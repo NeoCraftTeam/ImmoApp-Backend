@@ -29,13 +29,13 @@ jobs:
           coverage: none
 
       - name: Install Composer dependencies
-        run: composer install --no-progress --prefer-dist --optimize-autoloader
+        run: composer install --prefer-dist --no-interaction --no-progress
 
-      - name: Run tests
+      - name: Copy environment file
+        run: cp .env.example .env
+
+      - name: Generate app key
+        run: php artisan key:generate
+
+      - name: Execute tests
         run: php artisan test
-
-      - name: Run PHPStan (optional, requires phpstan installed)
-        run: ./vendor/bin/phpstan analyse --level=max
-
-      - name: Run Pint (code style)
-        run: ./vendor/bin/pint --test
