@@ -1,0 +1,77 @@
+name: ImmoApp-Backend CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  laravel-tests:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_DB: ${{ secrets.DB_DATABASE }}
+          POSTGRES_USER: ${{ secrets.DB_USERNAME }}
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+          extensions: mbstring, pdo_pgsql
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --no-progress --prefer-dist --optimize-autoloader
+
+      - name: Copy .env
+        run: cp .env.example .env
+
+      - name: Configure environment variables
+        run: |
+          php -r "file_put_contents('.env', str_replace('DB_CONNECTION=mysql', 'DB_CONNECTION=pgsql', file_get_contents('.env')));"
+          php -r "file_put_contents('.env', str_replace('DB_HOST=127.0.0.1', 'DB_HOST=postgres', file_get_contents('.env')));"
+          php -r "file_put_contents('.env', str_replace('DB_PORT=3306', 'DB_PORT=5432', file_get_contents('.env')));"
+          php -r "file_put_contents('.env', str_replace('DB_DATABASE=laravel', 'DB_DATABASE=${{ secrets.DB_DATABASE }}', file_get_contents('.env')));"
+          php -r "file_put_contents('.env', str_replace('DB_USERNAME=root', 'DB_USERNAME=${{ secrets.DB_USERNAME }}', file_get_contents('.env')));"
+          php -r "file_put_contents('.env', str_replace('DB_PASSWORD=', 'DB_PASSWORD=${{ secrets.DB_PASSWORD }}', file_get_contents('.env')));"
+
+      - name: Generate app key
+        run: php artisan key:generate
+
+      - name: Wait for PostgreSQL
+        run: sleep 15
+
+      - name: Run fresh migrations and seed (optional)
+        run: php artisan migrate:fresh --seed --force
+
+      - name: Run tests
+        run: php artisan test
+
+      - name: Run PHPStan (optional, requires phpstan installed)
+        run: ./vendor/bin/phpstan analyse --level=max
+
+      - name: Run Pint (code style)
+        run: ./vendor/bin/pint --test
