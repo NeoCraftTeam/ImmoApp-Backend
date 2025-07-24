@@ -1,4 +1,6 @@
-# 📘 Cahier des Charges Fonctionnel – Application de Gestion Immobilière (NeoCraft)
+[![ImmoApp-Backend CI](https://github.com/NeoCraftTeam/ImmoApp-Backend/actions/workflows/main.yml/badge.svg)](https://github.com/NeoCraftTeam/ImmoApp-Backend/actions/workflows/main.yml)
+
+# 📘 Cahier des Charges – Application de Gestion Immobilière
 
 ## 📋 Table des Matières
 
