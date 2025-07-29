@@ -9,7 +9,8 @@ Route::prefix('v1')->group(function () {
     
     //welcome
     Route::controller(welcomeController::class)->group(function () {
-        Route::get('/welcome', 'index');
+        Route::get('/users', 'index');
+        Route::get('/users/{id}', 'show');
     });
 
 
