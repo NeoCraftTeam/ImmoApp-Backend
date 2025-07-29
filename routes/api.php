@@ -1,8 +1,16 @@
 <?php
 
+use App\Http\Controllers\Api\V1\welcomeController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/user', function (Request $request) {
-    return $request->user();
-})->middleware('auth:sanctum');
+// Prefix routes 
+Route::prefix('v1')->group(function () {
+    
+    //welcome
+    Route::controller(welcomeController::class)->group(function () {
+        Route::get('/welcome', 'index');
+    });
+
+
+});
