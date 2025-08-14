@@ -40,6 +40,39 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(function ($user) {
+            $user->assignDefaultAvatar();
+            $user->validateAgentType();
+        });
+    }
+
+    private function assignDefaultAvatar(): void
+    {
+        if (empty($this->avatar)) {
+            $name = trim($this->firstname . ' ' . $this->lastname ?: 'User');
+            $this->avatar = 'https://ui-avatars.com/api/?name=' . urlencode($name) . '&background=random';
+        }
+    }
+
+    private function validateAgentType(): void
+    {
+        if ($this->role === 'agent' && !in_array($this->type, ['individual', 'agency'])) {
+            throw new \InvalidArgumentException('Invalid agent type. Must be either "individual" or "agency".');
+        }
+    }
+
+    public function canPublishAds(): bool
+    {
+        return in_array($this->role, ['customer', 'agent']);
+    }
+
+    public function ads(): HasMany
+    {
+        return $this->hasMany(Ad::class);
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -51,15 +84,5 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
-    }
-
-    public function canPublishAds(): bool
-    {
-        return in_array($this->role, ['customer', 'agent']);
-    }
-
-    public function ads(): HasMany
-    {
-        return $this->hasMany(Ad::class);
     }
 }
