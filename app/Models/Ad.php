@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
+
 
 class Ad extends Model
 {
@@ -39,6 +41,39 @@ class Ad extends Model
         'deleted_at'
     ];
 
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        static::creating(function ($ad) {
+            if (empty($ad->slug)) { // <-- garantie que même null sera généré
+                $ad->slug = self::generateUniqueSlug($ad->title);
+            }
+        });
+
+        static::updating(function ($ad) {
+            if ($ad->isDirty('title')) {
+                $ad->slug = self::generateUniqueSlug($ad->title, $ad->id);
+            }
+        });
+    }
+
+    public static function generateUniqueSlug(string $title, int $ignoreId = null): string
+    {
+        $slug = Str::slug($title);
+        $original = $slug;
+        $i = 1;
+
+        while (self::where('slug', $slug)
+            ->when($ignoreId, fn($query) => $query->where('id', '!=', $ignoreId))
+            ->exists()) {
+            $slug = $original . '-' . $i;
+            $i++;
+        }
+
+        return $slug;
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
@@ -62,7 +97,7 @@ class Ad extends Model
      * Returns true is the property is a house.
      *
      */
-    public function isHosuse(): bool
+    public function isHouse(): bool
     {
         return $this->type === PropertyType::HOUSE;
     }
@@ -92,6 +127,8 @@ class Ad extends Model
             'property_type' => PropertyType::class,
         ];
     }
+
+    // Génère automatiquement un slug unique avant de sauvegarder
 
     protected function images(): hasMany
     {

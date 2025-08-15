@@ -7,6 +7,7 @@ use App\Models\Quarter;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /** @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Ad> */
 class AdFactory extends Factory
@@ -15,9 +16,10 @@ class AdFactory extends Factory
 
     public function definition(): array
     {
+        $title = $this->faker->sentence();
         return [
-            'title' => $this->faker->word(),
-            'slug' => $this->faker->slug(),
+            'title' => $title,
+            'slug' => Str::slug($title),
             'description' => $this->faker->text(),
             'adresse' => $this->faker->address(),
             'price' => $this->faker->randomNumber(5, true), // Random number with 5 digits
