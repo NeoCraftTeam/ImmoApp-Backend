@@ -10,6 +10,252 @@
         "version": "v1"
     },
     "paths": {
+        "/api/v1/cities": {
+            "get": {
+                "tags": [
+                    "Cities"
+                ],
+                "summary": "Liste des villes",
+                "description": "Récupère la liste paginée des villes",
+                "operationId": "showCities",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Numéro de page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/City"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Non trouvé"
+                    },
+                    "500": {
+                        "description": "Erreur du Serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Cities"
+                ],
+                "summary": "Créer une ville",
+                "description": "Crée une nouvelle ville",
+                "operationId": "storeCity",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Paris"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Ville créée avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/City"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Requête invalide"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "500": {
+                        "description": "Erreur du Serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/cities/{id}": {
+            "get": {
+                "tags": [
+                    "Cities"
+                ],
+                "summary": "Afficher une ville",
+                "description": "Récupère les détails d'une ville",
+                "operationId": "showCity",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/City"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Ville non trouvé"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "500": {
+                        "description": "Erreur du Serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Cities"
+                ],
+                "summary": "Mettre à jour une ville",
+                "description": "Met à jour les détails d'une ville",
+                "operationId": "updateCity",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Lyon"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Ville mise à jour avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/City"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Requête invalide"
+                    },
+                    "404": {
+                        "description": "Ville non trouvée"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "500": {
+                        "description": "Erreur du Serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Cities"
+                ],
+                "summary": "Supprimer une ville",
+                "description": "Supprime une ville par son ID",
+                "operationId": "deleteCity",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Ville supprimée avec succès"
+                    },
+                    "404": {
+                        "description": "Ville non trouvée"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "500": {
+                        "description": "Erreur du Serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/users": {
             "get": {
                 "tags": [
@@ -17,10 +263,31 @@
                 ],
                 "summary": "Liste des utilisateurs",
                 "description": "Récupère la liste paginée des utilisateurs",
-                "operationId": "index",
+                "operationId": "ShowUsers",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Numéro de page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "Succès"
+                        "description": "Succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/User"
+                                    }
+                                }
+                            }
+                        }
                     },
                     "401": {
                         "description": "Non autorisé"
@@ -42,15 +309,15 @@
         "/api/v1/users/{id}": {
             "get": {
                 "tags": [
-                    "user"
+                    "Users"
                 ],
                 "summary": "Afficher un utilisateur",
-                "operationId": "show",
+                "description": "Récupère les détails d'un utilisateur spécifique",
+                "operationId": "showUser",
                 "parameters": [
                     {
                         "name": "id",
                         "in": "path",
-                        "description": "id de l'utitisateur",
                         "required": true,
                         "schema": {
                             "type": "integer"
@@ -59,13 +326,96 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Succès"
+                        "description": "Succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/User"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Utilisateur non trouvé"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "500": {
+                        "description": "Erreur du Serveur"
                     }
-                }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         }
     },
     "components": {
+        "schemas": {
+            "City": {
+                "title": "City",
+                "description": "Modèle pour une ville",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "User": {
+                "title": "User",
+                "description": "Modèle utilisateur",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "firstname": {
+                        "type": "string"
+                    },
+                    "lastname": {
+                        "type": "string"
+                    },
+                    "phone_number": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "password": {
+                        "type": "string"
+                    },
+                    "confirm_password": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "type": "string",
+                        "enum": [
+                            "admin",
+                            "agent",
+                            "customer"
+                        ]
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "individual",
+                            "agency"
+                        ],
+                        "nullable": true
+                    },
+                    "city_id": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            }
+        },
         "securitySchemes": {
             "bearerAuth": {
                 "type": "http",
@@ -78,12 +428,12 @@
     },
     "tags": [
         {
-            "name": "Users",
-            "description": "Users"
+            "name": "Cities",
+            "description": "Cities"
         },
         {
-            "name": "user",
-            "description": "user"
+            "name": "Users",
+            "description": "Users"
         }
     ]
 }
