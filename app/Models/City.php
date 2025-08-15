@@ -23,4 +23,14 @@ class City extends Model
         'updated_at',
         'deleted_at'
     ];
+
+
+    /**
+     * Mutator to always set the name attribute
+     * with the first letter in uppercase and the rest in lowercase.
+     */
+    public function setNameAttribute($value): void
+    {
+        $this->attributes['name'] = ucfirst(strtolower($value));
+    }
 }
