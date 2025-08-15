@@ -20,7 +20,6 @@ class Ad extends Model
         'description',
         'adresse',
         'price',
-        'amount',
         'property_type',
         'surface_area',
         'bedrooms',
@@ -31,6 +30,12 @@ class Ad extends Model
         'status',
         'user_id',
         'quarter_id',
+    ];
+
+    protected $hidden = [
+        'created_at',
+        'updated_at',
+        'deleted_at'
     ];
 
     public function user(): BelongsTo

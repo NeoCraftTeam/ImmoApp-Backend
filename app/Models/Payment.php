@@ -14,6 +14,7 @@ class Payment extends Model
     protected $table = 'payment';
 
     protected $fillable = [
+
         'type',
         'amount',
         'transaction_id',

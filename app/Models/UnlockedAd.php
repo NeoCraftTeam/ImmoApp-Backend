@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class UnlockedAd extends Model
 {
-    use HasFactory;
+    use HasFactory, softDeletes;
 
     public $timestamps = false;
 
@@ -16,8 +17,12 @@ class UnlockedAd extends Model
         'ad_id',
         'user_id',
         'payment_id',
+    ];
+
+    protected $hidden = [
         'unlocked_at',
         'updated_at',
+        'deleted_at'
     ];
 
     public function ad(): BelongsTo
