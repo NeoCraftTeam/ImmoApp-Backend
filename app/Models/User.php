@@ -3,12 +3,16 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+
+use App\UserRole;
+use App\UserType;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use InvalidArgumentException;
 
 class User extends Authenticatable
 {
@@ -30,7 +34,8 @@ class User extends Authenticatable
         'phone_number',
         'type',
         'role',
-        'avatar'
+        'avatar',
+        'city_id'
     ];
 
     /**
@@ -64,13 +69,16 @@ class User extends Authenticatable
     private function validateAgentType(): void
     {
         if ($this->role === 'agent' && !in_array($this->type, ['individual', 'agency'])) {
-            throw new \InvalidArgumentException('Invalid agent type. Must be either "individual" or "agency".');
+            throw new InvalidArgumentException('Invalid agent type. Must be either "individual" or "agency".');
         }
     }
 
     public function canPublishAds(): bool
     {
-        return in_array($this->role, ['customer', 'agent']);
+        return in_array($this->role, [
+            UserRole::AGENT,
+            UserRole::CUSTOMER,
+        ]);
     }
 
     public function ads(): HasMany
@@ -83,6 +91,51 @@ class User extends Authenticatable
         return $this->hasMany(Payment::class);
     }
 
+    public function unlockedAds(): HasMany
+    {
+        return $this->hasMany(UnlockedAd::class);
+    }
+
+    /**
+     * returns true if the user is an admin.
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === UserRole::ADMIN;
+    }
+
+    /**
+     * returns true if the user is an agent.
+     */
+    public function isAgent(): bool
+    {
+        return $this->role === UserRole::AGENT;
+    }
+
+    /**
+     * returns true if the user is a customer.
+     */
+    public function isCustomer(): bool
+    {
+        return $this->role === UserRole::CUSTOMER;
+    }
+
+    /**
+     * returns true if the user is an individual.
+     */
+    public function isAnIndividual(): bool
+    {
+        return $this->type === UserType::INDIVIDUAL;
+    }
+
+    /**
+     * returns true if the user is an agency.
+     */
+    public function isAnAgency(): bool
+    {
+        return $this->type === UserType::AGENCY;
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -93,6 +146,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'role' => UserRole::class,
+            'type' => UserType::class,
         ];
     }
 }
