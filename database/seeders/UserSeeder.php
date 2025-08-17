@@ -7,7 +7,7 @@ use App\Models\Review;
 use Illuminate\Database\Seeder;
 use App\Models\User;
 use App\Models\Ad;
-
+use App\Models\AdType;
 
 class UserSeeder extends Seeder
 {
