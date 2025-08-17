@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\PropertyType;
+
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,7 +23,6 @@ class Ad extends Model
         'description',
         'adresse',
         'price',
-        'property_type',
         'surface_area',
         'bedrooms',
         'bathrooms',
@@ -31,8 +30,10 @@ class Ad extends Model
         'latitude',
         'longitude',
         'status',
+        'expires_at',
         'user_id',
         'quarter_id',
+        'type_id'
     ];
 
     protected $hidden = [
@@ -57,6 +58,7 @@ class Ad extends Model
             }
         });
     }
+    // Génère automatiquement un slug unique avant de sauvegarder
 
     public static function generateUniqueSlug(string $title, int $ignoreId = null): string
     {
@@ -66,7 +68,8 @@ class Ad extends Model
 
         while (self::where('slug', $slug)
             ->when($ignoreId, fn($query) => $query->where('id', '!=', $ignoreId))
-            ->exists()) {
+            ->exists()
+        ) {
             $slug = $original . '-' . $i;
             $i++;
         }
@@ -84,51 +87,14 @@ class Ad extends Model
         return $this->belongsTo(Quarter::class);
     }
 
-    /**
-     * Returns true is the property is an apartment.
-     *
-     */
-    public function isApartment(): bool
-    {
-        return $this->type === PropertyType::APARTMENT;
-    }
-
-    /**
-     * Returns true is the property is a house.
-     *
-     */
-    public function isHouse(): bool
-    {
-        return $this->type === PropertyType::HOUSE;
-    }
-
-    /**
-     * Returns true is the property is a land.
-     *
-     */
-    public function isLand(): bool
-    {
-        return $this->type === PropertyType::LAND;
-    }
-
-    /**
-     * Returns true is the property is a studio.
-     *
-     */
-    public function isStudio(): bool
-    {
-        return $this->type === PropertyType::STUDIO;
-    }
-
     protected function casts(): array
     {
         return [
             'has_parking' => 'boolean',
-            'property_type' => PropertyType::class,
         ];
     }
 
-    // Génère automatiquement un slug unique avant de sauvegarder
+
 
     protected function images(): hasMany
     {
@@ -138,5 +104,10 @@ class Ad extends Model
     protected function reviews(): hasMany
     {
         return $this->hasMany(Review::class);
+    }
+
+    protected function ad_type(): BelongsTo
+    {
+        return $this->belongsTo(AdType::class);
     }
 }
