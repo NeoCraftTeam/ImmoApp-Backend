@@ -27,19 +27,21 @@ class CityPolicy
 
     public function update(User $user, City $city): bool
     {
-        return $user->isAdmin() || $user->id === $city->user_id;
+        return $user->isAdmin();
     }
 
     public function delete(User $user, City $city): bool
     {
-        return $user->isAdmin() || $user->id === $city->user_id;
+        return $user->isAdmin();
     }
 
     public function restore(User $user, City $city): bool
     {
+        return $user->isAdmin();
     }
 
     public function forceDelete(User $user, City $city): bool
     {
+        return $user->isAdmin();
     }
 }
