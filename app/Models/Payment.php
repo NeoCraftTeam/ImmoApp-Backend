@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
-use App\PaymentMethod;
-use App\PaymentStatus;
-use App\PaymentType;
+use App\Enums\PaymentMethod;
+use App\Enums\PaymentStatus;
+use App\Enums\PaymentType;
 use Database\Factories\PaymentFactory;
 use Eloquent;
 use Illuminate\Database\Eloquent\Builder;
