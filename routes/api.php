@@ -1,11 +1,21 @@
 <?php
 
+use App\Http\Controllers\API\V1\AdTypeController;
 use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\API\V1\UserController;
 use Illuminate\Support\Facades\Route;
 
 // Prefix routes
 Route::prefix('v1')->group(function () {
+
+    // adType
+    Route::controller(AdTypeController::class)->group(function () {
+        Route::get('/ad-types', 'index');
+        Route::get('/ad-types/{id}', 'show');
+        Route::post('/ad-types', 'store');
+        Route::put('/ad-types/{id}', 'update');
+        Route::delete('/ad-types/{id}', 'destroy');
+    });
 
 
     // City
