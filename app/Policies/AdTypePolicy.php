@@ -12,7 +12,7 @@ class AdTypePolicy
 
     public function viewAny(User $user): bool
     {
-                return true;
+        return true;
     }
 
     public function view(User $user, AdType $adType): bool

@@ -25,7 +25,7 @@ class paymentPolicy
 
     public function create(User $user): bool
     {
-        return $user->isCustomer() || $user->isAgent() && ( $user->isAnAgency() || $user->isAnIndividual());
+        return $user->isCustomer() || $user->isAgent() && ($user->isAnAgency() || $user->isAnIndividual());
     }
 
     public function update(User $user, payment $payment): bool
