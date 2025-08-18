@@ -18,7 +18,7 @@ class PaymentFactory extends Factory
             'type' => fake()->randomElement(['unlock', 'boost', 'suscription']),
             'amount' => fake()->randomFloat(2, 1, 1000),
             'status' => fake()->randomElement(['pending', 'success', 'failed']),
-            'transaction_id' =>fake()->uuid(),
+            'transaction_id' => fake()->uuid(),
             'payment_method' => fake()->randomElement(['orange_money', 'mobile_money', 'stripe']),
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),

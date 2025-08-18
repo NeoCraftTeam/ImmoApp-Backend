@@ -33,8 +33,11 @@ class AdPolicy
 
     public function delete(User $user, Ad $ad): bool
     {
-        return ($user->isAdmin() || ($user->isAgent() && ($user->isAnAgency() || $user->isAnIndividual())))
-            && $user->id === $ad->user_id;
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        return $user->isAgent() && ($user->isAnAgency() || $user->isAnIndividual()) && $user->id === $ad->user_id;
     }
 
     public function restore(User $user): bool

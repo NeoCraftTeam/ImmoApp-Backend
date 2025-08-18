@@ -2,11 +2,11 @@
 
 namespace App\Policies;
 
-use App\Models\City;
+use App\Models\AdType;
 use App\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
-class CityPolicy
+class AdTypePolicy
 {
     use HandlesAuthorization;
 
@@ -15,7 +15,7 @@ class CityPolicy
         return true;
     }
 
-    public function view(User $user, City $city): bool
+    public function view(User $user, AdType $adType): bool
     {
         return true;
     }
@@ -25,22 +25,22 @@ class CityPolicy
         return $user->isAdmin();
     }
 
-    public function update(User $user, City $city): bool
+    public function update(User $user, AdType $adType): bool
     {
         return $user->isAdmin();
     }
 
-    public function delete(User $user, City $city): bool
+    public function delete(User $user, AdType $adType): bool
     {
         return $user->isAdmin();
     }
 
-    public function restore(User $user, City $city): bool
+    public function restore(User $user, AdType $adType): bool
     {
         return $user->isAdmin();
     }
 
-    public function forceDelete(User $user, City $city): bool
+    public function forceDelete(User $user, AdType $adType): bool
     {
         return $user->isAdmin();
     }

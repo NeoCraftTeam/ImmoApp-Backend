@@ -17,7 +17,7 @@ class QuarterPolicy
 
     public function view(User $user, Quarter $quarter): bool
     {
-         return true;
+        return true;
     }
 
     public function create(User $user): bool

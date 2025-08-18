@@ -10,9 +10,10 @@ class QuarterRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255', 'unique:quarters,name'],
-            'city_id' => ['required', 'integer' , 'exists:city,id'],
+            'city_id' => ['required', 'integer', 'exists:city,id'],
         ];
     }
+
     public function messages(): array
     {
         return [

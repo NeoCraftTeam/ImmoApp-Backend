@@ -18,21 +18,23 @@ class AdResource extends JsonResource
             'description' => $this->description,
             'adresse' => $this->adresse,
             'price' => $this->price,
-            'property_type' => $this->property_type,
             'surface_area' => $this->surface_area,
             'bedrooms' => $this->bedrooms,
             'bathrooms' => $this->bathrooms,
             'has_parking' => $this->has_parking,
-            'latitude' => $this->latitude,
-            'longitude' => $this->longitude,
+            'location' => $this->location,
             'status' => $this->status,
+            'expires_at' => $this->expires_at,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
 
             'user_id' => $this->user_id,
             'quarter_id' => $this->quarter_id,
+            'type_id' => $this->type_id,
 
+            'user' => new UserResource($this->whenLoaded('user')),
             'quarter' => new QuarterResource($this->whenLoaded('quarter')),
+            'type' => new AdTypeResource($this->whenLoaded('type')),
         ];
     }
 }

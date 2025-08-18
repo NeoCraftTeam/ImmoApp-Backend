@@ -2,12 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Models\Ad;
 use App\Models\AdImage;
 use App\Models\Review;
-use Illuminate\Database\Seeder;
 use App\Models\User;
-use App\Models\Ad;
-
+use Illuminate\Database\Seeder;
 
 class UserSeeder extends Seeder
 {

@@ -4,7 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class paymentRequest extends FormRequest
+class PaymentRequest extends FormRequest
 {
     public function rules(): array
     {
@@ -14,6 +14,7 @@ class paymentRequest extends FormRequest
             'user_id' => ['required', 'exists:user,id'],
         ];
     }
+
     public function messages(): array
     {
         return [

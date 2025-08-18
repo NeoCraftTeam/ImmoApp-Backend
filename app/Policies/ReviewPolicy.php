@@ -13,7 +13,7 @@ class ReviewPolicy
     public function viewAny(?User $user): bool
     {
         // ?User $user allows this method to be called without a user, e.g., for public access
-       return true;
+        return true;
     }
 
     public function view(User $user, Review $review): bool

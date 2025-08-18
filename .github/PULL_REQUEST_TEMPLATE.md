@@ -1,6 +1,7 @@
 # 🚀 Pull Request – NeoCraft ImmoApp-Backend
 
-Merci de compléter les sections ci-dessous en ajoutant `X` dans la case correspondante pour une revue rapide et efficace.
+Merci de compléter les sections ci-dessous en ajoutant `X` dans la case correspondante pour une revue rapide et
+efficace.
 
 ---
 

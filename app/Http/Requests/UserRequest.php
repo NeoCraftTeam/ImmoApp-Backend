@@ -29,8 +29,8 @@ class UserRequest extends FormRequest
             'email' => ['required', 'email', 'max:255', 'unique:users,email,' . $this->user()->id],
             'password' => ['required', 'string', 'min:8'],
             'avatar' => ['required', 'image', 'max:2048'],
-            'role' => ['required', 'string', Rule::in(['admin','client','agent'])],
-            'type' => ['nullable', 'string', Rule::in(['individual','agency'])],
+            'role' => ['required', 'string', Rule::in(['admin', 'client', 'agent'])],
+            'type' => ['nullable', 'string', Rule::in(['individual', 'agency'])],
             'city_id' => ['required', 'integer', 'exists:city,id'],
         ];
     }
