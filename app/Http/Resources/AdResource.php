@@ -22,8 +22,7 @@ class AdResource extends JsonResource
             'bedrooms' => $this->bedrooms,
             'bathrooms' => $this->bathrooms,
             'has_parking' => $this->has_parking,
-            'latitude' => $this->latitude,
-            'longitude' => $this->longitude,
+            'location' => $this->location,
             'status' => $this->status,
             'expires_at' => $this->expires_at,
             'created_at' => $this->created_at,
@@ -33,7 +32,7 @@ class AdResource extends JsonResource
             'quarter_id' => $this->quarter_id,
             'type_id' => $this->type_id,
 
-            'user' => new UserResource($this->whenLoaded('user')), 
+            'user' => new UserResource($this->whenLoaded('user')),
             'quarter' => new QuarterResource($this->whenLoaded('quarter')),
             'type' => new AdTypeResource($this->whenLoaded('type')),
         ];
