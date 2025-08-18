@@ -7,28 +7,6 @@ use App\Http\Resources\CityResource;
 use App\Models\City;
 use Exception;
 
-/**
- * @OA\Info(
- *     title="KeyHome api",
- *     version="v1",
- *     description="Documentation complète de KeyHome api",
- *     @OA\License(
- *         name="MIT",
- *         url="https://opensource.org/licenses/MIT"
- *     )
- *     )
- *
- *
- *
- * @OA\SecurityScheme(
- *     securityScheme="bearerAuth",
- *     type="http",
- *     scheme="bearer",
- *     in="header",
- *     name="Authorization",
- *     bearerFormat="JWT"
- * )
- */
 class CityController
 {
 
@@ -37,7 +15,7 @@ class CityController
      *     path="/api/v1/cities",
      *     operationId="showCities",
      *     security={{"bearerAuth":{}}},
-     *     tags={"Cities"},
+     *     tags={"city"},
      *     summary="Liste des villes",
      *     description="Récupère la liste paginée des villes",
      *     @OA\Parameter(
@@ -71,7 +49,7 @@ class CityController
      *     path="/api/v1/cities",
      *     operationId="storeCity",
      *     security={{"bearerAuth":{}}},
-     *     tags={"Cities"},
+     *     tags={"city"},
      *     summary="Créer une ville",
      *     description="Crée une nouvelle ville",
      *    @OA\RequestBody(
@@ -110,7 +88,7 @@ class CityController
 
         } catch (Exception $e) {
             return response()->json([
-                'message' => 'Erreur lors de la création de la ville',
+                'message' => 'Erreur lors de la création',
                 'error' => $e->getMessage(),
             ], 500); // 500 = Internal Server Error
         }
@@ -121,7 +99,7 @@ class CityController
      *     path="/api/v1/cities/{id}",
      *     operationId="showCity",
      *     security={{"bearerAuth":{}}},
-     *     tags={"Cities"},
+     *     tags={"city"},
      *     summary="Afficher une ville",
      *     description="Récupère les détails d'une ville",
      *     @OA\Parameter(
@@ -156,7 +134,7 @@ class CityController
      *     path="/api/v1/cities/{id}",
      *     operationId="updateCity",
      *     security={{"bearerAuth":{}}},
-     *     tags={"Cities"},
+     *     tags={"city"},
      *     summary="Mettre à jour une ville",
      *     description="Met à jour les détails d'une ville",
      *     @OA\Parameter(
@@ -186,23 +164,23 @@ class CityController
     public function update(CityRequest $request, City $id)
     {
         try {
-        $existingCity = City::where('name', $request->name)
-            ->where('id', $id->id)
-            ->first();
-        if ($existingCity) {
-            return response()->json([
-                'message' => 'Cette ville a déjà ete modifiée',
-            ], 400); // 400 = Bad Request
-        }
-        $id->update($request->validated());
+            $existingCity = City::where('name', $request->name)
+                ->where('id', '!=', $id->id)
+                ->first();
+            if ($existingCity) {
+                return response()->json([
+                    'message' => 'Cette ville a déjà été modifiée',
+                ], 400); // 400 = Bad Request
+            }
+            $id->update($request->validated());
 
-        return response()->json([
-            'message' => 'Ville mise à jour avec succès',
-            'data' => new CityResource($id),
-        ], 200);
+            return response()->json([
+                'message' => 'Ville mise à jour avec succès',
+                'data' => new CityResource($id),
+            ], 200);
         } catch (Exception $e) {
             return response()->json([
-                'message' => 'Erreur lors de la mise à jour de la ville',
+                'message' => 'Erreur lors de la mise à jour',
                 'error' => $e->getMessage(),
             ], 500); // 500 = Internal Server Error
         }
@@ -213,7 +191,7 @@ class CityController
      *     path="/api/v1/cities/{id}",
      *     operationId="deleteCity",
      *     security={{"bearerAuth":{}}},
-     *     tags={"Cities"},
+     *     tags={"city"},
      *     summary="Supprimer une ville",
      *     description="Supprime une ville par son ID",
      *     @OA\Parameter(
