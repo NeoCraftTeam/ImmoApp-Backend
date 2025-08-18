@@ -15,6 +15,7 @@ class ReviewRequest extends FormRequest
             'user_id' => ['required', 'exists:user,id'],
         ];
     }
+
     public function messages(): array
     {
         return [

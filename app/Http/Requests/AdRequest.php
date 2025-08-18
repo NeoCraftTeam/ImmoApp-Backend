@@ -18,9 +18,7 @@ class AdRequest extends FormRequest
             'bedrooms' => ['required', 'integer', 'min:0'],
             'bathrooms' => ['required', 'integer', 'min:0'],
             'has_parking' => ['boolean'],
-            'latitude' => ['nullable', 'numeric'],
-            'longitude' => ['nullable', 'numeric'],
-            'status' => ['required'], // selon tes statuts
+            'location' => ['nullable', 'numeric'],
             'expires_at' => ['nullable', 'date'],
             'user_id' => ['required', 'exists:user,id'],
             'quarter_id' => ['required', 'exists:quarter,id'],
@@ -45,7 +43,6 @@ class AdRequest extends FormRequest
             'bedrooms.integer' => 'Le nombre de chambres doit être un entier.',
             'bathrooms.integer' => 'Le nombre de salles de bains doit être un entier.',
             'has_parking.boolean' => "Le champ 'parking' doit être vrai ou faux.",
-            'status.in' => 'Le statut sélectionné n’est pas valide.',
         ];
     }
 
