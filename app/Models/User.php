@@ -7,17 +7,75 @@ namespace App\Models;
 use App\UserRole;
 use App\UserType;
 use Database\Factories\UserFactory;
+use Eloquent;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Notifications\DatabaseNotificationCollection;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 use InvalidArgumentException;
+use Laravel\Sanctum\HasApiTokens;
+use Laravel\Sanctum\PersonalAccessToken;
 
+/**
+ * @property int $id
+ * @property string $firstname
+ * @property string $lastname
+ * @property string|null $phone_number
+ * @property string $email
+ * @property Carbon|null $email_verified_at
+ * @property string $password
+ * @property string $avatar
+ * @property UserType|null $type
+ * @property UserRole $role
+ * @property int $city_id
+ * @property string|null $remember_token
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
+ * @property-read Collection<int, Ad> $ads
+ * @property-read int|null $ads_count
+ * @property-read DatabaseNotificationCollection<int, DatabaseNotification> $notifications
+ * @property-read int|null $notifications_count
+ * @property-read Collection<int, Payment> $payments
+ * @property-read int|null $payments_count
+ * @property-read Collection<int, PersonalAccessToken> $tokens
+ * @property-read int|null $tokens_count
+ * @property-read Collection<int, UnlockedAd> $unlockedAds
+ * @property-read int|null $unlocked_ads_count
+ * @method static UserFactory factory($count = null, $state = [])
+ * @method static Builder<static>|User newModelQuery()
+ * @method static Builder<static>|User newQuery()
+ * @method static Builder<static>|User onlyTrashed()
+ * @method static Builder<static>|User query()
+ * @method static Builder<static>|User whereAvatar($value)
+ * @method static Builder<static>|User whereCityId($value)
+ * @method static Builder<static>|User whereCreatedAt($value)
+ * @method static Builder<static>|User whereDeletedAt($value)
+ * @method static Builder<static>|User whereEmail($value)
+ * @method static Builder<static>|User whereEmailVerifiedAt($value)
+ * @method static Builder<static>|User whereFirstname($value)
+ * @method static Builder<static>|User whereId($value)
+ * @method static Builder<static>|User whereLastname($value)
+ * @method static Builder<static>|User wherePassword($value)
+ * @method static Builder<static>|User wherePhoneNumber($value)
+ * @method static Builder<static>|User whereRememberToken($value)
+ * @method static Builder<static>|User whereRole($value)
+ * @method static Builder<static>|User whereType($value)
+ * @method static Builder<static>|User whereUpdatedAt($value)
+ * @method static Builder<static>|User withTrashed(bool $withTrashed = true)
+ * @method static Builder<static>|User withoutTrashed()
+ * @mixin Eloquent
+ */
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, softDeletes;
+    use HasFactory, Notifiable, softDeletes, HasApiTokens;
 
     protected $table = 'user';
 
@@ -26,29 +84,14 @@ class User extends Authenticatable
      *
      * @var list<string>
      */
-    protected $fillable = [
-        'firstname',
-        'lastname',
-        'email',
-        'password',
-        'phone_number',
-        'type',
-        'role',
-        'avatar',
-        'city_id'
-    ];
+    protected $fillable = ['firstname', 'lastname', 'email', 'password', 'phone_number', 'type', 'role', 'avatar', 'city_id'];
 
     /**
      * The attributes that should be hidden for serialization.
      *
      * @var list<string>
      */
-    protected $hidden = [
-        'password',
-        'remember_token',
-        'created_at',
-        'updated_at'
-    ];
+    protected $hidden = ['password', 'remember_token', 'created_at', 'updated_at'];
 
     protected static function booted(): void
     {
@@ -75,10 +118,7 @@ class User extends Authenticatable
 
     public function canPublishAds(): bool
     {
-        return in_array($this->role, [
-            UserRole::AGENT,
-            UserRole::CUSTOMER,
-        ]);
+        return in_array($this->role, [UserRole::AGENT, UserRole::CUSTOMER,]);
     }
 
     public function ads(): HasMany
@@ -143,11 +183,6 @@ class User extends Authenticatable
      */
     protected function casts(): array
     {
-        return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'role' => UserRole::class,
-            'type' => UserType::class,
-        ];
+        return ['email_verified_at' => 'datetime', 'password' => 'hashed', 'role' => UserRole::class, 'type' => UserType::class,];
     }
 }

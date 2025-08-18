@@ -5,11 +5,46 @@ namespace App\Models;
 use App\PaymentMethod;
 use App\PaymentStatus;
 use App\PaymentType;
+use Database\Factories\PaymentFactory;
+use Eloquent;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id
+ * @property PaymentType $type
+ * @property string $amount
+ * @property string $transaction_id
+ * @property PaymentMethod $payment_method
+ * @property int $user_id
+ * @property PaymentStatus $status
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
+ * @property-read User $user
+ * @method static PaymentFactory factory($count = null, $state = [])
+ * @method static Builder<static>|Payment newModelQuery()
+ * @method static Builder<static>|Payment newQuery()
+ * @method static Builder<static>|Payment onlyTrashed()
+ * @method static Builder<static>|Payment query()
+ * @method static Builder<static>|Payment whereAmount($value)
+ * @method static Builder<static>|Payment whereCreatedAt($value)
+ * @method static Builder<static>|Payment whereDeletedAt($value)
+ * @method static Builder<static>|Payment whereId($value)
+ * @method static Builder<static>|Payment wherePaymentMethod($value)
+ * @method static Builder<static>|Payment whereStatus($value)
+ * @method static Builder<static>|Payment whereTransactionId($value)
+ * @method static Builder<static>|Payment whereType($value)
+ * @method static Builder<static>|Payment whereUpdatedAt($value)
+ * @method static Builder<static>|Payment whereUserId($value)
+ * @method static Builder<static>|Payment withTrashed(bool $withTrashed = true)
+ * @method static Builder<static>|Payment withoutTrashed()
+ * @mixin Eloquent
+ */
 class Payment extends Model
 {
     use HasFactory, SoftDeletes;

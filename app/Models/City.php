@@ -2,12 +2,34 @@
 
 namespace App\Models;
 
+use Database\Factories\CityFactory;
+use Eloquent;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property int $id
+ * @property string $name
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
+ * @method static CityFactory factory($count = null, $state = [])
+ * @method static Builder<static>|City newModelQuery()
+ * @method static Builder<static>|City newQuery()
+ * @method static Builder<static>|City onlyTrashed()
+ * @method static Builder<static>|City query()
+ * @method static Builder<static>|City whereCreatedAt($value)
+ * @method static Builder<static>|City whereDeletedAt($value)
+ * @method static Builder<static>|City whereId($value)
+ * @method static Builder<static>|City whereName($value)
+ * @method static Builder<static>|City whereUpdatedAt($value)
+ * @method static Builder<static>|City withTrashed(bool $withTrashed = true)
+ * @method static Builder<static>|City withoutTrashed()
+ * @mixin Eloquent
+ */
 class City extends Model
 {
     use HasFactory, softDeletes;
