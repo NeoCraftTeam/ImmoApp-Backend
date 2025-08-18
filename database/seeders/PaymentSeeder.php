@@ -6,7 +6,6 @@ use App\Models\Ad;
 use App\Models\Payment;
 use App\Models\UnlockedAd;
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class PaymentSeeder extends Seeder
