@@ -35,7 +35,7 @@ class AdTypeController
      */
     public function index()
     {
-        //$this->authorize('viewAny', AdType::class);
+        $this->authorize('viewAny', AdType::class);
         $adTypes = AdType::all();
 
         return AdTypeResource::collection($adTypes);
@@ -67,7 +67,7 @@ class AdTypeController
      */
     public function store(AdTypeRequest $request)
     {
-        //$this->authorize('create', AdType::class);
+        $this->authorize('create', AdType::class);
 
         try {
 
@@ -115,16 +115,16 @@ class AdTypeController
      *     @OA\Response(response=500, description="Erreur du Serveur"),
      * )
      */
-    public function show(AdType $id)
+    public function show(AdType $adType)
     {
-        //$this->authorize('view', $adType);
+        $this->authorize('view', $adType);
 
-        if (!$id) {
+        if (!$adType) {
             return response()->json([
                 'message' => 'Type non trouvé',
             ], 404);
         }
-        return new AdTypeResource($id);
+        return new AdTypeResource($adType);
     }
 
     /**
@@ -158,25 +158,25 @@ class AdTypeController
      *      @OA\Response(response=500, description="Erreur du Serveur")
      * )
      */
-    public function update(AdTypeRequest $request, AdType $id)
+    public function update(AdTypeRequest $request, AdType $adType)
     {
-        //$this->authorize('update', $adType);
+        $this->authorize('update', $adType);
 
         try {
             $existingType = AdType::where('name', $request->name)
                 ->where('desc', $request->desc)
-                ->where('id', '!=', $id->id)
+                ->where('id', '!=', $adType->id)
                 ->first();
             if ($existingType) {
                 return response()->json([
                     'message' => 'Ce type a déjà été modifiée',
                 ], 400); // 400 = Bad Request
             }
-            $id->update($request->validated());
+            $adType->update($request->validated());
 
             return response()->json([
                 'message' => 'Mise à jour avec succès',
-                'data' => new AdTypeResource($id),
+                'data' => new AdTypeResource($adType),
             ], 200);
         } catch (Exception $e) {
             return response()->json([
@@ -209,13 +209,13 @@ class AdTypeController
      *      @OA\Response(response=500, description="Erreur du Serveur")
      * )
      */
-    public function destroy(AdType $id)
+    public function destroy(AdType $adType)
     {
-        //$this->authorize('delete', $adType);
+        $this->authorize('delete', $adType);
 
 
         try {
-            $id->delete();
+            $adType->delete();
             return response()->json([
                 'message' => 'Supprimée avec succès',
             ], 200); // 200 = OK
