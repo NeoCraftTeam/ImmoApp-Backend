@@ -26,11 +26,11 @@ class UserRequest extends FormRequest
             'firstname' => ['required', 'string', 'max:255'],
             'lastname' => ['required', 'string', 'max:255'],
             'phone_number' => ['required', 'string', 'regex:/^\+?[0-9]{7,20}$/'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email,' . $this->user()->id],
+            'email' => ['required', 'email', 'max:255', Rule::unique('user', 'email')->ignore($this->user()?->id)], // if the user is connected, ignore their own email
             'password' => ['required', 'string', 'min:8'],
             'avatar' => ['required', 'image', 'max:2048'],
-            'role' => ['required', 'string', Rule::in(['admin', 'client', 'agent'])],
-            'type' => ['nullable', 'string', Rule::in(['individual', 'agency'])],
+            'role' => ['required', 'string'],
+            'type' => ['nullable', 'string'],
             'city_id' => ['required', 'integer', 'exists:city,id'],
         ];
     }

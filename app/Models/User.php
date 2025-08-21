@@ -21,6 +21,9 @@ use Illuminate\Support\Carbon;
 use InvalidArgumentException;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\PersonalAccessToken;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 /**
  * @property int $id
@@ -72,10 +75,11 @@ use Laravel\Sanctum\PersonalAccessToken;
  * @method static Builder<static>|User withoutTrashed()
  * @mixin Eloquent
  */
-class User extends Authenticatable
+class User extends Authenticatable implements HasMedia
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable, softDeletes, HasApiTokens;
+    use InteractsWithMedia;
 
     protected $table = 'user';
 
@@ -184,5 +188,27 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return ['email_verified_at' => 'datetime', 'password' => 'hashed', 'role' => UserRole::class, 'type' => UserType::class,];
+    }
+
+
+    /**
+     * Définir les collections de médias
+     */
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('avatars')
+            ->singleFile()
+            ->acceptsMimeTypes(['image/jpeg', 'image/png']);
+    }
+
+    /**
+     * Définir les conversions d'images (optionnel)
+     */
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('webp')
+            ->width(150)
+            ->height(150)
+            ->sharpen(10);
     }
 }
