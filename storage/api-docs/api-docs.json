@@ -1,0 +1,688 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "KeyHome api",
+        "description": "Documentation complète de KeyHome api",
+        "license": {
+            "name": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+        },
+        "version": "v1"
+    },
+    "paths": {
+        "/api/v1/ad-types": {
+            "get": {
+                "tags": [
+                    "ad type"
+                ],
+                "summary": "Types d'annonces",
+                "description": "Récupère la liste des types d'annonces",
+                "operationId": "showAdTypes",
+                "responses": {
+                    "200": {
+                        "description": "Succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/AdType"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Non trouvé"
+                    },
+                    "500": {
+                        "description": "Erreur du Serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "ad type"
+                ],
+                "summary": "Creer un type d'annonce",
+                "operationId": "storeAdType",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Chambre"
+                                    },
+                                    "desc": {
+                                        "type": "string",
+                                        "example": "C'est une chambre"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Crée avec succès"
+                    },
+                    "400": {
+                        "description": "Requête invalide"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "500": {
+                        "description": "Erreur du Serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ad-types/{id}": {
+            "get": {
+                "tags": [
+                    "ad type"
+                ],
+                "summary": "Afficher un type d'annonce",
+                "operationId": "showAdType",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdType"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Type non trouvé"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "500": {
+                        "description": "Erreur du Serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "ad type"
+                ],
+                "summary": "Mettre à jour du type d'annonce",
+                "operationId": "updateAdType",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Chambre"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Mise à jour avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdType"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Requête invalide"
+                    },
+                    "404": {
+                        "description": "Type non trouvée"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "500": {
+                        "description": "Erreur du Serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "ad type"
+                ],
+                "summary": "Supprimer un type",
+                "description": "Supprime le type par son ID",
+                "operationId": "deleteAdType",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Supprimée avec succès"
+                    },
+                    "404": {
+                        "description": "Ville non trouvée"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "500": {
+                        "description": "Erreur du Serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/cities": {
+            "get": {
+                "tags": [
+                    "city"
+                ],
+                "summary": "Liste des villes",
+                "description": "Récupère la liste paginée des villes",
+                "operationId": "showCities",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Numéro de page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/City"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Non trouvé"
+                    },
+                    "500": {
+                        "description": "Erreur du Serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "city"
+                ],
+                "summary": "Créer une ville",
+                "description": "Crée une nouvelle ville",
+                "operationId": "storeCity",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Paris"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Ville créée avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/City"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Requête invalide"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "500": {
+                        "description": "Erreur du Serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/cities/{id}": {
+            "get": {
+                "tags": [
+                    "city"
+                ],
+                "summary": "Afficher une ville",
+                "description": "Récupère les détails d'une ville",
+                "operationId": "showCity",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/City"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Ville non trouvé"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "500": {
+                        "description": "Erreur du Serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "city"
+                ],
+                "summary": "Mettre à jour une ville",
+                "description": "Met à jour les détails d'une ville",
+                "operationId": "updateCity",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Lyon"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Ville mise à jour avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/City"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Requête invalide"
+                    },
+                    "404": {
+                        "description": "Ville non trouvée"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "500": {
+                        "description": "Erreur du Serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "city"
+                ],
+                "summary": "Supprimer une ville",
+                "description": "Supprime une ville par son ID",
+                "operationId": "deleteCity",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Ville supprimée avec succès"
+                    },
+                    "404": {
+                        "description": "Ville non trouvée"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "500": {
+                        "description": "Erreur du Serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/users": {
+            "get": {
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Liste des utilisateurs",
+                "description": "Récupère la liste paginée des utilisateurs",
+                "operationId": "ShowUsers",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Numéro de page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/User"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Non trouvé"
+                    },
+                    "500": {
+                        "description": "Erreur du Serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/users/{id}": {
+            "get": {
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Afficher un utilisateur",
+                "description": "Récupère les détails d'un utilisateur spécifique",
+                "operationId": "showUser",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/User"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Utilisateur non trouvé"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "500": {
+                        "description": "Erreur du Serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "AdType": {
+                "title": "AdType",
+                "description": "Modèle pour type d'annonce",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "desc": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "City": {
+                "title": "City",
+                "description": "Modèle pour une ville",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "type": "object"
+            },
+            "User": {
+                "title": "User",
+                "description": "Modèle utilisateur",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "firstname": {
+                        "type": "string"
+                    },
+                    "lastname": {
+                        "type": "string"
+                    },
+                    "phone_number": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string"
+                    },
+                    "password": {
+                        "type": "string"
+                    },
+                    "confirm_password": {
+                        "type": "string"
+                    },
+                    "role": {
+                        "type": "string",
+                        "enum": [
+                            "admin",
+                            "agent",
+                            "customer"
+                        ]
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "individual",
+                            "agency"
+                        ],
+                        "nullable": true
+                    },
+                    "city_id": {
+                        "type": "integer"
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "name": "Authorization",
+                "in": "header",
+                "bearerFormat": "JWT",
+                "scheme": "bearer"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "ad type",
+            "description": "Gestion des types d'annonces"
+        },
+        {
+            "name": "city",
+            "description": "Gestion des villes"
+        },
+        {
+            "name": "Users",
+            "description": "Users"
+        }
+    ]
+}

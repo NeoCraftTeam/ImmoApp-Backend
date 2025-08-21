@@ -8,9 +8,9 @@
 - [2. Objectifs du projet](#2-objectifs-du-projet)
 - [3. Acteurs du projet](#3-acteurs-du-projet)
 - [4. Périmètre fonctionnel](#4-périmètre-fonctionnel)
-  - [4.1 Pour les utilisateurs (clients)](#41-pour-les-utilisateurs-clients)
-  - [4.2 Pour les bailleurs / agents](#42-pour-les-bailleurs--agents)
-  - [4.3 Pour l'administrateur](#43-pour-ladministrateur)
+    - [4.1 Pour les utilisateurs (clients)](#41-pour-les-utilisateurs-clients)
+    - [4.2 Pour les bailleurs / agents](#42-pour-les-bailleurs--agents)
+    - [4.3 Pour l'administrateur](#43-pour-ladministrateur)
 - [5. Technologies utilisées](#5-technologies-utilisées)
 - [6. Modèle économique & monétisation](#6-modèle-économique--monétisation)
 - [7. Besoins fonctionnels](#7-besoins-fonctionnels)
@@ -24,7 +24,9 @@
 
 ## 1. Introduction
 
-L'application de gestion immobilière vise à digitaliser et fluidifier la recherche, la publication et la gestion des logements à louer. Elle s'adresse aux particuliers, bailleurs et agents immobiliers. Le projet prévoit une plateforme Web ainsi qu'une application mobile Android.
+L'application de gestion immobilière vise à digitaliser et fluidifier la recherche, la publication et la gestion des
+logements à louer. Elle s'adresse aux particuliers, bailleurs et agents immobiliers. Le projet prévoit une plateforme
+Web ainsi qu'une application mobile Android.
 
 ## 2. Objectifs du projet
 
@@ -68,15 +70,15 @@ L'application de gestion immobilière vise à digitaliser et fluidifier la reche
 
 ## 5. Technologies utilisées
 
-| Composant | Technologie |
-|----------|-------------|
-| Frontend Web | Vue.js 3, Bootstrap 5, Pinia,  Toastr
-| Backend | Laravel 12 |
-| Base de données | PostgreSQL | 
-| Application Mobile | Flutter avec Nylo |
-| Géolocalisation | Google Maps / OpenStreetMap, Leaflet
-| Paiement | API Mobile Money / Orange Money |
-| Notifications | Email avec Resend (Plus tard avec amazon SES pour l'envoi en masse)
+| Composant          | Technologie                                                         |
+|--------------------|---------------------------------------------------------------------|
+| Frontend Web       | Vue.js 3, Bootstrap 5, Pinia,  Toastr                               
+| Backend            | Laravel 12                                                          |
+| Base de données    | PostgreSQL                                                          | 
+| Application Mobile | Flutter avec Nylo                                                   |
+| Géolocalisation    | Google Maps / OpenStreetMap, Leaflet                                
+| Paiement           | API Mobile Money / Orange Money                                     |
+| Notifications      | Email avec Resend (Plus tard avec amazon SES pour l'envoi en masse) 
 
 ## 6. Modèle économique & monétisation
 
@@ -85,7 +87,7 @@ L'application de gestion immobilière vise à digitaliser et fluidifier la reche
 
 ## 7. Besoins fonctionnels
 
-- Authentification JWT + oAuth (Laravel Passport) 
+- Authentification JWT + oAuth (Laravel Passport)
 - Interface responsive Web + mobile
 - Carte interactive avec filtres avancés (Localisation, type, prix, nombre de pieces)
 - Interface publication d'annonce complète
@@ -110,18 +112,17 @@ L'application de gestion immobilière vise à digitaliser et fluidifier la reche
 - Utilisation cohérente de la charte graphique NeoCraft
 - Design mobile-first
 
-
 ## 10. Planification (7 mois)
 
-| Étape | Durée | Livrables |
-|-------|--------|-----------|
-| Analyse & Conception | 2 semaines | Maquettes, schéma BDD, specs techniques |
-| Backend & API REST | 2 mois | Auth, CRUD, paiement, sécurité |
-| Frontend Web | 1.5 mois | Interface utilisateur + carte |
-| Application mobile | 1.5 mois | App Flutter + MoMo |
-| Paiement & Géolocalisation | 1 mois | Intégration APIs |
-| Tests & validation | 2 semaines | QA, correctifs |
-| Déploiement & formation | 1 semaine | Mise en ligne + guide utilisateur |
+| Étape                      | Durée      | Livrables                               |
+|----------------------------|------------|-----------------------------------------|
+| Analyse & Conception       | 2 semaines | Maquettes, schéma BDD, specs techniques |
+| Backend & API REST         | 2 mois     | Auth, CRUD, paiement, sécurité          |
+| Frontend Web               | 1.5 mois   | Interface utilisateur + carte           |
+| Application mobile         | 1.5 mois   | App Flutter + MoMo                      |
+| Paiement & Géolocalisation | 1 mois     | Intégration APIs                        |
+| Tests & validation         | 2 semaines | QA, correctifs                          |
+| Déploiement & formation    | 1 semaine  | Mise en ligne + guide utilisateur       |
 
 ## 11. Livrables attendus
 
@@ -134,15 +135,15 @@ L'application de gestion immobilière vise à digitaliser et fluidifier la reche
 
 ## 12. Table des dependances
 
-| Étape  | Tache                      | Dépendance |
-| -----  | -------------------------- |---|
-| A      | Analyse & Conception       | - |
-| B      | Backend & API REST         | A |
-| C      | Frontend Web               | B |
-| D      | Application mobile         | B |
-| E      | Paiement & Géolocalisation | C, D |
-| F      | Tests & validation         | E |
-| G      | Déploiement & formation    | F |
+| Étape | Tache                      | Dépendance |
+|-------|----------------------------|------------|
+| A     | Analyse & Conception       | -          |
+| B     | Backend & API REST         | A          |
+| C     | Frontend Web               | B          |
+| D     | Application mobile         | B          |
+| E     | Paiement & Géolocalisation | C, D       |
+| F     | Tests & validation         | E          |
+| G     | Déploiement & formation    | F          |
 
 ---
 
