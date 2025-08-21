@@ -100,8 +100,13 @@ class User extends Authenticatable implements HasMedia
     protected static function booted(): void
     {
         static::saving(function ($user) {
-            $user->assignDefaultAvatar();
             $user->validateAgentType();
+        });
+
+        static::creating(function ($user) {
+            if (empty($user->avatar)) {
+                $user->assignDefaultAvatar();
+            }
         });
     }
 
