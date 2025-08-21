@@ -35,6 +35,11 @@ namespace App\Http\Controllers\Api\V1;
  *     name="city",
  *     description="Gestion des villes"
  * )
+ *
+ * @OA\Tag(
+ *      name="auth",
+ *      description="Gestion de l'authentification"
+ *  )
  */
 class DocController
 {

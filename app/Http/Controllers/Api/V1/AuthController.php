@@ -6,7 +6,6 @@ use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -20,14 +19,150 @@ use Throwable;
 class AuthController
 {
 
+
     /**
-     * Inscription utilisateur
-     *
-     * @param RegisterRequest $request
-     * @return JsonResponse
-     * @throws FileIsTooBig
-     * @throws FileDoesNotExist
+     * @OA\Post(
+     *     path="/api/v1/auth/registerCustomer",
+     *     tags={"auth"},
+     *     summary="Inscription d'un nouveau client",
+     *     description="Permet l'inscription d'un nouvel utilisateur avec validation des données et gestion d'avatar optionnel",
+     *     operationId="registerCustomer",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Données d'inscription de l'utilisateur",
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *             @OA\Schema(
+     *                 required={"firstname", "lastname", "email", "phone_number", "password"},
+     *                 @OA\Property(
+     *                     property="firstname",
+     *                     type="string",
+     *                     maxLength=50,
+     *                     example="Jean",
+     *                     description="Prénom de l'utilisateur"
+     *                 ),
+     *                 @OA\Property(
+     *                     property="lastname",
+     *                     type="string",
+     *                     maxLength=50,
+     *                     example="Dupont",
+     *                     description="Nom de famille de l'utilisateur"
+     *                 ),
+     *                 @OA\Property(
+     *                     property="email",
+     *                     type="string",
+     *                     format="email",
+     *                     example="jean.dupont@example.com",
+     *                     description="Adresse email unique de l'utilisateur"
+     *                 ),
+     *                 @OA\Property(
+     *                     property="phone_number",
+     *                     type="string",
+     *                     example="+33123456789",
+     *                     description="Numéro de téléphone de l'utilisateur"
+     *                 ),
+     *                 @OA\Property(
+     *                     property="password",
+     *                     type="string",
+     *                     format="password",
+     *                     minLength=8,
+     *                     example="Motdepasse123%",
+     *                     description="Mot de passe (minimum 8 caractères)"
+     *                 ),
+     *                   @OA\Property(
+     *                       property="confirm_password",
+     *                       type="string",
+     *                       format="password",
+     *                       minLength=8,
+     *                       example="Motdepasse123%",
+     *                       description="Mot de passe de confirmation (minimum 8 caractères)"
+     *                   ),
+     *                 @OA\Property(
+     *                     property="role",
+     *                     type="string",
+     *                     enum={"customer"},
+     *                     default="customer",
+     *                     description="Rôle de l'utilisateur"
+     *                 ),
+     *                 @OA\Property(
+     *                     property="city_id",
+     *                     type="integer",
+     *                     nullable=false,
+     *                     example=1,
+     *                     description="ID de la ville de résidence"
+     *                 ),
+     *                 @OA\Property(
+     *                     property="avatar",
+     *                     type="string",
+     *                     format="binary",
+     *                     description="Image d'avatar (optionnel, max 2MB)"
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Inscription réussie",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Inscription réussie."),
+     *             @OA\Property(property="access_token", type="string", example="1|abc123def456..."),
+     *             @OA\Property(property="email_verification_required", type="boolean", example=true)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=409,
+     *         description="Email déjà utilisé",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Cette adresse email est déjà utilisée.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=413,
+     *         description="Fichier avatar trop volumineux",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Le fichier avatar est trop volumineux."),
+     *             @OA\Property(property="max_size", type="string", example="2MB")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Erreur de validation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Erreur de validation."),
+     *             @OA\Property(
+     *                 property="errors",
+     *                 type="object",
+     *                 example={"email": {"Le champ email doit être une adresse email valide."}}
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=429,
+     *         description="Trop de tentatives d'inscription",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Trop de tentatives d'inscription. Réessayez dans 300 secondes."),
+     *             @OA\Property(property="retry_after", type="integer", example=300)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Erreur serveur",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Une erreur est survenue lors de l'inscription. Veuillez réessayer."),
+     *             @OA\Property(property="error", type="string", example="Database connection failed")
+     *         )
+     *     )
+     * )
      */
+    public function registerCustomer(RegisterRequest $request)
+    {
+        $data = $request->validated();
+        $data['role'] = 'customer';
+
+        // Appel de la méthode privée
+        return $this->registerUser($data, $request);
+    }
+
     private function registerUser(array $data, RegisterRequest $request)
     {
         try {
@@ -158,17 +293,149 @@ class AuthController
         }
     }
 
-
-    public function registerCustomer(RegisterRequest $request)
-    {
-        $data = $request->validated();
-        $data['role'] = 'customer';
-
-        // Appel de la méthode privée
-        return $this->registerUser($data, $request);
-    }
-
-
+    /**
+     * @OA\Post(
+     *     path="/api/v1/auth/registerAgent",
+     *     tags={"auth"},
+     *     summary="Inscription d'un nouvel agent",
+     *     description="Permet l'inscription d'un nouvel utilisateur avec validation des données et gestion d'avatar optionnel",
+     *     operationId="registerAgent",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Données d'inscription de l'utilisateur",
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
+     *             @OA\Schema(
+     *                 required={"firstname", "lastname", "email", "phone_number", "password"},
+     *                 @OA\Property(
+     *                     property="firstname",
+     *                     type="string",
+     *                     maxLength=50,
+     *                     example="Jean",
+     *                     description="Prénom de l'utilisateur"
+     *                 ),
+     *                 @OA\Property(
+     *                     property="lastname",
+     *                     type="string",
+     *                     maxLength=50,
+     *                     example="Dupont",
+     *                     description="Nom de famille de l'utilisateur"
+     *                 ),
+     *                 @OA\Property(
+     *                     property="email",
+     *                     type="string",
+     *                     format="email",
+     *                     example="jean.dupont@example.com",
+     *                     description="Adresse email unique de l'utilisateur"
+     *                 ),
+     *                 @OA\Property(
+     *                     property="phone_number",
+     *                     type="string",
+     *                     example="+33123456789",
+     *                     description="Numéro de téléphone de l'utilisateur"
+     *                 ),
+     *                 @OA\Property(
+     *                     property="password",
+     *                     type="string",
+     *                     format="password",
+     *                     minLength=8,
+     *                     example="Motdepasse123%",
+     *                     description="Mot de passe (minimum 8 caractères)"
+     *                 ),
+     *                  @OA\Property(
+     *                      property="confirm_password",
+     *                      type="string",
+     *                      format="password",
+     *                      minLength=8,
+     *                      example="Motdepasse123%",
+     *                      description="Mot de passe de confirmation (minimum 8 caractères)"
+     *                  ),
+     *                 @OA\Property(
+     *                     property="role",
+     *                     type="string",
+     *                     enum={"agent"},
+     *                     default="agent",
+     *                     example="user",
+     *                     description="Rôle de l'utilisateur"
+     *                 ),
+     *                 @OA\Property(
+     *                     property="type",
+     *                     type="string",
+     *                     enum={"agency", "individual"},
+     *                     example="premium",
+     *                     nullable=false,
+     *                     description="Type d'utilisateur (agence ou individuel)"
+     *                 ),
+     *                 @OA\Property(
+     *                     property="city_id",
+     *                     type="integer",
+     *                     nullable=false,
+     *                     example=1,
+     *                     description="ID de la ville de résidence"
+     *                 ),
+     *                 @OA\Property(
+     *                     property="avatar",
+     *                     type="string",
+     *                     format="binary",
+     *                     description="Image d'avatar (optionnel, max 2MB)"
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Inscription réussie",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Inscription réussie."),
+     *             @OA\Property(property="access_token", type="string", example="1|abc123def456..."),
+     *             @OA\Property(property="email_verification_required", type="boolean", example=true)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=409,
+     *         description="Email déjà utilisé",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Cette adresse email est déjà utilisée.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=413,
+     *         description="Fichier avatar trop volumineux",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Le fichier avatar est trop volumineux."),
+     *             @OA\Property(property="max_size", type="string", example="2MB")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Erreur de validation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Erreur de validation."),
+     *             @OA\Property(
+     *                 property="errors",
+     *                 type="object",
+     *                 example={"email": {"Le champ email doit être une adresse email valide."}}
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=429,
+     *         description="Trop de tentatives d'inscription",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Trop de tentatives d'inscription. Réessayez dans 300 secondes."),
+     *             @OA\Property(property="retry_after", type="integer", example=300)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Erreur serveur",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Une erreur est survenue lors de l'inscription. Veuillez réessayer."),
+     *             @OA\Property(property="error", type="string", example="Database connection failed")
+     *         )
+     *     )
+     * )
+     */
     public function registerAgent(RegisterRequest $request)
     {
         $data = $request->validated();
@@ -180,10 +447,42 @@ class AuthController
 
 
     /**
-     * Vérifier l'adresse email
-     *
-     * @param Request $request
-     * @return JsonResponse
+     * @OA\Post(
+     *     path="/api/v1/auth/verifyEmail",
+     *     tags={"auth"},
+     *     summary="Vérification de l'adresse email",
+     *     description="Vérifie l'adresse email de l'utilisateur via un lien de vérification",
+     *     operationId="verifyEmail",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"id", "hash"},
+     *             @OA\Property(property="id", type="integer", example=1, description="ID de l'utilisateur"),
+     *             @OA\Property(property="hash", type="string", example="abc123def456", description="Hash de vérification")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Email vérifié avec succès ou déjà vérifié",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Email vérifié avec succès.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=400,
+     *         description="Lien de vérification invalide",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Lien de vérification invalide.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Utilisateur non trouvé",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="No query results for model [App\\Models\\User]")
+     *         )
+     *     )
+     * )
      */
     public function verifyEmail(Request $request)
     {
@@ -219,10 +518,41 @@ class AuthController
     }
 
     /**
-     * Renvoyer l'email de vérification
-     *
-     * @param Request $request
-     * @return JsonResponse
+     * @OA\Post(
+     *     path="/api/v1/auth/resendVerificationEmail",
+     *     tags={"auth"},
+     *     summary="Renvoyer l'email de vérification",
+     *     description="Renvoie un email de vérification à l'utilisateur",
+     *     operationId="resendVerificationEmail",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"email"},
+     *             @OA\Property(property="email", type="string", format="email", example="jean.dupont@example.com", description="Adresse email de l'utilisateur")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Email de vérification renvoyé ou déjà vérifié",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Email de vérification renvoyé.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=404,
+     *         description="Utilisateur non trouvé",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Utilisateur non trouvé.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=429,
+     *         description="Trop de demandes de renvoi",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Trop de demandes. Réessayez dans 300 secondes.")
+     *         )
+     *     )
+     * )
      */
     public function resendVerificationEmail(Request $request)
     {
@@ -262,10 +592,72 @@ class AuthController
     }
 
     /**
-     * Connexion utilisateur
-     *
-     * @param LoginRequest $request
-     * @return JsonResponse
+     * @OA\Post(
+     *     path="/api/v1/auth/login",
+     *     tags={"auth"},
+     *     summary="Connexion utilisateur",
+     *     description="Authentifie un utilisateur et retourne un token d'accès",
+     *     operationId="login",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"email", "password"},
+     *             @OA\Property(property="email", type="string", format="email", example="jean.dupont@example.com", description="Adresse email de l'utilisateur"),
+     *             @OA\Property(property="password", type="string", format="password", example="motdepasse123", description="Mot de passe de l'utilisateur")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Connexion réussie",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Connexion réussie."),
+     *             @OA\Property(property="access_token", type="string", example="1|abc123def456..."),
+     *             @OA\Property(property="token_type", type="string", example="Bearer"),
+     *             @OA\Property(property="expires_at", type="string", format="date-time", nullable=true)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Identifiants invalides",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Identifiants invalides.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=403,
+     *         description="Compte désactivé ou email non vérifié",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Compte désactivé. Contactez l'administrateur.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=422,
+     *         description="Erreur de validation",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Données de validation invalides."),
+     *             @OA\Property(
+     *                 property="errors",
+     *                 type="object",
+     *                 example={"email": {"Le champ email doit être une adresse email valide."}}
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=429,
+     *         description="Trop de tentatives de connexion",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Trop de tentatives de connexion. Réessayez dans 300 secondes."),
+     *             @OA\Property(property="retry_after", type="integer", example=300)
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Erreur serveur",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Une erreur est survenue lors de la connexion.")
+     *         )
+     *     )
+     * )
      */
     public function login(LoginRequest $request)
     {
@@ -340,6 +732,8 @@ class AuthController
 
             $token = $user->createToken(
                 $tokenName,
+                ['*'], // abilities (permissions du token)
+                now()->addDays(7) // expiration dans 7 jours
             );
 
             // Mettre à jour les informations de connexion
@@ -383,10 +777,45 @@ class AuthController
     }
 
     /**
-     * Déconnexion
-     *
-     * @param Request $request
-     * @return JsonResponse
+     * @OA\Post(
+     *     path="/api/v1/auth/logout",
+     *     tags={"auth"},
+     *     summary="Déconnexion utilisateur",
+     *     description="Déconnecte l'utilisateur en révoquant son token d'accès",
+     *     operationId="logout",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(
+     *          name="Authorization",
+     *          in="header",
+     *          required=true,
+     *          description="Bearer token actuel à rafraîchir",
+     *          @OA\Schema(
+     *              type="string",
+     *              example="Bearer 1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
+     *          )
+     *      ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Déconnexion réussie",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Déconnexion réussie.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Token d'authentification manquant ou invalide",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Erreur serveur",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Erreur lors de la déconnexion.")
+     *         )
+     *     )
+     * )
      */
     public function logout(Request $request)
     {
@@ -420,10 +849,39 @@ class AuthController
     }
 
     /**
-     * Informations utilisateur connecté
-     *
-     * @param Request $request
-     * @return UserResource
+     * @OA\Get(
+     *     path="/api/v1/auth/me",
+     *     tags={"auth"},
+     *     summary="Informations de l'utilisateur connecté",
+     *     description="Retourne les informations de l'utilisateur actuellement authentifié",
+     *     operationId="me",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(
+     *          name="Authorization",
+     *          in="header",
+     *          required=true,
+     *          description="Bearer token pour l'authentification",
+     *          @OA\Schema(
+     *              type="string",
+     *              example="Bearer 1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
+     *          )
+     *      ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Informations utilisateur récupérées avec succès",
+     *     @OA\JsonContent(
+     *              type="object",
+     *              @OA\Property(property="message", type="string", example="authenticated.")
+     *          )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Token d'authentification manquant ou invalide",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     )
+     * )
      */
     public function me(Request $request)
     {
@@ -431,10 +889,47 @@ class AuthController
     }
 
     /**
-     * Rafraîchir le token
-     *
-     * @param Request $request
-     * @return JsonResponse
+     * @OA\Post(
+     *     path="/api/v1/auth/refresh",
+     *     tags={"auth"},
+     *     summary="Rafraîchir le token d'accès",
+     *     description="Génère un nouveau token d'accès et révoque l'ancien",
+     *     operationId="refresh",
+     *     security={{"sanctum": {}}},
+     *     @OA\Parameter(
+     *          name="Authorization",
+     *          in="header",
+     *          required=true,
+     *          description="Bearer token actuel à rafraîchir",
+     *          @OA\Schema(
+     *              type="string",
+     *              example="Bearer 1|abc123def456ghi789jkl012mno345pqr678stu901vwx234yz"
+     *          )
+     *      ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Token rafraîchi avec succès",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="access_token", type="string", example="2|def789ghi012..."),
+     *             @OA\Property(property="token_type", type="string", example="Bearer"),
+     *             @OA\Property(property="expires_at", type="string", format="date-time")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=401,
+     *         description="Token d'authentification manquant ou invalide",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Unauthenticated.")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=500,
+     *         description="Erreur serveur",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Erreur lors du rafraîchissement du token.")
+     *         )
+     *     )
+     * )
      */
     public function refresh(Request $request)
     {
@@ -446,7 +941,7 @@ class AuthController
             $newToken = $user->createToken(
                 'refreshed_token_' . now()->timestamp,
                 $currentToken->abilities,
-                now()->addDay()
+                now()->addDays(7)
             );
 
             // Supprimer l'ancien token
