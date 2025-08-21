@@ -11,13 +11,13 @@ class UserPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->isAgent();
+        return $user->isAdmin();
     }
 
     /**
      * Determine whether the user can view the model.
      */
-    public function view(User $user, User $model): bool
+    public function view(): bool
     {
         return true;
     }
@@ -47,6 +47,9 @@ class UserPolicy
      */
     public function delete(User $user, User $model): bool
     {
+        if($user->isAdmin()){
+            return true;
+        }
         return $user->isAgent() && $user->id !== $model->id;
     }
 
