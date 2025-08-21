@@ -6,10 +6,11 @@ use App\Http\Requests\CityRequest;
 use App\Http\Resources\CityResource;
 use App\Models\City;
 use Exception;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class CityController
 {
-
+   use AuthorizesRequests;
     /**
      * @OA\Get(
      *     path="/api/v1/cities",
@@ -40,6 +41,8 @@ class CityController
      */
     public function index()
     {
+        $this->authorize('viewAny', City::class);
+
         $cites = City::paginate(10);
         return CityResource::collection($cites);
     }
@@ -71,6 +74,7 @@ class CityController
      */
     public function store(CityRequest $request)
     {
+        $this->authorize('create', City::class);
         try {
 
             $existingCity = City::where('name', $request->name)->first();
@@ -120,6 +124,8 @@ class CityController
      */
     public function show(string $id)
     {
+        $this->authorize('view', City::class);
+
         $city = City::find($id);
         if (!$city) {
             return response()->json([
@@ -163,6 +169,8 @@ class CityController
      */
     public function update(CityRequest $request, City $id)
     {
+        $this->authorize('update', $id);
+
         try {
             $existingCity = City::where('name', $request->name)
                 ->where('id', '!=', $id->id)
@@ -211,6 +219,8 @@ class CityController
      */
     public function destroy(City $id)
     {
+        $this->authorize('delete', $id);
+
         try {
             $id->delete();
             return response()->json([
