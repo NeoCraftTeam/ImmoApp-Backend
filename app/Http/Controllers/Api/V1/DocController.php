@@ -40,6 +40,11 @@ namespace App\Http\Controllers\Api\V1;
  *      name="auth",
  *      description="Gestion de l'authentification"
  *  )
+ *
+ * @OA\Tag(
+ *       name="user",
+ *       description="Gestion des utilisateurs"
+ *   )
  */
 class DocController
 {
