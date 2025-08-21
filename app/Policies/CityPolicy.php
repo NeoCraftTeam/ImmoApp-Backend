@@ -10,12 +10,12 @@ class CityPolicy
 {
     use HandlesAuthorization;
 
-    public function viewAny(User $user): bool
+    public function viewAny(): bool
     {
         return true;
     }
 
-    public function view(User $user, City $city): bool
+    public function view(): bool
     {
         return true;
     }
