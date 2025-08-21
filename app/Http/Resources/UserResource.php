@@ -24,7 +24,7 @@ class UserResource extends JsonResource
             'lastname' => $this->lastname,
             'phone_number' => $this->phone_number,
             'email' => $this->email,
-            'avatar' => $this->avatar,
+            'avatar' => $this->getFirstMediaUrl('avatars', 'webp') || $this->avatar,
 
             // Champ sensible visible seulement par un admin
             'role' => $this->when($request->user()?->role === 'admin', $this->role),
