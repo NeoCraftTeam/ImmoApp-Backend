@@ -34,7 +34,7 @@ Route::prefix('v1')->group(function () {
 
 
 // adType
-    Route::controller(AdTypeController::class)->group(function () {
+    Route::middleware('auth:sanctum')->controller(AdTypeController::class)->group(function () {
         Route::get('/ad-types', 'index');
         Route::get('/ad-types/{id}', 'show');
         Route::post('/ad-types', 'store');
@@ -44,7 +44,7 @@ Route::prefix('v1')->group(function () {
 
 
 // City
-    Route::controller(CityController::class)->group(function () {
+    Route::middleware('auth:sanctum')->controller(CityController::class)->group(function () {
         Route::get('/cities', 'index');
         Route::get('/cities/{id}', 'show');
         Route::post('/cities', 'store');
@@ -53,7 +53,7 @@ Route::prefix('v1')->group(function () {
     });
 
 // User
-    Route::controller(UserController::class)->group(function () {
+    Route::middleware('auth:sanctum')->controller(UserController::class)->group(function () {
         Route::get('/users', 'index');
         Route::get('/users/{id}', 'show');
         Route::post('/users', 'store');
