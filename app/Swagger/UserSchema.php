@@ -15,6 +15,7 @@ namespace App\Swagger;
  *      @OA\Property(property="email", type="string"),
  *      @OA\Property(property="password", type="string"),
  *      @OA\Property(property="confirm_password", type="string"),
+ *      @OA\Property(property="avatar", type="string"),
  *     @OA\Property(
  *         property="role",
  *         type="string",
