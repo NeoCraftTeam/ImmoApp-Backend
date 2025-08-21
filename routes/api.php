@@ -36,10 +36,10 @@ Route::prefix('v1')->group(function () {
 // adType
     Route::middleware('auth:sanctum')->controller(AdTypeController::class)->group(function () {
         Route::get('/ad-types', 'index');
-        Route::get('/ad-types/{id}', 'show');
+        Route::get('/ad-types/{adType}', 'show');
         Route::post('/ad-types', 'store');
-        Route::put('/ad-types/{id}', 'update');
-        Route::delete('/ad-types/{id}', 'destroy');
+        Route::put('/ad-types/{adType}', 'update');
+        Route::delete('/ad-types/{adType}', 'destroy');
     });
 
 
@@ -57,8 +57,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/users', 'index');
         Route::get('/users/{id}', 'show');
         Route::post('/users', 'store');
-        Route::put('/users/{id}', 'update');
-        Route::delete('/users/{id}', 'destroy');
+        Route::put('/users/{user}', 'update');
+        Route::delete('/users/{user}', 'destroy');
     });
 
 
