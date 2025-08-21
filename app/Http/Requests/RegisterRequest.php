@@ -30,13 +30,13 @@ class RegisterRequest extends FormRequest
             'phone_number' => 'required|string|regex:/^[+]?[0-9\s\-\(\)]{10,15}$/',
             'password' => [
                 'required',
-                'confirmed',
+                'confirmed:confirm_password',
                 Password::min(8)
                     ->mixedCase()
                     ->numbers()
                     ->symbols()
             ],
-            'password_confirmation' => 'required|same:password',
+            'confirm_password' => 'required|same:password',
             'role' => 'nullable|string|in:customer,admin,agent',
             'type' => 'nullable|string|max:50',
             'city_id' => 'nullable|integer|exists:city,id',
@@ -58,7 +58,7 @@ class RegisterRequest extends FormRequest
             'phone_number.regex' => 'Le numéro de téléphone n\'est pas valide.',
             'password.required' => 'Le mot de passe est obligatoire.',
             'password.confirmed' => 'La confirmation du mot de passe ne correspond pas.',
-            'password_confirmation.same' => 'La confirmation doit être identique au mot de passe.',
+            'confirm_password.same' => 'La confirmation doit être identique au mot de passe.',
             'avatar.image' => 'Le fichier doit être une image.',
             'avatar.mimes' => 'L\'avatar doit être au format JPEG, JPG, PNG ou WebP.',
             'avatar.max' => 'L\'avatar ne peut pas dépasser 2MB.',
