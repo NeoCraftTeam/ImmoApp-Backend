@@ -1,9 +1,9 @@
 <?php
 
-use App\Http\Controllers\API\V1\AdTypeController;
-use App\Http\Controllers\API\V1\AuthController;
+use App\Http\Controllers\Api\V1\AdTypeController;
+use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CityController;
-use App\Http\Controllers\API\V1\UserController;
+use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Support\Facades\Route;
 
 // Prefix routes
