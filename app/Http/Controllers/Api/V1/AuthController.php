@@ -753,7 +753,6 @@ class AuthController
             return response()->json([
                 'message' => 'Connexion réussie.',
                 'access_token' => $token->plainTextToken,
-                'token_type' => 'Bearer',
                 'expires_at' => $token->accessToken->expires_at,
             ], 200);
 
