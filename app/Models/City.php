@@ -7,6 +7,7 @@ use Eloquent;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
@@ -54,5 +55,20 @@ class City extends Model
     public function setNameAttribute($value): void
     {
         $this->attributes['name'] = ucfirst(strtolower($value));
+    }
+
+     /**
+     * Get all of the quarters for the City
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function quarters(): hasMany
+    {
+        return $this->hasMany(Quarter::class);
+    }
+
+    public function users(): hasMany
+    {
+        return $this->hasMany(User::class);
     }
 }
