@@ -8,10 +8,20 @@ class QuarterRequest extends FormRequest
 {
     public function rules(): array
     {
-        return [
-            'name' => ['required', 'string', 'max:255', 'unique:quarters,name'],
-            'city_id' => ['required', 'integer', 'exists:city,id'],
-        ];
+        if($this->isMethod('post')){
+            return [
+                'name' => ['required', 'string', 'max:255', 'unique:quarter,name'],
+                'city_id' => ['required', 'integer', 'exists:city,id'],
+            ];
+        }
+
+         if($this->isMethod('put') || $this->isMethod('patch')){
+            return [
+                'name' => ['sometimes', 'string', 'max:255', 'unique:quarter,name'],
+                'city_id' => ['sometimes', 'integer', 'exists:city,id'],
+            ];
+        }
+        return [];
     }
 
     public function messages(): array
