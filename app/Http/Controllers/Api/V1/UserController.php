@@ -102,8 +102,7 @@ class UserController
     {
         $this->authorize('viewAny', User::class);
 
-        $users = User::paginate(config('pagination.default', 10));
-
+        $users = User::with('city')->paginate(config('pagination.default', 10));
         return UserResource::collection($users);
     }
 
