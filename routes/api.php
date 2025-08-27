@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\AdTypeController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\UserController;
+use App\Http\Controllers\Api\V1\QuarterController;
 use Illuminate\Support\Facades\Route;
 
 // Prefix routes
@@ -48,8 +49,17 @@ Route::prefix('v1')->group(function () {
         Route::get('/cities', 'index');
         Route::get('/cities/{id}', 'show');
         Route::post('/cities', 'store');
-        Route::put('/cities/{id}', 'update');
-        Route::delete('/cities/{id}', 'destroy');
+        Route::put('/cities/{city}', 'update');
+        Route::delete('/cities/{city}', 'destroy');
+    });
+
+// Quarter
+    Route::middleware('auth:sanctum')->controller(QuarterController::class)->group(function () {
+        Route::get('/quarters', 'index');
+        Route::get('/quarters/{id}', 'show');
+        Route::post('/quarters', 'store');
+        Route::put('/quarters/{quarter}', 'update');
+        Route::delete('/quarters/{quarter}', 'destroy');
     });
 
 // User
