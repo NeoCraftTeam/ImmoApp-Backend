@@ -10,7 +10,8 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
 class CityController
 {
-   use AuthorizesRequests;
+    use AuthorizesRequests;
+
     /**
      * @OA\Get(
      *     path="/api/v1/cities",
@@ -167,24 +168,24 @@ class CityController
      *      @OA\Response(response=500, description="Erreur du Serveur")
      * )
      */
-    public function update(CityRequest $request, City $id)
+    public function update(CityRequest $request, City $city)
     {
-        $this->authorize('update', $id);
+        $this->authorize('update', $city);
 
         try {
             $existingCity = City::where('name', $request->name)
-                ->where('id', '!=', $id->id)
+                ->where('id', '!=', $city->id)
                 ->first();
             if ($existingCity) {
                 return response()->json([
                     'message' => 'Cette ville a déjà été modifiée',
                 ], 400); // 400 = Bad Request
             }
-            $id->update($request->validated());
+            $city->update($request->validated());
 
             return response()->json([
                 'message' => 'Ville mise à jour avec succès',
-                'data' => new CityResource($id),
+                'data' => new CityResource($city),
             ], 200);
         } catch (Exception $e) {
             return response()->json([
@@ -217,12 +218,19 @@ class CityController
      *      @OA\Response(response=500, description="Erreur du Serveur")
      * )
      */
-    public function destroy(City $id)
+    public function destroy(City $city)
     {
-        $this->authorize('delete', $id);
+        $this->authorize('delete', $city);
 
         try {
-            $id->delete();
+            // Vérifier s'il y a des dépendances avant suppression
+            if ($city->user()->exists()) {
+                return response()->json([
+                    'message' => 'Impossible de supprimer cette ville car il contient des utilisateurs.'
+                ], 409); // Conflict
+
+            }
+            $city->delete();
             return response()->json([
                 'message' => 'Ville supprimée avec succès',
             ], 200); // 200 = OK
