@@ -754,7 +754,7 @@ class AuthController
                 'message' => 'Connexion réussie.',
                 'access_token' => $token->plainTextToken,
                 'expires_at' => $token->accessToken->expires_at,
-            ], 200);
+            ]);
 
         } catch (ValidationException $e) {
             return response()->json([
