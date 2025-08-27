@@ -44,7 +44,12 @@ namespace App\Http\Controllers\Api\V1;
  * @OA\Tag(
  *       name="user",
  *       description="Gestion des utilisateurs"
- *   )
+ * )
+ *
+ * @OA\Tag(
+ *        name="quarter",
+ *        description="Gestion des quartiers"
+ * )
  */
 class DocController
 {
