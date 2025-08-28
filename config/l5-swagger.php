@@ -1,4 +1,4 @@
-<?php
+    <?php
 
 return [
     'default' => 'default',
@@ -65,7 +65,7 @@ return [
              * Middleware allows to prevent unexpected access to API documentation
              */
             'middleware' => [
-                'api' => [],
+                'api' => ['web'],
                 'asset' => [],
                 'docs' => [],
                 'oauth2_callback' => [],
