@@ -12,7 +12,7 @@ class ReviewRequest extends FormRequest
             'rating' => ['required', 'integer', 'between:1,5'],
             'comment' => ['nullable', 'string', 'max:1000'],
             'ad_id' => ['required', 'exists:ad,id'],
-            'user_id' => ['required', 'exists:user,id'],
+            'user_id' => ['required', 'exists:users,id'],
         ];
     }
 
