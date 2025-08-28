@@ -15,7 +15,7 @@ return new class extends Migration {
             $table->decimal('rating', 2, 1)->nullable(false);
             $table->text('comment')->nullable();
             $table->foreignId('ad_id')->constrained('ad')->onDelete('cascade')->references('id')->on('ad');
-            $table->foreignId('user_id')->constrained()->onDelete('cascade')->references('id')->on('user');
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->timestamps();
             $table->softDeletes();
         });
