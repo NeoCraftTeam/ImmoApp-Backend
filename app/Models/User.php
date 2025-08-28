@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 
+use App\Enums\PaymentStatus;
 use App\Enums\UserRole;
 use App\Enums\UserType;
 use Database\Factories\UserFactory;
@@ -82,7 +83,6 @@ class User extends Authenticatable implements HasMedia
     use HasFactory, Notifiable, softDeletes, HasApiTokens;
     use InteractsWithMedia;
 
-    protected $table = 'user';
 
     /**
      * The attributes that are mass assignable.
@@ -150,6 +150,11 @@ class User extends Authenticatable implements HasMedia
     {
         return $this->belongsTo(City::class);
     }
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
+    }
+
 
     /**
      * returns true if the user is an admin.
