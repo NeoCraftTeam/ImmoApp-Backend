@@ -10,7 +10,7 @@ class AdRequest extends FormRequest
     {
         return [
             'title' => ['required', 'string', 'max:255'],
-            'slug' => ['required', 'string', 'max:255', 'unique:ads,slug'], // éviter les doublons
+            'slug' => ['required', 'string', 'max:255', 'unique:ad,slug'], // éviter les doublons
             'description' => ['required', 'string'],
             'adresse' => ['required', 'string', 'max:255'],
             'price' => ['required', 'numeric', 'min:0'],
