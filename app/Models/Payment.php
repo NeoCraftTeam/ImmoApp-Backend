@@ -58,6 +58,7 @@ class Payment extends Model
         'transaction_id',
         'payment_method',
         'user_id',
+        'ad_id',
         'status'
     ];
 
@@ -76,6 +77,15 @@ class Payment extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function ad(): BelongsTo
+    {
+        return $this->belongsTo(Ad::class);
+    }
+
+    public function isPaid(): bool{
+        return $this->payments->where('status', PaymentStatus::SUCCESS)->isNotEmpty();
     }
 
     /**
