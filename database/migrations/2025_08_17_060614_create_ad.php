@@ -24,7 +24,7 @@ return new class extends Migration {
             $table->magellanPoint('location', 4326)->nullable();
             $table->enum('status', ['available', 'reserved', 'rent', 'pending', 'sold']);
             $table->timestamp('expires_at')->nullable();
-            $table->foreignId('user_id')->constrained()->onDelete('cascade')->references('id')->on('user');
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('quarter_id')->constrained()->onDelete('cascade')->references('id')->on('quarter');
             $table->foreignId('type_id')->constrained()->onDelete('cascade')->references('id')->on('ad_type');
             $table->timestamps();
