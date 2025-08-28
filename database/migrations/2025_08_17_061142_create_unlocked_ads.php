@@ -13,8 +13,8 @@ return new class extends Migration {
         Schema::create('unlocked_ads', function (Blueprint $table) {
             $table->id();
             $table->foreignId('ad_id')->constrained('ad')->onDelete('cascade');
-            $table->foreignId('user_id')->constrained()->onDelete('cascade')->references('id')->on('user');
-            $table->foreignId('payment_id')->constrained('payment')->onDelete('cascade')->references('id')->on('payment');
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->foreignId('payment_id')->constrained('payments')->onDelete('cascade');
             $table->timestamp('unlocked_at')->nullable();
             $table->timestamp('updated_at')->nullable();
             $table->softDeletes();
