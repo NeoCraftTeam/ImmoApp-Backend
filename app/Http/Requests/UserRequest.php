@@ -28,7 +28,7 @@ class UserRequest extends FormRequest
                 'firstname' => ['required', 'string', 'max:255'],
                 'lastname' => ['required', 'string', 'max:255'],
                 'phone_number' => ['required', 'string', 'regex:/^\+?[0-9]{7,20}$/'],
-                'email' => ['required', 'email', 'max:255', Rule::unique('user', 'email')->ignore($this->user()?->id)], // if the user is connected, ignore their own email
+                'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->user()?->id)], // if the user is connected, ignore their own email
                 'password' => ['required', 'string', 'min:8', 'confirmed:confirm_password'],
                 'role' => ['required', 'string'],
                 'type' => ['nullable', 'string'],
@@ -40,7 +40,7 @@ class UserRequest extends FormRequest
                 'firstname' => ['sometimes', 'string', 'max:255'],
                 'lastname' => ['sometimes', 'string', 'max:255'],
                 'phone_number' => ['sometimes', 'string', 'regex:/^\+?[0-9]{7,20}$/'],
-                'email' => ['sometimes', 'email', 'max:255', Rule::unique('user', 'email')->ignore($this->user()?->id)], // if the user is connected, ignore their own email
+                'email' => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->user()?->id)], // if the user is connected, ignore their own email
                 'password' => ['sometimes', 'string', 'min:8'],
                 'role' => ['sometimes', 'string'],
                 'type' => ['nullable', 'string'],
