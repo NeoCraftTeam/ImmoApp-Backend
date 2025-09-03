@@ -48,21 +48,21 @@ Route::prefix('v1')->group(function () {
 
 
 // City
-    Route::middleware('auth:sanctum')->controller(CityController::class)->group(function () {
+    Route::controller(CityController::class)->group(function () {
         Route::get('/cities', 'index');
         Route::get('/cities/{id}', 'show');
-        Route::post('/cities', 'store');
-        Route::put('/cities/{city}', 'update');
-        Route::delete('/cities/{city}', 'destroy');
+        Route::post('/cities', 'store')->middleware('auth:sanctum');
+        Route::put('/cities/{city}', 'update')->middleware('auth:sanctum');
+        Route::delete('/cities/{city}', 'destroy')->middleware('auth:sanctum');
     });
 
 // Quarter
-    Route::middleware('auth:sanctum')->controller(QuarterController::class)->group(function () {
+    Route::controller(QuarterController::class)->group(function () {
         Route::get('/quarters', 'index');
         Route::get('/quarters/{id}', 'show');
-        Route::post('/quarters', 'store');
-        Route::put('/quarters/{quarter}', 'update');
-        Route::delete('/quarters/{quarter}', 'destroy');
+        Route::post('/quarters', 'store')->middleware('auth:sanctum');
+        Route::put('/quarters/{quarter}', 'update')->middleware('auth:sanctum');
+        Route::delete('/quarters/{quarter}', 'destroy')->middleware('auth:sanctum');
     });
 
 // User
