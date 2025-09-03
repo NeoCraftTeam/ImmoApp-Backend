@@ -42,8 +42,6 @@ class CityController
      */
     public function index()
     {
-        $this->authorize('viewAny', City::class);
-
         $cites = City::paginate(10);
         return CityResource::collection($cites);
     }
@@ -125,7 +123,6 @@ class CityController
      */
     public function show(string $id)
     {
-        $this->authorize('view', City::class);
 
         $city = City::find($id);
         if (!$city) {
