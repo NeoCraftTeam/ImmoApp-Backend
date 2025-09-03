@@ -87,7 +87,6 @@ class QuarterController
      */
     public function index()
     {
-        $this->authorize('viewAny', Quarter::class);
         $quarter = Quarter::paginate(config('pagination.default', 10));
         return QuarterResource::collection($quarter);
     }
@@ -246,7 +245,6 @@ class QuarterController
      */
     public function show(string $id)
     {
-        $this->authorize('view', Quarter::class);
         $quarterId = Quarter::find($id);
         if (!$quarterId) {
             return response()->json([
