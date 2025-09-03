@@ -14,13 +14,16 @@ Route::prefix('v1')->group(function () {
     Route::prefix('auth')->controller(AuthController::class)->group(function () {
         // Public routes with throttling(rate limiting)
         Route::post('registerCustomer', [AuthController::class, 'registerCustomer'])
-            ->middleware('throttle:3,1'); // 3 attempts per minute
+            ->middleware('throttle:5,1'); // 5 attempts per minute
 
         Route::post('registerAgent', [AuthController::class, 'registerAgent'])
-            ->middleware('throttle:3,1'); //  3 attempts per minute
+            ->middleware('throttle:5,1'); //  5 attempts per minute
+
+        Route::post('registerAd', [AuthController::class, 'registerAdmin'])
+            ->middleware('throttle:5,1'); //  5 attempts per minute
 
         Route::post('login', [AuthController::class, 'login'])
-            ->middleware('throttle:5,1'); // 5  3 attempts per minute
+            ->middleware('throttle:5,1'); //  5 attempts per minute
 
         Route::post('resend-verification', [AuthController::class, 'resendVerificationEmail'])
             ->middleware('throttle:2,5'); // 2 attempts every 5 minutes
