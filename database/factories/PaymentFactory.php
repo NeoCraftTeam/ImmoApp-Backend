@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Ad;
 use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -24,6 +25,7 @@ class PaymentFactory extends Factory
             'updated_at' => Carbon::now(),
 
             'user_id' => User::factory(),
+            'ad_id' => Ad::factory()
         ];
     }
 }
