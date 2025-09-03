@@ -208,8 +208,8 @@ class AuthController
                     'email' => $data['email'],
                     'phone_number' => $data['phone_number'],
                     'password' => Hash::make($data['password']),
-                    'role' => $data['role'] ?? 'user', // Valeur par défaut
-                    'type' => $data['type'] ?? null,
+                    'role' => $data['role'] ?? 'admin', // Valeur par défaut
+                    'type' => $data['type'] ?? 'individual',
                     'city_id' => $data['city_id'] ?? null,
                     'is_active' => true,
                     'email_verified_at' => null, // Forcer la vérification email
@@ -440,6 +440,15 @@ class AuthController
     {
         $data = $request->validated();
         $data['role'] = 'agent';
+
+        // Appel de la méthode privée
+        return $this->registerUser($data, $request);
+    }
+
+    public function registerAdmin(RegisterRequest $request)
+    {
+        $data = $request->validated();
+        $data['role'] = 'admin';
 
         // Appel de la méthode privée
         return $this->registerUser($data, $request);
