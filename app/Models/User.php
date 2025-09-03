@@ -4,7 +4,6 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 
-use App\Enums\PaymentStatus;
 use App\Enums\UserRole;
 use App\Enums\UserType;
 use Database\Factories\UserFactory;
@@ -83,6 +82,7 @@ class User extends Authenticatable implements HasMedia
     use HasFactory, Notifiable, softDeletes, HasApiTokens;
     use InteractsWithMedia;
 
+    protected $table = 'users';
 
     /**
      * The attributes that are mass assignable.
@@ -111,18 +111,18 @@ class User extends Authenticatable implements HasMedia
         });
     }
 
+    private function validateAgentType(): void
+    {
+        if ($this->role === 'agent' && !in_array($this->type, ['individual', 'agency'])) {
+            throw new InvalidArgumentException('Invalid agent type. Must be either "individual" or "agency".');
+        }
+    }
+
     private function assignDefaultAvatar(): void
     {
         if (empty($this->avatar)) {
             $name = trim($this->firstname . ' ' . $this->lastname ?: 'User');
             $this->avatar = 'https://ui-avatars.com/api/?name=' . urlencode($name) . '&background=random';
-        }
-    }
-
-    private function validateAgentType(): void
-    {
-        if ($this->role === 'agent' && !in_array($this->type, ['individual', 'agency'])) {
-            throw new InvalidArgumentException('Invalid agent type. Must be either "individual" or "agency".');
         }
     }
 
@@ -150,6 +150,7 @@ class User extends Authenticatable implements HasMedia
     {
         return $this->belongsTo(City::class);
     }
+
     public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
@@ -197,17 +198,6 @@ class User extends Authenticatable implements HasMedia
     }
 
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    protected function casts(): array
-    {
-        return ['email_verified_at' => 'datetime', 'password' => 'hashed', 'role' => UserRole::class, 'type' => UserType::class,];
-    }
-
-
-    /**
      * Définir les collections de médias
      */
     public function registerMediaCollections(): void
@@ -226,5 +216,15 @@ class User extends Authenticatable implements HasMedia
             ->width(150)
             ->height(150)
             ->sharpen(10);
+    }
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return ['email_verified_at' => 'datetime', 'password' => 'hashed', 'role' => UserRole::class, 'type' => UserType::class,];
     }
 }
