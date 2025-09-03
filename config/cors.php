@@ -22,6 +22,8 @@ return [
     'allowed_origins' => [
         'http://localhost:3000', // front
         'http://localhost:8080', // localhost
+        'http://localhost:5173', // localhost
+        'https://keyhome.neocraft.dev/https://keyhome.neocraft.dev' // prod
     ],
 
     'allowed_origins_patterns' => [],
