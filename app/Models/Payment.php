@@ -49,8 +49,6 @@ class Payment extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $table = 'payment';
-
     protected $fillable = [
 
         'type',
