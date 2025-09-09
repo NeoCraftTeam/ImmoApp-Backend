@@ -59,8 +59,8 @@ print_success "Cache d'application nettoyé"
 php artisan route:clear
 print_success "Cache des routes nettoyé"
 
-php artisan view:clear
-print_success "Cache des vues nettoyé"
+php artisan optimize:clear
+print_success "Cache des optimisations nettoyé"
 
 php artisan event:clear 2>/dev/null || print_warning "Cache des événements non disponible"
 
