@@ -6,6 +6,10 @@ use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use Illuminate\Auth\Events\Registered;
+use Illuminate\Auth\Events\Verified;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -154,7 +158,7 @@ class AuthController
      *     )
      * )
      */
-    public function registerCustomer(RegisterRequest $request)
+    public function registerCustomer(RegisterRequest $request): JsonResponse
     {
         $data = $request->validated();
         $data['role'] = 'customer';
@@ -163,7 +167,7 @@ class AuthController
         return $this->registerUser($data, $request);
     }
 
-    private function registerUser(array $data, RegisterRequest $request)
+    private function registerUser(array $data, RegisterRequest $request): JsonResponse
     {
         try {
             // Vérifier le rate limiting personnalisé
@@ -182,7 +186,8 @@ class AuthController
                 ], 429);
             }
 
-            $data = $request->validated();
+            // Fusionner les données validées avec les données supplémentaires
+            $data = array_merge($request->validated(), $data);
 
             // Vérifier si l'utilisateur existe déjà (double sécurité)
             if (User::where('email', $data['email'])->exists()) {
@@ -228,6 +233,9 @@ class AuthController
                 return $user;
 
             });
+
+            // Déclencher l'événement d'inscription (envoie l'email automatiquement)
+            event(new Registered($result));
 
             // Réinitialiser les tentatives d'inscription échouées
             RateLimiter::clear($key);
@@ -436,7 +444,7 @@ class AuthController
      *     )
      * )
      */
-    public function registerAgent(RegisterRequest $request)
+    public function registerAgent(RegisterRequest $request): JsonResponse
     {
         $data = $request->validated();
         $data['role'] = 'agent';
@@ -445,7 +453,7 @@ class AuthController
         return $this->registerUser($data, $request);
     }
 
-    public function registerAdmin(RegisterRequest $request)
+    public function registerAdmin(RegisterRequest $request): JsonResponse
     {
         $data = $request->validated();
         $data['role'] = 'admin';
@@ -493,37 +501,55 @@ class AuthController
      *     )
      * )
      */
-    public function verifyEmail(Request $request)
+    public function verifyEmail($id, $hash, Request $request): JsonResponse
     {
-        $request->validate([
-            'id' => 'required|integer',
-            'hash' => 'required|string',
-        ]);
+        try {
+            $user = User::findOrFail($id);
 
-        $user = User::findOrFail($request->id);
+            // Vérifier le hash
+            if (!hash_equals($hash, sha1($user->getEmailForVerification()))) {
+                return response()->json([
+                    'message' => 'Lien de vérification invalide'
+                ], 400);
+            }
 
-        if (!hash_equals(sha1($user->email), $request->hash)) {
+            if ($user->hasVerifiedEmail()) {
+                return response()->json([
+                    'message' => 'Email déjà vérifié.',
+                    'verified' => true
+                ]);
+            }
+
+            if ($user->markEmailAsVerified()) {
+                event(new Verified($user));
+
+                // Log de succès
+                Log::info('Email verified successfully', [
+                    'user_id' => $user->id,
+                    'email' => $user->email
+                ]);
+            }
+
             return response()->json([
-                'message' => 'Lien de vérification invalide.'
-            ], 400);
-        }
+                'message' => 'Email vérifié avec succès.',
+                'verified' => true
+            ]);
 
-        if ($user->hasVerifiedEmail()) {
+        } catch (ModelNotFoundException $e) {
             return response()->json([
-                'message' => 'Email déjà vérifié.'
-            ], 200);
+                'message' => 'Utilisateur non trouvé.'
+            ], 404);
+
+        } catch (Throwable $e) {
+            Log::error('Email verification failed', [
+                'error' => $e->getMessage(),
+                'user_id' => $id
+            ]);
+
+            return response()->json([
+                'message' => 'Erreur lors de la vérification.'
+            ], 500);
         }
-
-        $user->markEmailAsVerified();
-
-        Log::info('Email verified', [
-            'user_id' => $user->id,
-            'email' => $user->email
-        ]);
-
-        return response()->json([
-            'message' => 'Email vérifié avec succès.'
-        ], 200);
     }
 
     /**
@@ -563,7 +589,7 @@ class AuthController
      *     )
      * )
      */
-    public function resendVerificationEmail(Request $request)
+    public function resendVerificationEmail(Request $request): JsonResponse
     {
         $request->validate([
             'email' => 'required|email'
@@ -580,7 +606,7 @@ class AuthController
         if ($user->hasVerifiedEmail()) {
             return response()->json([
                 'message' => 'Email déjà vérifié.'
-            ], 200);
+            ]);
         }
 
         // Rate limiting pour éviter le spam
@@ -597,7 +623,7 @@ class AuthController
 
         return response()->json([
             'message' => 'Email de vérification renvoyé.'
-        ], 200);
+        ]);
     }
 
     /**
@@ -668,7 +694,7 @@ class AuthController
      *     )
      * )
      */
-    public function login(LoginRequest $request)
+    public function login(LoginRequest $request): JsonResponse
     {
         try {
             $credentials = $request->validated();

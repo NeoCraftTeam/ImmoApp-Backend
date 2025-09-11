@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AdController;
 use App\Http\Controllers\Api\V1\AdTypeController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CityController;
-use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\QuarterController;
+use App\Http\Controllers\Api\V1\UserController;
+use App\Http\Controllers\Api\V1\Auth\EmailVerificationController;
 use Illuminate\Support\Facades\Route;
 
 // Prefix routes
@@ -28,11 +30,15 @@ Route::prefix('v1')->group(function () {
         Route::post('resend-verification', [AuthController::class, 'resendVerificationEmail'])
             ->middleware('throttle:2,5'); // 2 attempts every 5 minutes
 
+        Route::get('email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])->name('verification.verify');
+
+
         // Routes protégées
         Route::middleware('auth:sanctum')->group(function () {
             Route::post('logout', [AuthController::class, 'logout']);
             Route::post('refresh', [AuthController::class, 'refresh']);
             Route::get('me', [AuthController::class, 'me']);
+            Route::post('email/resend', [AuthController::class, 'resendVerificationEmail'])->middleware('auth:sanctum');
         });
     });
 
@@ -72,6 +78,15 @@ Route::prefix('v1')->group(function () {
         Route::post('/users', 'store');
         Route::put('/users/{user}', 'update');
         Route::delete('/users/{user}', 'destroy');
+    });
+
+//  Ads
+    Route::middleware('auth:sanctum')->controller(AdController::class)->group(function () {
+        Route::get('/ads', 'index');
+        Route::get('/ads/{id}', 'show');
+        Route::post('/ads', 'store');
+        Route::put('/ads/{ad}', 'update');
+        Route::delete('/ads/{ad}', 'destroy');
     });
 
 
