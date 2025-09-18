@@ -1,20 +1,11 @@
 {
     "mcpServers": {
         "laravel-boost": {
-            "command": "/opt/homebrew/Cellar/php/8.4.14/bin/php",
+            "command": "/opt/homebrew/Cellar/php/8.4.12/bin/php",
             "args": [
                 "/Users/feze/Developer/Laravel/ImmoApp-Backend/artisan",
                 "boost:mcp"
             ]
-        },
-        "herd": {
-            "command": "/opt/homebrew/Cellar/php/8.4.14/bin/php",
-            "args": [
-                "/Applications/Herd.app/Contents/Resources/herd-mcp.phar"
-            ],
-            "env": {
-                "SITE_PATH": "/Users/feze/Developer/Laravel/ImmoApp-Backend"
-            }
         }
     }
 }
