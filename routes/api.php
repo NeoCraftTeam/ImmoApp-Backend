@@ -30,7 +30,7 @@ Route::prefix('v1')->group(function () {
         Route::post('resend-verification', [AuthController::class, 'resendVerificationEmail'])
             ->middleware('throttle:2,5'); // 2 attempts every 5 minutes
 
-       // Route::get('email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])->name('verification.verify');
+        // Route::get('email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])->name('verification.verify');
 
 
         // Routes protégées
@@ -85,8 +85,8 @@ Route::prefix('v1')->group(function () {
         Route::get('/ads', 'index');
         Route::get('/ads/{id}', 'show');
         Route::post('/ads', 'store');
-        Route::put('/ads/{ad}', 'update');
-        Route::delete('/ads/{ad}', 'destroy');
+        Route::put('/ads/{id}', 'update');
+        Route::delete('/ads/{id}', 'destroy');
     });
 
 
