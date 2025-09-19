@@ -28,13 +28,10 @@ class AdResource extends JsonResource
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
 
-            'user_id' => $this->user_id,
-            'quarter_id' => $this->quarter_id,
-            'type_id' => $this->type_id,
-
             'user' => new UserResource($this->whenLoaded('user')),
             'quarter' => new QuarterResource($this->whenLoaded('quarter')),
-            'type' => new AdTypeResource($this->whenLoaded('type')),
+            'type' => new AdTypeResource($this->whenLoaded('ad_type')),
+            'images' => AdImageResource::collection($this->whenLoaded('images')),
         ];
     }
 }
