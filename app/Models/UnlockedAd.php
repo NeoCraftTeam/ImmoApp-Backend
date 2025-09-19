@@ -21,6 +21,20 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @method static Builder<static>|UnlockedAd query()
  * @method static Builder<static>|UnlockedAd withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|UnlockedAd withoutTrashed()
+ * @property int $id
+ * @property int $ad_id
+ * @property int $user_id
+ * @property int $payment_id
+ * @property int|null $unlocked_at
+ * @property int|null $updated_at
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @method static Builder<static>|UnlockedAd whereAdId($value)
+ * @method static Builder<static>|UnlockedAd whereDeletedAt($value)
+ * @method static Builder<static>|UnlockedAd whereId($value)
+ * @method static Builder<static>|UnlockedAd wherePaymentId($value)
+ * @method static Builder<static>|UnlockedAd whereUnlockedAt($value)
+ * @method static Builder<static>|UnlockedAd whereUpdatedAt($value)
+ * @method static Builder<static>|UnlockedAd whereUserId($value)
  * @mixin Eloquent
  */
 class UnlockedAd extends Model
