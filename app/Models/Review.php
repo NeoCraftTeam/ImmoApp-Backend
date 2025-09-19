@@ -20,6 +20,22 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @method static Builder<static>|Review query()
  * @method static Builder<static>|Review withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|Review withoutTrashed()
+ * @property int $id
+ * @property string $rating
+ * @property string|null $comment
+ * @property int $ad_id
+ * @property int $user_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @method static Builder<static>|Review whereAdId($value)
+ * @method static Builder<static>|Review whereComment($value)
+ * @method static Builder<static>|Review whereCreatedAt($value)
+ * @method static Builder<static>|Review whereDeletedAt($value)
+ * @method static Builder<static>|Review whereId($value)
+ * @method static Builder<static>|Review whereRating($value)
+ * @method static Builder<static>|Review whereUpdatedAt($value)
+ * @method static Builder<static>|Review whereUserId($value)
  * @mixin Eloquent
  */
 class Review extends Model
