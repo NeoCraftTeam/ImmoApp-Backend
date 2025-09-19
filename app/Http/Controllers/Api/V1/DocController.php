@@ -50,6 +50,11 @@ namespace App\Http\Controllers\Api\V1;
  *        name="quarter",
  *        description="Gestion des quartiers"
  * )
+ *
+ * @OA\Tag(
+ *         name="Annonces",
+ *         description="Gestion des annonces"
+ * )
  */
 class DocController
 {
