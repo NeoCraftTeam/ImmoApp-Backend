@@ -10,6 +10,1010 @@
         "version": "v1"
     },
     "paths": {
+        "/api/v1/ads": {
+            "get": {
+                "tags": [
+                    "Annonces"
+                ],
+                "summary": "Obtenir toutes les annonces",
+                "description": "Récupérer une liste paginée de toutes les annonces avec leurs relations (utilisateur, quartier, ville, type, images)",
+                "operationId": "obtenirAnnonces",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Numéro de page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "minimum": 1,
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Nombre d'éléments par page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 15,
+                            "maximum": 100,
+                            "minimum": 1,
+                            "example": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Opération réussie",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "description": "Liste des annonces",
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/AdResource"
+                                            }
+                                        },
+                                        "links": {
+                                            "description": "Liens de pagination",
+                                            "properties": {
+                                                "first": {
+                                                    "type": "string",
+                                                    "example": "http://example.com/api/v1/ads?page=1"
+                                                },
+                                                "last": {
+                                                    "type": "string",
+                                                    "example": "http://example.com/api/v1/ads?page=10"
+                                                },
+                                                "prev": {
+                                                    "type": "string",
+                                                    "example": null,
+                                                    "nullable": true
+                                                },
+                                                "next": {
+                                                    "type": "string",
+                                                    "example": "http://example.com/api/v1/ads?page=2",
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "meta": {
+                                            "description": "Métadonnées de pagination",
+                                            "properties": {
+                                                "current_page": {
+                                                    "description": "Page actuelle",
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "from": {
+                                                    "description": "Premier élément de la page",
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "last_page": {
+                                                    "description": "Dernière page",
+                                                    "type": "integer",
+                                                    "example": 10
+                                                },
+                                                "per_page": {
+                                                    "description": "Éléments par page",
+                                                    "type": "integer",
+                                                    "example": 15
+                                                },
+                                                "to": {
+                                                    "description": "Dernier élément de la page",
+                                                    "type": "integer",
+                                                    "example": 15
+                                                },
+                                                "total": {
+                                                    "description": "Total des éléments",
+                                                    "type": "integer",
+                                                    "example": 150
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié - Token d'authentification manquant ou invalide",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Non authentifié"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Token d'authentification requis"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Interdit - Permissions insuffisantes pour voir les annonces",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Cette action n'est pas autorisée"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Permissions insuffisantes"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "Annonces"
+                ],
+                "summary": "Créer une nouvelle annonce",
+                "description": "Créer une nouvelle annonce immobilière avec images et données de localisation. Les coordonnées GPS sont obligatoires.",
+                "operationId": "creerAnnonce",
+                "requestBody": {
+                    "description": "Données de l'annonce avec images optionnelles",
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "required": [
+                                    "title",
+                                    "description",
+                                    "adresse",
+                                    "price",
+                                    "surface_area",
+                                    "bedrooms",
+                                    "bathrooms",
+                                    "latitude",
+                                    "longitude",
+                                    "quarter_id",
+                                    "type_id"
+                                ],
+                                "properties": {
+                                    "title": {
+                                        "description": "Titre accrocheur de l'annonce",
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "Magnifique appartement au centre-ville"
+                                    },
+                                    "description": {
+                                        "description": "Description détaillée du bien",
+                                        "type": "string",
+                                        "example": "Spacieux appartement de 3 pièces avec vue imprenable sur la ville, proche de tous commerces"
+                                    },
+                                    "adresse": {
+                                        "description": "Adresse complète du bien",
+                                        "type": "string",
+                                        "maxLength": 500,
+                                        "example": "123 Rue de la République, Centre-ville"
+                                    },
+                                    "price": {
+                                        "description": "Prix en euros",
+                                        "type": "number",
+                                        "format": "float",
+                                        "minimum": 0,
+                                        "example": 1200.5
+                                    },
+                                    "surface_area": {
+                                        "description": "Surface habitable en mètres carrés",
+                                        "type": "number",
+                                        "format": "float",
+                                        "minimum": 0,
+                                        "example": 85.5
+                                    },
+                                    "bedrooms": {
+                                        "description": "Nombre de chambres",
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "example": 2
+                                    },
+                                    "bathrooms": {
+                                        "description": "Nombre de salles de bain",
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "example": 1
+                                    },
+                                    "has_parking": {
+                                        "description": "Disponibilité d'une place de parking",
+                                        "type": "boolean",
+                                        "example": true
+                                    },
+                                    "latitude": {
+                                        "description": "Latitude GPS (obligatoire)",
+                                        "type": "number",
+                                        "format": "float",
+                                        "maximum": 90,
+                                        "minimum": -90,
+                                        "example": 48.8566
+                                    },
+                                    "longitude": {
+                                        "description": "Longitude GPS (obligatoire)",
+                                        "type": "number",
+                                        "format": "float",
+                                        "maximum": 180,
+                                        "minimum": -180,
+                                        "example": 2.3522
+                                    },
+                                    "status": {
+                                        "description": "Statut de l'annonce (par défaut: pending)",
+                                        "type": "string",
+                                        "enum": [
+                                            "pending",
+                                            "active",
+                                            "expired",
+                                            "sold"
+                                        ],
+                                        "example": "pending"
+                                    },
+                                    "expires_at": {
+                                        "description": "Date d'expiration de l'annonce",
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "example": "2024-12-31T23:59:59Z"
+                                    },
+                                    "quarter_id": {
+                                        "description": "Identifiant du quartier",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "type_id": {
+                                        "description": "Identifiant du type de bien",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "user_id": {
+                                        "description": "Identifiant du propriétaire (optionnel, par défaut l'utilisateur connecté)",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "images": {
+                                        "description": "Images du bien (maximum 10 images, 5MB chacune). Formats acceptés: JPEG, PNG, GIF, WebP",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "format": "binary"
+                                        },
+                                        "maxItems": 10
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Annonce créée avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Annonce créée avec succès"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "ad": {
+                                                    "$ref": "#/components/schemas/AdResource"
+                                                },
+                                                "images_count": {
+                                                    "description": "Nombre total d'images associées",
+                                                    "type": "integer",
+                                                    "example": 3
+                                                },
+                                                "images_processed": {
+                                                    "description": "Nombre d'images traitées avec succès",
+                                                    "type": "integer",
+                                                    "example": 3
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Non authentifié"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Token d'authentification requis"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Interdit - Permissions insuffisantes pour créer une annonce",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Cette action n'est pas autorisée"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Permissions insuffisantes pour créer une annonce"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Erreurs de validation ou échec de création",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Erreur lors de la création de l'annonce"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Les coordonnées GPS sont obligatoires"
+                                        },
+                                        "errors": {
+                                            "description": "Erreurs de validation détaillées",
+                                            "type": "object",
+                                            "example": {
+                                                "title": [
+                                                    "Le titre est obligatoire"
+                                                ],
+                                                "price": [
+                                                    "Le prix doit être supérieur à 0"
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{id}": {
+            "get": {
+                "tags": [
+                    "Annonces"
+                ],
+                "summary": "Obtenir une annonce spécifique",
+                "description": "Récupérer les informations détaillées d'une annonce spécifique incluant ses images et relations (utilisateur, quartier, ville, type de bien)",
+                "operationId": "obtenirAnnonce",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Identifiant unique de l'annonce",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "1"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Annonce récupérée avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/AdResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié - Token d'authentification manquant ou invalide",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Non authentifié"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Token d'authentification requis"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Interdit - Permissions insuffisantes pour voir cette annonce",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Cette action n'est pas autorisée"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Vous n'avez pas l'autorisation de voir cette annonce"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Annonce introuvable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Annonce introuvable"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "L'annonce avec l'ID spécifié n'existe pas"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "Annonces"
+                ],
+                "summary": "Mettre à jour une annonce existante",
+                "description": "Mettre à jour les informations d'une annonce, ajouter de nouvelles images ou supprimer des images existantes. Tous les champs sont optionnels sauf l'ID.",
+                "operationId": "mettreAJourAnnonce",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Identifiant unique de l'annonce à mettre à jour",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "1"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "description": "Données mises à jour de l'annonce avec nouvelles images optionnelles",
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "properties": {
+                                    "_method": {
+                                        "description": "Surcharge de méthode HTTP pour les uploads de fichiers",
+                                        "type": "string",
+                                        "example": "PUT"
+                                    },
+                                    "title": {
+                                        "description": "Nouveau titre de l'annonce",
+                                        "type": "string",
+                                        "maxLength": 255,
+                                        "example": "Titre d'annonce mis à jour"
+                                    },
+                                    "description": {
+                                        "description": "Nouvelle description détaillée",
+                                        "type": "string",
+                                        "example": "Description mise à jour avec nouveaux équipements"
+                                    },
+                                    "adresse": {
+                                        "description": "Nouvelle adresse du bien",
+                                        "type": "string",
+                                        "maxLength": 500,
+                                        "example": "456 Avenue Mise à Jour"
+                                    },
+                                    "price": {
+                                        "description": "Nouveau prix en euros",
+                                        "type": "number",
+                                        "format": "float",
+                                        "minimum": 0,
+                                        "example": 1350.75
+                                    },
+                                    "surface_area": {
+                                        "description": "Nouvelle surface en m²",
+                                        "type": "number",
+                                        "format": "float",
+                                        "minimum": 0,
+                                        "example": 90
+                                    },
+                                    "bedrooms": {
+                                        "description": "Nouveau nombre de chambres",
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "example": 3
+                                    },
+                                    "bathrooms": {
+                                        "description": "Nouveau nombre de salles de bain",
+                                        "type": "integer",
+                                        "minimum": 0,
+                                        "example": 2
+                                    },
+                                    "has_parking": {
+                                        "description": "Disponibilité parking mise à jour",
+                                        "type": "boolean",
+                                        "example": false
+                                    },
+                                    "latitude": {
+                                        "description": "Nouvelle latitude (optionnel - uniquement si localisation changée)",
+                                        "type": "number",
+                                        "format": "float",
+                                        "maximum": 90,
+                                        "minimum": -90,
+                                        "example": 48.8606
+                                    },
+                                    "longitude": {
+                                        "description": "Nouvelle longitude (optionnel - uniquement si localisation changée)",
+                                        "type": "number",
+                                        "format": "float",
+                                        "maximum": 180,
+                                        "minimum": -180,
+                                        "example": 2.3376
+                                    },
+                                    "status": {
+                                        "description": "Nouveau statut de l'annonce (optionnel)",
+                                        "type": "string",
+                                        "enum": [
+                                            "pending",
+                                            "active",
+                                            "expired",
+                                            "sold"
+                                        ],
+                                        "example": "active"
+                                    },
+                                    "expires_at": {
+                                        "description": "Nouvelle date d'expiration (optionnel)",
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "example": "2025-01-31T23:59:59Z"
+                                    },
+                                    "quarter_id": {
+                                        "description": "Nouvel identifiant de quartier",
+                                        "type": "integer",
+                                        "example": 2
+                                    },
+                                    "type_id": {
+                                        "description": "Nouvel identifiant de type de bien",
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "images": {
+                                        "description": "Nouvelles images à ajouter (maximum 10 images au total par annonce, 5MB chacune)",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "format": "binary"
+                                        }
+                                    },
+                                    "images_to_delete": {
+                                        "description": "Identifiants des images à supprimer",
+                                        "type": "array",
+                                        "items": {
+                                            "type": "integer"
+                                        },
+                                        "example": [
+                                            1,
+                                            3,
+                                            5
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Annonce mise à jour avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Annonce mise à jour avec succès"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "ad": {
+                                                    "$ref": "#/components/schemas/AdResource"
+                                                },
+                                                "images_count": {
+                                                    "description": "Nombre total d'images après mise à jour",
+                                                    "type": "integer",
+                                                    "example": 4
+                                                },
+                                                "new_images_processed": {
+                                                    "description": "Nombre de nouvelles images ajoutées",
+                                                    "type": "integer",
+                                                    "example": 2
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié - Token d'authentification manquant ou invalide",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Non authentifié"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Interdit - Permissions insuffisantes pour modifier cette annonce",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Cette action n'est pas autorisée"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Vous n'avez pas l'autorisation de modifier cette annonce"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Annonce introuvable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Annonce introuvable"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Validation errors or update failed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error updating ad"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Validation failed or server error"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "Annonces"
+                ],
+                "summary": "Supprimer une annonce",
+                "description": "Supprimer définitivement une annonce et toutes ses images associées. Cette action est irréversible et supprimera également tous les fichiers média stockés.",
+                "operationId": "supprimerAnnonce",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Identifiant unique de l'annonce à supprimer",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "1"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Annonce supprimée avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "description": "Statut de succès de l'opération",
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "message": {
+                                            "description": "Message de confirmation",
+                                            "type": "string",
+                                            "example": "Annonce supprimée avec succès"
+                                        },
+                                        "data": {
+                                            "description": "Informations détaillées sur la suppression effectuée",
+                                            "properties": {
+                                                "deleted_ad_id": {
+                                                    "description": "ID de l'annonce supprimée",
+                                                    "type": "string",
+                                                    "example": "1"
+                                                },
+                                                "deleted_ad_title": {
+                                                    "description": "Titre de l'annonce supprimée",
+                                                    "type": "string",
+                                                    "example": "Magnifique appartement centre-ville"
+                                                },
+                                                "deleted_images_count": {
+                                                    "description": "Nombre total d'images supprimées",
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "deleted_images_details": {
+                                                    "description": "Détails des images supprimées",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "description": "ID de l'image",
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "was_primary": {
+                                                                "description": "Si l'image était primaire",
+                                                                "type": "boolean",
+                                                                "example": true
+                                                            },
+                                                            "media_files_deleted": {
+                                                                "description": "Nombre de fichiers média supprimés",
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "deletion_timestamp": {
+                                                    "description": "Timestamp de la suppression",
+                                                    "type": "string",
+                                                    "format": "date-time",
+                                                    "example": "2024-01-15T14:30:00.000Z"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié - Token d'authentification manquant ou invalide",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Non authentifié"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Token d'authentification requis pour supprimer une annonce"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Interdit - Permissions insuffisantes pour supprimer cette annonce",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Cette action n'est pas autorisée"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Vous n'avez pas l'autorisation de supprimer cette annonce. Seul le propriétaire ou un administrateur peut la supprimer."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Annonce introuvable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Annonce introuvable"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "L'annonce avec l'ID spécifié n'existe pas ou a déjà été supprimée"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Erreur lors de la suppression",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Erreur lors de la suppression de l'annonce"
+                                        },
+                                        "error": {
+                                            "type": "string",
+                                            "example": "Une erreur s'est produite lors de la suppression des fichiers ou de la base de données"
+                                        },
+                                        "debug_info": {
+                                            "description": "Informations de debug (uniquement en mode debug)",
+                                            "properties": {
+                                                "file": {
+                                                    "type": "string",
+                                                    "example": "/path/to/file.php"
+                                                },
+                                                "line": {
+                                                    "type": "integer",
+                                                    "example": 123
+                                                },
+                                                "ad_id": {
+                                                    "type": "string",
+                                                    "example": "1"
+                                                }
+                                            },
+                                            "type": "object",
+                                            "nullable": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/ad-types": {
             "get": {
                 "tags": [
@@ -2884,6 +3888,592 @@
     },
     "components": {
         "schemas": {
+            "Ad": {
+                "title": "Ad",
+                "description": "Modèle Annonce immobilière",
+                "properties": {
+                    "id": {
+                        "description": "Identifiant unique de l'annonce",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "title": {
+                        "description": "Titre de l'annonce",
+                        "type": "string",
+                        "maxLength": 255,
+                        "example": "Magnifique appartement au centre-ville"
+                    },
+                    "description": {
+                        "description": "Description détaillée de l'annonce",
+                        "type": "string",
+                        "example": "Superbe appartement de 3 pièces avec vue imprenable sur la ville"
+                    },
+                    "adresse": {
+                        "description": "Adresse du bien",
+                        "type": "string",
+                        "maxLength": 500,
+                        "example": "123 Rue de la Paix, 75001 Paris"
+                    },
+                    "price": {
+                        "description": "Prix du bien",
+                        "type": "number",
+                        "format": "float",
+                        "minimum": 0,
+                        "example": 1250.5
+                    },
+                    "surface_area": {
+                        "description": "Surface en m²",
+                        "type": "number",
+                        "format": "float",
+                        "minimum": 0,
+                        "example": 85.5
+                    },
+                    "bedrooms": {
+                        "description": "Nombre de chambres",
+                        "type": "integer",
+                        "minimum": 0,
+                        "example": 2
+                    },
+                    "bathrooms": {
+                        "description": "Nombre de salles de bain",
+                        "type": "integer",
+                        "minimum": 0,
+                        "example": 1
+                    },
+                    "has_parking": {
+                        "description": "Disponibilité d'un parking",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "latitude": {
+                        "description": "Latitude GPS",
+                        "type": "number",
+                        "format": "float",
+                        "maximum": 90,
+                        "minimum": -90,
+                        "example": 48.8566
+                    },
+                    "longitude": {
+                        "description": "Longitude GPS",
+                        "type": "number",
+                        "format": "float",
+                        "maximum": 180,
+                        "minimum": -180,
+                        "example": 2.3522
+                    },
+                    "status": {
+                        "description": "Statut de l'annonce",
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "active",
+                            "expired",
+                            "sold"
+                        ],
+                        "example": "active"
+                    },
+                    "expires_at": {
+                        "description": "Date d'expiration",
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2024-12-31T23:59:59Z",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "description": "Date de création",
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2024-01-15T10:30:00Z"
+                    },
+                    "updated_at": {
+                        "description": "Date de dernière modification",
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2024-01-16T14:20:00Z"
+                    },
+                    "user_id": {
+                        "description": "ID du propriétaire de l'annonce",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "quarter_id": {
+                        "description": "ID du quartier",
+                        "type": "integer",
+                        "example": 5
+                    },
+                    "type_id": {
+                        "description": "ID du type de bien",
+                        "type": "integer",
+                        "example": 2
+                    }
+                },
+                "type": "object"
+            },
+            "AdResource": {
+                "title": "Ad Resource",
+                "description": "Ressource complète d'une annonce avec relations",
+                "type": "object",
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/Ad"
+                    },
+                    {
+                        "properties": {
+                            "user": {
+                                "description": "Propriétaire de l'annonce",
+                                "properties": {
+                                    "id": {
+                                        "type": "integer",
+                                        "example": 1
+                                    },
+                                    "firstname": {
+                                        "type": "string",
+                                        "example": "John"
+                                    },
+                                    "lastname": {
+                                        "type": "string",
+                                        "example": "Doe"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "example": "john.doe@example.com"
+                                    },
+                                    "phone_number": {
+                                        "type": "string",
+                                        "example": "+33123456789"
+                                    },
+                                    "avatar": {
+                                        "type": "string",
+                                        "example": "https://example.com/avatar.jpg",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            },
+                            "quarter": {
+                                "description": "Quartier du bien",
+                                "properties": {
+                                    "id": {
+                                        "type": "integer",
+                                        "example": 5
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Centre-ville"
+                                    },
+                                    "city": {
+                                        "description": "Ville du quartier",
+                                        "properties": {
+                                            "id": {
+                                                "type": "integer",
+                                                "example": 1
+                                            },
+                                            "name": {
+                                                "type": "string",
+                                                "example": "Paris"
+                                            },
+                                            "postal_code": {
+                                                "type": "string",
+                                                "example": "75001"
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                },
+                                "type": "object"
+                            },
+                            "ad_type": {
+                                "description": "Type de bien",
+                                "properties": {
+                                    "id": {
+                                        "type": "integer",
+                                        "example": 2
+                                    },
+                                    "name": {
+                                        "type": "string",
+                                        "example": "Appartement"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "example": "Logement dans un immeuble"
+                                    }
+                                },
+                                "type": "object"
+                            },
+                            "images": {
+                                "description": "Images de l'annonce",
+                                "type": "array",
+                                "items": {
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer",
+                                            "example": 1
+                                        },
+                                        "is_primary": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "media": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "Image principale"
+                                                    },
+                                                    "file_name": {
+                                                        "type": "string",
+                                                        "example": "1_1642234567_0.jpg"
+                                                    },
+                                                    "mime_type": {
+                                                        "type": "string",
+                                                        "example": "image/jpeg"
+                                                    },
+                                                    "size": {
+                                                        "type": "integer",
+                                                        "example": 1024576
+                                                    },
+                                                    "url": {
+                                                        "type": "string",
+                                                        "example": "https://example.com/storage/images/1_1642234567_0.jpg"
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "example": "2024-01-15T10:30:00Z"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            },
+                            "images_count": {
+                                "description": "Nombre total d'images",
+                                "type": "integer",
+                                "example": 4
+                            }
+                        },
+                        "type": "object"
+                    }
+                ]
+            },
+            "AdImage": {
+                "title": "Ad Image",
+                "description": "Image associée à une annonce",
+                "properties": {
+                    "id": {
+                        "description": "Identifiant unique de l'image",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "ad_id": {
+                        "description": "ID de l'annonce associée",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "is_primary": {
+                        "description": "Image principale",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "created_at": {
+                        "description": "Date de création",
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2024-01-15T10:30:00Z"
+                    },
+                    "updated_at": {
+                        "description": "Date de modification",
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2024-01-15T10:30:00Z"
+                    }
+                },
+                "type": "object"
+            },
+            "ErrorResponse": {
+                "title": "Error Response",
+                "description": "Réponse d'erreur standard",
+                "properties": {
+                    "success": {
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Une erreur s'est produite"
+                    },
+                    "error": {
+                        "type": "string",
+                        "example": "Détail de l'erreur",
+                        "nullable": true
+                    },
+                    "errors": {
+                        "description": "Erreurs de validation",
+                        "type": "object",
+                        "nullable": true,
+                        "additionalProperties": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "AdCreateRequest": {
+                "title": "Ad Create Request",
+                "description": "Données requises pour créer une annonce",
+                "required": [
+                    "title",
+                    "description",
+                    "adresse",
+                    "price",
+                    "surface_area",
+                    "bedrooms",
+                    "bathrooms",
+                    "latitude",
+                    "longitude",
+                    "quarter_id",
+                    "type_id"
+                ],
+                "properties": {
+                    "title": {
+                        "description": "Titre de l'annonce",
+                        "type": "string",
+                        "maxLength": 255,
+                        "example": "Magnifique appartement"
+                    },
+                    "description": {
+                        "description": "Description détaillée",
+                        "type": "string",
+                        "example": "Appartement spacieux avec vue"
+                    },
+                    "adresse": {
+                        "description": "Adresse du bien",
+                        "type": "string",
+                        "maxLength": 500,
+                        "example": "123 Rue de la Paix"
+                    },
+                    "price": {
+                        "description": "Prix",
+                        "type": "number",
+                        "format": "float",
+                        "minimum": 0,
+                        "example": 1250.5
+                    },
+                    "surface_area": {
+                        "description": "Surface en m²",
+                        "type": "number",
+                        "format": "float",
+                        "minimum": 0,
+                        "example": 85.5
+                    },
+                    "bedrooms": {
+                        "description": "Nombre de chambres",
+                        "type": "integer",
+                        "minimum": 0,
+                        "example": 2
+                    },
+                    "bathrooms": {
+                        "description": "Nombre de salles de bain",
+                        "type": "integer",
+                        "minimum": 0,
+                        "example": 1
+                    },
+                    "has_parking": {
+                        "description": "Parking disponible",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "latitude": {
+                        "description": "Latitude GPS",
+                        "type": "number",
+                        "format": "float",
+                        "maximum": 90,
+                        "minimum": -90,
+                        "example": 48.8566
+                    },
+                    "longitude": {
+                        "description": "Longitude GPS",
+                        "type": "number",
+                        "format": "float",
+                        "maximum": 180,
+                        "minimum": -180,
+                        "example": 2.3522
+                    },
+                    "status": {
+                        "description": "Statut",
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "active",
+                            "expired",
+                            "sold"
+                        ],
+                        "example": "pending"
+                    },
+                    "expires_at": {
+                        "description": "Date d'expiration",
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2024-12-31T23:59:59Z",
+                        "nullable": true
+                    },
+                    "user_id": {
+                        "description": "ID utilisateur (optionnel)",
+                        "type": "integer",
+                        "example": 1,
+                        "nullable": true
+                    },
+                    "quarter_id": {
+                        "description": "ID quartier",
+                        "type": "integer",
+                        "example": 5
+                    },
+                    "type_id": {
+                        "description": "ID type de bien",
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "images": {
+                        "description": "Images du bien (max 10, 5MB chaque)",
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "binary"
+                        },
+                        "maxItems": 10
+                    }
+                },
+                "type": "object"
+            },
+            "AdUpdateRequest": {
+                "title": "Ad Update Request",
+                "description": "Données pour mettre à jour une annonce",
+                "properties": {
+                    "title": {
+                        "description": "Titre de l'annonce",
+                        "type": "string",
+                        "maxLength": 255,
+                        "example": "Titre mis à jour"
+                    },
+                    "description": {
+                        "description": "Description mise à jour",
+                        "type": "string",
+                        "example": "Description modifiée"
+                    },
+                    "adresse": {
+                        "description": "Nouvelle adresse",
+                        "type": "string",
+                        "maxLength": 500,
+                        "example": "456 Avenue Updated"
+                    },
+                    "price": {
+                        "description": "Nouveau prix",
+                        "type": "number",
+                        "format": "float",
+                        "minimum": 0,
+                        "example": 1350.75
+                    },
+                    "surface_area": {
+                        "description": "Nouvelle surface",
+                        "type": "number",
+                        "format": "float",
+                        "minimum": 0,
+                        "example": 90
+                    },
+                    "bedrooms": {
+                        "description": "Nouveau nombre de chambres",
+                        "type": "integer",
+                        "minimum": 0,
+                        "example": 3
+                    },
+                    "bathrooms": {
+                        "description": "Nouveau nombre de salles de bain",
+                        "type": "integer",
+                        "minimum": 0,
+                        "example": 2
+                    },
+                    "has_parking": {
+                        "description": "Parking disponible",
+                        "type": "boolean",
+                        "example": false
+                    },
+                    "latitude": {
+                        "description": "Nouvelle latitude",
+                        "type": "number",
+                        "format": "float",
+                        "maximum": 90,
+                        "minimum": -90,
+                        "example": 48.8606
+                    },
+                    "longitude": {
+                        "description": "Nouvelle longitude",
+                        "type": "number",
+                        "format": "float",
+                        "maximum": 180,
+                        "minimum": -180,
+                        "example": 2.3376
+                    },
+                    "status": {
+                        "description": "Nouveau statut",
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "active",
+                            "expired",
+                            "sold"
+                        ],
+                        "example": "active"
+                    },
+                    "expires_at": {
+                        "description": "Nouvelle date d'expiration",
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2025-01-31T23:59:59Z"
+                    },
+                    "quarter_id": {
+                        "description": "Nouveau quartier",
+                        "type": "integer",
+                        "example": 3
+                    },
+                    "type_id": {
+                        "description": "Nouveau type",
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "images": {
+                        "description": "Nouvelles images à ajouter",
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "format": "binary"
+                        }
+                    },
+                    "images_to_delete": {
+                        "description": "IDs des images à supprimer",
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "example": [
+                            1,
+                            3,
+                            5
+                        ]
+                    }
+                },
+                "type": "object"
+            },
             "AdType": {
                 "title": "AdType",
                 "description": "Modèle pour type d'annonce",
@@ -3010,6 +4600,10 @@
         {
             "name": "quarter",
             "description": "Gestion des quartiers"
+        },
+        {
+            "name": "Annonces",
+            "description": "Gestion des annonces"
         }
     ]
 }
