@@ -43,6 +43,9 @@ use Illuminate\Support\Carbon;
  * @method static Builder<static>|Payment whereUserId($value)
  * @method static Builder<static>|Payment withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|Payment withoutTrashed()
+ * @property int $ad_id
+ * @property-read \App\Models\Ad $ad
+ * @method static Builder<static>|Payment whereAdId($value)
  * @mixin Eloquent
  */
 class Payment extends Model
