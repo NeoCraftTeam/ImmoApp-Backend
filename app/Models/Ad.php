@@ -25,6 +25,44 @@ use Illuminate\Support\Str;
  * @method static Builder<static>|Ad query()
  * @method static Builder<static>|Ad withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|Ad withoutTrashed()
+ * @property int $id
+ * @property string $title
+ * @property string $slug
+ * @property string $description
+ * @property string $adresse
+ * @property string|null $price
+ * @property string $surface_area
+ * @property int $bedrooms
+ * @property int $bathrooms
+ * @property bool $has_parking
+ * @property Point|null $location
+ * @property string $status
+ * @property string|null $expires_at
+ * @property int $user_id
+ * @property int $quarter_id
+ * @property int $type_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @method static Builder<static>|Ad whereAdresse($value)
+ * @method static Builder<static>|Ad whereBathrooms($value)
+ * @method static Builder<static>|Ad whereBedrooms($value)
+ * @method static Builder<static>|Ad whereCreatedAt($value)
+ * @method static Builder<static>|Ad whereDeletedAt($value)
+ * @method static Builder<static>|Ad whereDescription($value)
+ * @method static Builder<static>|Ad whereExpiresAt($value)
+ * @method static Builder<static>|Ad whereHasParking($value)
+ * @method static Builder<static>|Ad whereId($value)
+ * @method static Builder<static>|Ad whereLocation($value)
+ * @method static Builder<static>|Ad wherePrice($value)
+ * @method static Builder<static>|Ad whereQuarterId($value)
+ * @method static Builder<static>|Ad whereSlug($value)
+ * @method static Builder<static>|Ad whereStatus($value)
+ * @method static Builder<static>|Ad whereSurfaceArea($value)
+ * @method static Builder<static>|Ad whereTitle($value)
+ * @method static Builder<static>|Ad whereTypeId($value)
+ * @method static Builder<static>|Ad whereUpdatedAt($value)
+ * @method static Builder<static>|Ad whereUserId($value)
  * @mixin Eloquent
  */
 class Ad extends Model
@@ -61,6 +99,8 @@ class Ad extends Model
     protected $casts = [
         'location' => Point::class, // Assuming 'point' is a custom cast for PostGIS
         'has_parking' => 'boolean',
+        'expires_at' => 'datetime',
+        'price' => 'decimal:2',
     ];
 
     protected static function boot(): void
@@ -82,7 +122,8 @@ class Ad extends Model
 
     // Génère automatiquement un slug unique avant de sauvegarder
 
-    public static function generateUniqueSlug(string $title, int $ignoreId = null): string
+    // CORRECTION : paramètre nullable explicite
+    public static function generateUniqueSlug(string $title, ?int $ignoreId = null): string
     {
         $slug = Str::slug($title);
         $original = $slug;
@@ -110,18 +151,24 @@ class Ad extends Model
     }
 
 
-    protected function images(): hasMany
+    public function images(): hasMany
     {
         return $this->hasMany(AdImage::class);
     }
 
-    protected function reviews(): hasMany
+    public function primaryImage()
+    {
+        return $this->hasOne(AdImage::class)->where('is_primary', true);
+    }
+
+    public function reviews(): hasMany
     {
         return $this->hasMany(Review::class);
     }
 
-    protected function ad_type(): BelongsTo
+    public function ad_type(): BelongsTo
     {
-        return $this->belongsTo(AdType::class);
+        return $this->belongsTo(AdType::class, 'type_id');
     }
+
 }
