@@ -29,6 +29,10 @@ use Illuminate\Support\Carbon;
  * @method static Builder<static>|City whereUpdatedAt($value)
  * @method static Builder<static>|City withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|City withoutTrashed()
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Quarter> $quarters
+ * @property-read int|null $quarters_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\User> $users
+ * @property-read int|null $users_count
  * @mixin Eloquent
  */
 class City extends Model
