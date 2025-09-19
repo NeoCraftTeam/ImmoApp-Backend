@@ -75,6 +75,17 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @method static Builder<static>|User whereUpdatedAt($value)
  * @method static Builder<static>|User withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|User withoutTrashed()
+ * @property string|null $last_login_at
+ * @property string|null $last_login_ip
+ * @property bool $is_active
+ * @property-read \App\Models\City $city
+ * @property-read \Spatie\MediaLibrary\MediaCollections\Models\Collections\MediaCollection<int, Media> $media
+ * @property-read int|null $media_count
+ * @property-read Collection<int, \App\Models\Review> $reviews
+ * @property-read int|null $reviews_count
+ * @method static Builder<static>|User whereIsActive($value)
+ * @method static Builder<static>|User whereLastLoginAt($value)
+ * @method static Builder<static>|User whereLastLoginIp($value)
  * @mixin Eloquent
  */
 class User extends Authenticatable implements MustVerifyEmail, HasMedia
@@ -129,7 +140,7 @@ class User extends Authenticatable implements MustVerifyEmail, HasMedia
 
     public function canPublishAds(): bool
     {
-        return in_array($this->role, [UserRole::AGENT, UserRole::CUSTOMER,]);
+        return in_array($this->role, [UserRole::AGENT, UserRole::CUSTOMER, UserRole::ADMIN]);
     }
 
     public function ads(): HasMany
