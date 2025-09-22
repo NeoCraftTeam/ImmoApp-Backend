@@ -206,6 +206,7 @@ class AdController
      *
      * @param AdRequest $request Les données validées de la requête
      * @return JsonResponse Réponse JSON avec les détails de l'annonce créée
+     * @throws Throwable
      */
     public function store(AdRequest $request): JsonResponse
     {
@@ -294,7 +295,7 @@ class AdController
     }
 
     /**
-     * Gérer l'upload des images
+     * Gérer le téléchargement des images
      */
     private function handleImageUpload($request, Ad $ad): int
     {
@@ -583,56 +584,30 @@ class AdController
      * )
      *
      * @param AdRequest $request The validated request data
-     * @param string $id The ad ID to update
+     * @param Ad $ad
      * @return JsonResponse
+     * @throws Throwable
      */
 
-    public function update(AdRequest $request, string $id): JsonResponse
+    public function update(AdRequest $request, Ad $ad): JsonResponse
     {
-        $ad = Ad::with(['images.media', 'user', 'ad_type', 'quarter.city'])
-            ->findOrFail($id);
-
         $this->authorize('update', $ad);
-
         $data = $request->validated();
 
-        DB::beginTransaction();
-
         try {
+            DB::beginTransaction();
+
             Log::info('Data received for ad update:', $data);
             Log::info('Files received:', $request->allFiles());
 
-            // Préparer les données de mise à jour
-            $updateData = [
-                'title' => $data['title'],
-                'description' => $data['description'],
-                'adresse' => $data['adresse'],
-                'price' => $data['price'],
-                'surface_area' => $data['surface_area'],
-                'bedrooms' => $data['bedrooms'],
-                'bathrooms' => $data['bathrooms'],
-                'has_parking' => $data['has_parking'] ?? false,
-                'quarter_id' => $data['quarter_id'],
-                'type_id' => $data['type_id'],
-            ];
 
             // Mise à jour des coordonnées GPS si fournies
             if (isset($data['latitude']) && isset($data['longitude'])) {
-                $updateData['location'] = Point::makeGeodetic($data['latitude'], $data['longitude']);
-            }
-
-            // Mise à jour du statut si fourni
-            if (isset($data['status'])) {
-                $updateData['status'] = $data['status'];
-            }
-
-            // Mise à jour de la date d'expiration si fournie
-            if (isset($data['expires_at'])) {
-                $updateData['expires_at'] = $data['expires_at'];
+                $data['location'] = Point::makeGeodetic($data['latitude'], $data['longitude']);
             }
 
             // Mettre à jour l'annonce
-            $ad->update($updateData);
+            $ad->update($data);
 
             Log::info('Ad updated with ID: ' . $ad->id);
 
@@ -669,13 +644,13 @@ class AdController
                     'images_count' => $actualImagesCount,
                     'new_images_processed' => $imagesProcessed
                 ]
-            ], 200);
+            ]);
 
         } catch (Throwable $e) {
             DB::rollback();
 
             Log::error('Error updating ad: ' . $e->getMessage(), [
-                'ad_id' => $id,
+                'ad_id' => $ad->id,
                 'user_id' => auth()->id(),
                 'data' => $data,
                 'files' => $request->allFiles(),
@@ -728,9 +703,9 @@ class AdController
      */
     private function ensurePrimaryImage(Ad $ad): void
     {
-        $hassPrimary = $ad->images()->where('is_primary', true)->exists();
+        $hasPrimary = $ad->images()->where('is_primary', true)->exists();
 
-        if (!$hassPrimary) {
+        if (!$hasPrimary) {
             $firstImage = $ad->images()->first();
             if ($firstImage) {
                 $firstImage->update(['is_primary' => true]);
@@ -874,7 +849,7 @@ class AdController
             ], 200);
 
         } catch (Throwable $e) {
-            DB::rollback();
+            DB::rollBack();
 
             Log::error('Error deleting ad: ' . $e->getMessage(), [
                 'ad_id' => $id,
