@@ -36,6 +36,11 @@ class AdRequest extends FormRequest
                 'images' => 'sometimes|array|max:10',
                 'images.*' => 'image|mimes:jpeg,jpg,png,gif,webp|max:5120', // 5MB max
 
+                // Alias populaires (acceptation de variations courantes)
+                'image' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'photos' => 'sometimes|array|max:10',
+                'photos.*' => 'image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+
                 // Support pour images[0], images[1], etc.
                 'images.0' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
                 'images.1' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
@@ -72,6 +77,11 @@ class AdRequest extends FormRequest
                 'images' => 'sometimes|array|max:10',
                 'images.*' => 'image|mimes:jpeg,jpg,png,gif,webp|max:5120', // 5MB max
 
+                // Alias populaires (acceptation de variations courantes)
+                'image' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'photos' => 'sometimes|array|max:10',
+                'photos.*' => 'image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+
                 // Support pour images[0], images[1], etc.
                 'images.0' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
                 'images.1' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
@@ -85,6 +95,7 @@ class AdRequest extends FormRequest
                 'images.9' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
             ];
         }
+
         return [];
     }
 
@@ -103,9 +114,9 @@ class AdRequest extends FormRequest
             'price.numeric' => 'Le prix doit être un nombre.',
             'user_id.required' => "L'utilisateur est obligatoire.",
             'user_id.exists' => "L'utilisateur sélectionné n'existe pas.",
-            'quarter_id.required' => "Le quartier est obligatoire.",
+            'quarter_id.required' => 'Le quartier est obligatoire.',
             'quarter_id.exists' => "Le quartier sélectionné n'existe pas.",
-            'type_id.required' => "Le type est obligatoire.",
+            'type_id.required' => 'Le type est obligatoire.',
             'type_id.exists' => "Le type sélectionné n'existe pas.",
             'bedrooms.integer' => 'Le nombre de chambres doit être un entier.',
             'bathrooms.integer' => 'Le nombre de salles de bains doit être un entier.',
