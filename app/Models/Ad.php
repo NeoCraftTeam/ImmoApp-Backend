@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\AdFactory;
 use Eloquent;
@@ -14,10 +13,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 
-
 /**
  * @property-read Quarter|null $quarter
  * @property-read User|null $user
+ *
  * @method static AdFactory factory($count = null, $state = [])
  * @method static Builder<static>|Ad newModelQuery()
  * @method static Builder<static>|Ad newQuery()
@@ -25,6 +24,7 @@ use Illuminate\Support\Str;
  * @method static Builder<static>|Ad query()
  * @method static Builder<static>|Ad withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|Ad withoutTrashed()
+ *
  * @property int $id
  * @property string $title
  * @property string $slug
@@ -44,6 +44,7 @@ use Illuminate\Support\Str;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property \Illuminate\Support\Carbon|null $deleted_at
+ *
  * @method static Builder<static>|Ad whereAdresse($value)
  * @method static Builder<static>|Ad whereBathrooms($value)
  * @method static Builder<static>|Ad whereBedrooms($value)
@@ -63,12 +64,12 @@ use Illuminate\Support\Str;
  * @method static Builder<static>|Ad whereTypeId($value)
  * @method static Builder<static>|Ad whereUpdatedAt($value)
  * @method static Builder<static>|Ad whereUserId($value)
+ *
  * @mixin Eloquent
  */
 class Ad extends Model
 {
-    use HasFactory, softDeletes;
-
+    use HasFactory, SoftDeletes;
 
     protected $table = 'ad';
 
@@ -87,13 +88,13 @@ class Ad extends Model
         'expires_at',
         'user_id',
         'quarter_id',
-        'type_id'
+        'type_id',
     ];
 
     protected $hidden = [
         'created_at',
         'updated_at',
-        'deleted_at'
+        'deleted_at',
     ];
 
     protected $casts = [
@@ -130,10 +131,10 @@ class Ad extends Model
         $i = 1;
 
         while (self::where('slug', $slug)
-            ->when($ignoreId, fn($query) => $query->where('id', '!=', $ignoreId))
+            ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
             ->exists()
         ) {
-            $slug = $original . '-' . $i;
+            $slug = $original.'-'.$i;
             $i++;
         }
 
@@ -149,7 +150,6 @@ class Ad extends Model
     {
         return $this->belongsTo(Quarter::class);
     }
-
 
     public function images(): hasMany
     {
@@ -170,5 +170,4 @@ class Ad extends Model
     {
         return $this->belongsTo(AdType::class, 'type_id');
     }
-
 }
