@@ -27,6 +27,9 @@ class AdPolicy
 
     public function update(User $user, Ad $ad): bool
     {
+        if ($user->isAdmin()) {
+            return true;
+        }
         return ($user->isAgent() && ($user->isAnAgency() || $user->isAnIndividual()))
             && $user->id === $ad->user_id;
     }

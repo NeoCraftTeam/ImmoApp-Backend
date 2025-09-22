@@ -85,7 +85,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/ads', 'index');
         Route::get('/ads/{id}', 'show');
         Route::post('/ads', 'store');
-        Route::put('/ads/{id}', 'update');
+        Route::put('/ads/{ad}', 'update');
         Route::delete('/ads/{id}', 'destroy');
     });
 

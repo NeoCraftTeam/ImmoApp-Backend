@@ -13,40 +13,79 @@ class AdRequest extends FormRequest
 
     public function rules(): array
     {
-        return [
-            'title' => ['required', 'string', 'max:255'],
-            'slug' => ['string', 'max:255', 'unique:ad,slug'], // éviter les doublons
-            'description' => ['required', 'string'],
-            'adresse' => ['required', 'string', 'max:255'],
-            'price' => ['required', 'numeric', 'min:0'],
-            'surface_area' => ['required', 'numeric', 'min:0'],
-            'bedrooms' => ['required', 'integer', 'min:0'],
-            'bathrooms' => ['required', 'integer', 'min:0'],
-            'has_parking' => ['required', 'string'],
-            'location' => [new GeometryGeojsonRule([Point::class])],
-            'latitude' => 'required|numeric|between:-90,90',
-            'longitude' => 'required|numeric|between:-180,180',
-            'expires_at' => ['nullable', 'date'],
-            'user_id' => ['required', 'exists:users,id'],
-            'quarter_id' => ['required', 'exists:quarter,id'],
-            'type_id' => ['required', 'exists:ad_type,id'],
+        if ($this->isMethod('post')) {
+            return [
+                'title' => ['required', 'string', 'max:255'],
+                'slug' => ['string', 'max:255', 'unique:ad,slug'], // éviter les doublons
+                'description' => ['required', 'string'],
+                'adresse' => ['required', 'string', 'max:255'],
+                'price' => ['required', 'numeric', 'min:0'],
+                'surface_area' => ['required', 'numeric', 'min:0'],
+                'bedrooms' => ['required', 'integer', 'min:0'],
+                'bathrooms' => ['required', 'integer', 'min:0'],
+                'has_parking' => ['required', 'string'],
+                'location' => [new GeometryGeojsonRule([Point::class])],
+                'latitude' => 'required|numeric|between:-90,90',
+                'longitude' => 'required|numeric|between:-180,180',
+                'expires_at' => ['nullable', 'date'],
+                'user_id' => ['required', 'exists:users,id'],
+                'quarter_id' => ['required', 'exists:quarter,id'],
+                'type_id' => ['required', 'exists:ad_type,id'],
 
-            // Images - plusieurs formats possibles
-            'images' => 'sometimes|array|max:10',
-            'images.*' => 'image|mimes:jpeg,jpg,png,gif,webp|max:5120', // 5MB max
+                // Images,   plusieurs formats possibles
+                'images' => 'sometimes|array|max:10',
+                'images.*' => 'image|mimes:jpeg,jpg,png,gif,webp|max:5120', // 5MB max
 
-            // Support pour images[0], images[1], etc.
-            'images.0' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-            'images.1' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-            'images.2' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-            'images.3' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-            'images.4' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-            'images.5' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-            'images.6' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-            'images.7' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-            'images.8' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-            'images.9' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-        ];
+                // Support pour images[0], images[1], etc.
+                'images.0' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.1' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.2' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.3' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.4' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.5' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.6' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.7' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.8' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.9' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+            ];
+        }
+        if ($this->isMethod('put') || $this->isMethod('patch')) {
+            return [
+                'title' => ['sometimes', 'string', 'max:255'],
+                'slug' => ['string', 'max:255', 'unique:ad,slug'], // éviter les doublons
+                'description' => ['sometimes', 'string'],
+                'adresse' => ['sometimes', 'string', 'max:255'],
+                'price' => ['sometimes', 'numeric', 'min:0'],
+                'surface_area' => ['sometimes', 'numeric', 'min:0'],
+                'bedrooms' => ['sometimes', 'integer', 'min:0'],
+                'bathrooms' => ['sometimes', 'integer', 'min:0'],
+                'has_parking' => ['sometimes', 'string'],
+                'location' => [new GeometryGeojsonRule([Point::class])],
+                'latitude' => 'sometimes|numeric|between:-90,90',
+                'longitude' => 'sometimes|numeric|between:-180,180',
+                'expires_at' => ['nullable', 'date'],
+                'user_id' => ['sometimes', 'exists:users,id'],
+                'quarter_id' => ['sometimes', 'exists:quarter,id'],
+                'type_id' => ['sometimes', 'exists:ad_type,id'],
+
+                // Images, plusieurs formats possibles
+                'images' => 'sometimes|array|max:10',
+                'images.*' => 'image|mimes:jpeg,jpg,png,gif,webp|max:5120', // 5MB max
+
+                // Support pour images[0], images[1], etc.
+                'images.0' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.1' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.2' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.3' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.4' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.5' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.6' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.7' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.8' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.9' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+            ];
+        }
+        return [];
     }
 
     public function geometries(): array
@@ -70,7 +109,7 @@ class AdRequest extends FormRequest
             'type_id.exists' => "Le type sélectionné n'existe pas.",
             'bedrooms.integer' => 'Le nombre de chambres doit être un entier.',
             'bathrooms.integer' => 'Le nombre de salles de bains doit être un entier.',
-            
+
             'images.max' => 'You can upload a maximum of 10 images.',
             'images.*.image' => 'Each file must be an image.',
             'images.*.mimes' => 'Images must be in JPEG, PNG, GIF, or WebP format.',

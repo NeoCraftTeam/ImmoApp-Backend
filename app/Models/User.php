@@ -101,7 +101,10 @@ class User extends Authenticatable implements MustVerifyEmail, HasMedia
      *
      * @var list<string>
      */
-    protected $fillable = ['firstname', 'lastname', 'email', 'password', 'phone_number', 'type', 'role', 'avatar', 'city_id'];
+    protected $fillable = ['firstname', 'lastname', 'email', 'password', 'phone_number', 'type', 'role', 'avatar', 'city_id', 'is_active'];
+    protected $casts = [
+        'is_active' => 'boolean',
+    ];
 
     /**
      * The attributes that should be hidden for serialization.

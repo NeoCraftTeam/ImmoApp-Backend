@@ -6,6 +6,7 @@ use App\Http\Requests\UserRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -221,8 +222,7 @@ class UserController
                 'role' => $data['role'],
                 'type' => $data['type'] ?? null,
                 'city_id' => $data['city_id'],
-                'is_active' => true,
-                'created_at' => now(),
+                'is_active' => true
             ]);
 
             // Gestion de l'avatar (le modèle gère le default)
@@ -426,7 +426,7 @@ class UserController
      *     )
      * )
      */
-    public function update(UserRequest $request, User $user)
+    public function update(UserRequest $request, User $user): JsonResponse
     {
         $this->authorize('update', $user);
         $data = $request->validated();
