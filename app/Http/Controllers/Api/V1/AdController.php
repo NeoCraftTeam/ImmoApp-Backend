@@ -14,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class AdController
@@ -30,31 +31,40 @@ class AdController
      *     operationId="obtenirAnnonces",
      *     tags={"Annonces"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="page",
      *         in="query",
      *         description="Numéro de page",
      *         required=false,
+     *
      *         @OA\Schema(type="integer", minimum=1, default=1, example=1)
      *     ),
+     *
      *     @OA\Parameter(
      *         name="per_page",
      *         in="query",
      *         description="Nombre d'éléments par page",
      *         required=false,
+     *
      *         @OA\Schema(type="integer", minimum=1, maximum=100, default=15, example=15)
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Opération réussie",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(
      *                 property="data",
      *                 type="array",
      *                 description="Liste des annonces",
+     *
      *                 @OA\Items(ref="#/components/schemas/AdResource")
      *             ),
+     *
      *             @OA\Property(
      *                 property="links",
      *                 type="object",
@@ -77,20 +87,26 @@ class AdController
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=401,
      *         description="Non authentifié - Token d'authentification manquant ou invalide",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Non authentifié"),
      *             @OA\Property(property="error", type="string", example="Token d'authentification requis")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=403,
      *         description="Interdit - Permissions insuffisantes pour voir les annonces",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Cette action n'est pas autorisée"),
      *             @OA\Property(property="error", type="string", example="Permissions insuffisantes")
      *         )
@@ -98,12 +114,14 @@ class AdController
      * )
      *
      * @return AnonymousResourceCollection Collection paginée des ressources d'annonces
+     *
      * @throws AuthorizationException
      */
     public function index(): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Ad::class);
-        $ads = Ad::with('quarter.city', 'ad_type', 'images.media', 'user')->paginate(config('pagination.per_page', 15));
+        $ads = Ad::with('quarter.city', 'ad_type', 'images', 'user')->paginate(config('pagination.per_page', 15));
+
         return AdResource::collection($ads);
     }
 
@@ -117,13 +135,17 @@ class AdController
      *     operationId="creerAnnonce",
      *     tags={"Annonces"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\RequestBody(
      *         required=true,
      *         description="Données de l'annonce avec images optionnelles",
+     *
      *         @OA\MediaType(
      *             mediaType="multipart/form-data",
+     *
      *             @OA\Schema(
      *                 required={"title", "description", "adresse", "price", "surface_area", "bedrooms", "bathrooms", "latitude", "longitude", "quarter_id", "type_id"},
+     *
      *                 @OA\Property(property="title", type="string", maxLength=255, example="Magnifique appartement au centre-ville", description="Titre accrocheur de l'annonce"),
      *                 @OA\Property(property="description", type="string", example="Spacieux appartement de 3 pièces avec vue imprenable sur la ville, proche de tous commerces", description="Description détaillée du bien"),
      *                 @OA\Property(property="adresse", type="string", maxLength=500, example="123 Rue de la République, Centre-ville", description="Adresse complète du bien"),
@@ -143,17 +165,21 @@ class AdController
      *                     property="images",
      *                     type="array",
      *                     description="Images du bien (maximum 10 images, 5MB chacune). Formats acceptés: JPEG, PNG, GIF, WebP",
+     *
      *                     @OA\Items(type="string", format="binary"),
      *                     maxItems=10
      *                 )
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=201,
      *         description="Annonce créée avec succès",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Annonce créée avec succès"),
      *             @OA\Property(
@@ -165,29 +191,38 @@ class AdController
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=401,
      *         description="Non authentifié",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Non authentifié"),
      *             @OA\Property(property="error", type="string", example="Token d'authentification requis")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=403,
      *         description="Interdit - Permissions insuffisantes pour créer une annonce",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Cette action n'est pas autorisée"),
      *             @OA\Property(property="error", type="string", example="Permissions insuffisantes pour créer une annonce")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=422,
      *         description="Erreurs de validation ou échec de création",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Erreur lors de la création de l'annonce"),
      *             @OA\Property(property="error", type="string", example="Les coordonnées GPS sont obligatoires"),
@@ -204,8 +239,9 @@ class AdController
      *     )
      * )
      *
-     * @param AdRequest $request Les données validées de la requête
+     * @param  AdRequest  $request  Les données validées de la requête
      * @return JsonResponse Réponse JSON avec les détails de l'annonce créée
+     *
      * @throws Throwable
      */
     public function store(AdRequest $request): JsonResponse
@@ -220,7 +256,7 @@ class AdController
             Log::info('Files received:', $request->allFiles());
 
             // Validation des coordonnées GPS
-            if (!isset($data['latitude']) || !isset($data['longitude'])) {
+            if (! isset($data['latitude']) || ! isset($data['longitude'])) {
                 throw new Exception('Latitude and longitude are required');
             }
 
@@ -242,29 +278,29 @@ class AdController
                 'type_id' => $data['type_id'],
             ]);
 
-            Log::info('Ad created with ID: ' . $ad->id);
+            Log::info('Ad created with ID: '.$ad->id);
 
             // Gérer les images
             $imagesProcessed = 0;
-            if ($request->hasFile('images')) {
+            if (! empty($request->allFiles())) {
                 $imagesProcessed = $this->handleImageUpload($request, $ad);
             }
 
-            Log::info('Images processed: ' . $imagesProcessed);
+            Log::info('Images processed: '.$imagesProcessed);
 
             DB::commit();
 
-            // Charger les relations avec les médias
+            // Charger les relations
             $ad->load([
-                'images.media',
+                'images',
                 'user',
                 'ad_type',
-                'quarter.city'
+                'quarter.city',
             ]);
 
             // Recompter les images après chargement
             $actualImagesCount = $ad->images()->count();
-            Log::info('Actual images count after loading: ' . $actualImagesCount);
+            Log::info('Actual images count after loading: '.$actualImagesCount);
 
             return response()->json([
                 'success' => true,
@@ -272,24 +308,24 @@ class AdController
                 'data' => [
                     'ad' => new AdResource($ad),
                     'images_count' => $actualImagesCount,
-                    'images_processed' => $imagesProcessed
-                ]
+                    'images_processed' => $imagesProcessed,
+                ],
             ], 201);
 
         } catch (Throwable $e) {
             DB::rollback();
 
-            Log::error('Error creating ad: ' . $e->getMessage(), [
+            Log::error('Error creating ad: '.$e->getMessage(), [
                 'user_id' => auth()->id(),
                 'data' => $data,
                 'files' => $request->allFiles(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Error creating ad',
-                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while creating the ad.'
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while creating the ad.',
             ], 422);
         }
     }
@@ -299,43 +335,72 @@ class AdController
      */
     private function handleImageUpload($request, Ad $ad): int
     {
-        Log::info('Starting image upload process');
+        Log::info('Starting image upload process (filesystem mode)');
 
         $images = [];
         $imagesProcessed = 0;
 
-        // Récupérer les images - gérer les différents formats possibles
-        if ($request->hasFile('images')) {
-            $uploadedImages = $request->file('images');
+        // 1) Récupérer tous les fichiers envoyés et aplatir les structures imbriquées
+        $allFiles = $request->allFiles();
+        $detectedKeys = array_keys($allFiles);
+        Log::info('All file keys detected in request:', $detectedKeys);
 
-            // Cas où c'est un tableau d'images (images[0], images[1], etc.)
-            if (is_array($uploadedImages)) {
-                $images = $uploadedImages;
-                Log::info('Images received as array, count: ' . count($images));
-            } else {
-                // Cas où c'est une seule image
-                $images = [$uploadedImages];
-                Log::info('Single image received');
+        $flatten = function ($files) use (&$flatten) {
+            $out = [];
+            foreach ($files as $key => $value) {
+                if (is_array($value)) {
+                    $out = array_merge($out, $flatten($value));
+                } else {
+                    $out[] = $value; // UploadedFile instance
+                }
             }
+
+            return $out;
+        };
+
+        // 2) Sources prioritaires connues: images (array ou single), image (single), photos (array ou single), files (array)
+        $candidates = [];
+
+        if ($request->hasFile('images')) {
+            $candidates[] = $request->file('images');
+        }
+        if ($request->hasFile('image')) {
+            $candidates[] = $request->file('image');
+        }
+        if ($request->hasFile('photos')) {
+            $candidates[] = $request->file('photos');
+        }
+        if ($request->hasFile('files')) {
+            $candidates[] = $request->file('files');
         }
 
-        // Vérifier s'il y a des images individuelles (images[0], images[1], etc.)
-        for ($i = 0; $i < 10; $i++) {
-            if ($request->hasFile("images.{$i}")) {
-                $images[] = $request->file("images.{$i}");
-                Log::info("Individual image found: images.{$i}");
+        // Ajouter toute autre clé fichier détectée (fallback)
+        foreach ($allFiles as $key => $val) {
+            $candidates[] = $val;
+        }
+
+        // Aplatir en une liste d'UploadedFile
+        foreach ($candidates as $candidate) {
+            if ($candidate === null) {
+                continue;
+            }
+            if (is_array($candidate)) {
+                $images = array_merge($images, $flatten($candidate));
+            } else {
+                $images[] = $candidate;
             }
         }
 
         // Filtrer les images nulles ou invalides
-        $images = array_filter($images, function ($image) {
-            return $image !== null && $image->isValid();
-        });
+        $images = array_values(array_filter($images, function ($image) {
+            return $image !== null && method_exists($image, 'isValid') && $image->isValid();
+        }));
 
-        Log::info('Valid images found: ' . count($images));
+        Log::info('Valid images found after flattening: '.count($images));
 
         if (empty($images)) {
-            Log::warning('No valid images found');
+            Log::warning('No valid images found in the request');
+
             return 0;
         }
 
@@ -344,64 +409,65 @@ class AdController
             throw new Exception('Maximum 10 images allowed per ad.');
         }
 
+        $directory = 'ads/'.$ad->id;
+
         foreach ($images as $index => $image) {
             try {
-                Log::info("Processing image {$index}: " . $image->getClientOriginalName());
-
-                // Valider le fichier
-                if (!$image->isValid()) {
-                    Log::warning("Image {$index} is not valid, skipping");
-                    continue;
-                }
+                $originalName = method_exists($image, 'getClientOriginalName') ? $image->getClientOriginalName() : 'unknown';
+                Log::info("Processing image {$index}: ".$originalName);
 
                 // Valider le type MIME
                 $allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-                if (!in_array($image->getMimeType(), $allowedMimes)) {
-                    Log::warning("Image {$index} has invalid MIME type: " . $image->getMimeType());
+                $mime = method_exists($image, 'getMimeType') ? $image->getMimeType() : null;
+                if ($mime === null || ! in_array($mime, $allowedMimes)) {
+                    Log::warning("Image {$index} has invalid or unknown MIME type: ".$mime);
+
                     continue;
                 }
 
                 // Valider la taille (max 5MB)
-                if ($image->getSize() > 5 * 1024 * 1024) {
-                    Log::warning("Image {$index} is too large: " . $image->getSize() . " bytes");
+                $size = method_exists($image, 'getSize') ? $image->getSize() : 0;
+                if ($size > 5 * 1024 * 1024) {
+                    Log::warning("Image {$index} is too large: ".$size.' bytes');
+
                     continue;
                 }
 
-                // Créer l'enregistrement AdImage
-                $adImage = AdImage::create([
-                    'ad_id' => $ad->id,
-                    'is_primary' => $imagesProcessed === 0, // La première image valide est primaire.
-                ]);
-
-                Log::info("AdImage created with ID: " . $adImage->id);
-
                 // Générer un nom de fichier unique
+                $extension = method_exists($image, 'getClientOriginalExtension') ? $image->getClientOriginalExtension() : 'jpg';
                 $fileName = sprintf(
                     '%s_%s_%d.%s',
                     $ad->id,
                     time(),
                     $index,
-                    $image->getClientOriginalExtension()
+                    $extension
                 );
 
-                // Attacher le fichier avec Spatie Media Library
-                $mediaItem = $adImage->addMedia($image->getRealPath())
-                    ->usingName($ad->title . " - Image " . ($imagesProcessed + 1))
-                    ->usingFileName($fileName)
-                    ->toMediaCollection('images');
+                // Enregistrer sur le disque public
+                $stored = Storage::disk('public')->putFileAs($directory, $image, $fileName);
+                if (! $stored) {
+                    Log::warning('Failed to store image on disk for index '.$index);
 
-                Log::info("Media attached with ID: " . $mediaItem->id . ", URL: " . $mediaItem->getUrl());
+                    continue;
+                }
+
+                // Créer l'enregistrement AdImage avec le chemin
+                AdImage::create([
+                    'ad_id' => $ad->id,
+                    'image_path' => $directory.'/'.$fileName,
+                    'is_primary' => $imagesProcessed === 0, // La première image valide est primaire.
+                ]);
 
                 $imagesProcessed++;
-
             } catch (Exception $e) {
-                Log::error("Error processing image {$index}: " . $e->getMessage());
-                // Continue avec les autres images même si une échoue.
+                Log::error("Error processing image {$index}: ".$e->getMessage());
+
                 continue;
             }
         }
 
         Log::info("Total images processed successfully: {$imagesProcessed}");
+
         return $imagesProcessed;
     }
 
@@ -415,64 +481,78 @@ class AdController
      *     operationId="obtenirAnnonce",
      *     tags={"Annonces"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
      *         description="Identifiant unique de l'annonce",
+     *
      *         @OA\Schema(type="string", example="1")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Annonce récupérée avec succès",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="data", ref="#/components/schemas/AdResource", description="Données complètes de l'annonce")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=401,
      *         description="Non authentifié - Token d'authentification manquant ou invalide",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Non authentifié"),
      *             @OA\Property(property="error", type="string", example="Token d'authentification requis")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=403,
      *         description="Interdit - Permissions insuffisantes pour voir cette annonce",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Cette action n'est pas autorisée"),
      *             @OA\Property(property="error", type="string", example="Vous n'avez pas l'autorisation de voir cette annonce")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="Annonce introuvable",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Annonce introuvable"),
      *             @OA\Property(property="error", type="string", example="L'annonce avec l'ID spécifié n'existe pas")
      *         )
      *     )
      * )
      *
-     * @param string $id L'identifiant de l'annonce
+     * @param  string  $id  L'identifiant de l'annonce
      * @return JsonResponse Réponse JSON avec les données de l'annonce
      */
     public function show(string $id): JsonResponse
     {
-        $ad = Ad::with(['images.media', 'user', 'ad_type', 'quarter.city'])
+        $ad = Ad::with(['images', 'user', 'ad_type', 'quarter.city'])
             ->findOrFail($id);
 
         $this->authorize('view', $ad);
 
         return response()->json([
             'success' => true,
-            'data' => new AdResource($ad)
+            'data' => new AdResource($ad),
         ]);
     }
 
@@ -486,19 +566,25 @@ class AdController
      *     operationId="mettreAJourAnnonce",
      *     tags={"Annonces"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
      *         description="Identifiant unique de l'annonce à mettre à jour",
+     *
      *         @OA\Schema(type="string", example="1")
      *     ),
+     *
      *     @OA\RequestBody(
      *         required=true,
      *         description="Données mises à jour de l'annonce avec nouvelles images optionnelles",
+     *
      *         @OA\MediaType(
      *             mediaType="multipart/form-data",
+     *
      *             @OA\Schema(
+     *
      *                 @OA\Property(property="_method", type="string", example="PUT", description="Surcharge de méthode HTTP pour les uploads de fichiers"),
      *                 @OA\Property(property="title", type="string", maxLength=255, example="Titre d'annonce mis à jour", description="Nouveau titre de l'annonce"),
      *                 @OA\Property(property="description", type="string", example="Description mise à jour avec nouveaux équipements", description="Nouvelle description détaillée"),
@@ -518,23 +604,29 @@ class AdController
      *                     property="images",
      *                     type="array",
      *                     description="Nouvelles images à ajouter (maximum 10 images au total par annonce, 5MB chacune)",
+     *
      *                     @OA\Items(type="string", format="binary")
      *                 ),
+     *
      *                 @OA\Property(
      *                     property="images_to_delete",
      *                     type="array",
      *                     description="Identifiants des images à supprimer",
+     *
      *                     @OA\Items(type="integer"),
      *                     example={1, 3, 5}
      *                 )
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Annonce mise à jour avec succès",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(property="message", type="string", example="Annonce mise à jour avec succès"),
      *             @OA\Property(
@@ -546,36 +638,48 @@ class AdController
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=401,
      *         description="Non authentifié - Token d'authentification manquant ou invalide",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Non authentifié")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=403,
      *         description="Interdit - Permissions insuffisantes pour modifier cette annonce",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Cette action n'est pas autorisée"),
      *             @OA\Property(property="error", type="string", example="Vous n'avez pas l'autorisation de modifier cette annonce")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="Annonce introuvable",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Annonce introuvable")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=422,
      *         description="Validation errors or update failed",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Error updating ad"),
      *             @OA\Property(property="error", type="string", example="Validation failed or server error")
@@ -583,12 +687,10 @@ class AdController
      *     )
      * )
      *
-     * @param AdRequest $request The validated request data
-     * @param Ad $ad
-     * @return JsonResponse
+     * @param  AdRequest  $request  The validated request data
+     *
      * @throws Throwable
      */
-
     public function update(AdRequest $request, Ad $ad): JsonResponse
     {
         $this->authorize('update', $ad);
@@ -600,7 +702,6 @@ class AdController
             Log::info('Data received for ad update:', $data);
             Log::info('Files received:', $request->allFiles());
 
-
             // Mise à jour des coordonnées GPS si fournies
             if (isset($data['latitude']) && isset($data['longitude'])) {
                 $data['location'] = Point::makeGeodetic($data['latitude'], $data['longitude']);
@@ -609,11 +710,11 @@ class AdController
             // Mettre à jour l'annonce
             $ad->update($data);
 
-            Log::info('Ad updated with ID: ' . $ad->id);
+            Log::info('Ad updated with ID: '.$ad->id);
 
             // Gérer les nouvelles images si présentes
             $imagesProcessed = 0;
-            if ($request->hasFile('images')) {
+            if (! empty($request->allFiles())) {
                 $imagesProcessed = $this->handleImageUpload($request, $ad);
             }
 
@@ -622,16 +723,16 @@ class AdController
                 $this->handleImageDeletion($request->images_to_delete, $ad);
             }
 
-            Log::info('New images processed: ' . $imagesProcessed);
+            Log::info('New images processed: '.$imagesProcessed);
 
             DB::commit();
 
             // Recharger les relations
             $ad->load([
-                'images.media',
+                'images',
                 'user',
                 'ad_type',
-                'quarter.city'
+                'quarter.city',
             ]);
 
             $actualImagesCount = $ad->images()->count();
@@ -642,25 +743,25 @@ class AdController
                 'data' => [
                     'ad' => new AdResource($ad),
                     'images_count' => $actualImagesCount,
-                    'new_images_processed' => $imagesProcessed
-                ]
+                    'new_images_processed' => $imagesProcessed,
+                ],
             ]);
 
         } catch (Throwable $e) {
             DB::rollback();
 
-            Log::error('Error updating ad: ' . $e->getMessage(), [
+            Log::error('Error updating ad: '.$e->getMessage(), [
                 'ad_id' => $ad->id,
                 'user_id' => auth()->id(),
                 'data' => $data,
                 'files' => $request->allFiles(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Error updating ad',
-                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while updating the ad.'
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while updating the ad.',
             ], 422);
         }
     }
@@ -679,16 +780,19 @@ class AdController
                     ->first();
 
                 if ($adImage) {
-                    // Supprimer les fichiers média
-                    $adImage->clearMediaCollection('images');
+                    // Supprimer le fichier du disque si présent
+                    if (! empty($adImage->image_path)) {
+                        Storage::disk('public')->delete($adImage->image_path);
+                    }
                     $adImage->delete();
 
-                    Log::info('Image deleted successfully with ID: ' . $imageId);
+                    Log::info('Image deleted successfully with ID: '.$imageId);
                 } else {
-                    Log::warning('Image not found or does not belong to ad: ' . $imageId);
+                    Log::warning('Image not found or does not belong to ad: '.$imageId);
                 }
             } catch (Exception $e) {
-                Log::error('Error deleting image ID ' . $imageId . ': ' . $e->getMessage());
+                Log::error('Error deleting image ID '.$imageId.': '.$e->getMessage());
+
                 // Continue avec les autres images même si une échoue
                 continue;
             }
@@ -705,11 +809,11 @@ class AdController
     {
         $hasPrimary = $ad->images()->where('is_primary', true)->exists();
 
-        if (!$hasPrimary) {
+        if (! $hasPrimary) {
             $firstImage = $ad->images()->first();
             if ($firstImage) {
                 $firstImage->update(['is_primary' => true]);
-                Log::info('Set new primary image for ad ID: ' . $ad->id . ', image ID: ' . $firstImage->id);
+                Log::info('Set new primary image for ad ID: '.$ad->id.', image ID: '.$firstImage->id);
             }
         }
     }
@@ -724,18 +828,23 @@ class AdController
      *     operationId="supprimerAnnonce",
      *     tags={"Annonces"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
      *         description="Identifiant unique de l'annonce à supprimer",
+     *
      *         @OA\Schema(type="string", example="1")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Annonce supprimée avec succès",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=true, description="Statut de succès de l'opération"),
      *             @OA\Property(property="message", type="string", example="Annonce supprimée avec succès", description="Message de confirmation"),
      *             @OA\Property(
@@ -749,8 +858,10 @@ class AdController
      *                     property="deleted_images_details",
      *                     type="array",
      *                     description="Détails des images supprimées",
+     *
      *                     @OA\Items(
      *                         type="object",
+     *
      *                         @OA\Property(property="id", type="integer", example=1, description="ID de l'image"),
      *                         @OA\Property(property="was_primary", type="boolean", example=true, description="Si l'image était primaire"),
      *                         @OA\Property(property="media_files_deleted", type="integer", example=1, description="Nombre de fichiers média supprimés")
@@ -760,38 +871,50 @@ class AdController
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=401,
      *         description="Non authentifié - Token d'authentification manquant ou invalide",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Non authentifié"),
      *             @OA\Property(property="error", type="string", example="Token d'authentification requis pour supprimer une annonce")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=403,
      *         description="Interdit - Permissions insuffisantes pour supprimer cette annonce",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Cette action n'est pas autorisée"),
      *             @OA\Property(property="error", type="string", example="Vous n'avez pas l'autorisation de supprimer cette annonce. Seul le propriétaire ou un administrateur peut la supprimer.")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=404,
      *         description="Annonce introuvable",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Annonce introuvable"),
      *             @OA\Property(property="error", type="string", example="L'annonce avec l'ID spécifié n'existe pas ou a déjà été supprimée")
      *         )
      *     ),
+     *
      *     @OA\Response(
      *         response=422,
      *         description="Erreur lors de la suppression",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Erreur lors de la suppression de l'annonce"),
      *             @OA\Property(property="error", type="string", example="Une erreur s'est produite lors de la suppression des fichiers ou de la base de données"),
@@ -808,34 +931,47 @@ class AdController
      *     )
      * )
      *
-     * @param string $id L'identifiant de l'annonce à supprimer
+     * @param  string  $id  L'identifiant de l'annonce à supprimer
      * @return JsonResponse Réponse JSON confirmant la suppression avec détails
      */
     public function destroy(string $id): JsonResponse
     {
-        $ad = Ad::with(['images.media'])->findOrFail($id);
+        $ad = Ad::with(['images'])->findOrFail($id);
 
         $this->authorize('delete', $ad);
 
         DB::beginTransaction();
 
         try {
-            Log::info('Starting deletion of ad with ID: ' . $id);
+            Log::info('Starting deletion of ad with ID: '.$id);
 
             // Supprimer toutes les images associées
             $imagesCount = $ad->images()->count();
             foreach ($ad->images as $adImage) {
-                // Supprimer les fichiers média avec Spatie Media Library
-                $adImage->clearMediaCollection('images');
+                // Supprimer le fichier du disque
+                if (! empty($adImage->image_path)) {
+                    Storage::disk('public')->delete($adImage->image_path);
+                }
                 $adImage->delete();
             }
 
-            Log::info('Deleted ' . $imagesCount . ' images for ad ID: ' . $id);
+            // Supprimer le dossier de l'annonce s'il est vide
+            $dir = 'ads/'.$ad->id;
+            try {
+                $filesLeft = Storage::disk('public')->files($dir);
+                if (empty($filesLeft)) {
+                    Storage::disk('public')->deleteDirectory($dir);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Could not cleanup directory: '.$dir.' due to: '.$e->getMessage());
+            }
+
+            Log::info('Deleted '.$imagesCount.' images for ad ID: '.$id);
 
             // Supprimer l'annonce
             $ad->delete();
 
-            Log::info('Ad deleted successfully with ID: ' . $id);
+            Log::info('Ad deleted successfully with ID: '.$id);
 
             DB::commit();
 
@@ -844,23 +980,23 @@ class AdController
                 'message' => 'Ad deleted successfully',
                 'data' => [
                     'deleted_ad_id' => $id,
-                    'deleted_images_count' => $imagesCount
-                ]
+                    'deleted_images_count' => $imagesCount,
+                ],
             ], 200);
 
         } catch (Throwable $e) {
             DB::rollBack();
 
-            Log::error('Error deleting ad: ' . $e->getMessage(), [
+            Log::error('Error deleting ad: '.$e->getMessage(), [
                 'ad_id' => $id,
                 'user_id' => auth()->id(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Error deleting ad',
-                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while deleting the ad.'
+                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while deleting the ad.',
             ], 422);
         }
     }
