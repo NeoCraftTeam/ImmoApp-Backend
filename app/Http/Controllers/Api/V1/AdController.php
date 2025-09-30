@@ -1008,10 +1008,10 @@ class AdController
 
     public function ads_nearby(Ad $ad, AdRequest $request): JsonResponse
     {
-        $default_radius = 10000;
+        define('DEFAULT_RADIUS', 1000); // constante par défaut pour le rayon en mètres
         $lat = $request->input('latitude', $ad->location?->getLatitude());
         $long = $request->input('longitude', $ad->location?->getLongitude());
-        $radius = (float)$request->input('radius', $default_radius); // meters
+        $radius = (float)$request->input('radius', DEFAULT_RADIUS); // meters
 
         try {
 
