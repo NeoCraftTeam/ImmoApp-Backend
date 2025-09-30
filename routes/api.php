@@ -6,7 +6,6 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\QuarterController;
 use App\Http\Controllers\Api\V1\UserController;
-use App\Http\Controllers\Api\V1\Auth\EmailVerificationController;
 use Illuminate\Support\Facades\Route;
 
 // Prefix routes
@@ -32,7 +31,6 @@ Route::prefix('v1')->group(function () {
 
         // Route::get('email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])->name('verification.verify');
 
-
         // Routes protégées
         Route::middleware('auth:sanctum')->group(function () {
             Route::post('logout', [AuthController::class, 'logout']);
@@ -42,8 +40,7 @@ Route::prefix('v1')->group(function () {
         });
     });
 
-
-// adType
+    // adType
     Route::middleware('auth:sanctum')->controller(AdTypeController::class)->group(function () {
         Route::get('/ad-types', 'index');
         Route::get('/ad-types/{adType}', 'show');
@@ -52,8 +49,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('/ad-types/{adType}', 'destroy');
     });
 
-
-// City
+    // City
     Route::controller(CityController::class)->group(function () {
         Route::get('/cities', 'index');
         Route::get('/cities/{id}', 'show');
@@ -62,7 +58,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('/cities/{city}', 'destroy')->middleware('auth:sanctum');
     });
 
-// Quarter
+    // Quarter
     Route::controller(QuarterController::class)->group(function () {
         Route::get('/quarters', 'index');
         Route::get('/quarters/{id}', 'show');
@@ -71,7 +67,7 @@ Route::prefix('v1')->group(function () {
         Route::delete('/quarters/{quarter}', 'destroy')->middleware('auth:sanctum');
     });
 
-// User
+    // User
     Route::middleware('auth:sanctum')->controller(UserController::class)->group(function () {
         Route::get('/users', 'index');
         Route::get('/users/{id}', 'show');
@@ -80,14 +76,14 @@ Route::prefix('v1')->group(function () {
         Route::delete('/users/{user}', 'destroy');
     });
 
-//  Ads
+    //  Ads
     Route::middleware('auth:sanctum')->controller(AdController::class)->group(function () {
         Route::get('/ads', 'index');
         Route::get('/ads/{id}', 'show');
         Route::post('/ads', 'store');
         Route::put('/ads/{ad}', 'update');
         Route::delete('/ads/{id}', 'destroy');
+        Route::get('/ads/{ad}/nearby', 'ads_nearby');
     });
-
 
 });
