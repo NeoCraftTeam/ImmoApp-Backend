@@ -27,6 +27,7 @@ class AdRequest extends FormRequest
                 'location' => [new GeometryGeojsonRule([Point::class])],
                 'latitude' => 'required|numeric|between:-90,90',
                 'longitude' => 'required|numeric|between:-180,180',
+                'radius' => 'nullable|numeric|min:0',
                 'expires_at' => ['nullable', 'date'],
                 'user_id' => ['required', 'exists:users,id'],
                 'quarter_id' => ['required', 'exists:quarter,id'],
