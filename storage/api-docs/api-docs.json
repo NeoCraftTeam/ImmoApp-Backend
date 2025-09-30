@@ -64,11 +64,11 @@
                                             "properties": {
                                                 "first": {
                                                     "type": "string",
-                                                    "example": "http://example.com/api/v1/ads?page=1"
+                                                    "example": "https://example.com/api/v1/ads?page=1"
                                                 },
                                                 "last": {
                                                     "type": "string",
-                                                    "example": "http://example.com/api/v1/ads?page=10"
+                                                    "example": "https://example.com/api/v1/ads?page=10"
                                                 },
                                                 "prev": {
                                                     "type": "string",
@@ -77,7 +77,7 @@
                                                 },
                                                 "next": {
                                                     "type": "string",
-                                                    "example": "http://example.com/api/v1/ads?page=2",
+                                                    "example": "https://example.com/api/v1/ads?page=2",
                                                     "nullable": true
                                                 }
                                             },

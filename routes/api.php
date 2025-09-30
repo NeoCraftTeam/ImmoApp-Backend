@@ -76,14 +76,20 @@ Route::prefix('v1')->group(function () {
         Route::delete('/users/{user}', 'destroy');
     });
 
-    //  Ads
-    Route::middleware('auth:sanctum')->controller(AdController::class)->group(function () {
-        Route::get('/ads', 'index');
-        Route::get('/ads/{id}', 'show');
-        Route::post('/ads', 'store');
-        Route::put('/ads/{ad}', 'update');
-        Route::delete('/ads/{id}', 'destroy');
-        Route::get('/ads/{ad}/nearby', 'ads_nearby');
-    });
+//  Ads
+    Route::prefix('ads')->controller(AdController::class)->group(function () {
+        Route::get('/', 'index');
+        Route::get('/{id}', 'show');
 
+        Route::middleware('auth:sanctum')->group(function () {
+            Route::post('', 'store');
+            Route::put('/{ad}', 'update');
+            Route::delete('/{id}', 'destroy');
+            Route::get('/{ad}/nearby', 'ads_nearby');
+        });
+
+    });
 });
+
+
+
