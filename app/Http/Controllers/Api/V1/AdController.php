@@ -7,6 +7,7 @@ use App\Http\Resources\AdResource;
 use App\Models\Ad;
 use App\Models\AdImage;
 use Clickbar\Magellan\Data\Geometries\Point;
+use Clickbar\Magellan\Database\PostgisFunctions\ST;
 use Exception;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -69,10 +70,10 @@ class AdController
      *                 property="links",
      *                 type="object",
      *                 description="Liens de pagination",
-     *                 @OA\Property(property="first", type="string", example="http://example.com/api/v1/ads?page=1"),
-     *                 @OA\Property(property="last", type="string", example="http://example.com/api/v1/ads?page=10"),
+     *                 @OA\Property(property="first", type="string", example="https://example.com/api/v1/ads?page=1"),
+     *                 @OA\Property(property="last", type="string", example="https://example.com/api/v1/ads?page=10"),
      *                 @OA\Property(property="prev", type="string", nullable=true, example=null),
-     *                 @OA\Property(property="next", type="string", nullable=true, example="http://example.com/api/v1/ads?page=2")
+     *                 @OA\Property(property="next", type="string", nullable=true, example="https://example.com/api/v1/ads?page=2")
      *             ),
      *             @OA\Property(
      *                 property="meta",
@@ -239,7 +240,7 @@ class AdController
      *     )
      * )
      *
-     * @param  AdRequest  $request  Les données validées de la requête
+     * @param AdRequest $request Les données validées de la requête
      * @return JsonResponse Réponse JSON avec les détails de l'annonce créée
      *
      * @throws Throwable
@@ -256,7 +257,7 @@ class AdController
             Log::info('Files received:', $request->allFiles());
 
             // Validation des coordonnées GPS
-            if (! isset($data['latitude']) || ! isset($data['longitude'])) {
+            if (!isset($data['latitude']) || !isset($data['longitude'])) {
                 throw new Exception('Latitude and longitude are required');
             }
 
@@ -278,15 +279,15 @@ class AdController
                 'type_id' => $data['type_id'],
             ]);
 
-            Log::info('Ad created with ID: '.$ad->id);
+            Log::info('Ad created with ID: ' . $ad->id);
 
             // Gérer les images
             $imagesProcessed = 0;
-            if (! empty($request->allFiles())) {
+            if (!empty($request->allFiles())) {
                 $imagesProcessed = $this->handleImageUpload($request, $ad);
             }
 
-            Log::info('Images processed: '.$imagesProcessed);
+            Log::info('Images processed: ' . $imagesProcessed);
 
             DB::commit();
 
@@ -300,7 +301,7 @@ class AdController
 
             // Recompter les images après chargement
             $actualImagesCount = $ad->images()->count();
-            Log::info('Actual images count after loading: '.$actualImagesCount);
+            Log::info('Actual images count after loading: ' . $actualImagesCount);
 
             return response()->json([
                 'success' => true,
@@ -315,7 +316,7 @@ class AdController
         } catch (Throwable $e) {
             DB::rollback();
 
-            Log::error('Error creating ad: '.$e->getMessage(), [
+            Log::error('Error creating ad: ' . $e->getMessage(), [
                 'user_id' => auth()->id(),
                 'data' => $data,
                 'files' => $request->allFiles(),
@@ -332,6 +333,8 @@ class AdController
 
     /**
      * Gérer le téléchargement des images
+     *
+     * @throws Exception
      */
     private function handleImageUpload($request, Ad $ad): int
     {
@@ -347,7 +350,7 @@ class AdController
 
         $flatten = function ($files) use (&$flatten) {
             $out = [];
-            foreach ($files as $key => $value) {
+            foreach ($files as $value) {
                 if (is_array($value)) {
                     $out = array_merge($out, $flatten($value));
                 } else {
@@ -375,7 +378,7 @@ class AdController
         }
 
         // Ajouter toute autre clé fichier détectée (fallback)
-        foreach ($allFiles as $key => $val) {
+        foreach ($allFiles as $val) {
             $candidates[] = $val;
         }
 
@@ -396,7 +399,7 @@ class AdController
             return $image !== null && method_exists($image, 'isValid') && $image->isValid();
         }));
 
-        Log::info('Valid images found after flattening: '.count($images));
+        Log::info('Valid images found after flattening: ' . count($images));
 
         if (empty($images)) {
             Log::warning('No valid images found in the request');
@@ -409,18 +412,18 @@ class AdController
             throw new Exception('Maximum 10 images allowed per ad.');
         }
 
-        $directory = 'ads/'.$ad->id;
+        $directory = 'ads/' . $ad->id;
 
         foreach ($images as $index => $image) {
             try {
                 $originalName = method_exists($image, 'getClientOriginalName') ? $image->getClientOriginalName() : 'unknown';
-                Log::info("Processing image {$index}: ".$originalName);
+                Log::info("Processing image $index: " . $originalName);
 
                 // Valider le type MIME
                 $allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
                 $mime = method_exists($image, 'getMimeType') ? $image->getMimeType() : null;
-                if ($mime === null || ! in_array($mime, $allowedMimes)) {
-                    Log::warning("Image {$index} has invalid or unknown MIME type: ".$mime);
+                if ($mime === null || !in_array($mime, $allowedMimes)) {
+                    Log::warning("Image $index has invalid or unknown MIME type: " . $mime);
 
                     continue;
                 }
@@ -428,7 +431,7 @@ class AdController
                 // Valider la taille (max 5MB)
                 $size = method_exists($image, 'getSize') ? $image->getSize() : 0;
                 if ($size > 5 * 1024 * 1024) {
-                    Log::warning("Image {$index} is too large: ".$size.' bytes');
+                    Log::warning("Image $index is too large: " . $size . ' bytes');
 
                     continue;
                 }
@@ -445,8 +448,8 @@ class AdController
 
                 // Enregistrer sur le disque public
                 $stored = Storage::disk('public')->putFileAs($directory, $image, $fileName);
-                if (! $stored) {
-                    Log::warning('Failed to store image on disk for index '.$index);
+                if (!$stored) {
+                    Log::warning('Failed to store image on disk for index ' . $index);
 
                     continue;
                 }
@@ -454,19 +457,19 @@ class AdController
                 // Créer l'enregistrement AdImage avec le chemin
                 AdImage::create([
                     'ad_id' => $ad->id,
-                    'image_path' => $directory.'/'.$fileName,
+                    'image_path' => $directory . '/' . $fileName,
                     'is_primary' => $imagesProcessed === 0, // La première image valide est primaire.
                 ]);
 
                 $imagesProcessed++;
             } catch (Exception $e) {
-                Log::error("Error processing image {$index}: ".$e->getMessage());
+                Log::error("Error processing image $index: " . $e->getMessage());
 
                 continue;
             }
         }
 
-        Log::info("Total images processed successfully: {$imagesProcessed}");
+        Log::info("Total images processed successfully: $imagesProcessed");
 
         return $imagesProcessed;
     }
@@ -540,7 +543,7 @@ class AdController
      *     )
      * )
      *
-     * @param  string  $id  L'identifiant de l'annonce
+     * @param string $id L'identifiant de l'annonce
      * @return JsonResponse Réponse JSON avec les données de l'annonce
      */
     public function show(string $id): JsonResponse
@@ -687,7 +690,7 @@ class AdController
      *     )
      * )
      *
-     * @param  AdRequest  $request  The validated request data
+     * @param AdRequest $request The validated request data
      *
      * @throws Throwable
      */
@@ -710,11 +713,11 @@ class AdController
             // Mettre à jour l'annonce
             $ad->update($data);
 
-            Log::info('Ad updated with ID: '.$ad->id);
+            Log::info('Ad updated with ID: ' . $ad->id);
 
             // Gérer les nouvelles images si présentes
             $imagesProcessed = 0;
-            if (! empty($request->allFiles())) {
+            if (!empty($request->allFiles())) {
                 $imagesProcessed = $this->handleImageUpload($request, $ad);
             }
 
@@ -723,7 +726,7 @@ class AdController
                 $this->handleImageDeletion($request->images_to_delete, $ad);
             }
 
-            Log::info('New images processed: '.$imagesProcessed);
+            Log::info('New images processed: ' . $imagesProcessed);
 
             DB::commit();
 
@@ -750,7 +753,7 @@ class AdController
         } catch (Throwable $e) {
             DB::rollback();
 
-            Log::error('Error updating ad: '.$e->getMessage(), [
+            Log::error('Error updating ad: ' . $e->getMessage(), [
                 'ad_id' => $ad->id,
                 'user_id' => auth()->id(),
                 'data' => $data,
@@ -781,19 +784,19 @@ class AdController
 
                 if ($adImage) {
                     // Supprimer le fichier du disque si présent
-                    if (! empty($adImage->image_path)) {
+                    if (!empty($adImage->image_path)) {
                         Storage::disk('public')->delete($adImage->image_path);
                     }
                     $adImage->delete();
 
-                    Log::info('Image deleted successfully with ID: '.$imageId);
+                    Log::info('Image deleted successfully with ID: ' . $imageId);
                 } else {
-                    Log::warning('Image not found or does not belong to ad: '.$imageId);
+                    Log::warning('Image not found or does not belong to ad: ' . $imageId);
                 }
             } catch (Exception $e) {
-                Log::error('Error deleting image ID '.$imageId.': '.$e->getMessage());
+                Log::error('Error deleting image ID ' . $imageId . ': ' . $e->getMessage());
 
-                // Continue avec les autres images même si une échoue
+                // Continue avec les autres images même si une image échoue
                 continue;
             }
         }
@@ -809,11 +812,11 @@ class AdController
     {
         $hasPrimary = $ad->images()->where('is_primary', true)->exists();
 
-        if (! $hasPrimary) {
+        if (!$hasPrimary) {
             $firstImage = $ad->images()->first();
             if ($firstImage) {
                 $firstImage->update(['is_primary' => true]);
-                Log::info('Set new primary image for ad ID: '.$ad->id.', image ID: '.$firstImage->id);
+                Log::info('Set new primary image for ad ID: ' . $ad->id . ', image ID: ' . $firstImage->id);
             }
         }
     }
@@ -931,8 +934,10 @@ class AdController
      *     )
      * )
      *
-     * @param  string  $id  L'identifiant de l'annonce à supprimer
+     * @param string $id L'identifiant de l'annonce à supprimer
      * @return JsonResponse Réponse JSON confirmant la suppression avec détails
+     *
+     * @throws Throwable
      */
     public function destroy(string $id): JsonResponse
     {
@@ -943,35 +948,35 @@ class AdController
         DB::beginTransaction();
 
         try {
-            Log::info('Starting deletion of ad with ID: '.$id);
+            Log::info('Starting deletion of ad with ID: ' . $id);
 
             // Supprimer toutes les images associées
             $imagesCount = $ad->images()->count();
             foreach ($ad->images as $adImage) {
                 // Supprimer le fichier du disque
-                if (! empty($adImage->image_path)) {
+                if (!empty($adImage->image_path)) {
                     Storage::disk('public')->delete($adImage->image_path);
                 }
                 $adImage->delete();
             }
 
             // Supprimer le dossier de l'annonce s'il est vide
-            $dir = 'ads/'.$ad->id;
+            $dir = 'ads/' . $ad->id;
             try {
                 $filesLeft = Storage::disk('public')->files($dir);
                 if (empty($filesLeft)) {
                     Storage::disk('public')->deleteDirectory($dir);
                 }
-            } catch (\Throwable $e) {
-                Log::warning('Could not cleanup directory: '.$dir.' due to: '.$e->getMessage());
+            } catch (Throwable $e) {
+                Log::warning('Could not cleanup directory: ' . $dir . ' due to: ' . $e->getMessage());
             }
 
-            Log::info('Deleted '.$imagesCount.' images for ad ID: '.$id);
+            Log::info('Deleted ' . $imagesCount . ' images for ad ID: ' . $id);
 
             // Supprimer l'annonce
             $ad->delete();
 
-            Log::info('Ad deleted successfully with ID: '.$id);
+            Log::info('Ad deleted successfully with ID: ' . $id);
 
             DB::commit();
 
@@ -982,12 +987,12 @@ class AdController
                     'deleted_ad_id' => $id,
                     'deleted_images_count' => $imagesCount,
                 ],
-            ], 200);
+            ]);
 
         } catch (Throwable $e) {
             DB::rollBack();
 
-            Log::error('Error deleting ad: '.$e->getMessage(), [
+            Log::error('Error deleting ad: ' . $e->getMessage(), [
                 'ad_id' => $id,
                 'user_id' => auth()->id(),
                 'trace' => $e->getTraceAsString(),
@@ -998,6 +1003,69 @@ class AdController
                 'message' => 'Error deleting ad',
                 'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while deleting the ad.',
             ], 422);
+        }
+    }
+
+    public function ads_nearby(Ad $ad, AdRequest $request): JsonResponse
+    {
+        $default_radius = 10000;
+        $lat = $request->input('latitude', $ad->location?->getLatitude());
+        $long = $request->input('longitude', $ad->location?->getLongitude());
+        $radius = (float)$request->input('radius', $default_radius); // meters
+
+        try {
+
+
+            if ($lat === null || $long === null) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Latitude and longitude are required (either in request or via the ad location).',
+                ], 422);
+            }
+
+            $center = Point::makeGeodetic($lat, $long);
+
+            // Build the base query: exclude current ad, ensure location exists, select distance
+            $query = Ad::query()
+                ->where('id', '!=', $ad->id)
+                ->whereNotNull('location')
+                ->select('ad.*')
+                ->select(ST::distanceSphere('location', $center), 'distance')
+                ->orderBy('distance');
+
+            // If ST distance filtering is available, apply a radius filter
+            // Using stWhere keeps it database-side if the macro exists in Magellan
+            try {
+                $query = $query->where(ST::distanceSphere('location', $center), '<=', $radius);
+            } catch (Throwable $e) {
+                // If stWhere is not available, skip strict radius filtering and rely on ordering only
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+
+            $ads = $query
+                ->with(['user', 'quarter.city', 'ad_type', 'images'])
+                ->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => AdResource::collection($ads),
+                'meta' => [
+                    'center' => [
+                        'latitude' => $lat,
+                        'longitude' => $long,
+                    ],
+                    'radius' => $radius,
+                    'count' => $ads->count(),
+                ],
+            ]);
+        } catch (Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ]);
         }
     }
 }
