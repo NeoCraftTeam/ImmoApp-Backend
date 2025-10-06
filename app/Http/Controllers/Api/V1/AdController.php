@@ -121,7 +121,7 @@ class AdController
     public function index(): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Ad::class);
-        $ads = Ad::with('quarter.city', 'ad_type', 'images', 'user')->paginate(config('pagination.per_page', 15));
+        $ads = Ad::with('quarter.city', 'ad_type', 'images', 'user')->orderBy('id', 'desc')->paginate(config('pagination.per_page', 15));
 
         return AdResource::collection($ads);
     }
