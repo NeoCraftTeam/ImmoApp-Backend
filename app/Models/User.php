@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\UserRole;
 use App\Enums\UserType;
+use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\UserFactory;
 use Eloquent;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -53,6 +54,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property-read int|null $tokens_count
  * @property-read Collection<int, UnlockedAd> $unlockedAds
  * @property-read int|null $unlocked_ads_count
+ *
  * @method static UserFactory factory($count = null, $state = [])
  * @method static Builder<static>|User newModelQuery()
  * @method static Builder<static>|User newQuery()
@@ -75,6 +77,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @method static Builder<static>|User whereUpdatedAt($value)
  * @method static Builder<static>|User withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|User withoutTrashed()
+ *
  * @property string|null $last_login_at
  * @property string|null $last_login_ip
  * @property bool $is_active
@@ -83,15 +86,18 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property-read int|null $media_count
  * @property-read Collection<int, \App\Models\Review> $reviews
  * @property-read int|null $reviews_count
+ *
  * @method static Builder<static>|User whereIsActive($value)
  * @method static Builder<static>|User whereLastLoginAt($value)
  * @method static Builder<static>|User whereLastLoginIp($value)
+ *
  * @mixin Eloquent
  */
-class User extends Authenticatable implements MustVerifyEmail, HasMedia
+class User extends Authenticatable implements HasMedia, MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, softDeletes, HasApiTokens;
+    use HasApiTokens, HasFactory, Notifiable, softDeletes;
+
     use InteractsWithMedia;
 
     protected $table = 'users';
@@ -101,10 +107,7 @@ class User extends Authenticatable implements MustVerifyEmail, HasMedia
      *
      * @var list<string>
      */
-    protected $fillable = ['firstname', 'lastname', 'email', 'password', 'phone_number', 'type', 'role', 'avatar', 'city_id', 'is_active'];
-    protected $casts = [
-        'is_active' => 'boolean',
-    ];
+    protected $fillable = ['firstname', 'lastname', 'email', 'password', 'phone_number', 'type', 'role', 'avatar', 'city_id', 'is_active', 'location', 'email_verified_at', 'last_login_ip', 'created_at', 'updated_at'];
 
     /**
      * The attributes that should be hidden for serialization.
@@ -128,7 +131,7 @@ class User extends Authenticatable implements MustVerifyEmail, HasMedia
 
     private function validateAgentType(): void
     {
-        if ($this->role === 'agent' && !in_array($this->type, ['individual', 'agency'])) {
+        if ($this->role === 'agent' && ! in_array($this->type, ['individual', 'agency'])) {
             throw new InvalidArgumentException('Invalid agent type. Must be either "individual" or "agency".');
         }
     }
@@ -136,8 +139,8 @@ class User extends Authenticatable implements MustVerifyEmail, HasMedia
     private function assignDefaultAvatar(): void
     {
         if (empty($this->avatar)) {
-            $name = trim($this->firstname . ' ' . $this->lastname ?: 'User');
-            $this->avatar = 'https://ui-avatars.com/api/?name=' . urlencode($name) . '&background=random';
+            $name = trim($this->firstname.' '.$this->lastname ?: 'User');
+            $this->avatar = 'https://ui-avatars.com/api/?name='.urlencode($name).'&background=random';
         }
     }
 
@@ -170,7 +173,6 @@ class User extends Authenticatable implements MustVerifyEmail, HasMedia
     {
         return $this->hasMany(Review::class);
     }
-
 
     /**
      * returns true if the user is an admin.
@@ -240,6 +242,13 @@ class User extends Authenticatable implements MustVerifyEmail, HasMedia
      */
     protected function casts(): array
     {
-        return ['email_verified_at' => 'datetime', 'password' => 'hashed', 'role' => UserRole::class, 'type' => UserType::class,];
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            'role' => UserRole::class,
+            'type' => UserType::class,
+            'is_active' => 'boolean',
+            'location' => Point::class,
+        ];
     }
 }

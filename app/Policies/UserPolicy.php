@@ -36,7 +36,9 @@ class UserPolicy
     public function update(User $user, User $model): bool
     {
         // admins can update any user
-        if ($user->isAdmin() && $user->id !== $model->id) return true;
+        if ($user->isAdmin() && $user->id !== $model->id) {
+            return true;
+        }
 
         // Regular users can only update themselves
         return $user->id === $model->id;
@@ -47,9 +49,10 @@ class UserPolicy
      */
     public function delete(User $user, User $model): bool
     {
-        if($user->isAdmin()){
+        if ($user->isAdmin()) {
             return true;
         }
+
         return $user->isAgent() && $user->id !== $model->id;
     }
 

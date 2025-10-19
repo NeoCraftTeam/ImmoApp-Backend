@@ -2,12 +2,17 @@
 
 namespace App\Http\Requests;
 
+use Clickbar\Magellan\Data\Geometries\Point;
+use Clickbar\Magellan\Http\Requests\TransformsGeojsonGeometry;
+use Clickbar\Magellan\Rules\GeometryGeojsonRule;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class UserRequest extends FormRequest
 {
+    use TransformsGeojsonGeometry;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -30,6 +35,9 @@ class UserRequest extends FormRequest
                 'phone_number' => ['required', 'string', 'regex:/^\+?[0-9]{7,20}$/'],
                 'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->user()?->id)], // if the user is connected, ignore their own email
                 'password' => ['required', 'string', 'min:8', 'confirmed:confirm_password'],
+                'location' => ['sometimes', new GeometryGeojsonRule([Point::class])],
+                'latitude' => 'nullable|numeric|between:-90,90',
+                'longitude' => 'nullable|numeric|between:-180,180',
                 'role' => ['required', 'string'],
                 'type' => ['nullable', 'string'],
                 'city_id' => ['required', 'integer', 'exists:city,id'],
@@ -45,9 +53,18 @@ class UserRequest extends FormRequest
                 'role' => ['sometimes', 'string'],
                 'type' => ['nullable', 'string'],
                 'city_id' => ['sometimes', 'integer', 'exists:city,id'],
+                'location' => ['sometimes', new GeometryGeojsonRule([Point::class])],
+                'latitude' => 'sometimes|nullable|numeric|between:-90,90',
+                'longitude' => 'sometimes|nullable|numeric|between:-180,180',
             ];
         }
+
         return [];
+    }
+
+    public function geometries(): array
+    {
+        return ['location'];
     }
 
     public function messages(): array
@@ -62,7 +79,7 @@ class UserRequest extends FormRequest
             'password.required' => 'Le mot de passe est obligatoire.',
             'password.min' => 'Le mot de passe doit comporter au moins 8 caractères.',
             'password.confirmed' => 'Le mot de passe et sa confirmation ne correspondent pas.',
-            'city_id.required' => "La ville est obligatoire.",
+            'city_id.required' => 'La ville est obligatoire.',
         ];
     }
 }
