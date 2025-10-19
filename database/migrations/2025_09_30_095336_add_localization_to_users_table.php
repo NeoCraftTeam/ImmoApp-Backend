@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('ad_images', function (Blueprint $table) {
-            $table->boolean('is_primary')->default(false)->after('ad_id');
+        Schema::table('users', function (Blueprint $table) {
+            $table->magellanPoint('location', 4326)->nullable();
         });
     }
 
@@ -21,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('ad_images', function (Blueprint $table) {
-            $table->dropColumn('is_primary');
+        Schema::table('users', function (Blueprint $table) {
+            $table->magellanPoint('location', 4326)->nullable();
         });
     }
 };
