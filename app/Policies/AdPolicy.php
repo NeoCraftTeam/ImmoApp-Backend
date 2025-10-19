@@ -30,6 +30,7 @@ class AdPolicy
         if ($user->isAdmin()) {
             return true;
         }
+
         return ($user->isAgent() && ($user->isAnAgency() || $user->isAnIndividual()))
             && $user->id === $ad->user_id;
     }
@@ -51,5 +52,15 @@ class AdPolicy
     public function forceDelete(User $user): bool
     {
         return $user->isAdmin();
+    }
+
+    public function adsNearby(?User $user): bool
+    {
+        // Allow guests to access nearby ads endpoint; authenticated customers/admins also allowed
+        if ($user === null) {
+            return true;
+        }
+
+        return $user->isCustomer() || $user->isAdmin();
     }
 }

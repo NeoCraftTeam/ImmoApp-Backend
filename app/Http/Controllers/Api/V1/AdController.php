@@ -6,8 +6,8 @@ use App\Http\Requests\AdRequest;
 use App\Http\Resources\AdResource;
 use App\Models\Ad;
 use App\Models\AdImage;
+use App\Models\User;
 use Clickbar\Magellan\Data\Geometries\Point;
-use Clickbar\Magellan\Database\PostgisFunctions\ST;
 use Exception;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -1006,52 +1006,363 @@ class AdController
         }
     }
 
-    public function ads_nearby(Ad $ad, AdRequest $request): JsonResponse
+    /**
+     * Récupérer les annonces à proximité d'une localisation - Recherche publique par coordonnées GPS.
+     *
+     * @OA\Get(
+     *     path="/api/v1/ads/nearby",
+     *     summary="Recherche publique d'annonces à proximité par coordonnées GPS",
+     *     description="Récupérer toutes les annonces dans un rayon défini autour de coordonnées GPS fournies. Cette route est accessible sans authentification. Les coordonnées GPS (latitude/longitude) sont obligatoires pour cette route.",
+     *     operationId="obtenirAnnoncesProximitePublic",
+     *     tags={"Annonces"},
+     *
+     *     @OA\Parameter(
+     *         name="latitude",
+     *         in="query",
+     *         required=true,
+     *         description="Latitude du point central de recherche (obligatoire)",
+     *         @OA\Schema(type="number", format="float", minimum=-90, maximum=90, example=48.8566)
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="longitude",
+     *         in="query",
+     *         required=true,
+     *         description="Longitude du point central de recherche (obligatoire)",
+     *         @OA\Schema(type="number", format="float", minimum=-180, maximum=180, example=2.3522)
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="radius",
+     *         in="query",
+     *         required=false,
+     *         description="Rayon de recherche en mètres (par défaut: 1000m)",
+     *         @OA\Schema(type="number", format="float", minimum=0, default=1000, example=5000)
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Annonces à proximité récupérées avec succès",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 description="Liste des annonces à proximité triées par distance croissante",
+     *                 @OA\Items(ref="#/components/schemas/AdResource")
+     *             ),
+     *             @OA\Property(
+     *                 property="coordinates",
+     *                 type="array",
+     *                 description="Coordonnées et distances de chaque annonce",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="latitude", type="number", format="float", example=48.8606),
+     *                     @OA\Property(property="longitude", type="number", format="float", example=2.3376),
+     *                     @OA\Property(property="distance", type="number", format="float", example=523.45)
+     *                 )
+     *             ),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *                 @OA\Property(
+     *                     property="center",
+     *                     type="object",
+     *                     @OA\Property(property="latitude", type="number", format="float", example=48.8566),
+     *                     @OA\Property(property="longitude", type="number", format="float", example=2.3522)
+     *                 ),
+     *                 @OA\Property(property="radius", type="number", format="float", example=5000),
+     *                 @OA\Property(property="count", type="integer", example=12),
+     *                 @OA\Property(property="user_id", type="integer", nullable=true, example=null)
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=403,
+     *         description="Interdit - Permissions insuffisantes",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Cette action n'est pas autorisée")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=422,
+     *         description="Erreur de validation - Coordonnées manquantes ou invalides",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Latitude and longitude are required and must be within valid ranges.")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=500,
+     *         description="Erreur serveur",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="An error occurred while fetching nearby ads.")
+     *         )
+     *     )
+     * )
+     * @throws Throwable
+     */
+    public function ads_nearby_public(AdRequest $request): JsonResponse
     {
-        define('DEFAULT_RADIUS', 1000); // constante par défaut pour le rayon en mètres
-        $lat = $request->input('latitude', $ad->location?->getLatitude());
-        $long = $request->input('longitude', $ad->location?->getLongitude());
-        $radius = (float)$request->input('radius', DEFAULT_RADIUS); // meters
+        return $this->ads_nearby($request, null);
+    }
+
+    /**
+     * Récupérer les annonces à proximité de la localisation d'un utilisateur - Route authentifiée.
+     *
+     * @OA\Get(
+     *     path="/api/v1/ads/{user}/nearby",
+     *     summary="Recherche d'annonces à proximité d'un utilisateur spécifique",
+     *     description="Récupérer toutes les annonces dans un rayon défini autour de la localisation enregistrée d'un utilisateur spécifique. Cette route nécessite une authentification. Si l'utilisateur n'a pas de localisation enregistrée, vous pouvez fournir latitude/longitude en paramètres de requête pour override.",
+     *     operationId="obtenirAnnoncesProximiteUtilisateur",
+     *     tags={"Annonces"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="user",
+     *         in="path",
+     *         required=true,
+     *         description="Identifiant de l'utilisateur dont on utilise la localisation",
+     *         @OA\Schema(type="integer", example=2210)
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="radius",
+     *         in="query",
+     *         required=false,
+     *         description="Rayon de recherche en mètres (par défaut: 1000m)",
+     *         @OA\Schema(type="number", format="float", minimum=0, default=1000, example=1)
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="latitude",
+     *         in="query",
+     *         required=false,
+     *         description="Latitude optionnelle pour override la localisation de l'utilisateur",
+     *         @OA\Schema(type="number", format="float", minimum=-90, maximum=90, example=48.8566)
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="longitude",
+     *         in="query",
+     *         required=false,
+     *         description="Longitude optionnelle pour override la localisation de l'utilisateur",
+     *         @OA\Schema(type="number", format="float", minimum=-180, maximum=180, example=2.3522)
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Annonces à proximité de l'utilisateur récupérées avec succès",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(ref="#/components/schemas/AdResource")
+     *             ),
+     *             @OA\Property(
+     *                 property="coordinates",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="latitude", type="number", format="float", example=48.8606),
+     *                     @OA\Property(property="longitude", type="number", format="float", example=2.3376),
+     *                     @OA\Property(property="distance", type="number", format="float", example=0.85)
+     *                 )
+     *             ),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *                 @OA\Property(
+     *                     property="center",
+     *                     type="object",
+     *                     @OA\Property(property="latitude", type="number", format="float", example=48.8566),
+     *                     @OA\Property(property="longitude", type="number", format="float", example=2.3522)
+     *                 ),
+     *                 @OA\Property(property="radius", type="number", format="float", example=1),
+     *                 @OA\Property(property="count", type="integer", example=3),
+     *                 @OA\Property(property="user_id", type="integer", example=2210)
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=401,
+     *         description="Non authentifié",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Non authentifié")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=403,
+     *         description="Interdit - Permissions insuffisantes",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Cette action n'est pas autorisée")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=404,
+     *         description="Utilisateur introuvable",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="User not found.")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=422,
+     *         description="Erreur de validation",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Latitude and longitude are required and must be within valid ranges.")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=500,
+     *         description="Erreur serveur",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="An error occurred while fetching nearby ads.")
+     *         )
+     *     )
+     * )
+     * @throws Throwable
+     */
+    public function ads_nearby_user(AdRequest $request, int $user): JsonResponse
+    {
+        return $this->ads_nearby($request, $user);
+    }
+
+    /**
+     * Logique partagée pour récupérer les annonces à proximité.
+     * Fonction privée appelée par ads_nearby_public et ads_nearby_user.
+     * Cette fonction ne doit PAS avoir d'annotations Swagger.
+     *
+     * @param AdRequest $request
+     * @param int|null $user
+     * @return JsonResponse
+     * @throws Throwable
+     */
+    private function ads_nearby(AdRequest $request, ?int $user = null): JsonResponse
+    {
+        $this->authorize('adsNearby', Ad::class);
+
+        $defaultRadius = 1000;
+
+        // Si un ID utilisateur est fourni, chercher cet utilisateur
+        $targetUser = null;
+        if ($user !== null) {
+            $targetUser = User::find($user);
+            if (!$targetUser) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found.',
+                ], 404);
+            }
+        }
+
+        // Sinon, utiliser l'utilisateur authentifié uniquement si aucun utilisateur cible n'a été fourni
+        if ($targetUser === null) {
+            $targetUser = auth()->user();
+        }
+
+        // Préférer les paramètres de requête s'ils sont présents et valides, sinon utiliser la localisation de l'utilisateur
+        $latInput = $request->input('latitude');
+        $longInput = $request->input('longitude');
+
+        $lat = is_numeric($latInput) ? (float)$latInput : null;
+        $long = is_numeric($longInput) ? (float)$longInput : null;
+
+        // Si pas de coordonnées valides en entrée et qu'on a un utilisateur cible, récupérer via SQL
+        if (($lat === null || $long === null) && $targetUser?->id) {
+            $row = DB::table('users')
+                ->where('id', $targetUser->id)
+                ->selectRaw('ST_Y(location) as lat, ST_X(location) as lng')
+                ->first();
+            if ($row) {
+                $lat = $lat ?? (is_numeric($row->lat) ? (float)$row->lat : null);
+                $long = $long ?? (is_numeric($row->lng) ? (float)$row->lng : null);
+            }
+        }
+
+        $radius = (float)$request->input('radius', $defaultRadius);
+
+        // Valider la présence et les bornes des coordonnées finales
+        $latValid = is_numeric($lat) && $lat >= -90 && $lat <= 90;
+        $longValid = is_numeric($long) && $long >= -180 && $long <= 180;
+
+        if (!$latValid || !$longValid) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Latitude and longitude are required and must be within valid ranges.',
+            ], 422);
+        }
 
         try {
-
-
-            if ($lat === null || $long === null) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Latitude and longitude are required (either in request or via the ad location).',
-                ], 422);
+            // Distance calculée selon le driver (PostgresSQL vs MySQL/MariaDB)
+            $driver = DB::getDriverName();
+            if ($driver === 'pgsql') {
+                $ads = Ad::query()
+                    ->whereNotNull('location')
+                    ->selectRaw('ad.*')
+                    ->selectRaw(
+                        'ST_DistanceSphere(location, ST_GeomFromText(?, 4326)) as distance',
+                        ["POINT({$long} {$lat})"]
+                    )
+                    ->selectRaw('ST_Y(location) as lat')
+                    ->selectRaw('ST_X(location) as lng')
+                    ->whereRaw('ST_DistanceSphere(location, ST_GeomFromText(?, 4326)) <= ?', ["POINT({$long} {$lat})", $radius])
+                    ->orderBy('distance', 'asc')
+                    ->with(['user', 'quarter.city', 'ad_type', 'images'])
+                    ->get();
+            } else {
+                $ads = Ad::query()
+                    ->whereNotNull('location')
+                    ->selectRaw('ad.*')
+                    ->selectRaw(
+                        'ST_Distance_Sphere(location, ST_GeomFromText(?, 4326)) as distance',
+                        ["POINT({$long} {$lat})"]
+                    )
+                    ->selectRaw('ST_Y(location) as lat')
+                    ->selectRaw('ST_X(location) as lng')
+                    ->whereRaw('ST_Distance_Sphere(location, ST_GeomFromText(?, 4326)) <= ?', ["POINT({$long} {$lat})", $radius])
+                    ->orderBy('distance', 'asc')
+                    ->with(['user', 'quarter.city', 'ad_type', 'images'])
+                    ->get();
             }
 
-            $center = Point::makeGeodetic($lat, $long);
-
-            // Build the base query: exclude current ad, ensure location exists, select distance
-            $query = Ad::query()
-                ->where('id', '!=', $ad->id)
-                ->whereNotNull('location')
-                ->select('ad.*')
-                ->select(ST::distanceSphere('location', $center), 'distance')
-                ->orderBy('distance');
-
-            // If ST distance filtering is available, apply a radius filter
-            // Using stWhere keeps it database-side if the macro exists in Magellan
-            try {
-                $query = $query->where(ST::distanceSphere('location', $center), '<=', $radius);
-            } catch (Throwable $e) {
-                // If stWhere is not available, skip strict radius filtering and rely on ordering only
-                return response()->json([
-                    'success' => false,
-                    'message' => $e->getMessage(),
-                ]);
-            }
-
-            $ads = $query
-                ->with(['user', 'quarter.city', 'ad_type', 'images'])
-                ->get();
+            $coordinates = $ads->map(function (Ad $ad) {
+                return [
+                    'id' => $ad->id,
+                    'latitude' => isset($ad->lat) ? (float)$ad->lat : null,
+                    'longitude' => isset($ad->lng) ? (float)$ad->lng : null,
+                    'distance' => round($ad->distance ?? 0, 2),
+                ];
+            })->values();
 
             return response()->json([
                 'success' => true,
                 'data' => AdResource::collection($ads),
+                'coordinates' => $coordinates,
                 'meta' => [
                     'center' => [
                         'latitude' => $lat,
@@ -1059,13 +1370,24 @@ class AdController
                     ],
                     'radius' => $radius,
                     'count' => $ads->count(),
+                    'user_id' => $targetUser?->id,
                 ],
             ]);
+
         } catch (Throwable $e) {
+            Log::error('Error in ads_nearby: ' . $e->getMessage(), [
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
-            ]);
+                'message' => 'An error occurred while fetching nearby ads.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
         }
     }
 }
+
+

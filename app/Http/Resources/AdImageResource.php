@@ -14,8 +14,6 @@ class AdImageResource extends JsonResource
         return [
             'id' => $this->id,
             'image_path' => $this->image_path,
-            'url' => $this->url,
-            'is_primary' => $this->is_primary,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
 

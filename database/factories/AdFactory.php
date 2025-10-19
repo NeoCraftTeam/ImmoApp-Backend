@@ -18,8 +18,9 @@ class AdFactory extends Factory
     public function definition(): array
     {
         $title = $this->faker->sentence();
-        $latitude = $this->faker->latitude();      // entre -90 et 90
-        $longitude = $this->faker->longitude();    // entre -180 et 180
+        $latitude = $this->faker->latitude();
+        $longitude = $this->faker->longitude();
+
         return [
             'title' => $title,
             'slug' => Str::slug($title),
@@ -37,7 +38,7 @@ class AdFactory extends Factory
 
             'user_id' => User::factory(),
             'quarter_id' => Quarter::factory(),
-            // Each ad is limked to a type
+            // Each ad is linked to a type
             'type_id' => AdType::inRandomOrder()->first()->id ?? AdType::factory(),
         ];
     }

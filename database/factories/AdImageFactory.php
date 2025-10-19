@@ -7,7 +7,7 @@ use App\Models\AdImage;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
 
-/** @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\AdImage> */
+/** @extends Factory<AdImage> */
 class AdImageFactory extends Factory
 {
     protected $model = AdImage::class;
