@@ -1014,6 +1014,442 @@
                 ]
             }
         },
+        "/api/v1/ads/nearby": {
+            "get": {
+                "tags": [
+                    "Annonces"
+                ],
+                "summary": "Recherche publique d'annonces à proximité par coordonnées GPS",
+                "description": "Récupérer toutes les annonces dans un rayon défini autour de coordonnées GPS fournies. Cette route est accessible sans authentification. Les coordonnées GPS (latitude/longitude) sont obligatoires pour cette route.",
+                "operationId": "obtenirAnnoncesProximitePublic",
+                "parameters": [
+                    {
+                        "name": "latitude",
+                        "in": "query",
+                        "description": "Latitude du point central de recherche (obligatoire)",
+                        "required": true,
+                        "schema": {
+                            "type": "number",
+                            "format": "float",
+                            "maximum": 90,
+                            "minimum": -90,
+                            "example": 48.8566
+                        }
+                    },
+                    {
+                        "name": "longitude",
+                        "in": "query",
+                        "description": "Longitude du point central de recherche (obligatoire)",
+                        "required": true,
+                        "schema": {
+                            "type": "number",
+                            "format": "float",
+                            "maximum": 180,
+                            "minimum": -180,
+                            "example": 2.3522
+                        }
+                    },
+                    {
+                        "name": "radius",
+                        "in": "query",
+                        "description": "Rayon de recherche en mètres (par défaut: 1000m)",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "format": "float",
+                            "default": 1000,
+                            "minimum": 0,
+                            "example": 5000
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Annonces à proximité récupérées avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "description": "Liste des annonces à proximité triées par distance croissante",
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/AdResource"
+                                            }
+                                        },
+                                        "coordinates": {
+                                            "description": "Coordonnées et distances de chaque annonce",
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "latitude": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 48.8606
+                                                    },
+                                                    "longitude": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 2.3376
+                                                    },
+                                                    "distance": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 523.45
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "meta": {
+                                            "properties": {
+                                                "center": {
+                                                    "properties": {
+                                                        "latitude": {
+                                                            "type": "number",
+                                                            "format": "float",
+                                                            "example": 48.8566
+                                                        },
+                                                        "longitude": {
+                                                            "type": "number",
+                                                            "format": "float",
+                                                            "example": 2.3522
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "radius": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 5000
+                                                },
+                                                "count": {
+                                                    "type": "integer",
+                                                    "example": 12
+                                                },
+                                                "user_id": {
+                                                    "type": "integer",
+                                                    "example": null,
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Interdit - Permissions insuffisantes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Cette action n'est pas autorisée"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Erreur de validation - Coordonnées manquantes ou invalides",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Latitude and longitude are required and must be within valid ranges."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erreur serveur",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "An error occurred while fetching nearby ads."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ads/{user}/nearby": {
+            "get": {
+                "tags": [
+                    "Annonces"
+                ],
+                "summary": "Recherche d'annonces à proximité d'un utilisateur spécifique",
+                "description": "Récupérer toutes les annonces dans un rayon défini autour de la localisation enregistrée d'un utilisateur spécifique. Cette route nécessite une authentification. Si l'utilisateur n'a pas de localisation enregistrée, vous pouvez fournir latitude/longitude en paramètres de requête pour override.",
+                "operationId": "obtenirAnnoncesProximiteUtilisateur",
+                "parameters": [
+                    {
+                        "name": "user",
+                        "in": "path",
+                        "description": "Identifiant de l'utilisateur dont on utilise la localisation",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "example": 2210
+                        }
+                    },
+                    {
+                        "name": "radius",
+                        "in": "query",
+                        "description": "Rayon de recherche en mètres (par défaut: 1000m)",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "format": "float",
+                            "default": 1000,
+                            "minimum": 0,
+                            "example": 1
+                        }
+                    },
+                    {
+                        "name": "latitude",
+                        "in": "query",
+                        "description": "Latitude optionnelle pour override la localisation de l'utilisateur",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "format": "float",
+                            "maximum": 90,
+                            "minimum": -90,
+                            "example": 48.8566
+                        }
+                    },
+                    {
+                        "name": "longitude",
+                        "in": "query",
+                        "description": "Longitude optionnelle pour override la localisation de l'utilisateur",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "format": "float",
+                            "maximum": 180,
+                            "minimum": -180,
+                            "example": 2.3522
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Annonces à proximité de l'utilisateur récupérées avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/AdResource"
+                                            }
+                                        },
+                                        "coordinates": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "latitude": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 48.8606
+                                                    },
+                                                    "longitude": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 2.3376
+                                                    },
+                                                    "distance": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 0.85
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "meta": {
+                                            "properties": {
+                                                "center": {
+                                                    "properties": {
+                                                        "latitude": {
+                                                            "type": "number",
+                                                            "format": "float",
+                                                            "example": 48.8566
+                                                        },
+                                                        "longitude": {
+                                                            "type": "number",
+                                                            "format": "float",
+                                                            "example": 2.3522
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "radius": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 1
+                                                },
+                                                "count": {
+                                                    "type": "integer",
+                                                    "example": 3
+                                                },
+                                                "user_id": {
+                                                    "type": "integer",
+                                                    "example": 2210
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Non authentifié"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Interdit - Permissions insuffisantes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Cette action n'est pas autorisée"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Utilisateur introuvable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "User not found."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Erreur de validation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Latitude and longitude are required and must be within valid ranges."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erreur serveur",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "An error occurred while fetching nearby ads."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/ad-types": {
             "get": {
                 "tags": [
@@ -1249,7 +1685,7 @@
                     "auth"
                 ],
                 "summary": "Inscription d'un nouveau client",
-                "description": "Permet l'inscription d'un nouvel utilisateur avec validation des données et gestion d'avatar optionnel",
+                "description": "Permet l'inscription d'un nouvel utilisateur avec validation des données, gestion d'avatar optionnel et localisation GPS optionnelle",
                 "operationId": "registerCustomer",
                 "requestBody": {
                     "description": "Données d'inscription de l'utilisateur",
@@ -1262,7 +1698,9 @@
                                     "lastname",
                                     "email",
                                     "phone_number",
-                                    "password"
+                                    "password",
+                                    "confirm_password",
+                                    "city_id"
                                 ],
                                 "properties": {
                                     "firstname": {
@@ -1284,7 +1722,7 @@
                                         "example": "jean.dupont@example.com"
                                     },
                                     "phone_number": {
-                                        "description": "Numéro de téléphone de l'utilisateur",
+                                        "description": "Numéro de téléphone avec indicatif pays",
                                         "type": "string",
                                         "example": "+33123456789"
                                     },
@@ -1296,14 +1734,14 @@
                                         "example": "Motdepasse123%"
                                     },
                                     "confirm_password": {
-                                        "description": "Mot de passe de confirmation (minimum 8 caractères)",
+                                        "description": "Confirmation du mot de passe (doit correspondre au password)",
                                         "type": "string",
                                         "format": "password",
                                         "minLength": 8,
                                         "example": "Motdepasse123%"
                                     },
                                     "role": {
-                                        "description": "Rôle de l'utilisateur",
+                                        "description": "Rôle de l'utilisateur (automatiquement défini à 'customer')",
                                         "type": "string",
                                         "default": "customer",
                                         "enum": [
@@ -1311,15 +1749,33 @@
                                         ]
                                     },
                                     "city_id": {
-                                        "description": "ID de la ville de résidence",
+                                        "description": "ID de la ville de résidence de l'utilisateur",
                                         "type": "integer",
-                                        "example": 1,
-                                        "nullable": false
+                                        "example": 1
+                                    },
+                                    "latitude": {
+                                        "description": "Latitude GPS de la position de l'utilisateur (optionnel, doit être fournie avec longitude)",
+                                        "type": "number",
+                                        "format": "float",
+                                        "maximum": 90,
+                                        "minimum": -90,
+                                        "example": 48.8566,
+                                        "nullable": true
+                                    },
+                                    "longitude": {
+                                        "description": "Longitude GPS de la position de l'utilisateur (optionnel, doit être fournie avec latitude)",
+                                        "type": "number",
+                                        "format": "float",
+                                        "maximum": 180,
+                                        "minimum": -180,
+                                        "example": 2.3522,
+                                        "nullable": true
                                     },
                                     "avatar": {
-                                        "description": "Image d'avatar (optionnel, max 2MB)",
+                                        "description": "Image d'avatar (optionnel, formats acceptés: JPEG, PNG, GIF, WebP, max 2MB)",
                                         "type": "string",
-                                        "format": "binary"
+                                        "format": "binary",
+                                        "nullable": true
                                     }
                                 },
                                 "type": "object"
@@ -1339,10 +1795,12 @@
                                             "example": "Inscription réussie."
                                         },
                                         "access_token": {
+                                            "description": "Token d'authentification Bearer",
                                             "type": "string",
                                             "example": "1|abc123def456..."
                                         },
                                         "email_verification_required": {
+                                            "description": "Indique si la vérification email est requise",
                                             "type": "boolean",
                                             "example": true
                                         }
@@ -1353,7 +1811,7 @@
                         }
                     },
                     "409": {
-                        "description": "Email déjà utilisé",
+                        "description": "Conflit - Email déjà utilisé par un autre compte",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1389,7 +1847,7 @@
                         }
                     },
                     "422": {
-                        "description": "Erreur de validation",
+                        "description": "Erreur de validation des données fournies",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1399,10 +1857,20 @@
                                             "example": "Erreur de validation."
                                         },
                                         "errors": {
+                                            "description": "Détails des erreurs de validation par champ",
                                             "type": "object",
                                             "example": {
                                                 "email": [
                                                     "Le champ email doit être une adresse email valide."
+                                                ],
+                                                "latitude": [
+                                                    "The latitude must be between -90 and 90."
+                                                ],
+                                                "longitude": [
+                                                    "The longitude field is required when latitude is present."
+                                                ],
+                                                "confirm_password": [
+                                                    "The confirm password and password must match."
                                                 ]
                                             }
                                         }
@@ -1413,7 +1881,7 @@
                         }
                     },
                     "429": {
-                        "description": "Trop de tentatives d'inscription",
+                        "description": "Limitation de débit - Trop de tentatives d'inscription",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1423,6 +1891,7 @@
                                             "example": "Trop de tentatives d'inscription. Réessayez dans 300 secondes."
                                         },
                                         "retry_after": {
+                                            "description": "Nombre de secondes à attendre avant de réessayer",
                                             "type": "integer",
                                             "example": 300
                                         }
@@ -1433,7 +1902,7 @@
                         }
                     },
                     "500": {
-                        "description": "Erreur serveur",
+                        "description": "Erreur interne du serveur",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1443,8 +1912,10 @@
                                             "example": "Une erreur est survenue lors de l'inscription. Veuillez réessayer."
                                         },
                                         "error": {
+                                            "description": "Détails de l'erreur (uniquement en mode debug)",
                                             "type": "string",
-                                            "example": "Database connection failed"
+                                            "example": "Database connection failed",
+                                            "nullable": true
                                         }
                                     },
                                     "type": "object"
@@ -3233,7 +3704,7 @@
                     "user"
                 ],
                 "summary": "Créer un nouvel utilisateur",
-                "description": "Crée un nouvel utilisateur avec avatar optionnel et génère un token d'accès",
+                "description": "Crée un nouvel utilisateur avec avatar et localisation GPS optionnels et génère un token d'accès",
                 "operationId": "createUser",
                 "requestBody": {
                     "description": "Données de l'utilisateur à créer",
@@ -3246,43 +3717,51 @@
                                     "lastname",
                                     "email",
                                     "password",
+                                    "confirm_password",
                                     "phone_number",
                                     "role",
                                     "city_id"
                                 ],
                                 "properties": {
                                     "firstname": {
+                                        "description": "Prénom de l'utilisateur",
                                         "type": "string",
                                         "maxLength": 255,
                                         "example": "Jean"
                                     },
                                     "lastname": {
+                                        "description": "Nom de famille de l'utilisateur",
                                         "type": "string",
                                         "maxLength": 255,
                                         "example": "Dupont"
                                     },
                                     "email": {
+                                        "description": "Adresse email unique",
                                         "type": "string",
                                         "format": "email",
                                         "example": "jean.dupont@example.com"
                                     },
                                     "password": {
+                                        "description": "Mot de passe (min. 8 caractères)",
                                         "type": "string",
                                         "format": "password",
                                         "minLength": 8,
                                         "example": "motdepasse123"
                                     },
                                     "confirm_password": {
+                                        "description": "Confirmation du mot de passe (doit correspondre au password)",
                                         "type": "string",
                                         "format": "password",
                                         "minLength": 8,
                                         "example": "motdepasse123"
                                     },
                                     "phone_number": {
+                                        "description": "Numéro de téléphone avec indicatif pays",
                                         "type": "string",
                                         "example": "+33123456789"
                                     },
                                     "role": {
+                                        "description": "Rôle de l'utilisateur dans le système",
                                         "type": "string",
                                         "enum": [
                                             "customer",
@@ -3291,7 +3770,7 @@
                                         "example": "agent"
                                     },
                                     "type": {
-                                        "description": "Ce champ est requis pour les agents",
+                                        "description": "Type d'agent (requis uniquement si role=agent)",
                                         "type": "string",
                                         "enum": [
                                             "individual",
@@ -3301,13 +3780,33 @@
                                         "nullable": true
                                     },
                                     "city_id": {
+                                        "description": "Identifiant de la ville de l'utilisateur",
                                         "type": "integer",
                                         "example": 1
                                     },
+                                    "latitude": {
+                                        "description": "Latitude GPS de la localisation de l'utilisateur (optionnel)",
+                                        "type": "number",
+                                        "format": "float",
+                                        "maximum": 90,
+                                        "minimum": -90,
+                                        "example": 48.8566,
+                                        "nullable": true
+                                    },
+                                    "longitude": {
+                                        "description": "Longitude GPS de la localisation de l'utilisateur (optionnel)",
+                                        "type": "number",
+                                        "format": "float",
+                                        "maximum": 180,
+                                        "minimum": -180,
+                                        "example": 2.3522,
+                                        "nullable": true
+                                    },
                                     "avatar": {
-                                        "description": "Avatar de l'utilisateur (image)",
+                                        "description": "Photo de profil de l'utilisateur (formats acceptés: JPEG, PNG, GIF, WebP)",
                                         "type": "string",
-                                        "format": "binary"
+                                        "format": "binary",
+                                        "nullable": true
                                     }
                                 },
                                 "type": "object"
@@ -3330,6 +3829,7 @@
                                             "$ref": "#/components/schemas/User"
                                         },
                                         "access_token": {
+                                            "description": "Token d'authentification Bearer pour les futures requêtes",
                                             "type": "string",
                                             "example": "1|abcdef123456..."
                                         }
@@ -3350,12 +3850,27 @@
                                             "example": "The given data was invalid."
                                         },
                                         "errors": {
+                                            "description": "Détails des erreurs de validation par champ",
                                             "properties": {
                                                 "email": {
                                                     "type": "array",
                                                     "items": {
                                                         "type": "string",
                                                         "example": "The email field is required."
+                                                    }
+                                                },
+                                                "latitude": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The latitude must be between -90 and 90."
+                                                    }
+                                                },
+                                                "confirm_password": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The confirm password and password must match."
                                                     }
                                                 }
                                             },
@@ -3368,7 +3883,7 @@
                         }
                     },
                     "401": {
-                        "description": "Non autorisé",
+                        "description": "Non autorisé - Token d'authentification manquant ou invalide",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3384,7 +3899,7 @@
                         }
                     },
                     "403": {
-                        "description": "Accès interdit - Permissions insuffisantes",
+                        "description": "Accès interdit - Permissions insuffisantes pour créer un utilisateur",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3400,7 +3915,7 @@
                         }
                     },
                     "409": {
-                        "description": "Conflit - Email déjà utilisé",
+                        "description": "Conflit - Email déjà utilisé par un autre compte",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3415,8 +3930,36 @@
                             }
                         }
                     },
+                    "422": {
+                        "description": "Erreur de validation - Latitude et longitude doivent être fournies ensemble",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "The given data was invalid."
+                                        },
+                                        "errors": {
+                                            "properties": {
+                                                "longitude": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string",
+                                                        "example": "The longitude field is required when latitude is present."
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
                     "500": {
-                        "description": "Erreur interne du serveur",
+                        "description": "Erreur interne du serveur - Échec de création",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3426,8 +3969,10 @@
                                             "example": "Impossible de créer l'utilisateur pour le moment."
                                         },
                                         "error": {
+                                            "description": "Détails de l'erreur (uniquement en mode debug)",
                                             "type": "string",
-                                            "example": "Database connection failed"
+                                            "example": "Database connection failed",
+                                            "nullable": true
                                         }
                                     },
                                     "type": "object"
