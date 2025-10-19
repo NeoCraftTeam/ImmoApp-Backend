@@ -76,20 +76,22 @@ Route::prefix('v1')->group(function () {
         Route::delete('/users/{user}', 'destroy');
     });
 
-//  Ads
+    //  Ads
     Route::prefix('ads')->controller(AdController::class)->group(function () {
         Route::get('/', 'index');
-        Route::get('/{id}', 'show');
+        // Public nearby search by coordinates
+        Route::get('/nearby', 'ads_nearby_public');
 
         Route::middleware('auth:sanctum')->group(function () {
+            // Routes spécifiques AVANT les routes avec paramètres génériques
+            Route::get('/{user}/nearby', 'ads_nearby_user')->whereNumber('user');
+
             Route::post('', 'store');
             Route::put('/{ad}', 'update');
-            Route::delete('/{id}', 'destroy');
-            Route::get('/{ad}/nearby', 'ads_nearby');
+            Route::delete('/{id}', 'destroy')->whereNumber('id');
         });
 
+        // Cette route DOIT être en dernier pour ne pas capturer d'autres patterns
+        Route::get('/{id}', 'show')->whereNumber('id');
     });
 });
-
-
-
