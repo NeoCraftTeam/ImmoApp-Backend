@@ -269,7 +269,7 @@ class UserController
      *     )
      * )
      */
-    public function store(UserRequest $request)
+    public function store(UserRequest $request): JsonResponse
     {
         $this->authorize('create', User::class);
 
@@ -415,7 +415,7 @@ class UserController
      *     )
      * )
      */
-    public function show(string $id)
+    public function show(string $id): UserResource|JsonResponse
     {
         $this->authorize('view', User::class);
         $userId = User::find($id);
@@ -714,7 +714,7 @@ class UserController
      *     )
      * )
      */
-    public function destroy(User $user)
+    public function destroy(User $user): JsonResponse
     {
         $this->authorize('delete', $user);
 
