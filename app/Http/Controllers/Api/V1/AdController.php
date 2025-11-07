@@ -1117,142 +1117,6 @@ class AdController
     }
 
     /**
-     * Récupérer les annonces à proximité de la localisation d'un utilisateur - Route authentifiée.
-     *
-     * @OA\Get(
-     *     path="/api/v1/ads/{user}/nearby",
-     *     summary="Recherche d'annonces à proximité d'un utilisateur spécifique",
-     *     description="Récupérer toutes les annonces dans un rayon défini autour de la localisation enregistrée d'un utilisateur spécifique. Cette route nécessite une authentification. Si l'utilisateur n'a pas de localisation enregistrée, vous pouvez fournir latitude/longitude en paramètres de requête pour override.",
-     *     operationId="obtenirAnnoncesProximiteUtilisateur",
-     *     tags={"Annonces"},
-     *     security={{"bearerAuth":{}}},
-     *
-     *     @OA\Parameter(
-     *         name="user",
-     *         in="path",
-     *         required=true,
-     *         description="Identifiant de l'utilisateur dont on utilise la localisation",
-     *         @OA\Schema(type="integer", example=2210)
-     *     ),
-     *
-     *     @OA\Parameter(
-     *         name="radius",
-     *         in="query",
-     *         required=false,
-     *         description="Rayon de recherche en mètres (par défaut: 1000m)",
-     *         @OA\Schema(type="number", format="float", minimum=0, default=1000, example=1)
-     *     ),
-     *
-     *     @OA\Parameter(
-     *         name="latitude",
-     *         in="query",
-     *         required=false,
-     *         description="Latitude optionnelle pour override la localisation de l'utilisateur",
-     *         @OA\Schema(type="number", format="float", minimum=-90, maximum=90, example=48.8566)
-     *     ),
-     *
-     *     @OA\Parameter(
-     *         name="longitude",
-     *         in="query",
-     *         required=false,
-     *         description="Longitude optionnelle pour override la localisation de l'utilisateur",
-     *         @OA\Schema(type="number", format="float", minimum=-180, maximum=180, example=2.3522)
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Annonces à proximité de l'utilisateur récupérées avec succès",
-     *         @OA\JsonContent(
-     *             type="object",
-     *             @OA\Property(property="success", type="boolean", example=true),
-     *             @OA\Property(
-     *                 property="data",
-     *                 type="array",
-     *                 @OA\Items(ref="#/components/schemas/AdResource")
-     *             ),
-     *             @OA\Property(
-     *                 property="coordinates",
-     *                 type="array",
-     *                 @OA\Items(
-     *                     type="object",
-     *                     @OA\Property(property="id", type="integer", example=1),
-     *                     @OA\Property(property="latitude", type="number", format="float", example=48.8606),
-     *                     @OA\Property(property="longitude", type="number", format="float", example=2.3376),
-     *                     @OA\Property(property="distance", type="number", format="float", example=0.85)
-     *                 )
-     *             ),
-     *             @OA\Property(
-     *                 property="meta",
-     *                 type="object",
-     *                 @OA\Property(
-     *                     property="center",
-     *                     type="object",
-     *                     @OA\Property(property="latitude", type="number", format="float", example=48.8566),
-     *                     @OA\Property(property="longitude", type="number", format="float", example=2.3522)
-     *                 ),
-     *                 @OA\Property(property="radius", type="number", format="float", example=1),
-     *                 @OA\Property(property="count", type="integer", example=3),
-     *                 @OA\Property(property="user_id", type="integer", example=2210)
-     *             )
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=401,
-     *         description="Non authentifié",
-     *         @OA\JsonContent(
-     *             type="object",
-     *             @OA\Property(property="message", type="string", example="Non authentifié")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=403,
-     *         description="Interdit - Permissions insuffisantes",
-     *         @OA\JsonContent(
-     *             type="object",
-     *             @OA\Property(property="message", type="string", example="Cette action n'est pas autorisée")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=404,
-     *         description="Utilisateur introuvable",
-     *         @OA\JsonContent(
-     *             type="object",
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="User not found.")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=422,
-     *         description="Erreur de validation",
-     *         @OA\JsonContent(
-     *             type="object",
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="Latitude and longitude are required and must be within valid ranges.")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=500,
-     *         description="Erreur serveur",
-     *         @OA\JsonContent(
-     *             type="object",
-     *             @OA\Property(property="success", type="boolean", example=false),
-     *             @OA\Property(property="message", type="string", example="An error occurred while fetching nearby ads.")
-     *         )
-     *     )
-     * )
-     * @throws Throwable
-     */
-    public function ads_nearby_user(AdRequest $request, int $user): JsonResponse
-    {
-        return $this->ads_nearby($request, $user);
-    }
-
-    /**
      * Logique partagée pour récupérer les annonces à proximité.
      * Fonction privée appelée par ads_nearby_public et ads_nearby_user.
      * Cette fonction ne doit PAS avoir d'annotations Swagger.
@@ -1388,6 +1252,144 @@ class AdController
             ], 500);
         }
     }
+
+    /**
+     * Récupérer les annonces à proximité de la localisation d'un utilisateur - Route authentifiée.
+     *
+     * @OA\Get(
+     *     path="/api/v1/ads/{user}/nearby",
+     *     summary="Recherche d'annonces à proximité d'un utilisateur spécifique",
+     *     description="Récupérer toutes les annonces dans un rayon défini autour de la localisation enregistrée d'un utilisateur spécifique. Cette route nécessite une authentification. Si l'utilisateur n'a pas de localisation enregistrée, vous pouvez fournir latitude/longitude en paramètres de requête pour override.",
+     *     operationId="obtenirAnnoncesProximiteUtilisateur",
+     *     tags={"Annonces"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="user",
+     *         in="path",
+     *         required=true,
+     *         description="Identifiant de l'utilisateur dont on utilise la localisation",
+     *         @OA\Schema(type="integer", example=2210)
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="radius",
+     *         in="query",
+     *         required=false,
+     *         description="Rayon de recherche en mètres (par défaut: 1000m)",
+     *         @OA\Schema(type="number", format="float", minimum=0, default=1000, example=1)
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="latitude",
+     *         in="query",
+     *         required=false,
+     *         description="Latitude optionnelle pour override la localisation de l'utilisateur",
+     *         @OA\Schema(type="number", format="float", minimum=-90, maximum=90, example=48.8566)
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="longitude",
+     *         in="query",
+     *         required=false,
+     *         description="Longitude optionnelle pour override la localisation de l'utilisateur",
+     *         @OA\Schema(type="number", format="float", minimum=-180, maximum=180, example=2.3522)
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Annonces à proximité de l'utilisateur récupérées avec succès",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 @OA\Items(ref="#/components/schemas/AdResource")
+     *             ),
+     *             @OA\Property(
+     *                 property="coordinates",
+     *                 type="array",
+     *                 @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="latitude", type="number", format="float", example=48.8606),
+     *                     @OA\Property(property="longitude", type="number", format="float", example=2.3376),
+     *                     @OA\Property(property="distance", type="number", format="float", example=0.85)
+     *                 )
+     *             ),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *                 @OA\Property(
+     *                     property="center",
+     *                     type="object",
+     *                     @OA\Property(property="latitude", type="number", format="float", example=48.8566),
+     *                     @OA\Property(property="longitude", type="number", format="float", example=2.3522)
+     *                 ),
+     *                 @OA\Property(property="radius", type="number", format="float", example=1),
+     *                 @OA\Property(property="count", type="integer", example=3),
+     *                 @OA\Property(property="user_id", type="integer", example=2210)
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=401,
+     *         description="Non authentifié",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Non authentifié")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=403,
+     *         description="Interdit - Permissions insuffisantes",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="message", type="string", example="Cette action n'est pas autorisée")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=404,
+     *         description="Utilisateur introuvable",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="User not found.")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=422,
+     *         description="Erreur de validation",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Latitude and longitude are required and must be within valid ranges.")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=500,
+     *         description="Erreur serveur",
+     *         @OA\JsonContent(
+     *             type="object",
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="An error occurred while fetching nearby ads.")
+     *         )
+     *     )
+     * )
+     * @throws Throwable
+     */
+    public function ads_nearby_user(AdRequest $request, int $user): JsonResponse
+    {
+        return $this->ads_nearby($request, $user);
+    }
+
+
 }
 
 
