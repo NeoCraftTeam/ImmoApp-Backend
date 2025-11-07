@@ -2,7 +2,7 @@
 
 namespace App\Providers;
 
-use App\UserRole;
+use App\Enums\UserRole;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
