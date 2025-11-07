@@ -48,6 +48,7 @@ class AdImage extends Model
     protected $fillable = [
         'ad_id',
         'image_path',
+        'is_primary',
     ];
 
     protected $hidden = [
