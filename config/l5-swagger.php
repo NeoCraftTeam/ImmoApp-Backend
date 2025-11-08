@@ -1,4 +1,4 @@
-<?php
+    <?php
 
 return [
     'default' => 'default',
@@ -65,7 +65,7 @@ return [
              * Middleware allows to prevent unexpected access to API documentation
              */
             'middleware' => [
-                'api' => [],
+                'api' => ['web'],
                 'asset' => [],
                 'docs' => [],
                 'oauth2_callback' => [],
@@ -307,6 +307,14 @@ return [
                     'use_pkce_with_authorization_code_grant' => false,
                 ],
             ],
+            // Ajoutez cette section pour les headers CSRF
+    'headers' => [
+        'view' => [
+            'Content-Security-Policy' => "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;",
+            'X-Frame-Options' => 'SAMEORIGIN',
+            'X-Content-Type-Options' => 'nosniff',
+        ],
+    ],
         ],
         /*
          * Constants which can be used in annotations

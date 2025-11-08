@@ -10,8 +10,8 @@ class UnlockedAdRequest extends FormRequest
     {
         return [
             'ad_id' => ['required', 'exists:ad,id'],
-            'user_id' => ['required', 'exists:user,id'],
-            'payment_id' => ['required', 'exists:payment'],
+            'user_id' => ['required', 'exists:users,id'],
+            'payment_id' => ['required', 'exists:payments'],
         ];
     }
 

@@ -7,7 +7,7 @@ use App\Models\AdImage;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
 
-/** @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\AdImage> */
+/** @extends Factory<AdImage> */
 class AdImageFactory extends Factory
 {
     protected $model = AdImage::class;
@@ -15,7 +15,7 @@ class AdImageFactory extends Factory
     public function definition(): array
     {
         return [
-            'image_path' => $this->faker->imageUrl(640, 480, 'property', true, 'Image', true),
+            'image_path' => 'https://picsum.photos/640/480?random=' . $this->faker->numberBetween(1, 1000) . '.webp',
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
 

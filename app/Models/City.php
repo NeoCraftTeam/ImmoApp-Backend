@@ -7,6 +7,7 @@ use Eloquent;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
@@ -28,6 +29,10 @@ use Illuminate\Support\Carbon;
  * @method static Builder<static>|City whereUpdatedAt($value)
  * @method static Builder<static>|City withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|City withoutTrashed()
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Quarter> $quarters
+ * @property-read int|null $quarters_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\User> $users
+ * @property-read int|null $users_count
  * @mixin Eloquent
  */
 class City extends Model
@@ -54,5 +59,20 @@ class City extends Model
     public function setNameAttribute($value): void
     {
         $this->attributes['name'] = ucfirst(strtolower($value));
+    }
+
+     /**
+     * Get all of the quarters for the City
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasMany
+     */
+    public function quarters(): hasMany
+    {
+        return $this->hasMany(Quarter::class);
+    }
+
+    public function users(): hasMany
+    {
+        return $this->hasMany(User::class);
     }
 }

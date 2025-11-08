@@ -4,13 +4,16 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 
-use App\UserRole;
-use App\UserType;
+use App\Enums\UserRole;
+use App\Enums\UserType;
+use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\UserFactory;
 use Eloquent;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -51,6 +54,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property-read int|null $tokens_count
  * @property-read Collection<int, UnlockedAd> $unlockedAds
  * @property-read int|null $unlocked_ads_count
+ *
  * @method static UserFactory factory($count = null, $state = [])
  * @method static Builder<static>|User newModelQuery()
  * @method static Builder<static>|User newQuery()
@@ -73,22 +77,37 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @method static Builder<static>|User whereUpdatedAt($value)
  * @method static Builder<static>|User withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|User withoutTrashed()
+ *
+ * @property string|null $last_login_at
+ * @property string|null $last_login_ip
+ * @property bool $is_active
+ * @property-read \App\Models\City $city
+ * @property-read \Spatie\MediaLibrary\MediaCollections\Models\Collections\MediaCollection<int, Media> $media
+ * @property-read int|null $media_count
+ * @property-read Collection<int, \App\Models\Review> $reviews
+ * @property-read int|null $reviews_count
+ *
+ * @method static Builder<static>|User whereIsActive($value)
+ * @method static Builder<static>|User whereLastLoginAt($value)
+ * @method static Builder<static>|User whereLastLoginIp($value)
+ *
  * @mixin Eloquent
  */
-class User extends Authenticatable implements HasMedia
+class User extends Authenticatable implements HasMedia, MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, softDeletes, HasApiTokens;
+    use HasApiTokens, HasFactory, Notifiable, softDeletes;
+
     use InteractsWithMedia;
 
-    protected $table = 'user';
+    protected $table = 'users';
 
     /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
      */
-    protected $fillable = ['firstname', 'lastname', 'email', 'password', 'phone_number', 'type', 'role', 'avatar', 'city_id'];
+    protected $fillable = ['firstname', 'lastname', 'email', 'password', 'phone_number', 'type', 'role', 'avatar', 'city_id', 'is_active', 'location', 'email_verified_at', 'last_login_ip', 'created_at', 'updated_at'];
 
     /**
      * The attributes that should be hidden for serialization.
@@ -100,29 +119,34 @@ class User extends Authenticatable implements HasMedia
     protected static function booted(): void
     {
         static::saving(function ($user) {
-            $user->assignDefaultAvatar();
             $user->validateAgentType();
         });
+
+        static::creating(function ($user) {
+            if (empty($user->avatar)) {
+                $user->assignDefaultAvatar();
+            }
+        });
+    }
+
+    private function validateAgentType(): void
+    {
+        if ($this->role === 'agent' && ! in_array($this->type, ['individual', 'agency'])) {
+            throw new InvalidArgumentException('Invalid agent type. Must be either "individual" or "agency".');
+        }
     }
 
     private function assignDefaultAvatar(): void
     {
         if (empty($this->avatar)) {
-            $name = trim($this->firstname . ' ' . $this->lastname ?: 'User');
-            $this->avatar = 'https://ui-avatars.com/api/?name=' . urlencode($name) . '&background=random';
-        }
-    }
-
-    private function validateAgentType(): void
-    {
-        if ($this->role === 'agent' && !in_array($this->type, ['individual', 'agency'])) {
-            throw new InvalidArgumentException('Invalid agent type. Must be either "individual" or "agency".');
+            $name = trim($this->firstname.' '.$this->lastname ?: 'User');
+            $this->avatar = 'https://ui-avatars.com/api/?name='.urlencode($name).'&background=random';
         }
     }
 
     public function canPublishAds(): bool
     {
-        return in_array($this->role, [UserRole::AGENT, UserRole::CUSTOMER,]);
+        return in_array($this->role, [UserRole::AGENT, UserRole::CUSTOMER, UserRole::ADMIN]);
     }
 
     public function ads(): HasMany
@@ -138,6 +162,16 @@ class User extends Authenticatable implements HasMedia
     public function unlockedAds(): HasMany
     {
         return $this->hasMany(UnlockedAd::class);
+    }
+
+    public function city(): BelongsTo
+    {
+        return $this->belongsTo(City::class);
+    }
+
+    public function reviews(): HasMany
+    {
+        return $this->hasMany(Review::class);
     }
 
     /**
@@ -181,17 +215,6 @@ class User extends Authenticatable implements HasMedia
     }
 
     /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
-    protected function casts(): array
-    {
-        return ['email_verified_at' => 'datetime', 'password' => 'hashed', 'role' => UserRole::class, 'type' => UserType::class,];
-    }
-
-
-    /**
      * Définir les collections de médias
      */
     public function registerMediaCollections(): void
@@ -210,5 +233,22 @@ class User extends Authenticatable implements HasMedia
             ->width(150)
             ->height(150)
             ->sharpen(10);
+    }
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+            'role' => UserRole::class,
+            'type' => UserType::class,
+            'is_active' => 'boolean',
+            'location' => Point::class,
+        ];
     }
 }

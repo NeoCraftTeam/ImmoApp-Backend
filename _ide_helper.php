@@ -13099,89 +13099,6 @@ namespace Illuminate\Support\Facades {
         }
 
         /**
-         * Release a reserved job back onto the queue after (n) seconds.
-         *
-         * @param string $queue
-         * @param \Illuminate\Queue\Jobs\DatabaseJobRecord $job
-         * @param int $delay
-         * @return mixed
-         * @static
-         */
-        public static function release($queue, $job, $delay)
-        {
-            /** @var \Illuminate\Queue\DatabaseQueue $instance */
-            return $instance->release($queue, $job, $delay);
-        }
-
-        /**
-         * Delete a reserved job from the queue.
-         *
-         * @param string $queue
-         * @param string $id
-         * @return void
-         * @throws \Throwable
-         * @static
-         */
-        public static function deleteReserved($queue, $id)
-        {
-            /** @var \Illuminate\Queue\DatabaseQueue $instance */
-            $instance->deleteReserved($queue, $id);
-        }
-
-        /**
-         * Delete a reserved job from the reserved queue and release it.
-         *
-         * @param string $queue
-         * @param \Illuminate\Queue\Jobs\DatabaseJob $job
-         * @param int $delay
-         * @return void
-         * @static
-         */
-        public static function deleteAndRelease($queue, $job, $delay)
-        {
-            /** @var \Illuminate\Queue\DatabaseQueue $instance */
-            $instance->deleteAndRelease($queue, $job, $delay);
-        }
-
-        /**
-         * Delete all of the jobs from the queue.
-         *
-         * @param string $queue
-         * @return int
-         * @static
-         */
-        public static function clear($queue)
-        {
-            /** @var \Illuminate\Queue\DatabaseQueue $instance */
-            return $instance->clear($queue);
-        }
-
-        /**
-         * Get the queue or return the default.
-         *
-         * @param string|null $queue
-         * @return string
-         * @static
-         */
-        public static function getQueue($queue)
-        {
-            /** @var \Illuminate\Queue\DatabaseQueue $instance */
-            return $instance->getQueue($queue);
-        }
-
-        /**
-         * Get the underlying database instance.
-         *
-         * @return \Illuminate\Database\Connection
-         * @static
-         */
-        public static function getDatabase()
-        {
-            /** @var \Illuminate\Queue\DatabaseQueue $instance */
-            return $instance->getDatabase();
-        }
-
-        /**
          * Get the maximum number of attempts for an object-based queue handler.
          *
          * @param mixed $job
@@ -13191,7 +13108,7 @@ namespace Illuminate\Support\Facades {
         public static function getJobTries($job)
         {
             //Method inherited from \Illuminate\Queue\Queue 
-            /** @var \Illuminate\Queue\DatabaseQueue $instance */
+            /** @var \Illuminate\Queue\SyncQueue $instance */
             return $instance->getJobTries($job);
         }
 
@@ -13205,7 +13122,7 @@ namespace Illuminate\Support\Facades {
         public static function getJobBackoff($job)
         {
             //Method inherited from \Illuminate\Queue\Queue 
-            /** @var \Illuminate\Queue\DatabaseQueue $instance */
+            /** @var \Illuminate\Queue\SyncQueue $instance */
             return $instance->getJobBackoff($job);
         }
 
@@ -13219,7 +13136,7 @@ namespace Illuminate\Support\Facades {
         public static function getJobExpiration($job)
         {
             //Method inherited from \Illuminate\Queue\Queue 
-            /** @var \Illuminate\Queue\DatabaseQueue $instance */
+            /** @var \Illuminate\Queue\SyncQueue $instance */
             return $instance->getJobExpiration($job);
         }
 
@@ -13233,7 +13150,7 @@ namespace Illuminate\Support\Facades {
         public static function createPayloadUsing($callback)
         {
             //Method inherited from \Illuminate\Queue\Queue 
-            \Illuminate\Queue\DatabaseQueue::createPayloadUsing($callback);
+            \Illuminate\Queue\SyncQueue::createPayloadUsing($callback);
         }
 
         /**
@@ -13245,7 +13162,7 @@ namespace Illuminate\Support\Facades {
         public static function getContainer()
         {
             //Method inherited from \Illuminate\Queue\Queue 
-            /** @var \Illuminate\Queue\DatabaseQueue $instance */
+            /** @var \Illuminate\Queue\SyncQueue $instance */
             return $instance->getContainer();
         }
 
@@ -13259,7 +13176,7 @@ namespace Illuminate\Support\Facades {
         public static function setContainer($container)
         {
             //Method inherited from \Illuminate\Queue\Queue 
-            /** @var \Illuminate\Queue\DatabaseQueue $instance */
+            /** @var \Illuminate\Queue\SyncQueue $instance */
             $instance->setContainer($container);
         }
 
@@ -22793,6 +22710,65 @@ namespace L5Swagger {
             }
     }
 
+namespace Laravel\Mcp\Server\Facades {
+    /**
+     * @see \Laravel\Mcp\Server\Registrar
+     */
+    class Mcp {
+        /**
+         * Register an web-based MCP server running over HTTP.
+         *
+         * @static
+         */
+        public static function web($handle, $serverClass)
+        {
+            /** @var \Laravel\Mcp\Server\Registrar $instance */
+            return $instance->web($handle, $serverClass);
+        }
+
+        /**
+         * Register a local MCP server running over STDIO.
+         *
+         * @static
+         */
+        public static function local($handle, $serverClass)
+        {
+            /** @var \Laravel\Mcp\Server\Registrar $instance */
+            return $instance->local($handle, $serverClass);
+        }
+
+        /**
+         * Get the server class for a local MCP.
+         *
+         * @static
+         */
+        public static function getLocalServer($handle)
+        {
+            /** @var \Laravel\Mcp\Server\Registrar $instance */
+            return $instance->getLocalServer($handle);
+        }
+
+        /**
+         * @static
+         */
+        public static function getWebServer($handle)
+        {
+            /** @var \Laravel\Mcp\Server\Registrar $instance */
+            return $instance->getWebServer($handle);
+        }
+
+        /**
+         * @static
+         */
+        public static function oauthRoutes($oauthPrefix = 'oauth')
+        {
+            /** @var \Laravel\Mcp\Server\Registrar $instance */
+            return $instance->oauthRoutes($oauthPrefix);
+        }
+
+            }
+    }
+
 namespace Illuminate\Http {
     /**
      */
@@ -23212,7 +23188,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanPoint($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanPoint($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanPoint($column, $srid, $postgisType);
         }
@@ -23224,7 +23200,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanPointZ($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanPointZ($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanPointZ($column, $srid, $postgisType);
         }
@@ -23236,7 +23212,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanPointM($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanPointM($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanPointM($column, $srid, $postgisType);
         }
@@ -23248,7 +23224,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanPointZM($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanPointZM($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanPointZM($column, $srid, $postgisType);
         }
@@ -23260,7 +23236,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanLineString($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanLineString($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanLineString($column, $srid, $postgisType);
         }
@@ -23272,7 +23248,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanLineStringZ($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanLineStringZ($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanLineStringZ($column, $srid, $postgisType);
         }
@@ -23284,7 +23260,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanLineStringM($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanLineStringM($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanLineStringM($column, $srid, $postgisType);
         }
@@ -23296,7 +23272,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanLineStringZM($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanLineStringZM($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanLineStringZM($column, $srid, $postgisType);
         }
@@ -23308,7 +23284,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanPolygon($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanPolygon($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanPolygon($column, $srid, $postgisType);
         }
@@ -23320,7 +23296,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanPolygonZ($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanPolygonZ($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanPolygonZ($column, $srid, $postgisType);
         }
@@ -23332,7 +23308,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanPolygonM($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanPolygonM($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanPolygonM($column, $srid, $postgisType);
         }
@@ -23344,7 +23320,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanPolygonZM($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanPolygonZM($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanPolygonZM($column, $srid, $postgisType);
         }
@@ -23356,7 +23332,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanMultiPoint($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanMultiPoint($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanMultiPoint($column, $srid, $postgisType);
         }
@@ -23368,7 +23344,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanMultiPointZ($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanMultiPointZ($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanMultiPointZ($column, $srid, $postgisType);
         }
@@ -23380,7 +23356,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanMultiPointM($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanMultiPointM($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanMultiPointM($column, $srid, $postgisType);
         }
@@ -23392,7 +23368,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanMultiPointZM($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanMultiPointZM($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanMultiPointZM($column, $srid, $postgisType);
         }
@@ -23404,7 +23380,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanMultiLineString($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanMultiLineString($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanMultiLineString($column, $srid, $postgisType);
         }
@@ -23416,7 +23392,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanMultiLineStringZ($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanMultiLineStringZ($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanMultiLineStringZ($column, $srid, $postgisType);
         }
@@ -23428,7 +23404,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanMultiLineStringM($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanMultiLineStringM($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanMultiLineStringM($column, $srid, $postgisType);
         }
@@ -23440,7 +23416,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanMultiLineStringZM($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanMultiLineStringZM($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanMultiLineStringZM($column, $srid, $postgisType);
         }
@@ -23452,7 +23428,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanMultiPolygon($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanMultiPolygon($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanMultiPolygon($column, $srid, $postgisType);
         }
@@ -23464,7 +23440,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanMultiPolygonZ($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanMultiPolygonZ($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanMultiPolygonZ($column, $srid, $postgisType);
         }
@@ -23476,7 +23452,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanMultiPolygonM($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanMultiPolygonM($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanMultiPolygonM($column, $srid, $postgisType);
         }
@@ -23488,7 +23464,7 @@ namespace Illuminate\Database\Schema {
          * @param string $postgisType
          * @static
          */
-        public static function magellanMultiPolygonZM($column, $srid = 4326, $postgisType = 'GEOMETRY')
+        public static function magellanMultiPolygonZM($column, $srid = 4326, $postgisType = 'geometry')
         {
             return \Illuminate\Database\Schema\Blueprint::magellanMultiPolygonZM($column, $srid, $postgisType);
         }
@@ -28491,6 +28467,7 @@ namespace  {
     class View extends \Illuminate\Support\Facades\View {}
     class Vite extends \Illuminate\Support\Facades\Vite {}
     class L5Swagger extends \L5Swagger\L5SwaggerFacade {}
+    class Mcp extends \Laravel\Mcp\Server\Facades\Mcp {}
 }
 
 

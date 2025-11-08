@@ -11,7 +11,8 @@ class PaymentRequest extends FormRequest
         return [
             'amount' => ['required', 'numeric', 'min:0'],
             'payment_method' => ['required'],
-            'user_id' => ['required', 'exists:user,id'],
+            'user_id' => ['required', 'exists:users,id'],
+            'ad_id' => ['required', 'exists:ad,id'],
         ];
     }
 

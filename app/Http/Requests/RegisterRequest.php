@@ -26,20 +26,22 @@ class RegisterRequest extends FormRequest
         return [
             'firstname' => 'required|string|max:50|regex:/^[a-zA-ZÀ-ÿ\s]+$/',
             'lastname' => 'required|string|max:50|regex:/^[a-zA-ZÀ-ÿ\s]+$/',
-            'email' => 'required|email:|max:255|unique:user,email',
+            'email' => 'required|email:|max:255|unique:users,email',
             'phone_number' => 'required|string|regex:/^[+]?[0-9\s\-\(\)]{10,15}$/',
             'password' => [
                 'required',
-                'confirmed',
+                'confirmed:confirm_password',
                 Password::min(8)
                     ->mixedCase()
                     ->numbers()
-                    ->symbols()
+                    ->symbols(),
             ],
-            'password_confirmation' => 'required|same:password',
+            'confirm_password' => 'required|same:password',
             'role' => 'nullable|string|in:customer,admin,agent',
             'type' => 'nullable|string|max:50',
             'city_id' => 'nullable|integer|exists:city,id',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
             'avatar' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:2048|dimensions:min_width=100,min_height=100,max_width=2000,max_height=2000',
         ];
     }
@@ -58,7 +60,7 @@ class RegisterRequest extends FormRequest
             'phone_number.regex' => 'Le numéro de téléphone n\'est pas valide.',
             'password.required' => 'Le mot de passe est obligatoire.',
             'password.confirmed' => 'La confirmation du mot de passe ne correspond pas.',
-            'password_confirmation.same' => 'La confirmation doit être identique au mot de passe.',
+            'confirm_password.same' => 'La confirmation doit être identique au mot de passe.',
             'avatar.image' => 'Le fichier doit être une image.',
             'avatar.mimes' => 'L\'avatar doit être au format JPEG, JPG, PNG ou WebP.',
             'avatar.max' => 'L\'avatar ne peut pas dépasser 2MB.',

@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
-use App\PaymentMethod;
-use App\PaymentStatus;
-use App\PaymentType;
+use App\Enums\PaymentMethod;
+use App\Enums\PaymentStatus;
+use App\Enums\PaymentType;
 use Database\Factories\PaymentFactory;
 use Eloquent;
 use Illuminate\Database\Eloquent\Builder;
@@ -43,13 +43,14 @@ use Illuminate\Support\Carbon;
  * @method static Builder<static>|Payment whereUserId($value)
  * @method static Builder<static>|Payment withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|Payment withoutTrashed()
+ * @property int $ad_id
+ * @property-read \App\Models\Ad $ad
+ * @method static Builder<static>|Payment whereAdId($value)
  * @mixin Eloquent
  */
 class Payment extends Model
 {
     use HasFactory, SoftDeletes;
-
-    protected $table = 'payment';
 
     protected $fillable = [
 
@@ -58,6 +59,7 @@ class Payment extends Model
         'transaction_id',
         'payment_method',
         'user_id',
+        'ad_id',
         'status'
     ];
 
@@ -76,6 +78,15 @@ class Payment extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function ad(): BelongsTo
+    {
+        return $this->belongsTo(Ad::class);
+    }
+
+    public function isPaid(): bool{
+        return $this->payments->where('status', PaymentStatus::SUCCESS)->isNotEmpty();
     }
 
     /**

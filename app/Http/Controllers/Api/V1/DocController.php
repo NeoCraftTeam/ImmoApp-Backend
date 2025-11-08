@@ -27,14 +27,39 @@ namespace App\Http\Controllers\Api\V1;
  *
  *
  * @OA\Tag(
- *     name="ad type",
+ *     name="🏷️ Type d'annonce",
  *     description="Gestion des types d'annonces"
  * )
  *
  * @OA\Tag(
- *     name="city",
+ *     name="🏙️ Ville",
  *     description="Gestion des villes"
  * )
+ *
+ * @OA\Tag(
+ *      name="🔐 Authentification",
+ *      description="Gestion de l'authentification"
+ *  )
+ *
+ * @OA\Tag(
+ *       name="👤 Utilisateur",
+ *       description="Gestion des utilisateurs"
+ * )
+ *
+ * @OA\Tag(
+ *        name="📍 Quartier",
+ *        description="Gestion des quartiers"
+ * )
+ *
+ * @OA\Tag(
+ *         name="🏠 Annonces",
+ *         description="Gestion des annonces"
+ * )
+ *
+ * @OA\Tag(
+ *          name="🔍 Filtre",
+ *          description="Filtrer les annonces"
+ *  )
  */
 class DocController
 {

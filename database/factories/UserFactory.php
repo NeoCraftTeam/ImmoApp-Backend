@@ -25,6 +25,8 @@ class UserFactory extends Factory
      */
     public function definition(): array
     {
+        $latitude = fake()->latitude();
+        $longitude = fake()->longitude();
 
         return [
             'firstname' => fake()->firstName(),
@@ -38,6 +40,7 @@ class UserFactory extends Factory
             'remember_token' => Str::random(10),
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
+            'location' => "POINT($longitude $latitude)",
 
             'city_id' => City::factory(),
         ];
@@ -48,7 +51,7 @@ class UserFactory extends Factory
      */
     public function unverified(): static
     {
-        return $this->state(fn(array $attributes) => [
+        return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
         ]);
     }

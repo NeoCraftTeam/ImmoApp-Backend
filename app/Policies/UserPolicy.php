@@ -11,13 +11,13 @@ class UserPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->isAgent();
+        return $user->isAdmin();
     }
 
     /**
      * Determine whether the user can view the model.
      */
-    public function view(User $user, User $model): bool
+    public function view(): bool
     {
         return true;
     }
@@ -36,7 +36,9 @@ class UserPolicy
     public function update(User $user, User $model): bool
     {
         // admins can update any user
-        if ($user->isAdmin() && $user->id !== $model->id) return true;
+        if ($user->isAdmin() && $user->id !== $model->id) {
+            return true;
+        }
 
         // Regular users can only update themselves
         return $user->id === $model->id;
@@ -47,6 +49,10 @@ class UserPolicy
      */
     public function delete(User $user, User $model): bool
     {
+        if ($user->isAdmin()) {
+            return true;
+        }
+
         return $user->isAgent() && $user->id !== $model->id;
     }
 

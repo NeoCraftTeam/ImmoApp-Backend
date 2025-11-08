@@ -11,12 +11,19 @@ class QuarterResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        // 🔥 DEBUG temporaire
+        \Log::info('QuarterResource data:', [
+            'resource_id' => $this->resource->id ?? 'null',
+            'resource_name' => $this->resource->name ?? 'null',
+            'this_id' => $this->id,
+            'this_name' => $this->name,
+        ]);
+
         return [
             'id' => $this->id,
             'name' => $this->name,
             'city_id' => $this->city_id,
-            'created_at' => $this->created_at,
-            'updated_at' => $this->updated_at,
+            'city_name' => $this->city?->name,
         ];
     }
 }

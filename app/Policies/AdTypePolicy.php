@@ -10,12 +10,12 @@ class AdTypePolicy
 {
     use HandlesAuthorization;
 
-    public function viewAny(User $user): bool
+    public function viewAny(): bool
     {
         return true;
     }
 
-    public function view(User $user, AdType $adType): bool
+    public function view(): bool
     {
         return true;
     }

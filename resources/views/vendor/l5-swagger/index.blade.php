@@ -134,6 +134,7 @@
 
 <script src="{{ l5_swagger_asset($documentation, 'swagger-ui-bundle.js') }}"></script>
 <script src="{{ l5_swagger_asset($documentation, 'swagger-ui-standalone-preset.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/js-cookie@3.0.5/dist/js.cookie.min.js"></script>
 <script>
     window.onload = function () {
         const urls = [];
@@ -152,8 +153,9 @@
             validatorUrl: {!! isset($validatorUrl) ? '"' . $validatorUrl . '"' : 'null' !!},
             oauth2RedirectUrl: "{{ route('l5-swagger.'.$documentation.'.oauth2_callback', [], $useAbsolutePath) }}",
 
-            requestInterceptor: function (request) {
-                request.headers['X-CSRF-TOKEN'] = '{{ csrf_token() }}';
+            requestInterceptor: function(request) {
+                request.headers['accept'] = 'application/json';
+                request.headers['X-XSRF-TOKEN'] = Cookies.get('XSRF-TOKEN');
                 return request;
             },
 
