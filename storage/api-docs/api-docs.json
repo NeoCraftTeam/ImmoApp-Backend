@@ -1450,6 +1450,213 @@
                 ]
             }
         },
+        "/api/v1/ads/autocomplete": {
+            "get": {
+                "tags": [
+                    "Annonces"
+                ],
+                "summary": "Autocomplétion (villes, types, quartiers)",
+                "description": "Retourne jusqu'à 10 suggestions commençant par le préfixe fourni pour les champs: ville (city), type de bien (type), quartier (quarter). Les résultats incluent une clé 'value' (libellé) et 'count' (nombre d'annonces disponibles).",
+                "operationId": "autocompleteAnnonces",
+                "parameters": [
+                    {
+                        "name": "field",
+                        "in": "query",
+                        "description": "Champ ciblé pour l'autocomplétion",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "city",
+                                "type",
+                                "quarter"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Préfixe à rechercher (insensible à la casse). Si omis, retourne les 10 valeurs les plus fréquentes.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "Pa"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste de suggestions pour l'autocomplétion",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "description": "Jusqu'à 10 éléments triés par 'count' décroissant",
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "value": {
+                                                        "description": "Libellé proposé (ville / type / quartier)",
+                                                        "type": "string",
+                                                        "example": "Paris"
+                                                    },
+                                                    "count": {
+                                                        "description": "Nombre d'annonces avec status 'available' associées à cette valeur",
+                                                        "type": "integer",
+                                                        "example": 42
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Paramètre 'field' invalide ou non supporté",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Invalid field. Allowed values: city, type, quarter."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erreur serveur lors de la récupération des suggestions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error fetching autocomplete suggestions"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ads/search": {
+            "get": {
+                "tags": [
+                    "Annonces"
+                ],
+                "summary": "Rechercher des annonces",
+                "description": "Rechercher des annonces avec filtres multiples : texte, ville, type, chambres, prix, surface, parking",
+                "operationId": "rechercherAnnonces",
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Terme de recherche textuel",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "appartement lumineux"
+                        }
+                    },
+                    {
+                        "name": "city",
+                        "in": "query",
+                        "description": "Filtrer par ville",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "Paris"
+                        }
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "description": "Champ de tri",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "price",
+                                "surface_area",
+                                "created_at"
+                            ],
+                            "example": "price"
+                        }
+                    },
+                    {
+                        "name": "order",
+                        "in": "query",
+                        "description": "Ordre de tri",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "asc",
+                                "desc"
+                            ],
+                            "example": "asc"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Nombre d'éléments par page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Résultats de recherche",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/AdResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/ad-types": {
             "get": {
                 "tags": [

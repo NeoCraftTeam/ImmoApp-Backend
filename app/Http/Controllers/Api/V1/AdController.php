@@ -1424,6 +1424,217 @@ class AdController
     }
 
     /**
+     * Autocomplétion des champs de recherche (public, sans authentification)
+     *
+     * Fournit des suggestions basées sur un préfixe pour faciliter la saisie utilisateur.
+     * Les suggestions sont retournées avec un compteur du nombre d'annonces "available"
+     * qui correspondent à la valeur proposée.
+     *
+     * Important:
+     * - La recherche est un préfixe insensible à la casse ("Pa" trouve "Paris").
+     * - Seuls les champs suivants sont pris en charge: city, type, quarter.
+     * - Les suggestions sont limitées aux 10 valeurs les plus fréquentes (ordre décroissant par count).
+     * - Les compteurs ne prennent en compte que les annonces avec status = 'available'.
+     * - Aucune pagination n'est fournie sur cet endpoint.
+     *
+     * Exemple d'URL: /api/v1/ads/autocomplete?field=city&q=Pa
+     *
+     * @OA\Get(
+     *     path="/api/v1/ads/autocomplete",
+     *     summary="Autocomplétion (villes, types, quartiers)",
+     *     description="Retourne jusqu'à 10 suggestions commençant par le préfixe fourni pour les champs: ville (city), type de bien (type), quartier (quarter). Les résultats incluent une clé 'value' (libellé) et 'count' (nombre d'annonces disponibles).",
+     *     operationId="autocompleteAnnonces",
+     *     tags={"Annonces"},
+     *
+     *     @OA\Parameter(
+     *         name="field",
+     *         in="query",
+     *         required=true,
+     *         description="Champ ciblé pour l'autocomplétion",
+     *
+     *         @OA\Schema(type="string", enum={"city", "type", "quarter"})
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="q",
+     *         in="query",
+     *         required=false,
+     *         description="Préfixe à rechercher (insensible à la casse). Si omis, retourne les 10 valeurs les plus fréquentes.",
+     *
+     *         @OA\Schema(type="string", example="Pa")
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste de suggestions pour l'autocomplétion",
+     *
+     *         @OA\JsonContent(
+     *             type="object",
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 description="Jusqu'à 10 éléments triés par 'count' décroissant",
+     *
+     *                 @OA\Items(
+     *                     type="object",
+     *
+     *                     @OA\Property(property="value", type="string", example="Paris", description="Libellé proposé (ville / type / quartier)"),
+     *                     @OA\Property(property="count", type="integer", example=42, description="Nombre d'annonces avec status 'available' associées à cette valeur")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=422,
+     *         description="Paramètre 'field' invalide ou non supporté",
+     *
+     *         @OA\JsonContent(
+     *             type="object",
+     *
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Invalid field. Allowed values: city, type, quarter.")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=500,
+     *         description="Erreur serveur lors de la récupération des suggestions",
+     *
+     *         @OA\JsonContent(
+     *             type="object",
+     *
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error fetching autocomplete suggestions")
+     *         )
+     *     ),
+     *
+     *     @OA\Examples(
+     *         example="Ville - préfixe Pa",
+     *         summary="Suggestions pour city=Pa",
+     *         value={
+     *             "request": "/api/v1/ads/autocomplete?field=city&q=Pa",
+     *             "response": {
+     *                 "success": true,
+     *                 "data": {
+     *                     {"value": "Paris", "count": 128},
+     *                     {"value": "Pamiers", "count": 9}
+     *                 }
+     *             }
+     *         }
+     *     ),
+     *     @OA\Examples(
+     *         example="Type - préfixe Ap",
+     *         summary="Suggestions pour type=Ap",
+     *         value={
+     *             "request": "/api/v1/ads/autocomplete?field=type&q=Ap",
+     *             "response": {
+     *                 "success": true,
+     *                 "data": {
+     *                     {"value": "Appartement", "count": 312}
+     *                 }
+     *             }
+     *         }
+     *     ),
+     *     @OA\Examples(
+     *         example="Quartier - sans q",
+     *         summary="Top 10 quartiers les plus fréquents (sans préfixe)",
+     *         value={
+     *             "request": "/api/v1/ads/autocomplete?field=quarter",
+     *             "response": {
+     *                 "success": true,
+     *                 "data": {
+     *                     {"value": "Centre", "count": 67},
+     *                     {"value": "Vieux-Port", "count": 51}
+     *                 }
+     *             }
+     *         }
+     *     )
+     * )
+     */
+    public function autocomplete(AdRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+        $field = $validated['field'] ?? null;
+        $q = (string)($validated['q'] ?? '');
+
+        if (!in_array($field, ['city', 'type', 'quarter'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid field. Allowed values: city, type, quarter.',
+            ], 422);
+        }
+
+        try {
+            $driver = DB::getDriverName();
+            $likeOperator = $driver === 'pgsql' ? 'ilike' : 'like';
+            $prefix = $q !== '' ? ($q . '%') : '%';
+
+            // Build base query per field, counting only available ads
+            if ($field === 'city') {
+                $rows = DB::table('city')
+                    ->join('quarter', 'quarter.city_id', '=', 'city.id')
+                    ->join('ad', function ($join) {
+                        $join->on('ad.quarter_id', '=', 'quarter.id')
+                            ->where('ad.status', '=', 'available');
+                    })
+                    ->when($q !== '', function ($query) use ($likeOperator, $prefix) {
+                        $query->where('city.name', $likeOperator, $prefix);
+                    })
+                    ->groupBy('city.name')
+                    ->select(['city.name as value', DB::raw('COUNT(ad.id) as count')])
+                    ->orderByDesc('count')
+                    ->limit(10)
+                    ->get();
+            } elseif ($field === 'type') {
+                $rows = DB::table('ad_type')
+                    ->join('ad', function ($join) {
+                        $join->on('ad.type_id', '=', 'ad_type.id')
+                            ->where('ad.status', '=', 'available');
+                    })
+                    ->when($q !== '', function ($query) use ($likeOperator, $prefix) {
+                        $query->where('ad_type.name', $likeOperator, $prefix);
+                    })
+                    ->groupBy('ad_type.name')
+                    ->select(['ad_type.name as value', DB::raw('COUNT(ad.id) as count')])
+                    ->orderByDesc('count')
+                    ->limit(10)
+                    ->get();
+            } else { // quarter
+                $rows = DB::table('quarter')
+                    ->join('ad', function ($join) {
+                        $join->on('ad.quarter_id', '=', 'quarter.id')
+                            ->where('ad.status', '=', 'available');
+                    })
+                    ->when($q !== '', function ($query) use ($likeOperator, $prefix) {
+                        $query->where('quarter.name', $likeOperator, $prefix);
+                    })
+                    ->groupBy('quarter.name')
+                    ->select(['quarter.name as value', DB::raw('COUNT(ad.id) as count')])
+                    ->orderByDesc('count')
+                    ->limit(10)
+                    ->get();
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $rows,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Autocomplete error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching autocomplete suggestions',
+            ], 500);
+        }
+    }
+
+    /**
      * Rechercher des annonces avec filtres multiples
      *
      * @OA\Get(
@@ -1564,7 +1775,6 @@ class AdController
         if ($hasParking !== null) {
             $filters[] = sprintf('has_parking = %s', $hasParking ? 'true' : 'false');
         }
-
 
         // Toujours filtrer par status available (si tu veux)
         $filters[] = "status = 'available'";
