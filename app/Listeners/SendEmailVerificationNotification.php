@@ -1,13 +1,14 @@
 <?php
 
 // app/Listeners/SendEmailVerificationNotification.php
+
 namespace App\Listeners;
 
+use Exception;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
-use Exception;
 
 class SendEmailVerificationNotification implements ShouldQueue
 {
@@ -32,8 +33,9 @@ class SendEmailVerificationNotification implements ShouldQueue
             // Vérifier si l'utilisateur implémente MustVerifyEmail
             if (!method_exists($user, 'hasVerifiedEmail')) {
                 Log::warning('User does not implement MustVerifyEmail', [
-                    'user_id' => $user->id
+                    'user_id' => $user->id,
                 ]);
+
                 return;
             }
 
@@ -44,12 +46,12 @@ class SendEmailVerificationNotification implements ShouldQueue
                 Log::info('Email verification sent successfully', [
                     'user_id' => $user->id,
                     'email' => $user->email,
-                    'sent_at' => now()
+                    'sent_at' => now(),
                 ]);
             } else {
                 Log::info('User email already verified, skipping verification email', [
                     'user_id' => $user->id,
-                    'email' => $user->email
+                    'email' => $user->email,
                 ]);
             }
 
@@ -58,7 +60,7 @@ class SendEmailVerificationNotification implements ShouldQueue
                 'user_id' => $user->id,
                 'email' => $user->email ?? 'unknown',
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
 
             // En cas d'erreur, ne pas faire échouer toute l'inscription
@@ -73,7 +75,7 @@ class SendEmailVerificationNotification implements ShouldQueue
     {
         Log::error('SendEmailVerificationNotification job failed', [
             'user_id' => $event->user->id,
-            'error' => $exception->getMessage()
+            'error' => $exception->getMessage(),
         ]);
     }
 }

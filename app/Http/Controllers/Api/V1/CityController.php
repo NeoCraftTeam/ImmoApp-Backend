@@ -20,21 +20,27 @@ class CityController
      *    tags={"🏙️ Ville"},
      *     summary="Liste des villes",
      *     description="Récupère la liste paginée des villes",
+     *
      *     @OA\Parameter(
      *         name="page",
      *         in="query",
      *         description="Numéro de page",
      *         required=false,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Succès",
+     *
      *         @OA\JsonContent(
      *             type="array",
+     *
      *             @OA\Items(ref="#/components/schemas/City")
      *         )
      *     ),
+     *
      *     @OA\Response(response=401, description="Non autorisé"),
      *     @OA\Response(response=404, description="Non trouvé"),
      *     @OA\Response(response=500, description="Erreur du Serveur")
@@ -43,6 +49,7 @@ class CityController
     public function index()
     {
         $cites = City::paginate(10);
+
         return CityResource::collection($cites);
     }
 
@@ -54,18 +61,24 @@ class CityController
      *    tags={"🏙️ Ville"},
      *     summary="Créer une ville",
      *     description="Crée une nouvelle ville",
+     *
      *    @OA\RequestBody(
      *          required=true,
+     *
      *          @OA\JsonContent(
      *              type="object",
+     *
      *              @OA\Property(property="name", type="string", example="Paris")
      *          )
      *      ),
+     *
      *     @OA\Response(
      *          response=201,
      *          description="Ville créée avec succès",
+     *
      *          @OA\JsonContent(ref="#/components/schemas/City")
      *      ),
+     *
      *     @OA\Response(response=400, description="Requête invalide"),
      *     @OA\Response(response=401, description="Non autorisé"),
      *     @OA\Response(response=500, description="Erreur du Serveur")
@@ -84,6 +97,7 @@ class CityController
             }
 
             $city = City::create($request->validated());
+
             return response()->json([
                 'message' => 'Ville crée avec succès',
                 'data' => new CityResource($city),
@@ -105,17 +119,22 @@ class CityController
      *    tags={"🏙️ Ville"},
      *     summary="Afficher une ville",
      *     description="Récupère les détails d'une ville",
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Succès",
+     *
      *         @OA\JsonContent(ref="#/components/schemas/City")
      *     ),
+     *
      *     @OA\Response(response=404, description="Ville non trouvé"),
      *     @OA\Response(response=401, description="Non autorisé"),
      *     @OA\Response(response=500, description="Erreur du Serveur"),
@@ -130,6 +149,7 @@ class CityController
                 'message' => 'Ville non trouvée',
             ], 404);
         }
+
         return new CityResource($city);
     }
 
@@ -141,24 +161,32 @@ class CityController
      *    tags={"🏙️ Ville"},
      *     summary="Mettre à jour une ville",
      *     description="Met à jour les détails d'une ville",
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *    @OA\RequestBody(
      *          required=true,
+     *
      *          @OA\JsonContent(
      *              type="object",
+     *
      *              @OA\Property(property="name", type="string", example="Lyon")
      *          )
      *      ),
+     *
      *     @OA\Response(
      *          response=200,
      *          description="Ville mise à jour avec succès",
+     *
      *          @OA\JsonContent(ref="#/components/schemas/City")
      *      ),
+     *
      *      @OA\Response(response=400, description="Requête invalide"),
      *      @OA\Response(response=404, description="Ville non trouvée"),
      *      @OA\Response(response=401, description="Non autorisé"),
@@ -200,12 +228,15 @@ class CityController
      *    tags={"🏙️ Ville"},
      *     summary="Supprimer une ville",
      *     description="Supprime une ville par son ID",
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Ville supprimée avec succès"
@@ -223,11 +254,12 @@ class CityController
             // Vérifier s'il y a des dépendances avant suppression
             if ($city->user()->exists()) {
                 return response()->json([
-                    'message' => 'Impossible de supprimer cette ville car il contient des utilisateurs.'
+                    'message' => 'Impossible de supprimer cette ville car il contient des utilisateurs.',
                 ], 409); // Conflict
 
             }
             $city->delete();
+
             return response()->json([
                 'message' => 'Ville supprimée avec succès',
             ], 200); // 200 = OK

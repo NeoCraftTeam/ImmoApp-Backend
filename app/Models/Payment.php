@@ -26,6 +26,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  * @property-read User $user
+ *
  * @method static PaymentFactory factory($count = null, $state = [])
  * @method static Builder<static>|Payment newModelQuery()
  * @method static Builder<static>|Payment newQuery()
@@ -43,9 +44,12 @@ use Illuminate\Support\Carbon;
  * @method static Builder<static>|Payment whereUserId($value)
  * @method static Builder<static>|Payment withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|Payment withoutTrashed()
+ *
  * @property int $ad_id
  * @property-read \App\Models\Ad $ad
+ *
  * @method static Builder<static>|Payment whereAdId($value)
+ *
  * @mixin Eloquent
  */
 class Payment extends Model
@@ -60,19 +64,19 @@ class Payment extends Model
         'payment_method',
         'user_id',
         'ad_id',
-        'status'
+        'status',
     ];
 
     protected $hidden = [
         'created_at',
         'updated_at',
-        'deleted_at'
+        'deleted_at',
     ];
 
     protected $casts = [
         'type' => PaymentType::class,
         'payment_method' => PaymentMethod::class,
-        'status' => PaymentStatus::class
+        'status' => PaymentStatus::class,
     ];
 
     public function user(): BelongsTo
@@ -85,13 +89,13 @@ class Payment extends Model
         return $this->belongsTo(Ad::class);
     }
 
-    public function isPaid(): bool{
+    public function isPaid(): bool
+    {
         return $this->payments->where('status', PaymentStatus::SUCCESS)->isNotEmpty();
     }
 
     /**
      * Returns true if the payment method is Orange Money.
-     *
      */
     public function isOrangeMoney(): bool
     {
@@ -100,7 +104,6 @@ class Payment extends Model
 
     /**
      * Returns true if the payment method is MTN Mobile Money.
-     *
      */
     public function isMobileMoney(): bool
     {
@@ -109,7 +112,6 @@ class Payment extends Model
 
     /**
      * Returns true if the payment method is Stripe.
-     *
      */
     public function isStripe(): bool
     {
@@ -118,7 +120,6 @@ class Payment extends Model
 
     /**
      * Returns true if the payment  is pending.
-     *
      */
     public function isPending(): bool
     {
@@ -127,7 +128,6 @@ class Payment extends Model
 
     /**
      * Returns true if the payment  is successful.
-     *
      */
     public function isCompleted(): bool
     {
@@ -136,7 +136,6 @@ class Payment extends Model
 
     /**
      * Returns true if the payment has failed.
-     *
      */
     public function hasFailed(): bool
     {
@@ -145,7 +144,6 @@ class Payment extends Model
 
     /**
      * Returns true if the payment is for unlocking an ad.
-     *
      */
     public function isUnlocked(): bool
     {
@@ -154,7 +152,6 @@ class Payment extends Model
 
     /**
      * Returns true if the payment is for a subscription.
-     *
      */
     public function isSubscribed(): bool
     {
@@ -163,7 +160,6 @@ class Payment extends Model
 
     /**
      * Returns true if the payment is for boosting an ad.
-     *
      */
     public function isBoosted(): bool
     {

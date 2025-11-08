@@ -13,39 +13,8 @@ use Illuminate\Support\Str;
 /** @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Ad> */
 class AdFactory extends Factory
 {
-    protected $model = Ad::class;
-
-
     protected static $citiesData = null;
-
-    protected function getCitiesData(): array
-    {
-        if (self::$citiesData === null) {
-            $path = database_path('data/cities.sql');
-            $content = file_get_contents($path);
-
-            // Pattern regex pour extraire : name (position 2), latitude (position 3), longitude (position 4)
-            // Format: (geonameid, 'name', latitude, longitude, ...)
-            preg_match_all(
-                "/\(\d+,\s*'([^']+)',\s*([0-9.-]+),\s*([0-9.-]+),/",
-                $content,
-                $matches,
-                PREG_SET_ORDER
-            );
-
-            self::$citiesData = [];
-            foreach ($matches as $match) {
-                self::$citiesData[] = [
-                    'name' => $match[1],
-                    'latitude' => (float)$match[2],
-                    'longitude' => (float)$match[3],
-                ];
-            }
-        }
-
-        // Retourne une ville aléatoire
-        return self::$citiesData[array_rand(self::$citiesData)];
-    }
+    protected $model = Ad::class;
 
     public function definition(): array
     {
@@ -79,5 +48,34 @@ class AdFactory extends Factory
             // Each ad is linked to a type
             'type_id' => AdType::inRandomOrder()->first()->id ?? AdType::factory(),
         ];
+    }
+
+    protected function getCitiesData(): array
+    {
+        if (self::$citiesData === null) {
+            $path = database_path('data/cities.sql');
+            $content = file_get_contents($path);
+
+            // Pattern regex pour extraire : name (position 2), latitude (position 3), longitude (position 4)
+            // Format: (geonameid, 'name', latitude, longitude, ...)
+            preg_match_all(
+                "/\(\d+,\s*'([^']+)',\s*([0-9.-]+),\s*([0-9.-]+),/",
+                $content,
+                $matches,
+                PREG_SET_ORDER
+            );
+
+            self::$citiesData = [];
+            foreach ($matches as $match) {
+                self::$citiesData[] = [
+                    'name' => $match[1],
+                    'latitude' => (float)$match[2],
+                    'longitude' => (float)$match[3],
+                ];
+            }
+        }
+
+        // Retourne une ville aléatoire
+        return self::$citiesData[array_rand(self::$citiesData)];
     }
 }

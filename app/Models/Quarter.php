@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  * @property-read City $city
+ *
  * @method static QuarterFactory factory($count = null, $state = [])
  * @method static Builder<static>|Quarter newModelQuery()
  * @method static Builder<static>|Quarter newQuery()
@@ -32,6 +33,7 @@ use Illuminate\Support\Carbon;
  * @method static Builder<static>|Quarter whereUpdatedAt($value)
  * @method static Builder<static>|Quarter withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|Quarter withoutTrashed()
+ *
  * @mixin Eloquent
  */
 class Quarter extends Model
@@ -48,12 +50,11 @@ class Quarter extends Model
     protected $hidden = [
         'created_at',
         'updated_at',
-        'deleted_at'
+        'deleted_at',
     ];
 
     public function city(): BelongsTo
     {
         return $this->belongsTo(City::class);
     }
-
 }

@@ -18,7 +18,7 @@ class DatabaseSeeder extends Seeder
             AdTypeSeeder::class,
             CitySeeder::class,
             UserSeeder::class,
-            PaymentSeeder::class
+            PaymentSeeder::class,
         ]);
     }
 }

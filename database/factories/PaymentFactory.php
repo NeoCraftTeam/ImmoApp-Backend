@@ -25,7 +25,7 @@ class PaymentFactory extends Factory
             'updated_at' => Carbon::now(),
 
             'user_id' => User::factory(),
-            'ad_id' => Ad::factory()
+            'ad_id' => Ad::factory(),
         ];
     }
 }

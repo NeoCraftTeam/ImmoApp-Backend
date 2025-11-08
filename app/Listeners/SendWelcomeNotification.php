@@ -1,13 +1,14 @@
 <?php
 
 // app/Listeners/SendWelcomeNotification.php
+
 namespace App\Listeners;
 
+use Exception;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
-use Exception;
 
 class SendWelcomeNotification implements ShouldQueue
 {
@@ -34,7 +35,7 @@ class SendWelcomeNotification implements ShouldQueue
                 'user_id' => $user->id,
                 'email' => $user->email,
                 'verified_at' => $user->email_verified_at,
-                'role' => $user->role ?? 'unknown'
+                'role' => $user->role ?? 'unknown',
             ]);
 
             // 2. Envoyer email de bienvenue (optionnel)
@@ -56,7 +57,7 @@ class SendWelcomeNotification implements ShouldQueue
 
             // 4. Logger le succès
             Log::info('Welcome notification process completed', [
-                'user_id' => $user->id
+                'user_id' => $user->id,
             ]);
 
         } catch (Exception $e) {
@@ -64,7 +65,7 @@ class SendWelcomeNotification implements ShouldQueue
                 'user_id' => $user->id,
                 'email' => $user->email,
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
         }
     }
@@ -80,13 +81,13 @@ class SendWelcomeNotification implements ShouldQueue
 
             Log::info('User stats updated', [
                 'user_id' => $user->id,
-                'verification_date' => now()->format('Y-m-d')
+                'verification_date' => now()->format('Y-m-d'),
             ]);
 
         } catch (Exception $e) {
             Log::warning('Failed to update user stats', [
                 'user_id' => $user->id,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -101,7 +102,7 @@ class SendWelcomeNotification implements ShouldQueue
                 case 'customer':
                     // Actions pour les clients
                     Log::info('Customer welcome actions triggered', [
-                        'user_id' => $user->id
+                        'user_id' => $user->id,
                     ]);
                     // Exemple : créer un profil client, assigner des préférences par défaut
                     break;
@@ -109,7 +110,7 @@ class SendWelcomeNotification implements ShouldQueue
                 case 'agent':
                     // Actions pour les agents
                     Log::info('Agent welcome actions triggered', [
-                        'user_id' => $user->id
+                        'user_id' => $user->id,
                     ]);
                     // Exemple : créer un profil d'agent, assigner territoires
                     break;
@@ -117,7 +118,7 @@ class SendWelcomeNotification implements ShouldQueue
                 case 'admin':
                     // Actions pour les admins
                     Log::info('Admin welcome actions triggered', [
-                        'user_id' => $user->id
+                        'user_id' => $user->id,
                     ]);
                     // Exemple : notifier les super-admins
                     break;
@@ -125,7 +126,7 @@ class SendWelcomeNotification implements ShouldQueue
                 default:
                     Log::info('Default welcome actions triggered', [
                         'user_id' => $user->id,
-                        'role' => $user->role
+                        'role' => $user->role,
                     ]);
             }
 
@@ -133,7 +134,7 @@ class SendWelcomeNotification implements ShouldQueue
             Log::warning('Failed to handle role-specific actions', [
                 'user_id' => $user->id,
                 'role' => $user->role,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
     }
@@ -145,7 +146,7 @@ class SendWelcomeNotification implements ShouldQueue
     {
         Log::error('SendWelcomeNotification job failed', [
             'user_id' => $event->user->id,
-            'error' => $exception->getMessage()
+            'error' => $exception->getMessage(),
         ]);
     }
 }

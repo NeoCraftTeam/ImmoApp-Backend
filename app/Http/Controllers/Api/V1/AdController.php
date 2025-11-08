@@ -1933,107 +1933,149 @@ class AdController
      *     )
      * )
      */
-    public function search(AdRequest $request): AnonymousResourceCollection
+    public function search(AdRequest $request): JsonResponse
     {
-        $validated = $request->validated();
+        try {
 
-        // Paramètres de recherche
-        $q = (string)($validated['q'] ?? '');
-        $city = $validated['city'] ?? null;
-        $type = $validated['type'] ?? null;
-        $typeId = $validated['type_id'] ?? null;
-        $quarterId = $validated['quarter_id'] ?? null;
+            $validated = $request->validated();
 
-        // Filtres numériques
-        $minBedrooms = isset($validated['bedrooms']) ? (int)$validated['bedrooms'] : null;
-        $minBathrooms = isset($validated['bathrooms']) ? (int)$validated['bathrooms'] : null;
-        $minPrice = isset($validated['price_min']) ? (float)$validated['price_min'] : null;
-        $maxPrice = isset($validated['price_max']) ? (float)$validated['price_max'] : null;
-        $minSurface = isset($validated['surface_min']) ? (float)$validated['surface_min'] : null;
-        $maxSurface = isset($validated['surface_max']) ? (float)$validated['surface_max'] : null;
-        $hasParking = isset($validated['has_parking']) ? (bool)$validated['has_parking'] : null;
+            // Paramètres de recherche
+            $q = (string)($validated['q'] ?? '');
+            $city = $validated['city'] ?? null;
+            $type = $validated['type'] ?? null;
+            $typeId = $validated['type_id'] ?? null;
+            $quarterId = $validated['quarter_id'] ?? null;
 
-        // Tri et pagination
-        $sortBy = $validated['sort'] ?? 'created_at';
-        $sortOrder = strtolower($validated['order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
-        $perPage = (int)($validated['per_page'] ?? config('pagination.per_page', 15));
+            // Filtres numériques
+            $minBedrooms = isset($validated['bedrooms']) ? (int)$validated['bedrooms'] : null;
+            $minBathrooms = isset($validated['bathrooms']) ? (int)$validated['bathrooms'] : null;
+            $minPrice = isset($validated['price_min']) ? (float)$validated['price_min'] : null;
+            $maxPrice = isset($validated['price_max']) ? (float)$validated['price_max'] : null;
+            $minSurface = isset($validated['surface_min']) ? (float)$validated['surface_min'] : null;
+            $maxSurface = isset($validated['surface_max']) ? (float)$validated['surface_max'] : null;
+            $hasParking = isset($validated['has_parking']) ? (bool)$validated['has_parking'] : null;
 
-        // Construire les filtres Meilisearch
-        $filters = [];
+            // Tri et pagination
+            $sortBy = $validated['sort'] ?? 'created_at';
+            $sortOrder = strtolower($validated['order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+            $perPage = (int)($validated['per_page'] ?? config('pagination.per_page', 15));
 
-        // Filtres de chaînes
-        if (!empty($city)) {
-            $filters[] = sprintf("city = '%s'", str_replace("'", "\\'", $city));
-        }
-        if (!empty($type)) {
-            $filters[] = sprintf("type = '%s'", str_replace("'", "\\'", $type));
-        }
+            // Construire les filtres Meilisearch
+            $filters = [];
 
-        // Filtres d'ID
-        if (!empty($typeId)) {
-            $filters[] = sprintf('type_id = %d', (int)$typeId);
-        }
-        if (!empty($quarterId)) {
-            $filters[] = sprintf('quarter_id = %d', (int)$quarterId);
-        }
-
-        // Filtres de chambres et salles de bain
-        if ($minBedrooms !== null) {
-            $filters[] = sprintf('bedrooms >= %d', $minBedrooms);
-        }
-
-        if ($minBathrooms !== null) {
-            $filters[] = sprintf('bathrooms >= %d', $minBathrooms);
-        }
-
-        // Filtres de prix
-        if ($minPrice !== null) {
-            $filters[] = sprintf('price >= %f', $minPrice);
-        }
-        if ($maxPrice !== null) {
-            $filters[] = sprintf('price <= %f', $maxPrice);
-        }
-
-        // Filtres de surface
-        if ($minSurface !== null) {
-            $filters[] = sprintf('surface_area >= %f', $minSurface);
-        }
-        if ($maxSurface !== null) {
-            $filters[] = sprintf('surface_area <= %f', $maxSurface);
-        }
-
-        // Filtre parking
-        if ($hasParking !== null) {
-            $filters[] = sprintf('has_parking = %s', $hasParking ? 'true' : 'false');
-        }
-
-        // Toujours filtrer par status available (si tu veux)
-        $filters[] = "status = 'available'";
-
-        // Whitelist des champs de tri
-        $allowedSorts = ['price', 'surface_area', 'created_at'];
-        if (!in_array($sortBy, $allowedSorts, true)) {
-            $sortBy = 'created_at';
-        }
-
-        // Construire la requête Scout
-        $builder = Ad::search($q, function (\Meilisearch\Endpoints\Indexes $index, string $query, array $options) use ($filters, $sortBy, $sortOrder) {
-            if (!empty($filters)) {
-                // AND logic : tous les filtres doivent matcher
-                $options['filter'] = $filters;
+            // Filtres de chaînes
+            if (!empty($city)) {
+                $filters[] = sprintf("city = '%s'", str_replace("'", "\\'", $city));
+            }
+            if (!empty($type)) {
+                $filters[] = sprintf("type = '%s'", str_replace("'", "\\'", $type));
             }
 
-            // Tri
-            $options['sort'] = [sprintf('%s:%s', $sortBy, $sortOrder)];
+            // Filtres d'ID
+            if (!empty($typeId)) {
+                $filters[] = sprintf('type_id = %d', (int)$typeId);
+            }
+            if (!empty($quarterId)) {
+                $filters[] = sprintf('quarter_id = %d', (int)$quarterId);
+            }
 
-            return $index->search($query, $options);
-        })
-            // Eager load des relations
-            ->query(fn($eloquent) => $eloquent->with(['quarter.city', 'ad_type', 'images', 'user']));
+            // Filtres de chambres et salles de bain
+            if ($minBedrooms !== null) {
+                $filters[] = sprintf('bedrooms >= %d', $minBedrooms);
+            }
 
-        // Paginer
-        $results = $builder->paginate($perPage);
+            if ($minBathrooms !== null) {
+                $filters[] = sprintf('bathrooms >= %d', $minBathrooms);
+            }
 
-        return AdResource::collection($results);
+            // Filtres de prix
+            if ($minPrice !== null) {
+                $filters[] = sprintf('price >= %f', $minPrice);
+            }
+            if ($maxPrice !== null) {
+                $filters[] = sprintf('price <= %f', $maxPrice);
+            }
+
+            // Filtres de surface
+            if ($minSurface !== null) {
+                $filters[] = sprintf('surface_area >= %f', $minSurface);
+            }
+            if ($maxSurface !== null) {
+                $filters[] = sprintf('surface_area <= %f', $maxSurface);
+            }
+
+            // Filtre parking
+            if ($hasParking !== null) {
+                $filters[] = sprintf('has_parking = %s', $hasParking ? 'true' : 'false');
+            }
+
+            // Toujours filtrer par status available (si tu veux)
+            $filters[] = "status = 'available'";
+
+            // Whitelist des champs de tri
+            $allowedSorts = ['price', 'surface_area', 'created_at'];
+            if (!in_array($sortBy, $allowedSorts, true)) {
+                $sortBy = 'created_at';
+            }
+
+            // Construire la requête Scout
+            $builder = Ad::search($q, function (\Meilisearch\Endpoints\Indexes $index, string $query, array $options) use ($filters, $sortBy, $sortOrder) {
+                if (!empty($filters)) {
+                    // AND logic : tous les filtres doivent matcher
+                    $options['filter'] = $filters;
+                }
+
+                // Tri
+                $options['sort'] = [sprintf('%s:%s', $sortBy, $sortOrder)];
+
+                return $index->search($query, $options);
+            })
+                // Eager load des relations
+                ->query(fn($eloquent) => $eloquent->with(['quarter.city', 'ad_type', 'images', 'user']));
+
+            // Paginer
+            $results = $builder->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => $results->items(),
+                'meta' => [
+                    'current_page' => $results->currentPage(),
+                    'last_page' => $results->lastPage(),
+                    'per_page' => $results->perPage(),
+                    'total' => $results->total(),
+                ],
+                'links' => [
+                    'first' => $results->url(1),
+                    'last' => $results->url($results->lastPage()),
+                    'prev' => $results->previousPageUrl(),
+                    'next' => $results->nextPageUrl(),
+                ],
+            ], 200);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors' => $e->errors(),
+            ], 422);
+
+        } catch (\Meilisearch\Exceptions\ApiException $e) {
+            \Log::error('Meilisearch API Error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Search service error: ' . $e->getMessage(),
+            ], 500);
+
+        } catch (\Exception $e) {
+            \Log::error('Search Error: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while searching',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
     }
 }
