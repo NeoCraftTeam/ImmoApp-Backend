@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-
 use App\Models\City;
 use App\Models\Quarter;
 use Illuminate\Database\Seeder;

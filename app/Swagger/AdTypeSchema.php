@@ -8,6 +8,7 @@ namespace App\Swagger;
  *     type="object",
  *     title="AdType",
  *     description="Modèle pour type d'annonce",
+ *
  *     @OA\Property(property="id", type="integer"),
  *      @OA\Property(property="name", type="string"),
  *      @OA\Property(property="desc", type="string"),

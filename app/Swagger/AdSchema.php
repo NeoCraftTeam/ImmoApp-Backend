@@ -8,6 +8,7 @@ namespace App\Swagger;
  *     type="object",
  *     title="Ad",
  *     description="Modèle Annonce immobilière",
+ *
  *     @OA\Property(property="id", type="integer", description="Identifiant unique de l'annonce", example=1),
  *     @OA\Property(property="title", type="string", maxLength=255, description="Titre de l'annonce", example="Magnifique appartement au centre-ville"),
  *     @OA\Property(property="description", type="string", description="Description détaillée de l'annonce", example="Superbe appartement de 3 pièces avec vue imprenable sur la ville"),
@@ -47,6 +48,7 @@ class AdSchema
  *     allOf={
  *         @OA\Schema(ref="#/components/schemas/Ad"),
  *         @OA\Schema(
+ *
  *             @OA\Property(
  *                 property="user",
  *                 type="object",
@@ -85,15 +87,19 @@ class AdSchema
  *                 property="images",
  *                 type="array",
  *                 description="Images de l'annonce",
+ *
  *                 @OA\Items(
  *                     type="object",
+ *
  *                     @OA\Property(property="id", type="integer", example=1),
  *                     @OA\Property(property="is_primary", type="boolean", example=true),
  *                     @OA\Property(
  *                         property="media",
  *                         type="array",
+ *
  *                         @OA\Items(
  *                             type="object",
+ *
  *                             @OA\Property(property="id", type="integer", example=1),
  *                             @OA\Property(property="name", type="string", example="Image principale"),
  *                             @OA\Property(property="file_name", type="string", example="1_1642234567_0.jpg"),
@@ -120,6 +126,7 @@ class AdResourceSchema
  *     type="object",
  *     title="Ad Image",
  *     description="Image associée à une annonce",
+ *
  *     @OA\Property(property="id", type="integer", description="Identifiant unique de l'image", example=1),
  *     @OA\Property(property="ad_id", type="integer", description="ID de l'annonce associée", example=1),
  *     @OA\Property(property="is_primary", type="boolean", description="Image principale", example=true),
@@ -137,6 +144,7 @@ class AdImageSchema
  *     type="object",
  *     title="Error Response",
  *     description="Réponse d'erreur standard",
+ *
  *     @OA\Property(property="success", type="boolean", example=false),
  *     @OA\Property(property="message", type="string", example="Une erreur s'est produite"),
  *     @OA\Property(property="error", type="string", example="Détail de l'erreur", nullable=true),
@@ -160,6 +168,7 @@ class ErrorResponseSchema
  *     title="Ad Create Request",
  *     description="Données requises pour créer une annonce",
  *     required={"title", "description", "adresse", "price", "surface_area", "bedrooms", "bathrooms", "latitude", "longitude", "quarter_id", "type_id"},
+ *
  *     @OA\Property(property="title", type="string", maxLength=255, description="Titre de l'annonce", example="Magnifique appartement"),
  *     @OA\Property(property="description", type="string", description="Description détaillée", example="Appartement spacieux avec vue"),
  *     @OA\Property(property="adresse", type="string", maxLength=500, description="Adresse du bien", example="123 Rue de la Paix"),
@@ -179,6 +188,7 @@ class ErrorResponseSchema
  *         property="images",
  *         type="array",
  *         description="Images du bien (max 10, 5MB chaque)",
+ *
  *         @OA\Items(type="string", format="binary"),
  *         maxItems=10
  *     )
@@ -194,6 +204,7 @@ class AdCreateRequestSchema
  *     type="object",
  *     title="Ad Update Request",
  *     description="Données pour mettre à jour une annonce",
+ *
  *     @OA\Property(property="title", type="string", maxLength=255, description="Titre de l'annonce", example="Titre mis à jour"),
  *     @OA\Property(property="description", type="string", description="Description mise à jour", example="Description modifiée"),
  *     @OA\Property(property="adresse", type="string", maxLength=500, description="Nouvelle adresse", example="456 Avenue Updated"),
@@ -212,12 +223,15 @@ class AdCreateRequestSchema
  *         property="images",
  *         type="array",
  *         description="Nouvelles images à ajouter",
+ *
  *         @OA\Items(type="string", format="binary")
  *     ),
+ *
  *     @OA\Property(
  *         property="images_to_delete",
  *         type="array",
  *         description="IDs des images à supprimer",
+ *
  *         @OA\Items(type="integer"),
  *         example={1, 3, 5}
  *     )

@@ -191,12 +191,14 @@ class UserController
      *
      *                     @OA\Items(type="string", example="The email field is required.")
      *                 ),
+     *
      *                 @OA\Property(
      *                     property="latitude",
      *                     type="array",
      *
      *                     @OA\Items(type="string", example="The latitude must be between -90 and 90.")
      *                 ),
+     *
      *                 @OA\Property(
      *                     property="confirm_password",
      *                     type="array",

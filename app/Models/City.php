@@ -17,6 +17,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
+ *
  * @method static CityFactory factory($count = null, $state = [])
  * @method static Builder<static>|City newModelQuery()
  * @method static Builder<static>|City newQuery()
@@ -29,10 +30,12 @@ use Illuminate\Support\Carbon;
  * @method static Builder<static>|City whereUpdatedAt($value)
  * @method static Builder<static>|City withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|City withoutTrashed()
+ *
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Quarter> $quarters
  * @property-read int|null $quarters_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\User> $users
  * @property-read int|null $users_count
+ *
  * @mixin Eloquent
  */
 class City extends Model
@@ -48,9 +51,8 @@ class City extends Model
     protected $hidden = [
         'created_at',
         'updated_at',
-        'deleted_at'
+        'deleted_at',
     ];
-
 
     /**
      * Mutator to always set the name attribute
@@ -61,10 +63,8 @@ class City extends Model
         $this->attributes['name'] = ucfirst(strtolower($value));
     }
 
-     /**
+    /**
      * Get all of the quarters for the City
-     *
-     * @return \Illuminate\Database\Eloquent\Relations\HasMany
      */
     public function quarters(): hasMany
     {

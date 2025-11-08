@@ -8,6 +8,7 @@ namespace App\Swagger;
  *     type="object",
  *     title="User",
  *     description="Modèle utilisateur",
+ *
  *     @OA\Property(property="id", type="integer"),
  *      @OA\Property(property="firstname", type="string"),
  *      @OA\Property(property="lastname", type="string"),

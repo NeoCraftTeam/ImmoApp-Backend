@@ -17,7 +17,9 @@ class paymentPolicy
 
     public function view(User $user, payment $payment): bool
     {
-        if ($user->isAdmin()) return true;
+        if ($user->isAdmin()) {
+            return true;
+        }
 
         // Regular users can only view their own payments
         return $user->id === $payment->user_id;

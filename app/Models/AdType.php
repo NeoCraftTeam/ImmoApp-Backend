@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
+ *
  * @method static AdTypeFactory factory($count = null, $state = [])
  * @method static Builder<static>|AdType newModelQuery()
  * @method static Builder<static>|AdType newQuery()
@@ -31,6 +32,7 @@ use Illuminate\Support\Carbon;
  * @method static Builder<static>|AdType whereUpdatedAt($value)
  * @method static Builder<static>|AdType withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|AdType withoutTrashed()
+ *
  * @mixin Eloquent
  */
 class AdType extends Model
