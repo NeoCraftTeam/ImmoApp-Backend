@@ -1504,6 +1504,12 @@ class AdController
 
         // Filtres numériques
         $minBedrooms = isset($validated['bedrooms']) ? (int)$validated['bedrooms'] : null;
+        $minBathrooms = isset($validated['bathrooms']) ? (int)$validated['bathrooms'] : null;
+        $minPrice = isset($validated['price_min']) ? (float)$validated['price_min'] : null;
+        $maxPrice = isset($validated['price_max']) ? (float)$validated['price_max'] : null;
+        $minSurface = isset($validated['surface_min']) ? (float)$validated['surface_min'] : null;
+        $maxSurface = isset($validated['surface_max']) ? (float)$validated['surface_max'] : null;
+        $hasParking = isset($validated['has_parking']) ? (bool)$validated['has_parking'] : null;
 
         // Tri et pagination
         $sortBy = $validated['sort'] ?? 'created_at';
@@ -1533,6 +1539,32 @@ class AdController
         if ($minBedrooms !== null) {
             $filters[] = sprintf('bedrooms >= %d', $minBedrooms);
         }
+
+        if ($minBathrooms !== null) {
+            $filters[] = sprintf('bathrooms >= %d', $minBathrooms);
+        }
+
+        // Filtres de prix
+        if ($minPrice !== null) {
+            $filters[] = sprintf('price >= %f', $minPrice);
+        }
+        if ($maxPrice !== null) {
+            $filters[] = sprintf('price <= %f', $maxPrice);
+        }
+
+        // Filtres de surface
+        if ($minSurface !== null) {
+            $filters[] = sprintf('surface_area >= %f', $minSurface);
+        }
+        if ($maxSurface !== null) {
+            $filters[] = sprintf('surface_area <= %f', $maxSurface);
+        }
+
+        // Filtre parking
+        if ($hasParking !== null) {
+            $filters[] = sprintf('has_parking = %s', $hasParking ? 'true' : 'false');
+        }
+
 
         // Toujours filtrer par status available (si tu veux)
         $filters[] = "status = 'available'";
