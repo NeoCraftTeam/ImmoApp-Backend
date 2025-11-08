@@ -13,6 +13,7 @@
         "clickbar/laravel-magellan": "^2.0",
         "darkaonline/l5-swagger": "^9.0",
         "laravel/framework": "^12.0",
+        "laravel/pulse": "^1.4",
         "laravel/sanctum": "^4.0",
         "laravel/telescope": "^5.15",
         "laravel/tinker": "^2.10.1",
