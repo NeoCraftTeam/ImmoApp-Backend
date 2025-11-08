@@ -13,6 +13,37 @@ class AdRequest extends FormRequest
 
     public function rules(): array
     {
+
+        // Règles pour la recherche (GET)
+        if ($this->isMethod('get')) {
+            return [
+                // Recherche textuelle
+                'q' => ['nullable', 'string', 'max:255'],
+
+                // Filtres
+                'city' => ['nullable', 'string', 'max:100'],
+                'type' => ['nullable', 'string', 'max:100'],
+                'bedrooms' => ['nullable', 'integer', 'min:0'],
+                'quarter_id' => ['sometimes', 'exists:quarter,id'],
+                'type_id' => ['sometimes', 'exists:ad_type,id'],
+
+                // Tri
+                'sort' => ['nullable', 'string', 'in:price,surface_area,created_at'],
+                'order' => ['nullable', 'string', 'in:asc,desc'],
+
+                // Pagination
+                'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+
+                // Autocomplete
+                'field' => ['nullable', 'string', 'in:city,type,quarter'],
+
+                // Nearby
+                'latitude' => 'nullable|numeric|between:-90,90',
+                'longitude' => 'nullable|numeric|between:-180,180',
+                'radius' => 'nullable|numeric|min:0',
+            ];
+        }
+
         if ($this->isMethod('post')) {
             return [
                 'title' => ['required', 'string', 'max:255'],
