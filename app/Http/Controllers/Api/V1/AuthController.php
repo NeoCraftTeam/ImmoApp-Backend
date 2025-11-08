@@ -26,7 +26,7 @@ class AuthController
     /**
      * @OA\Post(
      *     path="/api/v1/auth/registerCustomer",
-     *     tags={"auth"},
+     *     tags={"🔐 Authentification"},
      *     summary="Inscription d'un nouveau client",
      *     description="Permet l'inscription d'un nouvel utilisateur avec validation des données, gestion d'avatar optionnel et localisation GPS optionnelle",
      *     operationId="registerCustomer",
@@ -354,7 +354,7 @@ class AuthController
     /**
      * @OA\Post(
      *     path="/api/v1/auth/registerAgent",
-     *     tags={"auth"},
+     *     tags={"🔐 Authentification"},
      *     summary="Inscription d'un nouvel agent",
      *     description="Permet l'inscription d'un nouvel utilisateur avec validation des données et gestion d'avatar optionnel",
      *     operationId="registerAgent",
@@ -537,7 +537,7 @@ class AuthController
     /**
      * @OA\Post(
      *     path="/api/v1/auth/verifyEmail",
-     *     tags={"auth"},
+     *     tags={"🔐 Authentification"},
      *     summary="Vérification de l'adresse email",
      *     description="Vérifie l'adresse email de l'utilisateur via un lien de vérification",
      *     operationId="verifyEmail",
@@ -638,7 +638,7 @@ class AuthController
     /**
      * @OA\Post(
      *     path="/api/v1/auth/resendVerificationEmail",
-     *     tags={"auth"},
+     *     tags={"🔐 Authentification"},
      *     summary="Renvoyer l'email de vérification",
      *     description="Renvoie un email de vérification à l'utilisateur",
      *     operationId="resendVerificationEmail",
@@ -725,7 +725,7 @@ class AuthController
     /**
      * @OA\Post(
      *     path="/api/v1/auth/login",
-     *     tags={"auth"},
+     *     tags={"🔐 Authentification"},
      *     summary="Connexion utilisateur",
      *     description="Authentifie un utilisateur et retourne un token d'accès",
      *     operationId="login",
@@ -929,7 +929,7 @@ class AuthController
     /**
      * @OA\Post(
      *     path="/api/v1/auth/logout",
-     *     tags={"auth"},
+     *     tags={"🔐 Authentification"},
      *     summary="Déconnexion utilisateur",
      *     description="Déconnecte l'utilisateur en révoquant son token d'accès",
      *     operationId="logout",
@@ -1012,7 +1012,7 @@ class AuthController
     /**
      * @OA\Get(
      *     path="/api/v1/auth/me",
-     *     tags={"auth"},
+     *     tags={"🔐 Authentification"},
      *     summary="Informations de l'utilisateur connecté",
      *     description="Retourne les informations de l'utilisateur actuellement authentifié",
      *     operationId="me",
@@ -1060,7 +1060,7 @@ class AuthController
     /**
      * @OA\Post(
      *     path="/api/v1/auth/refresh",
-     *     tags={"auth"},
+     *     tags={"🔐 Authentification"},
      *     summary="Rafraîchir le token d'accès",
      *     description="Génère un nouveau token d'accès et révoque l'ancien",
      *     operationId="refresh",

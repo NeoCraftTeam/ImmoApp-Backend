@@ -23,7 +23,7 @@ class UserController
      *     path="/api/v1/users",
      *     operationId="getUsersList",
      *     security={{"bearerAuth":{}}},
-     *     tags={"user"},
+     *     tags={"👤 Utilisateur"},
      *     summary="Liste des utilisateurs",
      *     description="Récupère la liste paginée des utilisateurs avec leurs relations (ville et média)",
      *
@@ -132,7 +132,7 @@ class UserController
      *     path="/api/v1/users",
      *     operationId="createUser",
      *     security={{"bearerAuth":{}}},
-     *     tags={"user"},
+     *     tags={"👤 Utilisateur"},
      *     summary="Créer un nouvel utilisateur",
      *     description="Crée un nouvel utilisateur avec avatar et localisation GPS optionnels et génère un token d'accès",
      *
@@ -346,7 +346,7 @@ class UserController
      *     path="/api/v1/users/{id}",
      *     operationId="getUserById",
      *     security={{"bearerAuth":{}}},
-     *     tags={"user"},
+     *     tags={"👤 Utilisateur"},
      *     summary="Afficher un utilisateur spécifique",
      *     description="Récupère les détails d'un utilisateur par son ID avec ses relations",
      *
@@ -433,7 +433,7 @@ class UserController
      *     path="/api/v1/users/{user}",
      *     operationId="updateUser",
      *     security={{"bearerAuth":{}}},
-     *     tags={"user"},
+     *     tags={"👤 Utilisateur"},
      *     summary="Mettre à jour un utilisateur",
      *     description="Met à jour les informations d'un utilisateur existant avec gestion d'avatar",
      *
@@ -634,7 +634,7 @@ class UserController
      *     path="/api/v1/users/{user}",
      *     operationId="deleteUser",
      *     security={{"bearerAuth":{}}},
-     *     tags={"user"},
+     *     tags={"👤 Utilisateur"},
      *     summary="Supprimer un utilisateur",
      *     description="Supprime définitivement un utilisateur et toutes ses données associées (avatar, médias)",
      *

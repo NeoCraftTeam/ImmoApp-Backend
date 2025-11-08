@@ -17,7 +17,7 @@ class AdTypeController
      *     path="/api/v1/ad-types",
      *     operationId="showAdTypes",
      *     security={{"bearerAuth":{}}},
-     *     tags={"ad type"},
+     *     tags={"🏷️ Type d'annonce"},
      *     summary="Types d'annonces",
      *     description="Récupère la liste des types d'annonces",
      *     @OA\Response(
@@ -46,7 +46,7 @@ class AdTypeController
      *     path="/api/v1/ad-types",
      *     operationId="storeAdType",
      *     security={{"bearerAuth":{}}},
-     *     tags={"ad type"},
+     *     tags={"🏷️ Type d'annonce"},
      *     summary="Creer un type d'annonce",
      *    @OA\RequestBody(
      *          required=true,
@@ -97,7 +97,7 @@ class AdTypeController
      *     path="/api/v1/ad-types/{id}",
      *     operationId="showAdType",
      *     security={{"bearerAuth":{}}},
-     *     tags={"ad type"},
+     *     tags={"🏷️ Type d'annonce"},
      *     summary="Afficher un type d'annonce",
      *     @OA\Parameter(
      *         name="id",
@@ -132,7 +132,7 @@ class AdTypeController
      *     path="/api/v1/ad-types/{id}",
      *     operationId="updateAdType",
      *     security={{"bearerAuth":{}}},
-     *     tags={"ad type"},
+     *     tags={"🏷️ Type d'annonce"},
      *     summary="Mettre à jour du type d'annonce",
      *     @OA\Parameter(
      *         name="id",
@@ -191,7 +191,7 @@ class AdTypeController
      *     path="/api/v1/ad-types/{id}",
      *     operationId="deleteAdType",
      *     security={{"bearerAuth":{}}},
-     *     tags={"ad type"},
+     *     tags={"🏷️ Type d'annonce"},
      *     summary="Supprimer un type",
      *     description="Supprime le type par son ID",
      *     @OA\Parameter(

@@ -17,7 +17,7 @@ class CityController
      *     path="/api/v1/cities",
      *     operationId="showCities",
      *     security={{"bearerAuth":{}}},
-     *     tags={"city"},
+     *    tags={"🏙️ Ville"},
      *     summary="Liste des villes",
      *     description="Récupère la liste paginée des villes",
      *     @OA\Parameter(
@@ -51,7 +51,7 @@ class CityController
      *     path="/api/v1/cities",
      *     operationId="storeCity",
      *     security={{"bearerAuth":{}}},
-     *     tags={"city"},
+     *    tags={"🏙️ Ville"},
      *     summary="Créer une ville",
      *     description="Crée une nouvelle ville",
      *    @OA\RequestBody(
@@ -102,7 +102,7 @@ class CityController
      *     path="/api/v1/cities/{id}",
      *     operationId="showCity",
      *     security={{"bearerAuth":{}}},
-     *     tags={"city"},
+     *    tags={"🏙️ Ville"},
      *     summary="Afficher une ville",
      *     description="Récupère les détails d'une ville",
      *     @OA\Parameter(
@@ -138,7 +138,7 @@ class CityController
      *     path="/api/v1/cities/{id}",
      *     operationId="updateCity",
      *     security={{"bearerAuth":{}}},
-     *     tags={"city"},
+     *    tags={"🏙️ Ville"},
      *     summary="Mettre à jour une ville",
      *     description="Met à jour les détails d'une ville",
      *     @OA\Parameter(
@@ -197,7 +197,7 @@ class CityController
      *     path="/api/v1/cities/{id}",
      *     operationId="deleteCity",
      *     security={{"bearerAuth":{}}},
-     *     tags={"city"},
+     *    tags={"🏙️ Ville"},
      *     summary="Supprimer une ville",
      *     description="Supprime une ville par son ID",
      *     @OA\Parameter(

@@ -23,7 +23,7 @@ class QuarterController
      *     path="/api/v1/quarters",
      *     summary="Liste des quartiers",
      *     description="Récupère la liste paginée de tous les quartiers",
-     *     tags={"quarter"},
+     *     tags={"📍 Quartier"},
      *     @OA\Parameter(
      *         name="page",
      *         in="query",
@@ -101,7 +101,7 @@ class QuarterController
      *     path="/api/v1/quarters",
      *     summary="Créer un quartier",
      *     description="Crée un nouveau quartier dans une ville",
-     *     tags={"quarter"},
+     *     tags={"📍 Quartier"},
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
@@ -206,7 +206,7 @@ class QuarterController
      *     path="/api/v1/quarters/{id}",
      *     summary="Afficher un quartier",
      *     description="Récupère les détails d'un quartier spécifique",
-     *     tags={"quarter"},
+     *     tags={"📍 Quartier"},
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
@@ -265,7 +265,7 @@ class QuarterController
      *     path="/api/v1/quarters/{quarter}",
      *     summary="Mettre à jour un quartier",
      *     description="Met à jour les informations d'un quartier existant",
-     *     tags={"quarter"},
+     *     tags={"📍 Quartier"},
      *     @OA\Parameter(
      *         name="quarter",
      *         in="path",
@@ -380,7 +380,7 @@ class QuarterController
      *     path="/api/v1/quarters/{quarter}",
      *     summary="Supprimer un quartier",
      *     description="Supprime définitivement un quartier",
-     *     tags={"quarter"},
+     *     tags={"📍 Quartier"},
      *     @OA\Parameter(
      *         name="quarter",
      *         in="path",

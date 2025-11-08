@@ -30,7 +30,7 @@ class AdController
      *     summary="Obtenir toutes les annonces",
      *     description="Récupérer une liste paginée de toutes les annonces avec leurs relations (utilisateur, quartier, ville, type, images)",
      *     operationId="obtenirAnnonces",
-     *     tags={"Annonces"},
+     *     tags={"🏠 Annonces"},
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(
@@ -134,7 +134,7 @@ class AdController
      *     summary="Créer une nouvelle annonce",
      *     description="Créer une nouvelle annonce immobilière avec images et données de localisation. Les coordonnées GPS sont obligatoires.",
      *     operationId="creerAnnonce",
-     *     tags={"Annonces"},
+     *     tags={"🏠 Annonces"},
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\RequestBody(
@@ -482,7 +482,7 @@ class AdController
      *     summary="Obtenir une annonce spécifique",
      *     description="Récupérer les informations détaillées d'une annonce spécifique incluant ses images et relations (utilisateur, quartier, ville, type de bien)",
      *     operationId="obtenirAnnonce",
-     *     tags={"Annonces"},
+     *     tags={"🏠 Annonces"},
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(
@@ -567,7 +567,7 @@ class AdController
      *     summary="Mettre à jour une annonce existante",
      *     description="Mettre à jour les informations d'une annonce, ajouter de nouvelles images ou supprimer des images existantes. Tous les champs sont optionnels sauf l'ID.",
      *     operationId="mettreAJourAnnonce",
-     *     tags={"Annonces"},
+     *     tags={"🏠 Annonces"},
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(
@@ -829,7 +829,7 @@ class AdController
      *     summary="Supprimer une annonce",
      *     description="Supprimer définitivement une annonce et toutes ses images associées. Cette action est irréversible et supprimera également tous les fichiers média stockés.",
      *     operationId="supprimerAnnonce",
-     *     tags={"Annonces"},
+     *     tags={"🏠 Annonces"},
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(
@@ -1014,7 +1014,7 @@ class AdController
      *     summary="Recherche publique d'annonces à proximité par coordonnées GPS",
      *     description="Récupérer toutes les annonces dans un rayon défini autour de coordonnées GPS fournies. Cette route est accessible sans authentification. Les coordonnées GPS (latitude/longitude) sont obligatoires pour cette route.",
      *     operationId="obtenirAnnoncesProximitePublic",
-     *     tags={"Annonces"},
+     *     tags={"🏠 Annonces"},
      *
      *     @OA\Parameter(
      *         name="latitude",
@@ -1274,7 +1274,7 @@ class AdController
      *     summary="Recherche d'annonces à proximité d'un utilisateur spécifique",
      *     description="Récupérer toutes les annonces dans un rayon défini autour de la localisation enregistrée d'un utilisateur spécifique. Cette route nécessite une authentification. Si l'utilisateur n'a pas de localisation enregistrée, vous pouvez fournir latitude/longitude en paramètres de requête pour override.",
      *     operationId="obtenirAnnoncesProximiteUtilisateur",
-     *     tags={"Annonces"},
+     *     tags={"🏠 Annonces"},
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(
@@ -1444,7 +1444,7 @@ class AdController
      *     summary="Autocomplétion (villes, types, quartiers)",
      *     description="Retourne jusqu'à 10 suggestions commençant par le préfixe fourni pour les champs: ville (city), type de bien (type), quartier (quarter). Les résultats incluent une clé 'value' (libellé) et 'count' (nombre d'annonces disponibles).",
      *     operationId="autocompleteAnnonces",
-     *     tags={"Annonces"},
+     *     tags={"🔍 Filtre"},
      *
      *     @OA\Parameter(
      *         name="field",
@@ -1654,7 +1654,7 @@ class AdController
      *     summary="Obtenir les facettes (compteurs de filtres)",
      *     description="Retourne les compteurs agrégés pour alimenter les filtres (villes, types, chambres, plages de prix/surface, parking). Endpoint public, sans authentification.",
      *     operationId="facettesAnnonces",
-     *     tags={"Annonces"},
+     *     tags={"🔍 Filtre"},
      *
      *     @OA\Response(
      *         response=200,
@@ -1873,7 +1873,7 @@ class AdController
      *     summary="Rechercher des annonces",
      *     description="Rechercher des annonces avec filtres multiples : texte, ville, type, chambres, prix, surface, parking",
      *     operationId="rechercherAnnonces",
-     *     tags={"Annonces"},
+     *     tags={"🔍 Filtre"},
      *
      *     @OA\Parameter(
      *         name="q",
