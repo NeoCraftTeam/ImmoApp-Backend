@@ -1021,6 +1021,7 @@ class AdController
      *         in="query",
      *         required=true,
      *         description="Latitude du point central de recherche (obligatoire)",
+     *
      *         @OA\Schema(type="number", format="float", minimum=-90, maximum=90, example=48.8566)
      *     ),
      *
@@ -1029,6 +1030,7 @@ class AdController
      *         in="query",
      *         required=true,
      *         description="Longitude du point central de recherche (obligatoire)",
+     *
      *         @OA\Schema(type="number", format="float", minimum=-180, maximum=180, example=2.3522)
      *     ),
      *
@@ -1037,27 +1039,34 @@ class AdController
      *         in="query",
      *         required=false,
      *         description="Rayon de recherche en mètres (par défaut: 1000m)",
+     *
      *         @OA\Schema(type="number", format="float", minimum=0, default=1000, example=5000)
      *     ),
      *
      *     @OA\Response(
      *         response=200,
      *         description="Annonces à proximité récupérées avec succès",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(
      *                 property="data",
      *                 type="array",
      *                 description="Liste des annonces à proximité triées par distance croissante",
+     *
      *                 @OA\Items(ref="#/components/schemas/AdResource")
      *             ),
+     *
      *             @OA\Property(
      *                 property="coordinates",
      *                 type="array",
      *                 description="Coordonnées et distances de chaque annonce",
+     *
      *                 @OA\Items(
      *                     type="object",
+     *
      *                     @OA\Property(property="id", type="integer", example=1),
      *                     @OA\Property(property="latitude", type="number", format="float", example=48.8606),
      *                     @OA\Property(property="longitude", type="number", format="float", example=2.3376),
@@ -1083,8 +1092,10 @@ class AdController
      *     @OA\Response(
      *         response=403,
      *         description="Interdit - Permissions insuffisantes",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Cette action n'est pas autorisée")
      *         )
      *     ),
@@ -1092,8 +1103,10 @@ class AdController
      *     @OA\Response(
      *         response=422,
      *         description="Erreur de validation - Coordonnées manquantes ou invalides",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Latitude and longitude are required and must be within valid ranges.")
      *         )
@@ -1102,13 +1115,16 @@ class AdController
      *     @OA\Response(
      *         response=500,
      *         description="Erreur serveur",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="An error occurred while fetching nearby ads.")
      *         )
      *     )
      * )
+     *
      * @throws Throwable
      */
     public function ads_nearby_public(AdRequest $request): JsonResponse
@@ -1121,9 +1137,6 @@ class AdController
      * Fonction privée appelée par ads_nearby_public et ads_nearby_user.
      * Cette fonction ne doit PAS avoir d'annotations Swagger.
      *
-     * @param AdRequest $request
-     * @param int|null $user
-     * @return JsonResponse
      * @throws Throwable
      */
     private function ads_nearby(AdRequest $request, ?int $user = null): JsonResponse
@@ -1269,6 +1282,7 @@ class AdController
      *         in="path",
      *         required=true,
      *         description="Identifiant de l'utilisateur dont on utilise la localisation",
+     *
      *         @OA\Schema(type="integer", example=2210)
      *     ),
      *
@@ -1277,6 +1291,7 @@ class AdController
      *         in="query",
      *         required=false,
      *         description="Rayon de recherche en mètres (par défaut: 1000m)",
+     *
      *         @OA\Schema(type="number", format="float", minimum=0, default=1000, example=1)
      *     ),
      *
@@ -1285,6 +1300,7 @@ class AdController
      *         in="query",
      *         required=false,
      *         description="Latitude optionnelle pour override la localisation de l'utilisateur",
+     *
      *         @OA\Schema(type="number", format="float", minimum=-90, maximum=90, example=48.8566)
      *     ),
      *
@@ -1293,25 +1309,32 @@ class AdController
      *         in="query",
      *         required=false,
      *         description="Longitude optionnelle pour override la localisation de l'utilisateur",
+     *
      *         @OA\Schema(type="number", format="float", minimum=-180, maximum=180, example=2.3522)
      *     ),
      *
      *     @OA\Response(
      *         response=200,
      *         description="Annonces à proximité de l'utilisateur récupérées avec succès",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(
      *                 property="data",
      *                 type="array",
+     *
      *                 @OA\Items(ref="#/components/schemas/AdResource")
      *             ),
+     *
      *             @OA\Property(
      *                 property="coordinates",
      *                 type="array",
+     *
      *                 @OA\Items(
      *                     type="object",
+     *
      *                     @OA\Property(property="id", type="integer", example=1),
      *                     @OA\Property(property="latitude", type="number", format="float", example=48.8606),
      *                     @OA\Property(property="longitude", type="number", format="float", example=2.3376),
@@ -1337,8 +1360,10 @@ class AdController
      *     @OA\Response(
      *         response=401,
      *         description="Non authentifié",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Non authentifié")
      *         )
      *     ),
@@ -1346,8 +1371,10 @@ class AdController
      *     @OA\Response(
      *         response=403,
      *         description="Interdit - Permissions insuffisantes",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Cette action n'est pas autorisée")
      *         )
      *     ),
@@ -1355,8 +1382,10 @@ class AdController
      *     @OA\Response(
      *         response=404,
      *         description="Utilisateur introuvable",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="User not found.")
      *         )
@@ -1365,8 +1394,10 @@ class AdController
      *     @OA\Response(
      *         response=422,
      *         description="Erreur de validation",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Latitude and longitude are required and must be within valid ranges.")
      *         )
@@ -1375,13 +1406,16 @@ class AdController
      *     @OA\Response(
      *         response=500,
      *         description="Erreur serveur",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="An error occurred while fetching nearby ads.")
      *         )
      *     )
      * )
+     *
      * @throws Throwable
      */
     public function ads_nearby_user(AdRequest $request, int $user): JsonResponse
@@ -1389,7 +1423,144 @@ class AdController
         return $this->ads_nearby($request, $user);
     }
 
+    /**
+     * Rechercher des annonces avec filtres multiples
+     *
+     * @OA\Get(
+     *     path="/api/v1/ads/search",
+     *     summary="Rechercher des annonces",
+     *     description="Rechercher des annonces avec filtres multiples : texte, ville, type, chambres, prix, surface, parking",
+     *     operationId="rechercherAnnonces",
+     *     tags={"Annonces"},
+     *
+     *     @OA\Parameter(
+     *         name="q",
+     *         in="query",
+     *         description="Terme de recherche textuel",
+     *         required=false,
+     *
+     *         @OA\Schema(type="string", example="appartement lumineux")
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="city",
+     *         in="query",
+     *         description="Filtrer par ville",
+     *         required=false,
+     *
+     *         @OA\Schema(type="string", example="Paris")
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="sort",
+     *         in="query",
+     *         description="Champ de tri",
+     *         required=false,
+     *
+     *         @OA\Schema(type="string", enum={"price", "surface_area", "created_at"}, example="price")
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="order",
+     *         in="query",
+     *         description="Ordre de tri",
+     *         required=false,
+     *
+     *         @OA\Schema(type="string", enum={"asc", "desc"}, example="asc")
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Nombre d'éléments par page",
+     *         required=false,
+     *
+     *         @OA\Schema(type="integer", example=15)
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Résultats de recherche",
+     *
+     *         @OA\JsonContent(
+     *             type="object",
+     *
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/AdResource")),
+     *             @OA\Property(property="meta", type="object")
+     *         )
+     *     )
+     * )
+     */
+    public function search(AdRequest $request): AnonymousResourceCollection
+    {
+        $validated = $request->validated();
 
+        // Paramètres de recherche
+        $q = (string)($validated['q'] ?? '');
+        $city = $validated['city'] ?? null;
+        $type = $validated['type'] ?? null;
+        $typeId = $validated['type_id'] ?? null;
+        $quarterId = $validated['quarter_id'] ?? null;
+
+        // Filtres numériques
+        $minBedrooms = isset($validated['bedrooms']) ? (int)$validated['bedrooms'] : null;
+
+        // Tri et pagination
+        $sortBy = $validated['sort'] ?? 'created_at';
+        $sortOrder = strtolower($validated['order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+        $perPage = (int)($validated['per_page'] ?? config('pagination.per_page', 15));
+
+        // Construire les filtres Meilisearch
+        $filters = [];
+
+        // Filtres de chaînes
+        if (!empty($city)) {
+            $filters[] = sprintf("city = '%s'", str_replace("'", "\\'", $city));
+        }
+        if (!empty($type)) {
+            $filters[] = sprintf("type = '%s'", str_replace("'", "\\'", $type));
+        }
+
+        // Filtres d'ID
+        if (!empty($typeId)) {
+            $filters[] = sprintf('type_id = %d', (int)$typeId);
+        }
+        if (!empty($quarterId)) {
+            $filters[] = sprintf('quarter_id = %d', (int)$quarterId);
+        }
+
+        // Filtres de chambres et salles de bain
+        if ($minBedrooms !== null) {
+            $filters[] = sprintf('bedrooms >= %d', $minBedrooms);
+        }
+
+        // Toujours filtrer par status available (si tu veux)
+        $filters[] = "status = 'available'";
+
+        // Whitelist des champs de tri
+        $allowedSorts = ['price', 'surface_area', 'created_at'];
+        if (!in_array($sortBy, $allowedSorts, true)) {
+            $sortBy = 'created_at';
+        }
+
+        // Construire la requête Scout
+        $builder = Ad::search($q, function (\Meilisearch\Endpoints\Indexes $index, string $query, array $options) use ($filters, $sortBy, $sortOrder) {
+            if (!empty($filters)) {
+                // AND logic : tous les filtres doivent matcher
+                $options['filter'] = $filters;
+            }
+
+            // Tri
+            $options['sort'] = [sprintf('%s:%s', $sortBy, $sortOrder)];
+
+            return $index->search($query, $options);
+        })
+            // Eager load des relations
+            ->query(fn($eloquent) => $eloquent->with(['quarter.city', 'ad_type', 'images', 'user']));
+
+        // Paginer
+        $results = $builder->paginate($perPage);
+
+        return AdResource::collection($results);
+    }
 }
-
-
