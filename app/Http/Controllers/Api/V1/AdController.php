@@ -1635,6 +1635,237 @@ class AdController
     }
 
     /**
+     * Obtenir les facettes (compteurs) pour les filtres
+     *
+     * Agrège côté base de données les compteurs utiles pour construire l'UI de filtres.
+     * Aucun paramètre n'est requis. Endpoint public (sans authentification).
+     * Seules les annonces avec status = "available" sont comptabilisées.
+     *
+     * Structure de la réponse:
+     * - cities:     Top 20 villes par nombre d'annonces disponibles [{ name, count }]
+     * - types:      Top 20 types de bien [{ name, count }]
+     * - bedrooms:   Toutes les valeurs présentes, triées numériquement croissant [{ value, count }]
+     * - price_range:    bornes min/max (valeurs sous forme de chaînes décimales)
+     * - surface_range:  bornes min/max (valeurs sous forme de chaînes décimales)
+     * - has_parking:    répartition avec/sans parking { with_parking, without_parking }
+     *
+     * @OA\Get(
+     *     path="/api/v1/ads/facets",
+     *     summary="Obtenir les facettes (compteurs de filtres)",
+     *     description="Retourne les compteurs agrégés pour alimenter les filtres (villes, types, chambres, plages de prix/surface, parking). Endpoint public, sans authentification.",
+     *     operationId="facettesAnnonces",
+     *     tags={"Annonces"},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Facettes récupérées avec succès",
+     *
+     *         @OA\JsonContent(
+     *             type="object",
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(
+     *                     property="cities",
+     *                     type="array",
+     *                     description="Top 20 villes par nombre d'annonces disponibles",
+     *
+     *                     @OA\Items(type="object",
+     *
+     *                         @OA\Property(property="name", type="string", example="Paris"),
+     *                         @OA\Property(property="count", type="integer", example=128)
+     *                     )
+     *                 ),
+     *                 @OA\Property(
+     *                     property="types",
+     *                     type="array",
+     *                     description="Top 20 types de bien",
+     *
+     *                     @OA\Items(type="object",
+     *
+     *                         @OA\Property(property="name", type="string", example="Appartement"),
+     *                         @OA\Property(property="count", type="integer", example=312)
+     *                     )
+     *                 ),
+     *                 @OA\Property(
+     *                     property="bedrooms",
+     *                     type="array",
+     *                     description="Répartition par nombre de chambres (tri croissant)",
+     *
+     *                     @OA\Items(type="object",
+     *
+     *                         @OA\Property(property="value", type="integer", example=2),
+     *                         @OA\Property(property="count", type="integer", example=105)
+     *                     )
+     *                 ),
+     *                 @OA\Property(
+     *                     property="price_range",
+     *                     type="object",
+     *                     description="Plage de prix (valeurs décimales en chaîne)",
+     *                     @OA\Property(property="min", type="string", example="25000.00"),
+     *                     @OA\Property(property="max", type="string", example="150000.00")
+     *                 ),
+     *                 @OA\Property(
+     *                     property="surface_range",
+     *                     type="object",
+     *                     description="Plage de surface (valeurs décimales en chaîne)",
+     *                     @OA\Property(property="min", type="string", example="31.00"),
+     *                     @OA\Property(property="max", type="string", example="120.00")
+     *                 ),
+     *                 @OA\Property(
+     *                     property="has_parking",
+     *                     type="object",
+     *                     description="Répartition des annonces avec/sans parking",
+     *                     @OA\Property(property="with_parking", type="integer", example=511),
+     *                     @OA\Property(property="without_parking", type="integer", example=489)
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=500,
+     *         description="Erreur serveur lors de la récupération des facettes",
+     *
+     *         @OA\JsonContent(
+     *             type="object",
+     *
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error fetching facets")
+     *         )
+     *     ),
+     *
+     *     @OA\Examples(
+     *         example="Réponse de succès",
+     *         summary="Exemple de payload retourné",
+     *         value={
+     *             "success": true,
+     *             "data": {
+     *                 "cities": {
+     *                     {"name": "Paris", "count": 128},
+     *                     {"name": "Lyon", "count": 64}
+     *                 },
+     *                 "types": {
+     *                     {"name": "Appartement", "count": 312},
+     *                     {"name": "Maison", "count": 198}
+     *                 },
+     *                 "bedrooms": {
+     *                     {"value": 1, "count": 109},
+     *                     {"value": 2, "count": 105}
+     *                 },
+     *                 "price_range": {"min": "25000.00", "max": "150000.00"},
+     *                 "surface_range": {"min": "31.00", "max": "120.00"},
+     *                 "has_parking": {"with_parking": 511, "without_parking": 489}
+     *             }
+     *         }
+     *     )
+     * )
+     */
+    public function facets(): JsonResponse
+    {
+        try {
+            $driver = DB::getDriverName();
+            // Choisir une expression de CAST compatible selon le SGBD
+            $bedroomsCast = match ($driver) {
+                'pgsql' => 'CAST(bedrooms as integer)',
+                'sqlite' => 'CAST(bedrooms as integer)',
+                default => 'CAST(bedrooms as signed)', // MySQL / MariaDB
+            };
+
+            // Villes (top 20 par nombre d'annonces disponibles)
+            $cities = DB::table('ad')
+                ->join('quarter', 'ad.quarter_id', '=', 'quarter.id')
+                ->join('city', 'quarter.city_id', '=', 'city.id')
+                ->where('ad.status', '=', 'available')
+                ->whereNotNull('city.name')
+                ->groupBy('city.name')
+                ->select(['city.name as name', DB::raw('COUNT(*) as count')])
+                ->orderByDesc('count')
+                ->limit(20)
+                ->get();
+
+            // Types (top 20)
+            $types = DB::table('ad')
+                ->join('ad_type', 'ad.type_id', '=', 'ad_type.id')
+                ->where('ad.status', '=', 'available')
+                ->whereNotNull('ad_type.name')
+                ->groupBy('ad_type.name')
+                ->select(['ad_type.name as name', DB::raw('COUNT(*) as count')])
+                ->orderByDesc('count')
+                ->limit(20)
+                ->get();
+
+            // Chambres (toutes les valeurs présentes, tri croissant)
+            $bedrooms = DB::table('ad')
+                ->where('status', '=', 'available')
+                ->whereNotNull('bedrooms')
+                ->groupBy('bedrooms')
+                ->select([DB::raw($bedroomsCast . ' as value'), DB::raw('COUNT(*) as count')])
+                ->orderBy('value')
+                ->get();
+
+            // Plages min/max (ignorer les NULL)
+            $priceRange = DB::table('ad')
+                ->where('status', '=', 'available')
+                ->whereNotNull('price')
+                ->selectRaw('MIN(price) as min, MAX(price) as max')
+                ->first();
+
+            $surfaceRange = DB::table('ad')
+                ->where('status', '=', 'available')
+                ->whereNotNull('surface_area')
+                ->selectRaw('MIN(surface_area) as min, MAX(surface_area) as max')
+                ->first();
+
+            // Parking (attention aux différences booléennes entre SGBD)
+            $withParking = DB::table('ad')
+                ->where('status', '=', 'available')
+                ->where('has_parking', '=', $driver === 'pgsql' ? DB::raw('TRUE') : 1)
+                ->count();
+
+            $withoutParking = DB::table('ad')
+                ->where('status', '=', 'available')
+                ->where('has_parking', '=', $driver === 'pgsql' ? DB::raw('FALSE') : 0)
+                ->count();
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'cities' => $cities,
+                    'types' => $types,
+                    'bedrooms' => $bedrooms,
+                    'price_range' => [
+                        'min' => $priceRange?->min,
+                        'max' => $priceRange?->max,
+                    ],
+                    'surface_range' => [
+                        'min' => $surfaceRange?->min,
+                        'max' => $surfaceRange?->max,
+                    ],
+                    'has_parking' => [
+                        'with_parking' => $withParking,
+                        'without_parking' => $withoutParking,
+                    ],
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Facets error: ' . $e->getMessage(), [
+                'driver' => DB::getDriverName(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching facets',
+            ], 500);
+        }
+    }
+
+    /**
      * Rechercher des annonces avec filtres multiples
      *
      * @OA\Get(

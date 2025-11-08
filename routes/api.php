@@ -85,6 +85,7 @@ Route::prefix('v1')->group(function () {
         // Public search endpoint (must be before catch-all ID route)
         Route::get('/search', 'search')->name('ads.search');
         Route::get('/autocomplete', 'autocomplete')->name('ads.autocomplete');
+        Route::get('/facets', 'facets')->name('ads.facets');
 
         Route::middleware('auth:sanctum')->group(function () {
             // Routes spécifiques AVANT les routes avec paramètres génériques

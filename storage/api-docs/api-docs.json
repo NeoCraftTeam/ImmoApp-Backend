@@ -1563,6 +1563,152 @@
                 }
             }
         },
+        "/api/v1/ads/facets": {
+            "get": {
+                "tags": [
+                    "Annonces"
+                ],
+                "summary": "Obtenir les facettes (compteurs de filtres)",
+                "description": "Retourne les compteurs agrégés pour alimenter les filtres (villes, types, chambres, plages de prix/surface, parking). Endpoint public, sans authentification.",
+                "operationId": "facettesAnnonces",
+                "responses": {
+                    "200": {
+                        "description": "Facettes récupérées avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "cities": {
+                                                    "description": "Top 20 villes par nombre d'annonces disponibles",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "name": {
+                                                                "type": "string",
+                                                                "example": "Paris"
+                                                            },
+                                                            "count": {
+                                                                "type": "integer",
+                                                                "example": 128
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "types": {
+                                                    "description": "Top 20 types de bien",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "name": {
+                                                                "type": "string",
+                                                                "example": "Appartement"
+                                                            },
+                                                            "count": {
+                                                                "type": "integer",
+                                                                "example": 312
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "bedrooms": {
+                                                    "description": "Répartition par nombre de chambres (tri croissant)",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "value": {
+                                                                "type": "integer",
+                                                                "example": 2
+                                                            },
+                                                            "count": {
+                                                                "type": "integer",
+                                                                "example": 105
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "price_range": {
+                                                    "description": "Plage de prix (valeurs décimales en chaîne)",
+                                                    "properties": {
+                                                        "min": {
+                                                            "type": "string",
+                                                            "example": "25000.00"
+                                                        },
+                                                        "max": {
+                                                            "type": "string",
+                                                            "example": "150000.00"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "surface_range": {
+                                                    "description": "Plage de surface (valeurs décimales en chaîne)",
+                                                    "properties": {
+                                                        "min": {
+                                                            "type": "string",
+                                                            "example": "31.00"
+                                                        },
+                                                        "max": {
+                                                            "type": "string",
+                                                            "example": "120.00"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "has_parking": {
+                                                    "description": "Répartition des annonces avec/sans parking",
+                                                    "properties": {
+                                                        "with_parking": {
+                                                            "type": "integer",
+                                                            "example": 511
+                                                        },
+                                                        "without_parking": {
+                                                            "type": "integer",
+                                                            "example": 489
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erreur serveur lors de la récupération des facettes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error fetching facets"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/ads/search": {
             "get": {
                 "tags": [
