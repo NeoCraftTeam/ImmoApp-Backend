@@ -17,17 +17,21 @@ class AdTypeController
      *     path="/api/v1/ad-types",
      *     operationId="showAdTypes",
      *     security={{"bearerAuth":{}}},
-     *     tags={"ad type"},
+     *     tags={"🏷️ Type d'annonce"},
      *     summary="Types d'annonces",
      *     description="Récupère la liste des types d'annonces",
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Succès",
+     *
      *         @OA\JsonContent(
      *             type="array",
+     *
      *             @OA\Items(ref="#/components/schemas/AdType")
      *         ),
      *     ),
+     *
      *     @OA\Response(response=401, description="Non autorisé"),
      *     @OA\Response(response=404, description="Non trouvé"),
      *     @OA\Response(response=500, description="Erreur du Serveur")
@@ -46,16 +50,20 @@ class AdTypeController
      *     path="/api/v1/ad-types",
      *     operationId="storeAdType",
      *     security={{"bearerAuth":{}}},
-     *     tags={"ad type"},
+     *     tags={"🏷️ Type d'annonce"},
      *     summary="Creer un type d'annonce",
+     *
      *    @OA\RequestBody(
      *          required=true,
+     *
      *          @OA\JsonContent(
      *              type="object",
+     *
      *              @OA\Property(property="name", type="string", example="Chambre"),
      *              @OA\Property(property="desc", type="string", example="C'est une chambre")
      *          )
      *      ),
+     *
      *     @OA\Response(
      *          response=201,
      *          description="Crée avec succès",
@@ -79,6 +87,7 @@ class AdTypeController
             }
 
             $type = AdType::create($request->validated());
+
             return response()->json([
                 'message' => 'Crée avec succès',
                 'data' => new adTypeResource($type),
@@ -97,19 +106,24 @@ class AdTypeController
      *     path="/api/v1/ad-types/{id}",
      *     operationId="showAdType",
      *     security={{"bearerAuth":{}}},
-     *     tags={"ad type"},
+     *     tags={"🏷️ Type d'annonce"},
      *     summary="Afficher un type d'annonce",
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Succès",
+     *
      *         @OA\JsonContent(ref="#/components/schemas/AdType")
      *     ),
+     *
      *     @OA\Response(response=404, description="Type non trouvé"),
      *     @OA\Response(response=401, description="Non autorisé"),
      *     @OA\Response(response=500, description="Erreur du Serveur"),
@@ -124,6 +138,7 @@ class AdTypeController
                 'message' => 'Type non trouvé',
             ], 404);
         }
+
         return new AdTypeResource($adType);
     }
 
@@ -132,26 +147,34 @@ class AdTypeController
      *     path="/api/v1/ad-types/{id}",
      *     operationId="updateAdType",
      *     security={{"bearerAuth":{}}},
-     *     tags={"ad type"},
+     *     tags={"🏷️ Type d'annonce"},
      *     summary="Mettre à jour du type d'annonce",
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *    @OA\RequestBody(
      *          required=true,
+     *
      *          @OA\JsonContent(
      *              type="object",
+     *
      *              @OA\Property(property="name", type="string", example="Chambre")
      *          )
      *      ),
+     *
      *     @OA\Response(
      *          response=200,
      *          description="Mise à jour avec succès",
+     *
      *          @OA\JsonContent(ref="#/components/schemas/AdType")
      *      ),
+     *
      *      @OA\Response(response=400, description="Requête invalide"),
      *      @OA\Response(response=404, description="Type non trouvée"),
      *      @OA\Response(response=401, description="Non autorisé"),
@@ -191,15 +214,18 @@ class AdTypeController
      *     path="/api/v1/ad-types/{id}",
      *     operationId="deleteAdType",
      *     security={{"bearerAuth":{}}},
-     *     tags={"ad type"},
+     *     tags={"🏷️ Type d'annonce"},
      *     summary="Supprimer un type",
      *     description="Supprime le type par son ID",
+     *
      *     @OA\Parameter(
      *         name="id",
      *         in="path",
      *         required=true,
+     *
      *         @OA\Schema(type="integer")
      *     ),
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Supprimée avec succès"
@@ -213,9 +239,9 @@ class AdTypeController
     {
         $this->authorize('delete', $adType);
 
-
         try {
             $adType->delete();
+
             return response()->json([
                 'message' => 'Supprimée avec succès',
             ], 200); // 200 = OK

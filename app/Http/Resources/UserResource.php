@@ -34,7 +34,7 @@ class UserResource extends JsonResource
             'created_at' => $this->when($request->user()?->role === 'admin', $this->created_at),
             'updated_at' => $this->when($request->user()?->role === 'admin', $this->updated_at),
             'city_id' => $this->city_id,
-            'city_name' => $this->city?->name
+            'city_name' => $this->city?->name,
         ];
     }
 }

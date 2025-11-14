@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
+use Laravel\Scout\Searchable;
 
 /**
  * @property-read Quarter|null $quarter
@@ -70,6 +71,7 @@ use Illuminate\Support\Str;
 class Ad extends Model
 {
     use HasFactory, SoftDeletes;
+    use Searchable;
 
     protected $table = 'ad';
 
@@ -121,9 +123,6 @@ class Ad extends Model
         });
     }
 
-    // Génère automatiquement un slug unique avant de sauvegarder
-
-    // CORRECTION : paramètre nullable explicite
     public static function generateUniqueSlug(string $title, ?int $ignoreId = null): string
     {
         $slug = Str::slug($title);
@@ -139,6 +138,43 @@ class Ad extends Model
         }
 
         return $slug;
+    }
+
+    public function toSearchableArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'title' => $this->title,
+            'description' => $this->description,
+            'adresse' => $this->adresse,
+            'price' => (float)$this->price,
+            'surface_area' => (float)$this->surface_area,
+            'bedrooms' => (int)$this->bedrooms,
+            'bathrooms' => (int)$this->bathrooms,
+            'has_parking' => (bool)$this->has_parking,
+            'status' => $this->status,
+
+            // Relations — vérifier qu'elles existent
+            'city' => $this->quarter?->city?->name,
+            'quarter' => $this->quarter?->name,
+            'type' => $this->ad_type?->name,
+            'type_id' => $this->type_id,
+            'quarter_id' => $this->quarter_id,
+
+            // Pour la recherche géographique (optionnel)
+            '_geo' => $this->location ? [
+                'lat' => $this->location->getLatitude(),
+                'lng' => $this->location->getLongitude(),
+            ] : null,
+
+            'created_at' => $this->created_at?->timestamp,
+        ];
+    }
+
+    public function shouldBeSearchable(): bool
+    {
+        // N'indexer que les annonces non supprimées et actives
+        return $this->status === 'available' && !$this->trashed();
     }
 
     public function user(): BelongsTo
@@ -169,5 +205,10 @@ class Ad extends Model
     public function ad_type(): BelongsTo
     {
         return $this->belongsTo(AdType::class, 'type_id');
+    }
+
+    protected function makeAllSearchableUsing(Builder $query): Builder
+    {
+        return $query->with(['quarter.city', 'ad_type']);
     }
 }

@@ -30,7 +30,7 @@ class AdController
      *     summary="Obtenir toutes les annonces",
      *     description="Récupérer une liste paginée de toutes les annonces avec leurs relations (utilisateur, quartier, ville, type, images)",
      *     operationId="obtenirAnnonces",
-     *     tags={"Annonces"},
+     *     tags={"🏠 Annonces"},
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(
@@ -134,7 +134,7 @@ class AdController
      *     summary="Créer une nouvelle annonce",
      *     description="Créer une nouvelle annonce immobilière avec images et données de localisation. Les coordonnées GPS sont obligatoires.",
      *     operationId="creerAnnonce",
-     *     tags={"Annonces"},
+     *     tags={"🏠 Annonces"},
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\RequestBody(
@@ -462,7 +462,7 @@ class AdController
      *     summary="Obtenir une annonce spécifique",
      *     description="Récupérer les informations détaillées d'une annonce spécifique incluant ses images et relations (utilisateur, quartier, ville, type de bien)",
      *     operationId="obtenirAnnonce",
-     *     tags={"Annonces"},
+     *     tags={"🏠 Annonces"},
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(
@@ -547,7 +547,7 @@ class AdController
      *     summary="Mettre à jour une annonce existante",
      *     description="Mettre à jour les informations d'une annonce, ajouter de nouvelles images ou supprimer des images existantes. Tous les champs sont optionnels sauf l'ID.",
      *     operationId="mettreAJourAnnonce",
-     *     tags={"Annonces"},
+     *     tags={"🏠 Annonces"},
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(
@@ -809,7 +809,7 @@ class AdController
      *     summary="Supprimer une annonce",
      *     description="Supprimer définitivement une annonce et toutes ses images associées. Cette action est irréversible et supprimera également tous les fichiers média stockés.",
      *     operationId="supprimerAnnonce",
-     *     tags={"Annonces"},
+     *     tags={"🏠 Annonces"},
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(
@@ -994,13 +994,14 @@ class AdController
      *     summary="Recherche publique d'annonces à proximité par coordonnées GPS",
      *     description="Récupérer toutes les annonces dans un rayon défini autour de coordonnées GPS fournies. Cette route est accessible sans authentification. Les coordonnées GPS (latitude/longitude) sont obligatoires pour cette route.",
      *     operationId="obtenirAnnoncesProximitePublic",
-     *     tags={"Annonces"},
+     *     tags={"🏠 Annonces"},
      *
      *     @OA\Parameter(
      *         name="latitude",
      *         in="query",
      *         required=true,
      *         description="Latitude du point central de recherche (obligatoire)",
+     *
      *         @OA\Schema(type="number", format="float", minimum=-90, maximum=90, example=48.8566)
      *     ),
      *
@@ -1009,6 +1010,7 @@ class AdController
      *         in="query",
      *         required=true,
      *         description="Longitude du point central de recherche (obligatoire)",
+     *
      *         @OA\Schema(type="number", format="float", minimum=-180, maximum=180, example=2.3522)
      *     ),
      *
@@ -1017,27 +1019,34 @@ class AdController
      *         in="query",
      *         required=false,
      *         description="Rayon de recherche en mètres (par défaut: 1000m)",
+     *
      *         @OA\Schema(type="number", format="float", minimum=0, default=1000, example=5000)
      *     ),
      *
      *     @OA\Response(
      *         response=200,
      *         description="Annonces à proximité récupérées avec succès",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(
      *                 property="data",
      *                 type="array",
      *                 description="Liste des annonces à proximité triées par distance croissante",
+     *
      *                 @OA\Items(ref="#/components/schemas/AdResource")
      *             ),
+     *
      *             @OA\Property(
      *                 property="coordinates",
      *                 type="array",
      *                 description="Coordonnées et distances de chaque annonce",
+     *
      *                 @OA\Items(
      *                     type="object",
+     *
      *                     @OA\Property(property="id", type="integer", example=1),
      *                     @OA\Property(property="latitude", type="number", format="float", example=48.8606),
      *                     @OA\Property(property="longitude", type="number", format="float", example=2.3376),
@@ -1063,8 +1072,10 @@ class AdController
      *     @OA\Response(
      *         response=403,
      *         description="Interdit - Permissions insuffisantes",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Cette action n'est pas autorisée")
      *         )
      *     ),
@@ -1072,8 +1083,10 @@ class AdController
      *     @OA\Response(
      *         response=422,
      *         description="Erreur de validation - Coordonnées manquantes ou invalides",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Latitude and longitude are required and must be within valid ranges.")
      *         )
@@ -1082,13 +1095,16 @@ class AdController
      *     @OA\Response(
      *         response=500,
      *         description="Erreur serveur",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="An error occurred while fetching nearby ads.")
      *         )
      *     )
      * )
+     *
      * @throws Throwable
      */
     public function ads_nearby_public(AdRequest $request): JsonResponse
@@ -1101,9 +1117,6 @@ class AdController
      * Fonction privée appelée par ads_nearby_public et ads_nearby_user.
      * Cette fonction ne doit PAS avoir d'annotations Swagger.
      *
-     * @param AdRequest $request
-     * @param int|null $user
-     * @return JsonResponse
      * @throws Throwable
      */
     private function ads_nearby(AdRequest $request, ?int $user = null): JsonResponse
@@ -1241,7 +1254,7 @@ class AdController
      *     summary="Recherche d'annonces à proximité d'un utilisateur spécifique",
      *     description="Récupérer toutes les annonces dans un rayon défini autour de la localisation enregistrée d'un utilisateur spécifique. Cette route nécessite une authentification. Si l'utilisateur n'a pas de localisation enregistrée, vous pouvez fournir latitude/longitude en paramètres de requête pour override.",
      *     operationId="obtenirAnnoncesProximiteUtilisateur",
-     *     tags={"Annonces"},
+     *     tags={"🏠 Annonces"},
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(
@@ -1249,6 +1262,7 @@ class AdController
      *         in="path",
      *         required=true,
      *         description="Identifiant de l'utilisateur dont on utilise la localisation",
+     *
      *         @OA\Schema(type="integer", example=2210)
      *     ),
      *
@@ -1257,6 +1271,7 @@ class AdController
      *         in="query",
      *         required=false,
      *         description="Rayon de recherche en mètres (par défaut: 1000m)",
+     *
      *         @OA\Schema(type="number", format="float", minimum=0, default=1000, example=1)
      *     ),
      *
@@ -1265,6 +1280,7 @@ class AdController
      *         in="query",
      *         required=false,
      *         description="Latitude optionnelle pour override la localisation de l'utilisateur",
+     *
      *         @OA\Schema(type="number", format="float", minimum=-90, maximum=90, example=48.8566)
      *     ),
      *
@@ -1273,25 +1289,32 @@ class AdController
      *         in="query",
      *         required=false,
      *         description="Longitude optionnelle pour override la localisation de l'utilisateur",
+     *
      *         @OA\Schema(type="number", format="float", minimum=-180, maximum=180, example=2.3522)
      *     ),
      *
      *     @OA\Response(
      *         response=200,
      *         description="Annonces à proximité de l'utilisateur récupérées avec succès",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=true),
      *             @OA\Property(
      *                 property="data",
      *                 type="array",
+     *
      *                 @OA\Items(ref="#/components/schemas/AdResource")
      *             ),
+     *
      *             @OA\Property(
      *                 property="coordinates",
      *                 type="array",
+     *
      *                 @OA\Items(
      *                     type="object",
+     *
      *                     @OA\Property(property="id", type="integer", example=1),
      *                     @OA\Property(property="latitude", type="number", format="float", example=48.8606),
      *                     @OA\Property(property="longitude", type="number", format="float", example=2.3376),
@@ -1317,8 +1340,10 @@ class AdController
      *     @OA\Response(
      *         response=401,
      *         description="Non authentifié",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Non authentifié")
      *         )
      *     ),
@@ -1326,8 +1351,10 @@ class AdController
      *     @OA\Response(
      *         response=403,
      *         description="Interdit - Permissions insuffisantes",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="message", type="string", example="Cette action n'est pas autorisée")
      *         )
      *     ),
@@ -1335,8 +1362,10 @@ class AdController
      *     @OA\Response(
      *         response=404,
      *         description="Utilisateur introuvable",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="User not found.")
      *         )
@@ -1345,8 +1374,10 @@ class AdController
      *     @OA\Response(
      *         response=422,
      *         description="Erreur de validation",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="Latitude and longitude are required and must be within valid ranges.")
      *         )
@@ -1355,13 +1386,16 @@ class AdController
      *     @OA\Response(
      *         response=500,
      *         description="Erreur serveur",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="success", type="boolean", example=false),
      *             @OA\Property(property="message", type="string", example="An error occurred while fetching nearby ads.")
      *         )
      *     )
      * )
+     *
      * @throws Throwable
      */
     public function ads_nearby_user(AdRequest $request, int $user): JsonResponse
@@ -1369,7 +1403,659 @@ class AdController
         return $this->ads_nearby($request, $user);
     }
 
+    /**
+     * Autocomplétion des champs de recherche (public, sans authentification)
+     *
+     * Fournit des suggestions basées sur un préfixe pour faciliter la saisie utilisateur.
+     * Les suggestions sont retournées avec un compteur du nombre d'annonces "available"
+     * qui correspondent à la valeur proposée.
+     *
+     * Important:
+     * - La recherche est un préfixe insensible à la casse ("Pa" trouve "Paris").
+     * - Seuls les champs suivants sont pris en charge: city, type, quarter.
+     * - Les suggestions sont limitées aux 10 valeurs les plus fréquentes (ordre décroissant par count).
+     * - Les compteurs ne prennent en compte que les annonces avec status = 'available'.
+     * - Aucune pagination n'est fournie sur cet endpoint.
+     *
+     * Exemple d'URL: /api/v1/ads/autocomplete?field=city&q=Pa
+     *
+     * @OA\Get(
+     *     path="/api/v1/ads/autocomplete",
+     *     summary="Autocomplétion (villes, types, quartiers)",
+     *     description="Retourne jusqu'à 10 suggestions commençant par le préfixe fourni pour les champs: ville (city), type de bien (type), quartier (quarter). Les résultats incluent une clé 'value' (libellé) et 'count' (nombre d'annonces disponibles).",
+     *     operationId="autocompleteAnnonces",
+     *     tags={"🔍 Filtre"},
+     *
+     *     @OA\Parameter(
+     *         name="field",
+     *         in="query",
+     *         required=true,
+     *         description="Champ ciblé pour l'autocomplétion",
+     *
+     *         @OA\Schema(type="string", enum={"city", "type", "quarter"})
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="q",
+     *         in="query",
+     *         required=false,
+     *         description="Préfixe à rechercher (insensible à la casse). Si omis, retourne les 10 valeurs les plus fréquentes.",
+     *
+     *         @OA\Schema(type="string", example="Pa")
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste de suggestions pour l'autocomplétion",
+     *
+     *         @OA\JsonContent(
+     *             type="object",
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *                 description="Jusqu'à 10 éléments triés par 'count' décroissant",
+     *
+     *                 @OA\Items(
+     *                     type="object",
+     *
+     *                     @OA\Property(property="value", type="string", example="Paris", description="Libellé proposé (ville / type / quartier)"),
+     *                     @OA\Property(property="count", type="integer", example=42, description="Nombre d'annonces avec status 'available' associées à cette valeur")
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=422,
+     *         description="Paramètre 'field' invalide ou non supporté",
+     *
+     *         @OA\JsonContent(
+     *             type="object",
+     *
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Invalid field. Allowed values: city, type, quarter.")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=500,
+     *         description="Erreur serveur lors de la récupération des suggestions",
+     *
+     *         @OA\JsonContent(
+     *             type="object",
+     *
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error fetching autocomplete suggestions")
+     *         )
+     *     ),
+     *
+     *     @OA\Examples(
+     *         example="Ville - préfixe Pa",
+     *         summary="Suggestions pour city=Pa",
+     *         value={
+     *             "request": "/api/v1/ads/autocomplete?field=city&q=Pa",
+     *             "response": {
+     *                 "success": true,
+     *                 "data": {
+     *                     {"value": "Paris", "count": 128},
+     *                     {"value": "Pamiers", "count": 9}
+     *                 }
+     *             }
+     *         }
+     *     ),
+     *     @OA\Examples(
+     *         example="Type - préfixe Ap",
+     *         summary="Suggestions pour type=Ap",
+     *         value={
+     *             "request": "/api/v1/ads/autocomplete?field=type&q=Ap",
+     *             "response": {
+     *                 "success": true,
+     *                 "data": {
+     *                     {"value": "Appartement", "count": 312}
+     *                 }
+     *             }
+     *         }
+     *     ),
+     *     @OA\Examples(
+     *         example="Quartier - sans q",
+     *         summary="Top 10 quartiers les plus fréquents (sans préfixe)",
+     *         value={
+     *             "request": "/api/v1/ads/autocomplete?field=quarter",
+     *             "response": {
+     *                 "success": true,
+     *                 "data": {
+     *                     {"value": "Centre", "count": 67},
+     *                     {"value": "Vieux-Port", "count": 51}
+     *                 }
+     *             }
+     *         }
+     *     )
+     * )
+     */
+    public function autocomplete(AdRequest $request): JsonResponse
+    {
+        $validated = $request->validated();
+        $field = $validated['field'] ?? null;
+        $q = (string)($validated['q'] ?? '');
 
+        if (!in_array($field, ['city', 'type', 'quarter'], true)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid field. Allowed values: city, type, quarter.',
+            ], 422);
+        }
+
+        try {
+            $driver = DB::getDriverName();
+            $likeOperator = $driver === 'pgsql' ? 'ilike' : 'like';
+            $prefix = $q !== '' ? ($q . '%') : '%';
+
+            // Build base query per field, counting only available ads
+            if ($field === 'city') {
+                $rows = DB::table('city')
+                    ->join('quarter', 'quarter.city_id', '=', 'city.id')
+                    ->join('ad', function ($join) {
+                        $join->on('ad.quarter_id', '=', 'quarter.id')
+                            ->where('ad.status', '=', 'available');
+                    })
+                    ->when($q !== '', function ($query) use ($likeOperator, $prefix) {
+                        $query->where('city.name', $likeOperator, $prefix);
+                    })
+                    ->groupBy('city.name')
+                    ->select(['city.name as value', DB::raw('COUNT(ad.id) as count')])
+                    ->orderByDesc('count')
+                    ->limit(10)
+                    ->get();
+            } elseif ($field === 'type') {
+                $rows = DB::table('ad_type')
+                    ->join('ad', function ($join) {
+                        $join->on('ad.type_id', '=', 'ad_type.id')
+                            ->where('ad.status', '=', 'available');
+                    })
+                    ->when($q !== '', function ($query) use ($likeOperator, $prefix) {
+                        $query->where('ad_type.name', $likeOperator, $prefix);
+                    })
+                    ->groupBy('ad_type.name')
+                    ->select(['ad_type.name as value', DB::raw('COUNT(ad.id) as count')])
+                    ->orderByDesc('count')
+                    ->limit(10)
+                    ->get();
+            } else { // quarter
+                $rows = DB::table('quarter')
+                    ->join('ad', function ($join) {
+                        $join->on('ad.quarter_id', '=', 'quarter.id')
+                            ->where('ad.status', '=', 'available');
+                    })
+                    ->when($q !== '', function ($query) use ($likeOperator, $prefix) {
+                        $query->where('quarter.name', $likeOperator, $prefix);
+                    })
+                    ->groupBy('quarter.name')
+                    ->select(['quarter.name as value', DB::raw('COUNT(ad.id) as count')])
+                    ->orderByDesc('count')
+                    ->limit(10)
+                    ->get();
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $rows,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Autocomplete error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching autocomplete suggestions',
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtenir les facettes (compteurs) pour les filtres
+     *
+     * Agrège côté base de données les compteurs utiles pour construire l'UI de filtres.
+     * Aucun paramètre n'est requis. Endpoint public (sans authentification).
+     * Seules les annonces avec status = "available" sont comptabilisées.
+     *
+     * Structure de la réponse:
+     * - cities:     Top 20 villes par nombre d'annonces disponibles [{ name, count }]
+     * - types:      Top 20 types de bien [{ name, count }]
+     * - bedrooms:   Toutes les valeurs présentes, triées numériquement croissant [{ value, count }]
+     * - price_range:    bornes min/max (valeurs sous forme de chaînes décimales)
+     * - surface_range:  bornes min/max (valeurs sous forme de chaînes décimales)
+     * - has_parking:    répartition avec/sans parking { with_parking, without_parking }
+     *
+     * @OA\Get(
+     *     path="/api/v1/ads/facets",
+     *     summary="Obtenir les facettes (compteurs de filtres)",
+     *     description="Retourne les compteurs agrégés pour alimenter les filtres (villes, types, chambres, plages de prix/surface, parking). Endpoint public, sans authentification.",
+     *     operationId="facettesAnnonces",
+     *     tags={"🔍 Filtre"},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Facettes récupérées avec succès",
+     *
+     *         @OA\JsonContent(
+     *             type="object",
+     *
+     *             @OA\Property(property="success", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="object",
+     *                 @OA\Property(
+     *                     property="cities",
+     *                     type="array",
+     *                     description="Top 20 villes par nombre d'annonces disponibles",
+     *
+     *                     @OA\Items(type="object",
+     *
+     *                         @OA\Property(property="name", type="string", example="Paris"),
+     *                         @OA\Property(property="count", type="integer", example=128)
+     *                     )
+     *                 ),
+     *                 @OA\Property(
+     *                     property="types",
+     *                     type="array",
+     *                     description="Top 20 types de bien",
+     *
+     *                     @OA\Items(type="object",
+     *
+     *                         @OA\Property(property="name", type="string", example="Appartement"),
+     *                         @OA\Property(property="count", type="integer", example=312)
+     *                     )
+     *                 ),
+     *                 @OA\Property(
+     *                     property="bedrooms",
+     *                     type="array",
+     *                     description="Répartition par nombre de chambres (tri croissant)",
+     *
+     *                     @OA\Items(type="object",
+     *
+     *                         @OA\Property(property="value", type="integer", example=2),
+     *                         @OA\Property(property="count", type="integer", example=105)
+     *                     )
+     *                 ),
+     *                 @OA\Property(
+     *                     property="price_range",
+     *                     type="object",
+     *                     description="Plage de prix (valeurs décimales en chaîne)",
+     *                     @OA\Property(property="min", type="string", example="25000.00"),
+     *                     @OA\Property(property="max", type="string", example="150000.00")
+     *                 ),
+     *                 @OA\Property(
+     *                     property="surface_range",
+     *                     type="object",
+     *                     description="Plage de surface (valeurs décimales en chaîne)",
+     *                     @OA\Property(property="min", type="string", example="31.00"),
+     *                     @OA\Property(property="max", type="string", example="120.00")
+     *                 ),
+     *                 @OA\Property(
+     *                     property="has_parking",
+     *                     type="object",
+     *                     description="Répartition des annonces avec/sans parking",
+     *                     @OA\Property(property="with_parking", type="integer", example=511),
+     *                     @OA\Property(property="without_parking", type="integer", example=489)
+     *                 )
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=500,
+     *         description="Erreur serveur lors de la récupération des facettes",
+     *
+     *         @OA\JsonContent(
+     *             type="object",
+     *
+     *             @OA\Property(property="success", type="boolean", example=false),
+     *             @OA\Property(property="message", type="string", example="Error fetching facets")
+     *         )
+     *     ),
+     *
+     *     @OA\Examples(
+     *         example="Réponse de succès",
+     *         summary="Exemple de payload retourné",
+     *         value={
+     *             "success": true,
+     *             "data": {
+     *                 "cities": {
+     *                     {"name": "Paris", "count": 128},
+     *                     {"name": "Lyon", "count": 64}
+     *                 },
+     *                 "types": {
+     *                     {"name": "Appartement", "count": 312},
+     *                     {"name": "Maison", "count": 198}
+     *                 },
+     *                 "bedrooms": {
+     *                     {"value": 1, "count": 109},
+     *                     {"value": 2, "count": 105}
+     *                 },
+     *                 "price_range": {"min": "25000.00", "max": "150000.00"},
+     *                 "surface_range": {"min": "31.00", "max": "120.00"},
+     *                 "has_parking": {"with_parking": 511, "without_parking": 489}
+     *             }
+     *         }
+     *     )
+     * )
+     */
+    public function facets(): JsonResponse
+    {
+        try {
+            $driver = DB::getDriverName();
+            // Choisir une expression de CAST compatible selon le SGBD
+            $bedroomsCast = match ($driver) {
+                'pgsql' => 'CAST(bedrooms as integer)',
+                'sqlite' => 'CAST(bedrooms as integer)',
+                default => 'CAST(bedrooms as signed)', // MySQL / MariaDB
+            };
+
+            // Villes (top 20 par nombre d'annonces disponibles)
+            $cities = DB::table('ad')
+                ->join('quarter', 'ad.quarter_id', '=', 'quarter.id')
+                ->join('city', 'quarter.city_id', '=', 'city.id')
+                ->where('ad.status', '=', 'available')
+                ->whereNotNull('city.name')
+                ->groupBy('city.name')
+                ->select(['city.name as name', DB::raw('COUNT(*) as count')])
+                ->orderByDesc('count')
+                ->limit(20)
+                ->get();
+
+            // Types (top 20)
+            $types = DB::table('ad')
+                ->join('ad_type', 'ad.type_id', '=', 'ad_type.id')
+                ->where('ad.status', '=', 'available')
+                ->whereNotNull('ad_type.name')
+                ->groupBy('ad_type.name')
+                ->select(['ad_type.name as name', DB::raw('COUNT(*) as count')])
+                ->orderByDesc('count')
+                ->limit(20)
+                ->get();
+
+            // Chambres (toutes les valeurs présentes, tri croissant)
+            $bedrooms = DB::table('ad')
+                ->where('status', '=', 'available')
+                ->whereNotNull('bedrooms')
+                ->groupBy('bedrooms')
+                ->select([DB::raw($bedroomsCast . ' as value'), DB::raw('COUNT(*) as count')])
+                ->orderBy('value')
+                ->get();
+
+            // Plages min/max (ignorer les NULL)
+            $priceRange = DB::table('ad')
+                ->where('status', '=', 'available')
+                ->whereNotNull('price')
+                ->selectRaw('MIN(price) as min, MAX(price) as max')
+                ->first();
+
+            $surfaceRange = DB::table('ad')
+                ->where('status', '=', 'available')
+                ->whereNotNull('surface_area')
+                ->selectRaw('MIN(surface_area) as min, MAX(surface_area) as max')
+                ->first();
+
+            // Parking (attention aux différences booléennes entre SGBD)
+            $withParking = DB::table('ad')
+                ->where('status', '=', 'available')
+                ->where('has_parking', '=', $driver === 'pgsql' ? DB::raw('TRUE') : 1)
+                ->count();
+
+            $withoutParking = DB::table('ad')
+                ->where('status', '=', 'available')
+                ->where('has_parking', '=', $driver === 'pgsql' ? DB::raw('FALSE') : 0)
+                ->count();
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'cities' => $cities,
+                    'types' => $types,
+                    'bedrooms' => $bedrooms,
+                    'price_range' => [
+                        'min' => $priceRange?->min,
+                        'max' => $priceRange?->max,
+                    ],
+                    'surface_range' => [
+                        'min' => $surfaceRange?->min,
+                        'max' => $surfaceRange?->max,
+                    ],
+                    'has_parking' => [
+                        'with_parking' => $withParking,
+                        'without_parking' => $withoutParking,
+                    ],
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Facets error: ' . $e->getMessage(), [
+                'driver' => DB::getDriverName(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error fetching facets',
+            ], 500);
+        }
+    }
+
+    /**
+     * Rechercher des annonces avec filtres multiples
+     *
+     * @OA\Get(
+     *     path="/api/v1/ads/search",
+     *     summary="Rechercher des annonces",
+     *     description="Rechercher des annonces avec filtres multiples : texte, ville, type, chambres, prix, surface, parking",
+     *     operationId="rechercherAnnonces",
+     *     tags={"🔍 Filtre"},
+     *
+     *     @OA\Parameter(
+     *         name="q",
+     *         in="query",
+     *         description="Terme de recherche textuel",
+     *         required=false,
+     *
+     *         @OA\Schema(type="string", example="appartement lumineux")
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="city",
+     *         in="query",
+     *         description="Filtrer par ville",
+     *         required=false,
+     *
+     *         @OA\Schema(type="string", example="Paris")
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="sort",
+     *         in="query",
+     *         description="Champ de tri",
+     *         required=false,
+     *
+     *         @OA\Schema(type="string", enum={"price", "surface_area", "created_at"}, example="price")
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="order",
+     *         in="query",
+     *         description="Ordre de tri",
+     *         required=false,
+     *
+     *         @OA\Schema(type="string", enum={"asc", "desc"}, example="asc")
+     *     ),
+     *
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Nombre d'éléments par page",
+     *         required=false,
+     *
+     *         @OA\Schema(type="integer", example=15)
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Résultats de recherche",
+     *
+     *         @OA\JsonContent(
+     *             type="object",
+     *
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/AdResource")),
+     *             @OA\Property(property="meta", type="object")
+     *         )
+     *     )
+     * )
+     */
+    public function search(AdRequest $request): JsonResponse
+    {
+        try {
+
+            $validated = $request->validated();
+
+            // Paramètres de recherche
+            $q = (string)($validated['q'] ?? '');
+            $city = $validated['city'] ?? null;
+            $type = $validated['type'] ?? null;
+            $typeId = $validated['type_id'] ?? null;
+            $quarterId = $validated['quarter_id'] ?? null;
+
+            // Filtres numériques
+            $minBedrooms = isset($validated['bedrooms']) ? (int)$validated['bedrooms'] : null;
+            $minBathrooms = isset($validated['bathrooms']) ? (int)$validated['bathrooms'] : null;
+            $minPrice = isset($validated['price_min']) ? (float)$validated['price_min'] : null;
+            $maxPrice = isset($validated['price_max']) ? (float)$validated['price_max'] : null;
+            $minSurface = isset($validated['surface_min']) ? (float)$validated['surface_min'] : null;
+            $maxSurface = isset($validated['surface_max']) ? (float)$validated['surface_max'] : null;
+            $hasParking = isset($validated['has_parking']) ? (bool)$validated['has_parking'] : null;
+
+            // Tri et pagination
+            $sortBy = $validated['sort'] ?? 'created_at';
+            $sortOrder = strtolower($validated['order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+            $perPage = (int)($validated['per_page'] ?? config('pagination.per_page', 15));
+
+            // Construire les filtres Meilisearch
+            $filters = [];
+
+            // Filtres de chaînes
+            if (!empty($city)) {
+                $filters[] = sprintf("city = '%s'", str_replace("'", "\\'", $city));
+            }
+            if (!empty($type)) {
+                $filters[] = sprintf("type = '%s'", str_replace("'", "\\'", $type));
+            }
+
+            // Filtres d'ID
+            if (!empty($typeId)) {
+                $filters[] = sprintf('type_id = %d', (int)$typeId);
+            }
+            if (!empty($quarterId)) {
+                $filters[] = sprintf('quarter_id = %d', (int)$quarterId);
+            }
+
+            // Filtres de chambres et salles de bain
+            if ($minBedrooms !== null) {
+                $filters[] = sprintf('bedrooms >= %d', $minBedrooms);
+            }
+
+            if ($minBathrooms !== null) {
+                $filters[] = sprintf('bathrooms >= %d', $minBathrooms);
+            }
+
+            // Filtres de prix
+            if ($minPrice !== null) {
+                $filters[] = sprintf('price >= %f', $minPrice);
+            }
+            if ($maxPrice !== null) {
+                $filters[] = sprintf('price <= %f', $maxPrice);
+            }
+
+            // Filtres de surface
+            if ($minSurface !== null) {
+                $filters[] = sprintf('surface_area >= %f', $minSurface);
+            }
+            if ($maxSurface !== null) {
+                $filters[] = sprintf('surface_area <= %f', $maxSurface);
+            }
+
+            // Filtre parking
+            if ($hasParking !== null) {
+                $filters[] = sprintf('has_parking = %s', $hasParking ? 'true' : 'false');
+            }
+
+            // Toujours filtrer par status available (si tu veux)
+            $filters[] = "status = 'available'";
+
+            // Whitelist des champs de tri
+            $allowedSorts = ['price', 'surface_area', 'created_at'];
+            if (!in_array($sortBy, $allowedSorts, true)) {
+                $sortBy = 'created_at';
+            }
+
+            // Construire la requête Scout
+            $builder = Ad::search($q, function (\Meilisearch\Endpoints\Indexes $index, string $query, array $options) use ($filters, $sortBy, $sortOrder) {
+                if (!empty($filters)) {
+                    // AND logic : tous les filtres doivent matcher
+                    $options['filter'] = $filters;
+                }
+
+                // Tri
+                $options['sort'] = [sprintf('%s:%s', $sortBy, $sortOrder)];
+
+                return $index->search($query, $options);
+            })
+                // Eager load des relations
+                ->query(fn($eloquent) => $eloquent->with(['quarter.city', 'ad_type', 'images', 'user']));
+
+            // Paginer
+            $results = $builder->paginate($perPage);
+
+            return response()->json([
+                'success' => true,
+                'data' => $results->items(),
+                'meta' => [
+                    'current_page' => $results->currentPage(),
+                    'last_page' => $results->lastPage(),
+                    'per_page' => $results->perPage(),
+                    'total' => $results->total(),
+                ],
+                'links' => [
+                    'first' => $results->url(1),
+                    'last' => $results->url($results->lastPage()),
+                    'prev' => $results->previousPageUrl(),
+                    'next' => $results->nextPageUrl(),
+                ],
+            ], 200);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation error',
+                'errors' => $e->errors(),
+            ], 422);
+
+        } catch (\Meilisearch\Exceptions\ApiException $e) {
+            \Log::error('Meilisearch API Error: ' . $e->getMessage());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Search service error: ' . $e->getMessage(),
+            ], 500);
+
+        } catch (\Exception $e) {
+            \Log::error('Search Error: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'An error occurred while searching',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
 }
-
-

@@ -13,7 +13,7 @@
         "/api/v1/ads": {
             "get": {
                 "tags": [
-                    "Annonces"
+                    "🏠 Annonces"
                 ],
                 "summary": "Obtenir toutes les annonces",
                 "description": "Récupérer une liste paginée de toutes les annonces avec leurs relations (utilisateur, quartier, ville, type, images)",
@@ -174,7 +174,7 @@
             },
             "post": {
                 "tags": [
-                    "Annonces"
+                    "🏠 Annonces"
                 ],
                 "summary": "Créer une nouvelle annonce",
                 "description": "Créer une nouvelle annonce immobilière avec images et données de localisation. Les coordonnées GPS sont obligatoires.",
@@ -436,7 +436,7 @@
         "/api/v1/ads/{id}": {
             "get": {
                 "tags": [
-                    "Annonces"
+                    "🏠 Annonces"
                 ],
                 "summary": "Obtenir une annonce spécifique",
                 "description": "Récupérer les informations détaillées d'une annonce spécifique incluant ses images et relations (utilisateur, quartier, ville, type de bien)",
@@ -542,7 +542,7 @@
             },
             "put": {
                 "tags": [
-                    "Annonces"
+                    "🏠 Annonces"
                 ],
                 "summary": "Mettre à jour une annonce existante",
                 "description": "Mettre à jour les informations d'une annonce, ajouter de nouvelles images ou supprimer des images existantes. Tous les champs sont optionnels sauf l'ID.",
@@ -812,7 +812,7 @@
             },
             "delete": {
                 "tags": [
-                    "Annonces"
+                    "🏠 Annonces"
                 ],
                 "summary": "Supprimer une annonce",
                 "description": "Supprimer définitivement une annonce et toutes ses images associées. Cette action est irréversible et supprimera également tous les fichiers média stockés.",
@@ -1017,7 +1017,7 @@
         "/api/v1/ads/nearby": {
             "get": {
                 "tags": [
-                    "Annonces"
+                    "🏠 Annonces"
                 ],
                 "summary": "Recherche publique d'annonces à proximité par coordonnées GPS",
                 "description": "Récupérer toutes les annonces dans un rayon défini autour de coordonnées GPS fournies. Cette route est accessible sans authentification. Les coordonnées GPS (latitude/longitude) sont obligatoires pour cette route.",
@@ -1211,7 +1211,7 @@
         "/api/v1/ads/{user}/nearby": {
             "get": {
                 "tags": [
-                    "Annonces"
+                    "🏠 Annonces"
                 ],
                 "summary": "Recherche d'annonces à proximité d'un utilisateur spécifique",
                 "description": "Récupérer toutes les annonces dans un rayon défini autour de la localisation enregistrée d'un utilisateur spécifique. Cette route nécessite une authentification. Si l'utilisateur n'a pas de localisation enregistrée, vous pouvez fournir latitude/longitude en paramètres de requête pour override.",
@@ -1450,10 +1450,363 @@
                 ]
             }
         },
+        "/api/v1/ads/autocomplete": {
+            "get": {
+                "tags": [
+                    "🔍 Filtre"
+                ],
+                "summary": "Autocomplétion (villes, types, quartiers)",
+                "description": "Retourne jusqu'à 10 suggestions commençant par le préfixe fourni pour les champs: ville (city), type de bien (type), quartier (quarter). Les résultats incluent une clé 'value' (libellé) et 'count' (nombre d'annonces disponibles).",
+                "operationId": "autocompleteAnnonces",
+                "parameters": [
+                    {
+                        "name": "field",
+                        "in": "query",
+                        "description": "Champ ciblé pour l'autocomplétion",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "city",
+                                "type",
+                                "quarter"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Préfixe à rechercher (insensible à la casse). Si omis, retourne les 10 valeurs les plus fréquentes.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "Pa"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste de suggestions pour l'autocomplétion",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "description": "Jusqu'à 10 éléments triés par 'count' décroissant",
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "value": {
+                                                        "description": "Libellé proposé (ville / type / quartier)",
+                                                        "type": "string",
+                                                        "example": "Paris"
+                                                    },
+                                                    "count": {
+                                                        "description": "Nombre d'annonces avec status 'available' associées à cette valeur",
+                                                        "type": "integer",
+                                                        "example": 42
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Paramètre 'field' invalide ou non supporté",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Invalid field. Allowed values: city, type, quarter."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erreur serveur lors de la récupération des suggestions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error fetching autocomplete suggestions"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ads/facets": {
+            "get": {
+                "tags": [
+                    "🔍 Filtre"
+                ],
+                "summary": "Obtenir les facettes (compteurs de filtres)",
+                "description": "Retourne les compteurs agrégés pour alimenter les filtres (villes, types, chambres, plages de prix/surface, parking). Endpoint public, sans authentification.",
+                "operationId": "facettesAnnonces",
+                "responses": {
+                    "200": {
+                        "description": "Facettes récupérées avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "cities": {
+                                                    "description": "Top 20 villes par nombre d'annonces disponibles",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "name": {
+                                                                "type": "string",
+                                                                "example": "Paris"
+                                                            },
+                                                            "count": {
+                                                                "type": "integer",
+                                                                "example": 128
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "types": {
+                                                    "description": "Top 20 types de bien",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "name": {
+                                                                "type": "string",
+                                                                "example": "Appartement"
+                                                            },
+                                                            "count": {
+                                                                "type": "integer",
+                                                                "example": 312
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "bedrooms": {
+                                                    "description": "Répartition par nombre de chambres (tri croissant)",
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "value": {
+                                                                "type": "integer",
+                                                                "example": 2
+                                                            },
+                                                            "count": {
+                                                                "type": "integer",
+                                                                "example": 105
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "price_range": {
+                                                    "description": "Plage de prix (valeurs décimales en chaîne)",
+                                                    "properties": {
+                                                        "min": {
+                                                            "type": "string",
+                                                            "example": "25000.00"
+                                                        },
+                                                        "max": {
+                                                            "type": "string",
+                                                            "example": "150000.00"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "surface_range": {
+                                                    "description": "Plage de surface (valeurs décimales en chaîne)",
+                                                    "properties": {
+                                                        "min": {
+                                                            "type": "string",
+                                                            "example": "31.00"
+                                                        },
+                                                        "max": {
+                                                            "type": "string",
+                                                            "example": "120.00"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "has_parking": {
+                                                    "description": "Répartition des annonces avec/sans parking",
+                                                    "properties": {
+                                                        "with_parking": {
+                                                            "type": "integer",
+                                                            "example": 511
+                                                        },
+                                                        "without_parking": {
+                                                            "type": "integer",
+                                                            "example": 489
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erreur serveur lors de la récupération des facettes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": false
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Error fetching facets"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ads/search": {
+            "get": {
+                "tags": [
+                    "🔍 Filtre"
+                ],
+                "summary": "Rechercher des annonces",
+                "description": "Rechercher des annonces avec filtres multiples : texte, ville, type, chambres, prix, surface, parking",
+                "operationId": "rechercherAnnonces",
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Terme de recherche textuel",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "appartement lumineux"
+                        }
+                    },
+                    {
+                        "name": "city",
+                        "in": "query",
+                        "description": "Filtrer par ville",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "Paris"
+                        }
+                    },
+                    {
+                        "name": "sort",
+                        "in": "query",
+                        "description": "Champ de tri",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "price",
+                                "surface_area",
+                                "created_at"
+                            ],
+                            "example": "price"
+                        }
+                    },
+                    {
+                        "name": "order",
+                        "in": "query",
+                        "description": "Ordre de tri",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "asc",
+                                "desc"
+                            ],
+                            "example": "asc"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Nombre d'éléments par page",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Résultats de recherche",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/AdResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/ad-types": {
             "get": {
                 "tags": [
-                    "ad type"
+                    "🏷️ Type d'annonce"
                 ],
                 "summary": "Types d'annonces",
                 "description": "Récupère la liste des types d'annonces",
@@ -1490,7 +1843,7 @@
             },
             "post": {
                 "tags": [
-                    "ad type"
+                    "🏷️ Type d'annonce"
                 ],
                 "summary": "Creer un type d'annonce",
                 "operationId": "storeAdType",
@@ -1538,7 +1891,7 @@
         "/api/v1/ad-types/{id}": {
             "get": {
                 "tags": [
-                    "ad type"
+                    "🏷️ Type d'annonce"
                 ],
                 "summary": "Afficher un type d'annonce",
                 "operationId": "showAdType",
@@ -1581,7 +1934,7 @@
             },
             "put": {
                 "tags": [
-                    "ad type"
+                    "🏷️ Type d'annonce"
                 ],
                 "summary": "Mettre à jour du type d'annonce",
                 "operationId": "updateAdType",
@@ -1643,7 +1996,7 @@
             },
             "delete": {
                 "tags": [
-                    "ad type"
+                    "🏷️ Type d'annonce"
                 ],
                 "summary": "Supprimer un type",
                 "description": "Supprime le type par son ID",
@@ -1682,7 +2035,7 @@
         "/api/v1/auth/registerCustomer": {
             "post": {
                 "tags": [
-                    "auth"
+                    "🔐 Authentification"
                 ],
                 "summary": "Inscription d'un nouveau client",
                 "description": "Permet l'inscription d'un nouvel utilisateur avec validation des données, gestion d'avatar optionnel et localisation GPS optionnelle",
@@ -1929,7 +2282,7 @@
         "/api/v1/auth/registerAgent": {
             "post": {
                 "tags": [
-                    "auth"
+                    "🔐 Authentification"
                 ],
                 "summary": "Inscription d'un nouvel agent",
                 "description": "Permet l'inscription d'un nouvel utilisateur avec validation des données et gestion d'avatar optionnel",
@@ -2152,7 +2505,7 @@
         "/api/v1/auth/verifyEmail": {
             "post": {
                 "tags": [
-                    "auth"
+                    "🔐 Authentification"
                 ],
                 "summary": "Vérification de l'adresse email",
                 "description": "Vérifie l'adresse email de l'utilisateur via un lien de vérification",
@@ -2238,7 +2591,7 @@
         "/api/v1/auth/resendVerificationEmail": {
             "post": {
                 "tags": [
-                    "auth"
+                    "🔐 Authentification"
                 ],
                 "summary": "Renvoyer l'email de vérification",
                 "description": "Renvoie un email de vérification à l'utilisateur",
@@ -2319,7 +2672,7 @@
         "/api/v1/auth/login": {
             "post": {
                 "tags": [
-                    "auth"
+                    "🔐 Authentification"
                 ],
                 "summary": "Connexion utilisateur",
                 "description": "Authentifie un utilisateur et retourne un token d'accès",
@@ -2480,7 +2833,7 @@
         "/api/v1/auth/logout": {
             "post": {
                 "tags": [
-                    "auth"
+                    "🔐 Authentification"
                 ],
                 "summary": "Déconnexion utilisateur",
                 "description": "Déconnecte l'utilisateur en révoquant son token d'accès",
@@ -2557,7 +2910,7 @@
         "/api/v1/auth/me": {
             "get": {
                 "tags": [
-                    "auth"
+                    "🔐 Authentification"
                 ],
                 "summary": "Informations de l'utilisateur connecté",
                 "description": "Retourne les informations de l'utilisateur actuellement authentifié",
@@ -2618,7 +2971,7 @@
         "/api/v1/auth/refresh": {
             "post": {
                 "tags": [
-                    "auth"
+                    "🔐 Authentification"
                 ],
                 "summary": "Rafraîchir le token d'accès",
                 "description": "Génère un nouveau token d'accès et révoque l'ancien",
@@ -2703,7 +3056,7 @@
         "/api/v1/cities": {
             "get": {
                 "tags": [
-                    "city"
+                    "🏙️ Ville"
                 ],
                 "summary": "Liste des villes",
                 "description": "Récupère la liste paginée des villes",
@@ -2751,7 +3104,7 @@
             },
             "post": {
                 "tags": [
-                    "city"
+                    "🏙️ Ville"
                 ],
                 "summary": "Créer une ville",
                 "description": "Crée une nouvelle ville",
@@ -2803,7 +3156,7 @@
         "/api/v1/cities/{id}": {
             "get": {
                 "tags": [
-                    "city"
+                    "🏙️ Ville"
                 ],
                 "summary": "Afficher une ville",
                 "description": "Récupère les détails d'une ville",
@@ -2847,7 +3200,7 @@
             },
             "put": {
                 "tags": [
-                    "city"
+                    "🏙️ Ville"
                 ],
                 "summary": "Mettre à jour une ville",
                 "description": "Met à jour les détails d'une ville",
@@ -2910,7 +3263,7 @@
             },
             "delete": {
                 "tags": [
-                    "city"
+                    "🏙️ Ville"
                 ],
                 "summary": "Supprimer une ville",
                 "description": "Supprime une ville par son ID",
@@ -2949,7 +3302,7 @@
         "/api/v1/quarters": {
             "get": {
                 "tags": [
-                    "quarter"
+                    "📍 Quartier"
                 ],
                 "summary": "Liste des quartiers",
                 "description": "Récupère la liste paginée de tous les quartiers",
@@ -3081,7 +3434,7 @@
             },
             "post": {
                 "tags": [
-                    "quarter"
+                    "📍 Quartier"
                 ],
                 "summary": "Créer un quartier",
                 "description": "Crée un nouveau quartier dans une ville",
@@ -3214,7 +3567,7 @@
         "/api/v1/quarters/{id}": {
             "get": {
                 "tags": [
-                    "quarter"
+                    "📍 Quartier"
                 ],
                 "summary": "Afficher un quartier",
                 "description": "Récupère les détails d'un quartier spécifique",
@@ -3301,7 +3654,7 @@
         "/api/v1/quarters/{quarter}": {
             "put": {
                 "tags": [
-                    "quarter"
+                    "📍 Quartier"
                 ],
                 "summary": "Mettre à jour un quartier",
                 "description": "Met à jour les informations d'un quartier existant",
@@ -3445,7 +3798,7 @@
             },
             "delete": {
                 "tags": [
-                    "quarter"
+                    "📍 Quartier"
                 ],
                 "summary": "Supprimer un quartier",
                 "description": "Supprime définitivement un quartier",
@@ -3557,7 +3910,7 @@
         "/api/v1/users": {
             "get": {
                 "tags": [
-                    "user"
+                    "👤 Utilisateur"
                 ],
                 "summary": "Liste des utilisateurs",
                 "description": "Récupère la liste paginée des utilisateurs avec leurs relations (ville et média)",
@@ -3701,7 +4054,7 @@
             },
             "post": {
                 "tags": [
-                    "user"
+                    "👤 Utilisateur"
                 ],
                 "summary": "Créer un nouvel utilisateur",
                 "description": "Crée un nouvel utilisateur avec avatar et localisation GPS optionnels et génère un token d'accès",
@@ -3991,7 +4344,7 @@
         "/api/v1/users/{id}": {
             "get": {
                 "tags": [
-                    "user"
+                    "👤 Utilisateur"
                 ],
                 "summary": "Afficher un utilisateur spécifique",
                 "description": "Récupère les détails d'un utilisateur par son ID avec ses relations",
@@ -4101,7 +4454,7 @@
         "/api/v1/users/{user}": {
             "put": {
                 "tags": [
-                    "user"
+                    "👤 Utilisateur"
                 ],
                 "summary": "Mettre à jour un utilisateur",
                 "description": "Met à jour les informations d'un utilisateur existant avec gestion d'avatar",
@@ -4302,7 +4655,7 @@
             },
             "delete": {
                 "tags": [
-                    "user"
+                    "👤 Utilisateur"
                 ],
                 "summary": "Supprimer un utilisateur",
                 "description": "Supprime définitivement un utilisateur et toutes ses données associées (avatar, médias)",
@@ -5127,28 +5480,32 @@
     },
     "tags": [
         {
-            "name": "ad type",
+            "name": "🏷️ Type d'annonce",
             "description": "Gestion des types d'annonces"
         },
         {
-            "name": "city",
+            "name": "🏙️ Ville",
             "description": "Gestion des villes"
         },
         {
-            "name": "auth",
+            "name": "🔐 Authentification",
             "description": "Gestion de l'authentification"
         },
         {
-            "name": "user",
+            "name": "👤 Utilisateur",
             "description": "Gestion des utilisateurs"
         },
         {
-            "name": "quarter",
+            "name": "📍 Quartier",
             "description": "Gestion des quartiers"
         },
         {
-            "name": "Annonces",
+            "name": "🏠 Annonces",
             "description": "Gestion des annonces"
+        },
+        {
+            "name": "🔍 Filtre",
+            "description": "Filtrer les annonces"
         }
     ]
 }

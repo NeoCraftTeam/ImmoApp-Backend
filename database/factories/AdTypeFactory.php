@@ -25,7 +25,6 @@ class AdTypeFactory extends Factory
             'terrain',
         ];
 
-
         return [
             'name' => $this->faker->unique()->randomElement($types),
             'desc' => $this->faker->sentence(12),

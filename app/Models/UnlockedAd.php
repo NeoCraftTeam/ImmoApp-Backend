@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read Ad|null $ad
  * @property-read Payment|null $payment
  * @property-read User|null $user
+ *
  * @method static UnlockedAdFactory factory($count = null, $state = [])
  * @method static Builder<static>|UnlockedAd newModelQuery()
  * @method static Builder<static>|UnlockedAd newQuery()
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @method static Builder<static>|UnlockedAd query()
  * @method static Builder<static>|UnlockedAd withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|UnlockedAd withoutTrashed()
+ *
  * @property int $id
  * @property int $ad_id
  * @property int $user_id
@@ -28,6 +30,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int|null $unlocked_at
  * @property int|null $updated_at
  * @property \Illuminate\Support\Carbon|null $deleted_at
+ *
  * @method static Builder<static>|UnlockedAd whereAdId($value)
  * @method static Builder<static>|UnlockedAd whereDeletedAt($value)
  * @method static Builder<static>|UnlockedAd whereId($value)
@@ -35,6 +38,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @method static Builder<static>|UnlockedAd whereUnlockedAt($value)
  * @method static Builder<static>|UnlockedAd whereUpdatedAt($value)
  * @method static Builder<static>|UnlockedAd whereUserId($value)
+ *
  * @mixin Eloquent
  */
 class UnlockedAd extends Model
@@ -43,7 +47,7 @@ class UnlockedAd extends Model
 
     public $timestamps = false;
 
-    protected $fillable = ['ad_id', 'user_id', 'payment_id',];
+    protected $fillable = ['ad_id', 'user_id', 'payment_id'];
 
     protected $hidden = ['unlocked_at', 'updated_at', 'deleted_at'];
 
@@ -64,6 +68,6 @@ class UnlockedAd extends Model
 
     protected function casts(): array
     {
-        return ['unlocked_at' => 'timestamp', 'updated_at' => 'timestamp',];
+        return ['unlocked_at' => 'timestamp', 'updated_at' => 'timestamp'];
     }
 }

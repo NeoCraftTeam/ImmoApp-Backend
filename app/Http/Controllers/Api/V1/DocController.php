@@ -7,13 +7,12 @@ namespace App\Http\Controllers\Api\V1;
  * title="KeyHome api",
  * version="v1",
  * description="Documentation complète de KeyHome api",
+ *
  * @OA\License(
  * name="MIT",
  * url="https://opensource.org/licenses/MIT"
  * )
  * )
- *
- *
  *
  * @OA\SecurityScheme(
  * securityScheme="bearerAuth",
@@ -24,39 +23,35 @@ namespace App\Http\Controllers\Api\V1;
  * bearerFormat="JWT"
  * )
  *
- *
- *
  * @OA\Tag(
- *     name="ad type",
+ *     name="🏷️ Type d'annonce",
  *     description="Gestion des types d'annonces"
  * )
- *
  * @OA\Tag(
- *     name="city",
+ *     name="🏙️ Ville",
  *     description="Gestion des villes"
  * )
- *
  * @OA\Tag(
- *      name="auth",
+ *      name="🔐 Authentification",
  *      description="Gestion de l'authentification"
  *  )
- *
  * @OA\Tag(
- *       name="user",
+ *       name="👤 Utilisateur",
  *       description="Gestion des utilisateurs"
  * )
- *
  * @OA\Tag(
- *        name="quarter",
+ *        name="📍 Quartier",
  *        description="Gestion des quartiers"
  * )
- *
  * @OA\Tag(
- *         name="Annonces",
+ *         name="🏠 Annonces",
  *         description="Gestion des annonces"
  * )
+ * @OA\Tag(
+ *          name="🔍 Filtre",
+ *          description="Filtrer les annonces"
+ *  )
  */
 class DocController
 {
-
 }

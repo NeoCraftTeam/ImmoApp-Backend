@@ -18,7 +18,7 @@ class EmailVerificationController
         // Vérifier que l'URL est valide et signée
         if (!URL::hasValidSignature($request)) {
             return view('email-verification-error', [
-                'message' => 'Lien de vérification invalide ou expiré'
+                'message' => 'Lien de vérification invalide ou expiré',
             ]);
         }
 
@@ -27,14 +27,14 @@ class EmailVerificationController
         // Vérifier le hash
         if (!hash_equals($hash, sha1($user->getEmailForVerification()))) {
             return view('email-verification-error', [
-                'message' => 'Lien de vérification invalide'
+                'message' => 'Lien de vérification invalide',
             ]);
         }
 
         if ($user->hasVerifiedEmail()) {
             return view('email-verified', [
                 'message' => 'Email déjà vérifié',
-                'user' => $user
+                'user' => $user,
             ]);
         }
 
@@ -44,7 +44,7 @@ class EmailVerificationController
 
         return view('email-verified', [
             'message' => 'Email vérifié avec succès',
-            'user' => $user
+            'user' => $user,
         ]);
     }
 
@@ -54,14 +54,14 @@ class EmailVerificationController
 
         if ($user->hasVerifiedEmail()) {
             return response()->json([
-                'message' => 'Email déjà vérifié'
+                'message' => 'Email déjà vérifié',
             ]);
         }
 
         $user->sendEmailVerificationNotification();
 
         return response()->json([
-            'message' => 'Lien de vérification envoyé'
+            'message' => 'Lien de vérification envoyé',
         ]);
     }
 }

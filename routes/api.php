@@ -82,6 +82,11 @@ Route::prefix('v1')->group(function () {
         // Public nearby search by coordinates
         Route::get('/nearby', 'ads_nearby_public');
 
+        // Public search endpoint (must be before catch-all ID route)
+        Route::get('/search', 'search')->name('ads.search');
+        Route::get('/autocomplete', 'autocomplete')->name('ads.autocomplete');
+        Route::get('/facets', 'facets')->name('ads.facets');
+
         Route::middleware('auth:sanctum')->group(function () {
             // Routes spécifiques AVANT les routes avec paramètres génériques
             Route::get('/{user}/nearby', 'ads_nearby_user')->whereNumber('user');
