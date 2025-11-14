@@ -338,106 +338,70 @@ class AdController
      */
     private function handleImageUpload($request, Ad $ad): int
     {
-        Log::info('Starting image upload process (filesystem mode)');
+        Log::info('Starting image upload process for ad ID: ' . $ad->id);
 
-        $images = [];
         $imagesProcessed = 0;
+        $images = [];
 
-        // 1) Récupérer tous les fichiers envoyés et aplatir les structures imbriquées
-        $allFiles = $request->allFiles();
-        $detectedKeys = array_keys($allFiles);
-        Log::info('All file keys detected in request:', $detectedKeys);
-
-        $flatten = function ($files) use (&$flatten) {
-            $out = [];
-            foreach ($files as $value) {
-                if (is_array($value)) {
-                    $out = array_merge($out, $flatten($value));
-                } else {
-                    $out[] = $value; // UploadedFile instance
-                }
-            }
-
-            return $out;
-        };
-
-        // 2) Sources prioritaires connues: images (array ou single), image (single), photos (array ou single), files (array)
-        $candidates = [];
-
+        // 1. Récupérer les fichiers de manière simple et directe
         if ($request->hasFile('images')) {
-            $candidates[] = $request->file('images');
-        }
-        if ($request->hasFile('image')) {
-            $candidates[] = $request->file('image');
-        }
-        if ($request->hasFile('photos')) {
-            $candidates[] = $request->file('photos');
-        }
-        if ($request->hasFile('files')) {
-            $candidates[] = $request->file('files');
+            $files = $request->file('images');
+            // Normaliser en tableau
+            $images = is_array($files) ? $files : [$files];
+        } elseif ($request->hasFile('image')) {
+            $images = [$request->file('image')];
+        } elseif ($request->hasFile('photos')) {
+            $files = $request->file('photos');
+            $images = is_array($files) ? $files : [$files];
         }
 
-        // Ajouter toute autre clé fichier détectée (fallback)
-        foreach ($allFiles as $val) {
-            $candidates[] = $val;
-        }
+        // 2. Filtrer les fichiers valides
+        $images = array_filter($images, function ($image) {
+            return $image !== null
+                && is_object($image)
+                && method_exists($image, 'isValid')
+                && $image->isValid();
+        });
 
-        // Aplatir en une liste d'UploadedFile
-        foreach ($candidates as $candidate) {
-            if ($candidate === null) {
-                continue;
-            }
-            if (is_array($candidate)) {
-                $images = array_merge($images, $flatten($candidate));
-            } else {
-                $images[] = $candidate;
-            }
-        }
+        $imageCount = count($images);
+        Log::info("Valid images found: $imageCount");
 
-        // Filtrer les images nulles ou invalides
-        $images = array_values(array_filter($images, function ($image) {
-            return $image !== null && method_exists($image, 'isValid') && $image->isValid();
-        }));
-
-        Log::info('Valid images found after flattening: ' . count($images));
-
-        if (empty($images)) {
+        if ($imageCount === 0) {
             Log::warning('No valid images found in the request');
-
             return 0;
         }
 
-        // Limiter le nombre d'images
-        if (count($images) > 10) {
+        // 3. Limiter le nombre d'images
+        if ($imageCount > 10) {
             throw new Exception('Maximum 10 images allowed per ad.');
         }
 
+        // 4. Définir les types MIME autorisés
+        $allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
         $directory = 'ads/' . $ad->id;
 
+        // 5. Traiter chaque image
         foreach ($images as $index => $image) {
             try {
-                $originalName = method_exists($image, 'getClientOriginalName') ? $image->getClientOriginalName() : 'unknown';
-                Log::info("Processing image $index: " . $originalName);
+                $originalName = $image->getClientOriginalName();
+                Log::info("Processing image $index: $originalName");
 
                 // Valider le type MIME
-                $allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-                $mime = method_exists($image, 'getMimeType') ? $image->getMimeType() : null;
-                if ($mime === null || !in_array($mime, $allowedMimes)) {
-                    Log::warning("Image $index has invalid or unknown MIME type: " . $mime);
-
-                    continue;
+                $mime = $image->getMimeType();
+                if (!in_array($mime, $allowedMimes)) {
+                    Log::error("Image $index rejected - Invalid MIME type: $mime");
+                    throw new Exception("Invalid image type for $originalName. Allowed: JPEG, PNG, GIF, WebP");
                 }
 
                 // Valider la taille (max 5MB)
-                $size = method_exists($image, 'getSize') ? $image->getSize() : 0;
+                $size = $image->getSize();
                 if ($size > 5 * 1024 * 1024) {
-                    Log::warning("Image $index is too large: " . $size . ' bytes');
-
-                    continue;
+                    Log::error("Image $index rejected - Too large: $size bytes");
+                    throw new Exception("Image $originalName is too large (max 5MB)");
                 }
 
                 // Générer un nom de fichier unique
-                $extension = method_exists($image, 'getClientOriginalExtension') ? $image->getClientOriginalExtension() : 'jpg';
+                $extension = $image->getClientOriginalExtension();
                 $fileName = sprintf(
                     '%s_%s_%d.%s',
                     $ad->id,
@@ -446,26 +410,42 @@ class AdController
                     $extension
                 );
 
-                // Enregistrer sur le disque public
-                $stored = Storage::disk('public')->putFileAs($directory, $image, $fileName);
-                if (!$stored) {
-                    Log::warning('Failed to store image on disk for index ' . $index);
+                // Stocker sur le disque public
+                $path = $image->storeAs($directory, $fileName, 'public');
 
-                    continue;
+                if (!$path) {
+                    Log::error("Failed to store image $index on disk");
+                    throw new Exception("Failed to store image $originalName");
                 }
 
-                // Créer l'enregistrement AdImage avec le chemin
-                AdImage::create([
+                Log::info("Image stored at: $path");
+
+                // Créer l'enregistrement AdImage
+                $adImage = AdImage::create([
                     'ad_id' => $ad->id,
-                    'image_path' => $directory . '/' . $fileName,
-                    'is_primary' => $imagesProcessed === 0, // La première image valide est primaire.
+                    'image_path' => $path,
+                    'is_primary' => $imagesProcessed === 0,
                 ]);
 
+                if (!$adImage) {
+                    Log::error("Failed to create AdImage record for $path");
+                    // Supprimer le fichier si la création échoue
+                    Storage::disk('public')->delete($path);
+                    throw new Exception("Failed to create database record for $originalName");
+                }
+
+                Log::info("AdImage created with ID: {$adImage->id}");
                 $imagesProcessed++;
+
             } catch (Exception $e) {
+                // En cas d'erreur, logger et continuer (ou lever l'exception selon votre besoin)
                 Log::error("Error processing image $index: " . $e->getMessage());
 
+                // Option 1: Continuer avec les autres images
                 continue;
+
+                // Option 2: Stopper tout et lever l'exception (recommandé en transaction)
+                // throw $e;
             }
         }
 

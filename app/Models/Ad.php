@@ -153,7 +153,7 @@ class Ad extends Model
 
     public function images(): hasMany
     {
-        return $this->hasMany(AdImage::class);
+        return $this->hasMany(AdImage::class, 'ad_id', 'id');
     }
 
     public function primaryImage()

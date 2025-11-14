@@ -31,7 +31,17 @@ class AdResource extends JsonResource
             'user' => new UserResource($this->whenLoaded('user')),
             'quarter' => new QuarterResource($this->whenLoaded('quarter')),
             'type' => new AdTypeResource($this->whenLoaded('ad_type')),
-            'images' => AdImageResource::collection($this->whenLoaded('images')),
+            'images' => $this->when($this->relationLoaded('images'), function () {
+                return $this->images->map(function ($image) {
+                    return [
+                        'id' => $image->id,
+                        'path' => $image->image_path,
+                        'url' => Storage::url($image->image_path),
+                        'full_url' => url(Storage::url($image->image_path)),
+                        'is_primary' => (bool)$image->is_primary,
+                    ];
+                })->values();
+            }, []),
         ];
     }
 }

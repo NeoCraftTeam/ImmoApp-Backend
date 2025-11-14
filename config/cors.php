@@ -15,13 +15,13 @@ return [
     |
     */
 
-    'paths' => ['api/*', 'sanctum/csrf-cookie', 'api/v1/auth/login', 'api/v1/auth/registerCustomer', 'api/v1/auth/registerAgent', 'api/v1/auth/registerAdmin', 'api/v1/auth/logout', 'api/v1/auth/refresh', 'api/v1/auth/me'],
+    'paths' => ['api/*', 'auth/*', 'sanctum/csrf-cookie', 'api/v1/auth/login', 'api/v1/auth/registerCustomer', 'api/v1/auth/registerAgent', 'api/v1/auth/registerAdmin', 'api/v1/auth/logout', 'api/v1/auth/refresh', 'api/v1/auth/me'],
 
     'allowed_methods' => ['*'],
 
     'allowed_origins' => [
         'http://localhost:3000', // front
-        'http://localhost:8080', // localhost
+        'http://localhost:8000', // localhost
         'http://localhost:5173', // localhost
         'https://keyhome.neocraft.dev', // prod
         'http://127.0.0.1:3000',

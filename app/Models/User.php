@@ -9,6 +9,8 @@ use App\Enums\UserType;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\UserFactory;
 use Eloquent;
+use Filament\Models\Contracts\FilamentUser;
+use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -93,7 +95,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  *
  * @mixin Eloquent
  */
-class User extends Authenticatable implements HasMedia, MustVerifyEmail
+class User extends Authenticatable implements HasMedia, MustVerifyEmail, FilamentUser
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, softDeletes;
@@ -175,14 +177,6 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
     }
 
     /**
-     * returns true if the user is an admin.
-     */
-    public function isAdmin(): bool
-    {
-        return $this->role === UserRole::ADMIN;
-    }
-
-    /**
      * returns true if the user is an agent.
      */
     public function isAgent(): bool
@@ -233,6 +227,29 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail
             ->width(150)
             ->height(150)
             ->sharpen(10);
+    }
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        \Log::info('Tentative canAccessPanel', [
+            'email' => $this->email,
+            'role' => $this->role?->value,
+            'is_active' => $this->is_active,
+            'email_verified_at' => $this->email_verified_at,
+        ]);
+
+        $canAccess = $this->role === UserRole::ADMIN;
+        \Log::info('Résultat canAccessPanel: ' . ($canAccess ? 'OUI' : 'NON'));
+
+        return $canAccess;
+    }
+
+    /**
+     * returns true if the user is an admin.
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === UserRole::ADMIN;
     }
 
     /**

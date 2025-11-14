@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * @property-read Ad|null $ad
@@ -45,6 +44,7 @@ class AdImage extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected $table = 'ad_image';
     protected $fillable = [
         'ad_id',
         'image_path',
@@ -63,14 +63,14 @@ class AdImage extends Model
 
     public function ad(): BelongsTo
     {
-        return $this->belongsTo(Ad::class, 'ad_id');
+        return $this->belongsTo(Ad::class, 'ad_id', 'id');
     }
 
     /**
      * Get the full public URL to the stored image.
      */
-    public function getUrlAttribute(): ?string
+    public function getUrlAttribute()
     {
-        return $this->image_path ? Storage::disk('public')->url($this->image_path) : null;
+        return \Storage::url($this->image_path);
     }
 }
