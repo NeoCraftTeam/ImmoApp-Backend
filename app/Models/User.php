@@ -10,6 +10,7 @@ use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\UserFactory;
 use Eloquent;
 use Filament\Models\Contracts\FilamentUser;
+use Filament\Models\Contracts\HasName;
 use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
@@ -95,7 +96,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  *
  * @mixin Eloquent
  */
-class User extends Authenticatable implements HasMedia, MustVerifyEmail, FilamentUser
+class User extends Authenticatable implements HasMedia, MustVerifyEmail, FilamentUser, HasName
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, softDeletes;
@@ -231,18 +232,15 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
 
     public function canAccessPanel(Panel $panel): bool
     {
-        \Log::info('Tentative canAccessPanel', [
-            'email' => $this->email,
-            'role' => $this->role?->value,
-            'is_active' => $this->is_active,
-            'email_verified_at' => $this->email_verified_at,
-        ]);
-
-        $canAccess = $this->role === UserRole::ADMIN;
-        \Log::info('Résultat canAccessPanel: ' . ($canAccess ? 'OUI' : 'NON'));
-
-        return $canAccess;
+        return $this->email === "contact@neocraft.dev";
     }
+
+    public function getFilamentName(): string
+    {
+        return "{$this->firstname} {$this->lastname}";
+    }
+
+
 
     /**
      * returns true if the user is an admin.
