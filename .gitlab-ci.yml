@@ -1,18 +1,183 @@
-# You can override the included template(s) by including variable overrides
-# SAST customization: https://docs.gitlab.com/ee/user/application_security/sast/#customizing-the-sast-settings
-# Secret Detection customization: https://docs.gitlab.com/user/application_security/secret_detection/pipeline/configure
-# Dependency Scanning customization: https://docs.gitlab.com/ee/user/application_security/dependency_scanning/#customizing-the-dependency-scanning-settings
-# Container Scanning customization: https://docs.gitlab.com/ee/user/application_security/container_scanning/#customizing-the-container-scanning-settings
-# Note that environment variables can be set in several places
-# See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
+# Pipeline GitLab CI/CD pour Laravel avec sécurité et déploiement
+
 stages:
-- test
-- secret-detection
-sast:
-  stage: test
-include:
-- template: Security/Secret-Detection.gitlab-ci.yml
+  - test
+  - security
+  - deploy
+
 variables:
-  SECRET_DETECTION_ENABLED: 'true'
+  POSTGRES_DB: laravel_test
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: secret
+  DB_HOST: postgres
+  DB_CONNECTION: pgsql
+
+# Tests unitaires et fonctionnels
+test:laravel:
+  stage: test
+  image: php:8.2-fpm
+  services:
+    - name: postgis/postgis:15-3.3
+      alias: postgres
+  before_script:
+    # Installation des dépendances système
+    - apt-get update -qq && apt-get install -y -qq git curl libzip-dev libpq-dev unzip
+    - docker-php-ext-install pdo_pgsql pgsql zip
+
+    # Installation de Composer
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+
+    # Installation des dépendances Laravel
+    - composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+
+    # Configuration de l'environnement de test
+    - cp .env.example .env
+    - php artisan key:generate
+    - php artisan config:clear
+
+  script:
+    # Exécution des migrations (PostGIS sera activé automatiquement si configuré dans les migrations)
+    - php artisan migrate --force
+
+    # Exécution des tests
+    - php artisan test
+
+  only:
+    - main
+    - develop
+    - merge_requests
+
+# Analyse de sécurité - SAST
+sast:
+  stage: security
+  include:
+    - template: Security/SAST.gitlab-ci.yml
+
+# Détection de secrets
 secret_detection:
-  stage: secret-detection
+  stage: security
+  include:
+    - template: Security/Secret-Detection.gitlab-ci.yml
+
+# Analyse des dépendances
+dependency_scanning:
+  stage: security
+  include:
+    - template: Security/Dependency-Scanning.gitlab-ci.yml
+
+# Déploiement sur VPS
+deploy:production:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    # Installation d'OpenSSH
+    - apk add --no-cache openssh-client git
+
+    # Configuration SSH
+    - eval $(ssh-agent -s)
+    # Décoder la clé privée depuis Base64
+    - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+
+  script:
+    - |
+      ssh $VPS_USER@$VPS_HOST "
+        set -e
+        echo '🚀 Début du déploiement...'
+
+        # Navigation vers le répertoire du projet
+        cd $VPS_PATH
+
+        # Mise en mode maintenance
+        php artisan down || true
+
+        # Mise à jour du code
+        echo '📥 Récupération du code...'
+        git fetch origin main
+        git reset --hard origin/main
+
+        # Installation/mise à jour des dépendances Composer
+        echo '📦 Installation des dépendances...'
+        composer install --no-dev --optimize-autoloader --no-interaction
+
+        # Optimisation et nettoyage
+        echo '🧹 Nettoyage des caches...'
+        php artisan cache:clear
+        php artisan config:clear
+        php artisan route:clear
+        php artisan view:clear
+
+        # Vérification et activation de l'extension PostGIS (si nécessaire)
+        echo '🗺️  Vérification de PostGIS...'
+        php artisan db:check-postgis || echo 'PostGIS déjà activé ou commande non disponible'
+
+        # Exécution des migrations
+        echo '🗄️  Exécution des migrations...'
+        php artisan migrate --force
+
+        # Optimisation pour la production
+        echo '⚡ Optimisation...'
+        php artisan config:cache
+        php artisan route:cache
+        php artisan view:cache
+        php artisan event:cache
+
+        # Permissions des fichiers
+        echo '🔒 Configuration des permissions...'
+        chmod -R 775 storage bootstrap/cache
+        chown -R www-data:www-data storage bootstrap/cache
+
+        # Redémarrage des workers Queue (si vous utilisez Laravel Queue)
+        # php artisan queue:restart
+
+        # Sortie du mode maintenance
+        php artisan up
+
+        echo '✅ Déploiement terminé avec succès!'
+      "
+
+  only:
+    - main
+
+  when: manual  # Déploiement manuel, retirez cette ligne pour un déploiement automatique
+
+  environment:
+    name: production
+    url: https://votre-domaine.com
+
+# Déploiement sur environnement de staging (optionnel)
+deploy:staging:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh-client git
+    - eval $(ssh-agent -s)
+    # Décoder la clé privée depuis Base64
+    - echo "$SSH_PRIVATE_KEY_STAGING" | base64 -d | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan -H $VPS_HOST_STAGING >> ~/.ssh/known_hosts
+
+  script:
+    - |
+      ssh $VPS_USER_STAGING@$VPS_HOST_STAGING "
+        cd $VPS_PATH_STAGING
+        git fetch origin develop
+        git reset --hard origin/develop
+        composer install --optimize-autoloader --no-interaction
+        php artisan migrate --force
+        php artisan cache:clear
+        php artisan config:cache
+        php artisan route:cache
+        php artisan view:cache
+      "
+
+  only:
+    - develop
+
+  environment:
+    name: staging
+    url: https://staging.votre-domaine.com
