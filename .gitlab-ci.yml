@@ -26,7 +26,7 @@ variables:
   # SSH_PRIVATE_KEY: votre clé SSH privée (encodée en Base64)
 
 # Tests unitaires et fonctionnels
-test:unit-and-functional-tests:
+test:keyhome:
   stage: test
   image: php:8.4-fpm
   services:
@@ -155,8 +155,6 @@ deploy:production:
   only:
     - main
 
-  when: manual
-
   environment:
     name: production
-    url: https://votre-domaine.com
+    url: https://keyhomeback.neocraft.dev
