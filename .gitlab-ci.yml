@@ -26,12 +26,20 @@ variables:
   # SSH_PRIVATE_KEY: votre clé SSH privée (encodée en Base64)
 
 # Tests unitaires et fonctionnels
-test:laravel:
+test:unit-and-functional-tests:
   stage: test
   image: php:8.4-fpm
   services:
     - name: postgis/postgis:15-3.3
       alias: postgres
+  variables:
+    # Variables pour Laravel pendant les tests
+    DB_CONNECTION: pgsql
+    DB_HOST: postgres
+    DB_PORT: 5432
+    DB_DATABASE: laravel_test
+    DB_USERNAME: postgres
+    DB_PASSWORD: secret
   before_script:
     # Installation des dépendances système
     - apt-get update -qq && apt-get install -y -qq git curl libzip-dev libpq-dev unzip libicu-dev
@@ -47,6 +55,15 @@ test:laravel:
     # Configuration de l'environnement de test
     - cp .env.example .env
     - php artisan key:generate
+
+    # Configurer les variables de base de données dans .env
+    - echo "DB_CONNECTION=pgsql" >> .env
+    - echo "DB_HOST=postgres" >> .env
+    - echo "DB_PORT=5432" >> .env
+    - echo "DB_DATABASE=laravel_test" >> .env
+    - echo "DB_USERNAME=postgres" >> .env
+    - echo "DB_PASSWORD=secret" >> .env
+
     - php artisan config:clear
 
   script:
