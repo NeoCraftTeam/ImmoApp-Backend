@@ -1,16 +1,29 @@
 # Pipeline GitLab CI/CD pour Laravel avec sécurité et déploiement
 
+include:
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+  - template: Security/Dependency-Scanning.gitlab-ci.yml
+
 stages:
   - test
   - security
   - deploy
 
 variables:
+  # Variables PostgreSQL pour les tests
   POSTGRES_DB: laravel_test
   POSTGRES_USER: postgres
   POSTGRES_PASSWORD: secret
   DB_HOST: postgres
   DB_CONNECTION: pgsql
+  # Variables pour SAST
+  SAST_EXCLUDED_PATHS: "spec,test,tests,tmp,vendor"
+  # Variables pour le déploiement (à définir dans GitLab CI/CD Settings > Variables)
+  # VPS_HOST: votre-serveur.com
+  # VPS_USER: votre-utilisateur
+  # VPS_PATH: /var/www/votre-projet
+  # SSH_PRIVATE_KEY: votre clé SSH privée (encodée en Base64)
 
 # Tests unitaires et fonctionnels
 test:laravel:
@@ -46,24 +59,6 @@ test:laravel:
     - main
     - develop
     - merge_requests
-
-# Analyse de sécurité - SAST
-sast:
-  stage: security
-  include:
-    - template: Security/SAST.gitlab-ci.yml
-
-# Détection de secrets
-secret_detection:
-  stage: security
-  include:
-    - template: Security/Secret-Detection.gitlab-ci.yml
-
-# Analyse des dépendances
-dependency_scanning:
-  stage: security
-  include:
-    - template: Security/Dependency-Scanning.gitlab-ci.yml
 
 # Déploiement sur VPS
 deploy:production:
@@ -142,42 +137,8 @@ deploy:production:
   only:
     - main
 
-  when: manual  # Déploiement manuel, retirez cette ligne pour un déploiement automatique
+  when: manual
 
   environment:
     name: production
-    url: https://votre-domaine.com
-
-# Déploiement sur environnement de staging (optionnel)
-deploy:staging:
-  stage: deploy
-  image: alpine:latest
-  before_script:
-    - apk add --no-cache openssh-client git
-    - eval $(ssh-agent -s)
-    # Décoder la clé privée depuis Base64
-    - echo "$SSH_PRIVATE_KEY_STAGING" | base64 -d | tr -d '\r' | ssh-add -
-    - mkdir -p ~/.ssh
-    - chmod 700 ~/.ssh
-    - ssh-keyscan -H $VPS_HOST_STAGING >> ~/.ssh/known_hosts
-
-  script:
-    - |
-      ssh $VPS_USER_STAGING@$VPS_HOST_STAGING "
-        cd $VPS_PATH_STAGING
-        git fetch origin develop
-        git reset --hard origin/develop
-        composer install --optimize-autoloader --no-interaction
-        php artisan migrate --force
-        php artisan cache:clear
-        php artisan config:cache
-        php artisan route:cache
-        php artisan view:cache
-      "
-
-  only:
-    - develop
-
-  environment:
-    name: staging
-    url: https://staging.votre-domaine.com
+    url: https://keyhome.neocraft.dev
