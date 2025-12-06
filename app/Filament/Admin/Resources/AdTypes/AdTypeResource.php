@@ -21,7 +21,7 @@ class AdTypeResource extends Resource
 {
     protected static ?string $model = AdType::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::CursorArrowRipple;
 
     protected static ?string $recordTitleAttribute = 'type-annonce';
 
