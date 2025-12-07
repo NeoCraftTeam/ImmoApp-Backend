@@ -9,6 +9,9 @@ use App\Enums\UserType;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\UserFactory;
 use Eloquent;
+use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
+use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthenticationRecovery;
+use Filament\Auth\MultiFactor\Email\Contracts\HasEmailAuthentication;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasName;
 use Filament\Panel;
@@ -96,7 +99,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  *
  * @mixin Eloquent
  */
-class User extends Authenticatable implements HasMedia, MustVerifyEmail, FilamentUser, HasName
+class User extends Authenticatable implements HasMedia, MustVerifyEmail, FilamentUser, HasName, HasAppAuthentication, HasAppAuthenticationRecovery, HasEmailAuthentication
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, softDeletes;
@@ -117,7 +120,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
      *
      * @var list<string>
      */
-    protected $hidden = ['password', 'remember_token', 'created_at', 'updated_at'];
+    protected $hidden = ['password', 'app_authentication_secret', 'app_authentication_recovery_codes', 'remember_token', 'created_at', 'updated_at'];
 
     protected static function booted(): void
     {
@@ -134,7 +137,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
 
     private function validateAgentType(): void
     {
-        if ($this->role === 'agent' && ! in_array($this->type, ['individual', 'agency'])) {
+        if ($this->role === 'agent' && !in_array($this->type, ['individual', 'agency'])) {
             throw new InvalidArgumentException('Invalid agent type. Must be either "individual" or "agency".');
         }
     }
@@ -142,8 +145,8 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
     private function assignDefaultAvatar(): void
     {
         if (empty($this->avatar)) {
-            $name = trim($this->firstname.' '.$this->lastname ?: 'User');
-            $this->avatar = 'https://ui-avatars.com/api/?name='.urlencode($name).'&background=random';
+            $name = trim($this->firstname . ' ' . $this->lastname ?: 'User');
+            $this->avatar = 'https://ui-avatars.com/api/?name=' . urlencode($name) . '&background=random';
         }
     }
 
@@ -241,13 +244,72 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
     }
 
 
-
     /**
      * returns true if the user is an admin.
      */
     public function isAdmin(): bool
     {
         return $this->role === UserRole::ADMIN;
+    }
+
+    public function getAppAuthenticationSecret(): ?string
+    {
+        // This method should return the user's saved app authentication secret.
+
+        return $this->app_authentication_secret;
+    }
+
+    public function saveAppAuthenticationSecret(?string $secret): void
+    {
+        // This method should save the user's app authentication secret.
+
+        $this->app_authentication_secret = $secret;
+        $this->save();
+    }
+
+    public function getAppAuthenticationHolderName(): string
+    {
+        // In a user's authentication app, each account can be represented by a "holder name".
+        // If the user has multiple accounts in your app, it might be a good idea to use
+        // their email address as then they are still uniquely identifiable.
+
+        return $this->email;
+    }
+
+    /**
+     * @return ?array<string>
+     */
+    public function getAppAuthenticationRecoveryCodes(): ?array
+    {
+        // This method should return the user's saved app authentication recovery codes.
+
+        return $this->app_authentication_recovery_codes;
+    }
+
+    /**
+     * @param array<string> | null $codes
+     */
+    public function saveAppAuthenticationRecoveryCodes(?array $codes): void
+    {
+        // This method should save the user's app authentication recovery codes.
+
+        $this->app_authentication_recovery_codes = $codes;
+        $this->save();
+    }
+
+    public function hasEmailAuthentication(): bool
+    {
+        // This method should return true if the user has enabled email authentication.
+
+        return $this->has_email_authentication;
+    }
+
+    public function toggleEmailAuthentication(bool $condition): void
+    {
+        // This method should save whether or not the user has enabled email authentication.
+
+        $this->has_email_authentication = $condition;
+        $this->save();
     }
 
     /**
@@ -264,6 +326,9 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
             'type' => UserType::class,
             'is_active' => 'boolean',
             'location' => Point::class,
+            'app_authentication_secret' => 'encrypted',
+            'app_authentication_recovery_codes' => 'encrypted:array',
+            'has_email_authentication' => 'boolean',
         ];
     }
 }
