@@ -32,6 +32,7 @@ use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\PersonalAccessToken;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Collections\MediaCollection;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 /**
@@ -87,10 +88,10 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property string|null $last_login_at
  * @property string|null $last_login_ip
  * @property bool $is_active
- * @property-read \App\Models\City $city
- * @property-read \Spatie\MediaLibrary\MediaCollections\Models\Collections\MediaCollection<int, Media> $media
+ * @property-read City $city
+ * @property-read MediaCollection<int, Media> $media
  * @property-read int|null $media_count
- * @property-read Collection<int, \App\Models\Review> $reviews
+ * @property-read Collection<int, Review> $reviews
  * @property-read int|null $reviews_count
  *
  * @method static Builder<static>|User whereIsActive($value)
@@ -137,7 +138,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
 
     private function validateAgentType(): void
     {
-        if ($this->role === 'agent' && !in_array($this->type, ['individual', 'agency'])) {
+        if ($this->role == 'agent' && !in_array($this->type, ['individual', 'agency'])) {
             throw new InvalidArgumentException('Invalid agent type. Must be either "individual" or "agency".');
         }
     }
@@ -235,14 +236,8 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->email === "contact@neocraft.dev";
+        return $this->isAdmin() && $this->hasVerifiedEmail();
     }
-
-    public function getFilamentName(): string
-    {
-        return "{$this->firstname} {$this->lastname}";
-    }
-
 
     /**
      * returns true if the user is an admin.
@@ -250,6 +245,11 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
     public function isAdmin(): bool
     {
         return $this->role === UserRole::ADMIN;
+    }
+
+    public function getFilamentName(): string
+    {
+        return "{$this->firstname} {$this->lastname}";
     }
 
     public function getAppAuthenticationSecret(): ?string

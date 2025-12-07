@@ -51,7 +51,7 @@ build:assets:
 test:keyhome:
   stage: test
   image: php:8.4-fpm
-    #  services:
+  services:
     - name: postgis/postgis:15-3.3
       alias: postgres
   variables:
@@ -106,8 +106,8 @@ deploy:production:
   stage: deploy
   image: alpine:latest
   needs:
-    - test:laravel
-    # - build:assets  # Décommentez si vous utilisez npm
+    - test:keyhome
+    # - build:assets # Décommentez si vous utilisez npm
   before_script:
     - echo "🔐 Configuration SSH..."
     - apk add --no-cache openssh-client git curl
