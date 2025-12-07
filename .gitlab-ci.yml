@@ -48,10 +48,10 @@ build:assets:
 # ==========================================
 # STAGE: TEST - Tests automatisés
 # ==========================================
-test:laravel:
+test:keyhome:
   stage: test
   image: php:8.4-fpm
-  services:
+    #  services:
     - name: postgis/postgis:15-3.3
       alias: postgres
   variables:
@@ -107,7 +107,7 @@ deploy:production:
   image: alpine:latest
   needs:
     - test:laravel
-    # - build:assets # Décommentez si vous utilisez npm
+    # - build:assets  # Décommentez si vous utilisez npm
   before_script:
     - echo "🔐 Configuration SSH..."
     - apk add --no-cache openssh-client git curl
@@ -190,6 +190,12 @@ deploy:production:
         echo '🗄️ Exécution des migrations...'
         php artisan migrate --force
 
+        # Publication des assets Livewire et Filament
+        echo ''
+        echo '📦 Publication des assets...'
+        php artisan vendor:publish --force --tag=livewire:assets --ansi --no-interaction
+        php artisan filament:assets
+
         # Optimisations pour la production
         echo ''
         echo '⚡ Optimisations...'
@@ -197,6 +203,7 @@ deploy:production:
         php artisan route:cache
         php artisan view:cache
         php artisan event:cache
+        php artisan filament:cache-components
 
         # Permissions des fichiers
         echo ''
@@ -231,7 +238,7 @@ deploy:production:
   only:
     - main
 
-  when: manual  # Changez-en "on_success" pour déploiement automatique
+  when: manual  # Changez en "on_success" pour déploiement automatique
 
 # ==========================================
 # STAGE: VERIFY - Vérification post-déploiement
@@ -276,6 +283,108 @@ verify:health-check:
     - main
 
   allow_failure: true  # Ne bloque pas si le health check échoue
+
+# ==========================================
+# MONITORING - Installation Sentry (optionnel)
+# ==========================================
+setup:monitoring:
+  stage: verify
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh-client
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts
+  script:
+    - |
+      ssh $VPS_USER@$VPS_HOST "
+        cd $VPS_PATH
+
+        # Vérifier si Sentry est configuré
+        if grep -q 'SENTRY_LARAVEL_DSN' .env; then
+          echo '✅ Sentry déjà configuré'
+        else
+          echo '⚠️ Sentry non configuré. Ajoutez SENTRY_LARAVEL_DSN dans votre .env'
+          echo '📝 Installation: composer require sentry/sentry-laravel'
+        fi
+
+        # Vérifier Laravel Telescope (dev only)
+        if php artisan | grep -q telescope; then
+          echo '✅ Telescope installé'
+        else
+          echo '💡 Conseil: Installez Laravel Telescope pour le debug'
+        fi
+      "
+  when: manual
+  only:
+    - main
+
+# ==========================================
+# NOTIFICATIONS - Slack/Discord (optionnel)
+# ==========================================
+notify:success:
+  stage: verify
+  image: curlimages/curl:latest
+  script:
+    - |
+      if [ -n "$SLACK_WEBHOOK_URL" ]; then
+        curl -X POST "$SLACK_WEBHOOK_URL" \
+          -H 'Content-Type: application/json' \
+          -d "{
+            \"text\": \"✅ Déploiement réussi!\",
+            \"attachments\": [{
+              \"color\": \"good\",
+              \"fields\": [
+                {\"title\": \"Projet\", \"value\": \"$CI_PROJECT_NAME\", \"short\": true},
+                {\"title\": \"Branche\", \"value\": \"$CI_COMMIT_REF_NAME\", \"short\": true},
+                {\"title\": \"Commit\", \"value\": \"$CI_COMMIT_SHORT_SHA\", \"short\": true},
+                {\"title\": \"Par\", \"value\": \"$GITLAB_USER_LOGIN\", \"short\": true},
+                {\"title\": \"Pipeline\", \"value\": \"#$CI_PIPELINE_ID\", \"short\": true},
+                {\"title\": \"URL\", \"value\": \"https://votre-domaine.com\", \"short\": true}
+              ]
+            }]
+          }"
+        echo "✅ Notification Slack envoyée"
+      else
+        echo "ℹ️ SLACK_WEBHOOK_URL non configuré - notifications désactivées"
+      fi
+  needs:
+    - deploy:production
+  when: on_success
+  only:
+    - main
+  allow_failure: true
+
+notify:failure:
+  stage: verify
+  image: curlimages/curl:latest
+  script:
+    - |
+      if [ -n "$SLACK_WEBHOOK_URL" ]; then
+        curl -X POST "$SLACK_WEBHOOK_URL" \
+          -H 'Content-Type: application/json' \
+          -d "{
+            \"text\": \"❌ Déploiement échoué!\",
+            \"attachments\": [{
+              \"color\": \"danger\",
+              \"fields\": [
+                {\"title\": \"Projet\", \"value\": \"$CI_PROJECT_NAME\", \"short\": true},
+                {\"title\": \"Branche\", \"value\": \"$CI_COMMIT_REF_NAME\", \"short\": true},
+                {\"title\": \"Pipeline\", \"value\": \"#$CI_PIPELINE_ID\", \"short\": true},
+                {\"title\": \"Lien\", \"value\": \"$CI_PIPELINE_URL\", \"short\": false}
+              ]
+            }]
+          }"
+        echo "✅ Notification d'échec envoyée"
+      fi
+  needs:
+    - deploy:production
+  when: on_failure
+  only:
+    - main
+  allow_failure: true
 
 # ==========================================
 # ROLLBACK - En cas de problème
@@ -338,4 +447,4 @@ rollback:production:
 
   environment:
     name: production
-    action: start
+    action: rollback
