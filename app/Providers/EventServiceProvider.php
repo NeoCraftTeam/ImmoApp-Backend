@@ -1,0 +1,45 @@
+<?php
+
+namespace App\Providers;
+
+use App\Listeners\SendEmailVerificationNotification;
+use App\Listeners\SendWelcomeNotification;
+use Illuminate\Auth\Events\Registered;
+use Illuminate\Auth\Events\Verified;
+use Illuminate\Support\ServiceProvider;
+
+class EventServiceProvider extends ServiceProvider
+{
+    /**
+     * The event to listener mappings for the application.
+     *
+     * @var array<class-string, array<int, class-string>>
+     */
+    protected array $listen = [
+        // Événement déclenché après l'inscription
+        Registered::class => [
+            SendEmailVerificationNotification::class,
+        ],
+
+        // Événement déclenché après vérification email
+        Verified::class => [
+            SendWelcomeNotification::class,
+        ],
+    ];
+
+    /**
+     * Register any events for your application.
+     */
+    public function boot(): void
+    {
+        //
+    }
+
+    /**
+     * Determine if events and listeners should be automatically discovered.
+     */
+    public function shouldDiscoverEvents(): bool
+    {
+        return false;
+    }
+}
