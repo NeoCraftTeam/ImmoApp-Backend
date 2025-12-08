@@ -2,6 +2,7 @@
 
 namespace App\Filament\Admin\Resources\AdTypes\Tables;
 
+use App\Models\AdType;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -18,6 +19,7 @@ class AdTypesTable
         return $table
             ->columns([
                 TextColumn::make('name')->label('label')
+                    ->description(fn(AdType $record): string => $record->desc)
                     ->searchable(),
                 TextColumn::make('created_at')
                     ->dateTime()
