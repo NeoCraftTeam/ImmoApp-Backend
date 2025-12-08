@@ -1,28 +1,23 @@
 <?php
 
-namespace App\Filament\Admin\Resources\Payments;
+namespace App\Filament\Admin\Resources\Reviews;
 
-use App\Enums\PaymentMethod;
-use App\Enums\PaymentStatus;
-use App\Enums\PaymentType;
-use App\Filament\Admin\Resources\Payments\Pages\ManagePayments;
-use App\Filament\Exports\PaymentExporter;
-use App\Filament\Imports\PaymentImporter;
-use App\Models\Payment;
+use App\Filament\Admin\Resources\Reviews\Pages\ManageReviews;
+use App\Models\Review;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Actions\ExportAction;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\ForceDeleteBulkAction;
-use Filament\Actions\ImportAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -32,68 +27,72 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
-class PaymentResource extends Resource
+class ReviewResource extends Resource
 {
-    protected static ?string $model = Payment::class;
+    protected static ?string $model = Review::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::CurrencyDollar;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::Star;
 
-    protected static ?string $recordTitleAttribute = 'id';
+    protected static ?string $recordTitleAttribute = 'user_id';
+
+    protected static ?string $navigationLabel = 'Avis des clients';
+
+    protected static ?string $modelLabel = 'Avis clients';
 
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->components([
-                Select::make('type')
-                    ->options(PaymentType::class)
-                    ->default('unlock')
-                    ->required(),
-                TextInput::make('amount')
+                TextInput::make('rating')
                     ->required()
                     ->numeric(),
-                TextInput::make('transaction_id')
-                    ->required(),
-                Select::make('payment_method')
-                    ->options(PaymentMethod::class)
-                    ->required(),
+                Textarea::make('comment')
+                    ->columnSpanFull(),
                 Select::make('ad_id')
                     ->relationship('ad', 'title')
                     ->required(),
-                Select::make('user_id')
+                Select::make('user.fullname')
                     ->relationship('user', 'id')
                     ->required(),
-                Select::make('status')
-                    ->options(PaymentStatus::class)
-                    ->default('pending')
-                    ->required(),
+            ]);
+    }
+
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                TextEntry::make('rating')
+                    ->numeric(),
+                TextEntry::make('comment')
+                    ->placeholder('-')
+                    ->columnSpanFull(),
+                TextEntry::make('ad.title')
+                    ->label('Ad'),
+                TextEntry::make('user.fullname')
+                    ->label('User'),
+                TextEntry::make('created_at')
+                    ->dateTime()
+                    ->placeholder('-'),
+                TextEntry::make('updated_at')
+                    ->dateTime()
+                    ->placeholder('-'),
+                TextEntry::make('deleted_at')
+                    ->dateTime()
+                    ->visible(fn(Review $record): bool => $record->trashed()),
             ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('type')
+            ->recordTitleAttribute('user_id')
             ->columns([
-                TextColumn::make('type')
-                    ->badge()
-                    ->searchable()
-                    ->visible(false),
-                TextColumn::make('amount')
+                TextColumn::make('rating')
                     ->numeric()
                     ->sortable(),
-                TextColumn::make('transaction_id')
-                    ->searchable(),
-                TextColumn::make('payment_method')
-                    ->badge()
-                    ->searchable(),
                 TextColumn::make('ad.title')
                     ->searchable(),
-                TextColumn::make('ad.ad_type.name')
-                    ->searchable(),
                 TextColumn::make('user.fullname')
-                    ->searchable(),
-                TextColumn::make('status')
-                    ->badge()
                     ->searchable(),
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -112,19 +111,11 @@ class PaymentResource extends Resource
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                EditAction::make(),
                 ViewAction::make(),
+                EditAction::make(),
                 DeleteAction::make(),
                 ForceDeleteAction::make(),
                 RestoreAction::make(),
-            ])->headerActions([
-                ImportAction::make()->label('Importer')
-                    ->importer(PaymentImporter::class)
-                    ->icon(Heroicon::ArrowUpTray),
-
-                ExportAction::make()->label('Exporter')
-                    ->exporter(PaymentExporter::class)
-                    ->icon(Heroicon::ArrowDownTray)
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
@@ -138,7 +129,7 @@ class PaymentResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => ManagePayments::route('/'),
+            'index' => ManageReviews::route('/'),
         ];
     }
 

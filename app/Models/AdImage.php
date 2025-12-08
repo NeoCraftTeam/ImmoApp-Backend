@@ -44,7 +44,7 @@ class AdImage extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $table = 'ad_image';
+    protected $table = 'ad_images';
     protected $fillable = [
         'ad_id',
         'image_path',

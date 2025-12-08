@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 /**
  * @property-read Ad|null $ad
@@ -29,7 +30,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int $payment_id
  * @property int|null $unlocked_at
  * @property int|null $updated_at
- * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property Carbon|null $deleted_at
  *
  * @method static Builder<static>|UnlockedAd whereAdId($value)
  * @method static Builder<static>|UnlockedAd whereDeletedAt($value)
@@ -46,6 +47,8 @@ class UnlockedAd extends Model
     use HasFactory, softDeletes;
 
     public $timestamps = false;
+
+    protected $table = 'unlocked_ads';
 
     protected $fillable = ['ad_id', 'user_id', 'payment_id'];
 

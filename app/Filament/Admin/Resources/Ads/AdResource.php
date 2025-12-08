@@ -38,11 +38,16 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 class AdResource extends Resource
 {
     protected static ?string $model = Ad::class;
+    protected static string|null|\UnitEnum $navigationGroup = 'Annonces';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::InboxArrowDown;
 
     protected static ?string $recordTitleAttribute = 'title';
 
+    protected static ?string $navigationLabel = 'Annonces';
+
+
+    protected static ?string $modelLabel = 'Annonce';
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -74,7 +79,7 @@ class AdResource extends Resource
                 TextInput::make('status')
                     ->required(),
                 DateTimePicker::make('expires_at'),
-                Select::make('user.firstname')
+                Select::make('user.fullname')
                     ->relationship('user', 'id')
                     ->required(),
                 Select::make('quarter.name')
@@ -91,7 +96,8 @@ class AdResource extends Resource
         return $schema
             ->components([
                 TextEntry::make('title'),
-                TextEntry::make('slug'),
+                TextEntry::make('slug')
+                    ->visible(false),
                 TextEntry::make('description')
                     ->columnSpanFull(),
                 TextEntry::make('adresse'),
@@ -112,7 +118,7 @@ class AdResource extends Resource
                 TextEntry::make('expires_at')
                     ->dateTime()
                     ->placeholder('-'),
-                TextEntry::make('user.id')
+                TextEntry::make('user.fullname')
                     ->label('User'),
                 TextEntry::make('quarter.name')
                     ->label('Quarter'),
@@ -159,7 +165,7 @@ class AdResource extends Resource
                 TextColumn::make('expires_at')
                     ->dateTime()
                     ->sortable(),
-                TextColumn::make('user.firstname')
+                TextColumn::make('user.fullname')
                     ->searchable(),
                 TextColumn::make('quarter.name')
                     ->searchable(),

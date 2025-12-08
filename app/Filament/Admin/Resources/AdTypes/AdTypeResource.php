@@ -21,9 +21,14 @@ class AdTypeResource extends Resource
 {
     protected static ?string $model = AdType::class;
 
+    protected static string|null|\UnitEnum $navigationGroup = 'Annonces';
     protected static string|BackedEnum|null $navigationIcon = Heroicon::CursorArrowRipple;
 
-    protected static ?string $recordTitleAttribute = 'type-annonce';
+    protected static ?string $recordTitleAttribute = 'categorie -annonce';
+
+    protected static ?string $navigationLabel = 'Categories des annonces';
+
+    protected static ?string $modelLabel = 'Categorie d\'annonce';
 
     public static function form(Schema $schema): Schema
     {
