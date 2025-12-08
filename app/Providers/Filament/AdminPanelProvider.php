@@ -2,6 +2,9 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Admin\Widgets\StatsOverview;
+use App\Filament\Admin\Widgets\UserChart;
+use App\Filament\Admin\Widgets\UserStatusChart;
 use App\Filament\Pages\Auth\EditProfile;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Auth\MultiFactor\Email\EmailAuthentication;
@@ -57,8 +60,9 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Admin/Widgets'), for: 'App\Filament\Admin\Widgets')
             ->widgets([
-                // AccountWidget::class,
-                // FilamentInfoWidget::class,
+                StatsOverview::class,
+                UserChart::class,
+                UserStatusChart::class,
             ])
             ->middleware([
                 EncryptCookies::class,
