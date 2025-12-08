@@ -1,5 +1,5 @@
 # Pipeline GitLab CI/CD DevOps pour Laravel - Production
-# Optimisé pour une meilleure visualisation des stages
+# Optimisé pour une meilleure visualisation
 
 include:
   - template: Security/SAST.gitlab-ci.yml
@@ -10,14 +10,14 @@ include:
 # DÉFINITION DES STAGES (ordre d'exécution)
 # ==========================================
 stages:
-  - 🔍 prepare      # Préparation et validation
-  - 🏗️ build        # Compilation des assets
-  - 🧪 test         # Tests automatisés
-  - 🔒 security     # Analyse de sécurité
-  - 🚀 deploy       # Déploiement production
-  - ✅ verify       # Vérifications post-déploiement
-  - 📢 notify       # Notifications
-  - 🔧 maintenance  # Maintenance et rollback
+  - prepare
+  - build
+  - test
+  - security
+  - deploy
+  - verify
+  - notify
+  - maintenance
 
 # ==========================================
 # VARIABLES GLOBALES
@@ -41,8 +41,8 @@ variables:
 # ==========================================
 # STAGE: PREPARE - Validation du code
 # ==========================================
-validate:syntax:
-  stage: 🔍 prepare
+🔍 validate:syntax:
+  stage: prepare
   image: php:8.4-cli
   script:
     - echo "🔍 Validation de la syntaxe PHP..."
@@ -52,8 +52,8 @@ validate:syntax:
     - merge_requests
   allow_failure: false
 
-validate:composer:
-  stage: 🔍 prepare
+🔍 validate:composer:
+  stage: prepare
   image: composer:latest
   script:
     - echo "📋 Validation du fichier composer.json..."
@@ -70,8 +70,8 @@ validate:composer:
 # ==========================================
 # STAGE: BUILD - Compilation des assets
 # ==========================================
-build:frontend:
-  stage: 🏗️ build
+🏗️ build:frontend:
+  stage: build
   image: node:20-alpine
   cache:
     key: ${CI_COMMIT_REF_SLUG}-npm
@@ -96,8 +96,8 @@ build:frontend:
     - main
   # Commentez ce job si vous n'utilisez pas npm/Vite
 
-build:dependencies:
-  stage: 🏗️ build
+🏗️ build:dependencies:
+  stage: build
   image: composer:latest
   cache:
     key: ${CI_COMMIT_REF_SLUG}-composer
@@ -118,8 +118,8 @@ build:dependencies:
 # ==========================================
 # STAGE: TEST - Tests automatisés
 # ==========================================
-test:unit:
-  stage: 🧪 test
+🧪 test:unit:
+  stage: test
   image: php:8.4-fpm
   services:
     - name: postgis/postgis:15-3.3
@@ -186,8 +186,8 @@ test:unit:
     - main
     - merge_requests
 
-test:code-quality:
-  stage: 🧪 test
+🧪 test:code-quality:
+  stage: test
   image: php:8.4-cli
   before_script:
     - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
@@ -204,8 +204,8 @@ test:code-quality:
 # ==========================================
 # STAGE: SECURITY - Analyses de sécurité
 # ==========================================
-security:dependencies:
-  stage: 🔒 security
+🔒 security:dependencies:
+  stage: security
   image: composer:latest
   script:
     - echo "🔒 Vérification des vulnérabilités Composer..."
@@ -218,13 +218,13 @@ security:dependencies:
 # ==========================================
 # STAGE: DEPLOY - Déploiement Production
 # ==========================================
-deploy:production:
-  stage: 🚀 deploy
+🚀 deploy:production:
+  stage: deploy
   image: alpine:latest
   needs:
-    - job: test:unit
+    - job: 🧪 test:unit
       artifacts: false
-    # - job: build:frontend
+    # - job: 🏗️ build:frontend
     #   artifacts: true  # Décommentez si vous utilisez npm
   before_script:
     - echo "🔐 Configuration SSH..."
@@ -346,15 +346,15 @@ deploy:production:
   environment:
     name: production
     url: https://votre-domaine.com
-    on_stop: stop:production
+    on_stop: 🛑 stop:production
 
   only:
     - main
 
   when: manual  # Changez en "on_success" pour auto-déploiement
 
-stop:production:
-  stage: 🚀 deploy
+🛑 stop:production:
+  stage: deploy
   image: alpine:latest
   before_script:
     - apk add --no-cache openssh-client
@@ -367,7 +367,9 @@ stop:production:
     - |
       ssh $VPS_USER@$VPS_HOST "
         cd $VPS_PATH
+        echo '🛑 Mise en mode maintenance...'
         php artisan down
+        echo '✅ Application en maintenance'
       "
   environment:
     name: production
@@ -379,11 +381,11 @@ stop:production:
 # ==========================================
 # STAGE: VERIFY - Vérifications
 # ==========================================
-verify:health-check:
-  stage: ✅ verify
+✅ verify:health-check:
+  stage: verify
   image: alpine:latest
   needs:
-    - deploy:production
+    - 🚀 deploy:production
   before_script:
     - apk add --no-cache curl
   script:
@@ -403,11 +405,11 @@ verify:health-check:
     - main
   allow_failure: true
 
-verify:ssl:
-  stage: ✅ verify
+✅ verify:ssl:
+  stage: verify
   image: alpine:latest
   needs:
-    - deploy:production
+    - 🚀 deploy:production
   before_script:
     - apk add --no-cache openssl
   script:
@@ -424,11 +426,11 @@ verify:ssl:
 # ==========================================
 # STAGE: NOTIFY - Notifications
 # ==========================================
-notify:success:
-  stage: 📢 notify
+📢 notify:success:
+  stage: notify
   image: curlimages/curl:latest
   needs:
-    - deploy:production
+    - 🚀 deploy:production
   script:
     - |
       if [ -n "$SLACK_WEBHOOK_URL" ]; then
@@ -455,11 +457,11 @@ notify:success:
     - main
   allow_failure: true
 
-notify:failure:
-  stage: 📢 notify
+📢 notify:failure:
+  stage: notify
   image: curlimages/curl:latest
   needs:
-    - deploy:production
+    - 🚀 deploy:production
   script:
     - |
       if [ -n "$SLACK_WEBHOOK_URL" ]; then
@@ -484,8 +486,8 @@ notify:failure:
 # ==========================================
 # STAGE: MAINTENANCE - Rollback
 # ==========================================
-rollback:production:
-  stage: 🔧 maintenance
+🔙 rollback:production:
+  stage: maintenance
   image: alpine:latest
   before_script:
     - apk add --no-cache openssh-client git
@@ -535,8 +537,8 @@ rollback:production:
   environment:
     name: production
 
-maintenance:clear-cache:
-  stage: 🔧 maintenance
+🧹 maintenance:clear-cache:
+  stage: maintenance
   image: alpine:latest
   before_script:
     - apk add --no-cache openssh-client
