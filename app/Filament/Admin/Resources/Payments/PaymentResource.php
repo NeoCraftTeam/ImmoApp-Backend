@@ -1,21 +1,19 @@
 <?php
 
-namespace App\Filament\Admin\Resources\Quarters;
+namespace App\Filament\Admin\Resources\Payments;
 
-use App\Filament\Admin\Resources\Quarters\Pages\ManageQuarters;
-use App\Filament\Exports\QuarterExporter;
-use App\Filament\Imports\QuarterImporter;
-use App\Models\Quarter;
+use App\Enums\PaymentMethod;
+use App\Enums\PaymentStatus;
+use App\Enums\PaymentType;
+use App\Filament\Admin\Resources\Payments\Pages\ManagePayments;
+use App\Models\Payment;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Actions\ExportAction;
-use Filament\Actions\Exports\Enums\ExportFormat;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\ForceDeleteBulkAction;
-use Filament\Actions\ImportAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Forms\Components\Select;
@@ -29,42 +27,65 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
-class QuarterResource extends Resource
+class PaymentResource extends Resource
 {
-    protected static ?string $model = Quarter::class;
+    protected static ?string $model = Payment::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::BuildingOffice2;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
-    protected static ?string $recordTitleAttribute = 'name';
+    protected static ?string $recordTitleAttribute = 'type';
 
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->components([
-                TextInput::make('name')
+                Select::make('type')
+                    ->options(PaymentType::class)
+                    ->default('unlock')
                     ->required(),
-                Select::make('city_id')
-                    ->relationship('city', 'name')
+                TextInput::make('amount')
                     ->required()
-                    ->searchable()
-                    ->placeholder('Choisir une ville')
-                    ->searchDebounce(250)
-                    ->preload()
-                    ->suffixIcon(Heroicon::HomeModern)
-                    ->loadingMessage('Chargement des villes...')
-                    ->noSearchResultsMessage('Aucun résultat trouvé')
-                    ->native(false)
+                    ->numeric(),
+                TextInput::make('transaction_id')
+                    ->required(),
+                Select::make('payment_method')
+                    ->options(PaymentMethod::class)
+                    ->required(),
+                Select::make('ad_id')
+                    ->relationship('ad', 'title')
+                    ->required(),
+                Select::make('user_id')
+                    ->relationship('user', 'id')
+                    ->required(),
+                Select::make('status')
+                    ->options(PaymentStatus::class)
+                    ->default('pending')
+                    ->required(),
             ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('name')
+            ->recordTitleAttribute('type')
             ->columns([
-                TextColumn::make('name')
+                TextColumn::make('type')
+                    ->badge()
                     ->searchable(),
-                TextColumn::make('city.name')->label('Ville')
+                TextColumn::make('amount')
+                    ->numeric()
+                    ->sortable(),
+                TextColumn::make('transaction_id')
+                    ->searchable(),
+                TextColumn::make('payment_method')
+                    ->badge()
+                    ->searchable(),
+                TextColumn::make('ad.title')
+                    ->searchable(),
+                TextColumn::make('user.id')
+                    ->searchable(),
+                TextColumn::make('status')
+                    ->badge()
                     ->searchable(),
                 TextColumn::make('created_at')
                     ->dateTime()
@@ -87,18 +108,6 @@ class QuarterResource extends Resource
                 DeleteAction::make(),
                 ForceDeleteAction::make(),
                 RestoreAction::make(),
-            ])->headerActions([
-                ImportAction::make()->label('Importer')
-                    ->importer(QuarterImporter::class)
-                    ->icon(Heroicon::ArrowUpTray),
-
-                ExportAction::make()->label('Exporter')
-                    ->exporter(QuarterExporter::class)
-                    ->icon(Heroicon::ArrowDownTray)
-                    ->formats([
-                        ExportFormat::Csv,
-                        ExportFormat::Xlsx,
-                    ])
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
@@ -112,7 +121,7 @@ class QuarterResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => ManageQuarters::route('/'),
+            'index' => ManagePayments::route('/'),
         ];
     }
 
@@ -122,15 +131,5 @@ class QuarterResource extends Resource
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
-    }
-
-    public static function getNavigationBadge(): ?string
-    {
-        return static::getModel()::count();
-    }
-
-    public static function getNavigationBadgeTooltip(): ?string
-    {
-        return 'The number of quarters';
     }
 }

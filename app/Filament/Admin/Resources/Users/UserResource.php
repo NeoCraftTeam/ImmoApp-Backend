@@ -5,16 +5,22 @@ namespace App\Filament\Admin\Resources\Users;
 use App\Enums\UserRole;
 use App\Enums\UserType;
 use App\Filament\Admin\Resources\Users\Pages\ManageUsers;
+use App\Filament\Exports\UserExporter;
+use App\Filament\Imports\UserImporter;
 use App\Models\User;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ExportAction;
+use Filament\Actions\Exports\Enums\ExportFormat;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\ForceDeleteBulkAction;
+use Filament\Actions\ImportAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
+use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
@@ -24,6 +30,8 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -99,6 +107,11 @@ class UserResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->heading('Utilisateurs')
+            ->description('Liste des utilisateurs')
+            ->deferLoading()
+            ->striped()
+            ->extremePaginationLinks()
             ->recordTitleAttribute('firstname')
             ->columns([
                 ImageColumn::make('avatar')->label('Avatar')
@@ -106,46 +119,85 @@ class UserResource extends Resource
                     ->size(40)
                     ->searchable(),
                 TextColumn::make('firstname')
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('lastname')
                     ->searchable(),
                 TextColumn::make('phone_number')
-                    ->searchable(),
+                    ->searchable()
+                    ->copyable()
+                    ->copyMessage('Phone number copied to clipboard!')
+                    ->copyMessageDuration(1500),
                 TextColumn::make('email')
                     ->label('Email address')
-                    ->searchable(),
+                    ->searchable()
+                    ->copyable()
+                    ->copyMessage('Email copied to clipboard!')
+                    ->copyMessageDuration(1500),
                 TextColumn::make('email_verified_at')
-                    ->dateTime()
+                    ->dateTime('M j, Y H:i')
                     ->sortable(),
                 TextColumn::make('type')
                     ->badge()
-                    ->searchable(),
+                    ->searchable()
+                    ->visible(false),
                 TextColumn::make('role')
                     ->badge()
-                    ->searchable(),
-                TextColumn::make('city_id')->label('city')
+                    ->searchable()
+                    ->visible(false),
+                TextColumn::make('city.name')->label('city')
                     ->searchable(),
                 TextColumn::make('created_at')
-                    ->dateTime()
+                    ->isoDateTime('LLLL', 'Europe/Paris')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: false),
                 TextColumn::make('updated_at')
-                    ->dateTime()
+                    ->dateTime('M j, Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: false),
                 TextColumn::make('deleted_at')
-                    ->dateTime()
+                    ->dateTime('M j, Y H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: false),
             ])
             ->filters([
                 TrashedFilter::make(),
+                Filter::make('is_active')->label('utilisateurs actifs')
+                    ->toggle()
+                    ->query(fn(Builder $query) => $query->where('is_active', true)),
+                SelectFilter::make('role')->label('Filter par role')
+                    ->options([
+                        'admin' => 'Admin',
+                        'agent' => 'Agent',
+                        'customer' => 'Customer',
+                    ])->native(false),
+                SelectFilter::make('type')->label('Filter par type')
+                    ->options([
+                        'individual' => 'Individual',
+                        'Agency' => 'Agency',
+                    ])->native(false),
             ])
             ->recordActions([
-                EditAction::make(),
-                DeleteAction::make(),
+                ViewAction::make()
+                    ->iconButton(),
+                EditAction::make()
+                    ->iconButton(),
+                DeleteAction::make()
+                    ->iconButton(),
                 ForceDeleteAction::make(),
                 RestoreAction::make(),
+            ])->headerActions([
+                ImportAction::make()->label('Importer')
+                    ->importer(UserImporter::class)
+                    ->icon(Heroicon::ArrowUpTray),
+
+                ExportAction::make()->label('Exporter')
+                    ->exporter(UserExporter::class)
+                    ->icon(Heroicon::ArrowDownTray)
+                    ->formats([
+                        ExportFormat::Csv,
+                        ExportFormat::Xlsx,
+                    ])
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
@@ -169,5 +221,15 @@ class UserResource extends Resource
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        return static::getModel()::count();
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'The number of users';
     }
 }
