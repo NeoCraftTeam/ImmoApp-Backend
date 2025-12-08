@@ -12,12 +12,12 @@ class UnlockedAdPolicy
 
     public function viewAny(User $user): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
     public function view(User $user, UnlockedAd $unlockedAd): bool
     {
-        return $user->isCustomer() && $user->id === $unlockedAd->user_id;
+        return $user->isAdmin() || ($user->isCustomer() && ($user->id === $unlockedAd->user_id));
     }
 
     public function create(User $user): bool

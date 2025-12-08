@@ -189,6 +189,11 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
         return $this->role === UserRole::AGENT;
     }
 
+    public function getFullnameAttribute(): string
+    {
+        return trim(($this->firstname ?? '') . ' ' . ($this->lastname ?? ''));
+    }
+
     /**
      * returns true if the user is a customer.
      */
