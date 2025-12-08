@@ -10,10 +10,12 @@
     "license": "MIT",
     "require": {
         "php": "^8.4",
+        "ext-gettext": "*",
         "ext-pdo": "*",
         "clickbar/laravel-magellan": "^2.0",
         "darkaonline/l5-swagger": "^9.0",
         "filament/filament": "~4.0",
+        "flowframe/laravel-trend": "*",
         "http-interop/http-factory-guzzle": "^1.2",
         "laravel/framework": "^12.0",
         "laravel/pulse": "*",
@@ -23,8 +25,8 @@
         "laravel/tinker": "^2.10.1",
         "livewire/livewire": "^3.0",
         "meilisearch/meilisearch-php": "^1.16",
-        "spatie/laravel-medialibrary": "^11.14",
-        "ext-gettext": "*"
+        "sentry/sentry-laravel": "^4.20",
+        "spatie/laravel-medialibrary": "^11.14"
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^3.6",
