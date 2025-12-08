@@ -94,6 +94,7 @@ class Ad extends Model
     ];
 
     protected $hidden = [
+        'location',
         'created_at',
         'updated_at',
         'deleted_at',
