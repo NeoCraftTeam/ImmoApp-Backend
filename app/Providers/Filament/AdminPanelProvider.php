@@ -44,6 +44,8 @@ class AdminPanelProvider extends PanelProvider
             ->emailChangeVerification()
             ->profile(EditProfile::class)
             ->sidebarCollapsibleOnDesktop()
+            ->font('poppins')
+            ->brandLogo(asset('images/keyhomelogo.png'))
             ->authGuard('web')
             ->unsavedChangesAlerts()
             ->colors([
