@@ -27,7 +27,7 @@ class AdImageResource extends Resource
 
     protected static string|null|\UnitEnum $navigationGroup = 'Annonces';
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::Camera;
 
     protected static ?string $recordTitleAttribute = 'title';
 
