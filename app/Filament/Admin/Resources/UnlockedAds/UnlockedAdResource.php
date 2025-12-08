@@ -3,14 +3,18 @@
 namespace App\Filament\Admin\Resources\UnlockedAds;
 
 use App\Filament\Admin\Resources\UnlockedAds\Pages\ManageUnlockedAds;
+use App\Filament\Exports\UnlockedAdExporter;
+use App\Filament\Imports\UnlockedAdImporter;
 use App\Models\UnlockedAd;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ExportAction;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\ForceDeleteBulkAction;
+use Filament\Actions\ImportAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
@@ -30,9 +34,15 @@ class UnlockedAdResource extends Resource
 {
     protected static ?string $model = UnlockedAd::class;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|null|\UnitEnum $navigationGroup = 'Annonces';
+
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::LockOpen;
 
     protected static ?string $recordTitleAttribute = 'ad_id';
+
+    protected static ?string $navigationLabel = 'Annonces débloquées';
+
+    protected static ?string $modelLabel = 'Annonce débloquée';
 
     public static function form(Schema $schema): Schema
     {
@@ -41,7 +51,7 @@ class UnlockedAdResource extends Resource
                 Select::make('ad_id')
                     ->relationship('ad', 'title')
                     ->required(),
-                Select::make('user_id')
+                Select::make('user.fullname')
                     ->relationship('user', 'id')
                     ->required(),
                 Select::make('payment_id')
@@ -55,18 +65,15 @@ class UnlockedAdResource extends Resource
     {
         return $schema
             ->components([
+                TextEntry::make('ad.user.fullname')->label('Propriétaire'),
                 TextEntry::make('ad.title')
                     ->label('Ad'),
-                TextEntry::make('user.id')
-                    ->label('User'),
-                TextEntry::make('payment.id')
+                TextEntry::make('user.fullname')
+                    ->label('Débloquée par'),
+                TextEntry::make('payment.transaction_id')
                     ->label('Payment'),
                 TextEntry::make('unlocked_at')
-                    ->dateTime()
-                    ->placeholder('-'),
-                TextEntry::make('updated_at')
-                    ->dateTime()
-                    ->placeholder('-'),
+                    ->isoDate('LLLL', 'Europe/Paris'),
                 TextEntry::make('deleted_at')
                     ->dateTime()
                     ->visible(fn(UnlockedAd $record): bool => $record->trashed()),
@@ -78,19 +85,17 @@ class UnlockedAdResource extends Resource
         return $table
             ->recordTitleAttribute('id')
             ->columns([
-                TextColumn::make('ad.title')
+                TextColumn::make('ad.user.fullname')->label('Propriétaire')
                     ->searchable(),
-                TextColumn::make('user.id')
+                TextColumn::make('ad.title')->label('Annonce')
                     ->searchable(),
-                TextColumn::make('payment.id')
+                TextColumn::make('user.fullname')->label('Débloquée par')
+                    ->searchable(),
+                TextColumn::make('payment.transaction_id')->label('Payment ID')
                     ->searchable(),
                 TextColumn::make('unlocked_at')
-                    ->dateTime()
+                    ->isoDate('LLLL', 'Europe/Paris')
                     ->sortable(),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('deleted_at')
                     ->dateTime()
                     ->sortable()
@@ -100,11 +105,20 @@ class UnlockedAdResource extends Resource
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                ViewAction::make(),
+                ViewAction::make()->label('Voir'),
                 EditAction::make(),
                 DeleteAction::make(),
                 ForceDeleteAction::make(),
                 RestoreAction::make(),
+            ])->headerActions([
+
+                ImportAction::make()->label('Importer')
+                    ->importer(UnlockedAdImporter::class)
+                    ->icon(Heroicon::ArrowUpTray),
+
+                ExportAction::make()->label('Exporter')
+                    ->exporter(UnlockedAdExporter::class)
+                    ->icon(Heroicon::ArrowDownTray)
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
