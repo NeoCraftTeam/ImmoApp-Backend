@@ -47,6 +47,7 @@ class AdminPanelProvider extends PanelProvider
             ->font('poppins')
             ->brandLogo(asset('images/keyhomelogo.png'))
             ->authGuard('web')
+            ->unsavedChangesAlerts()
             ->colors([
                 'primary' => Color::Amber,
             ])
