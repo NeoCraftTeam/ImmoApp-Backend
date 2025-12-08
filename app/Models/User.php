@@ -152,7 +152,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
 
     public function canPublishAds(): bool
     {
-        return in_array($this->role, [UserRole::AGENT, UserRole::CUSTOMER, UserRole::ADMIN]);
+        return in_array($this->role, [UserRole::AGENT, UserRole::ADMIN]);
     }
 
     public function ads(): HasMany
