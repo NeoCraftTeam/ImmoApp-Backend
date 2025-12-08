@@ -447,4 +447,4 @@ rollback:production:
 
   environment:
     name: production
-    action: rollback
+    # Supprimez la ligne "action : rollback". Elle n'est pas valide
