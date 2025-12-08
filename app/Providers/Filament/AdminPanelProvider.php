@@ -39,12 +39,13 @@ class AdminPanelProvider extends PanelProvider
                     ->brandName('KeyHome App'),
                 EmailAuthentication::make(),
             ], isRequired: true)
-            ->registration()
             ->passwordReset()
             ->emailVerification()
             ->emailChangeVerification()
             ->profile(EditProfile::class)
             ->sidebarCollapsibleOnDesktop()
+            ->font('poppins')
+            ->brandLogo(asset('images/keyhomelogo.png'))
             ->authGuard('web')
             ->colors([
                 'primary' => Color::Amber,
