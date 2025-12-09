@@ -10,7 +10,6 @@ include:
 # DÉFINITION DES STAGES (ordre d'exécution)
 # ==========================================
 stages:
-  - prepare
   - build
   - test
   - security
@@ -37,35 +36,6 @@ variables:
   GIT_DEPTH: 10
   FF_USE_FASTZIP: "true"
   CACHE_COMPRESSION_LEVEL: "fast"
-
-# ==========================================
-# STAGE: PREPARE - Validation du code
-# ==========================================
-🔍 validate:syntax:
-  stage: prepare
-  image: php:8.4-cli
-  script:
-    - echo "🔍 Validation de la syntaxe PHP..."
-    - find . -type f -name "*.php" ! -path "./vendor/*" -exec php -l {} \; | grep -v "No syntax errors"
-  only:
-    - main
-    - merge_requests
-  allow_failure: false
-
-🔍 validate:composer:
-  stage: prepare
-  image: composer:latest
-  script:
-    - echo "📋 Validation du fichier composer.json..."
-    - composer validate --strict
-  cache:
-    key: composer-cache
-    paths:
-      - vendor/
-  only:
-    - main
-    - merge_requests
-  allow_failure: true
 
 # ==========================================
 # STAGE: BUILD - Compilation des assets
@@ -485,7 +455,7 @@ stop:production:
   stage: deploy
   image: alpine:latest
   before_script:
-    - apk add --no-cache openssh-client
+    - sudo apt-get update && sudo apt-get install openssh-client rsync
     - eval $(ssh-agent -s)
     - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' | ssh-add -
     - mkdir -p ~/.ssh
