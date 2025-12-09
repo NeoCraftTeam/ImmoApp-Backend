@@ -24,10 +24,10 @@ test:pint:
     paths:
       - vendor/
   before_script:
-    - apt-get update -qq && apt-get install -y -qq \
-        git unzip \
-        gettext libgettextpo-dev \
-        libicu-dev \
+    - apt-get update -qq && apt-get install -y -qq\
+        git unzip\
+        gettext libgettextpo-dev\
+        libicu-dev\
         libzip-dev
     - docker-php-ext-configure intl
     - docker-php-ext-install intl zip exif gettext
