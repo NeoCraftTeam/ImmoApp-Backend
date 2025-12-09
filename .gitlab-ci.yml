@@ -24,7 +24,8 @@ test:pint:
     paths:
       - vendor/
   before_script:
-    - apt-get update -qq && apt-get install -y -qq git unzip
+    - apt-get update -qq && apt-get install -y -qq git unzip gettext libgettextpo-dev
+    - docker-php-ext-install gettext
     - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
     - composer install --no-ansi --no-interaction --no-progress
   script:
