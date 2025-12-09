@@ -169,9 +169,6 @@ rollback:production:
         php artisan view:cache
         php artisan up
       "
-  environment:
-    name: production
-    action: rollback
   when: manual
   only:
     - main
