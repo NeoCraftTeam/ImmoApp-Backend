@@ -26,7 +26,6 @@ class UserResource extends JsonResource
                 ? $this->getFirstMediaUrl('avatar')
                 : $this->avatar,
 
-
             // Champ sensible visible seulement par un admin
             'role' => $this->when($request->user()?->role === 'admin', $this->role),
             'type' => $this->when($request->user()?->role === 'admin', $this->type),

@@ -144,7 +144,7 @@ class CityController
     {
 
         $city = City::find($id);
-        if (!$city) {
+        if (! $city) {
             return response()->json([
                 'message' => 'Ville non trouvée',
             ], 404);

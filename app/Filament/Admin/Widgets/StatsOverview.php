@@ -28,11 +28,11 @@ class StatsOverview extends StatsOverviewWidget
                 ->descriptionIcon('heroicon-m-user-group')
                 ->color('info'),
 
-            Stat::make('Note Moyenne', number_format(Review::avg('rating'), 1) . ' / 5')
+            Stat::make('Note Moyenne', number_format(Review::avg('rating'), 1).' / 5')
                 ->description('⭐ Satisfaction globale')
                 ->color('warning'),
 
-            Stat::make('Revenus', '€ ' . number_format(12500, 2))
+            Stat::make('Revenus', '€ '.number_format(12500, 2))
                 ->description('Ce mois')
                 ->descriptionIcon('heroicon-m-currency-euro')
                 ->color('success'),

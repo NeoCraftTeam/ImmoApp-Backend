@@ -38,6 +38,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 class AdResource extends Resource
 {
     protected static ?string $model = Ad::class;
+
     protected static string|null|\UnitEnum $navigationGroup = 'Annonces';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::InboxArrowDown;
@@ -46,8 +47,8 @@ class AdResource extends Resource
 
     protected static ?string $navigationLabel = 'Annonces';
 
-
     protected static ?string $modelLabel = 'Annonce';
+
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -132,7 +133,7 @@ class AdResource extends Resource
                     ->placeholder('-'),
                 TextEntry::make('deleted_at')
                     ->dateTime()
-                    ->visible(fn(Ad $record): bool => $record->trashed()),
+                    ->visible(fn (Ad $record): bool => $record->trashed()),
             ]);
     }
 
@@ -201,7 +202,7 @@ class AdResource extends Resource
 
                 ExportAction::make()->label('Exporter')
                     ->exporter(AdExporter::class)
-                    ->icon(Heroicon::ArrowDownTray)
+                    ->icon(Heroicon::ArrowDownTray),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

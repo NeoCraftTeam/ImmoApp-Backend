@@ -22,6 +22,7 @@ class AdTypeResource extends Resource
     protected static ?string $model = AdType::class;
 
     protected static string|null|\UnitEnum $navigationGroup = 'Annonces';
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::CursorArrowRipple;
 
     protected static ?string $recordTitleAttribute = 'categorie -annonce';
@@ -41,7 +42,7 @@ class AdTypeResource extends Resource
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make(),
-                DeleteAction::make()
+                DeleteAction::make(),
             ]);
     }
 
@@ -66,5 +67,4 @@ class AdTypeResource extends Resource
                 SoftDeletingScope::class,
             ]);
     }
-
 }

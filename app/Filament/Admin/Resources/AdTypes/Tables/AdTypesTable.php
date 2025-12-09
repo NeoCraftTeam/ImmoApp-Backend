@@ -19,7 +19,7 @@ class AdTypesTable
         return $table
             ->columns([
                 TextColumn::make('name')->label('label')
-                    ->description(fn(AdType $record): string => $record->desc)
+                    ->description(fn (AdType $record): string => $record->desc)
                     ->searchable(),
                 TextColumn::make('created_at')
                     ->dateTime()

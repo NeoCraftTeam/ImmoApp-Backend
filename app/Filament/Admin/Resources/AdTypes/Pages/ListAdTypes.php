@@ -17,9 +17,9 @@ class ListAdTypes extends ListRecords
                 ->modalHeading('Créer un nouveau type d\'annonce')
                 ->mutateDataUsing(function (array $data): array { // Lier l'ID de l'utilisateur
                     $data['user_id'] = auth()->id();
-                    return $data;
-                })
 
+                    return $data;
+                }),
 
         ];
     }

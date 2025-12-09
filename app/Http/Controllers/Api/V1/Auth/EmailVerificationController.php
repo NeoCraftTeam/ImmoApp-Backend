@@ -16,7 +16,7 @@ class EmailVerificationController
         $hash = $request->route('hash');
 
         // Vérifier que l'URL est valide et signée
-        if (!URL::hasValidSignature($request)) {
+        if (! URL::hasValidSignature($request)) {
             return view('email-verification-error', [
                 'message' => 'Lien de vérification invalide ou expiré',
             ]);
@@ -25,7 +25,7 @@ class EmailVerificationController
         $user = User::findOrFail($id);
 
         // Vérifier le hash
-        if (!hash_equals($hash, sha1($user->getEmailForVerification()))) {
+        if (! hash_equals($hash, sha1($user->getEmailForVerification()))) {
             return view('email-verification-error', [
                 'message' => 'Lien de vérification invalide',
             ]);

@@ -124,7 +124,7 @@ class PaymentResource extends Resource
 
                 ExportAction::make()->label('Exporter')
                     ->exporter(PaymentExporter::class)
-                    ->icon(Heroicon::ArrowDownTray)
+                    ->icon(Heroicon::ArrowDownTray),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

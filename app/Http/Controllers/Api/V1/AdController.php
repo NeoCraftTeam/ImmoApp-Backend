@@ -240,7 +240,7 @@ class AdController
      *     )
      * )
      *
-     * @param AdRequest $request Les données validées de la requête
+     * @param  AdRequest  $request  Les données validées de la requête
      * @return JsonResponse Réponse JSON avec les détails de l'annonce créée
      *
      * @throws Throwable
@@ -257,7 +257,7 @@ class AdController
             Log::info('Files received:', $request->allFiles());
 
             // Validation des coordonnées GPS
-            if (!isset($data['latitude']) || !isset($data['longitude'])) {
+            if (! isset($data['latitude']) || ! isset($data['longitude'])) {
                 throw new Exception('Latitude and longitude are required');
             }
 
@@ -279,15 +279,15 @@ class AdController
                 'type_id' => $data['type_id'],
             ]);
 
-            Log::info('Ad created with ID: ' . $ad->id);
+            Log::info('Ad created with ID: '.$ad->id);
 
             // Gérer les images
             $imagesProcessed = 0;
-            if (!empty($request->allFiles())) {
+            if (! empty($request->allFiles())) {
                 $imagesProcessed = $this->handleImageUpload($request, $ad);
             }
 
-            Log::info('Images processed: ' . $imagesProcessed);
+            Log::info('Images processed: '.$imagesProcessed);
 
             DB::commit();
 
@@ -301,7 +301,7 @@ class AdController
 
             // Recompter les images après chargement
             $actualImagesCount = $ad->images()->count();
-            Log::info('Actual images count after loading: ' . $actualImagesCount);
+            Log::info('Actual images count after loading: '.$actualImagesCount);
 
             return response()->json([
                 'success' => true,
@@ -316,7 +316,7 @@ class AdController
         } catch (Throwable $e) {
             DB::rollback();
 
-            Log::error('Error creating ad: ' . $e->getMessage(), [
+            Log::error('Error creating ad: '.$e->getMessage(), [
                 'user_id' => auth()->id(),
                 'data' => $data,
                 'files' => $request->allFiles(),
@@ -338,7 +338,7 @@ class AdController
      */
     private function handleImageUpload($request, Ad $ad): int
     {
-        Log::info('Starting image upload process for ad ID: ' . $ad->id);
+        Log::info('Starting image upload process for ad ID: '.$ad->id);
 
         $imagesProcessed = 0;
         $images = [];
@@ -368,6 +368,7 @@ class AdController
 
         if ($imageCount === 0) {
             Log::warning('No valid images found in the request');
+
             return 0;
         }
 
@@ -378,7 +379,7 @@ class AdController
 
         // 4. Définir les types MIME autorisés
         $allowedMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-        $directory = 'ads/' . $ad->id;
+        $directory = 'ads/'.$ad->id;
 
         // 5. Traiter chaque image
         foreach ($images as $index => $image) {
@@ -388,7 +389,7 @@ class AdController
 
                 // Valider le type MIME
                 $mime = $image->getMimeType();
-                if (!in_array($mime, $allowedMimes)) {
+                if (! in_array($mime, $allowedMimes)) {
                     Log::error("Image $index rejected - Invalid MIME type: $mime");
                     throw new Exception("Invalid image type for $originalName. Allowed: JPEG, PNG, GIF, WebP");
                 }
@@ -413,7 +414,7 @@ class AdController
                 // Stocker sur le disque public
                 $path = $image->storeAs($directory, $fileName, 'public');
 
-                if (!$path) {
+                if (! $path) {
                     Log::error("Failed to store image $index on disk");
                     throw new Exception("Failed to store image $originalName");
                 }
@@ -427,7 +428,7 @@ class AdController
                     'is_primary' => $imagesProcessed === 0,
                 ]);
 
-                if (!$adImage) {
+                if (! $adImage) {
                     Log::error("Failed to create AdImage record for $path");
                     // Supprimer le fichier si la création échoue
                     Storage::disk('public')->delete($path);
@@ -439,7 +440,7 @@ class AdController
 
             } catch (Exception $e) {
                 // En cas d'erreur, logger et continuer (ou lever l'exception selon votre besoin)
-                Log::error("Error processing image $index: " . $e->getMessage());
+                Log::error("Error processing image $index: ".$e->getMessage());
 
                 // Option 1: Continuer avec les autres images
                 continue;
@@ -523,7 +524,7 @@ class AdController
      *     )
      * )
      *
-     * @param string $id L'identifiant de l'annonce
+     * @param  string  $id  L'identifiant de l'annonce
      * @return JsonResponse Réponse JSON avec les données de l'annonce
      */
     public function show(string $id): JsonResponse
@@ -670,7 +671,7 @@ class AdController
      *     )
      * )
      *
-     * @param AdRequest $request The validated request data
+     * @param  AdRequest  $request  The validated request data
      *
      * @throws Throwable
      */
@@ -693,11 +694,11 @@ class AdController
             // Mettre à jour l'annonce
             $ad->update($data);
 
-            Log::info('Ad updated with ID: ' . $ad->id);
+            Log::info('Ad updated with ID: '.$ad->id);
 
             // Gérer les nouvelles images si présentes
             $imagesProcessed = 0;
-            if (!empty($request->allFiles())) {
+            if (! empty($request->allFiles())) {
                 $imagesProcessed = $this->handleImageUpload($request, $ad);
             }
 
@@ -706,7 +707,7 @@ class AdController
                 $this->handleImageDeletion($request->images_to_delete, $ad);
             }
 
-            Log::info('New images processed: ' . $imagesProcessed);
+            Log::info('New images processed: '.$imagesProcessed);
 
             DB::commit();
 
@@ -733,7 +734,7 @@ class AdController
         } catch (Throwable $e) {
             DB::rollback();
 
-            Log::error('Error updating ad: ' . $e->getMessage(), [
+            Log::error('Error updating ad: '.$e->getMessage(), [
                 'ad_id' => $ad->id,
                 'user_id' => auth()->id(),
                 'data' => $data,
@@ -764,17 +765,17 @@ class AdController
 
                 if ($adImage) {
                     // Supprimer le fichier du disque si présent
-                    if (!empty($adImage->image_path)) {
+                    if (! empty($adImage->image_path)) {
                         Storage::disk('public')->delete($adImage->image_path);
                     }
                     $adImage->delete();
 
-                    Log::info('Image deleted successfully with ID: ' . $imageId);
+                    Log::info('Image deleted successfully with ID: '.$imageId);
                 } else {
-                    Log::warning('Image not found or does not belong to ad: ' . $imageId);
+                    Log::warning('Image not found or does not belong to ad: '.$imageId);
                 }
             } catch (Exception $e) {
-                Log::error('Error deleting image ID ' . $imageId . ': ' . $e->getMessage());
+                Log::error('Error deleting image ID '.$imageId.': '.$e->getMessage());
 
                 // Continue avec les autres images même si une image échoue
                 continue;
@@ -792,11 +793,11 @@ class AdController
     {
         $hasPrimary = $ad->images()->where('is_primary', true)->exists();
 
-        if (!$hasPrimary) {
+        if (! $hasPrimary) {
             $firstImage = $ad->images()->first();
             if ($firstImage) {
                 $firstImage->update(['is_primary' => true]);
-                Log::info('Set new primary image for ad ID: ' . $ad->id . ', image ID: ' . $firstImage->id);
+                Log::info('Set new primary image for ad ID: '.$ad->id.', image ID: '.$firstImage->id);
             }
         }
     }
@@ -914,7 +915,7 @@ class AdController
      *     )
      * )
      *
-     * @param string $id L'identifiant de l'annonce à supprimer
+     * @param  string  $id  L'identifiant de l'annonce à supprimer
      * @return JsonResponse Réponse JSON confirmant la suppression avec détails
      *
      * @throws Throwable
@@ -928,35 +929,35 @@ class AdController
         DB::beginTransaction();
 
         try {
-            Log::info('Starting deletion of ad with ID: ' . $id);
+            Log::info('Starting deletion of ad with ID: '.$id);
 
             // Supprimer toutes les images associées
             $imagesCount = $ad->images()->count();
             foreach ($ad->images as $adImage) {
                 // Supprimer le fichier du disque
-                if (!empty($adImage->image_path)) {
+                if (! empty($adImage->image_path)) {
                     Storage::disk('public')->delete($adImage->image_path);
                 }
                 $adImage->delete();
             }
 
             // Supprimer le dossier de l'annonce s'il est vide
-            $dir = 'ads/' . $ad->id;
+            $dir = 'ads/'.$ad->id;
             try {
                 $filesLeft = Storage::disk('public')->files($dir);
                 if (empty($filesLeft)) {
                     Storage::disk('public')->deleteDirectory($dir);
                 }
             } catch (Throwable $e) {
-                Log::warning('Could not cleanup directory: ' . $dir . ' due to: ' . $e->getMessage());
+                Log::warning('Could not cleanup directory: '.$dir.' due to: '.$e->getMessage());
             }
 
-            Log::info('Deleted ' . $imagesCount . ' images for ad ID: ' . $id);
+            Log::info('Deleted '.$imagesCount.' images for ad ID: '.$id);
 
             // Supprimer l'annonce
             $ad->delete();
 
-            Log::info('Ad deleted successfully with ID: ' . $id);
+            Log::info('Ad deleted successfully with ID: '.$id);
 
             DB::commit();
 
@@ -972,7 +973,7 @@ class AdController
         } catch (Throwable $e) {
             DB::rollBack();
 
-            Log::error('Error deleting ad: ' . $e->getMessage(), [
+            Log::error('Error deleting ad: '.$e->getMessage(), [
                 'ad_id' => $id,
                 'user_id' => auth()->id(),
                 'trace' => $e->getTraceAsString(),
@@ -1129,7 +1130,7 @@ class AdController
         $targetUser = null;
         if ($user !== null) {
             $targetUser = User::find($user);
-            if (!$targetUser) {
+            if (! $targetUser) {
                 return response()->json([
                     'success' => false,
                     'message' => 'User not found.',
@@ -1146,8 +1147,8 @@ class AdController
         $latInput = $request->input('latitude');
         $longInput = $request->input('longitude');
 
-        $lat = is_numeric($latInput) ? (float)$latInput : null;
-        $long = is_numeric($longInput) ? (float)$longInput : null;
+        $lat = is_numeric($latInput) ? (float) $latInput : null;
+        $long = is_numeric($longInput) ? (float) $longInput : null;
 
         // Si pas de coordonnées valides en entrée et qu'on a un utilisateur cible, récupérer via SQL
         if (($lat === null || $long === null) && $targetUser?->id) {
@@ -1156,18 +1157,18 @@ class AdController
                 ->selectRaw('ST_Y(location) as lat, ST_X(location) as lng')
                 ->first();
             if ($row) {
-                $lat = $lat ?? (is_numeric($row->lat) ? (float)$row->lat : null);
-                $long = $long ?? (is_numeric($row->lng) ? (float)$row->lng : null);
+                $lat = $lat ?? (is_numeric($row->lat) ? (float) $row->lat : null);
+                $long = $long ?? (is_numeric($row->lng) ? (float) $row->lng : null);
             }
         }
 
-        $radius = (float)$request->input('radius', $defaultRadius);
+        $radius = (float) $request->input('radius', $defaultRadius);
 
         // Valider la présence et les bornes des coordonnées finales
         $latValid = is_numeric($lat) && $lat >= -90 && $lat <= 90;
         $longValid = is_numeric($long) && $long >= -180 && $long <= 180;
 
-        if (!$latValid || !$longValid) {
+        if (! $latValid || ! $longValid) {
             return response()->json([
                 'success' => false,
                 'message' => 'Latitude and longitude are required and must be within valid ranges.',
@@ -1210,8 +1211,8 @@ class AdController
             $coordinates = $ads->map(function (Ad $ad) {
                 return [
                     'id' => $ad->id,
-                    'latitude' => isset($ad->lat) ? (float)$ad->lat : null,
-                    'longitude' => isset($ad->lng) ? (float)$ad->lng : null,
+                    'latitude' => isset($ad->lat) ? (float) $ad->lat : null,
+                    'longitude' => isset($ad->lng) ? (float) $ad->lng : null,
                     'distance' => round($ad->distance ?? 0, 2),
                 ];
             })->values();
@@ -1232,7 +1233,7 @@ class AdController
             ]);
 
         } catch (Throwable $e) {
-            Log::error('Error in ads_nearby: ' . $e->getMessage(), [
+            Log::error('Error in ads_nearby: '.$e->getMessage(), [
                 'line' => $e->getLine(),
                 'file' => $e->getFile(),
                 'trace' => $e->getTraceAsString(),
@@ -1538,9 +1539,9 @@ class AdController
     {
         $validated = $request->validated();
         $field = $validated['field'] ?? null;
-        $q = (string)($validated['q'] ?? '');
+        $q = (string) ($validated['q'] ?? '');
 
-        if (!in_array($field, ['city', 'type', 'quarter'], true)) {
+        if (! in_array($field, ['city', 'type', 'quarter'], true)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid field. Allowed values: city, type, quarter.',
@@ -1550,7 +1551,7 @@ class AdController
         try {
             $driver = DB::getDriverName();
             $likeOperator = $driver === 'pgsql' ? 'ilike' : 'like';
-            $prefix = $q !== '' ? ($q . '%') : '%';
+            $prefix = $q !== '' ? ($q.'%') : '%';
 
             // Build base query per field, counting only available ads
             if ($field === 'city') {
@@ -1603,7 +1604,7 @@ class AdController
                 'data' => $rows,
             ]);
         } catch (\Throwable $e) {
-            Log::error('Autocomplete error: ' . $e->getMessage(), [
+            Log::error('Autocomplete error: '.$e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
 
@@ -1782,7 +1783,7 @@ class AdController
                 ->where('status', '=', 'available')
                 ->whereNotNull('bedrooms')
                 ->groupBy('bedrooms')
-                ->select([DB::raw($bedroomsCast . ' as value'), DB::raw('COUNT(*) as count')])
+                ->select([DB::raw($bedroomsCast.' as value'), DB::raw('COUNT(*) as count')])
                 ->orderBy('value')
                 ->get();
 
@@ -1831,7 +1832,7 @@ class AdController
                 ],
             ]);
         } catch (\Throwable $e) {
-            Log::error('Facets error: ' . $e->getMessage(), [
+            Log::error('Facets error: '.$e->getMessage(), [
                 'driver' => DB::getDriverName(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
@@ -1920,43 +1921,43 @@ class AdController
             $validated = $request->validated();
 
             // Paramètres de recherche
-            $q = (string)($validated['q'] ?? '');
+            $q = (string) ($validated['q'] ?? '');
             $city = $validated['city'] ?? null;
             $type = $validated['type'] ?? null;
             $typeId = $validated['type_id'] ?? null;
             $quarterId = $validated['quarter_id'] ?? null;
 
             // Filtres numériques
-            $minBedrooms = isset($validated['bedrooms']) ? (int)$validated['bedrooms'] : null;
-            $minBathrooms = isset($validated['bathrooms']) ? (int)$validated['bathrooms'] : null;
-            $minPrice = isset($validated['price_min']) ? (float)$validated['price_min'] : null;
-            $maxPrice = isset($validated['price_max']) ? (float)$validated['price_max'] : null;
-            $minSurface = isset($validated['surface_min']) ? (float)$validated['surface_min'] : null;
-            $maxSurface = isset($validated['surface_max']) ? (float)$validated['surface_max'] : null;
-            $hasParking = isset($validated['has_parking']) ? (bool)$validated['has_parking'] : null;
+            $minBedrooms = isset($validated['bedrooms']) ? (int) $validated['bedrooms'] : null;
+            $minBathrooms = isset($validated['bathrooms']) ? (int) $validated['bathrooms'] : null;
+            $minPrice = isset($validated['price_min']) ? (float) $validated['price_min'] : null;
+            $maxPrice = isset($validated['price_max']) ? (float) $validated['price_max'] : null;
+            $minSurface = isset($validated['surface_min']) ? (float) $validated['surface_min'] : null;
+            $maxSurface = isset($validated['surface_max']) ? (float) $validated['surface_max'] : null;
+            $hasParking = isset($validated['has_parking']) ? (bool) $validated['has_parking'] : null;
 
             // Tri et pagination
             $sortBy = $validated['sort'] ?? 'created_at';
             $sortOrder = strtolower($validated['order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
-            $perPage = (int)($validated['per_page'] ?? config('pagination.per_page', 15));
+            $perPage = (int) ($validated['per_page'] ?? config('pagination.per_page', 15));
 
             // Construire les filtres Meilisearch
             $filters = [];
 
             // Filtres de chaînes
-            if (!empty($city)) {
+            if (! empty($city)) {
                 $filters[] = sprintf("city = '%s'", str_replace("'", "\\'", $city));
             }
-            if (!empty($type)) {
+            if (! empty($type)) {
                 $filters[] = sprintf("type = '%s'", str_replace("'", "\\'", $type));
             }
 
             // Filtres d'ID
-            if (!empty($typeId)) {
-                $filters[] = sprintf('type_id = %d', (int)$typeId);
+            if (! empty($typeId)) {
+                $filters[] = sprintf('type_id = %d', (int) $typeId);
             }
-            if (!empty($quarterId)) {
-                $filters[] = sprintf('quarter_id = %d', (int)$quarterId);
+            if (! empty($quarterId)) {
+                $filters[] = sprintf('quarter_id = %d', (int) $quarterId);
             }
 
             // Filtres de chambres et salles de bain
@@ -1994,13 +1995,13 @@ class AdController
 
             // Whitelist des champs de tri
             $allowedSorts = ['price', 'surface_area', 'created_at'];
-            if (!in_array($sortBy, $allowedSorts, true)) {
+            if (! in_array($sortBy, $allowedSorts, true)) {
                 $sortBy = 'created_at';
             }
 
             // Construire la requête Scout
             $builder = Ad::search($q, function (\Meilisearch\Endpoints\Indexes $index, string $query, array $options) use ($filters, $sortBy, $sortOrder) {
-                if (!empty($filters)) {
+                if (! empty($filters)) {
                     // AND logic : tous les filtres doivent matcher
                     $options['filter'] = $filters;
                 }
@@ -2011,7 +2012,7 @@ class AdController
                 return $index->search($query, $options);
             })
                 // Eager load des relations
-                ->query(fn($eloquent) => $eloquent->with(['quarter.city', 'ad_type', 'images', 'user']));
+                ->query(fn ($eloquent) => $eloquent->with(['quarter.city', 'ad_type', 'images', 'user']));
 
             // Paginer
             $results = $builder->paginate($perPage);
@@ -2040,15 +2041,15 @@ class AdController
             ], 422);
 
         } catch (\Meilisearch\Exceptions\ApiException $e) {
-            \Log::error('Meilisearch API Error: ' . $e->getMessage());
+            \Log::error('Meilisearch API Error: '.$e->getMessage());
 
             return response()->json([
                 'success' => false,
-                'message' => 'Search service error: ' . $e->getMessage(),
+                'message' => 'Search service error: '.$e->getMessage(),
             ], 500);
 
         } catch (\Exception $e) {
-            \Log::error('Search Error: ' . $e->getMessage());
+            \Log::error('Search Error: '.$e->getMessage());
             \Log::error($e->getTraceAsString());
 
             return response()->json([

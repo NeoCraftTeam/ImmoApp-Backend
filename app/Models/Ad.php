@@ -148,11 +148,11 @@ class Ad extends Model
             'title' => $this->title,
             'description' => $this->description,
             'adresse' => $this->adresse,
-            'price' => (float)$this->price,
-            'surface_area' => (float)$this->surface_area,
-            'bedrooms' => (int)$this->bedrooms,
-            'bathrooms' => (int)$this->bathrooms,
-            'has_parking' => (bool)$this->has_parking,
+            'price' => (float) $this->price,
+            'surface_area' => (float) $this->surface_area,
+            'bedrooms' => (int) $this->bedrooms,
+            'bathrooms' => (int) $this->bathrooms,
+            'has_parking' => (bool) $this->has_parking,
             'status' => $this->status,
 
             // Relations — vérifier qu'elles existent
@@ -175,7 +175,7 @@ class Ad extends Model
     public function shouldBeSearchable(): bool
     {
         // N'indexer que les annonces non supprimées et actives
-        return $this->status === 'available' && !$this->trashed();
+        return $this->status === 'available' && ! $this->trashed();
     }
 
     public function user(): BelongsTo

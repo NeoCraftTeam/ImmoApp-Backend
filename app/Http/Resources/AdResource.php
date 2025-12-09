@@ -38,7 +38,7 @@ class AdResource extends JsonResource
                         'path' => $image->image_path,
                         'url' => Storage::url($image->image_path),
                         'full_url' => url(Storage::url($image->image_path)),
-                        'is_primary' => (bool)$image->is_primary,
+                        'is_primary' => (bool) $image->is_primary,
                     ];
                 })->values();
             }, []),

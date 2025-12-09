@@ -76,7 +76,7 @@ class UnlockedAdResource extends Resource
                     ->isoDate('LLLL', 'Europe/Paris'),
                 TextEntry::make('deleted_at')
                     ->dateTime()
-                    ->visible(fn(UnlockedAd $record): bool => $record->trashed()),
+                    ->visible(fn (UnlockedAd $record): bool => $record->trashed()),
             ]);
     }
 
@@ -118,7 +118,7 @@ class UnlockedAdResource extends Resource
 
                 ExportAction::make()->label('Exporter')
                     ->exporter(UnlockedAdExporter::class)
-                    ->icon(Heroicon::ArrowDownTray)
+                    ->icon(Heroicon::ArrowDownTray),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

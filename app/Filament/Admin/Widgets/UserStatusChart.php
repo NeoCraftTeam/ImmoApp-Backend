@@ -8,7 +8,9 @@ use Filament\Widgets\ChartWidget;
 class UserStatusChart extends ChartWidget
 {
     protected static ?int $sort = 3;
+
     protected ?string $heading = 'Répartition des utilisateurs';
+
     protected int|string|array $columnSpan = '1/2';
 
     protected function getData(): array

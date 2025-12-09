@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 class AdFactory extends Factory
 {
     protected static $citiesData = null;
+
     protected $model = Ad::class;
 
     public function definition(): array
@@ -26,7 +27,7 @@ class AdFactory extends Factory
         $cityName = $cityData['name'];
 
         // Utilise le nom de la ville dans l'adresse
-        $address = $this->faker->streetAddress() . ', ' . $cityName;
+        $address = $this->faker->streetAddress().', '.$cityName;
 
         return [
             'title' => $title,
@@ -69,8 +70,8 @@ class AdFactory extends Factory
             foreach ($matches as $match) {
                 self::$citiesData[] = [
                     'name' => $match[1],
-                    'latitude' => (float)$match[2],
-                    'longitude' => (float)$match[3],
+                    'latitude' => (float) $match[2],
+                    'longitude' => (float) $match[3],
                 ];
             }
         }

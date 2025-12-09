@@ -14,6 +14,4 @@ namespace App\Swagger;
  *      @OA\Property(property="desc", type="string"),
  * )
  */
-class AdTypeSchema
-{
-}
+class AdTypeSchema {}

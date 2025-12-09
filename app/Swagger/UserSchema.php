@@ -31,6 +31,4 @@ namespace App\Swagger;
  *     @OA\Property(property="city_id", type="integer")
  * )
  */
-class UserSchema
-{
-}
+class UserSchema {}

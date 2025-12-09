@@ -13,7 +13,7 @@ class ManageCities extends ManageRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make()->label('Créer une ville')
+            CreateAction::make()->label('Créer une ville'),
         ];
     }
 }

@@ -15,7 +15,7 @@ class AdImageFactory extends Factory
     public function definition(): array
     {
         return [
-            'image_path' => 'https://picsum.photos/640/480?random=' . $this->faker->numberBetween(1, 1000) . '.webp',
+            'image_path' => 'https://picsum.photos/640/480?random='.$this->faker->numberBetween(1, 1000).'.webp',
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
 

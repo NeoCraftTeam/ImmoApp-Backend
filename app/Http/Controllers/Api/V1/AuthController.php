@@ -218,7 +218,7 @@ class AuthController
     {
         try {
             // Vérifier le rate limiting personnalisé
-            $key = 'register-attempts:' . $request->ip();
+            $key = 'register-attempts:'.$request->ip();
             if (RateLimiter::tooManyAttempts($key, 10)) {
                 $seconds = RateLimiter::availableIn($key);
 
@@ -228,7 +228,7 @@ class AuthController
                 ]);
 
                 return response()->json([
-                    'message' => 'Trop de tentatives d\'inscription. Réessayez dans ' . $seconds . ' secondes.',
+                    'message' => 'Trop de tentatives d\'inscription. Réessayez dans '.$seconds.' secondes.',
                     'retry_after' => $seconds,
                 ], 429);
             }
@@ -261,7 +261,7 @@ class AuthController
                     'phone_number' => $data['phone_number'],
                     'password' => Hash::make($data['password']),
                     'location' => (isset($data['latitude'], $data['longitude']) && $data['latitude'] !== null && $data['longitude'] !== null)
-                        ? Point::makeGeodetic((float)$data['latitude'], (float)$data['longitude'])
+                        ? Point::makeGeodetic((float) $data['latitude'], (float) $data['longitude'])
                         : null,
                     'role' => $data['role'] ?? 'admin', // Valeur par défaut
                     'type' => $data['type'] ?? 'individual',
@@ -276,7 +276,7 @@ class AuthController
                 if ($request->hasFile('avatar')) {
                     $user->clearMediaCollection('avatars');
                     $user->addMediaFromRequest('avatar')
-                        ->usingName($user->firstname . '_' . $user->lastname . '_avatar')
+                        ->usingName($user->firstname.'_'.$user->lastname.'_avatar')
                         ->toMediaCollection('avatars');
                 }
 
@@ -292,7 +292,7 @@ class AuthController
 
             // Créer le token d'accès
             $token = $result->createToken(
-                'registration_token_' . now()->timestamp,
+                'registration_token_'.now()->timestamp,
             );
 
             // Log de succès
@@ -590,7 +590,7 @@ class AuthController
             $user = User::findOrFail($id);
 
             // Vérifier le hash
-            if (!hash_equals($hash, sha1($user->getEmailForVerification()))) {
+            if (! hash_equals($hash, sha1($user->getEmailForVerification()))) {
                 return response()->json([
                     'message' => 'Lien de vérification invalide',
                 ], 400);
@@ -692,7 +692,7 @@ class AuthController
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'message' => 'Utilisateur non trouvé.',
             ], 404);
@@ -705,12 +705,12 @@ class AuthController
         }
 
         // Rate limiting pour éviter le spam
-        $key = 'resend-verification:' . $request->ip() . ':' . $user->id;
+        $key = 'resend-verification:'.$request->ip().':'.$user->id;
         if (RateLimiter::tooManyAttempts($key, 2)) {
             $seconds = RateLimiter::availableIn($key);
 
             return response()->json([
-                'message' => 'Trop de demandes. Réessayez dans ' . $seconds . ' secondes.',
+                'message' => 'Trop de demandes. Réessayez dans '.$seconds.' secondes.',
             ], 429);
         }
 
@@ -819,7 +819,7 @@ class AuthController
             $password = $credentials['password'];
 
             // Vérifier le rate limiting personnalisé
-            $key = 'login-attempts:' . $request->ip();
+            $key = 'login-attempts:'.$request->ip();
             if (RateLimiter::tooManyAttempts($key, 5)) {
                 $seconds = RateLimiter::availableIn($key);
 
@@ -830,7 +830,7 @@ class AuthController
                 ]);
 
                 return response()->json([
-                    'message' => 'Trop de tentatives de connexion. Réessayez dans ' . $seconds . ' secondes.',
+                    'message' => 'Trop de tentatives de connexion. Réessayez dans '.$seconds.' secondes.',
                     'retry_after' => $seconds,
                 ], 429);
             }
@@ -839,7 +839,7 @@ class AuthController
             $user = User::where('email', $email)->first();
 
             // Vérification des credentials avec timing attack protection
-            if (!$user || !Hash::check($password, $user->password)) {
+            if (! $user || ! Hash::check($password, $user->password)) {
                 // Incrémenter les tentatives échouées
                 RateLimiter::hit($key, 300); // 5 minutes de blocage
 
@@ -857,7 +857,7 @@ class AuthController
             }
 
             // Vérifier si le compte est actif
-            if (isset($user->is_active) && !$user->is_active) {
+            if (isset($user->is_active) && ! $user->is_active) {
                 Log::info('Login attempt on inactive account', [
                     'user_id' => $user->id,
                     'email' => $email,
@@ -879,7 +879,7 @@ class AuthController
             RateLimiter::clear($key);
 
             // Créer le token avec expiration
-            $tokenName = 'api_token_' . now()->timestamp;
+            $tokenName = 'api_token_'.now()->timestamp;
 
             $token = $user->createToken(
                 $tokenName,
@@ -1119,7 +1119,7 @@ class AuthController
 
             // Créer un nouveau token
             $newToken = $user->createToken(
-                'refreshed_token_' . now()->timestamp,
+                'refreshed_token_'.now()->timestamp,
                 $currentToken->abilities,
                 now()->addDays(7)
             );

@@ -85,7 +85,7 @@ class CityResource extends Resource
                     ->formats([
                         ExportFormat::Csv,
                         ExportFormat::Xlsx,
-                    ])
+                    ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

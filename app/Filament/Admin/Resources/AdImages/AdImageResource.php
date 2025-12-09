@@ -58,7 +58,7 @@ class AdImageResource extends Resource
                             ->label('Titre'),
                         TextEntry::make('images_count')
                             ->label('Nombre d\'images')
-                            ->state(fn($record) => $record->images()->count()),
+                            ->state(fn ($record) => $record->images()->count()),
                     ])
                     ->columns(2),
 

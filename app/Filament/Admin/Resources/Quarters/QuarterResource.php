@@ -53,7 +53,7 @@ class QuarterResource extends Resource
                     ->suffixIcon(Heroicon::HomeModern)
                     ->loadingMessage('Chargement des villes...')
                     ->noSearchResultsMessage('Aucun résultat trouvé')
-                    ->native(false)
+                    ->native(false),
             ]);
     }
 
@@ -98,7 +98,7 @@ class QuarterResource extends Resource
                     ->formats([
                         ExportFormat::Csv,
                         ExportFormat::Xlsx,
-                    ])
+                    ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

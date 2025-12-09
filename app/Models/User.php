@@ -100,7 +100,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  *
  * @mixin Eloquent
  */
-class User extends Authenticatable implements HasMedia, MustVerifyEmail, FilamentUser, HasName, HasAppAuthentication, HasAppAuthenticationRecovery, HasEmailAuthentication
+class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasEmailAuthentication, HasMedia, HasName, MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable, softDeletes;
@@ -138,7 +138,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
 
     private function validateAgentType(): void
     {
-        if ($this->role == 'agent' && !in_array($this->type, ['individual', 'agency'])) {
+        if ($this->role == 'agent' && ! in_array($this->type, ['individual', 'agency'])) {
             throw new InvalidArgumentException('Invalid agent type. Must be either "individual" or "agency".');
         }
     }
@@ -146,8 +146,8 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
     private function assignDefaultAvatar(): void
     {
         if (empty($this->avatar)) {
-            $name = trim($this->firstname . ' ' . $this->lastname ?: 'User');
-            $this->avatar = 'https://ui-avatars.com/api/?name=' . urlencode($name) . '&background=random';
+            $name = trim($this->firstname.' '.$this->lastname ?: 'User');
+            $this->avatar = 'https://ui-avatars.com/api/?name='.urlencode($name).'&background=random';
         }
     }
 
@@ -191,7 +191,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
 
     public function getFullnameAttribute(): string
     {
-        return trim(($this->firstname ?? '') . ' ' . ($this->lastname ?? ''));
+        return trim(($this->firstname ?? '').' '.($this->lastname ?? ''));
     }
 
     /**
@@ -292,7 +292,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
     }
 
     /**
-     * @param array<string> | null $codes
+     * @param  array<string> | null  $codes
      */
     public function saveAppAuthenticationRecoveryCodes(?array $codes): void
     {

@@ -31,7 +31,7 @@ class SendEmailVerificationNotification implements ShouldQueue
 
         try {
             // Vérifier si l'utilisateur implémente MustVerifyEmail
-            if (!method_exists($user, 'hasVerifiedEmail')) {
+            if (! method_exists($user, 'hasVerifiedEmail')) {
                 Log::warning('User does not implement MustVerifyEmail', [
                     'user_id' => $user->id,
                 ]);
@@ -40,7 +40,7 @@ class SendEmailVerificationNotification implements ShouldQueue
             }
 
             // Envoyer l'email de vérification seulement si pas déjà vérifié
-            if (!$user->hasVerifiedEmail()) {
+            if (! $user->hasVerifiedEmail()) {
                 $user->sendEmailVerificationNotification();
 
                 Log::info('Email verification sent successfully', [

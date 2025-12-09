@@ -10,6 +10,7 @@ use Flowframe\Trend\TrendValue;
 class UserChart extends ChartWidget
 {
     protected static ?int $sort = 2;
+
     public ?string $filter = 'year';
 
     // Largeur du widget
@@ -54,14 +55,14 @@ class UserChart extends ChartWidget
             'datasets' => [
                 [
                     'label' => 'Nouveaux utilisateurs',
-                    'data' => $data->map(fn(TrendValue $value) => $value->aggregate),
+                    'data' => $data->map(fn (TrendValue $value) => $value->aggregate),
                     'backgroundColor' => 'rgba(59, 130, 246, 0.1)',
                     'borderColor' => 'rgb(59, 130, 246)',
                     'fill' => true,
                     'tension' => 0.3, // Courbe lisse
                 ],
             ],
-            'labels' => $data->map(fn(TrendValue $value) => $value->date),
+            'labels' => $data->map(fn (TrendValue $value) => $value->date),
         ];
     }
 
