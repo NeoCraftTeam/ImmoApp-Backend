@@ -49,6 +49,7 @@ test:unit:
     - sed -i "s/DB_USERNAME=.*/DB_USERNAME=postgres/" .env
     - sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=secret/" .env
     - php artisan config:clear
+    - psql -U $DB_USERNAME -d $DB_DATABASE -c "CREATE EXTENSION IF NOT EXISTS postgis;"
     - php artisan migrate --force --database=pgsql
   script:
     - php artisan test
