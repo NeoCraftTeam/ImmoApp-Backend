@@ -1,6 +1,3 @@
-# Pipeline GitLab CI/CD DevOps pour Laravel - Production
-# Optimisé pour une meilleure visualisation
-
 include:
   - template: Security/SAST.gitlab-ci.yml
   - template: Security/Secret-Detection.gitlab-ci.yml
@@ -40,32 +37,6 @@ variables:
 # ==========================================
 # STAGE: BUILD - Compilation des assets
 # ==========================================
-🏗️ build:frontend:
-  stage: build
-  image: node:20-alpine
-  cache:
-    key: ${CI_COMMIT_REF_SLUG}-npm
-    paths:
-      - node_modules/
-      - .npm/
-  before_script:
-    - echo "📦 Configuration du cache npm..."
-    - npm config set cache .npm --global
-  script:
-    - echo "📥 Installation des dépendances npm..."
-    - npm ci --prefer-offline --no-audit
-    - echo "🏗️ Build des assets frontend..."
-    - npm run build
-    - echo "✅ Build terminé avec succès!"
-  artifacts:
-    name: "frontend-assets-${CI_COMMIT_SHORT_SHA}"
-    paths:
-      - public/build/
-    expire_in: 1 day
-  only:
-    - main
-  # Commentez ce job si vous n'utilisez pas npm/Vite
-
 🏗️ build:dependencies:
   stage: build
   image: composer:latest
@@ -74,9 +45,9 @@ variables:
     paths:
       - vendor/
   script:
-    - echo "📦 Installation des dépendances Composer..."
-    - composer install --prefer-dist --no-dev --optimize-autoloader --no-interaction --no-progress
-    - echo "✅ Dépendances installées!"
+    - echo "Installation des dépendances Composer..."
+    - composer install
+    - echo "Dépendances installées!"
   artifacts:
     name: "composer-vendor-${CI_COMMIT_SHORT_SHA}"
     paths:
