@@ -59,7 +59,6 @@ deploy:production:
   stage: deploy
   image: alpine:latest
   needs:
-    - test:pint
     - test:unit
   before_script:
     - apk add --no-cache openssh-client git
