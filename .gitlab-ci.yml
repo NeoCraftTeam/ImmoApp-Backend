@@ -34,7 +34,7 @@ test:unit:
     paths:
       - vendor/
   before_script:
-    - apt-get update -qq && apt-get install -y -qq git curl libzip-dev libpq-dev unzip libicu-dev
+    - apt-get update -qq && apt-get install -y -qq libpq-dev postgresql-client unzip git  libzip-dev libicu-dev postgis
     - docker-php-ext-install gettext
     - docker-php-ext-configure intl
     - docker-php-ext-install pdo_pgsql pgsql zip intl exif
@@ -49,7 +49,7 @@ test:unit:
     - sed -i "s/DB_USERNAME=.*/DB_USERNAME=postgres/" .env
     - sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=secret/" .env
     - php artisan config:clear
-    - psql -U $DB_USERNAME -d $DB_DATABASE -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+    - psql -h $DB_HOST -U $DB_USERNAME -d $DB_DATABASE -c "CREATE EXTENSION IF NOT EXISTS postgis;"
     - php artisan migrate --force --database=pgsql
   script:
     - php artisan test
