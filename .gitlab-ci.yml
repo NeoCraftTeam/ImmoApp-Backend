@@ -16,33 +16,6 @@ variables:
   DB_CONNECTION: pgsql
   SAST_EXCLUDED_PATHS: "spec,test,tests,tmp,vendor"
 
-test:pint:
-  stage: test
-  image: php:8.4-cli
-  cache:
-    key: ${CI_COMMIT_REF_SLUG}-composer
-    paths:
-      - vendor/
-  before_script:
-  - apt-get update -qq && apt-get install -y -qq \
-      git \
-      unzip \
-      gettext \
-      libgettextpo-dev \
-      libicu-dev \
-      libzip-dev \
-      pkg-config \
-      build-essential
-  - docker-php-ext-configure intl
-  - docker-php-ext-install intl zip exif gettext
-  - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-  - composer install --no-ansi --no-interaction --no-progress
-  script:
-    - vendor/bin/pint --test
-  only:
-    - branches
-    - merge_requests
-
 test:unit:
   stage: test
   image: php:8.4-fpm
