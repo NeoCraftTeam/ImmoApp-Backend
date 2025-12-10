@@ -53,9 +53,10 @@ test:unit:
       - vendor/
   before_script:
     - apt-get update -qq && apt-get install -y -qq libpq-dev postgresql-client unzip git libzip-dev libicu-dev
-    - docker-php-ext-install gettext
+    - docker-php-ext-install gettext pdo_pgsql pgsql zip exif
     - docker-php-ext-configure intl
-    - docker-php-ext-install pdo_pgsql pgsql zip intl exif
+    - docker-php-ext-install intl
+    - php -m | grep -E 'gettext|pdo_pgsql|pgsql|zip|intl|exif'
     - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
     - composer install --no-ansi --no-interaction --no-progress
     - cp .env.example .env
