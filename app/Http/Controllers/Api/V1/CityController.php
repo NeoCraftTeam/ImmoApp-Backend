@@ -2,6 +2,11 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Actions\City\CreateCityAction;
+use App\Actions\City\DeleteCityAction;
+use App\Actions\City\ListCitiesAction;
+use App\Actions\City\ShowCityAction;
+use App\Actions\City\UpdateCityAction;
 use App\Http\Requests\CityRequest;
 use App\Http\Resources\CityResource;
 use App\Models\City;
@@ -46,11 +51,11 @@ class CityController
      *     @OA\Response(response=500, description="Erreur du Serveur")
      * )
      */
-    public function index()
+    public function index(ListCitiesAction $action)
     {
-        $cites = City::paginate(10);
+        $cities = $action->handle(10);
 
-        return CityResource::collection($cites);
+        return CityResource::collection($cities);
     }
 
     /**
@@ -84,19 +89,11 @@ class CityController
      *     @OA\Response(response=500, description="Erreur du Serveur")
      * )
      */
-    public function store(CityRequest $request)
+    public function store(CityRequest $request, CreateCityAction $action)
     {
         $this->authorize('create', City::class);
         try {
-
-            $existingCity = City::where('name', $request->name)->first();
-            if ($existingCity) {
-                return response()->json([
-                    'message' => 'Cette ville existe déjà',
-                ], 400); // 400 = Bad Request
-            }
-
-            $city = City::create($request->validated());
+            $city = $action->handle($request->validated());
 
             return response()->json([
                 'message' => 'Ville crée avec succès',
@@ -140,10 +137,9 @@ class CityController
      *     @OA\Response(response=500, description="Erreur du Serveur"),
      * )
      */
-    public function show(string $id)
+    public function show(string $id, ShowCityAction $action)
     {
-
-        $city = City::find($id);
+        $city = $action->handle((int) $id);
         if (! $city) {
             return response()->json([
                 'message' => 'Ville non trouvée',
@@ -193,20 +189,12 @@ class CityController
      *      @OA\Response(response=500, description="Erreur du Serveur")
      * )
      */
-    public function update(CityRequest $request, City $city)
+    public function update(CityRequest $request, City $city, UpdateCityAction $action)
     {
         $this->authorize('update', $city);
 
         try {
-            $existingCity = City::where('name', $request->name)
-                ->where('id', '!=', $city->id)
-                ->first();
-            if ($existingCity) {
-                return response()->json([
-                    'message' => 'Cette ville a déjà été modifiée',
-                ], 400); // 400 = Bad Request
-            }
-            $city->update($request->validated());
+            $city = $action->handle($city, $request->validated());
 
             return response()->json([
                 'message' => 'Ville mise à jour avec succès',
@@ -246,19 +234,12 @@ class CityController
      *      @OA\Response(response=500, description="Erreur du Serveur")
      * )
      */
-    public function destroy(City $city)
+    public function destroy(City $city, DeleteCityAction $action)
     {
         $this->authorize('delete', $city);
 
         try {
-            // Vérifier s'il y a des dépendances avant suppression
-            if ($city->user()->exists()) {
-                return response()->json([
-                    'message' => 'Impossible de supprimer cette ville car il contient des utilisateurs.',
-                ], 409); // Conflict
-
-            }
-            $city->delete();
+            $action->handle($city);
 
             return response()->json([
                 'message' => 'Ville supprimée avec succès',
