@@ -17,12 +17,14 @@ class UserExporter extends Exporter
         return [
             ExportColumn::make('id')
                 ->label('ID'),
-            ExportColumn::make('firstname'),
-            ExportColumn::make('lastname'),
+            ExportColumn::make('full_name')
+                ->label('Nom complet')
+                ->formatStateUsing(function ($record) {
+                    return $record->firstname . ' ' . $record->lastname;
+                }),
             ExportColumn::make('phone_number'),
             ExportColumn::make('email'),
             ExportColumn::make('email_verified_at'),
-            ExportColumn::make('avatar'),
             ExportColumn::make('type'),
             ExportColumn::make('role'),
             ExportColumn::make('city.name'),
@@ -31,11 +33,6 @@ class UserExporter extends Exporter
             ExportColumn::make('deleted_at'),
             ExportColumn::make('last_login_at'),
             ExportColumn::make('last_login_ip'),
-            ExportColumn::make('is_active'),
-            ExportColumn::make('location'),
-            ExportColumn::make('app_authentication_secret'),
-            ExportColumn::make('app_authentication_recovery_codes'),
-            ExportColumn::make('has_email_authentication'),
         ];
     }
 
