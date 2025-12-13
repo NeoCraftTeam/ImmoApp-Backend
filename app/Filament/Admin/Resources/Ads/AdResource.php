@@ -34,12 +34,13 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use UnitEnum;
 
 class AdResource extends Resource
 {
     protected static ?string $model = Ad::class;
 
-    protected static string|null|\UnitEnum $navigationGroup = 'Annonces';
+    protected static string|null|UnitEnum $navigationGroup = 'Annonces';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::InboxArrowDown;
 
