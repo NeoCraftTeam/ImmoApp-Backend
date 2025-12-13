@@ -32,9 +32,15 @@ class CityResource extends Resource
 {
     protected static ?string $model = City::class;
 
+    protected static string|null|\UnitEnum $navigationGroup = 'Villes & Quartiers';
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::HomeModern;
 
     protected static ?string $recordTitleAttribute = 'name';
+
+    protected static ?string $navigationLabel = 'Villes';
+
+    protected static ?string $modelLabel = 'Ville';
 
     public static function form(Schema $schema): Schema
     {
