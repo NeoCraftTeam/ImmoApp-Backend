@@ -5,7 +5,6 @@ namespace App\Providers\Filament;
 use App\Filament\Admin\Widgets\StatsOverview;
 use App\Filament\Admin\Widgets\UserChart;
 use App\Filament\Admin\Widgets\UserStatusChart;
-use App\Filament\Pages\Auth\EditProfile;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Auth\MultiFactor\Email\EmailAuthentication;
 use Filament\Http\Middleware\Authenticate;
@@ -44,12 +43,13 @@ class AdminPanelProvider extends PanelProvider
             ->emailVerification()
             ->emailChangeVerification()
             ->globalSearch(false)
-            ->profile(EditProfile::class)
+            ->profile(isSimple: false)
             ->sidebarCollapsibleOnDesktop()
             ->font('poppins')
             ->brandLogo(asset('images/keyhomelogo.png'))
             ->authGuard('web')
             ->unsavedChangesAlerts()
+            ->collapsibleNavigationGroups(false)
             ->colors([
                 'primary' => Color::Amber,
             ])
