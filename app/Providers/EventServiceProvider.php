@@ -2,7 +2,7 @@
 
 namespace App\Providers;
 
-use App\Listeners\SendEmailVerificationNotification;
+// use App\Listeners\SendEmailVerificationNotification;
 use App\Listeners\SendWelcomeNotification;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
@@ -17,9 +17,9 @@ class EventServiceProvider extends ServiceProvider
      */
     protected array $listen = [
         // Événement déclenché après l'inscription
-        Registered::class => [
-            SendEmailVerificationNotification::class,
-        ],
+        // Registered::class => [
+        //     SendEmailVerificationNotification::class,
+        // ],
 
         // Événement déclenché après vérification email
         Verified::class => [
