@@ -12,10 +12,6 @@ cache:
 services:
   - name: postgis/postgis:15-3.3
     alias: postgres
-    environment:
-      POSTGRES_DB: testing
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secret
 
 variables:
   DB_CONNECTION: pgsql
@@ -58,16 +54,16 @@ deploy:
       ssh $SSH_USER@$VPS_HOST "
         set -e
         cd $VPS_PATH
-        
+
         # Pull latest changes
         git pull origin main
-        
+
         # Install dependencies
         composer install --no-dev --optimize-autoloader --no-interaction
-        
+
         # Run migrations
         php artisan migrate --force
-        
+
         # Clear and Cache Configs
         php artisan optimize:clear
         php artisan optimize
@@ -75,7 +71,7 @@ deploy:
         php artisan route:cache
         php artisan view:cache
         php artisan event:cache
-        
+
         # Restart Queue Workers
         php artisan queue:restart
       "
