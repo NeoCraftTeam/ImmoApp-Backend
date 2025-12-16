@@ -8,7 +8,6 @@ use App\Models\Quarter;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
 
 /** @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Ad> */
 class AdFactory extends Factory

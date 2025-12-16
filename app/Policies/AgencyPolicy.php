@@ -12,7 +12,7 @@ class AgencyPolicy
 
     public function viewAny(User $user): bool
     {
-      return $user->isAdmin();
+        return $user->isAdmin();
     }
 
     public function view(User $user, Agency $agency): bool

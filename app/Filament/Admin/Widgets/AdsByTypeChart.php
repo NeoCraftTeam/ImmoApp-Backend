@@ -9,7 +9,7 @@ class AdsByTypeChart extends ChartWidget
 {
     protected static ?int $sort = 5;
 
-   // protected static ?string $heading = 'Répartition par Type de Bien';
+    // protected static ?string $heading = 'Répartition par Type de Bien';
 
     protected int|string|array $columnSpan = 1;
 

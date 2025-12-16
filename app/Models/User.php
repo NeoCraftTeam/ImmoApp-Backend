@@ -102,7 +102,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasEmailAuthentication, HasMedia, HasName, MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable, softDeletes, HasUuids;
+    use HasApiTokens, HasFactory, HasUuids, Notifiable, softDeletes;
 
     use InteractsWithMedia;
 
@@ -137,7 +137,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
     private function validateAgentType(): void
     {
-        if ($this->role == 'agent' && !in_array($this->type, ['individual', 'agency'])) {
+        if ($this->role == 'agent' && ! in_array($this->type, ['individual', 'agency'])) {
             throw new InvalidArgumentException('Invalid agent type. Must be either "individual" or "agency".');
         }
     }
@@ -145,8 +145,8 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     private function assignDefaultAvatar(): void
     {
         if (empty($this->avatar)) {
-            $name = trim($this->firstname . ' ' . $this->lastname ?: 'User');
-            $this->avatar = 'https://ui-avatars.com/api/?name=' . urlencode($name) . '&background=random';
+            $name = trim($this->firstname.' '.$this->lastname ?: 'User');
+            $this->avatar = 'https://ui-avatars.com/api/?name='.urlencode($name).'&background=random';
         }
     }
 
@@ -195,7 +195,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
     public function getFullnameAttribute(): string
     {
-        return trim(($this->firstname ?? '') . ' ' . ($this->lastname ?? ''));
+        return trim(($this->firstname ?? '').' '.($this->lastname ?? ''));
     }
 
     /**
@@ -296,7 +296,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
-     * @param array<string> | null $codes
+     * @param  array<string> | null  $codes
      */
     public function saveAppAuthenticationRecoveryCodes(?array $codes): void
     {

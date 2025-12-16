@@ -45,7 +45,7 @@ use Illuminate\Support\Carbon;
  */
 class UnlockedAd extends Model
 {
-    use HasFactory, softDeletes, HasUuids;
+    use HasFactory, HasUuids, softDeletes;
 
     public $timestamps = false;
 

@@ -71,7 +71,7 @@ use Laravel\Scout\Searchable;
  */
 class Ad extends Model
 {
-    use HasFactory, SoftDeletes, HasUuids;
+    use HasFactory, HasUuids, SoftDeletes;
     use Searchable;
 
     protected $table = 'ad';
@@ -137,6 +137,7 @@ class Ad extends Model
             $slug = $original.'-'.$i;
             $i++;
         }
+
         return $slug;
     }
 

@@ -2,13 +2,12 @@
 
 namespace App\Providers;
 
+use App\Models\PersonalAccessToken;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
-
-use App\Models\PersonalAccessToken;
 use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
@@ -46,7 +45,7 @@ class AppServiceProvider extends ServiceProvider
                 ]
             );
 
-            return $frontendUrl . '/verify-email?verify_url=' . urlencode($verifyUrl);
+            return $frontendUrl.'/verify-email?verify_url='.urlencode($verifyUrl);
         });
     }
 }

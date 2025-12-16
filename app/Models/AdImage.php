@@ -43,7 +43,7 @@ use Illuminate\Support\Carbon;
  */
 class AdImage extends Model
 {
-    use HasFactory, SoftDeletes, HasUuids;
+    use HasFactory, HasUuids, SoftDeletes;
 
     protected $table = 'ad_images';
 

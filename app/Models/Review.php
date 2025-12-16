@@ -46,7 +46,7 @@ use Illuminate\Support\Carbon;
  */
 class Review extends Model
 {
-    use HasFactory, softDeletes, HasUuids;
+    use HasFactory, HasUuids, softDeletes;
 
     protected $fillable = ['rating', 'comment', 'ad_id', 'user_id'];
 

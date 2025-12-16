@@ -38,7 +38,7 @@ use Illuminate\Support\Carbon;
  */
 class AdType extends Model
 {
-    use HasFactory, SoftDeletes, HasUuids;
+    use HasFactory, HasUuids, SoftDeletes;
 
     protected $table = 'ad_type';
 

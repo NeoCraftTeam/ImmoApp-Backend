@@ -25,7 +25,7 @@ class AgencySeeder extends Seeder
             if (Agency::where('owner_id', $agent->id)->doesntExist()) {
                 Agency::factory()->count(10)->create([
                     'owner_id' => $agent->id,
-                    'name' => 'Agence ' . $agent->lastname,
+                    'name' => 'Agence '.$agent->lastname,
                 ]);
             }
         });

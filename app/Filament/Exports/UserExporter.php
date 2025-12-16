@@ -20,7 +20,7 @@ class UserExporter extends Exporter
             ExportColumn::make('full_name')
                 ->label('Nom complet')
                 ->formatStateUsing(function ($record) {
-                    return $record->firstname . ' ' . $record->lastname;
+                    return $record->firstname.' '.$record->lastname;
                 }),
             ExportColumn::make('phone_number'),
             ExportColumn::make('email'),

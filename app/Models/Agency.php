@@ -11,19 +11,23 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Agency extends Model
 {
-    use SoftDeletes, HasUuids, hasFactory;
+    use hasFactory, HasUuids, SoftDeletes;
 
     public $incrementing = false;
+
     protected $table = 'agency';
+
     protected $keyType = 'string';
+
     protected $fillable = [
         'name',
         'slug',
         'logo',
         'owner_id',
         'created_at',
-        'updated_at'
+        'updated_at',
     ];
+
     protected $casts = [
         'id' => 'string',
     ];
@@ -37,5 +41,4 @@ class Agency extends Model
     {
         return $this->hasMany(User::class);
     }
-
 }

@@ -39,7 +39,7 @@ use Illuminate\Support\Carbon;
  */
 class Quarter extends Model
 {
-    use HasFactory, softDeletes, HasUuids;
+    use HasFactory, HasUuids, softDeletes;
 
     protected $table = 'quarter';
 

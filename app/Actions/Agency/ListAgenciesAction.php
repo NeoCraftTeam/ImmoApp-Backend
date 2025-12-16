@@ -8,10 +8,10 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ListAgenciesAction
 {
-      public function handle() : AnonymousResourceCollection
-      {
-          $agencies = Agency::with('users')->paginate(config('pagination.default', 10));
-          return AgencyResource::collection($agencies);
-      }
+    public function handle(): AnonymousResourceCollection
+    {
+        $agencies = Agency::with('users')->paginate(config('pagination.default', 10));
 
+        return AgencyResource::collection($agencies);
+    }
 }

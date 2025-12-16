@@ -30,7 +30,7 @@ class StatsOverview extends StatsOverviewWidget
                 ->descriptionIcon('heroicon-m-chat-bubble-left-right')
                 ->color('info'),
 
-            Stat::make('Revenus', number_format(Payment::sum('amount'), 0, ',', ' ') . ' FCFA')
+            Stat::make('Revenus', number_format(Payment::sum('amount'), 0, ',', ' ').' FCFA')
                 ->description('Gains totaux')
                 ->descriptionIcon('heroicon-m-currency-dollar')
                 ->chart([3, 5, 10, 8, 15, 12, 17])
@@ -46,7 +46,7 @@ class StatsOverview extends StatsOverviewWidget
                 ->descriptionIcon('heroicon-m-eye')
                 ->color('success'),
 
-            Stat::make('Prix Moyen', number_format(Ad::avg('price'), 0, ',', ' ') . ' FCFA')
+            Stat::make('Prix Moyen', number_format(Ad::avg('price'), 0, ',', ' ').' FCFA')
                 ->description('Tendance du marché')
                 ->descriptionIcon('heroicon-m-tag')
                 ->color('gray'),
@@ -56,9 +56,8 @@ class StatsOverview extends StatsOverviewWidget
                 ->descriptionIcon('heroicon-m-bell')
                 ->color('danger')
                 ->extraAttributes([
-                   'class' => 'cursor-pointer',
+                    'class' => 'cursor-pointer',
                 ]),
         ];
     }
 }
-

@@ -11,7 +11,7 @@ class RevenueChart extends ChartWidget
 {
     protected static ?int $sort = 3;
 
-   // protected static ?string $heading = 'Évolution des Revenus';
+    // protected static ?string $heading = 'Évolution des Revenus';
 
     protected int|string|array $columnSpan = 1;
 

@@ -41,7 +41,7 @@ use Illuminate\Support\Carbon;
  */
 class City extends Model
 {
-    use HasFactory, softDeletes, HasUuids;
+    use HasFactory, HasUuids, softDeletes;
 
     protected $table = 'city';
 

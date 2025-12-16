@@ -36,7 +36,7 @@ class StatsOverview extends BaseWidget
                 ->description('Registered agencies')
                 ->descriptionIcon('heroicon-m-building-office')
                 ->color('info'),
-                
+
             // Optional: If Payment model exists and has amount
             // Stat::make('Revenue', Payment::sum('amount') . ' XAF')
             //    ->description('Total revenue')

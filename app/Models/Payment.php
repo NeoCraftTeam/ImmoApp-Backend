@@ -55,7 +55,7 @@ use Illuminate\Support\Carbon;
  */
 class Payment extends Model
 {
-    use HasFactory, SoftDeletes, HasUuids;
+    use HasFactory, HasUuids, SoftDeletes;
 
     protected $fillable = [
 

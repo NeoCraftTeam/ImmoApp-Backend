@@ -590,13 +590,14 @@ class AuthController
      */
     public function verifyEmail($id, $hash, Request $request)
     {
-        Log::info("VerifyEmail called with ID: " . $id);
-        
-        if (!Str::isUuid($id)) {
-            Log::warning("Invalid UUID provided: " . $id);
+        Log::info('VerifyEmail called with ID: '.$id);
+
+        if (! Str::isUuid($id)) {
+            Log::warning('Invalid UUID provided: '.$id);
             if ($request->wantsJson()) {
                 return response()->json(['message' => 'ID utilisateur invalide.'], 400);
             }
+
             return abort(400, 'ID utilisateur invalide.');
         }
 
@@ -608,11 +609,12 @@ class AuthController
                 if ($request->wantsJson()) {
                     return response()->json(['message' => 'Lien de vérification invalide'], 400);
                 }
+
                 return abort(400, 'Lien de vérification invalide.');
             }
 
             if ($user->hasVerifiedEmail()) {
-                return $request->wantsJson() 
+                return $request->wantsJson()
                     ? response()->json(['message' => 'Email déjà vérifié.', 'verified' => true])
                     : view('auth.verified');
             }
@@ -635,6 +637,7 @@ class AuthController
             if ($request->wantsJson()) {
                 return response()->json(['message' => 'Utilisateur non trouvé.'], 404);
             }
+
             return abort(404, 'Utilisateur non trouvé.');
 
         } catch (Throwable $e) {
@@ -646,6 +649,7 @@ class AuthController
             if ($request->wantsJson()) {
                 return response()->json(['message' => 'Erreur lors de la vérification.'], 500);
             }
+
             return abort(500, 'Erreur lors de la vérification.');
         }
     }
