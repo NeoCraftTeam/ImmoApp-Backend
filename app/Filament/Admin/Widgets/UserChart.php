@@ -17,7 +17,7 @@ class UserChart extends ChartWidget
     protected ?string $heading = 'Inscriptions des utilisateurs'; // ou '1/2' pour moitié
 
     // Filtre pour changer la période
-    protected int|string|array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 1;
 
     protected function getFilters(): ?array
     {
@@ -77,12 +77,20 @@ class UserChart extends ChartWidget
         return [
             'plugins' => [
                 'legend' => [
-                    'display' => true,
+                    'display' => false,
                 ],
             ],
             'scales' => [
                 'y' => [
                     'beginAtZero' => true,
+                    'grid' => [
+                        'display' => false,
+                    ],
+                ],
+                'x' => [
+                    'grid' => [
+                        'display' => false,
+                    ],
                 ],
             ],
         ];
