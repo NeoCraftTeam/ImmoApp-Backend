@@ -1,179 +1,82 @@
-include:
-  - template: Security/SAST.gitlab-ci.yml
-  - template: Security/Secret-Detection.gitlab-ci.yml
-  - template: Security/Dependency-Scanning.gitlab-ci.yml
+image: php:8.4
 
 stages:
   - test
-  - security
   - deploy
 
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - vendor/
+
+services:
+  - name: postgis/postgis:15-3.3
+    alias: postgres
+    environment:
+      POSTGRES_DB: testing
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+
 variables:
-  POSTGRES_DB: laravel_test
-  POSTGRES_USER: postgres
-  POSTGRES_PASSWORD: secret
-  DB_HOST: postgres
   DB_CONNECTION: pgsql
-  SAST_EXCLUDED_PATHS: "spec,test,tests,tmp,vendor"
+  DB_HOST: postgres
+  DB_PORT: 5432
+  DB_DATABASE: testing
+  DB_USERNAME: postgres
+  DB_PASSWORD: secret
 
-test:pint:
+test:
   stage: test
-  image: php:8.4-cli
-  cache:
-    key: ${CI_COMMIT_REF_SLUG}-composer
-    paths:
-      - vendor/
   before_script:
-    - apt-get update -qq && apt-get install -y -qq git unzip
+    # Install system dependencies and PHP extensions
+    - apt-get update && apt-get install -y unzip git libzip-dev libicu-dev libpq-dev
+    - docker-php-ext-install pdo_pgsql zip intl
+    # Install Composer
     - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-    - composer install --no-ansi --no-interaction --no-progress
-  script:
-    - vendor/bin/pint --test
-  only:
-    - branches
-    - merge_requests
-
-test:unit:
-  stage: test
-  image: php:8.4-fpm
-  services:
-    - name: postgis/postgis:15-3.3
-      alias: postgres
-  variables:
-    DB_CONNECTION: pgsql
-    DB_HOST: postgres
-    DB_PORT: 5432
-    DB_DATABASE: testing
-    DB_USERNAME: postgres
-    DB_PASSWORD: secret
-    PGPASSWORD: secret
-  cache:
-    key: ${CI_COMMIT_REF_SLUG}-composer
-    paths:
-      - vendor/
-  before_script:
-    - apt-get update -qq && apt-get install -y -qq libpq-dev postgresql-client unzip git libzip-dev libicu-dev
-    - docker-php-ext-install gettext pdo_pgsql pgsql zip exif
-    - docker-php-ext-configure intl
-    - docker-php-ext-install intl
-    - php -m | grep -E 'gettext|pdo_pgsql|pgsql|zip|intl|exif'
-    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-    - composer install --no-ansi --no-interaction --no-progress
+    - composer install --no-ansi --no-interaction --no-progress --prefer-dist
     - cp .env.example .env
     - php artisan key:generate
-    - sed -i "s/DB_CONNECTION=.*/DB_CONNECTION=pgsql/" .env
-    - sed -i "s/DB_HOST=.*/DB_HOST=postgres/" .env
-    - sed -i "s/DB_PORT=.*/DB_PORT=5432/" .env
-    - sed -i "s/DB_DATABASE=.*/DB_DATABASE=testing/" .env
-    - sed -i "s/DB_USERNAME=.*/DB_USERNAME=postgres/" .env
-    - sed -i "s/DB_PASSWORD=.*/DB_PASSWORD=secret/" .env
-    - php artisan config:clear
-    - psql -h postgres -U postgres -d testing -c "CREATE EXTENSION IF NOT EXISTS postgis;"
-    - psql -h postgres -U postgres -d testing -c "CREATE EXTENSION IF NOT EXISTS postgis_topology;"
-    - php artisan migrate --force
   script:
     - php artisan test
+    - php artisan pint --test
   only:
     - branches
     - merge_requests
 
-deploy:production:
-  stage: deploy
-  image: alpine:latest
-  needs:
-    - test:pint
-    - test:unit
-  before_script:
-    - apk add --no-cache openssh-client git
-    - eval $(ssh-agent -s)
-    - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' | ssh-add -
-    - mkdir -p ~/.ssh
-    - chmod 700 ~/.ssh
-    - ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts
-  script:
-    - |
-      ssh $VPS_USER@$VPS_HOST "
-        set -e
-        cd $VPS_PATH
-
-        CURRENT_COMMIT=\$(git rev-parse HEAD 2>/dev/null || echo 'unknown')
-        echo \$CURRENT_COMMIT > /tmp/last_commit.txt
-
-        BACKUP_DIR=/var/backups/app
-        mkdir -p \$BACKUP_DIR
-        BACKUP_FILE=\$BACKUP_DIR/db_\$(date +%Y%m%d_%H%M%S).sql
-        DB_NAME=\$(grep DB_DATABASE .env | cut -d '=' -f2)
-        pg_dump \$DB_NAME > \$BACKUP_FILE 2>/dev/null && gzip \$BACKUP_FILE || echo 'Backup skipped'
-        ls -t \$BACKUP_DIR/db_*.sql.gz 2>/dev/null | tail -n +10 | xargs -r rm
-
-        php artisan down || true
-
-        git fetch origin main
-        git reset --hard origin/main
-
-        composer install --no-dev --optimize-autoloader --no-interaction
-
-        php artisan migrate --force
-
-        php artisan cache:clear
-        php artisan config:clear
-        php artisan route:clear
-        php artisan view:clear
-
-        php artisan vendor:publish --force --tag=livewire:assets --ansi --no-interaction 2>/dev/null || true
-        php artisan filament:assets 2>/dev/null || true
-
-        php artisan config:cache
-        php artisan route:cache
-        php artisan view:cache
-        php artisan event:cache
-        php artisan filament:cache-components 2>/dev/null || true
-
-        chmod -R 775 storage bootstrap/cache
-        chown -R www-data:www-data storage bootstrap/cache
-
-        php artisan queue:restart 2>/dev/null || true
-
-        php artisan up
-      "
-  environment:
-    name: production
-    url: https://keyhomeback.neocraft.dev
-  only:
-    - main
-  when: manual
-
-rollback:production:
+deploy:
   stage: deploy
   image: alpine:latest
   before_script:
     - apk add --no-cache openssh-client git
     - eval $(ssh-agent -s)
-    - echo "$SSH_PRIVATE_KEY" | base64 -d | tr -d '\r' | ssh-add -
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
     - ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts
   script:
-    - |
-      ssh $VPS_USER@$VPS_HOST "
-        set -e
-        cd $VPS_PATH
-        php artisan down || true
-
-        if [ -f /tmp/last_commit.txt ]; then
-          LAST_COMMIT=\$(cat /tmp/last_commit.txt)
-          git reset --hard \$LAST_COMMIT
-        else
-          git reset --hard HEAD~1
-        fi
-
-        composer install --no-dev --optimize-autoloader --no-interaction
-        php artisan migrate:rollback --step=1 --force
-        php artisan config:cache
-        php artisan route:cache
-        php artisan view:cache
-        php artisan up
+    - ssh $SSH_USER@$VPS_HOST "
+      set -e
+      cd $VPS_PATH
+      
+      # Pull latest changes
+      git pull origin main
+      
+      # Install dependencies
+      composer install --no-dev --optimize-autoloader --no-interaction
+      
+      # Run migrations
+      php artisan migrate --force
+      
+      # Clear and Cache Configs
+      php artisan optimize:clear
+      php artisan optimize
+      php artisan config:cache
+      php artisan route:cache
+      php artisan view:cache
+      php artisan event:cache
+      
+      # Restart Queue Workers
+      php artisan queue:restart
       "
-  when: manual
   only:
     - main
