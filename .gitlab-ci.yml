@@ -26,7 +26,7 @@ test:
   before_script:
     # Install system dependencies and PHP extensions
     - apt-get update && apt-get install -y unzip git libzip-dev libicu-dev libpq-dev
-    - docker-php-ext-install pdo_pgsql zip intl
+    - docker-php-ext-install pdo_pgsql zip intl gettext exif
     # Install Composer
     - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
     - composer install --no-ansi --no-interaction --no-progress --prefer-dist
