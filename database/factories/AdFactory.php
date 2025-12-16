@@ -31,7 +31,7 @@ class AdFactory extends Factory
 
         return [
             'title' => $title,
-            'slug' => Str::slug($title),
+            'slug' => Ad::generateUniqueSlug($title),
             'description' => $this->faker->paragraph(),
             'adresse' => $address,
             'price' => $this->faker->numberBetween(25000, 150000), // Random number with 5 digits
