@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\AdController;
 use App\Http\Controllers\Api\V1\AdTypeController;
+use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\QuarterController;
@@ -29,7 +30,7 @@ Route::prefix('v1')->group(function () {
         Route::post('resend-verification', [AuthController::class, 'resendVerificationEmail'])
             ->middleware('throttle:2,5'); // 2 attempts every 5 minutes
 
-        // Route::get('email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])->name('verification.verify');
+        Route::get('email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])->name('api.verification.verify');
 
         // Routes protégées
         Route::middleware('auth:sanctum')->group(function () {
@@ -65,6 +66,15 @@ Route::prefix('v1')->group(function () {
         Route::post('/quarters', 'store')->middleware('auth:sanctum');
         Route::put('/quarters/{quarter}', 'update')->middleware('auth:sanctum');
         Route::delete('/quarters/{quarter}', 'destroy')->middleware('auth:sanctum');
+    });
+
+    // Agency
+    Route::controller(AgencyController::class)->group(function () {
+        Route::get('/agencies', 'index');
+        Route::get('/agencies/{agency}', 'show');
+        Route::post('/agencies', 'store')->middleware('auth:sanctum');
+        Route::put('/agencies/{agency}', 'update')->middleware('auth:sanctum');
+        Route::delete('/agencies/{agency}', 'destroy')->middleware('auth:sanctum');
     });
 
     // User
