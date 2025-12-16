@@ -38,7 +38,7 @@ test:
     - php artisan key:generate
   script:
     - php artisan test
-    - php artisan pint --test
+    - ./vendor/bin/pint --test
   only:
     - branches
     - merge_requests
