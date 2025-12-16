@@ -8,6 +8,9 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 
+use App\Models\PersonalAccessToken;
+use Laravel\Sanctum\Sanctum;
+
 class AppServiceProvider extends ServiceProvider
 {
     /**
@@ -23,6 +26,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+
         VerifyEmail::toMailUsing(function (object $notifiable, string $url) {
             return (new MailMessage)
                 ->subject('Vérifiez votre adresse email')
@@ -33,10 +38,10 @@ class AppServiceProvider extends ServiceProvider
             $frontendUrl = config('app.email_verify_callback');
 
             $verifyUrl = URL::temporarySignedRoute(
-                'verification.verify',
+                'api.verification.verify',
                 Carbon::now()->addMinutes(config('auth.verification.expire', 60)),
                 [
-                    'id' => $notifiable->getKey(),
+                    'id' => (string) $notifiable->getKey(),
                     'hash' => sha1($notifiable->getEmailForVerification()),
                 ]
             );
