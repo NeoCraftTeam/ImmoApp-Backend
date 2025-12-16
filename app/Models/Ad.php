@@ -6,6 +6,7 @@ use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\AdFactory;
 use Eloquent;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -70,7 +71,7 @@ use Laravel\Scout\Searchable;
  */
 class Ad extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasUuids;
     use Searchable;
 
     protected $table = 'ad';
@@ -124,12 +125,11 @@ class Ad extends Model
         });
     }
 
-    public static function generateUniqueSlug(string $title, ?int $ignoreId = null): string
+    public static function generateUniqueSlug(string $title, ?string $ignoreId = null): string
     {
         $slug = Str::slug($title);
         $original = $slug;
         $i = 1;
-
         while (self::where('slug', $slug)
             ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
             ->exists()
@@ -137,7 +137,6 @@ class Ad extends Model
             $slug = $original.'-'.$i;
             $i++;
         }
-
         return $slug;
     }
 

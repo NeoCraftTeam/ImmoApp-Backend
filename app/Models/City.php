@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\CityFactory;
 use Eloquent;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -40,7 +41,7 @@ use Illuminate\Support\Carbon;
  */
 class City extends Model
 {
-    use HasFactory, softDeletes;
+    use HasFactory, softDeletes, HasUuids;
 
     protected $table = 'city';
 
