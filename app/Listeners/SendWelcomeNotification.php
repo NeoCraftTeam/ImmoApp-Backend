@@ -40,12 +40,11 @@ class SendWelcomeNotification implements ShouldQueue
 
             // 2. Envoyer email de bienvenue (optionnel)
             // Décommente si tu créés une classe WelcomeEmail
-            /*
+            // 2. Envoyer email de bienvenue
             if (class_exists(\App\Mail\WelcomeEmail::class)) {
-                Mail::to($user->email)->send(new \App\Mail\WelcomeEmail($user));
-                Log::info('Welcome email sent', ['user_id' => $user->id]);
+                 \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\WelcomeEmail($user));
+                 Log::info('Welcome email sent', ['user_id' => $user->id]);
             }
-            */
 
             // 3. Autres actions automatiques que tu peux ajouter :
 

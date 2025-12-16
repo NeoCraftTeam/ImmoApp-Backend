@@ -29,7 +29,7 @@
             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
 
-        .header { background: linear-gradient(135deg, #F6475F 0%, #D5384EFF 100%); padding: 40px 20px; text-align: center; }
+        .header { background: linear-gradient(135deg, #F6475F 0%, #D5384EFF 100%); padding: 40px 20px; text-align: right; }
         .logo { font-size: 28px; font-weight: 800; color: #ffffff; text-decoration: none; letter-spacing: -0.5px; display: inline-block; }
         .hero { padding: 40px 32px 20px; text-align: center; }
         .hero h1 { margin: 0; font-size: 24px; font-weight: 700; color: #0f172a; letter-spacing: -0.5px; }
@@ -50,7 +50,7 @@
 <div class="wrapper">
     <div class="container">
         <div class="header">
-            <div class="logo">KeyHome</div>
+            <img src="{{ asset('images/logo.png') }}" alt="KeyHome Logo" class="logo" style="max-width: 150px; height: auto;">
         </div>
 
         <div class="hero">

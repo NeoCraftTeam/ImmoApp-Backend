@@ -8,7 +8,7 @@
         body { margin: 0; padding: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #1e293b; -webkit-font-smoothing: antialiased; }
         .wrapper { width: 100%; background-color: #f8fafc; padding: 40px 0; }
         .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
-        .header { background: linear-gradient(135deg, #F6475F 0%, #D5384EFF 100%); padding: 40px 20px; text-align: center; }
+        .header { background: linear-gradient(135deg, #F6475F 0%, #D5384EFF 100%); padding: 40px 20px; text-align: right; }
         .logo { font-size: 28px; font-weight: 800; color: #ffffff; text-decoration: none; letter-spacing: -0.5px; display: inline-block; }
         .hero { padding: 40px 32px 20px; text-align: center; }
         .hero h1 { margin: 0; font-size: 24px; font-weight: 700; color: #0f172a; letter-spacing: -0.5px; }
@@ -25,8 +25,7 @@
     <div class="wrapper">
         <div class="container">
             <div class="header">
-                 <!-- Remplacez par votre URL de logo vraie si disponible -->
-                 <div class="logo">KeyHome</div>
+                 <img src="{{ asset('images/logo.png') }}" alt="KeyHome Logo" class="logo" style="max-width: 150px; height: auto;">
             </div>
             
             <div class="hero">
