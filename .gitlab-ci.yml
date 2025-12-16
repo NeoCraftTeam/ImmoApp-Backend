@@ -54,29 +54,30 @@ deploy:
     - chmod 700 ~/.ssh
     - ssh-keyscan -H $VPS_HOST >> ~/.ssh/known_hosts
   script:
-    - ssh $SSH_USER@$VPS_HOST "
-      set -e
-      cd $VPS_PATH
-      
-      # Pull latest changes
-      git pull origin main
-      
-      # Install dependencies
-      composer install --no-dev --optimize-autoloader --no-interaction
-      
-      # Run migrations
-      php artisan migrate --force
-      
-      # Clear and Cache Configs
-      php artisan optimize:clear
-      php artisan optimize
-      php artisan config:cache
-      php artisan route:cache
-      php artisan view:cache
-      php artisan event:cache
-      
-      # Restart Queue Workers
-      php artisan queue:restart
+    - |
+      ssh $SSH_USER@$VPS_HOST "
+        set -e
+        cd $VPS_PATH
+        
+        # Pull latest changes
+        git pull origin main
+        
+        # Install dependencies
+        composer install --no-dev --optimize-autoloader --no-interaction
+        
+        # Run migrations
+        php artisan migrate --force
+        
+        # Clear and Cache Configs
+        php artisan optimize:clear
+        php artisan optimize
+        php artisan config:cache
+        php artisan route:cache
+        php artisan view:cache
+        php artisan event:cache
+        
+        # Restart Queue Workers
+        php artisan queue:restart
       "
   only:
     - main
