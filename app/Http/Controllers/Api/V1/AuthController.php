@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Spatie\MediaLibrary\MediaCollections\Exceptions\FileDoesNotExist;
 use Spatie\MediaLibrary\MediaCollections\Exceptions\FileIsTooBig;
@@ -280,34 +281,37 @@ class AuthController
                         ->toMediaCollection('avatars');
                 }
 
-                return $user;
+                // Créer le token d'accès
+                $token = $user->createToken(
+                    'registration_token_'.now()->timestamp,
+                );
+
+                return ['user' => $user, 'token' => $token];
 
             });
 
+            $user = $result['user'];
+            $token = $result['token'];
+
             // Déclencher l'événement d'inscription (envoie l'email automatiquement)
-            event(new Registered($result));
+            event(new Registered($user));
 
             // Réinitialiser les tentatives d'inscription échouées
             RateLimiter::clear($key);
 
-            // Créer le token d'accès
-            $token = $result->createToken(
-                'registration_token_'.now()->timestamp,
-            );
-
             // Log de succès
             Log::info('User registered successfully', [
-                'user_id' => $result->id,
-                'email' => $result->email,
+                'user_id' => $user->id,
+                'email' => $user->email,
                 'ip' => $request->ip(),
                 'user_agent' => $request->userAgent(),
             ]);
 
             return response()->json([
                 'message' => 'Inscription réussie.',
-                'user' => new UserResource($result),
+                'user' => new UserResource($user),
                 'access_token' => $token->plainTextToken,
-                'email_verification_required' => $result->email_verified_at === null,
+                'email_verification_required' => $user->email_verified_at === null,
             ], 201);
 
         } catch (ValidationException $e) {
@@ -584,23 +588,33 @@ class AuthController
      *     )
      * )
      */
-    public function verifyEmail($id, $hash, Request $request): JsonResponse
+    public function verifyEmail($id, $hash, Request $request)
     {
+        Log::info("VerifyEmail called with ID: " . $id);
+        
+        if (!Str::isUuid($id)) {
+            Log::warning("Invalid UUID provided: " . $id);
+            if ($request->wantsJson()) {
+                return response()->json(['message' => 'ID utilisateur invalide.'], 400);
+            }
+            return abort(400, 'ID utilisateur invalide.');
+        }
+
         try {
             $user = User::findOrFail($id);
 
             // Vérifier le hash
             if (! hash_equals($hash, sha1($user->getEmailForVerification()))) {
-                return response()->json([
-                    'message' => 'Lien de vérification invalide',
-                ], 400);
+                if ($request->wantsJson()) {
+                    return response()->json(['message' => 'Lien de vérification invalide'], 400);
+                }
+                return abort(400, 'Lien de vérification invalide.');
             }
 
             if ($user->hasVerifiedEmail()) {
-                return response()->json([
-                    'message' => 'Email déjà vérifié.',
-                    'verified' => true,
-                ]);
+                return $request->wantsJson() 
+                    ? response()->json(['message' => 'Email déjà vérifié.', 'verified' => true])
+                    : view('auth.verified');
             }
 
             if ($user->markEmailAsVerified()) {
@@ -613,15 +627,15 @@ class AuthController
                 ]);
             }
 
-            return response()->json([
-                'message' => 'Email vérifié avec succès.',
-                'verified' => true,
-            ]);
+            return $request->wantsJson()
+                ? response()->json(['message' => 'Email vérifié avec succès.', 'verified' => true])
+                : view('auth.verified');
 
         } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'message' => 'Utilisateur non trouvé.',
-            ], 404);
+            if ($request->wantsJson()) {
+                return response()->json(['message' => 'Utilisateur non trouvé.'], 404);
+            }
+            return abort(404, 'Utilisateur non trouvé.');
 
         } catch (Throwable $e) {
             Log::error('Email verification failed', [
@@ -629,9 +643,10 @@ class AuthController
                 'user_id' => $id,
             ]);
 
-            return response()->json([
-                'message' => 'Erreur lors de la vérification.',
-            ], 500);
+            if ($request->wantsJson()) {
+                return response()->json(['message' => 'Erreur lors de la vérification.'], 500);
+            }
+            return abort(500, 'Erreur lors de la vérification.');
         }
     }
 
