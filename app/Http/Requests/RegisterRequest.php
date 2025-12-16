@@ -39,7 +39,7 @@ class RegisterRequest extends FormRequest
             'confirm_password' => 'required|same:password',
             'role' => 'nullable|string|in:customer,admin,agent',
             'type' => 'nullable|string|max:50',
-            'city_id' => 'nullable|integer|exists:city,id',
+            'city_id' => 'nullable|string|exists:city,id',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
             'avatar' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:2048|dimensions:min_width=100,min_height=100,max_width=2000,max_height=2000',

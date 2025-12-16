@@ -40,7 +40,7 @@ class UserRequest extends FormRequest
                 'longitude' => 'nullable|numeric|between:-180,180',
                 'role' => ['required', 'string'],
                 'type' => ['nullable', 'string'],
-                'city_id' => ['required', 'integer', 'exists:city,id'],
+                'city_id' => ['required', 'uuid', 'exists:city,id'],
             ];
         }
         if ($this->isMethod('put') || $this->isMethod('patch')) {
@@ -52,7 +52,7 @@ class UserRequest extends FormRequest
                 'password' => ['sometimes', 'string', 'min:8'],
                 'role' => ['sometimes', 'string'],
                 'type' => ['nullable', 'string'],
-                'city_id' => ['sometimes', 'integer', 'exists:city,id'],
+                'city_id' => ['sometimes', 'uuid', 'exists:city,id'],
                 'location' => ['sometimes', new GeometryGeojsonRule([Point::class])],
                 'latitude' => 'sometimes|nullable|numeric|between:-90,90',
                 'longitude' => 'sometimes|nullable|numeric|between:-180,180',
