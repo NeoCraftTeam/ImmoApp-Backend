@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('firstname');
             $table->string('lastname');
             $table->string('phone_number')->nullable();
@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('avatar');
             $table->enum('type', ['individual', 'agency'])->nullable();
             $table->enum('role', ['customer', 'agent', 'admin']);
-            $table->foreignId('city_id')->constrained('city')->onDelete('cascade')->references('id')->on('city');
+            $table->foreignUuid('city_id')->constrained('city')->onDelete('cascade')->references('id')->on('city');
             $table->rememberToken();
             $table->timestamps();
             $table->softDeletes();

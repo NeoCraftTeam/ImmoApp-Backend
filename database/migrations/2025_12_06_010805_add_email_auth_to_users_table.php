@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             $table->boolean('has_email_authentication')->default(false);
         });
-    }
+    }   
 
     /**
      * Reverse the migrations.

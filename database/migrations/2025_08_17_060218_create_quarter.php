@@ -12,9 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('quarter', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('name');
-            $table->foreignId('city_id')->constrained('city')->onDelete('cascade')->references('id')->on('city');
+            $table->foreignUuid('city_id')->constrained('city')->onDelete('cascade')->references('id')->on('city');
             $table->timestamps();
             $table->softDeletes();
         });

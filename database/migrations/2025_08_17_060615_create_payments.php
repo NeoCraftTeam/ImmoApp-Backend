@@ -12,13 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('payments', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->enum('type', ['unlock', 'boost', 'subscription'])->default('unlock');
             $table->decimal('amount', 10, 2);
             $table->string('transaction_id', 100)->unique()->nullable(false);
             $table->enum('payment_method', ['orange_money', 'mobile_money', 'stripe'])->nullable(false);
-            $table->foreignId('ad_id')->constrained('ad')->onDelete('cascade');
-            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->foreignUuid('ad_id')->constrained('ad')->onDelete('cascade');
+            $table->foreignUuid('user_id')->constrained('users')->onDelete('cascade');
             $table->enum('status', ['pending', 'success', 'failed'])->default('pending')->nullable(false);
             $table->timestamps();
             $table->softDeletes();

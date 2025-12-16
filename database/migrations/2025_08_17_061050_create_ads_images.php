@@ -12,9 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('ad_images', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('image_path')->nullable(false);
-            $table->foreignId('ad_id')->constrained('ad')->onDelete('cascade');
+            $table->foreignUuid('ad_id')->constrained('ad')->onDelete('cascade');
             $table->timestamps();
             $table->softDeletes();
         });
