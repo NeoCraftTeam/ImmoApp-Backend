@@ -23,6 +23,7 @@ return new class extends Migration
             $table->integer('bathrooms')->nullable(false);
             $table->boolean('has_parking')->default(false);
             $table->magellanPoint('location', 4326)->nullable();
+            $table->spatialIndex('location');
             $table->enum('status', ['available', 'reserved', 'rent', 'pending', 'sold']);
             $table->timestamp('expires_at')->nullable();
             $table->foreignUuid('user_id')->constrained('users')->onDelete('cascade');
