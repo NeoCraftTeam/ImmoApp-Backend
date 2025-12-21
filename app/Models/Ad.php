@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use Laravel\Scout\Searchable;
+use App\Models\Payment;
 
 /**
  * @property-read Quarter|null $quarter
@@ -69,10 +70,14 @@ use Laravel\Scout\Searchable;
  *
  * @mixin Eloquent
  */
-class Ad extends Model
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
+
+class Ad extends Model implements HasMedia
 {
     use HasFactory, HasUuids, SoftDeletes;
-    use Searchable;
+    use Searchable, InteractsWithMedia;
 
     protected $table = 'ad';
 
@@ -211,5 +216,62 @@ class Ad extends Model
     protected function makeAllSearchableUsing(Builder $query): Builder
     {
         return $query->with(['quarter.city', 'ad_type']);
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('images')
+            ->maxNumberOfFiles(10)
+            ->useDisk('public');
+    }
+
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('thumb')
+            ->width(300)
+            ->height(300)
+            ->sharpen(10)
+            ->nonQueued(); // Fast generation for immediate API response
+    }
+
+    /**
+     * Check if the ad is unlocked for a specific user.
+     */
+    public function isUnlockedFor(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        // Owner always has access
+        if ($this->user_id === $user->id) {
+            return true;
+        }
+
+        // Check for successful unlock payment (assuming Payment model links user and ad)
+        return Payment::where('user_id', $user->id)
+            ->where('ad_id', $this->id)
+            ->where('type', 'unlock') // Assuming 'unlock' is the enum value or string
+            ->where('status', 'success') // Assuming 'success' is the enum value
+            ->exists();
+    }
+
+    /**
+     * Get images accessible to the current user context.
+     */
+    public function getAccessibleImages(?User $user): \Illuminate\Support\Collection
+    {
+        $media = $this->getMedia('images');
+
+        if ($media->isEmpty()) {
+            return collect();
+        }
+
+        if ($this->isUnlockedFor($user)) {
+            return $media;
+        }
+
+        // Return only the first image (primary)
+        return $media->take(1);
     }
 }
