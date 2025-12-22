@@ -3,7 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Ad;
-use App\Models\AdImage;
+
 use App\Models\Agency;
 use App\Models\Review;
 use App\Models\User;
@@ -35,7 +35,10 @@ class UserSeeder extends Seeder
 
             $ads = Ad::factory()->count(5)->for($agent)->create();
             $ads->each(function ($ad) {
-                AdImage::factory()->count(3)->for($ad)->create();
+                $ad->addMedia(storage_path('app/public/dummy.png'))
+                    ->preservingOriginal()
+                    ->toMediaCollection('images');
+
                 $customers = User::where('role', 'customer')->get();
                 Review::factory()->count(3)->for($ad)->create([
                     'user_id' => $customers->random()->id,
