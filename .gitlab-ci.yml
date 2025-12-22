@@ -2,7 +2,7 @@ stages:
   - test
   - deploy
 
-# Configuration globale pour utiliser UNIQUEMENT votre Runner VPS (0 minute GitLab consommée)
+# Configuration globale pour utiliser UNIQUEMENT votre Runner VPS
 default:
   tags:
     - self-hosted-shell
@@ -11,12 +11,13 @@ default:
 test_suite:
   stage: test
   script:
-    - echo "🧪 Lancement des tests sur le VPS..."
-    # On prépare un environnement de test local sur le VPS
+    - echo "🧪 Préparation des tests sur le VPS..."
+    # 1. Installer les dépendances en PREMIER pour éviter l'erreur autoload
+    - composer install --no-ansi --no-interaction
+    # 2. Préparer l'environnement
     - cp .env.example .env.testing
     - php artisan key:generate --env=testing
-    - composer install --no-ansi --no-interaction
-    # Note : Assurez-vous d'avoir configuré une DB de test sur le VPS (ex: immo_testing)
+    # 3. Lancer les tests
     - php artisan test --env=testing
   only:
     - branches
@@ -31,6 +32,7 @@ production_deploy:
     # On s'assure d'être sur la bonne branche avant le pull
     - git fetch origin
     - git checkout main
+    - git pull origin main
     - bash deploy.sh
   only:
     - main
