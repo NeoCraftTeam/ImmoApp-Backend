@@ -36,11 +36,11 @@ production_deploy:
   script:
     - echo "🚀 Déploiement local sur le VPS..."
     - cd /var/www/ImmoApp-Backend || exit 1
-    # On utilise le token temporaire de GitLab pour s'authentifier sans mot de passe
-    - git remote set-url origin https://gitlab-ci-token:${CI_JOB_TOKEN}@$CI_SERVER_HOST/$CI_PROJECT_PATH.git
+    # On force le reset pour écraser les changements locaux parasites sur le VPS
     - git fetch origin
     - git checkout main
-    - git pull origin main
+    - git reset --hard origin/main
+    - git clean -fd
     - bash deploy.sh
   only:
     - main
