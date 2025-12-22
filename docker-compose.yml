@@ -12,6 +12,10 @@ services:
       - .:/var/www
     networks:
       - keyhome-network
+    environment:
+      - DB_HOST=db
+      - REDIS_HOST=redis
+      - APP_ENV=production
 
   # Le serveur Web (Nginx)
   web:
