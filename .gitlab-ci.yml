@@ -40,13 +40,14 @@ production_deploy:
     - echo "🚀 Déploiement Docker sur le VPS..."
     - cd /var/www/ImmoApp-Backend || exit 1
     
-    # 1. Mise à jour du code sur l'hôte
+    # 1. Mise à jour du code sur l'hôte et nettoyage radical des caches
     - sudo chown -R gitlab-runner:www-data .
     - git remote set-url origin https://gitlab-ci-token:${CI_JOB_TOKEN}@$CI_SERVER_HOST/$CI_PROJECT_PATH.git
     - git fetch origin
     - git checkout main
     - git reset --hard origin/main
     - git clean -fd
+    - rm -f bootstrap/cache/*.php # Supprime les résidus de config système
     
     # 2. Nettoyage et Reconstruction
     # On force l'arrêt des anciens conteneurs pour libérer les ports et éviter les KeyError
@@ -54,8 +55,6 @@ production_deploy:
     - docker-compose up -d --build
     
     # 3. Exécution des tâches Laravel à l'INTÉRIEUR du conteneur
-    # On vide d'abord les caches qui pourraient contenir l'ancien 127.0.0.1
-    - docker-compose exec -T app php artisan optimize:clear
     - docker-compose exec -T app php artisan migrate --force
     - docker-compose exec -T app php artisan optimize
     - docker-compose exec -T app bash app/Scripts/resetFilamentLivewire.sh
