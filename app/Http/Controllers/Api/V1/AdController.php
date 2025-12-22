@@ -165,7 +165,7 @@ class AdController
      *                 @OA\Property(
      *                     property="images",
      *                     type="array",
-     *                     description="Images du bien (maximum 10 images, 5MB chacune). Formats acceptés: JPEG, PNG, GIF, WebP",
+     *                     description="Images du bien (maximum 10 images, 5MB chacune). Formats: JPEG, PNG, GIF, WebP. Note: Utiliser le nom de champ 'images[]' pour l'envoi multiple.",
      *
      *                     @OA\Items(type="string", format="binary"),
      *                     maxItems=10
@@ -455,7 +455,7 @@ class AdController
      *                 @OA\Property(
      *                     property="images",
      *                     type="array",
-     *                     description="Nouvelles images à ajouter (maximum 10 images au total par annonce, 5MB chacune)",
+     *                     description="Nouvelles images à ajouter (max 10 total). Note: Utiliser le nom de champ 'images[]'.",
      *
      *                     @OA\Items(type="string", format="binary")
      *                 ),
