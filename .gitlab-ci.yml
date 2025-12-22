@@ -15,15 +15,16 @@ test_suite:
     DB_HOST: 127.0.0.1
     DB_PORT: 5432
     DB_DATABASE: testing
-    DB_USERNAME: postgres
-    DB_PASSWORD: password # <--- Assurez-vous que ce mot de passe est correct pour votre VPS
+    DB_USERNAME: gitlab-runner # Utilise l'utilisateur du runner
+    # DB_PASSWORD: n'est plus nécessaire si l'utilisateur est configuré en local
   script:
     - echo "🧪 Préparation des tests sur le VPS..."
     - composer install --no-ansi --no-interaction
     - cp .env.example .env.testing
     - php artisan key:generate --env=testing
-    # On force la création de la base de test si elle n'existe pas (optionnel mais recommandé)
-    # - sudo -u postgres psql -c "CREATE DATABASE testing;" || true
+    # On s'assure que la DB de test est prête (si vous avez donné les droits sudo au runner)
+    # - php artisan db:wipe --env=testing || true 
+    - php artisan migrate --env=testing --force
     - php artisan test --env=testing
   only:
     - branches
