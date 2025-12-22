@@ -12,9 +12,7 @@ cache:
 services:
   - name: postgis/postgis:15-3.3
     alias: postgres
-    command: ["postgres", "-c", "fsync=off", "-c", "full_page_writes=off"] # Speed optimization
-  - name: redis:alpine
-    alias: redis
+    command: ["postgres", "-c", "fsync=off", "-c", "full_page_writes=off"]
 
 variables:
   DB_CONNECTION: pgsql
@@ -26,31 +24,31 @@ variables:
   CACHE_DRIVER: redis
   REDIS_HOST: redis
 
-test:
+# Étape 1 : Tests (Tourne sur le Runner GitLab pour isolation)
+test_suite:
   stage: test
   before_script:
     - apt-get update && apt-get install -y unzip git libzip-dev libicu-dev libpq-dev libpng-dev libonig-dev
     - docker-php-ext-install pdo_pgsql zip intl exif bcmath gd
     - pecl install redis && docker-php-ext-enable redis
-    # Install Composer
     - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
     - composer install --no-ansi --no-interaction --no-progress --prefer-dist
     - cp .env.example .env
     - php artisan key:generate
   script:
     - php artisan test
-    # - ./vendor/bin/pint --test # Uncomment if you want style checks
   only:
     - branches
     - merge_requests
 
-deploy:
+# Étape 2 : Déploiement (Tourne sur VOTRE VPS - Gratuit, Zéro minute)
+production_deploy:
   stage: deploy
   script:
-    - echo "🚀 Deploying to Production via Shell Runner..."
-    - cd /var/www/ImmoApp-Backend || exit 1 # Se déplacer dans le dossier ou échouer
+    - echo "🚀 Déploiement sur le VPS via Runner local..."
+    - cd /var/www/ImmoApp-Backend || exit 1
     - bash deploy.sh
   tags:
-    - self-hosted-shell # Assurez-vous que votre Runner a ce tag
+    - self-hosted-shell
   only:
     - main
