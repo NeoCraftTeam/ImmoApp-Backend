@@ -90,14 +90,16 @@ print_success "Documentation Swagger générée"
 
 # 6. Gestion des permissions
 print_step "Configuration des permissions"
-sudo chown -R www-data:www-data storage/ bootstrap/cache/
-print_success "Propriétaire défini sur www-data"
+# On donne la propriété à l'utilisateur du runner et au groupe web
+sudo chown -R gitlab-runner:www-data storage/ bootstrap/cache/
+print_success "Propriétaire défini sur gitlab-runner:www-data"
 
-sudo find storage/ -type f -exec chmod 644 {} \;
-sudo find storage/ -type d -exec chmod 755 {} \;
-sudo find bootstrap/cache/ -type f -exec chmod 644 {} \;
-sudo find bootstrap/cache/ -type d -exec chmod 755 {} \;
-print_success "Permissions configurées"
+# Permissions : 775 pour les dossiers, 664 pour les fichiers (groupe writeable)
+sudo find storage/ -type d -exec chmod 775 {} \;
+sudo find storage/ -type f -exec chmod 664 {} \;
+sudo find bootstrap/cache/ -type d -exec chmod 775 {} \;
+sudo find bootstrap/cache/ -type f -exec chmod 664 {} \;
+print_success "Permissions configurées (775/664)"
 
 # 7. Reconstruction des caches de production
 print_step "Reconstruction des caches pour la production"
