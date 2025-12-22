@@ -48,7 +48,9 @@ production_deploy:
     - git reset --hard origin/main
     - git clean -fd
     
-    # 2. Reconstruction et redémarrage des conteneurs
+    # 2. Nettoyage et Reconstruction
+    # On force l'arrêt des anciens conteneurs pour libérer les ports et éviter les KeyError
+    - docker-compose down --remove-orphans || true
     - docker-compose up -d --build
     
     # 3. Exécution des tâches Laravel à l'INTÉRIEUR du conteneur

@@ -19,7 +19,7 @@ services:
     container_name: keyhome-web
     restart: unless-stopped
     ports:
-      - "8082:80" # Changé de 8080 à 8081
+      - "9090:80" # On utilise 9090 pour sortir de la zone de conflit 808x
     volumes:
       - .:/var/www
       - .docker/nginx/conf.d:/etc/nginx/conf.d
