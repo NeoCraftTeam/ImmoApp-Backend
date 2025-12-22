@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\QuarterController;
 use App\Http\Controllers\Api\V1\UserController;
+use App\Http\Controllers\Api\V1\PaymentController;
 use Illuminate\Support\Facades\Route;
 
 // Prefix routes
@@ -84,6 +85,11 @@ Route::prefix('v1')->group(function () {
         Route::post('/users', 'store');
         Route::put('/users/{user}', 'update');
         Route::delete('/users/{user}', 'destroy');
+    });
+
+    // Payments
+    Route::middleware('auth:sanctum')->prefix('payments')->controller(PaymentController::class)->group(function () {
+        Route::post('/unlock', 'unlockAd');
     });
 
     //  Ads
