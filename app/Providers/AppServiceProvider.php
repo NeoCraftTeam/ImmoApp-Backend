@@ -26,6 +26,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (config('app.env') === 'production') {
+            URL::forceScheme('https');
+        }
+
         \App\Models\Payment::observe(\App\Observers\PaymentObserver::class);
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
