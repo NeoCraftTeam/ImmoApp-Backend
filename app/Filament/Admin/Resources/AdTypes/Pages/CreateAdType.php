@@ -8,6 +8,4 @@ use Filament\Resources\Pages\CreateRecord;
 class CreateAdType extends CreateRecord
 {
     protected static string $resource = AdTypeResource::class;
-
-
 }

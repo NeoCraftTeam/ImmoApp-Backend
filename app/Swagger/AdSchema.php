@@ -35,9 +35,7 @@ namespace App\Swagger;
  *     @OA\Property(property="type_id", type="integer", description="ID du type de bien", example=2)
  * )
  */
-class AdSchema
-{
-}
+class AdSchema {}
 
 /**
  * @OA\Schema(
@@ -116,9 +114,7 @@ class AdSchema
  *     }
  * )
  */
-class AdResourceSchema
-{
-}
+class AdResourceSchema {}
 
 /**
  * @OA\Schema(
@@ -134,9 +130,7 @@ class AdResourceSchema
  *     @OA\Property(property="updated_at", type="string", format="date-time", description="Date de modification", example="2024-01-15T10:30:00Z")
  * )
  */
-class AdImageSchema
-{
-}
+class AdImageSchema {}
 
 /**
  * @OA\Schema(
@@ -157,9 +151,7 @@ class AdImageSchema
  *     )
  * )
  */
-class ErrorResponseSchema
-{
-}
+class ErrorResponseSchema {}
 
 /**
  * @OA\Schema(
@@ -194,9 +186,7 @@ class ErrorResponseSchema
  *     )
  * )
  */
-class AdCreateRequestSchema
-{
-}
+class AdCreateRequestSchema {}
 
 /**
  * @OA\Schema(
@@ -237,6 +227,4 @@ class AdCreateRequestSchema
  *     )
  * )
  */
-class AdUpdateRequestSchema
-{
-}
+class AdUpdateRequestSchema {}

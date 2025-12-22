@@ -78,7 +78,7 @@ class ReviewResource extends Resource
                     ->placeholder('-'),
                 TextEntry::make('deleted_at')
                     ->dateTime()
-                    ->visible(fn(Review $record): bool => $record->trashed()),
+                    ->visible(fn (Review $record): bool => $record->trashed()),
             ]);
     }
 

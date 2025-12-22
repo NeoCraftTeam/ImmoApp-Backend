@@ -2,10 +2,13 @@
 
 use App\Http\Controllers\Api\V1\AdController;
 use App\Http\Controllers\Api\V1\AdTypeController;
+use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\QuarterController;
 use App\Http\Controllers\Api\V1\UserController;
+use App\Http\Controllers\Api\V1\PaymentController;
+use App\Http\Controllers\Api\V1\RecommendationController;
 use Illuminate\Support\Facades\Route;
 
 // Prefix routes
@@ -29,7 +32,11 @@ Route::prefix('v1')->group(function () {
         Route::post('resend-verification', [AuthController::class, 'resendVerificationEmail'])
             ->middleware('throttle:2,5'); // 2 attempts every 5 minutes
 
-        // Route::get('email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])->name('verification.verify');
+        Route::get('email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])->name('api.verification.verify');
+
+        // Password Reset
+        Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:3,10');
+        Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:3,10');
 
         // Routes protégées
         Route::middleware('auth:sanctum')->group(function () {
@@ -37,6 +44,7 @@ Route::prefix('v1')->group(function () {
             Route::post('refresh', [AuthController::class, 'refresh']);
             Route::get('me', [AuthController::class, 'me']);
             Route::post('email/resend', [AuthController::class, 'resendVerificationEmail'])->middleware('auth:sanctum');
+            Route::post('update-password', [AuthController::class, 'updatePassword']);
         });
     });
 
@@ -67,6 +75,15 @@ Route::prefix('v1')->group(function () {
         Route::delete('/quarters/{quarter}', 'destroy')->middleware('auth:sanctum');
     });
 
+    // Agency
+    Route::controller(AgencyController::class)->group(function () {
+        Route::get('/agencies', 'index');
+        Route::get('/agencies/{agency}', 'show');
+        Route::post('/agencies', 'store')->middleware('auth:sanctum');
+        Route::put('/agencies/{agency}', 'update')->middleware('auth:sanctum');
+        Route::delete('/agencies/{agency}', 'destroy')->middleware('auth:sanctum');
+    });
+
     // User
     Route::middleware('auth:sanctum')->controller(UserController::class)->group(function () {
         Route::get('/users', 'index');
@@ -75,6 +92,14 @@ Route::prefix('v1')->group(function () {
         Route::put('/users/{user}', 'update');
         Route::delete('/users/{user}', 'destroy');
     });
+
+    // Payments
+    Route::middleware('auth:sanctum')->prefix('payments')->controller(PaymentController::class)->group(function () {
+        Route::post('/unlock', 'unlockAd');
+    });
+
+    // Recommendations
+    Route::middleware('auth:sanctum')->get('/recommendations', [RecommendationController::class, 'index']);
 
     //  Ads
     Route::prefix('ads')->controller(AdController::class)->group(function () {
@@ -89,14 +114,14 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware('auth:sanctum')->group(function () {
             // Routes spécifiques AVANT les routes avec paramètres génériques
-            Route::get('/{user}/nearby', 'ads_nearby_user')->whereNumber('user');
+            Route::get('/{user}/nearby', 'ads_nearby_user');
 
             Route::post('', 'store');
             Route::put('/{ad}', 'update');
-            Route::delete('/{id}', 'destroy')->whereNumber('id');
+            Route::delete('/{id}', 'destroy');
         });
 
         // Cette route DOIT être en dernier pour ne pas capturer d'autres patterns
-        Route::get('/{id}', 'show')->whereNumber('id');
+        Route::get('/{id}', 'show');
     });
 });

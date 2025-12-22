@@ -52,6 +52,4 @@ namespace App\Http\Controllers\Api\V1;
  *          description="Filtrer les annonces"
  *  )
  */
-class DocController
-{
-}
+class DocController {}

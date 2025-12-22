@@ -296,7 +296,7 @@
                                         "example": 1
                                     },
                                     "images": {
-                                        "description": "Images du bien (maximum 10 images, 5MB chacune). Formats acceptés: JPEG, PNG, GIF, WebP",
+                                        "description": "Images du bien (maximum 10 images, 5MB chacune). Formats: JPEG, PNG, GIF, WebP. Note: Utiliser le nom de champ 'images[]' pour l'envoi multiple.",
                                         "type": "array",
                                         "items": {
                                             "type": "string",
@@ -663,7 +663,7 @@
                                         "example": 1
                                     },
                                     "images": {
-                                        "description": "Nouvelles images à ajouter (maximum 10 images au total par annonce, 5MB chacune)",
+                                        "description": "Nouvelles images à ajouter (max 10 total). Note: Utiliser le nom de champ 'images[]'.",
                                         "type": "array",
                                         "items": {
                                             "type": "string",
@@ -3053,6 +3053,232 @@
                 ]
             }
         },
+        "/api/v1/auth/forgot-password": {
+            "post": {
+                "tags": [
+                    "🔐 Authentification"
+                ],
+                "summary": "Mot de passe oublié",
+                "description": "Envoie un lien de réinitialisation de mot de passe par email",
+                "operationId": "forgotPassword",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "user@example.com"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Lien envoyé",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Nous vous avons envoyé par email le lien de réinitialisation du mot de passe !"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Erreur de validation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Impossible de trouver un utilisateur avec cette adresse email."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/reset-password": {
+            "post": {
+                "tags": [
+                    "🔐 Authentification"
+                ],
+                "summary": "Réinitialiser le mot de passe",
+                "description": "Définit un nouveau mot de passe en utilisant le token reçu par email",
+                "operationId": "resetPassword",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "token",
+                                    "email",
+                                    "password",
+                                    "password_confirmation"
+                                ],
+                                "properties": {
+                                    "token": {
+                                        "description": "Le token reçu dans l'email",
+                                        "type": "string"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "user@example.com"
+                                    },
+                                    "password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "example": "NewPassword123!"
+                                    },
+                                    "password_confirmation": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "example": "NewPassword123!"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Mot de passe réinitialisé",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Votre mot de passe a été réinitialisé !"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Erreur (token invalide, email incorrect...)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Ce jeton de réinitialisation de mot de passe est invalide."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/update-password": {
+            "post": {
+                "tags": [
+                    "🔐 Authentification"
+                ],
+                "summary": "Mettre à jour le mot de passe (connecté)",
+                "description": "Permet à un utilisateur connecté de changer son mot de passe actuel",
+                "operationId": "updatePassword",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "current_password",
+                                    "new_password",
+                                    "new_password_confirmation"
+                                ],
+                                "properties": {
+                                    "current_password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "example": "OldPass123!"
+                                    },
+                                    "new_password": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "example": "NewPass456!"
+                                    },
+                                    "new_password_confirmation": {
+                                        "type": "string",
+                                        "format": "password",
+                                        "example": "NewPass456!"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Mot de passe mis à jour",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Mot de passe mis à jour avec succès."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Erreur de validation (ancien mot de passe incorrect...)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Le mot de passe actuel est incorrect."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/api/v1/cities": {
             "get": {
                 "tags": [
@@ -3290,6 +3516,79 @@
                     },
                     "500": {
                         "description": "Erreur du Serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/payments/unlock": {
+            "post": {
+                "tags": [
+                    "Payments"
+                ],
+                "summary": "Unlock an ad",
+                "description": "Unlock an ad for the authenticated user.",
+                "operationId": "78978d97cdd3f87d64192a5ebab98a50",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "ad_id",
+                                    "payment_method"
+                                ],
+                                "properties": {
+                                    "ad_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "example": "019b42fb-e032-71ae-ae45-da62c36aab3f"
+                                    },
+                                    "payment_method": {
+                                        "type": "string",
+                                        "enum": [
+                                            "orange_money",
+                                            "mobile_money",
+                                            "stripe"
+                                        ],
+                                        "example": "orange_money"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Ad unlocked successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Ad unlocked successfully"
+                                        },
+                                        "payment_id": {
+                                            "type": "integer",
+                                            "example": 1
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Ad already unlocked or invalid request"
+                    },
+                    "404": {
+                        "description": "Ad not found"
                     }
                 },
                 "security": [
@@ -3898,6 +4197,54 @@
                                 }
                             }
                         }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/recommendations": {
+            "get": {
+                "tags": [
+                    "🤖 Recommandations"
+                ],
+                "summary": "Recommandations personnalisées",
+                "description": "Retourne une liste d'annonces recommandées en fonction des précédents déblocages (paiements) de l'utilisateur.\n     *\n     *     Fonctionnement :\n     *     1. L'API identifie qui appelle ($user->id).\n     *     2. Elle récupère uniquement les paiements de ce client.\n     *     3. Elle calcule SES préférences (le type d'appartement qu'IL aime, la ville où IL cherche, SON budget moyen).\n     *     4. Elle cherche des annonces qui correspondent à SES critères.\n     *\n     *     Exemples concrets :\n     *     - Paul, qui a débloqué 2 appartements à Douala à 200.000 FCFA, verra des Appartements à Douala (~200k).\n     *     - Marie, qui a débloqué des villas à Yaoundé à 1.000.000 FCFA, verra des Villas à Yaoundé (~1M).\n     *     - Nouveau Client, qui n'a rien fait, verra les annonces les plus récentes (Cold Start).",
+                "operationId": "9e1d04bb0918eedb7d013e17e448a5a0",
+                "responses": {
+                    "200": {
+                        "description": "Liste des annonces recommandées",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/AdResource"
+                                            }
+                                        },
+                                        "meta": {
+                                            "properties": {
+                                                "source": {
+                                                    "description": "Indique si les recommandations sont 'personalized' ou 'latest' (cold start)",
+                                                    "type": "string",
+                                                    "example": "personalized"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
                     }
                 },
                 "security": [
@@ -5506,6 +5853,14 @@
         {
             "name": "🔍 Filtre",
             "description": "Filtrer les annonces"
+        },
+        {
+            "name": "Payments",
+            "description": "Payments"
+        },
+        {
+            "name": "🤖 Recommandations",
+            "description": "🤖 Recommandations"
         }
     ]
 }

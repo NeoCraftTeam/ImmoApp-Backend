@@ -8,12 +8,12 @@ use App\Models\Quarter;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Str;
 
 /** @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Ad> */
 class AdFactory extends Factory
 {
     protected static $citiesData = null;
+
     protected $model = Ad::class;
 
     public function definition(): array
@@ -26,11 +26,11 @@ class AdFactory extends Factory
         $cityName = $cityData['name'];
 
         // Utilise le nom de la ville dans l'adresse
-        $address = $this->faker->streetAddress() . ', ' . $cityName;
+        $address = $this->faker->streetAddress().', '.$cityName;
 
         return [
             'title' => $title,
-            'slug' => Str::slug($title),
+            'slug' => Ad::generateUniqueSlug($title),
             'description' => $this->faker->paragraph(),
             'adresse' => $address,
             'price' => $this->faker->numberBetween(25000, 150000), // Random number with 5 digits
@@ -69,8 +69,8 @@ class AdFactory extends Factory
             foreach ($matches as $match) {
                 self::$citiesData[] = [
                     'name' => $match[1],
-                    'latitude' => (float)$match[2],
-                    'longitude' => (float)$match[3],
+                    'latitude' => (float) $match[2],
+                    'longitude' => (float) $match[3],
                 ];
             }
         }

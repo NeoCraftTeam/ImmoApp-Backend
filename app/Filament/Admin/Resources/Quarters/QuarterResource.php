@@ -33,9 +33,15 @@ class QuarterResource extends Resource
 {
     protected static ?string $model = Quarter::class;
 
+    protected static string|null|\UnitEnum $navigationGroup = 'Villes & Quartiers';
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::BuildingOffice2;
 
     protected static ?string $recordTitleAttribute = 'name';
+
+    protected static ?string $navigationLabel = 'Quartiers';
+
+    protected static ?string $modelLabel = 'Quartier';
 
     public static function form(Schema $schema): Schema
     {
@@ -53,7 +59,7 @@ class QuarterResource extends Resource
                     ->suffixIcon(Heroicon::HomeModern)
                     ->loadingMessage('Chargement des villes...')
                     ->noSearchResultsMessage('Aucun résultat trouvé')
-                    ->native(false)
+                    ->native(false),
             ]);
     }
 
@@ -98,7 +104,7 @@ class QuarterResource extends Resource
                     ->formats([
                         ExportFormat::Csv,
                         ExportFormat::Xlsx,
-                    ])
+                    ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

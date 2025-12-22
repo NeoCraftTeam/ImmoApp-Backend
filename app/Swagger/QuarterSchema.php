@@ -14,6 +14,4 @@ namespace App\Swagger;
  *      @OA\Property(property="city_id", type="int"),
  * )
  */
-class QuarterSchema
-{
-}
+class QuarterSchema {}

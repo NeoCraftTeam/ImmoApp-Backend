@@ -2,6 +2,8 @@
 
 namespace App\Filament\Admin\Resources\Ads;
 
+use App\Enums\AdStatus;
+use Clickbar\Magellan\Data\Geometries\Point;
 use App\Filament\Admin\Resources\Ads\Pages\ManageAds;
 use App\Filament\Exports\AdExporter;
 use App\Filament\Imports\AdImporter;
@@ -20,6 +22,7 @@ use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -34,11 +37,13 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use UnitEnum;
 
 class AdResource extends Resource
 {
     protected static ?string $model = Ad::class;
-    protected static string|null|\UnitEnum $navigationGroup = 'Annonces';
+
+    protected static string|null|UnitEnum $navigationGroup = 'Annonces';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::InboxArrowDown;
 
@@ -46,8 +51,8 @@ class AdResource extends Resource
 
     protected static ?string $navigationLabel = 'Annonces';
 
-
     protected static ?string $modelLabel = 'Annonce';
+
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -58,6 +63,12 @@ class AdResource extends Resource
                     ->visible(false),
                 Textarea::make('description')
                     ->required()
+                    ->columnSpanFull(),
+                SpatieMediaLibraryFileUpload::make('images')
+                    ->collection('images')
+                    ->multiple()
+                    ->reorderable()
+                    ->maxFiles(10)
                     ->columnSpanFull(),
                 TextInput::make('adresse')
                     ->required(),
@@ -75,19 +86,33 @@ class AdResource extends Resource
                     ->numeric(),
                 Toggle::make('has_parking')
                     ->required(),
-                TextInput::make('location'),
-                TextInput::make('status')
-                    ->required(),
-                DateTimePicker::make('expires_at'),
-                Select::make('user.fullname')
-                    ->relationship('user', 'id')
-                    ->required(),
-                Select::make('quarter.name')
-                    ->relationship('quarter', 'name')
-                    ->required(),
-                TextInput::make('type.name')
+                TextInput::make('latitude')
+                    ->numeric()
                     ->required()
-                    ->numeric(),
+                    ->formatStateUsing(fn(?Ad $record) => $record?->location?->getLatitude()),
+                TextInput::make('longitude')
+                    ->numeric()
+                    ->required()
+                    ->formatStateUsing(fn(?Ad $record) => $record?->location?->getLongitude()),
+                Select::make('status')
+                    ->options(AdStatus::class)
+                    ->required()
+                    ->default(AdStatus::AVAILABLE),
+                DateTimePicker::make('expires_at'),
+                Select::make('user_id')
+                    ->relationship('user', 'firstname')
+                    ->getOptionLabelFromRecordUsing(fn($record) => "{$record->firstname} {$record->lastname}")
+                    ->searchable()
+                    ->preload()
+                    ->required(),
+                Select::make('quarter_id')
+                    ->relationship('quarter', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->required(),
+                Select::make('type_id')
+                    ->relationship('ad_type', 'name')
+                    ->required(),
             ]);
     }
 
@@ -190,19 +215,26 @@ class AdResource extends Resource
             ])
             ->recordActions([
                 ViewAction::make(),
-                EditAction::make(),
+                EditAction::make()
+                    ->mutateFormDataUsing(function (array $data): array {
+                        if (isset($data['latitude']) && isset($data['longitude'])) {
+                            $data['location'] = Point::make($data['latitude'], $data['longitude']);
+                            unset($data['latitude'], $data['longitude']);
+                        }
+                        return $data;
+                    }),
                 DeleteAction::make(),
                 ForceDeleteAction::make(),
                 RestoreAction::make(),
             ])->headerActions([
-                ImportAction::make()->label('Importer')
-                    ->importer(AdImporter::class)
-                    ->icon(Heroicon::ArrowUpTray),
+                    ImportAction::make()->label('Importer')
+                        ->importer(AdImporter::class)
+                        ->icon(Heroicon::ArrowUpTray),
 
-                ExportAction::make()->label('Exporter')
-                    ->exporter(AdExporter::class)
-                    ->icon(Heroicon::ArrowDownTray)
-            ])
+                    ExportAction::make()->label('Exporter')
+                        ->exporter(AdExporter::class)
+                        ->icon(Heroicon::ArrowDownTray),
+                ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),

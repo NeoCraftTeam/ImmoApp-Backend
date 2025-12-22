@@ -301,7 +301,7 @@ class UserController
                 'phone_number' => $data['phone_number'],
                 'role' => $data['role'],
                 'location' => (isset($data['latitude'], $data['longitude']) && $data['latitude'] !== null && $data['longitude'] !== null)
-                    ? Point::makeGeodetic((float)$data['latitude'], (float)$data['longitude'])
+                    ? Point::makeGeodetic((float) $data['latitude'], (float) $data['longitude'])
                     : null,
                 'type' => $data['type'] ?? null,
                 'city_id' => $data['city_id'],
@@ -312,12 +312,12 @@ class UserController
             if ($request->hasFile('avatar')) {
                 $user->clearMediaCollection('avatars');
                 $user->addMediaFromRequest('avatar')
-                    ->usingName($user->firstname . '_' . $user->lastname . '_avatar')
+                    ->usingName($user->firstname.'_'.$user->lastname.'_avatar')
                     ->toMediaCollection('avatars');
             }
 
             // Création du token
-            $token = $user->createToken('creation_token_' . now()->timestamp);
+            $token = $user->createToken('creation_token_'.now()->timestamp);
 
             DB::commit();
 
@@ -421,7 +421,7 @@ class UserController
     {
         $this->authorize('view', User::class);
         $userId = User::find($id);
-        if (!$userId) {
+        if (! $userId) {
             return response()->json([
                 'message' => 'Utilisateur non trouvé',
             ], 404);
@@ -583,14 +583,14 @@ class UserController
             $user->fill($data);
 
             // Si le mot de passe est présent, le hacher
-            if (!empty($data['password'])) {
+            if (! empty($data['password'])) {
                 $user->password = Hash::make($data['password']);
             }
 
             // Mettre à jour la localisation si fournie (lat/lng)
             if (array_key_exists('latitude', $data) || array_key_exists('longitude', $data)) {
                 if (($data['latitude'] ?? null) !== null && ($data['longitude'] ?? null) !== null) {
-                    $user->location = Point::makeGeodetic((float)$data['latitude'], (float)$data['longitude']);
+                    $user->location = Point::makeGeodetic((float) $data['latitude'], (float) $data['longitude']);
                 } else {
                     // Permettre de réinitialiser la localisation si null est envoyé
                     $user->location = null;
@@ -603,7 +603,7 @@ class UserController
             if ($request->hasFile('avatar')) {
                 $user->clearMediaCollection('avatars');
                 $user->addMediaFromRequest('avatar')
-                    ->usingName($user->firstname . '_' . $user->lastname . '_avatar')
+                    ->usingName($user->firstname.'_'.$user->lastname.'_avatar')
                     ->toMediaCollection('avatars');
             }
 

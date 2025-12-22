@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             AdTypeSeeder::class,
             CitySeeder::class,
             UserSeeder::class,
+            AgencySeeder::class,
             PaymentSeeder::class,
         ]);
     }

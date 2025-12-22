@@ -6,6 +6,7 @@ use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\AdFactory;
 use Eloquent;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use Laravel\Scout\Searchable;
+use App\Models\Payment;
 
 /**
  * @property-read Quarter|null $quarter
@@ -68,10 +70,14 @@ use Laravel\Scout\Searchable;
  *
  * @mixin Eloquent
  */
-class Ad extends Model
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
+
+class Ad extends Model implements HasMedia
 {
-    use HasFactory, SoftDeletes;
-    use Searchable;
+    use HasFactory, HasUuids, SoftDeletes;
+    use Searchable, InteractsWithMedia;
 
     protected $table = 'ad';
 
@@ -102,6 +108,7 @@ class Ad extends Model
 
     protected $casts = [
         'location' => Point::class, // Assuming 'point' is a custom cast for PostGIS
+        'status' => \App\Enums\AdStatus::class,
         'has_parking' => 'boolean',
         'expires_at' => 'datetime',
         'price' => 'decimal:2',
@@ -124,17 +131,17 @@ class Ad extends Model
         });
     }
 
-    public static function generateUniqueSlug(string $title, ?int $ignoreId = null): string
+    public static function generateUniqueSlug(string $title, ?string $ignoreId = null): string
     {
         $slug = Str::slug($title);
         $original = $slug;
         $i = 1;
-
-        while (self::where('slug', $slug)
-            ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
-            ->exists()
+        while (
+            self::where('slug', $slug)
+                ->when($ignoreId, fn($query) => $query->where('id', '!=', $ignoreId))
+                ->exists()
         ) {
-            $slug = $original.'-'.$i;
+            $slug = $original . '-' . $i;
             $i++;
         }
 
@@ -148,11 +155,11 @@ class Ad extends Model
             'title' => $this->title,
             'description' => $this->description,
             'adresse' => $this->adresse,
-            'price' => (float)$this->price,
-            'surface_area' => (float)$this->surface_area,
-            'bedrooms' => (int)$this->bedrooms,
-            'bathrooms' => (int)$this->bathrooms,
-            'has_parking' => (bool)$this->has_parking,
+            'price' => (float) $this->price,
+            'surface_area' => (float) $this->surface_area,
+            'bedrooms' => (int) $this->bedrooms,
+            'bathrooms' => (int) $this->bathrooms,
+            'has_parking' => (bool) $this->has_parking,
             'status' => $this->status,
 
             // Relations — vérifier qu'elles existent
@@ -188,15 +195,9 @@ class Ad extends Model
         return $this->belongsTo(Quarter::class);
     }
 
-    public function images(): hasMany
-    {
-        return $this->hasMany(AdImage::class, 'ad_id', 'id');
-    }
 
-    public function primaryImage()
-    {
-        return $this->hasOne(AdImage::class)->where('is_primary', true);
-    }
+
+
 
     public function reviews(): hasMany
     {
@@ -211,5 +212,62 @@ class Ad extends Model
     protected function makeAllSearchableUsing(Builder $query): Builder
     {
         return $query->with(['quarter.city', 'ad_type']);
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('images')
+            ->onlyKeepLatest(10)
+            ->useDisk('public');
+    }
+
+    public function registerMediaConversions(?Media $media = null): void
+    {
+        $this->addMediaConversion('thumb')
+            ->width(300)
+            ->height(300)
+            ->sharpen(10)
+            ->nonQueued(); // Fast generation for immediate API response
+    }
+
+    /**
+     * Check if the ad is unlocked for a specific user.
+     */
+    public function isUnlockedFor(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        // Owner always has access
+        if ($this->user_id === $user->id) {
+            return true;
+        }
+
+        // Check for successful unlock payment (assuming Payment model links user and ad)
+        return Payment::where('user_id', $user->id)
+            ->where('ad_id', $this->id)
+            ->where('type', 'unlock') // Assuming 'unlock' is the enum value or string
+            ->where('status', 'success') // Assuming 'success' is the enum value
+            ->exists();
+    }
+
+    /**
+     * Get images accessible to the current user context.
+     */
+    public function getAccessibleImages(?User $user): \Illuminate\Support\Collection
+    {
+        $media = $this->getMedia('images');
+
+        if ($media->isEmpty()) {
+            return collect();
+        }
+
+        if ($this->isUnlockedFor($user)) {
+            return $media;
+        }
+
+        // Return only the first image (primary)
+        return $media->take(1);
     }
 }

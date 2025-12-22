@@ -11,14 +11,14 @@ class QuarterRequest extends FormRequest
         if ($this->isMethod('post')) {
             return [
                 'name' => ['required', 'string', 'max:255', 'unique:quarter,name'],
-                'city_id' => ['required', 'integer', 'exists:city,id'],
+                'city_id' => ['required', 'uuid', 'exists:city,id'],
             ];
         }
 
         if ($this->isMethod('put') || $this->isMethod('patch')) {
             return [
                 'name' => ['sometimes', 'string', 'max:255', 'unique:quarter,name'],
-                'city_id' => ['sometimes', 'integer', 'exists:city,id'],
+                'city_id' => ['sometimes', 'uuid', 'exists:city,id'],
             ];
         }
 

@@ -24,6 +24,7 @@ class PaymentSeeder extends Seeder
             foreach ($adsToUnlock as $ad) {
                 $payment = Payment::factory()->create([
                     'user_id' => $customer->id,
+                    'ad_id' => $ad->id,
                     'amount' => $ad->price ?? fake()->randomFloat(2, 10, 100),
                     'status' => 'success',
                     'type' => 'unlock',

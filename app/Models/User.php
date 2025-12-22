@@ -16,8 +16,7 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasName;
 use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -100,10 +99,10 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  *
  * @mixin Eloquent
  */
-class User extends Authenticatable implements HasMedia, MustVerifyEmail, FilamentUser, HasName, HasAppAuthentication, HasAppAuthenticationRecovery, HasEmailAuthentication
+class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasEmailAuthentication, HasMedia, HasName, MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable, softDeletes;
+    use HasApiTokens, HasFactory, HasUuids, Notifiable, softDeletes;
 
     use InteractsWithMedia;
 
@@ -114,7 +113,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
      *
      * @var list<string>
      */
-    protected $fillable = ['firstname', 'lastname', 'email', 'password', 'phone_number', 'type', 'role', 'avatar', 'city_id', 'is_active', 'location', 'email_verified_at', 'last_login_ip', 'created_at', 'updated_at'];
+    protected $fillable = ['firstname', 'lastname', 'email', 'password', 'phone_number', 'type', 'role', 'avatar', 'city_id', 'is_active', 'location', 'agency_id', 'email_verified_at', 'last_login_ip', 'created_at', 'updated_at'];
 
     /**
      * The attributes that should be hidden for serialization.
@@ -138,7 +137,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
 
     private function validateAgentType(): void
     {
-        if ($this->role == 'agent' && !in_array($this->type, ['individual', 'agency'])) {
+        if ($this->role == 'agent' && ! in_array($this->type, ['individual', 'agency'])) {
             throw new InvalidArgumentException('Invalid agent type. Must be either "individual" or "agency".');
         }
     }
@@ -146,8 +145,8 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
     private function assignDefaultAvatar(): void
     {
         if (empty($this->avatar)) {
-            $name = trim($this->firstname . ' ' . $this->lastname ?: 'User');
-            $this->avatar = 'https://ui-avatars.com/api/?name=' . urlencode($name) . '&background=random';
+            $name = trim($this->firstname.' '.$this->lastname ?: 'User');
+            $this->avatar = 'https://ui-avatars.com/api/?name='.urlencode($name).'&background=random';
         }
     }
 
@@ -159,6 +158,11 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
     public function ads(): HasMany
     {
         return $this->hasMany(Ad::class);
+    }
+
+    public function agency(): belongsTo
+    {
+        return $this->belongsTo(agency::class);
     }
 
     public function payments(): HasMany
@@ -191,7 +195,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
 
     public function getFullnameAttribute(): string
     {
-        return trim(($this->firstname ?? '') . ' ' . ($this->lastname ?? ''));
+        return trim(($this->firstname ?? '').' '.($this->lastname ?? ''));
     }
 
     /**
@@ -292,7 +296,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Filamen
     }
 
     /**
-     * @param array<string> | null $codes
+     * @param  array<string> | null  $codes
      */
     public function saveAppAuthenticationRecoveryCodes(?array $codes): void
     {

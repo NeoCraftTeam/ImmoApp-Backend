@@ -11,6 +11,7 @@ class AdResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+
         return [
             'id' => $this->id,
             'title' => $this->title,
@@ -22,7 +23,10 @@ class AdResource extends JsonResource
             'bedrooms' => $this->bedrooms,
             'bathrooms' => $this->bathrooms,
             'has_parking' => $this->has_parking,
-            'location' => $this->location,
+            'location' => $this->location ? [
+                'latitude' => $this->location->getLatitude(),
+                'longitude' => $this->location->getLongitude(),
+            ] : null,
             'status' => $this->status,
             'expires_at' => $this->expires_at,
             'created_at' => $this->created_at,
@@ -31,17 +35,15 @@ class AdResource extends JsonResource
             'user' => new UserResource($this->whenLoaded('user')),
             'quarter' => new QuarterResource($this->whenLoaded('quarter')),
             'type' => new AdTypeResource($this->whenLoaded('ad_type')),
-            'images' => $this->when($this->relationLoaded('images'), function () {
-                return $this->images->map(function ($image) {
-                    return [
-                        'id' => $image->id,
-                        'path' => $image->image_path,
-                        'url' => Storage::url($image->image_path),
-                        'full_url' => url(Storage::url($image->image_path)),
-                        'is_primary' => (bool)$image->is_primary,
-                    ];
-                })->values();
-            }, []),
+            'images' => $this->getAccessibleImages($request->user())->map(function ($media) {
+                return [
+                    'id' => $media->id,
+                    'url' => $media->getUrl(),
+                    'thumb' => $media->getUrl('thumb'),
+                    'mime_type' => $media->mime_type,
+                    'is_primary' => $this->getMedia('images')->first()?->id === $media->id,
+                ];
+            }),
         ];
     }
 }

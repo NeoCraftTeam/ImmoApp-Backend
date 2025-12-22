@@ -14,6 +14,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ExportAction;
+use Filament\Actions\ExportBulkAction;
 use Filament\Actions\Exports\Enums\ExportFormat;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\ForceDeleteBulkAction;
@@ -51,6 +52,7 @@ class UserResource extends Resource
     protected static ?string $navigationLabel = 'Utilisateurs';
 
     protected static ?string $modelLabel = 'Utilisateur';
+
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -75,8 +77,8 @@ class UserResource extends Resource
                     ->required() // Le mot de passe est obligatoire.
                     ->revealable()
                     ->minLength(8) // Ajoutez des règles de validation (minimum 8 caractères)
-                    ->dehydrateStateUsing(fn(string $state): string => Hash::make($state)) // Hachage (Crucial!)
-                    ->dehydrated(fn(?string $state) => filled($state)), // S'assure que le champ n'est pas sauvegardé vide lors de l'édition
+                    ->dehydrateStateUsing(fn (string $state): string => Hash::make($state)) // Hachage (Crucial!)
+                    ->dehydrated(fn (?string $state) => filled($state)), // S'assure que le champ n'est pas sauvegardé vide lors de l'édition
 
                 TextInput::make('password_confirmation')
                     ->label('Confirmer le mot de passe')
@@ -110,6 +112,7 @@ class UserResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            // ->modifyQueryUsing(fn( $query) => $query->where('role', 'agent'))
             ->heading('Utilisateurs')
             ->description('Liste des utilisateurs')
             ->deferLoading()
@@ -121,11 +124,11 @@ class UserResource extends Resource
                     ->circular()
                     ->size(40)
                     ->searchable(),
-                TextColumn::make('firstname')
-                    ->searchable()
-                    ->sortable(),
-                TextColumn::make('lastname')
-                    ->searchable(),
+                TextColumn::make('full_name')
+                    ->label('Nom complet')
+                    ->formatStateUsing(function ($record) {
+                        return $record->firstname.' '.$record->lastname;
+                    })->searchable()->sortable(),
                 TextColumn::make('phone_number')
                     ->searchable()
                     ->copyable()
@@ -148,7 +151,7 @@ class UserResource extends Resource
                     ->badge()
                     ->searchable()
                     ->visible(false),
-                TextColumn::make('city.name')->label('city')
+                TextColumn::make('city.name')->label('Ville')
                     ->searchable(),
                 TextColumn::make('created_at')
                     ->isoDateTime('LLLL', 'Europe/Paris')
@@ -167,7 +170,7 @@ class UserResource extends Resource
                 TrashedFilter::make(),
                 Filter::make('is_active')->label('utilisateurs actifs')
                     ->toggle()
-                    ->query(fn(Builder $query) => $query->where('is_active', true)),
+                    ->query(fn (Builder $query) => $query->where('is_active', true)),
                 SelectFilter::make('role')->label('Filter par role')
                     ->options([
                         'admin' => 'Admin',
@@ -189,6 +192,13 @@ class UserResource extends Resource
                     ->iconButton(),
                 ForceDeleteAction::make(),
                 RestoreAction::make(),
+            ])->filters([
+                SelectFilter::make('role')
+                    ->options([
+                        'customer' => 'Clients',
+                        'agent' => 'Agents',
+                        'admin' => 'Admins',
+                    ])->native(false),
             ])->headerActions([
                 ImportAction::make()->label('Importer')
                     ->importer(UserImporter::class)
@@ -200,13 +210,16 @@ class UserResource extends Resource
                     ->formats([
                         ExportFormat::Csv,
                         ExportFormat::Xlsx,
-                    ])
+                    ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                     ForceDeleteBulkAction::make(),
                     RestoreBulkAction::make(),
+                    ExportBulkAction::make()
+                        ->label('Exporter')
+                        ->exporter(UserExporter::class),
                 ]),
             ]);
     }

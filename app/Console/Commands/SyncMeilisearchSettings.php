@@ -33,7 +33,7 @@ class SyncMeilisearchSettings extends Command
 
             return CommandAlias::SUCCESS;
         } catch (\Exception $e) {
-            $this->error('❌ Erreur lors de la synchronisation des paramètres Meilisearch : ' . $e->getMessage());
+            $this->error('❌ Erreur lors de la synchronisation des paramètres Meilisearch : '.$e->getMessage());
 
             return CommandAlias::FAILURE;
         }

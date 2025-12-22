@@ -42,6 +42,14 @@ fi
 print_message "🚀 Démarrage du script de déploiement Laravel"
 print_message "📍 Répertoire: $(pwd)"
 
+# 0. Récupérer le dernier code
+print_step "Récupération du dernier code (Git Pull)"
+git pull origin main || {
+    print_error "Git pull a échoué"
+    exit 1
+}
+print_success "Code mis à jour avec succès"
+
 # 1. Mettre l'application en maintenance
 print_step "Activation du mode maintenance"
 php artisan down --retry=60 --secret="deploy-secret-$(date +%s)" || {
@@ -70,15 +78,10 @@ composer install --no-dev --optimize-autoloader --no-interaction
 print_success "Dépendances Composer mises à jour"
 
 # 4. Migration de la base de données
+# 4. Migration de la base de données
 print_step "Migration de la base de données"
-read -p "Voulez-vous exécuter les migrations ? (y/N): " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    php artisan migrate --force
-    print_success "Migrations exécutées"
-else
-    print_warning "Migrations ignorées"
-fi
+php artisan migrate --force
+print_success "Migrations exécutées"
 
 # 5. Génération de L5 Swagger
 print_step "Génération de la documentation L5 Swagger"

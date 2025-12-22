@@ -13,6 +13,4 @@ namespace App\Swagger;
  *      @OA\Property(property="name", type="string"),
  * )
  */
-class CitySchema
-{
-}
+class CitySchema {}

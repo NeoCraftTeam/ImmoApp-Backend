@@ -4,16 +4,17 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     /**
      * Run the migrations.
      */
     public function up(): void
     {
         Schema::create('ad_images', function (Blueprint $table) {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('image_path')->nullable(false);
-            $table->foreignId('ad_id')->constrained('ad')->onDelete('cascade');
+            $table->foreignUuid('ad_id')->constrained('ad')->onDelete('cascade');
             $table->timestamps();
             $table->softDeletes();
         });

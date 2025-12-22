@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\QuarterFactory;
 use Eloquent;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -38,7 +39,7 @@ use Illuminate\Support\Carbon;
  */
 class Quarter extends Model
 {
-    use HasFactory, softDeletes;
+    use HasFactory, HasUuids, softDeletes;
 
     protected $table = 'quarter';
 

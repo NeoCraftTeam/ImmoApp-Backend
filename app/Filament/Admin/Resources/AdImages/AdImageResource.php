@@ -58,15 +58,16 @@ class AdImageResource extends Resource
                             ->label('Titre'),
                         TextEntry::make('images_count')
                             ->label('Nombre d\'images')
-                            ->state(fn($record) => $record->images()->count()),
+                            ->state(fn($record) => $record->getMedia('images')->count()),
                     ])
                     ->columns(2),
 
                 Section::make('Images')
                     ->schema([
-                        ImageEntry::make('images.image_path')
+                        ImageEntry::make('media')
                             ->label('')
                             ->size(200)
+                            ->state(fn($record) => $record->getMedia('images')->map(fn($media) => $media->getUrl())->toArray())
                             ->columnSpanFull(),
                     ]),
             ]);
@@ -89,14 +90,15 @@ class AdImageResource extends Resource
                     ->limit(50)
                     ->weight('bold'),
 
-                // Images empilées
-                ImageColumn::make('images.image_path')
+                // Images empilées via Spatie
+                ImageColumn::make('media')
                     ->label('Images')
                     ->circular()
                     ->stacked()
                     ->limit(5)
                     ->limitedRemainingText()
-                    ->ring(2),
+                    ->ring(2)
+                    ->state(fn($record) => $record->getMedia('images')->map(fn($media) => $media->getUrl())->toArray()),
 
                 TextColumn::make('created_at')
                     ->label('Créée le')
@@ -123,8 +125,8 @@ class AdImageResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->has('images') // Afficher uniquement les annonces qui ont des images
-            ->withCount('images');
+            ->whereHas('media') // Afficher uniquement les annonces qui ont des médias Spatie
+            ->withCount('media');
     }
 
     public static function getRecordRouteBindingEloquentQuery(): Builder

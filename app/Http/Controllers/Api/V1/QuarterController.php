@@ -291,7 +291,7 @@ class QuarterController
     public function show(string $id)
     {
         $quarterId = Quarter::find($id);
-        if (!$quarterId) {
+        if (! $quarterId) {
             return response()->json([
                 'message' => 'Ce quartier n\'existe pas',
             ], 404);
@@ -516,7 +516,7 @@ class QuarterController
 
             $deleted = $quarter->delete();
 
-            if (!$quarter) {
+            if (! $quarter) {
                 return response()->json([
                     'message' => 'Ce quartier n\'existe pas,',
                 ], 404);

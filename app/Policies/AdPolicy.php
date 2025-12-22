@@ -15,7 +15,7 @@ class AdPolicy
         return true;
     }
 
-    public function view(User $user): bool
+    public function view(?User $user, Ad $ad): bool
     {
         return true;
     }
@@ -27,7 +27,7 @@ class AdPolicy
 
     public function update(User $user, Ad $ad): bool
     {
-        return ($user->id === $ad->user_id);
+        return $user->id === $ad->user_id;
     }
 
     public function delete(User $user, Ad $ad): bool
