@@ -55,9 +55,11 @@ production_deploy:
     - docker-compose up -d --build
     
     # 3. Exécution des tâches Laravel à l'INTÉRIEUR du conteneur
+    # On active PostGIS sur la nouvelle DB Docker
+    - docker-compose exec -T db psql -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-keyhome} -c "CREATE EXTENSION IF NOT EXISTS postgis;"
     - docker-compose exec -T app php artisan migrate --force
     - docker-compose exec -T app php artisan optimize
-    - docker-compose exec -T app bash app/Scripts/resetFilamentLivewire.sh
+    - docker-compose exec -T app bash resetFilamentLivewire.sh # Le script est à la racine
     
   only:
     - main
