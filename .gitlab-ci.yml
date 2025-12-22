@@ -10,14 +10,20 @@ default:
 # --- ÉTAPE 1 : TESTS ---
 test_suite:
   stage: test
+  variables:
+    DB_CONNECTION: pgsql
+    DB_HOST: 127.0.0.1
+    DB_PORT: 5432
+    DB_DATABASE: testing
+    DB_USERNAME: postgres
+    DB_PASSWORD: password # <--- Assurez-vous que ce mot de passe est correct pour votre VPS
   script:
     - echo "🧪 Préparation des tests sur le VPS..."
-    # 1. Installer les dépendances en PREMIER pour éviter l'erreur autoload
     - composer install --no-ansi --no-interaction
-    # 2. Préparer l'environnement
     - cp .env.example .env.testing
     - php artisan key:generate --env=testing
-    # 3. Lancer les tests
+    # On force la création de la base de test si elle n'existe pas (optionnel mais recommandé)
+    # - sudo -u postgres psql -c "CREATE DATABASE testing;" || true
     - php artisan test --env=testing
   only:
     - branches
