@@ -78,8 +78,8 @@ class UserResource extends Resource
                     ->required() // Le mot de passe est obligatoire.
                     ->revealable()
                     ->minLength(8) // Ajoutez des règles de validation (minimum 8 caractères)
-                    ->dehydrateStateUsing(fn (string $state): string => Hash::make($state)) // Hachage (Crucial!)
-                    ->dehydrated(fn (?string $state) => filled($state)), // S'assure que le champ n'est pas sauvegardé vide lors de l'édition
+                    ->dehydrateStateUsing(fn(string $state): string => Hash::make($state)) // Hachage (Crucial!)
+                    ->dehydrated(fn(?string $state) => filled($state)), // S'assure que le champ n'est pas sauvegardé vide lors de l'édition
 
                 TextInput::make('password_confirmation')
                     ->label('Confirmer le mot de passe')
@@ -114,115 +114,144 @@ class UserResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
-            // ->modifyQueryUsing(fn( $query) => $query->where('role', 'agent'))
             ->heading('Utilisateurs')
             ->description('Liste des utilisateurs')
             ->deferLoading()
             ->striped()
             ->extremePaginationLinks()
             ->recordTitleAttribute('firstname')
-            ->columns([
-                ImageColumn::make('avatar')->label('Avatar')
-                    ->circular()
-                    ->size(40)
-                    ->searchable(),
-                TextColumn::make('full_name')
-                    ->label('Nom complet')
-                    ->formatStateUsing(fn ($record) => $record->firstname.' '.$record->lastname)->searchable()->sortable(),
-                TextColumn::make('phone_number')
-                    ->searchable()
-                    ->copyable()
-                    ->copyMessage('Phone number copied to clipboard!')
-                    ->copyMessageDuration(1500),
-                TextColumn::make('email')
-                    ->label('Email address')
-                    ->searchable()
-                    ->copyable()
-                    ->copyMessage('Email copied to clipboard!')
-                    ->copyMessageDuration(1500),
-                TextColumn::make('email_verified_at')
-                    ->dateTime('M j, Y H:i')
-                    ->sortable(),
-                TextColumn::make('type')
-                    ->badge()
-                    ->searchable()
-                    ->visible(false),
-                TextColumn::make('role')
-                    ->badge()
-                    ->searchable()
-                    ->visible(false),
-                TextColumn::make('city.name')->label('Ville')
-                    ->searchable(),
-                TextColumn::make('created_at')
-                    ->isoDateTime('LLLL', 'Europe/Paris')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: false),
-                TextColumn::make('updated_at')
-                    ->dateTime('M j, Y H:i')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: false),
-                TextColumn::make('deleted_at')
-                    ->dateTime('M j, Y H:i')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: false),
-            ])
-            ->filters([
-                TrashedFilter::make(),
-                Filter::make('is_active')->label('utilisateurs actifs')
-                    ->toggle()
-                    ->query(fn (Builder $query) => $query->where('is_active', true)),
-                SelectFilter::make('role')->label('Filter par role')
-                    ->options([
-                        'admin' => 'Admin',
-                        'agent' => 'Agent',
-                        'customer' => 'Customer',
-                    ])->native(false),
-                SelectFilter::make('type')->label('Filter par type')
-                    ->options([
-                        'individual' => 'Individual',
-                        'Agency' => 'Agency',
-                    ])->native(false),
-            ])
-            ->recordActions([
-                ViewAction::make()
-                    ->iconButton(),
-                EditAction::make()
-                    ->iconButton(),
-                DeleteAction::make()
-                    ->iconButton(),
-                ForceDeleteAction::make(),
-                RestoreAction::make(),
-            ])->filters([
-                SelectFilter::make('role')
-                    ->options([
-                        'customer' => 'Clients',
-                        'agent' => 'Agents',
-                        'admin' => 'Admins',
-                    ])->native(false),
-            ])->headerActions([
-                ImportAction::make()->label('Importer')
-                    ->importer(UserImporter::class)
-                    ->icon(Heroicon::ArrowUpTray),
-
-                ExportAction::make()->label('Exporter')
-                    ->exporter(UserExporter::class)
-                    ->icon(Heroicon::ArrowDownTray)
-                    ->formats([
-                        ExportFormat::Csv,
-                        ExportFormat::Xlsx,
-                    ]),
-            ])
-            ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                    ForceDeleteBulkAction::make(),
-                    RestoreBulkAction::make(),
-                    ExportBulkAction::make()
-                        ->label('Exporter')
-                        ->exporter(UserExporter::class),
-                ]),
-            ]);
+            ->columns(static::getTableColumns())
+            ->filters(static::getTableFilters())
+            ->recordActions(static::getTableRecordActions())
+            ->headerActions(static::getTableHeaderActions())
+            ->toolbarActions(static::getTableToolbarActions());
     }
+
+    public static function getTableColumns(): array
+    {
+        return [
+            ImageColumn::make('avatar')
+                ->label('Avatar')
+                ->circular()
+                ->size(40)
+                ->searchable(),
+            TextColumn::make('full_name')
+                ->label('Nom complet')
+                ->formatStateUsing(fn($record) => $record->firstname . ' ' . $record->lastname)
+                ->searchable()
+                ->sortable(),
+            TextColumn::make('phone_number')
+                ->searchable()
+                ->copyable()
+                ->copyMessage('Phone number copied to clipboard!')
+                ->copyMessageDuration(1500),
+            TextColumn::make('email')
+                ->label('Email address')
+                ->searchable()
+                ->copyable()
+                ->copyMessage('Email copied to clipboard!')
+                ->copyMessageDuration(1500),
+            TextColumn::make('email_verified_at')
+                ->dateTime('M j, Y H:i')
+                ->sortable(),
+            TextColumn::make('type')
+                ->badge()
+                ->searchable()
+                ->visible(false),
+            TextColumn::make('role')
+                ->badge()
+                ->searchable()
+                ->visible(false),
+            TextColumn::make('city.name')
+                ->label('Ville')
+                ->searchable(),
+            TextColumn::make('created_at')
+                ->isoDateTime('LLLL', 'Europe/Paris')
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: false),
+            TextColumn::make('updated_at')
+                ->dateTime('M j, Y H:i')
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: false),
+            TextColumn::make('deleted_at')
+                ->dateTime('M j, Y H:i')
+                ->sortable()
+                ->toggleable(isToggledHiddenByDefault: false),
+        ];
+    }
+
+    public static function getTableFilters(): array
+    {
+        return [
+            TrashedFilter::make(),
+            Filter::make('is_active')
+                ->label('utilisateurs actifs')
+                ->toggle()
+                ->query(fn(Builder $query) => $query->where('is_active', true)),
+            SelectFilter::make('role')
+                ->label('Filtrer par rôle')
+                ->options([
+                    'customer' => 'Clients',
+                    'agent' => 'Agents',
+                    'admin' => 'Admins',
+                ])
+                ->native(false),
+            SelectFilter::make('type')
+                ->label('Filtrer par type')
+                ->options([
+                    'individual' => 'Individual',
+                    'Agency' => 'Agency',
+                ])
+                ->native(false),
+        ];
+    }
+
+    public static function getTableRecordActions(): array
+    {
+        return [
+            ViewAction::make()
+                ->iconButton(),
+            EditAction::make()
+                ->iconButton(),
+            DeleteAction::make()
+                ->iconButton(),
+            ForceDeleteAction::make(),
+            RestoreAction::make(),
+        ];
+    }
+
+    public static function getTableHeaderActions(): array
+    {
+        return [
+            ImportAction::make()
+                ->label('Importer')
+                ->importer(UserImporter::class)
+                ->icon(Heroicon::ArrowUpTray),
+            ExportAction::make()
+                ->label('Exporter')
+                ->exporter(UserExporter::class)
+                ->icon(Heroicon::ArrowDownTray)
+                ->formats([
+                    ExportFormat::Csv,
+                    ExportFormat::Xlsx,
+                ]),
+        ];
+    }
+
+    public static function getTableToolbarActions(): array
+    {
+        return [
+            BulkActionGroup::make([
+                DeleteBulkAction::make(),
+                ForceDeleteBulkAction::make(),
+                RestoreBulkAction::make(),
+                ExportBulkAction::make()
+                    ->label('Exporter')
+                    ->exporter(UserExporter::class),
+            ]),
+        ];
+    }
+
 
     public static function getPages(): array
     {
