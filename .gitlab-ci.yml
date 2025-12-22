@@ -12,7 +12,7 @@ test_suite:
   stage: test
   script:
     - echo "🧪 Préparation des tests sur le VPS..."
-    # 1. Installer les dépendances en PREMIER
+    # 1. Installer les dépendances en PREMIER pour éviter l'erreur autoload
     - composer install --no-ansi --no-interaction
     # 2. Préparer l'environnement
     - cp .env.example .env.testing
@@ -29,6 +29,7 @@ production_deploy:
   script:
     - echo "🚀 Déploiement local sur le VPS..."
     - cd /var/www/ImmoApp-Backend || exit 1
+    # On s'assure d'être sur la bonne branche avant le pull
     - git fetch origin
     - git checkout main
     - git pull origin main

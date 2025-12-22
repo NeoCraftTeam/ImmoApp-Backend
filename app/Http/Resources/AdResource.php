@@ -1,0 +1,49 @@
+<?php
+
+namespace App\Http\Resources;
+
+use App\Models\Ad;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+/** @mixin Ad */
+class AdResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+
+        return [
+            'id' => $this->id,
+            'title' => $this->title,
+            'slug' => $this->slug,
+            'description' => $this->description,
+            'adresse' => $this->adresse,
+            'price' => $this->price,
+            'surface_area' => $this->surface_area,
+            'bedrooms' => $this->bedrooms,
+            'bathrooms' => $this->bathrooms,
+            'has_parking' => $this->has_parking,
+            'location' => $this->location ? [
+                'latitude' => $this->location->getLatitude(),
+                'longitude' => $this->location->getLongitude(),
+            ] : null,
+            'status' => $this->status,
+            'expires_at' => $this->expires_at,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+
+            'user' => new UserResource($this->whenLoaded('user')),
+            'quarter' => new QuarterResource($this->whenLoaded('quarter')),
+            'type' => new AdTypeResource($this->whenLoaded('ad_type')),
+            'images' => $this->getAccessibleImages($request->user())->map(function ($media) {
+                return [
+                    'id' => $media->id,
+                    'url' => $media->getUrl(),
+                    'thumb' => $media->getUrl('thumb'),
+                    'mime_type' => $media->mime_type,
+                    'is_primary' => $this->getMedia('images')->first()?->id === $media->id,
+                ];
+            }),
+        ];
+    }
+}
