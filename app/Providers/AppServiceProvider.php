@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\PersonalAccessToken;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Carbon;
@@ -48,6 +49,15 @@ class AppServiceProvider extends ServiceProvider
             );
 
             return $frontendUrl . '/verify-email?verify_url=' . urlencode($verifyUrl);
+        });
+
+        ResetPassword::createUrlUsing(function (object $notifiable, string $token) {
+            $frontendUrl = config('app.frontend_url', 'http://localhost:3000');
+            $link = "{$frontendUrl}/reset-password?token={$token}&email={$notifiable->getEmailForVerification()}";
+
+            \Illuminate\Support\Facades\Log::error("PASSWORD RESET LINK: " . $link); // Force LOG
+
+            return $link;
         });
     }
 }
