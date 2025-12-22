@@ -1,54 +1,36 @@
-image: php:8.2
-
 stages:
   - test
   - deploy
 
-cache:
-  key: ${CI_COMMIT_REF_SLUG}
-  paths:
-    - vendor/
+# Configuration globale pour utiliser UNIQUEMENT votre Runner VPS (0 minute GitLab consommée)
+default:
+  tags:
+    - self-hosted-shell
 
-services:
-  - name: postgis/postgis:15-3.3
-    alias: postgres
-    command: ["postgres", "-c", "fsync=off", "-c", "full_page_writes=off"]
-
-variables:
-  DB_CONNECTION: pgsql
-  DB_HOST: postgres
-  DB_PORT: 5432
-  DB_DATABASE: testing
-  DB_USERNAME: postgres
-  DB_PASSWORD: password
-  CACHE_DRIVER: redis
-  REDIS_HOST: redis
-
-# Étape 1 : Tests (Tourne sur le Runner GitLab pour isolation)
+# --- ÉTAPE 1 : TESTS ---
 test_suite:
   stage: test
-  before_script:
-    - apt-get update && apt-get install -y unzip git libzip-dev libicu-dev libpq-dev libpng-dev libonig-dev
-    - docker-php-ext-install pdo_pgsql zip intl exif bcmath gd
-    - pecl install redis && docker-php-ext-enable redis
-    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-    - composer install --no-ansi --no-interaction --no-progress --prefer-dist
-    - cp .env.example .env
-    - php artisan key:generate
   script:
-    - php artisan test
+    - echo "🧪 Lancement des tests sur le VPS..."
+    # On prépare un environnement de test local sur le VPS
+    - cp .env.example .env.testing
+    - php artisan key:generate --env=testing
+    - composer install --no-ansi --no-interaction
+    # Note : Assurez-vous d'avoir configuré une DB de test sur le VPS (ex: immo_testing)
+    - php artisan test --env=testing
   only:
     - branches
     - merge_requests
 
-# Étape 2 : Déploiement (Tourne sur VOTRE VPS - Gratuit, Zéro minute)
+# --- ÉTAPE 2 : DÉPLOIEMENT ---
 production_deploy:
   stage: deploy
   script:
-    - echo "🚀 Déploiement sur le VPS via Runner local..."
+    - echo "🚀 Déploiement local sur le VPS..."
     - cd /var/www/ImmoApp-Backend || exit 1
+    # On s'assure d'être sur la bonne branche avant le pull
+    - git fetch origin
+    - git checkout main
     - bash deploy.sh
-  tags:
-    - self-hosted-shell
   only:
     - main
