@@ -1,0 +1,37 @@
+stages:
+  - test
+  - deploy
+
+# Configuration globale pour utiliser UNIQUEMENT votre Runner VPS
+default:
+  tags:
+    - self-hosted-shell
+
+# --- ÉTAPE 1 : TESTS ---
+test_suite:
+  stage: test
+  script:
+    - echo "🧪 Préparation des tests sur le VPS..."
+    # 1. Installer les dépendances en PREMIER
+    - composer install --no-ansi --no-interaction
+    # 2. Préparer l'environnement
+    - cp .env.example .env.testing
+    - php artisan key:generate --env=testing
+    # 3. Lancer les tests
+    - php artisan test --env=testing
+  only:
+    - branches
+    - merge_requests
+
+# --- ÉTAPE 2 : DÉPLOIEMENT ---
+production_deploy:
+  stage: deploy
+  script:
+    - echo "🚀 Déploiement local sur le VPS..."
+    - cd /var/www/ImmoApp-Backend || exit 1
+    - git fetch origin
+    - git checkout main
+    - git pull origin main
+    - bash deploy.sh
+  only:
+    - main
