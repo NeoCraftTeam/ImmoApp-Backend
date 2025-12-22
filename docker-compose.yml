@@ -19,12 +19,12 @@ services:
     container_name: keyhome-web
     restart: unless-stopped
     ports:
-      - "8080:80" # On utilise le port 8080 pour ne pas entrer en conflit avec votre Nginx actuel
+      - "8080:80"
     volumes:
       - .:/var/www
       - .docker/nginx/conf.d:/etc/nginx/conf.d
     networks:
-      - immoapp-network
+      - keyhome-network
 
   # La base de données (Postgres + PostGIS)
   db:
@@ -46,12 +46,12 @@ services:
     container_name: keyhome-redis
     restart: unless-stopped
     networks:
-      - immoapp-network
+      - keyhome-network
 
 networks:
-  immoapp-network:
+  keyhome-network:
     driver: bridge
 
 volumes:
-  immoapp-db-data:
+  keyhome-db-data:
     driver: local
