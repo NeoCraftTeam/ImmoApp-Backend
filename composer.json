@@ -15,6 +15,7 @@
         "clickbar/laravel-magellan": "^2.0",
         "darkaonline/l5-swagger": "^9.0",
         "filament/filament": "~4.0",
+        "filament/spatie-laravel-media-library-plugin": "^4.3",
         "flowframe/laravel-trend": "*",
         "http-interop/http-factory-guzzle": "^1.2",
         "laravel/framework": "^12.0",
