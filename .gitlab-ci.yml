@@ -54,7 +54,8 @@ production_deploy:
     - docker-compose up -d --build
     
     # 3. Exécution des tâches Laravel à l'INTÉRIEUR du conteneur
-    # On utilise 'exec -T' (T pour non-interactif, évite les erreurs de terminal)
+    # On vide d'abord les caches qui pourraient contenir l'ancien 127.0.0.1
+    - docker-compose exec -T app php artisan optimize:clear
     - docker-compose exec -T app php artisan migrate --force
     - docker-compose exec -T app php artisan optimize
     - docker-compose exec -T app bash app/Scripts/resetFilamentLivewire.sh
