@@ -5,11 +5,11 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
+use App\Http\Requests\UnlockAdRequest;
 use App\Models\Ad;
 use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Annotated\Rules\Enum;
 use OpenApi\Annotations as OA;
 
 class PaymentController
@@ -42,13 +42,8 @@ class PaymentController
      *     @OA\Response(response=404, description="Ad not found")
      * )
      */
-    public function unlockAd(Request $request)
+    public function unlockAd(UnlockAdRequest $request)
     {
-        $request->validate([
-            'ad_id' => 'required|exists:ad,id',
-            'payment_method' => ['required', 'string', new \Illuminate\Validation\Rules\Enum(PaymentMethod::class)],
-        ]);
-
         $user = $request->user();
         $ad = Ad::findOrFail($request->ad_id);
 
@@ -56,17 +51,24 @@ class PaymentController
             return response()->json(['message' => 'Ad already unlocked'], 400);
         }
 
-        // Simulate payment gateway interaction here...
-        // For this implementation, we assume payment is always successful.
+        // -------------------------------------------------------------------------
+        // ⚠️ TODO: PROD - INTÉGRER LA PASSERELLE DE PAIEMENT RÉELLE ICI ⚠️
+        // -------------------------------------------------------------------------
+        // Actuellement, le paiement est SIMULÉ et toujours accepté.
+        // Avant la mise en prod, vous devez :
+        // 1. Appeler l'API de paiement (Orange Money, MTN, Stripe...)
+        // 2. Vérifier que la transaction est validée.
+        // 3. Ne créer l'enregistrement Payment QUE si le paiement est confirmé.
+        // -------------------------------------------------------------------------
 
         $payment = Payment::create([
             'user_id' => $user->id,
             'ad_id' => $ad->id,
-            'amount' => 100, // This could be dynamic based on Ad price or global setting
+            'amount' => 200, // This could be dynamic based on Ad price or global setting
             'status' => PaymentStatus::SUCCESS,
             'type' => PaymentType::UNLOCK,
             'payment_method' => PaymentMethod::from($request->payment_method),
-            'transaction_id' => 'TXN_' . strtoupper(Str::random(10)),
+            'transaction_id' => (string) Str::uuid(),
         ]);
 
         return response()->json([
