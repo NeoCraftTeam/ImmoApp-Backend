@@ -124,11 +124,11 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
     protected static function booted(): void
     {
-        static::saving(function ($user) {
+        static::saving(function ($user): void {
             $user->validateAgentType();
         });
 
-        static::creating(function ($user) {
+        static::creating(function ($user): void {
             if (empty($user->avatar)) {
                 $user->assignDefaultAvatar();
             }

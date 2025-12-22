@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 
-test('a user can request a password reset link', function () {
+test('a user can request a password reset link', function (): void {
     Notification::fake();
     $user = User::factory()->create();
 
@@ -21,7 +21,7 @@ test('a user can request a password reset link', function () {
     Notification::assertSentTo($user, ResetPassword::class);
 });
 
-test('a user can reset password with valid token', function () {
+test('a user can reset password with valid token', function (): void {
     Notification::fake();
     $user = User::factory()->create([
         'password' => bcrypt('OldPassword123!'),
@@ -47,7 +47,7 @@ test('a user can reset password with valid token', function () {
     expect(Hash::check('OldPassword123!', $user->password))->toBeFalse();
 });
 
-test('authenticated user can update password', function () {
+test('authenticated user can update password', function (): void {
     $user = User::factory()->create([
         'password' => bcrypt('CurrentPass1!'),
     ]);

@@ -116,13 +116,13 @@ class Ad extends Model implements HasMedia
     {
         parent::boot();
 
-        static::creating(function ($ad) {
+        static::creating(function ($ad): void {
             if (empty($ad->slug)) { // <-- garantie que même null sera généré
                 $ad->slug = self::generateUniqueSlug($ad->title);
             }
         });
 
-        static::updating(function ($ad) {
+        static::updating(function ($ad): void {
             if ($ad->isDirty('title')) {
                 $ad->slug = self::generateUniqueSlug($ad->title, $ad->id);
             }

@@ -2,7 +2,7 @@
 
 use Illuminate\Support\Facades\RateLimiter;
 
-test('login endpoint is rate limited', function () {
+test('login endpoint is rate limited', function (): void {
     RateLimiter::clear('api');
 
     for ($i = 0; $i < 5; $i++) {
@@ -20,7 +20,7 @@ test('login endpoint is rate limited', function () {
     $response->assertStatus(429);
 });
 
-test('public api endpoints have basic security headers', function () {
+test('public api endpoints have basic security headers', function (): void {
     $response = $this->getJson('/api/v1/ads');
 
     $response->assertStatus(200);

@@ -1356,11 +1356,11 @@ class AdController
             if ($field === 'city') {
                 $rows = DB::table('city')
                     ->join('quarter', 'quarter.city_id', '=', 'city.id')
-                    ->join('ad', function ($join) {
+                    ->join('ad', function ($join): void {
                         $join->on('ad.quarter_id', '=', 'quarter.id')
                             ->where('ad.status', '=', 'available');
                     })
-                    ->when($q !== '', function ($query) use ($likeOperator, $prefix) {
+                    ->when($q !== '', function ($query) use ($likeOperator, $prefix): void {
                         $query->where('city.name', $likeOperator, $prefix);
                     })
                     ->groupBy('city.name')
@@ -1370,11 +1370,11 @@ class AdController
                     ->get();
             } elseif ($field === 'type') {
                 $rows = DB::table('ad_type')
-                    ->join('ad', function ($join) {
+                    ->join('ad', function ($join): void {
                         $join->on('ad.type_id', '=', 'ad_type.id')
                             ->where('ad.status', '=', 'available');
                     })
-                    ->when($q !== '', function ($query) use ($likeOperator, $prefix) {
+                    ->when($q !== '', function ($query) use ($likeOperator, $prefix): void {
                         $query->where('ad_type.name', $likeOperator, $prefix);
                     })
                     ->groupBy('ad_type.name')
@@ -1384,11 +1384,11 @@ class AdController
                     ->get();
             } else { // quarter
                 $rows = DB::table('quarter')
-                    ->join('ad', function ($join) {
+                    ->join('ad', function ($join): void {
                         $join->on('ad.quarter_id', '=', 'quarter.id')
                             ->where('ad.status', '=', 'available');
                     })
-                    ->when($q !== '', function ($query) use ($likeOperator, $prefix) {
+                    ->when($q !== '', function ($query) use ($likeOperator, $prefix): void {
                         $query->where('quarter.name', $likeOperator, $prefix);
                     })
                     ->groupBy('quarter.name')

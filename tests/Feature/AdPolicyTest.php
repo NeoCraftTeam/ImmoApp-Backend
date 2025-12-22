@@ -4,7 +4,7 @@ use App\Models\Ad;
 use App\Models\User;
 use Laravel\Sanctum\Sanctum;
 
-test('user can update own ad', function () {
+test('user can update own ad', function (): void {
     $user = User::factory()->create();
     $ad = Ad::factory()->create(['user_id' => $user->id]);
 
@@ -34,7 +34,7 @@ test('user can update own ad', function () {
     ]);
 });
 
-test('user cannot update other user ad', function () {
+test('user cannot update other user ad', function (): void {
     $owner = User::factory()->create();
     $attacker = User::factory()->create();
     $ad = Ad::factory()->create(['user_id' => $owner->id]);
@@ -47,7 +47,7 @@ test('user cannot update other user ad', function () {
     $response->assertStatus(403); // Forbidden
 });
 
-test('user cannot delete other user ad', function () {
+test('user cannot delete other user ad', function (): void {
     $owner = User::factory()->create();
     $attacker = User::factory()->create(['role' => 'customer']); // Force Customer
     $ad = Ad::factory()->create(['user_id' => $owner->id]);

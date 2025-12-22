@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 // Attention : Laravel Factory UserFactory utilise "POINT($longitude $latitude)".
 // AdFactory utilise Clickbar Magellan $point->toWKT().
 
-test('can search ads nearby a location', function () {
+test('can search ads nearby a location', function (): void {
     // Créer une annonce à Paris (48.8566, 2.3522)
     // On va utiliser des coordonnées brutes via DB raw pour s'assurer du format PostGIS sans dépendre de la factory complexe
     // Ou mieux : utiliser la factory si elle marche bien.
@@ -48,7 +48,7 @@ test('can search ads nearby a location', function () {
     expect($data[1]['id'])->toBe($marseilleAd->id); // Marseille est à 700km
 });
 
-test('nearby search requires coordinates', function () {
+test('nearby search requires coordinates', function (): void {
     $response = $this->getJson('/api/v1/ads/nearby');
     $response->assertStatus(422); // Validation error
 });

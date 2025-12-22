@@ -7,7 +7,7 @@ use App\Models\Payment;
 use App\Models\User;
 use Laravel\Sanctum\Sanctum;
 
-test('authenticated user can unlock ad', function () {
+test('authenticated user can unlock ad', function (): void {
     $user = User::factory()->create();
     $ad = Ad::factory()->create();
 
@@ -29,7 +29,7 @@ test('authenticated user can unlock ad', function () {
     ]);
 });
 
-test('user cannot unlock already unlocked ad', function () {
+test('user cannot unlock already unlocked ad', function (): void {
     $user = User::factory()->create();
     $ad = Ad::factory()->create();
 
@@ -51,7 +51,7 @@ test('user cannot unlock already unlocked ad', function () {
         ->assertJson(['message' => 'Ad already unlocked']);
 });
 
-test('guest cannot unlock ad', function () {
+test('guest cannot unlock ad', function (): void {
     $ad = Ad::factory()->create();
 
     $response = $this->postJson('/api/v1/payments/unlock', [

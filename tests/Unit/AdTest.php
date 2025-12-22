@@ -6,21 +6,21 @@ use App\Models\Ad;
 use App\Models\Payment;
 use App\Models\User;
 
-test('owner can always view full ad', function () {
+test('owner can always view full ad', function (): void {
     $owner = User::factory()->create();
     $ad = Ad::factory()->create(['user_id' => $owner->id]);
 
     expect($ad->isUnlockedFor($owner))->toBeTrue();
 });
 
-test('guest cannot view locked ad', function () {
+test('guest cannot view locked ad', function (): void {
     $ad = Ad::factory()->create();
     $guest = User::factory()->create();
 
     expect($ad->isUnlockedFor($guest))->toBeFalse();
 });
 
-test('user who paid can view ad', function () {
+test('user who paid can view ad', function (): void {
     $user = User::factory()->create();
     $ad = Ad::factory()->create();
 

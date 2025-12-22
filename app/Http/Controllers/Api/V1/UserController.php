@@ -721,7 +721,7 @@ class UserController
         $this->authorize('delete', $user);
 
         try {
-            DB::transaction(function () use ($user) {
+            DB::transaction(function () use ($user): void {
                 // Si tu gères des médias ou autres relations
                 $user->clearMediaCollection('avatars');
 

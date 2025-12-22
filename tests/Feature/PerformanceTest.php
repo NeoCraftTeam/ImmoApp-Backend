@@ -7,7 +7,7 @@ use App\Models\Quarter;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
-test('ad list endpoint is optimized and has no N+1 queries', function () {
+test('ad list endpoint is optimized and has no N+1 queries', function (): void {
     // Setup data
     $user = User::factory()->create();
     $city = City::factory()->create();

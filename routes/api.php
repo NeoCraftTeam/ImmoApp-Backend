@@ -12,10 +12,10 @@ use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Support\Facades\Route;
 
 // Prefix routes
-Route::prefix('v1')->group(function () {
+Route::prefix('v1')->group(function (): void {
 
     //  Auth
-    Route::prefix('auth')->controller(AuthController::class)->group(function () {
+    Route::prefix('auth')->controller(AuthController::class)->group(function (): void {
         // Public routes with throttling(rate limiting)
         Route::post('registerCustomer', [AuthController::class, 'registerCustomer'])
             ->middleware('throttle:5,1'); // 5 attempts per minute
@@ -39,7 +39,7 @@ Route::prefix('v1')->group(function () {
         Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:3,10');
 
         // Routes protégées
-        Route::middleware('auth:sanctum')->group(function () {
+        Route::middleware('auth:sanctum')->group(function (): void {
             Route::post('logout', [AuthController::class, 'logout']);
             Route::post('refresh', [AuthController::class, 'refresh']);
             Route::get('me', [AuthController::class, 'me']);
@@ -49,7 +49,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // adType
-    Route::middleware('auth:sanctum')->controller(AdTypeController::class)->group(function () {
+    Route::middleware('auth:sanctum')->controller(AdTypeController::class)->group(function (): void {
         Route::get('/ad-types', 'index');
         Route::get('/ad-types/{adType}', 'show');
         Route::post('/ad-types', 'store');
@@ -58,7 +58,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // City
-    Route::controller(CityController::class)->group(function () {
+    Route::controller(CityController::class)->group(function (): void {
         Route::get('/cities', 'index');
         Route::get('/cities/{id}', 'show');
         Route::post('/cities', 'store')->middleware('auth:sanctum');
@@ -67,7 +67,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // Quarter
-    Route::controller(QuarterController::class)->group(function () {
+    Route::controller(QuarterController::class)->group(function (): void {
         Route::get('/quarters', 'index');
         Route::get('/quarters/{id}', 'show');
         Route::post('/quarters', 'store')->middleware('auth:sanctum');
@@ -76,7 +76,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // Agency
-    Route::controller(AgencyController::class)->group(function () {
+    Route::controller(AgencyController::class)->group(function (): void {
         Route::get('/agencies', 'index');
         Route::get('/agencies/{agency}', 'show');
         Route::post('/agencies', 'store')->middleware('auth:sanctum');
@@ -85,7 +85,7 @@ Route::prefix('v1')->group(function () {
     });
 
     // User
-    Route::middleware('auth:sanctum')->controller(UserController::class)->group(function () {
+    Route::middleware('auth:sanctum')->controller(UserController::class)->group(function (): void {
         Route::get('/users', 'index');
         Route::get('/users/{id}', 'show');
         Route::post('/users', 'store');
@@ -102,7 +102,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/payments/callback', [PaymentController::class, 'callback']); // Route de retour utilisateur
 
     //  Ads
-    Route::prefix('ads')->controller(AdController::class)->group(function () {
+    Route::prefix('ads')->controller(AdController::class)->group(function (): void {
         Route::get('/', 'index');
         // Public nearby search by coordinates
         Route::get('/nearby', 'ads_nearby_public');
@@ -112,7 +112,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/autocomplete', 'autocomplete')->name('ads.autocomplete');
         Route::get('/facets', 'facets')->name('ads.facets');
 
-        Route::middleware('auth:sanctum')->group(function () {
+        Route::middleware('auth:sanctum')->group(function (): void {
             // Routes spécifiques AVANT les routes avec paramètres génériques
             Route::get('/{user}/nearby', 'ads_nearby_user');
 

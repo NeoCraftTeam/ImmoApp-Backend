@@ -5,12 +5,12 @@ use App\Models\Payment;
 use App\Models\User;
 use Laravel\Sanctum\Sanctum;
 
-test('recommendations endpoint returns 401 for guest', function () {
+test('recommendations endpoint returns 401 for guest', function (): void {
     $response = $this->getJson('/api/v1/recommendations');
     $response->assertStatus(401);
 });
 
-test('cold start returns latest ads for user without history', function () {
+test('cold start returns latest ads for user without history', function (): void {
     $user = User::factory()->create();
     Ad::factory(5)->create(['status' => 'available', 'created_at' => now()->subDays(1)]);
     Ad::factory(5)->create(['status' => 'available', 'created_at' => now()]); // Plus récents
@@ -23,7 +23,7 @@ test('cold start returns latest ads for user without history', function () {
         ->assertJsonCount(10, 'data');
 });
 
-test('returns personalized recommendations for user with history', function () {
+test('returns personalized recommendations for user with history', function (): void {
     $user = User::factory()->create();
 
     // Créer une annonce cible que l'utilisateur a aimée (débloquée)

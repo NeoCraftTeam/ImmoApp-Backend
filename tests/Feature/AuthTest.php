@@ -3,7 +3,7 @@
 use App\Models\User;
 use Illuminate\Support\Facades\Notification;
 
-test('customer can login with valid credentials', function () {
+test('customer can login with valid credentials', function (): void {
     $user = User::factory()->create([
         'email' => 'test@example.com',
         'password' => bcrypt('password'),
@@ -20,7 +20,7 @@ test('customer can login with valid credentials', function () {
         ->assertJsonStructure(['access_token']);
 });
 
-test('login fails with invalid credentials', function () {
+test('login fails with invalid credentials', function (): void {
     User::factory()->create([
         'email' => 'test@example.com',
         'password' => bcrypt('password'),
@@ -36,7 +36,7 @@ test('login fails with invalid credentials', function () {
 
 use App\Models\City;     // Ajout import
 
-test('customer can register', function () {
+test('customer can register', function (): void {
     Notification::fake();
     $city = City::factory()->create();
 

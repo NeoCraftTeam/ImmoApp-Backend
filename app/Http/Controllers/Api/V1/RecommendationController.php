@@ -88,12 +88,12 @@ class RecommendationController
             $recommendations = Ad::with(['quarter.city', 'ad_type', 'media', 'user'])
                 ->whereNotIn('id', $seenAdIds)
                 ->where('status', 'available')
-                ->where(function (Builder $query) use ($preferredTypeIds, $preferredCityIds, $minPrice, $maxPrice) {
-                    $query->where(function ($q) use ($preferredTypeIds, $minPrice, $maxPrice) {
+                ->where(function (Builder $query) use ($preferredTypeIds, $preferredCityIds, $minPrice, $maxPrice): void {
+                    $query->where(function ($q) use ($preferredTypeIds, $minPrice, $maxPrice): void {
                         $q->whereIn('type_id', $preferredTypeIds)
                             ->whereBetween('price', [$minPrice, $maxPrice]);
                     })
-                        ->orWhereHas('quarter', function ($q) use ($preferredCityIds) {
+                        ->orWhereHas('quarter', function ($q) use ($preferredCityIds): void {
                             $q->whereIn('city_id', $preferredCityIds);
                         });
                 })
