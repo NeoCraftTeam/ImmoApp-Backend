@@ -16,7 +16,7 @@ class PaymentFactory extends Factory
     public function definition(): array
     {
         return [
-            'type' => fake()->randomElement(['unlock', 'boost', 'suscription']),
+            'type' => fake()->randomElement(['unlock', 'boost', 'subscription']),
             'amount' => fake()->randomFloat(2, 1, 1000),
             'status' => fake()->randomElement(['pending', 'success', 'failed']),
             'transaction_id' => fake()->uuid(),

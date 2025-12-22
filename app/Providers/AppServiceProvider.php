@@ -25,6 +25,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        \App\Models\Payment::observe(\App\Observers\PaymentObserver::class);
+
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
         VerifyEmail::toMailUsing(function (object $notifiable, string $url) {
@@ -45,7 +47,7 @@ class AppServiceProvider extends ServiceProvider
                 ]
             );
 
-            return $frontendUrl.'/verify-email?verify_url='.urlencode($verifyUrl);
+            return $frontendUrl . '/verify-email?verify_url=' . urlencode($verifyUrl);
         });
     }
 }

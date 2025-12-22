@@ -11,9 +11,11 @@
 |
 */
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
 pest()->extend(Tests\TestCase::class)
-    // ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
-    ->in('Feature');
+    ->use(RefreshDatabase::class)
+    ->in('Feature', 'Unit');
 
 /*
 |--------------------------------------------------------------------------

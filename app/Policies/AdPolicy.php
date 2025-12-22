@@ -15,7 +15,7 @@ class AdPolicy
         return true;
     }
 
-    public function view(User $user): bool
+    public function view(?User $user, Ad $ad): bool
     {
         return true;
     }
