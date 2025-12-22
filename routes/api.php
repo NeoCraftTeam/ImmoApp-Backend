@@ -109,14 +109,14 @@ Route::prefix('v1')->group(function () {
 
         Route::middleware('auth:sanctum')->group(function () {
             // Routes spécifiques AVANT les routes avec paramètres génériques
-            Route::get('/{user}/nearby', 'ads_nearby_user')->whereNumber('user');
+            Route::get('/{user}/nearby', 'ads_nearby_user');
 
             Route::post('', 'store');
             Route::put('/{ad}', 'update');
-            Route::delete('/{id}', 'destroy')->whereNumber('id');
+            Route::delete('/{id}', 'destroy');
         });
 
         // Cette route DOIT être en dernier pour ne pas capturer d'autres patterns
-        Route::get('/{id}', 'show')->whereNumber('id');
+        Route::get('/{id}', 'show');
     });
 });
