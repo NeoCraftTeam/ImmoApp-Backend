@@ -4209,7 +4209,7 @@
         "/api/v1/recommendations": {
             "get": {
                 "tags": [
-                    "🤖 Recommandations"
+                    "⭐ Recommandations"
                 ],
                 "summary": "Recommandations personnalisées",
                 "description": "Retourne une liste d'annonces recommandées en fonction des précédents déblocages (paiements) de l'utilisateur.\n     *\n     *     Fonctionnement :\n     *     1. L'API identifie qui appelle ($user->id).\n     *     2. Elle récupère uniquement les paiements de ce client.\n     *     3. Elle calcule SES préférences (le type d'appartement qu'IL aime, la ville où IL cherche, SON budget moyen).\n     *     4. Elle cherche des annonces qui correspondent à SES critères.\n     *\n     *     Exemples concrets :\n     *     - Paul, qui a débloqué 2 appartements à Douala à 200.000 FCFA, verra des Appartements à Douala (~200k).\n     *     - Marie, qui a débloqué des villas à Yaoundé à 1.000.000 FCFA, verra des Villas à Yaoundé (~1M).\n     *     - Nouveau Client, qui n'a rien fait, verra les annonces les plus récentes (Cold Start).",
@@ -5855,12 +5855,12 @@
             "description": "Filtrer les annonces"
         },
         {
-            "name": "Payments",
-            "description": "Payments"
+            "name": "⭐ Recommandations",
+            "description": "Gestion des recommandations"
         },
         {
-            "name": "🤖 Recommandations",
-            "description": "🤖 Recommandations"
+            "name": "Payments",
+            "description": "Payments"
         }
     ]
 }

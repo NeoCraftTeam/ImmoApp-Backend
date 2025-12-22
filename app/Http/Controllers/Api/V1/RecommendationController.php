@@ -30,7 +30,7 @@ class RecommendationController
      *     - Paul, qui a débloqué 2 appartements à Douala à 200.000 FCFA, verra des Appartements à Douala (~200k).
      *     - Marie, qui a débloqué des villas à Yaoundé à 1.000.000 FCFA, verra des Villas à Yaoundé (~1M).
      *     - Nouveau Client, qui n'a rien fait, verra les annonces les plus récentes (Cold Start).",
-     *     tags={"🤖 Recommandations"},
+     *     tags={"⭐ Recommandations"},
      *     security={{"bearerAuth":{}}},
      *     @OA\Response(
      *         response=200,
