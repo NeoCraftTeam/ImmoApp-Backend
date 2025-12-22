@@ -14,6 +14,7 @@ RUN apk add --no-cache \
     freetype-dev \
     libjpeg-turbo-dev \
     oniguruma-dev \
+    gettext-dev \
     shadow
 
 # Configuration et installation des extensions PHP
@@ -25,7 +26,9 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     pdo_pgsql \
     mbstring \
     zip \
-    opcache
+    opcache \
+    exif \
+    gettext
 
 # Installation de Redis via PECL
 RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
