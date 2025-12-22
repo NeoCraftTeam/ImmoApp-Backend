@@ -79,10 +79,10 @@ echo -e "${YELLOW}🔒 ÉTAPE 4: Configuration des permissions...${NC}"
 chmod -R 775 storage bootstrap/cache
 echo "✓ Permissions configurées"
 
-# Si vous utilisez www-data (Nginx/Apache)
+# Si vous utilisez www-data (Nginx/Apache/Docker)
 if id "www-data" &>/dev/null; then
-    chown -R gitlab-runner:www-data storage bootstrap/cache
-    echo "✓ Propriétaire défini (gitlab-runner:www-data)"
+    chown -R www-data:www-data storage bootstrap/cache
+    echo "✓ Propriétaire défini (www-data:www-data)"
 fi
 
 # ==========================================
