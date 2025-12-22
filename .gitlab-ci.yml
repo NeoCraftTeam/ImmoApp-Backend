@@ -23,8 +23,8 @@ test_suite:
     - composer install --no-ansi --no-interaction
     - cp .env.example .env.testing
     - php artisan key:generate --env=testing
-    # On s'assure que la DB de test est prête (si vous avez donné les droits sudo au runner)
-    # - php artisan db:wipe --env=testing || true 
+    # On vérifie que le style du code est parfait
+    - ./vendor/bin/pint --test
     - php artisan migrate --env=testing --force
     - php artisan test --env=testing
   only:
