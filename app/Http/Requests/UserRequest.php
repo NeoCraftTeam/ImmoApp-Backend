@@ -67,6 +67,7 @@ class UserRequest extends FormRequest
         return ['location'];
     }
 
+    #[\Override]
     public function messages(): array
     {
         return [

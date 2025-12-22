@@ -53,6 +53,7 @@ class AdResource extends Resource
 
     protected static ?string $modelLabel = 'Annonce';
 
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -116,6 +117,7 @@ class AdResource extends Resource
             ]);
     }
 
+    #[\Override]
     public static function infolist(Schema $schema): Schema
     {
         return $schema
@@ -161,6 +163,7 @@ class AdResource extends Resource
             ]);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return $table

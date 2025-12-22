@@ -13,6 +13,7 @@ class AdsByTypeChart extends ChartWidget
 
     protected int|string|array $columnSpan = 1;
 
+    #[\Override]
     protected function getData(): array
     {
         $data = Ad::join('ad_type', 'ad.type_id', '=', 'ad_type.id')

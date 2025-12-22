@@ -29,6 +29,7 @@ class UserChart extends ChartWidget
         ];
     }
 
+    #[\Override]
     protected function getData(): array
     {
         $activeFilter = $this->filter;
@@ -72,6 +73,7 @@ class UserChart extends ChartWidget
     }
 
     // Options supplémentaires du graphique
+    #[\Override]
     protected function getOptions(): array
     {
         return [

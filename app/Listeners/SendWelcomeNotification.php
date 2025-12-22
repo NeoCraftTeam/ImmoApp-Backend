@@ -97,37 +97,24 @@ class SendWelcomeNotification implements ShouldQueue
     private function handleRoleSpecificActions($user): void
     {
         try {
-            switch ($user->role) {
-                case 'customer':
-                    // Actions pour les clients
-                    Log::info('Customer welcome actions triggered', [
-                        'user_id' => $user->id,
-                    ]);
-                    // Exemple : créer un profil client, assigner des préférences par défaut
-                    break;
-
-                case 'agent':
-                    // Actions pour les agents
-                    Log::info('Agent welcome actions triggered', [
-                        'user_id' => $user->id,
-                    ]);
-                    // Exemple : créer un profil d'agent, assigner territoires
-                    break;
-
-                case 'admin':
-                    // Actions pour les admins
-                    Log::info('Admin welcome actions triggered', [
-                        'user_id' => $user->id,
-                    ]);
-                    // Exemple : notifier les super-admins
-                    break;
-
-                default:
-                    Log::info('Default welcome actions triggered', [
-                        'user_id' => $user->id,
-                        'role' => $user->role,
-                    ]);
-            }
+            match ($user->role) {
+                // Actions pour les clients
+                'customer' => Log::info('Customer welcome actions triggered', [
+                    'user_id' => $user->id,
+                ]),
+                // Actions pour les agents
+                'agent' => Log::info('Agent welcome actions triggered', [
+                    'user_id' => $user->id,
+                ]),
+                // Actions pour les admins
+                'admin' => Log::info('Admin welcome actions triggered', [
+                    'user_id' => $user->id,
+                ]),
+                default => Log::info('Default welcome actions triggered', [
+                    'user_id' => $user->id,
+                    'role' => $user->role,
+                ]),
+            };
 
         } catch (Exception $e) {
             Log::warning('Failed to handle role-specific actions', [

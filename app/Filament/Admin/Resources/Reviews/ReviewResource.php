@@ -39,6 +39,7 @@ class ReviewResource extends Resource
 
     protected static ?string $modelLabel = 'Avis clients';
 
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -57,6 +58,7 @@ class ReviewResource extends Resource
             ]);
     }
 
+    #[\Override]
     public static function infolist(Schema $schema): Schema
     {
         return $schema
@@ -82,6 +84,7 @@ class ReviewResource extends Resource
             ]);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return $table

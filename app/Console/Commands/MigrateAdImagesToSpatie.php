@@ -59,9 +59,7 @@ class MigrateAdImagesToSpatie extends Command
             if (\Illuminate\Support\Facades\Storage::disk('public')->exists($relativePath)) {
                 try {
                     // Check if already migrated
-                    $alreadyMigrated = $ad->getMedia('images')->contains(function ($media) use ($oldImage) {
-                        return $media->getCustomProperty('old_id') === $oldImage->id;
-                    });
+                    $alreadyMigrated = $ad->getMedia('images')->contains(fn ($media) => $media->getCustomProperty('old_id') === $oldImage->id);
 
                     if (! $alreadyMigrated) {
                         $ad->addMediaFromDisk($relativePath, 'public')

@@ -46,6 +46,7 @@ class RegisterRequest extends FormRequest
         ];
     }
 
+    #[\Override]
     public function messages(): array
     {
         return [

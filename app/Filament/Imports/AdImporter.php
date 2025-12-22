@@ -78,6 +78,7 @@ class AdImporter extends Importer
         return $body;
     }
 
+    #[\Override]
     public function resolveRecord(): Ad
     {
         return Ad::firstOrNew([

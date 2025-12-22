@@ -40,6 +40,7 @@ class PaymentResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'id';
 
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -69,6 +70,7 @@ class PaymentResource extends Resource
             ]);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return $table

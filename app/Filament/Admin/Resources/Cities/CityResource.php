@@ -42,6 +42,7 @@ class CityResource extends Resource
 
     protected static ?string $modelLabel = 'Ville';
 
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -51,6 +52,7 @@ class CityResource extends Resource
             ]);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return $table

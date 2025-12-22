@@ -7,6 +7,7 @@ use Filament\Schemas\Schema;
 
 class EditProfile extends BaseEditProfile
 {
+    #[\Override]
     public function form(Schema $schema): Schema
     {
         return $schema

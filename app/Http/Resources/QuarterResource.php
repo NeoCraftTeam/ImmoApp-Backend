@@ -9,6 +9,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /** @mixin Quarter */
 class QuarterResource extends JsonResource
 {
+    #[\Override]
     public function toArray(Request $request): array
     {
         // 🔥 DEBUG temporaire

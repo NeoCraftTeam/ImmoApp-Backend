@@ -956,8 +956,8 @@ class AdController
                 ->selectRaw('ST_Y(location) as lat, ST_X(location) as lng')
                 ->first();
             if ($row) {
-                $lat = $lat ?? (is_numeric($row->lat) ? (float) $row->lat : null);
-                $long = $long ?? (is_numeric($row->lng) ? (float) $row->lng : null);
+                $lat ??= is_numeric($row->lat) ? (float) $row->lat : null;
+                $long ??= is_numeric($row->lng) ? (float) $row->lng : null;
             }
         }
 
@@ -1007,14 +1007,12 @@ class AdController
                     ->get();
             }
 
-            $coordinates = $ads->map(function (Ad $ad) {
-                return [
-                    'id' => $ad->id,
-                    'latitude' => isset($ad->lat) ? (float) $ad->lat : null,
-                    'longitude' => isset($ad->lng) ? (float) $ad->lng : null,
-                    'distance' => round($ad->distance ?? 0, 2),
-                ];
-            })->values();
+            $coordinates = $ads->map(fn (Ad $ad) => [
+                'id' => $ad->id,
+                'latitude' => isset($ad->lat) ? (float) $ad->lat : null,
+                'longitude' => isset($ad->lng) ? (float) $ad->lng : null,
+                'distance' => round($ad->distance ?? 0, 2),
+            ])->values();
 
             return response()->json([
                 'success' => true,

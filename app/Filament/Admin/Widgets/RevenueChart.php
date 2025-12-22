@@ -15,6 +15,7 @@ class RevenueChart extends ChartWidget
 
     protected int|string|array $columnSpan = 1;
 
+    #[\Override]
     protected function getData(): array
     {
         $data = Trend::model(Payment::class)
@@ -45,6 +46,7 @@ class RevenueChart extends ChartWidget
         return 'line';
     }
 
+    #[\Override]
     protected function getOptions(): array
     {
         return [

@@ -16,6 +16,7 @@ class AppServiceProvider extends ServiceProvider
     /**
      * Register any application services.
      */
+    #[\Override]
     public function register(): void
     {
         //
@@ -34,11 +35,9 @@ class AppServiceProvider extends ServiceProvider
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
-        VerifyEmail::toMailUsing(function (object $notifiable, string $url) {
-            return (new MailMessage)
-                ->subject('Vérifiez votre adresse email')
-                ->view('emails.verify-email', ['url' => $url, 'user' => $notifiable]);
-        });
+        VerifyEmail::toMailUsing(fn (object $notifiable, string $url) => (new MailMessage)
+            ->subject('Vérifiez votre adresse email')
+            ->view('emails.verify-email', ['url' => $url, 'user' => $notifiable]));
 
         VerifyEmail::createUrlUsing(function ($notifiable) {
             $frontendUrl = config('app.email_verify_callback');
@@ -48,7 +47,7 @@ class AppServiceProvider extends ServiceProvider
                 Carbon::now()->addMinutes(config('auth.verification.expire', 60)),
                 [
                     'id' => (string) $notifiable->getKey(),
-                    'hash' => sha1($notifiable->getEmailForVerification()),
+                    'hash' => sha1((string) $notifiable->getEmailForVerification()),
                 ]
             );
 

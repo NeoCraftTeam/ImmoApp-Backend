@@ -26,21 +26,25 @@ class AgencyResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'Agency';
 
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return AgencyForm::configure($schema);
     }
 
+    #[\Override]
     public static function infolist(Schema $schema): Schema
     {
         return AgencyInfolist::configure($schema);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return AgenciesTable::configure($table);
     }
 
+    #[\Override]
     public static function getRelations(): array
     {
         return [

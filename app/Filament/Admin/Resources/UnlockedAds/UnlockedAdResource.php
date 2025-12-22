@@ -44,6 +44,7 @@ class UnlockedAdResource extends Resource
 
     protected static ?string $modelLabel = 'Annonce débloquée';
 
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -61,6 +62,7 @@ class UnlockedAdResource extends Resource
             ]);
     }
 
+    #[\Override]
     public static function infolist(Schema $schema): Schema
     {
         return $schema
@@ -80,6 +82,7 @@ class UnlockedAdResource extends Resource
             ]);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return $table

@@ -19,9 +19,7 @@ class UserExporter extends Exporter
                 ->label('ID'),
             ExportColumn::make('full_name')
                 ->label('Nom complet')
-                ->formatStateUsing(function ($record) {
-                    return $record->firstname.' '.$record->lastname;
-                }),
+                ->formatStateUsing(fn ($record) => $record->firstname.' '.$record->lastname),
             ExportColumn::make('phone_number'),
             ExportColumn::make('email'),
             ExportColumn::make('email_verified_at'),

@@ -69,6 +69,7 @@ class UserImporter extends Importer
         return $body;
     }
 
+    #[\Override]
     public function resolveRecord(): User
     {
         return User::firstOrNew([

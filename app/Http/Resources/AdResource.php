@@ -9,6 +9,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /** @mixin Ad */
 class AdResource extends JsonResource
 {
+    #[\Override]
     public function toArray(Request $request): array
     {
 
@@ -35,15 +36,13 @@ class AdResource extends JsonResource
             'user' => new UserResource($this->whenLoaded('user')),
             'quarter' => new QuarterResource($this->whenLoaded('quarter')),
             'type' => new AdTypeResource($this->whenLoaded('ad_type')),
-            'images' => $this->getAccessibleImages($request->user())->map(function ($media) {
-                return [
-                    'id' => $media->id,
-                    'url' => $media->getUrl(),
-                    'thumb' => $media->getUrl('thumb'),
-                    'mime_type' => $media->mime_type,
-                    'is_primary' => $this->getMedia('images')->first()?->id === $media->id,
-                ];
-            }),
+            'images' => $this->getAccessibleImages($request->user())->map(fn ($media) => [
+                'id' => $media->id,
+                'url' => $media->getUrl(),
+                'thumb' => $media->getUrl('thumb'),
+                'mime_type' => $media->mime_type,
+                'is_primary' => $this->getMedia('images')->first()?->id === $media->id,
+            ]),
         ];
     }
 }

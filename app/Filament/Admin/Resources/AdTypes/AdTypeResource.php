@@ -31,11 +31,13 @@ class AdTypeResource extends Resource
 
     protected static ?string $modelLabel = 'Categorie d\'annonce';
 
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return AdTypeForm::configure($schema);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return AdTypesTable::configure($table)
@@ -46,6 +48,7 @@ class AdTypeResource extends Resource
             ]);
     }
 
+    #[\Override]
     public static function getRelations(): array
     {
         return [

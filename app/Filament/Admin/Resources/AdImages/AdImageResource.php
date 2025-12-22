@@ -37,6 +37,7 @@ class AdImageResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Annonces avec images';
 
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -48,6 +49,7 @@ class AdImageResource extends Resource
             ]);
     }
 
+    #[\Override]
     public static function infolist(Schema $schema): Schema
     {
         return $schema
@@ -73,6 +75,7 @@ class AdImageResource extends Resource
             ]);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return $table
@@ -122,6 +125,7 @@ class AdImageResource extends Resource
         ];
     }
 
+    #[\Override]
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()

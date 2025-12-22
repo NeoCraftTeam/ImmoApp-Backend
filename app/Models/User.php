@@ -122,6 +122,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
      */
     protected $hidden = ['password', 'app_authentication_secret', 'app_authentication_recovery_codes', 'remember_token', 'created_at', 'updated_at'];
 
+    #[\Override]
     protected static function booted(): void
     {
         static::saving(function ($user): void {

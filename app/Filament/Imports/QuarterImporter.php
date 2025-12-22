@@ -36,6 +36,7 @@ class QuarterImporter extends Importer
         return $body;
     }
 
+    #[\Override]
     public function resolveRecord(): Quarter
     {
         return Quarter::firstOrNew([

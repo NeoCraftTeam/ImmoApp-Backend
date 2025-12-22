@@ -12,6 +12,7 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
 
 class StatsOverview extends StatsOverviewWidget
 {
+    #[\Override]
     protected function getStats(): array
     {
         return [

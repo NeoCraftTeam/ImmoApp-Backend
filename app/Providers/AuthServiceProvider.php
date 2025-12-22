@@ -11,6 +11,7 @@ class AuthServiceProvider extends ServiceProvider
     /**
      * Register services.
      */
+    #[\Override]
     public function register(): void
     {
         //
@@ -22,16 +23,10 @@ class AuthServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Gate::define('admin-access', function ($user) {
-            return $user->role === UserRole::ADMIN;
-        });
+        Gate::define('admin-access', fn ($user) => $user->role === UserRole::ADMIN);
 
-        Gate::define('customer-access', function ($user) {
-            return $user->role === UserRole::CUSTOMER;
-        });
+        Gate::define('customer-access', fn ($user) => $user->role === UserRole::CUSTOMER);
 
-        Gate::define('agent-access', function ($user) {
-            return $user->role === UserRole::AGENT;
-        });
+        Gate::define('agent-access', fn ($user) => $user->role === UserRole::AGENT);
     }
 }

@@ -32,6 +32,7 @@ class CityImporter extends Importer
         return $body;
     }
 
+    #[\Override]
     public function resolveRecord(): City
     {
         return City::firstOrNew([

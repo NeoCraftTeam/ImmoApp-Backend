@@ -25,6 +25,7 @@ class QuarterRequest extends FormRequest
         return [];
     }
 
+    #[\Override]
     public function messages(): array
     {
         return [

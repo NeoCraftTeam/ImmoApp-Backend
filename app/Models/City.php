@@ -61,7 +61,7 @@ class City extends Model
      */
     public function setNameAttribute($value): void
     {
-        $this->attributes['name'] = ucfirst(strtolower($value));
+        $this->attributes['name'] = ucfirst(strtolower((string) $value));
     }
 
     /**

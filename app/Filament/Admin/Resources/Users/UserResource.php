@@ -53,6 +53,7 @@ class UserResource extends Resource
 
     protected static ?string $modelLabel = 'Utilisateur';
 
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -109,6 +110,7 @@ class UserResource extends Resource
             ]);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return $table
@@ -126,9 +128,7 @@ class UserResource extends Resource
                     ->searchable(),
                 TextColumn::make('full_name')
                     ->label('Nom complet')
-                    ->formatStateUsing(function ($record) {
-                        return $record->firstname.' '.$record->lastname;
-                    })->searchable()->sortable(),
+                    ->formatStateUsing(fn ($record) => $record->firstname.' '.$record->lastname)->searchable()->sortable(),
                 TextColumn::make('phone_number')
                     ->searchable()
                     ->copyable()

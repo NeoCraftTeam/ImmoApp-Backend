@@ -606,7 +606,7 @@ class AuthController
             $user = User::findOrFail($id);
 
             // Vérifier le hash
-            if (! hash_equals($hash, sha1($user->getEmailForVerification()))) {
+            if (! hash_equals($hash, sha1((string) $user->getEmailForVerification()))) {
                 if ($request->wantsJson()) {
                     return response()->json(['message' => 'Lien de vérification invalide'], 400);
                 }
@@ -634,7 +634,7 @@ class AuthController
                 ? response()->json(['message' => 'Email vérifié avec succès.', 'verified' => true])
                 : view('auth.verified');
 
-        } catch (ModelNotFoundException $e) {
+        } catch (ModelNotFoundException) {
             if ($request->wantsJson()) {
                 return response()->json(['message' => 'Utilisateur non trouvé.'], 404);
             }

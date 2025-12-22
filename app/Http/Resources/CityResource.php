@@ -9,6 +9,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /** @mixin City */
 class CityResource extends JsonResource
 {
+    #[\Override]
     public function toArray(Request $request): array
     {
         return [

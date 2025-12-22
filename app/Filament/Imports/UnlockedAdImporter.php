@@ -43,6 +43,7 @@ class UnlockedAdImporter extends Importer
         return $body;
     }
 
+    #[\Override]
     public function resolveRecord(): UnlockedAd
     {
         return UnlockedAd::firstOrNew([

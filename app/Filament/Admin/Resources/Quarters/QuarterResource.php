@@ -43,6 +43,7 @@ class QuarterResource extends Resource
 
     protected static ?string $modelLabel = 'Quartier';
 
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -63,6 +64,7 @@ class QuarterResource extends Resource
             ]);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return $table

@@ -13,6 +13,7 @@ class UserStatusChart extends ChartWidget
 
     protected int|string|array $columnSpan = '1/2';
 
+    #[\Override]
     protected function getData(): array
     {
         $activeUsers = User::whereNotNull('email_verified_at')->count();
@@ -43,6 +44,7 @@ class UserStatusChart extends ChartWidget
         return 'doughnut'; // ou 'pie'
     }
 
+    #[\Override]
     protected function getOptions(): array
     {
         return [

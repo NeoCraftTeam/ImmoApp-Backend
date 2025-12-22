@@ -19,6 +19,7 @@ use OpenApi\Annotations as OA;
 class PaymentController
 {
     protected $fedaPay;
+
     private $amount = 500;
 
     public function __construct(FedaPayService $fedaPay)
@@ -105,7 +106,7 @@ class PaymentController
                 ]);
             } catch (\Exception $e) {
                 DB::rollBack();
-                Log::error('Erreur lors de la création du paiement en base: ' . $e->getMessage());
+                Log::error('Erreur lors de la création du paiement en base: '.$e->getMessage());
 
                 return response()->json([
                     'message' => 'Erreur technique lors de l\'initialisation.',
@@ -152,13 +153,13 @@ class PaymentController
         Log::info('FedaPay Webhook reçu:', $event);
 
         $transactionId = $event['entity']['id'] ?? null;
-        if (!$transactionId) {
+        if (! $transactionId) {
             return response()->json(['status' => 'error', 'message' => 'No transaction ID'], 400);
         }
 
         $payment = Payment::where('transaction_id', (string) $transactionId)->first();
 
-        if (!$payment) {
+        if (! $payment) {
             return response()->json(['status' => 'not_found'], 404);
         }
 
@@ -181,7 +182,7 @@ class PaymentController
             return response()->json(['status' => 'ok']);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Erreur lors du traitement du webhook: ' . $e->getMessage());
+            Log::error('Erreur lors du traitement du webhook: '.$e->getMessage());
 
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
         }

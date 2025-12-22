@@ -53,6 +53,7 @@ class PaymentImporter extends Importer
         return $body;
     }
 
+    #[\Override]
     public function resolveRecord(): Payment
     {
         return Payment::firstOrNew([

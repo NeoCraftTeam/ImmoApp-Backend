@@ -112,6 +112,7 @@ class Ad extends Model implements HasMedia
         'price' => 'decimal:2',
     ];
 
+    #[\Override]
     protected static function boot(): void
     {
         parent::boot();

@@ -13,6 +13,7 @@ class AdsByCityChart extends ChartWidget
 
     protected int|string|array $columnSpan = 1;
 
+    #[\Override]
     protected function getData(): array
     {
         $data = Ad::join('quarter', 'ad.quarter_id', '=', 'quarter.id')
@@ -42,6 +43,7 @@ class AdsByCityChart extends ChartWidget
         return 'bar';
     }
 
+    #[\Override]
     protected function getOptions(): array
     {
         return [
