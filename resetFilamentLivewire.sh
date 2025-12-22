@@ -81,8 +81,8 @@ echo "✓ Permissions configurées"
 
 # Si vous utilisez www-data (Nginx/Apache)
 if id "www-data" &>/dev/null; then
-    chown -R www-data:www-data storage bootstrap/cache
-    echo "✓ Propriétaire défini (www-data)"
+    chown -R gitlab-runner:www-data storage bootstrap/cache
+    echo "✓ Propriétaire défini (gitlab-runner:www-data)"
 fi
 
 # ==========================================

@@ -171,7 +171,17 @@ print_step "Nettoyage des anciens logs"
 find storage/logs/ -name "*.log" -mtime +7 -delete 2>/dev/null || true
 print_success "Anciens logs nettoyés (>7 jours)"
 
-# 12. Désactivation du mode maintenance
+# 12. Optimisation spécifique Filament & Livewire
+print_step "Nettoyage et optimisation Filament/Livewire"
+if [ -f "resetFilamentLivewire.sh" ]; then
+    chmod +x resetFilamentLivewire.sh
+    bash resetFilamentLivewire.sh
+    print_success "Script Filament/Livewire exécuté"
+else
+    print_warning "Script resetFilamentLivewire.sh non trouvé"
+fi
+
+# 13. Désactivation du mode maintenance
 print_step "Désactivation du mode maintenance"
 php artisan up
 print_success "Mode maintenance désactivé"
