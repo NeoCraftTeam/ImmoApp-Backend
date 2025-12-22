@@ -12,11 +12,10 @@ test_suite:
   stage: test
   variables:
     DB_CONNECTION: pgsql
-    DB_HOST: 127.0.0.1
+    DB_HOST: "" # Vide pour forcer l'usage du socket Unix (Peer Auth)
     DB_PORT: 5432
     DB_DATABASE: testing
-    DB_USERNAME: gitlab-runner # Utilise l'utilisateur du runner
-    # DB_PASSWORD: n'est plus nécessaire si l'utilisateur est configuré en local
+    DB_USERNAME: gitlab-runner
   script:
     - echo "🧪 Préparation des tests sur le VPS..."
     - composer install --no-ansi --no-interaction
