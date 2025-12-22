@@ -19,7 +19,7 @@ services:
     container_name: keyhome-web
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "8082:80" # Changé de 8080 à 8081
     volumes:
       - .:/var/www
       - .docker/nginx/conf.d:/etc/nginx/conf.d
