@@ -5,10 +5,6 @@ use App\Enums\PaymentType;
 use App\Models\Ad;
 use App\Models\Payment;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-
-
 use Laravel\Sanctum\Sanctum;
 
 test('authenticated user can unlock ad', function () {
@@ -19,7 +15,7 @@ test('authenticated user can unlock ad', function () {
 
     $response = $this->postJson('/api/v1/payments/unlock', [
         'ad_id' => $ad->id,
-        'payment_method' => 'orange_money'
+        'payment_method' => 'orange_money',
     ]);
 
     $response->assertStatus(200)
@@ -29,7 +25,7 @@ test('authenticated user can unlock ad', function () {
         'user_id' => $user->id,
         'ad_id' => $ad->id,
         'status' => PaymentStatus::SUCCESS->value,
-        'payment_method' => 'orange_money'
+        'payment_method' => 'orange_money',
     ]);
 });
 
@@ -42,13 +38,13 @@ test('user cannot unlock already unlocked ad', function () {
         'user_id' => $user->id,
         'ad_id' => $ad->id,
         'type' => PaymentType::UNLOCK,
-        'status' => PaymentStatus::SUCCESS
+        'status' => PaymentStatus::SUCCESS,
     ]);
 
     Sanctum::actingAs($user);
     $response = $this->postJson('/api/v1/payments/unlock', [
         'ad_id' => $ad->id,
-        'payment_method' => 'orange_money'
+        'payment_method' => 'orange_money',
     ]);
 
     $response->assertStatus(400)
@@ -60,7 +56,7 @@ test('guest cannot unlock ad', function () {
 
     $response = $this->postJson('/api/v1/payments/unlock', [
         'ad_id' => $ad->id,
-        'payment_method' => 'orange_money'
+        'payment_method' => 'orange_money',
     ]);
 
     $response->assertStatus(401); // Unauthorized

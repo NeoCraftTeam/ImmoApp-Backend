@@ -1,8 +1,6 @@
 <?php
 
 use App\Models\Ad;
-use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
 // POINT(lng lat) // PostGIS utilise Longitude d'abord dans POINT() mais souvent on insert via raw geometry.
@@ -17,7 +15,7 @@ test('can search ads nearby a location', function () {
     // Annonce "Cible" (Centre Paris)
     $parisAd = Ad::factory()->create([
         'title' => 'Paris Apartment',
-        'status' => 'available'
+        'status' => 'available',
     ]);
 
     // Forcer la localisation SQL (plus sûr pour le test)
@@ -27,7 +25,7 @@ test('can search ads nearby a location', function () {
     // Annonce "Loin" (Marseille : 43.2965, 5.3698)
     $marseilleAd = Ad::factory()->create([
         'title' => 'Marseille Apartment',
-        'status' => 'available'
+        'status' => 'available',
     ]);
     DB::statement("UPDATE ad SET location = ST_SetSRID(ST_MakePoint(5.3698, 43.2965), 4326) WHERE id = '{$marseilleAd->id}'");
 

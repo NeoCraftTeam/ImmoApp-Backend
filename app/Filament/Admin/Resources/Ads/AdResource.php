@@ -3,12 +3,12 @@
 namespace App\Filament\Admin\Resources\Ads;
 
 use App\Enums\AdStatus;
-use Clickbar\Magellan\Data\Geometries\Point;
 use App\Filament\Admin\Resources\Ads\Pages\ManageAds;
 use App\Filament\Exports\AdExporter;
 use App\Filament\Imports\AdImporter;
 use App\Models\Ad;
 use BackedEnum;
+use Clickbar\Magellan\Data\Geometries\Point;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -89,11 +89,11 @@ class AdResource extends Resource
                 TextInput::make('latitude')
                     ->numeric()
                     ->required()
-                    ->formatStateUsing(fn(?Ad $record) => $record?->location?->getLatitude()),
+                    ->formatStateUsing(fn (?Ad $record) => $record?->location?->getLatitude()),
                 TextInput::make('longitude')
                     ->numeric()
                     ->required()
-                    ->formatStateUsing(fn(?Ad $record) => $record?->location?->getLongitude()),
+                    ->formatStateUsing(fn (?Ad $record) => $record?->location?->getLongitude()),
                 Select::make('status')
                     ->options(AdStatus::class)
                     ->required()
@@ -101,7 +101,7 @@ class AdResource extends Resource
                 DateTimePicker::make('expires_at'),
                 Select::make('user_id')
                     ->relationship('user', 'firstname')
-                    ->getOptionLabelFromRecordUsing(fn($record) => "{$record->firstname} {$record->lastname}")
+                    ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->firstname} {$record->lastname}")
                     ->searchable()
                     ->preload()
                     ->required(),
@@ -157,7 +157,7 @@ class AdResource extends Resource
                     ->placeholder('-'),
                 TextEntry::make('deleted_at')
                     ->dateTime()
-                    ->visible(fn(Ad $record): bool => $record->trashed()),
+                    ->visible(fn (Ad $record): bool => $record->trashed()),
             ]);
     }
 
@@ -221,20 +221,21 @@ class AdResource extends Resource
                             $data['location'] = Point::make($data['latitude'], $data['longitude']);
                             unset($data['latitude'], $data['longitude']);
                         }
+
                         return $data;
                     }),
                 DeleteAction::make(),
                 ForceDeleteAction::make(),
                 RestoreAction::make(),
             ])->headerActions([
-                    ImportAction::make()->label('Importer')
-                        ->importer(AdImporter::class)
-                        ->icon(Heroicon::ArrowUpTray),
+                ImportAction::make()->label('Importer')
+                    ->importer(AdImporter::class)
+                    ->icon(Heroicon::ArrowUpTray),
 
-                    ExportAction::make()->label('Exporter')
-                        ->exporter(AdExporter::class)
-                        ->icon(Heroicon::ArrowDownTray),
-                ])
+                ExportAction::make()->label('Exporter')
+                    ->exporter(AdExporter::class)
+                    ->icon(Heroicon::ArrowDownTray),
+            ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),

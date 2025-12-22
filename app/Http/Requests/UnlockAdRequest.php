@@ -31,14 +31,12 @@ class UnlockAdRequest extends FormRequest
 
     /**
      * Get custom messages for validator errors.
-     *
-     * @return array
      */
     public function messages(): array
     {
         return [
             'ad_id.exists' => "L'annonce spécifiée est introuvable.",
-            'payment_method.enum' => "La méthode de paiement choisie est invalide.",
+            'payment_method.enum' => 'La méthode de paiement choisie est invalide.',
         ];
     }
 }

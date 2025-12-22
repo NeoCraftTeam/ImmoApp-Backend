@@ -1,10 +1,6 @@
 <?php
 
 use App\Models\Ad;
-use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-
 
 test('anyone can view ad list', function () {
     Ad::factory(3)->create(['status' => 'available']);
@@ -15,8 +11,6 @@ test('anyone can view ad list', function () {
         ->assertJsonCount(3, 'data');
 });
 
-
-
 test('can search ads by city', function () {
     // Ce test nécessite que Scout soit configuré avec 'collection' driver pour le test
     // Ou que AdController utilise une query SQL fallback si Scout n'est pas là.
@@ -26,7 +20,7 @@ test('can search ads by city', function () {
 test('single ad response structure is correct', function () {
     $ad = Ad::factory()->create(['status' => 'available']);
 
-    $response = $this->getJson('/api/v1/ads/' . $ad->id);
+    $response = $this->getJson('/api/v1/ads/'.$ad->id);
 
     $response->assertStatus(200)
         ->assertJsonStructure([
@@ -37,7 +31,7 @@ test('single ad response structure is correct', function () {
                 'location' => ['latitude', 'longitude'],
                 'images',
                 'user' => ['id', 'firstname'],
-                'quarter'
-            ]
+                'quarter',
+            ],
         ]);
 });

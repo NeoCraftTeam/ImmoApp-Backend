@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\Ad;
-
 use App\Models\Agency;
 use App\Models\Review;
 use App\Models\User;

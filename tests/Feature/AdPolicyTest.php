@@ -2,10 +2,7 @@
 
 use App\Models\Ad;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
-
-
 
 test('user can update own ad', function () {
     $user = User::factory()->create();
@@ -24,7 +21,7 @@ test('user can update own ad', function () {
         'has_parking' => 'true',
         'quarter_id' => $ad->quarter_id,
         'type_id' => $ad->type_id,
-        'status' => 'available' // Important si validation enum
+        'status' => 'available', // Important si validation enum
     ]);
 
     // Si ça échoue 422, c'est validation error. Si 403, c'est policy error.
@@ -33,7 +30,7 @@ test('user can update own ad', function () {
 
     $this->assertDatabaseHas('ad', [
         'id' => $ad->id,
-        'title' => 'Updated Title'
+        'title' => 'Updated Title',
     ]);
 });
 
@@ -44,7 +41,7 @@ test('user cannot update other user ad', function () {
 
     Sanctum::actingAs($attacker);
     $response = $this->putJson("/api/v1/ads/{$ad->id}", [
-        'title' => 'Hacked Title'
+        'title' => 'Hacked Title',
     ]);
 
     $response->assertStatus(403); // Forbidden

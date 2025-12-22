@@ -58,7 +58,7 @@ class AdImageResource extends Resource
                             ->label('Titre'),
                         TextEntry::make('images_count')
                             ->label('Nombre d\'images')
-                            ->state(fn($record) => $record->getMedia('images')->count()),
+                            ->state(fn ($record) => $record->getMedia('images')->count()),
                     ])
                     ->columns(2),
 
@@ -67,7 +67,7 @@ class AdImageResource extends Resource
                         ImageEntry::make('media')
                             ->label('')
                             ->size(200)
-                            ->state(fn($record) => $record->getMedia('images')->map(fn($media) => $media->getUrl())->toArray())
+                            ->state(fn ($record) => $record->getMedia('images')->map(fn ($media) => $media->getUrl())->toArray())
                             ->columnSpanFull(),
                     ]),
             ]);
@@ -98,7 +98,7 @@ class AdImageResource extends Resource
                     ->limit(5)
                     ->limitedRemainingText()
                     ->ring(2)
-                    ->state(fn($record) => $record->getMedia('images')->map(fn($media) => $media->getUrl())->toArray()),
+                    ->state(fn ($record) => $record->getMedia('images')->map(fn ($media) => $media->getUrl())->toArray()),
 
                 TextColumn::make('created_at')
                     ->label('Créée le')

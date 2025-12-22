@@ -5,10 +5,10 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Resources\AdResource;
 use App\Models\Ad;
 use App\Models\Payment;
-use Illuminate\Http\Request;
-use OpenApi\Annotations as OA;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use OpenApi\Annotations as OA;
 
 class RecommendationController
 {
@@ -32,17 +32,21 @@ class RecommendationController
      *     - Nouveau Client, qui n'a rien fait, verra les annonces les plus récentes (Cold Start).",
      *     tags={"⭐ Recommandations"},
      *     security={{"bearerAuth":{}}},
+     *
      *     @OA\Response(
      *         response=200,
      *         description="Liste des annonces recommandées",
+     *
      *         @OA\JsonContent(
      *             type="object",
+     *
      *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/AdResource")),
      *             @OA\Property(property="meta", type="object",
      *                 @OA\Property(property="source", type="string", example="personalized", description="Indique si les recommandations sont 'personalized' ou 'latest' (cold start)")
      *             )
      *         )
      *     ),
+     *
      *     @OA\Response(response=401, description="Non authentifié")
      * )
      */

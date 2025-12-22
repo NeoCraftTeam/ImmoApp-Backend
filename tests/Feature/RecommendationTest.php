@@ -3,10 +3,7 @@
 use App\Models\Ad;
 use App\Models\Payment;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
-
-
 
 test('recommendations endpoint returns 401 for guest', function () {
     $response = $this->getJson('/api/v1/recommendations');
@@ -32,21 +29,21 @@ test('returns personalized recommendations for user with history', function () {
     // Créer une annonce cible que l'utilisateur a aimée (débloquée)
     $targetAd = Ad::factory()->create([
         'price' => 100000,
-        'status' => 'available'
+        'status' => 'available',
     ]);
 
     // Créer le paiement (historique)
     Payment::factory()->create([
         'user_id' => $user->id,
         'ad_id' => $targetAd->id,
-        'status' => 'success'
+        'status' => 'success',
     ]);
 
     // Créer des annonces similaires (recommandations potentielles)
     Ad::factory(3)->create([
         'price' => 100000,
         'type_id' => $targetAd->type_id,
-        'status' => 'available'
+        'status' => 'available',
     ]);
 
     Sanctum::actingAs($user);

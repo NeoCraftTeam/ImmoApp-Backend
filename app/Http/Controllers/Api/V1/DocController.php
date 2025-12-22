@@ -51,12 +51,10 @@ namespace App\Http\Controllers\Api\V1;
  *          name="🔍 Filtre",
  *          description="Filtrer les annonces"
  *  )
- * 
  *  @OA\Tag(
  *          name="💰 Paiements",
  *          description="Gestion des paiements"
  *  )
- * 
  *  @OA\Tag(
  *          name="⭐ Recommandations",
  *          description="Gestion des recommandations"

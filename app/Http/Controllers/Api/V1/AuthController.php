@@ -220,7 +220,7 @@ class AuthController
     {
         try {
             // Vérifier le rate limiting personnalisé
-            $key = 'register-attempts:' . $request->ip();
+            $key = 'register-attempts:'.$request->ip();
             if (RateLimiter::tooManyAttempts($key, 10)) {
                 $seconds = RateLimiter::availableIn($key);
 
@@ -230,7 +230,7 @@ class AuthController
                 ]);
 
                 return response()->json([
-                    'message' => 'Trop de tentatives d\'inscription. Réessayez dans ' . $seconds . ' secondes.',
+                    'message' => 'Trop de tentatives d\'inscription. Réessayez dans '.$seconds.' secondes.',
                     'retry_after' => $seconds,
                 ], 429);
             }
@@ -278,13 +278,13 @@ class AuthController
                 if ($request->hasFile('avatar')) {
                     $user->clearMediaCollection('avatars');
                     $user->addMediaFromRequest('avatar')
-                        ->usingName($user->firstname . '_' . $user->lastname . '_avatar')
+                        ->usingName($user->firstname.'_'.$user->lastname.'_avatar')
                         ->toMediaCollection('avatars');
                 }
 
                 // Créer le token d'accès
                 $token = $user->createToken(
-                    'registration_token_' . now()->timestamp,
+                    'registration_token_'.now()->timestamp,
                 );
 
                 return ['user' => $user, 'token' => $token];
@@ -591,10 +591,10 @@ class AuthController
      */
     public function verifyEmail($id, $hash, Request $request)
     {
-        Log::info('VerifyEmail called with ID: ' . $id);
+        Log::info('VerifyEmail called with ID: '.$id);
 
-        if (!Str::isUuid($id)) {
-            Log::warning('Invalid UUID provided: ' . $id);
+        if (! Str::isUuid($id)) {
+            Log::warning('Invalid UUID provided: '.$id);
             if ($request->wantsJson()) {
                 return response()->json(['message' => 'ID utilisateur invalide.'], 400);
             }
@@ -606,7 +606,7 @@ class AuthController
             $user = User::findOrFail($id);
 
             // Vérifier le hash
-            if (!hash_equals($hash, sha1($user->getEmailForVerification()))) {
+            if (! hash_equals($hash, sha1($user->getEmailForVerification()))) {
                 if ($request->wantsJson()) {
                     return response()->json(['message' => 'Lien de vérification invalide'], 400);
                 }
@@ -712,7 +712,7 @@ class AuthController
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
                 'message' => 'Utilisateur non trouvé.',
             ], 404);
@@ -725,12 +725,12 @@ class AuthController
         }
 
         // Rate limiting pour éviter le spam
-        $key = 'resend-verification:' . $request->ip() . ':' . $user->id;
+        $key = 'resend-verification:'.$request->ip().':'.$user->id;
         if (RateLimiter::tooManyAttempts($key, 2)) {
             $seconds = RateLimiter::availableIn($key);
 
             return response()->json([
-                'message' => 'Trop de demandes. Réessayez dans ' . $seconds . ' secondes.',
+                'message' => 'Trop de demandes. Réessayez dans '.$seconds.' secondes.',
             ], 429);
         }
 
@@ -839,7 +839,7 @@ class AuthController
             $password = $credentials['password'];
 
             // Vérifier le rate limiting personnalisé
-            $key = 'login-attempts:' . $request->ip();
+            $key = 'login-attempts:'.$request->ip();
             if (RateLimiter::tooManyAttempts($key, 5)) {
                 $seconds = RateLimiter::availableIn($key);
 
@@ -850,7 +850,7 @@ class AuthController
                 ]);
 
                 return response()->json([
-                    'message' => 'Trop de tentatives de connexion. Réessayez dans ' . $seconds . ' secondes.',
+                    'message' => 'Trop de tentatives de connexion. Réessayez dans '.$seconds.' secondes.',
                     'retry_after' => $seconds,
                 ], 429);
             }
@@ -859,7 +859,7 @@ class AuthController
             $user = User::where('email', $email)->first();
 
             // Vérification des credentials avec timing attack protection
-            if (!$user || !Hash::check($password, $user->password)) {
+            if (! $user || ! Hash::check($password, $user->password)) {
                 // Incrémenter les tentatives échouées
                 RateLimiter::hit($key, 300); // 5 minutes de blocage
 
@@ -877,7 +877,7 @@ class AuthController
             }
 
             // Vérifier si le compte est actif
-            if (isset($user->is_active) && !$user->is_active) {
+            if (isset($user->is_active) && ! $user->is_active) {
                 Log::info('Login attempt on inactive account', [
                     'user_id' => $user->id,
                     'email' => $email,
@@ -899,7 +899,7 @@ class AuthController
             RateLimiter::clear($key);
 
             // Créer le token avec expiration
-            $tokenName = 'api_token_' . now()->timestamp;
+            $tokenName = 'api_token_'.now()->timestamp;
 
             $token = $user->createToken(
                 $tokenName,
@@ -1139,7 +1139,7 @@ class AuthController
 
             // Créer un nouveau token
             $newToken = $user->createToken(
-                'refreshed_token_' . now()->timestamp,
+                'refreshed_token_'.now()->timestamp,
                 $currentToken->abilities,
                 now()->addDays(7)
             );
@@ -1175,8 +1175,10 @@ class AuthController
      *
      *     @OA\RequestBody(
      *         required=true,
+     *
      *         @OA\JsonContent(
      *             required={"email"},
+     *
      *             @OA\Property(property="email", type="string", format="email", example="user@example.com")
      *         )
      *     ),
@@ -1184,11 +1186,14 @@ class AuthController
      *     @OA\Response(
      *         response=200,
      *         description="Lien envoyé",
+     *
      *         @OA\JsonContent(@OA\Property(property="message", type="string", example="Nous vous avons envoyé par email le lien de réinitialisation du mot de passe !"))
      *     ),
+     *
      *     @OA\Response(
      *         response=422,
      *         description="Erreur de validation",
+     *
      *         @OA\JsonContent(@OA\Property(property="message", type="string", example="Impossible de trouver un utilisateur avec cette adresse email."))
      *     )
      * )
@@ -1214,8 +1219,10 @@ class AuthController
      *
      *     @OA\RequestBody(
      *         required=true,
+     *
      *         @OA\JsonContent(
      *             required={"token", "email", "password", "password_confirmation"},
+     *
      *             @OA\Property(property="token", type="string", description="Le token reçu dans l'email"),
      *             @OA\Property(property="email", type="string", format="email", example="user@example.com"),
      *             @OA\Property(property="password", type="string", format="password", example="NewPassword123!"),
@@ -1226,11 +1233,14 @@ class AuthController
      *     @OA\Response(
      *         response=200,
      *         description="Mot de passe réinitialisé",
+     *
      *         @OA\JsonContent(@OA\Property(property="message", type="string", example="Votre mot de passe a été réinitialisé !"))
      *     ),
+     *
      *     @OA\Response(
      *         response=422,
      *         description="Erreur (token invalide, email incorrect...)",
+     *
      *         @OA\JsonContent(@OA\Property(property="message", type="string", example="Ce jeton de réinitialisation de mot de passe est invalide."))
      *     )
      * )
@@ -1247,7 +1257,7 @@ class AuthController
             $request->only('email', 'password', 'password_confirmation', 'token'),
             function ($user, $password) {
                 $user->forceFill([
-                    'password' => Hash::make($password)
+                    'password' => Hash::make($password),
                 ])->setRememberToken(Str::random(60));
 
                 $user->save();
@@ -1272,8 +1282,10 @@ class AuthController
      *
      *     @OA\RequestBody(
      *         required=true,
+     *
      *         @OA\JsonContent(
      *             required={"current_password", "new_password", "new_password_confirmation"},
+     *
      *             @OA\Property(property="current_password", type="string", format="password", example="OldPass123!"),
      *             @OA\Property(property="new_password", type="string", format="password", example="NewPass456!"),
      *             @OA\Property(property="new_password_confirmation", type="string", format="password", example="NewPass456!")
@@ -1283,11 +1295,14 @@ class AuthController
      *     @OA\Response(
      *         response=200,
      *         description="Mot de passe mis à jour",
+     *
      *         @OA\JsonContent(@OA\Property(property="message", type="string", example="Mot de passe mis à jour avec succès."))
      *     ),
+     *
      *     @OA\Response(
      *         response=422,
      *         description="Erreur de validation (ancien mot de passe incorrect...)",
+     *
      *         @OA\JsonContent(@OA\Property(property="message", type="string", example="Le mot de passe actuel est incorrect."))
      *     )
      * )
@@ -1301,12 +1316,12 @@ class AuthController
 
         $user = $request->user();
 
-        if (!Hash::check($request->current_password, $user->password)) {
+        if (! Hash::check($request->current_password, $user->password)) {
             return response()->json(['message' => 'Le mot de passe actuel est incorrect.'], 422);
         }
 
         $user->fill([
-            'password' => Hash::make($request->new_password)
+            'password' => Hash::make($request->new_password),
         ])->save();
 
         return response()->json(['message' => 'Mot de passe mis à jour avec succès.']);

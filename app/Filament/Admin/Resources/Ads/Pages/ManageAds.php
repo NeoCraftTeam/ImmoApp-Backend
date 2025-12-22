@@ -20,6 +20,7 @@ class ManageAds extends ManageRecords
                         $data['location'] = Point::make($data['latitude'], $data['longitude']);
                         unset($data['latitude'], $data['longitude']);
                     }
+
                     return $data;
                 }),
         ];

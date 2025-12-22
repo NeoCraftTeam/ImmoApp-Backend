@@ -5,10 +5,10 @@ use App\Http\Controllers\Api\V1\AdTypeController;
 use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CityController;
-use App\Http\Controllers\Api\V1\QuarterController;
-use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\PaymentController;
+use App\Http\Controllers\Api\V1\QuarterController;
 use App\Http\Controllers\Api\V1\RecommendationController;
+use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Support\Facades\Route;
 
 // Prefix routes
@@ -93,13 +93,13 @@ Route::prefix('v1')->group(function () {
         Route::delete('/users/{user}', 'destroy');
     });
 
-    // Payments
-    Route::middleware('auth:sanctum')->prefix('payments')->controller(PaymentController::class)->group(function () {
-        Route::post('/unlock', 'unlockAd');
-    });
+    // --- RECOMMANDATIONS ---
+    Route::get('/recommendations', [RecommendationController::class, 'index']);
 
-    // Recommendations
-    Route::middleware('auth:sanctum')->get('/recommendations', [RecommendationController::class, 'index']);
+    // --- PAIEMENTS ---
+    Route::post('/payments/initialize/{ad}', [PaymentController::class, 'initialize'])->middleware('auth:sanctum');
+    Route::post('/payments/webhook', [PaymentController::class, 'webhook']); // Route publique pour FedaPay
+    Route::get('/payments/callback', [PaymentController::class, 'callback']); // Route de retour utilisateur
 
     //  Ads
     Route::prefix('ads')->controller(AdController::class)->group(function () {

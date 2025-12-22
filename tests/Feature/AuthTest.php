@@ -1,21 +1,18 @@
 <?php
 
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-
 use Illuminate\Support\Facades\Notification;
 
 test('customer can login with valid credentials', function () {
     $user = User::factory()->create([
         'email' => 'test@example.com',
         'password' => bcrypt('password'),
-        'role' => 'customer'
+        'role' => 'customer',
     ]);
 
     $response = $this->postJson('/api/v1/auth/login', [
         'email' => 'test@example.com',
-        'password' => 'password'
+        'password' => 'password',
     ]);
 
     // On vérifie juste qu'on a un token
@@ -26,12 +23,12 @@ test('customer can login with valid credentials', function () {
 test('login fails with invalid credentials', function () {
     User::factory()->create([
         'email' => 'test@example.com',
-        'password' => bcrypt('password')
+        'password' => bcrypt('password'),
     ]);
 
     $response = $this->postJson('/api/v1/auth/login', [
         'email' => 'test@example.com',
-        'password' => 'wrong-password'
+        'password' => 'wrong-password',
     ]);
 
     $response->assertStatus(401);
@@ -50,7 +47,7 @@ test('customer can register', function () {
         'password' => 'Password123@',         // Password complexe
         'confirm_password' => 'Password123@', // Champ confirm_password
         'phone_number' => '+237699999999',
-        'city_id' => $city->id
+        'city_id' => $city->id,
     ]);
 
     if ($response->status() !== 201) {
@@ -62,6 +59,6 @@ test('customer can register', function () {
 
     $this->assertDatabaseHas('users', [
         'email' => 'john@new.com',
-        'role' => 'customer'
+        'role' => 'customer',
     ]);
 });

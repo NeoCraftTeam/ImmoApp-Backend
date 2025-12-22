@@ -5,10 +5,7 @@ use App\Models\AdType;
 use App\Models\City;
 use App\Models\Quarter;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
-
-
 
 test('ad list endpoint is optimized and has no N+1 queries', function () {
     // Setup data
@@ -22,7 +19,7 @@ test('ad list endpoint is optimized and has no N+1 queries', function () {
         'user_id' => $user->id,
         'quarter_id' => $quarter->id,
         'type_id' => $type->id,
-        'status' => 'available'
+        'status' => 'available',
     ]);
 
     // Activer l'écoute DB

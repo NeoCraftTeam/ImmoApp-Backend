@@ -3525,37 +3525,81 @@
                 ]
             }
         },
-        "/api/v1/payments/unlock": {
+        "/api/v1/payments/initialize/{ad}": {
             "post": {
                 "tags": [
-                    "Payments"
+                    "💰 Paiements"
                 ],
-                "summary": "Unlock an ad",
-                "description": "Unlock an ad for the authenticated user.",
-                "operationId": "78978d97cdd3f87d64192a5ebab98a50",
+                "summary": "1. Initialiser une demande de paiement",
+                "description": "Génère un lien de paiement sécurisé via FedaPay. Le frontend doit rediriger l'utilisateur vers 'payment_url'.",
+                "operationId": "2668ecddf3c0a8a298c0f5a00e1ed8b2",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "description": "UUID de l'annonce à débloquer",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Succès : Lien généré",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "payment_url": {
+                                            "description": "URL vers l'interface FedaPay",
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Redirigez l'utilisateur vers cette URL pour payer."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "404": {
+                        "description": "L'annonce demandée n'existe pas"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/payments/webhook": {
+            "post": {
+                "tags": [
+                    "💰 Paiements"
+                ],
+                "summary": "2. Webhook de validation (Usage interne FedaPay)",
+                "description": "Cet endpoint est appelé automatiquement par FedaPay dès qu'une transaction change de statut. Ne pas appeler manuellement par le frontend.",
+                "operationId": "4ce4817727fef48fb4e50d0d0555595d",
                 "requestBody": {
-                    "required": true,
+                    "description": "Payload envoyé par FedaPay",
                     "content": {
                         "application/json": {
                             "schema": {
-                                "required": [
-                                    "ad_id",
-                                    "payment_method"
-                                ],
                                 "properties": {
-                                    "ad_id": {
+                                    "event": {
                                         "type": "string",
-                                        "format": "uuid",
-                                        "example": "019b42fb-e032-71ae-ae45-da62c36aab3f"
+                                        "example": "transaction.approved"
                                     },
-                                    "payment_method": {
-                                        "type": "string",
-                                        "enum": [
-                                            "orange_money",
-                                            "mobile_money",
-                                            "stripe"
-                                        ],
-                                        "example": "orange_money"
+                                    "entity": {
+                                        "type": "object"
                                     }
                                 },
                                 "type": "object"
@@ -3565,37 +3609,63 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Ad unlocked successfully",
+                        "description": "Webhook traité avec succès",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "properties": {
-                                        "message": {
+                                        "status": {
                                             "type": "string",
-                                            "example": "Ad unlocked successfully"
-                                        },
-                                        "payment_id": {
-                                            "type": "integer",
-                                            "example": 1
+                                            "example": "ok"
                                         }
                                     },
                                     "type": "object"
                                 }
                             }
                         }
-                    },
-                    "400": {
-                        "description": "Ad already unlocked or invalid request"
-                    },
-                    "404": {
-                        "description": "Ad not found"
                     }
-                },
-                "security": [
+                }
+            }
+        },
+        "/api/v1/payments/callback": {
+            "get": {
+                "tags": [
+                    "💰 Paiements"
+                ],
+                "summary": "3. Retour utilisateur après paiement",
+                "description": "Page vers laquelle l'utilisateur est redirigé après avoir quitté l'interface de paiement. Le frontend peut intercepter cette URL pour fermer la WebView.",
+                "operationId": "8fd83614f4eaa636fde8efd984a3c0c9",
+                "parameters": [
                     {
-                        "bearerAuth": []
+                        "name": "ad_id",
+                        "in": "query",
+                        "description": "ID de l'annonce d'origine",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
                     }
-                ]
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "status": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/v1/quarters": {
@@ -5855,12 +5925,12 @@
             "description": "Filtrer les annonces"
         },
         {
-            "name": "⭐ Recommandations",
-            "description": "Gestion des recommandations"
+            "name": "💰 Paiements",
+            "description": "Gestion des paiements"
         },
         {
-            "name": "Payments",
-            "description": "Payments"
+            "name": "⭐ Recommandations",
+            "description": "Gestion des recommandations"
         }
     ]
 }

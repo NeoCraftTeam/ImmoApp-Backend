@@ -24,7 +24,7 @@ test('a user can request a password reset link', function () {
 test('a user can reset password with valid token', function () {
     Notification::fake();
     $user = User::factory()->create([
-        'password' => bcrypt('OldPassword123!')
+        'password' => bcrypt('OldPassword123!'),
     ]);
 
     // Générer un token valide manuellement (comme si envoyé par mail)
@@ -49,14 +49,14 @@ test('a user can reset password with valid token', function () {
 
 test('authenticated user can update password', function () {
     $user = User::factory()->create([
-        'password' => bcrypt('CurrentPass1!')
+        'password' => bcrypt('CurrentPass1!'),
     ]);
 
     $response = $this->actingAs($user, 'sanctum')
         ->postJson('/api/v1/auth/update-password', [
             'current_password' => 'CurrentPass1!',
             'new_password' => 'NewSuperPass2!',
-            'new_password_confirmation' => 'NewSuperPass2!'
+            'new_password_confirmation' => 'NewSuperPass2!',
         ]);
 
     $response->assertStatus(200);

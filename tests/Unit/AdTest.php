@@ -5,9 +5,6 @@ use App\Enums\PaymentType;
 use App\Models\Ad;
 use App\Models\Payment;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
-
-
 
 test('owner can always view full ad', function () {
     $owner = User::factory()->create();
@@ -31,7 +28,7 @@ test('user who paid can view ad', function () {
         'user_id' => $user->id,
         'ad_id' => $ad->id,
         'type' => PaymentType::UNLOCK,
-        'status' => PaymentStatus::SUCCESS
+        'status' => PaymentStatus::SUCCESS,
     ]);
 
     expect($ad->isUnlockedFor($user))->toBeTrue();

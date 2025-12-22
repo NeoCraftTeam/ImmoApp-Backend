@@ -8,13 +8,13 @@ test('login endpoint is rate limited', function () {
     for ($i = 0; $i < 5; $i++) {
         $this->postJson('/api/v1/auth/login', [
             'email' => 'hacker@test.com',
-            'password' => 'wrong'
+            'password' => 'wrong',
         ]);
     }
 
     $response = $this->postJson('/api/v1/auth/login', [
         'email' => 'hacker@test.com',
-        'password' => 'wrong'
+        'password' => 'wrong',
     ]);
 
     $response->assertStatus(429);

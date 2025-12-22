@@ -36,6 +36,7 @@ class MigrateAdImagesToSpatie extends Command
         $count = $oldImages->count();
         if ($count === 0) {
             $this->info('No images found in ad_images table.');
+
             return;
         }
 
@@ -47,8 +48,9 @@ class MigrateAdImagesToSpatie extends Command
             $ad = \App\Models\Ad::find($oldImage->ad_id);
 
             // Skip if ad deleted
-            if (!$ad) {
+            if (! $ad) {
                 $bar->advance();
+
                 continue;
             }
 
@@ -61,7 +63,7 @@ class MigrateAdImagesToSpatie extends Command
                         return $media->getCustomProperty('old_id') === $oldImage->id;
                     });
 
-                    if (!$alreadyMigrated) {
+                    if (! $alreadyMigrated) {
                         $ad->addMediaFromDisk($relativePath, 'public')
                             ->preservingOriginal()
                             ->withCustomProperties(['old_id' => $oldImage->id])
@@ -69,7 +71,7 @@ class MigrateAdImagesToSpatie extends Command
                     }
                 } catch (\Exception $e) {
                     // Log error but continue
-                    $this->error("\nFailed to migrate image {$oldImage->id}: " . $e->getMessage());
+                    $this->error("\nFailed to migrate image {$oldImage->id}: ".$e->getMessage());
                 }
             }
             $bar->advance();

@@ -14,8 +14,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use Laravel\Scout\Searchable;
-use App\Models\Payment;
-
 /**
  * @property-read Quarter|null $quarter
  * @property-read User|null $user
@@ -77,7 +75,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class Ad extends Model implements HasMedia
 {
     use HasFactory, HasUuids, SoftDeletes;
-    use Searchable, InteractsWithMedia;
+    use InteractsWithMedia, Searchable;
 
     protected $table = 'ad';
 
@@ -138,10 +136,10 @@ class Ad extends Model implements HasMedia
         $i = 1;
         while (
             self::where('slug', $slug)
-                ->when($ignoreId, fn($query) => $query->where('id', '!=', $ignoreId))
+                ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
                 ->exists()
         ) {
-            $slug = $original . '-' . $i;
+            $slug = $original.'-'.$i;
             $i++;
         }
 
@@ -182,7 +180,7 @@ class Ad extends Model implements HasMedia
     public function shouldBeSearchable(): bool
     {
         // N'indexer que les annonces non supprimées et actives
-        return $this->status === 'available' && !$this->trashed();
+        return $this->status === 'available' && ! $this->trashed();
     }
 
     public function user(): BelongsTo
@@ -194,10 +192,6 @@ class Ad extends Model implements HasMedia
     {
         return $this->belongsTo(Quarter::class);
     }
-
-
-
-
 
     public function reviews(): hasMany
     {
@@ -235,7 +229,7 @@ class Ad extends Model implements HasMedia
      */
     public function isUnlockedFor(?User $user): bool
     {
-        if (!$user) {
+        if (! $user) {
             return false;
         }
 
