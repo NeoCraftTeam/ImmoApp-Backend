@@ -36,7 +36,8 @@ production_deploy:
   script:
     - echo "🚀 Déploiement local sur le VPS..."
     - cd /var/www/ImmoApp-Backend || exit 1
-    # On force le reset pour écraser les changements locaux parasites sur le VPS
+    # Authentification forcée avec le Jetons temporaire de GitLab
+    - git remote set-url origin https://gitlab-ci-token:${CI_JOB_TOKEN}@$CI_SERVER_HOST/$CI_PROJECT_PATH.git
     - git fetch origin
     - git checkout main
     - git reset --hard origin/main
