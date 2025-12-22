@@ -108,6 +108,7 @@ class Ad extends Model implements HasMedia
 
     protected $casts = [
         'location' => Point::class, // Assuming 'point' is a custom cast for PostGIS
+        'status' => \App\Enums\AdStatus::class,
         'has_parking' => 'boolean',
         'expires_at' => 'datetime',
         'price' => 'decimal:2',
@@ -135,11 +136,12 @@ class Ad extends Model implements HasMedia
         $slug = Str::slug($title);
         $original = $slug;
         $i = 1;
-        while (self::where('slug', $slug)
-            ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
-            ->exists()
+        while (
+            self::where('slug', $slug)
+                ->when($ignoreId, fn($query) => $query->where('id', '!=', $ignoreId))
+                ->exists()
         ) {
-            $slug = $original.'-'.$i;
+            $slug = $original . '-' . $i;
             $i++;
         }
 
@@ -180,7 +182,7 @@ class Ad extends Model implements HasMedia
     public function shouldBeSearchable(): bool
     {
         // N'indexer que les annonces non supprimées et actives
-        return $this->status === 'available' && ! $this->trashed();
+        return $this->status === 'available' && !$this->trashed();
     }
 
     public function user(): BelongsTo
@@ -193,15 +195,9 @@ class Ad extends Model implements HasMedia
         return $this->belongsTo(Quarter::class);
     }
 
-    public function images(): hasMany
-    {
-        return $this->hasMany(AdImage::class, 'ad_id', 'id');
-    }
 
-    public function primaryImage()
-    {
-        return $this->hasOne(AdImage::class)->where('is_primary', true);
-    }
+
+
 
     public function reviews(): hasMany
     {
@@ -221,7 +217,7 @@ class Ad extends Model implements HasMedia
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('images')
-            ->maxNumberOfFiles(10)
+            ->onlyKeepLatest(10)
             ->useDisk('public');
     }
 
@@ -239,7 +235,7 @@ class Ad extends Model implements HasMedia
      */
     public function isUnlockedFor(?User $user): bool
     {
-        if (! $user) {
+        if (!$user) {
             return false;
         }
 
