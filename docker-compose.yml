@@ -1,56 +1,57 @@
 services:
-    laravel.test:
-        build:
-            context: './vendor/laravel/sail/runtimes/8.4'
-            dockerfile: Dockerfile
-            args:
-                WWWGROUP: '${WWWGROUP}'
-        image: 'sail-8.4/app'
-        extra_hosts:
-            - 'host.docker.internal:host-gateway'
-        ports:
-            - '${APP_PORT:-80}:80'
-            - '${VITE_PORT:-5173}:${VITE_PORT:-5173}'
-        environment:
-            WWWUSER: '${WWWUSER}'
-            LARAVEL_SAIL: 1
-            XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
-            XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
-            IGNITION_LOCAL_SITES_PATH: '${PWD}'
-        volumes:
-            - '.:/var/www/html'
-        networks:
-            - sail
-        depends_on:
-            - pgsql
-    pgsql:
-        image: 'postgres:17'
-        ports:
-            - '${FORWARD_DB_PORT:-5432}:5432'
-        environment:
-            PGPASSWORD: '${DB_PASSWORD:-secret}'
-            POSTGRES_DB: '${DB_DATABASE}'
-            POSTGRES_USER: '${DB_USERNAME}'
-            POSTGRES_PASSWORD: '${DB_PASSWORD:-secret}'
-        volumes:
-            - 'sail-pgsql:/var/lib/postgresql/data'
-            - './vendor/laravel/sail/database/pgsql/create-testing-database.sql:/docker-entrypoint-initdb.d/10-create-testing-database.sql'
-        networks:
-            - sail
-        healthcheck:
-            test:
-                - CMD
-                - pg_isready
-                - '-q'
-                - '-d'
-                - '${DB_DATABASE}'
-                - '-U'
-                - '${DB_USERNAME}'
-            retries: 3
-            timeout: 5s
+  # L'application Laravel (PHP-FPM)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: immoapp-backend
+    container_name: keyhome-backend
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - .:/var/www
+    networks:
+      - keyhome-network
+
+  # Le serveur Web (Nginx)
+  web:
+    image: nginx:alpine
+    container_name: keyhome-web
+    restart: unless-stopped
+    ports:
+      - "8080:80" # On utilise le port 8080 pour ne pas entrer en conflit avec votre Nginx actuel
+    volumes:
+      - .:/var/www
+      - .docker/nginx/conf.d:/etc/nginx/conf.d
+    networks:
+      - immoapp-network
+
+  # La base de données (Postgres + PostGIS)
+  db:
+    image: postgis/postgis:15-3.3-alpine
+    container_name: keyhome-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-keyhome}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+    volumes:
+      - keyhome-db-data:/var/lib/postgresql/data
+    networks:
+      - keyhome-network
+
+  # Cache (Redis)
+  redis:
+    image: redis:alpine
+    container_name: keyhome-redis
+    restart: unless-stopped
+    networks:
+      - immoapp-network
+
 networks:
-    sail:
-        driver: bridge
+  immoapp-network:
+    driver: bridge
+
 volumes:
-    sail-pgsql:
-        driver: local
+  immoapp-db-data:
+    driver: local
