@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\QuarterController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\PaymentController;
+use App\Http\Controllers\Api\V1\RecommendationController;
 use Illuminate\Support\Facades\Route;
 
 // Prefix routes
@@ -91,6 +92,9 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->prefix('payments')->controller(PaymentController::class)->group(function () {
         Route::post('/unlock', 'unlockAd');
     });
+
+    // Recommendations
+    Route::middleware('auth:sanctum')->get('/recommendations', [RecommendationController::class, 'index']);
 
     //  Ads
     Route::prefix('ads')->controller(AdController::class)->group(function () {
