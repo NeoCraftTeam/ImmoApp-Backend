@@ -23,9 +23,8 @@ class AgencySeeder extends Seeder
         $agents->each(function ($agent) {
             // Check if agencies already exist for this owner to avoid duplication on re-runs (optional but good practice)
             if (Agency::where('owner_id', $agent->id)->doesntExist()) {
-                Agency::factory()->count(10)->create([
+                Agency::factory()->create([
                     'owner_id' => $agent->id,
-                    'name' => 'Agence '.$agent->lastname,
                 ]);
             }
         });

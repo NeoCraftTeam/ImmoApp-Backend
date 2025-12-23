@@ -19,11 +19,12 @@ class AgencyFactory extends Factory
      */
     public function definition(): array
     {
-        $name = fake()->company();
+        $name = fake()->unique()->company();
+        $slug = Str::slug($name);
 
         return [
             'name' => $name,
-            'slug' => Str::slug($name),
+            'slug' => $slug,
             'logo' => fake()->imageUrl(),
             'owner_id' => User::factory(),
         ];
