@@ -11,16 +11,11 @@ test('anyone can view ad list', function (): void {
         ->assertJsonCount(3, 'data');
 });
 
-test('can search ads by city', function (): void {
-    // Ce test nécessite que Scout soit configuré avec 'collection' driver pour le test
-    // Ou que AdController utilise une query SQL fallback si Scout n'est pas là.
-    // Mettons de côté le search complexe pour l'instant.
-});
 
 test('single ad response structure is correct', function (): void {
     $ad = Ad::factory()->create(['status' => 'available']);
 
-    $response = $this->getJson('/api/v1/ads/'.$ad->id);
+    $response = $this->getJson('/api/v1/ads/' . $ad->id);
 
     $response->assertStatus(200)
         ->assertJsonStructure([
