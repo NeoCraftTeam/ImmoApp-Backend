@@ -5,6 +5,7 @@ FROM php:8.4-fpm-alpine
 RUN apk add --no-cache \
     bash \
     curl \
+    git \
     libpng-dev \
     libzip-dev \
     zlib-dev \
