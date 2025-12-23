@@ -18,7 +18,7 @@ class AdFactory extends Factory
 
     public function definition(): array
     {
-        $title = $this->faker->sentence();
+        $title = fake()->sentence();
         $cityData = $this->getCitiesData();
 
         $latitude = $cityData['latitude'];
@@ -26,20 +26,20 @@ class AdFactory extends Factory
         $cityName = $cityData['name'];
 
         // Utilise le nom de la ville dans l'adresse
-        $address = $this->faker->streetAddress().', '.$cityName;
+        $address = fake()->streetAddress().', '.$cityName;
 
         return [
             'title' => $title,
             'slug' => Ad::generateUniqueSlug($title),
-            'description' => $this->faker->paragraph(),
+            'description' => fake()->paragraph(),
             'adresse' => $address,
-            'price' => $this->faker->numberBetween(25000, 150000), // Random number with 5 digits
-            'surface_area' => $this->faker->randomNumber(5, false),
-            'bedrooms' => $this->faker->randomDigitNotNull(),
-            'bathrooms' => $this->faker->randomDigitNotNull(),
-            'has_parking' => $this->faker->boolean(),
+            'price' => fake()->numberBetween(25000, 150000), // Random number with 5 digits
+            'surface_area' => fake()->randomNumber(5, false),
+            'bedrooms' => fake()->randomDigitNotNull(),
+            'bathrooms' => fake()->randomDigitNotNull(),
+            'has_parking' => fake()->boolean(),
             'location' => "POINT($longitude $latitude)",
-            'status' => $this->faker->randomElement(['available', 'reserved', 'rent']),
+            'status' => fake()->randomElement(['available', 'reserved', 'rent']),
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
 

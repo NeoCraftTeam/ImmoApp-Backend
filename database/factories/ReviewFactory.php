@@ -16,8 +16,8 @@ class ReviewFactory extends Factory
     public function definition(): array
     {
         return [
-            'rating' => $this->faker->numberBetween(1, 5),
-            'comment' => $this->faker->sentence(),
+            'rating' => fake()->numberBetween(1, 5),
+            'comment' => fake()->sentence(),
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
 

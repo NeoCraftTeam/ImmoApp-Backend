@@ -14,7 +14,7 @@ class CityFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => $this->faker->city(),
+            'name' => fake()->city(),
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
         ];

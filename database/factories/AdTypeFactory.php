@@ -26,8 +26,8 @@ class AdTypeFactory extends Factory
         ];
 
         return [
-            'name' => $this->faker->unique()->randomElement($types),
-            'desc' => $this->faker->sentence(12),
+            'name' => fake()->unique()->randomElement($types),
+            'desc' => fake()->sentence(12),
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
         ];
