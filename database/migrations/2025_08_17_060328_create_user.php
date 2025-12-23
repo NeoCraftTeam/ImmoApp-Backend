@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('avatar');
             $table->enum('type', ['individual', 'agency'])->nullable();
             $table->enum('role', ['customer', 'agent', 'admin']);
-            $table->foreignUuid('city_id')->constrained('city')->onDelete('cascade')->references('id')->on('city');
+            $table->foreignUuid('city_id')->constrained('city')->onDelete('cascade')->references('id')->on('city')->nullable();
             $table->rememberToken();
             $table->timestamps();
             $table->softDeletes();

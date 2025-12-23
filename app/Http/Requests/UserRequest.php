@@ -40,7 +40,7 @@ class UserRequest extends FormRequest
                 'longitude' => 'nullable|numeric|between:-180,180',
                 'role' => ['required', 'string'],
                 'type' => ['nullable', 'string'],
-                'city_id' => ['required', 'uuid', 'exists:city,id'],
+                'city_id' => ['sometimes', 'uuid', 'exists:city,id'],
             ];
         }
         if ($this->isMethod('put') || $this->isMethod('patch')) {
