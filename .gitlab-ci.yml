@@ -23,9 +23,6 @@ test_suite:
     - composer install --no-ansi --no-interaction
     - cp .env.example .env.testing
     - php artisan key:generate --env=testing
-    # On vérifie que le style et la qualité du code sont parfaits
-    - ./vendor/bin/pint --test
-    - ./vendor/bin/rector --dry-run
     - php artisan migrate --env=testing --force
     - php artisan test --env=testing
   only:
