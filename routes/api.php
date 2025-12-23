@@ -94,7 +94,7 @@ Route::prefix('v1')->group(function (): void {
     });
 
     // --- RECOMMANDATIONS ---
-    Route::get('/recommendations', [RecommendationController::class, 'index']);
+    Route::middleware('auth:sanctum')->get('/recommendations', [RecommendationController::class, 'index']);
 
     // --- PAIEMENTS ---
     Route::post('/payments/initialize/{ad}', [PaymentController::class, 'initialize'])->middleware('auth:sanctum');
