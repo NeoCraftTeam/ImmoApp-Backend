@@ -77,6 +77,13 @@ print_step "Mise à jour des dépendances Composer"
 composer install --no-dev --optimize-autoloader --no-interaction
 print_success "Dépendances Composer mises à jour"
 
+# 3b. Nettoyage et Optimisation du code (Auto-fix)
+print_step "Nettoyage du code avec Pint"
+./vendor/bin/pint || print_warning "Pint a rencontré des problèmes mais on continue"
+
+print_step "Amélioration du code avec Rector"
+./vendor/bin/rector --no-progress-bar --no-diffs || print_warning "Rector a rencontré des problèmes mais on continue"
+
 # 4. Migration de la base de données
 # 4. Migration de la base de données
 print_step "Migration de la base de données"
