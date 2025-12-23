@@ -1,63 +1,67 @@
 <?php
 
 use App\Enums\PaymentStatus;
-use App\Enums\PaymentType;
 use App\Models\Ad;
 use App\Models\Payment;
 use App\Models\User;
+use App\Services\FedaPayService;
 use Laravel\Sanctum\Sanctum;
 
-test('authenticated user can unlock ad', function (): void {
-    $user = User::factory()->create();
+test('authenticated user can initialize payment for ad', function (): void {
+    $user = User::factory()->create(['firstname' => 'John', 'lastname' => 'Doe']);
     $ad = Ad::factory()->create();
+
+    // Mock FedaPayService
+    $mock = Mockery::mock(FedaPayService::class);
+    $mock->shouldReceive('createPayment')
+        ->once()
+        ->andReturn([
+            'success' => true,
+            'url' => 'https://fedapay.com/pay/123',
+            'transaction_id' => '12345',
+        ]);
+    $this->app->instance(FedaPayService::class, $mock);
 
     Sanctum::actingAs($user);
 
-    $response = $this->postJson('/api/v1/payments/unlock', [
-        'ad_id' => $ad->id,
-        'payment_method' => 'orange_money',
-    ]);
+    $response = $this->postJson("/api/v1/payments/initialize/{$ad->id}");
 
     $response->assertStatus(200)
-        ->assertJson(['message' => 'Ad unlocked successfully']);
+        ->assertJson([
+            'payment_url' => 'https://fedapay.com/pay/123',
+            'message' => 'Redirigez l\'utilisateur vers cette URL pour payer.',
+        ]);
 
     $this->assertDatabaseHas('payments', [
         'user_id' => $user->id,
         'ad_id' => $ad->id,
-        'status' => PaymentStatus::SUCCESS->value,
-        'payment_method' => 'orange_money',
+        'status' => PaymentStatus::PENDING->value,
+        'transaction_id' => '12345',
     ]);
 });
 
-test('user cannot unlock already unlocked ad', function (): void {
+test('user cannot initialize payment for already unlocked ad', function (): void {
     $user = User::factory()->create();
     $ad = Ad::factory()->create();
 
-    // Create existing payment
+    // Create existing successful payment
     Payment::factory()->create([
         'user_id' => $user->id,
         'ad_id' => $ad->id,
-        'type' => PaymentType::UNLOCK,
         'status' => PaymentStatus::SUCCESS,
     ]);
 
     Sanctum::actingAs($user);
-    $response = $this->postJson('/api/v1/payments/unlock', [
-        'ad_id' => $ad->id,
-        'payment_method' => 'orange_money',
-    ]);
+    $response = $this->postJson("/api/v1/payments/initialize/{$ad->id}");
 
-    $response->assertStatus(400)
-        ->assertJson(['message' => 'Ad already unlocked']);
+    $response->assertStatus(200)
+        ->assertJson(['status' => 'already_paid']);
 });
 
-test('guest cannot unlock ad', function (): void {
+test('guest cannot initialize payment', function (): void {
     $ad = Ad::factory()->create();
 
-    $response = $this->postJson('/api/v1/payments/unlock', [
-        'ad_id' => $ad->id,
-        'payment_method' => 'orange_money',
-    ]);
+    $response = $this->postJson("/api/v1/payments/initialize/{$ad->id}");
 
-    $response->assertStatus(401); // Unauthorized
+    $response->assertStatus(401);
 });
