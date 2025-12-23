@@ -40,7 +40,7 @@ class AppServiceProvider extends ServiceProvider
             ->view('emails.verify-email', ['url' => $url, 'user' => $notifiable]));
 
         VerifyEmail::createUrlUsing(function ($notifiable) {
-            $frontendUrl = config('app.email_verify_callback');
+            $frontendUrl = config('app.email_verify_callback') ?: config('app.url');
 
             $verifyUrl = URL::temporarySignedRoute(
                 'api.verification.verify',
@@ -51,7 +51,14 @@ class AppServiceProvider extends ServiceProvider
                 ]
             );
 
-            return $frontendUrl.'/verify-email?verify_url='.urlencode($verifyUrl);
+            $finalUrl = $frontendUrl.'/verify-email?verify_url='.urlencode($verifyUrl);
+
+            \Log::info('Email verification URL generated', [
+                'frontend_url' => $frontendUrl,
+                'final_url' => $finalUrl,
+            ]);
+
+            return $finalUrl;
         });
 
         ResetPassword::createUrlUsing(function (object $notifiable, string $token) {
