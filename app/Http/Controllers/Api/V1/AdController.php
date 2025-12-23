@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Requests\AdRequest;
-use App\Http\Resources\AdResource;
+use App\Http\Resources\AdResource as AdApiResource;
 use App\Models\Ad;
 use App\Models\User;
 use Clickbar\Magellan\Data\Geometries\Point;
@@ -120,7 +120,7 @@ class AdController
         $this->authorize('viewAny', Ad::class);
         $ads = Ad::with('quarter.city', 'ad_type', 'media', 'user')->orderBy('id', 'desc')->paginate(config('pagination.per_page', 15));
 
-        return AdResource::collection($ads);
+        return AdApiResource::collection($ads);
     }
 
     /**
@@ -299,7 +299,7 @@ class AdController
                 'success' => true,
                 'message' => 'Ad created successfully',
                 'data' => [
-                    'ad' => new AdResource($ad),
+                    'ad' => new AdApiResource($ad),
                     'images_count' => $ad->getMedia('images')->count(),
                 ],
             ], 201);
@@ -401,7 +401,7 @@ class AdController
 
         return response()->json([
             'success' => true,
-            'data' => new AdResource($ad),
+            'data' => new AdApiResource($ad),
         ]);
     }
 
@@ -577,8 +577,8 @@ class AdController
             }
 
             // Gérer la suppression d'images existantes
-            if ($request->has('images_to_delete') && is_array($request->images_to_delete)) {
-                foreach ($request->images_to_delete as $mediaId) {
+            if ($request->has('images_to_delete') && is_array($request->input('images_to_delete'))) {
+                foreach ($request->input('images_to_delete') as $mediaId) {
                     $ad->media()->where('id', $mediaId)->delete();
                 }
             }
@@ -599,7 +599,7 @@ class AdController
                 'success' => true,
                 'message' => 'Ad updated successfully',
                 'data' => [
-                    'ad' => new AdResource($ad),
+                    'ad' => new AdApiResource($ad),
                     'images_count' => $ad->getMedia('images')->count(),
                 ],
             ]);
@@ -1016,7 +1016,7 @@ class AdController
 
             return response()->json([
                 'success' => true,
-                'data' => AdResource::collection($ads),
+                'data' => AdApiResource::collection($ads),
                 'coordinates' => $coordinates,
                 'meta' => [
                     'center' => [

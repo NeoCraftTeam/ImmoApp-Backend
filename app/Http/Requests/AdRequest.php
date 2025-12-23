@@ -7,6 +7,9 @@ use Clickbar\Magellan\Http\Requests\TransformsGeojsonGeometry;
 use Clickbar\Magellan\Rules\GeometryGeojsonRule;
 use Illuminate\Foundation\Http\FormRequest;
 
+/**
+ * @property-read array|null $images_to_delete
+ */
 class AdRequest extends FormRequest
 {
     use TransformsGeojsonGeometry;
@@ -108,6 +111,9 @@ class AdRequest extends FormRequest
                 // Images, plusieurs formats possibles
                 'images' => 'sometimes|array|max:10',
                 'images.*' => 'image|mimes:jpeg,jpg,png,gif,webp|max:5120', // 5MB max
+
+                'images_to_delete' => 'sometimes|array',
+                'images_to_delete.*' => 'exists:media,id',
 
                 // Alias populaires (acceptation de variations courantes)
                 'image' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
