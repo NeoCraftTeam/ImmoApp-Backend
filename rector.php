@@ -7,16 +7,16 @@ use RectorLaravel\Set\LaravelSetProvider;
 
 return RectorConfig::configure()
     ->withPaths([
-        __DIR__ . '/app',
-        __DIR__ . '/bootstrap',
-        __DIR__ . '/config',
-        __DIR__ . '/public',
-        __DIR__ . '/resources',
-        __DIR__ . '/routes',
-        __DIR__ . '/tests',
+        __DIR__.'/app',
+        __DIR__.'/bootstrap',
+        __DIR__.'/config',
+        __DIR__.'/public',
+        __DIR__.'/resources',
+        __DIR__.'/routes',
+        __DIR__.'/tests',
     ])
     ->withSkip([
-        __DIR__ . '/bootstrap/cache',
+        __DIR__.'/bootstrap/cache',
     ])
     // active la modernisation vers PHP 8.4
     ->withPhpSets(php84: true)

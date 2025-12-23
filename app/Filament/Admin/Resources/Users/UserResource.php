@@ -78,8 +78,8 @@ class UserResource extends Resource
                     ->required() // Le mot de passe est obligatoire.
                     ->revealable()
                     ->minLength(8) // Ajoutez des règles de validation (minimum 8 caractères)
-                    ->dehydrateStateUsing(fn(string $state): string => Hash::make($state)) // Hachage (Crucial!)
-                    ->dehydrated(fn(?string $state) => filled($state)), // S'assure que le champ n'est pas sauvegardé vide lors de l'édition
+                    ->dehydrateStateUsing(fn (string $state): string => Hash::make($state)) // Hachage (Crucial!)
+                    ->dehydrated(fn (?string $state) => filled($state)), // S'assure que le champ n'est pas sauvegardé vide lors de l'édition
 
                 TextInput::make('password_confirmation')
                     ->label('Confirmer le mot de passe')
@@ -137,7 +137,7 @@ class UserResource extends Resource
                 ->searchable(),
             TextColumn::make('full_name')
                 ->label('Nom complet')
-                ->formatStateUsing(fn($record) => $record->firstname . ' ' . $record->lastname)
+                ->formatStateUsing(fn ($record) => $record->firstname.' '.$record->lastname)
                 ->searchable()
                 ->sortable(),
             TextColumn::make('phone_number')
@@ -187,7 +187,7 @@ class UserResource extends Resource
             Filter::make('is_active')
                 ->label('utilisateurs actifs')
                 ->toggle()
-                ->query(fn(Builder $query) => $query->where('is_active', true)),
+                ->query(fn (Builder $query) => $query->where('is_active', true)),
             SelectFilter::make('role')
                 ->label('Filtrer par rôle')
                 ->options([
@@ -251,7 +251,6 @@ class UserResource extends Resource
             ]),
         ];
     }
-
 
     public static function getPages(): array
     {
