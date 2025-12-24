@@ -148,6 +148,9 @@ class PaymentController
      */
     public function webhook(Request $request)
     {
+        Log::info('--- WEBHOOK FEDAPAY START ---');
+        Log::info('Raw Content: '.$request->getContent());
+
         $event = $request->all();
 
         Log::info('FedaPay Webhook reçu:', $event);
