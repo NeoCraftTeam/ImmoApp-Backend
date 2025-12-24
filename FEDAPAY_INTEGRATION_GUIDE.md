@@ -47,7 +47,7 @@ Vous devez surveiller l'URL de la WebView à chaque changement de page.
 Pour tester sans payer :
 1.  Ouvrez le lien `payment_url`.
 2.  Sur l'interface FedaPay, choisissez n'importe quel mode.
-3.  Utilisez n'importe quel numéro (ex: `61000000`).
+3.  Utilisez n'importe quel numéro (ex: `66000001`).
 4.  **Très important** : Un bouton bleu **"Approve"** (ou simulateur) apparaîtra. Cliquez dessus pour simuler un vrai succès.
 
 ---
