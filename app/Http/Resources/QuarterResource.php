@@ -24,7 +24,7 @@ class QuarterResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'city_id' => $this->city_id,
-            'city_name' => $this->city?->name,
+            'city_name' => $this->city->name,
         ];
     }
 }

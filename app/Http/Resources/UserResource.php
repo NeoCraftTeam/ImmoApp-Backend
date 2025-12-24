@@ -23,18 +23,16 @@ class UserResource extends JsonResource
             'lastname' => $this->lastname,
             'phone_number' => $this->phone_number,
             'email' => $this->email,
-            'avatar' => method_exists($this, 'getFirstMediaUrl')
-                ? $this->getFirstMediaUrl('avatar')
-                : $this->avatar,
+            'avatar' => $this->getFirstMediaUrl('avatar') ?: $this->avatar,
 
             // Champ sensible visible seulement par un admin
-            'role' => $this->when($request->user()?->role === 'admin', $this->role),
-            'type' => $this->when($request->user()?->role === 'admin', $this->type),
+            'role' => $this->when($request->user()?->isAdmin(), $this->role),
+            'type' => $this->when($request->user()?->isAdmin(), $this->type),
 
-            'created_at' => $this->when($request->user()?->role === 'admin', $this->created_at),
-            'updated_at' => $this->when($request->user()?->role === 'admin', $this->updated_at),
+            'created_at' => $this->when($request->user()?->isAdmin(), $this->created_at),
+            'updated_at' => $this->when($request->user()?->isAdmin(), $this->updated_at),
             'city_id' => $this->city_id,
-            'city_name' => $this->city?->name,
+            'city_name' => $this->city->name,
         ];
     }
 }

@@ -300,7 +300,7 @@ class UserController
                 'password' => Hash::make($data['password']),
                 'phone_number' => $data['phone_number'],
                 'role' => $data['role'],
-                'location' => (isset($data['latitude'], $data['longitude']) && $data['latitude'] !== null && $data['longitude'] !== null)
+                'location' => isset($data['latitude'], $data['longitude'])
                     ? Point::makeGeodetic((float) $data['latitude'], (float) $data['longitude'])
                     : null,
                 'type' => $data['type'] ?? null,

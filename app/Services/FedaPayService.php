@@ -30,6 +30,7 @@ class FedaPayService
             FedaPay::setApiKey($key);
             FedaPay::setEnvironment($env);
 
+            /** @var Transaction $transaction */
             $transaction = Transaction::create([
                 'description' => "Déblocage de l'annonce #{$adId}",
                 'amount' => $amount,
@@ -43,11 +44,12 @@ class FedaPayService
                 ],
             ]);
 
+            /** @var \FedaPay\FedaPayObject $token */
             $token = $transaction->generateToken();
 
             return [
                 'success' => true,
-                'url' => $token->url,
+                'url' => (string) ($token->url ?? ''),
                 'transaction_id' => $transaction->id,
             ];
         } catch (\Exception $e) {

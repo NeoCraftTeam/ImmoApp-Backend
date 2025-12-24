@@ -17,7 +17,7 @@ class AgencyPolicy
 
     public function view(User $user, Agency $agency): bool
     {
-        return $user->isAdmin() || $agency->user_id === $user->id;
+        return $user->isAdmin() || $agency->owner_id === $user->id;
     }
 
     public function create(User $user): bool
@@ -25,22 +25,22 @@ class AgencyPolicy
         return $user->isAnAgency();
     }
 
-    public function update(User $user, agency $agency): bool
+    public function update(User $user, Agency $agency): bool
     {
         return $user->isAdmin() || $agency->owner_id === $user->id;
     }
 
-    public function delete(User $user, agency $agency): bool
+    public function delete(User $user, Agency $agency): bool
     {
         return $user->isAnAgency();
     }
 
-    public function restore(User $user, agency $agency): bool
+    public function restore(User $user, Agency $agency): bool
     {
         return $user->isAdmin();
     }
 
-    public function forceDelete(User $user, agency $agency): bool
+    public function forceDelete(User $user, Agency $agency): bool
     {
         return $user->isAdmin();
     }

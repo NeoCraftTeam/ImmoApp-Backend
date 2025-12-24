@@ -134,7 +134,7 @@ class QuarterResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        return static::getModel()::count();
+        return (string) static::getModel()::count();
     }
 
     public static function getNavigationBadgeTooltip(): ?string

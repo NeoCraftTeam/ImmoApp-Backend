@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AdStatus;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\AdFactory;
 use Eloquent;
@@ -15,8 +16,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use Laravel\Scout\Searchable;
 /**
- * @property-read Quarter|null $quarter
- * @property-read User|null $user
+ * @property-read \App\Models\Quarter|null $quarter
+ * @property-read \App\Models\User|null $user
+ * @property-read \App\Models\AdType|null $ad_type
  *
  * @method static AdFactory factory($count = null, $state = [])
  * @method static Builder<static>|Ad newModelQuery()
@@ -181,14 +183,20 @@ class Ad extends Model implements HasMedia
     public function shouldBeSearchable(): bool
     {
         // N'indexer que les annonces non supprimées et actives
-        return $this->status === 'available' && ! $this->trashed();
+        return $this->status === AdStatus::AVAILABLE && ! $this->trashed();
     }
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * @return BelongsTo<Quarter, $this>
+     */
     public function quarter(): BelongsTo
     {
         return $this->belongsTo(Quarter::class);
@@ -199,6 +207,9 @@ class Ad extends Model implements HasMedia
         return $this->hasMany(Review::class);
     }
 
+    /**
+     * @return BelongsTo<AdType, $this>
+     */
     public function ad_type(): BelongsTo
     {
         return $this->belongsTo(AdType::class, 'type_id');
@@ -219,10 +230,10 @@ class Ad extends Model implements HasMedia
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
+            ->nonQueued()
             ->width(300)
             ->height(300)
-            ->sharpen(10)
-            ->nonQueued(); // Fast generation for immediate API response
+            ->sharpen(10);
     }
 
     /**

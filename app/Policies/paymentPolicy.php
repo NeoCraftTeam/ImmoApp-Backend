@@ -2,11 +2,11 @@
 
 namespace App\Policies;
 
-use App\Models\payment;
+use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
-class paymentPolicy
+class PaymentPolicy
 {
     use HandlesAuthorization;
 
@@ -15,7 +15,7 @@ class paymentPolicy
         return $user->isAdmin();
     }
 
-    public function view(User $user, payment $payment): bool
+    public function view(User $user, Payment $payment): bool
     {
         if ($user->isAdmin()) {
             return true;
@@ -30,22 +30,22 @@ class paymentPolicy
         return $user->isCustomer() || $user->isAgent() && ($user->isAnAgency() || $user->isAnIndividual());
     }
 
-    public function update(User $user, payment $payment): bool
+    public function update(User $user, Payment $payment): bool
     {
         return false; // No updates allowed for payments
     }
 
-    public function delete(User $user, payment $payment): bool
+    public function delete(User $user, Payment $payment): bool
     {
         return false; // No deletions allowed for payments
     }
 
-    public function restore(User $user, payment $payment): bool
+    public function restore(User $user, Payment $payment): bool
     {
         return false; // No restoration allowed for payments
     }
 
-    public function forceDelete(User $user, payment $payment): bool
+    public function forceDelete(User $user, Payment $payment): bool
     {
         return false; // No force deletions allowed for payments
     }

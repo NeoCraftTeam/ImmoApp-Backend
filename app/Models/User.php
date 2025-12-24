@@ -16,16 +16,16 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasName;
 use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\DatabaseNotification;
-use Illuminate\Notifications\DatabaseNotificationCollection;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use InvalidArgumentException;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -52,7 +52,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property Carbon|null $deleted_at
  * @property-read Collection<int, Ad> $ads
  * @property-read int|null $ads_count
- * @property-read DatabaseNotificationCollection<int, DatabaseNotification> $notifications
+ * @property-read \Illuminate\Notifications\DatabaseNotificationCollection<int, \Illuminate\Notifications\DatabaseNotification> $notifications
  * @property-read int|null $notifications_count
  * @property-read Collection<int, Payment> $payments
  * @property-read int|null $payments_count
@@ -60,6 +60,8 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property-read int|null $tokens_count
  * @property-read Collection<int, UnlockedAd> $unlockedAds
  * @property-read int|null $unlocked_ads_count
+ * @property array<string>|null $app_authentication_recovery_codes
+ * @property string|null $app_authentication_secret
  *
  * @method static UserFactory factory($count = null, $state = [])
  * @method static Builder<static>|User newModelQuery()
@@ -89,7 +91,6 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property bool $is_active
  * @property-read City $city
  * @property-read MediaCollection<int, Media> $media
- * @property-read int|null $media_count
  * @property-read Collection<int, Review> $reviews
  * @property-read int|null $reviews_count
  *
@@ -138,7 +139,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
     private function validateAgentType(): void
     {
-        if ($this->role == 'agent' && ! in_array($this->type, ['individual', 'agency'])) {
+        if ($this->role === UserRole::AGENT && ! in_array($this->type, [UserType::INDIVIDUAL, UserType::AGENCY])) {
             throw new InvalidArgumentException('Invalid agent type. Must be either "individual" or "agency".');
         }
     }
@@ -146,7 +147,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     private function assignDefaultAvatar(): void
     {
         if (empty($this->avatar)) {
-            $name = trim($this->firstname.' '.$this->lastname ?: 'User');
+            $name = trim($this->firstname.' '.$this->lastname) ?: 'User';
             $this->avatar = 'https://ui-avatars.com/api/?name='.urlencode($name).'&background=random';
         }
     }
@@ -161,9 +162,9 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return $this->hasMany(Ad::class);
     }
 
-    public function agency(): belongsTo
+    public function agency(): BelongsTo
     {
-        return $this->belongsTo(agency::class);
+        return $this->belongsTo(Agency::class);
     }
 
     public function payments(): HasMany
@@ -287,7 +288,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
-     * @return ?array<string>
+     * @return array<string>|null
      */
     public function getAppAuthenticationRecoveryCodes(): ?array
     {

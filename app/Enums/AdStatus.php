@@ -12,7 +12,7 @@ enum AdStatus: string implements HasLabel
     case PENDING = 'pending';
     case SOLD = 'sold';
 
-    public function getLabel(): ?string
+    public function getLabel(): string
     {
         return match ($this) {
             self::AVAILABLE => 'Available',

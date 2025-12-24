@@ -92,7 +92,7 @@ class Payment extends Model
 
     public function isPaid(): bool
     {
-        return $this->payments->where('status', PaymentStatus::SUCCESS)->isNotEmpty();
+        return $this->status === PaymentStatus::SUCCESS;
     }
 
     /**

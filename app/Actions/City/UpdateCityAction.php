@@ -18,7 +18,7 @@ class UpdateCityAction
     {
         return DB::transaction(function () use ($city, $payload) {
             $exists = City::query()
-                ->where('name', $payload['name'] ?? $city->name)
+                ->where('name', $payload['name'])
                 ->where('id', '!=', $city->id)
                 ->first();
 

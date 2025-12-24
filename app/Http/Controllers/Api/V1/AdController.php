@@ -1798,10 +1798,8 @@ class AdController
 
             // Construire la requête Scout
             $builder = Ad::search($q, function (\Meilisearch\Endpoints\Indexes $index, string $query, array $options) use ($filters, $sortBy, $sortOrder) {
-                if (! empty($filters)) {
-                    // AND logic : tous les filtres doivent matcher
-                    $options['filter'] = $filters;
-                }
+                // AND logic : tous les filtres doivent matcher
+                $options['filter'] = $filters;
 
                 // Tri
                 $options['sort'] = [sprintf('%s:%s', $sortBy, $sortOrder)];
@@ -1809,7 +1807,7 @@ class AdController
                 return $index->search($query, $options);
             })
                 // Eager load des relations
-                ->query(fn ($eloquent) => $eloquent->with(['quarter.city', 'ad_type', 'images', 'user']));
+                ->query(fn ($eloquent) => $eloquent->with(['quarter.city', 'ad_type', 'media', 'user']));
 
             // Paginer
             $results = $builder->paginate($perPage);

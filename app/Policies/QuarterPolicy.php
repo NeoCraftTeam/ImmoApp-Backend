@@ -27,21 +27,21 @@ class QuarterPolicy
 
     public function update(User $user, Quarter $quarter): bool
     {
-        return $user->isAdmin() || $user->id === $quarter->city->user_id;
+        return $user->isAdmin();
     }
 
     public function delete(User $user, Quarter $quarter): bool
     {
-        return $user->isAdmin() || $user->id === $quarter->city->user_id;
+        return $user->isAdmin();
     }
 
     public function restore(User $user, Quarter $quarter): bool
     {
-        return $user->isAdmin() || $user->id === $quarter->city->user_id;
+        return $user->isAdmin();
     }
 
     public function forceDelete(User $user, Quarter $quarter): bool
     {
-        return $user->isAdmin() || $user->id === $quarter->city->user_id;
+        return $user->isAdmin();
     }
 }

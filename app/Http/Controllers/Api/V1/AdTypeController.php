@@ -133,12 +133,6 @@ class AdTypeController
     {
         $this->authorize('view', $adType);
 
-        if (! $adType) {
-            return response()->json([
-                'message' => 'Type non trouvé',
-            ], 404);
-        }
-
         return new AdTypeResource($adType);
     }
 

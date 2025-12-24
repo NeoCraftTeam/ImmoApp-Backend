@@ -19,7 +19,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
- * @property-read City $city
+ * @property-read \App\Models\City $city
  *
  * @method static QuarterFactory factory($count = null, $state = [])
  * @method static Builder<static>|Quarter newModelQuery()
@@ -54,6 +54,9 @@ class Quarter extends Model
         'deleted_at',
     ];
 
+    /**
+     * @return BelongsTo<City, $this>
+     */
     public function city(): BelongsTo
     {
         return $this->belongsTo(City::class);

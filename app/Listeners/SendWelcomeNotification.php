@@ -27,6 +27,7 @@ class SendWelcomeNotification implements ShouldQueue
      */
     public function handle(Verified $event): void
     {
+        /** @var \App\Models\User $user */
         $user = $event->user;
 
         try {
@@ -130,8 +131,11 @@ class SendWelcomeNotification implements ShouldQueue
      */
     public function failed(Verified $event, Exception $exception): void
     {
+        /** @var \App\Models\User $user */
+        $user = $event->user;
+
         Log::error('SendWelcomeNotification job failed', [
-            'user_id' => $event->user->id,
+            'user_id' => $user->id,
             'error' => $exception->getMessage(),
         ]);
     }

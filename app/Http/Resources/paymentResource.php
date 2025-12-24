@@ -2,12 +2,12 @@
 
 namespace App\Http\Resources;
 
-use App\Models\payment;
+use App\Models\Payment;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/** @mixin payment */
-class paymentResource extends JsonResource
+/** @mixin Payment */
+class PaymentResource extends JsonResource
 {
     #[\Override]
     public function toArray(Request $request): array

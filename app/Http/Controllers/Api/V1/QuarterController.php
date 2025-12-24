@@ -410,10 +410,12 @@ class QuarterController
 
         try {
             // Vérifier si un autre quarter utilise déjà ce nom
-            if (isset($data['name']) &&
+            if (
+                isset($data['name']) &&
                 Quarter::where('name', $data['name'])
                     ->where('id', '!=', $quarter->id)
-                    ->exists()) {
+                    ->exists()
+            ) {
                 return response()->json([
                     'message' => 'Ce nom de quartier est déjà utilisé.',
                 ], 409);
@@ -515,12 +517,6 @@ class QuarterController
         try {
 
             $deleted = $quarter->delete();
-
-            if (! $quarter) {
-                return response()->json([
-                    'message' => 'Ce quartier n\'existe pas,',
-                ], 404);
-            }
 
             return response()->json([
                 'message' => 'Quartier supprimé avec succès.',

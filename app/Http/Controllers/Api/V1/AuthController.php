@@ -262,7 +262,7 @@ class AuthController
                     'email' => $data['email'],
                     'phone_number' => $data['phone_number'],
                     'password' => Hash::make($data['password']),
-                    'location' => (isset($data['latitude'], $data['longitude']) && $data['latitude'] !== null && $data['longitude'] !== null)
+                    'location' => isset($data['latitude'], $data['longitude'])
                         ? Point::makeGeodetic((float) $data['latitude'], (float) $data['longitude'])
                         : null,
                     'role' => $data['role'] ?? 'admin', // Valeur par défaut

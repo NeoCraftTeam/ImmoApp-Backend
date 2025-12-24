@@ -22,7 +22,7 @@ class UnlockedAdResource extends JsonResource
             'payment_id' => $this->payment_id,
 
             'ad' => new AdResource($this->whenLoaded('ad')),
-            'payment' => new paymentResource($this->whenLoaded('payment')),
+            'payment' => new PaymentResource($this->whenLoaded('payment')),
         ];
     }
 }
