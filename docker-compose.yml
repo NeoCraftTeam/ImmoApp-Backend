@@ -4,7 +4,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: immoapp-backend
+    image: ${APP_IMAGE:-keyhome-backend}
     container_name: keyhome-backend
     restart: unless-stopped
     working_dir: /var/www

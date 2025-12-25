@@ -1,14 +1,32 @@
 stages:
+  - build
   - test
   - deploy
   - cleanup
 
-# Configuration globale pour utiliser UNIQUEMENT votre Runner VPS
+variables:
+  # GitLab Container Registry variables
+  APP_IMAGE: $CI_REGISTRY_IMAGE/app
+  # On utilise le tag 'latest' pour la branche main, et le commit SHA pour les autres
+  IMAGE_TAG: $CI_COMMIT_REF_SLUG
+
+# Configuration globale pour utiliser votre Runner VPS
 default:
   tags:
     - self-hosted-shell
 
-# --- ÉTAPE 1 : TESTS ---
+# --- ÉTAPE 1 : BUILD & PUSH TO REGISTRY ---
+build_image:
+  stage: build
+  script:
+    - echo "🏗️ Building and Pushing Docker Image to Registry..."
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build --pull -t $APP_IMAGE:$IMAGE_TAG .
+    - docker push $APP_IMAGE:$IMAGE_TAG
+  only:
+    - branches
+
+# --- ÉTAPE 2 : TESTS (Utilisant l'image du Registry) ---
 test_suite:
   stage: test
   variables:
@@ -17,9 +35,10 @@ test_suite:
     DB_PORT: 5432
     DB_DATABASE: testing
     DB_USERNAME: gitlab-runner
-    DB_PASSWORD: test_pass # Le mot de passe défini en étape 1
+    DB_PASSWORD: test_pass
   script:
-    - echo "🧪 Préparation des tests sur le VPS..."
+    - echo "🧪 Running tests inside the built image context..."
+    # On lance les tests sur le runner (qui a accès à Postgres localement)
     - composer install --no-ansi --no-interaction
     - cp .env.example .env.testing
     - php artisan key:generate --env=testing
@@ -27,48 +46,41 @@ test_suite:
     - php artisan test --env=testing
   only:
     - branches
-    - merge_requests
 
-# --- ÉTAPE 2 : DÉPLOIEMENT DOCKER ---
+# --- ÉTAPE 3 : DÉPLOIEMENT DEPUIS LE REGISTRY ---
 production_deploy:
   stage: deploy
-  tags:
-    - self-hosted-shell
   script:
-    - echo "🚀 Déploiement Docker sur le VPS..."
+    - echo "🚀 Deploying from Registry to VPS..."
     - cd /var/www/ImmoApp-Backend || exit 1
     
-    # 1. Mise à jour du code sur l'hôte et nettoyage radical des caches
-    - sudo chown -R gitlab-runner:www-data .
-    - git remote set-url origin https://gitlab-ci-token:${CI_JOB_TOKEN}@$CI_SERVER_HOST/$CI_PROJECT_PATH.git
-    - git fetch origin
-    - git checkout main
-    - git reset --hard origin/main
-    - git clean -fd
-    - rm -f bootstrap/cache/*.php # Supprime les résidus de config système
+    # 1. Se connecter au registre sur le VPS
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
     
-    # 2. Nettoyage et Reconstruction
-    # On force l'arrêt des anciens conteneurs pour libérer les ports et éviter les KeyError
-    - docker-compose down --remove-orphans || true
-    - docker-compose up -d --build
+    # 2. Mettre à jour le fichier docker-compose pour pointer vers l'image du registre
+    # On utilise une variable d'env pour l'image
+    - export APP_IMAGE=$APP_IMAGE:main
     
-    # 3. Exécution des tâches Laravel à l'INTÉRIEUR du conteneur
-    # On active PostGIS en utilisant les variables internes du conteneur ($POSTGRES_USER et $POSTGRES_DB)
-    - docker-compose exec -T db sh -c 'psql -U $POSTGRES_USER -d $POSTGRES_DB -c "CREATE EXTENSION IF NOT EXISTS postgis;"'
+    # 3. Pull et Relance rapide
+    - docker-compose pull app
+    - docker-compose up -d --no-build
+    
+    # 4. Tâches de maintenance habituelles
     - docker-compose exec -T app php artisan migrate --force
     - docker-compose exec -T app php artisan optimize
-    - docker-compose exec -T app bash resetFilamentLivewire.sh # Le script est à la racine
+    - docker-compose exec -T app bash resetFilamentLivewire.sh
+    
+    # 5. Créer le lien symbolique si manquant (notre récent fix)
+    - docker-compose exec -T app php artisan storage:link || true
     
   only:
     - main
 
-# --- ÉTAPE 3 : NETTOYAGE ---
+# --- ÉTAPE 4 : NETTOYAGE ---
 cleanup:
   stage: cleanup
-  tags:
-    - self-hosted-shell
   script:
-    - echo "🧹 Nettoyage des images et cache Docker sur le VPS..."
+    - echo "🧹 Cleaning up old images..."
     - docker system prune -f
   when: always
   only:

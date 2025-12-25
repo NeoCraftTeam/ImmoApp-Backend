@@ -61,4 +61,6 @@ RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 # Exposition du port FPM
 EXPOSE 9000
 
+# Script d'entrée pour assurer les permissions au runtime si nécessaire
+# CMD ["php-fpm"]
 CMD ["php-fpm"]
