@@ -7,6 +7,8 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use App\Enums\UserRole;
+use App\Enums\UserType;
 
 /**
  * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\User>
@@ -27,12 +29,14 @@ class UserFactory extends Factory
     {
         $latitude = fake()->latitude();
         $longitude = fake()->longitude();
+        $role = fake()->randomElement(UserRole::cases());
 
         return [
             'firstname' => fake()->firstName(),
             'lastname' => fake()->lastName(),
             'avatar' => fake()->imageUrl(),
-            'role' => fake()->randomElement(['admin', 'customer', 'agent']),
+            'role' => $role,
+            'type' => $role === UserRole::AGENT ? fake()->randomElement(UserType::cases()) : null,
             'phone_number' => fake()->phoneNumber(),
             'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
@@ -51,7 +55,7 @@ class UserFactory extends Factory
      */
     public function unverified(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'email_verified_at' => null,
         ]);
     }
@@ -59,15 +63,15 @@ class UserFactory extends Factory
     public function agents(): Factory|UserFactory
     {
         return $this->state([
-            'role' => 'agent',
-            'type' => fake()->randomElement(['individual', 'agency']),
+            'role' => UserRole::AGENT,
+            'type' => fake()->randomElement(UserType::cases()),
         ]);
     }
 
     public function admin(): Factory|UserFactory
     {
         return $this->state([
-            'role' => 'admin',
+            'role' => UserRole::ADMIN,
             'type' => null,
         ]);
     }
@@ -75,7 +79,7 @@ class UserFactory extends Factory
     public function customers(): Factory|UserFactory
     {
         return $this->state([
-            'role' => 'customer',
+            'role' => UserRole::CUSTOMER,
             'type' => null,
         ]);
     }
