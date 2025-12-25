@@ -95,6 +95,11 @@ print_step "Génération de la documentation L5 Swagger"
 php artisan l5-swagger:generate
 print_success "Documentation Swagger générée"
 
+# 5b. Création du lien symbolique de stockage
+print_step "Lien symbolique de stockage"
+php artisan storage:link || print_warning "Le lien symbolique existe peut-être déjà"
+print_success "Lien symbolique configuré"
+
 # 6. Gestion des permissions
 print_step "Configuration des permissions"
 # On donne la propriété à l'utilisateur du runner et au groupe web
@@ -200,6 +205,7 @@ print_message "📊 Résumé du déploiement:"
 echo "  • Caches nettoyés et reconstruits"
 echo "  • Dépendances mises à jour"
 echo "  • Documentation Swagger générée"
+echo "  • Lien symbolique de stockage configuré"
 echo "  • Permissions configurées"
 echo "  • Services redémarrés"
 echo "  • Application optimisée"
