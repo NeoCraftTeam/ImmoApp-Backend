@@ -11,8 +11,9 @@ services:
     # On utilise le fichier .env du VPS pour configurer le conteneur
     env_file:
       - .env
-    # volumes:
-    #   - .:/var/www
+    # On partage le code généré dans l'image avec Nginx via un volume nommé
+    volumes:
+      - keyhome-app-code:/var/www
     networks:
       - keyhome-network
     environment:
@@ -28,7 +29,7 @@ services:
     ports:
       - "9090:80" # On utilise 9090 pour sortir de la zone de conflit 808x
     volumes:
-      # - .:/var/www
+      - keyhome-app-code:/var/www
       - .docker/nginx/conf.d:/etc/nginx/conf.d
     networks:
       - keyhome-network
@@ -74,4 +75,6 @@ networks:
 
 volumes:
   keyhome-db-data:
+    driver: local
+  keyhome-app-code:
     driver: local
