@@ -94,6 +94,7 @@ production_deploy:
     - export FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:main"
     - APP_IMAGE=$FULL_IMAGE docker compose pull app
     - APP_IMAGE=$FULL_IMAGE docker compose up -d --no-build
+    - APP_IMAGE=$FULL_IMAGE docker compose restart web
     
     # 5. Tâches Laravel (Via Docker)
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan migrate --force
