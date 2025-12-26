@@ -1,32 +1,60 @@
 stages:
+  - quality
+  - security
   - build
   - test
   - deploy
+  - notify
   - cleanup
 
 variables:
-  # GitLab Container Registry variables
   APP_IMAGE: $CI_REGISTRY_IMAGE/app
-  # On utilise le tag 'latest' pour la branche main, et le commit SHA pour les autres
   IMAGE_TAG: $CI_COMMIT_REF_SLUG
 
-# Configuration globale pour utiliser votre Runner VPS
 default:
   tags:
     - self-hosted-shell
 
-# --- ÉTAPE 1 : BUILD & PUSH TO REGISTRY ---
-build_image:
-  stage: build
+# --- ÉTAPE 1 : QUALITY (Lint & Static Analysis) ---
+phpstan:
+  stage: quality
   script:
-    - echo "🏗️ Building and Pushing Docker Image to Registry..."
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build --pull -t $APP_IMAGE:$IMAGE_TAG .
-    - docker push $APP_IMAGE:$IMAGE_TAG
+    - echo "🔍 Running PHPStan Analysis..."
+    - composer install --no-interaction
+    - ./vendor/bin/phpstan analyse
   only:
     - branches
 
-# --- ÉTAPE 2 : TESTS (Utilisant l'image du Registry) ---
+style_check:
+  stage: quality
+  script:
+    - echo "💅 Checking Code Style (Pint)..."
+    - ./vendor/bin/pint --test
+  only:
+    - branches
+
+# --- ÉTAPE 2 : SECURITY ---
+composer_security:
+  stage: security
+  script:
+    - echo "🛡️ Checking PHP Dependencies Security..."
+    - composer audit
+  only:
+    - branches
+
+# --- ÉTAPE 3 : BUILD & PUSH ---
+build_image:
+  stage: build
+  script:
+    - echo "🏗️ Building Docker Image..."
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - docker build --pull -t $APP_IMAGE:$IMAGE_TAG .
+    - docker push $APP_IMAGE:$IMAGE_TAG
+    - docker logout $CI_REGISTRY
+  only:
+    - branches
+
+# --- ÉTAPE 4 : TESTS ---
 test_suite:
   stage: test
   variables:
@@ -37,8 +65,7 @@ test_suite:
     DB_USERNAME: gitlab-runner
     DB_PASSWORD: test_pass
   script:
-    - echo "🧪 Running tests inside the built image context..."
-    # On lance les tests sur le runner (qui a accès à Postgres localement)
+    - echo "🧪 Running Test Suite..."
     - composer install --no-ansi --no-interaction
     - cp .env.example .env.testing
     - php artisan key:generate --env=testing
@@ -47,40 +74,52 @@ test_suite:
   only:
     - branches
 
-# --- ÉTAPE 3 : DÉPLOIEMENT DEPUIS LE REGISTRY ---
+# --- ÉTAPE 5 : DÉPLOIEMENT ---
 production_deploy:
   stage: deploy
   script:
-    - echo "🚀 Deploying from Registry to VPS..."
+    - echo "🚀 Deploying to VPS..."
     - cd /var/www/ImmoApp-Backend || exit 1
-    
-    # 1. Se connecter au registre sur le VPS
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    
-    # 2. Mettre à jour le fichier docker-compose pour pointer vers l'image du registre
-    # On utilise une variable d'env pour l'image
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - export APP_IMAGE=$APP_IMAGE:main
-    
-    # 3. Pull et Relance rapide
     - docker-compose pull app
     - docker-compose up -d --no-build
-    
-    # 4. Tâches de maintenance habituelles
     - docker-compose exec -T app php artisan migrate --force
     - docker-compose exec -T app php artisan optimize
     - docker-compose exec -T app bash resetFilamentLivewire.sh
-    
-    # 5. Créer le lien symbolique si manquant (notre récent fix)
     - docker-compose exec -T app php artisan storage:link || true
-    
+    - docker logout $CI_REGISTRY
   only:
     - main
 
-# --- ÉTAPE 4 : NETTOYAGE ---
+# --- ÉTAPE 6 : NOTIFICATIONS ---
+notify_slack_success:
+  stage: notify
+  script:
+    - |
+      curl -X POST -H 'Content-type: application/json' \
+      --data "{\"text\":\"✅ *KeyHome - Déploiement Réussi !* \n*Branche:* $CI_COMMIT_REF_NAME\n*Commit:* $CI_COMMIT_TITLE\n<https://gitlab.com/$CI_PROJECT_PATH/-/pipelines/$CI_PIPELINE_ID|Voir la pipeline>\"}" \
+      $SLACK_WEBHOOK_URL
+  when: on_success
+  only:
+    - main
+
+notify_slack_failure:
+  stage: notify
+  script:
+    - |
+      curl -X POST -H 'Content-type: application/json' \
+      --data "{\"text\":\"❌ *KeyHome - Échec de la Pipeline !* \n*Étape:* $CI_JOB_STAGE\n*Branche:* $CI_COMMIT_REF_NAME\n<https://gitlab.com/$CI_PROJECT_PATH/-/pipelines/$CI_PIPELINE_ID|Vérifier l'erreur>\"}" \
+      $SLACK_WEBHOOK_URL
+  when: on_failure
+  only:
+    - branches
+
+# --- ÉTAPE 7 : NETTOYAGE ---
 cleanup:
   stage: cleanup
   script:
-    - echo "🧹 Cleaning up old images..."
+    - echo "🧹 Cleaning up..."
     - docker system prune -f
   when: always
   only:
