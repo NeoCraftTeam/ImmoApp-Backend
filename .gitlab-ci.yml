@@ -80,11 +80,11 @@ production_deploy:
   stage: deploy
   script:
     - echo "🚀 Déploiement via Registry (Pure Docker)..."
-    # 1. On recrée le dossier s'il a été supprimé
-    - mkdir -p /var/www/ImmoApp-Backend
+    # 1. On recrée la structure des dossiers
+    - mkdir -p /var/www/ImmoApp-Backend/.docker/nginx/conf.d
     - cp docker-compose.yml /var/www/ImmoApp-Backend/docker-compose.yml
-    # On force la copie du dossier .docker complet
-    - cp -rf .docker /var/www/ImmoApp-Backend/
+    # 2. On copie explicitement le contenu de la config Nginx
+    - cp -rf .docker/nginx/conf.d/. /var/www/ImmoApp-Backend/.docker/nginx/conf.d/
     - cd /var/www/ImmoApp-Backend || exit 1
     
     # 3. Authentification au registre
