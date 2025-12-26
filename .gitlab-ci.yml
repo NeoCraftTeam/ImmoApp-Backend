@@ -80,19 +80,21 @@ production_deploy:
   stage: deploy
   script:
     - echo "🚀 Déploiement via Registry (Pure Docker)..."
+    # 1. On recrée le dossier s'il a été supprimé
+    - mkdir -p /var/www/ImmoApp-Backend
+    # 2. On copie le docker-compose.yml du repo vers le dossier de destination
+    - cp docker-compose.yml /var/www/ImmoApp-Backend/docker-compose.yml
     - cd /var/www/ImmoApp-Backend || exit 1
     
-    # 1. Authentification au registre
+    # 3. Authentification au registre
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     
-    # 2. On définit l'image complète
+    # 4. On définit et on injecte l'image
     - export FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:main"
-    
-    # 3. Pull et Relance avec injection de variable pour Docker Compose
     - APP_IMAGE=$FULL_IMAGE docker-compose pull app
     - APP_IMAGE=$FULL_IMAGE docker-compose up -d --no-build
     
-    # 4. Tâches Laravel à l'intérieur du conteneur (Utilise la même variable pour docker-compose exec)
+    # 5. Tâches Laravel (Via Docker)
     - APP_IMAGE=$FULL_IMAGE docker-compose exec -T app php artisan migrate --force
     - APP_IMAGE=$FULL_IMAGE docker-compose exec -T app php artisan optimize
     - APP_IMAGE=$FULL_IMAGE docker-compose exec -T app bash resetFilamentLivewire.sh
