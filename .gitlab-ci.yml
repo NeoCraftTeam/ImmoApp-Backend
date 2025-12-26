@@ -82,8 +82,9 @@ production_deploy:
     - echo "🚀 Déploiement via Registry (Pure Docker)..."
     # 1. On recrée le dossier s'il a été supprimé
     - mkdir -p /var/www/ImmoApp-Backend
-    # 2. On copie le docker-compose.yml du repo vers le dossier de destination
     - cp docker-compose.yml /var/www/ImmoApp-Backend/docker-compose.yml
+    # On force la copie du dossier .docker complet
+    - cp -rf .docker /var/www/ImmoApp-Backend/
     - cd /var/www/ImmoApp-Backend || exit 1
     
     # 3. Authentification au registre
@@ -110,8 +111,9 @@ notify_slack_success:
   script:
     - |
       curl -X POST -H 'Content-type: application/json' \
-      --data "{\"text\":\"✅ *KeyHome - Déploiement Réussi !* \n*Branche:* $CI_COMMIT_REF_NAME\n*Commit:* $CI_COMMIT_TITLE\n<https://gitlab.com/$CI_PROJECT_PATH/-/pipelines/$CI_PIPELINE_ID|Voir la pipeline>\"}" \
-      $SLACK_WEBHOOK_URL
+      --data "{
+        \"text\": \"✅ *[BACKEND] Déploiement Réussi !*\n\n*Auteur:* $GITLAB_USER_NAME\n*Branche:* \`$CI_COMMIT_REF_NAME\`\n*Message:* _${CI_COMMIT_TITLE}_\n\n🔗 <$CI_PROJECT_URL/-/commit/$CI_COMMIT_SHA|Voir le commit> | <$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID|Voir la pipeline>\"
+      }" $SLACK_WEBHOOK_URL
   when: on_success
   only:
     - main
@@ -121,8 +123,9 @@ notify_slack_failure:
   script:
     - |
       curl -X POST -H 'Content-type: application/json' \
-      --data "{\"text\":\"❌ *KeyHome - Échec de la Pipeline !* \n*Étape:* $CI_JOB_STAGE\n*Branche:* $CI_COMMIT_REF_NAME\n<https://gitlab.com/$CI_PROJECT_PATH/-/pipelines/$CI_PIPELINE_ID|Vérifier l'erreur>\"}" \
-      $SLACK_WEBHOOK_URL
+      --data "{
+        \"text\": \"❌ *[BACKEND] Échec de la Pipeline !*\n\n*Étape:* \`$CI_JOB_STAGE\`\n*Auteur:* $GITLAB_USER_NAME\n*Branche:* \`$CI_COMMIT_REF_NAME\`\n\n🚨 <$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID|Vérifier l'erreur immédiatement>\"
+      }" $SLACK_WEBHOOK_URL
   when: on_failure
   only:
     - branches
