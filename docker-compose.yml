@@ -8,8 +8,11 @@ services:
     container_name: keyhome-backend
     restart: unless-stopped
     working_dir: /var/www
-    volumes:
-      - .:/var/www
+    # On utilise le fichier .env du VPS pour configurer le conteneur
+    env_file:
+      - .env
+    # volumes:
+    #   - .:/var/www
     networks:
       - keyhome-network
     environment:
@@ -25,7 +28,7 @@ services:
     ports:
       - "9090:80" # On utilise 9090 pour sortir de la zone de conflit 808x
     volumes:
-      - .:/var/www
+      # - .:/var/www
       - .docker/nginx/conf.d:/etc/nginx/conf.d
     networks:
       - keyhome-network
