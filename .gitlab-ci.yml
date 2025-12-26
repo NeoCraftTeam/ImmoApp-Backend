@@ -29,6 +29,7 @@ style_check:
   stage: quality
   script:
     - echo "💅 Checking Code Style (Pint)..."
+    - composer install --no-interaction
     - ./vendor/bin/pint --test
   only:
     - branches
