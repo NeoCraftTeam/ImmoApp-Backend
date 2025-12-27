@@ -22,6 +22,7 @@ class CustomRegister extends BaseRegister
                 $this->getFirstnameFormComponent(),
                 $this->getLastnameFormComponent(),
                 $this->getEmailFormComponent(),
+                $this->getAgencyNameFormComponent(),
                 $this->getPasswordFormComponent(),
                 $this->getPasswordConfirmationFormComponent(),
             ]);
@@ -44,6 +45,17 @@ class CustomRegister extends BaseRegister
             ->maxLength(255);
     }
 
+    protected function getAgencyNameFormComponent(): Component
+    {
+        $panelId = \Filament\Facades\Filament::getCurrentPanel()->getId();
+
+        return TextInput::make('agency_name')
+            ->label('Nom de votre agence')
+            ->required($panelId === 'agency')
+            ->visible($panelId === 'agency')
+            ->maxLength(255);
+    }
+
     #[\Override]
     protected function handleRegistration(array $data): Model
     {
@@ -63,7 +75,8 @@ class CustomRegister extends BaseRegister
         $agencyService = app(AgencyService::class);
 
         if ($panelId === 'agency') {
-            $agencyService->promoteToAgency($user, 'Agence de '.$user->lastname);
+            $agencyName = $data['agency_name'] ?? 'Agence de '.$user->lastname;
+            $agencyService->promoteToAgency($user, $agencyName);
         } else {
             $agencyService->promoteToBailleur($user);
         }

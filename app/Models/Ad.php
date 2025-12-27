@@ -18,6 +18,7 @@ use Laravel\Scout\Searchable;
 /**
  * @property-read \App\Models\Quarter|null $quarter
  * @property-read \App\Models\User|null $user
+ * @property-read \App\Models\Agency|null $agency
  * @property-read \App\Models\AdType|null $ad_type
  *
  * @method static AdFactory factory($count = null, $state = [])
@@ -195,6 +196,22 @@ class Ad extends Model implements HasMedia
     {
         // N'indexer que les annonces non supprimées et actives
         return $this->status === AdStatus::AVAILABLE && ! $this->trashed();
+    }
+
+    /**
+     * Get the name of the publisher (Agency name or User name).
+     */
+    public function getPublisherName(): string
+    {
+        if ($this->agency_id && $this->agency instanceof \App\Models\Agency) {
+            // Si c'est une agence (type AGENCY), on affiche le nom de l'agence
+            if ($this->user?->type === \App\Enums\UserType::AGENCY) {
+                return $this->agency->name;
+            }
+        }
+
+        // Sinon (Bailleur individuel ou fallback), on affiche le nom de l'utilisateur
+        return $this->user ? "{$this->user->firstname} {$this->user->lastname}" : 'Anonyme';
     }
 
     /**

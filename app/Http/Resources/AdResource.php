@@ -42,6 +42,8 @@ class AdResource extends JsonResource
             'updated_at' => $this->updated_at,
 
             'user' => new UserResource($this->whenLoaded('user')),
+            'agency' => new AgencyResource($this->whenLoaded('agency')),
+            'published_by' => $this->getPublisherName(),
             'quarter' => new QuarterResource($this->whenLoaded('quarter')),
             'type' => new AdTypeResource($this->whenLoaded('ad_type')),
             'images' => $this->getAccessibleImages($request->user())->map(fn ($media) => [

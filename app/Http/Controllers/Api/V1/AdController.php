@@ -118,7 +118,7 @@ class AdController
     public function index(): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Ad::class);
-        $ads = Ad::with('quarter.city', 'ad_type', 'media', 'user')->orderBy('id', 'desc')->paginate(config('pagination.per_page', 15));
+        $ads = Ad::with('quarter.city', 'ad_type', 'media', 'user', 'agency')->orderBy('id', 'desc')->paginate(config('pagination.per_page', 15));
 
         return AdApiResource::collection($ads);
     }
@@ -394,7 +394,7 @@ class AdController
      */
     public function show(string $id): JsonResponse
     {
-        $ad = Ad::with(['media', 'user', 'ad_type', 'quarter.city'])
+        $ad = Ad::with(['media', 'user', 'ad_type', 'quarter.city', 'agency'])
             ->findOrFail($id);
 
         $this->authorize('view', $ad);
