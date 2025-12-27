@@ -118,7 +118,7 @@ class AdController
     public function index(): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Ad::class);
-        $ads = Ad::with('quarter.city', 'ad_type', 'media', 'user', 'agency')->orderBy('id', 'desc')->paginate(config('pagination.per_page', 15));
+        $ads = Ad::with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')->orderBy('id', 'desc')->paginate(config('pagination.per_page', 15));
 
         return AdApiResource::collection($ads);
     }
@@ -292,8 +292,8 @@ class AdController
 
             DB::commit();
 
-            // Recharger les médias
-            $ad->load('media');
+            // Recharger les relations nécessaires pour la réponse
+            $ad->load(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency']);
 
             return response()->json([
                 'success' => true,
@@ -394,7 +394,7 @@ class AdController
      */
     public function show(string $id): JsonResponse
     {
-        $ad = Ad::with(['media', 'user', 'ad_type', 'quarter.city', 'agency'])
+        $ad = Ad::with(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency'])
             ->findOrFail($id);
 
         $this->authorize('view', $ad);
@@ -590,9 +590,11 @@ class AdController
             // Recharger les relations
             $ad->load([
                 'media',
-                'user',
+                'user.agency',
+                'user.city',
                 'ad_type',
                 'quarter.city',
+                'agency',
             ]);
 
             return response()->json([

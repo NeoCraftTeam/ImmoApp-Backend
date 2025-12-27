@@ -203,15 +203,23 @@ class Ad extends Model implements HasMedia
      */
     public function getPublisherName(): string
     {
-        if ($this->agency_id && $this->agency instanceof \App\Models\Agency) {
-            // Si c'est une agence (type AGENCY), on affiche le nom de l'agence
-            if ($this->user?->type === \App\Enums\UserType::AGENCY) {
-                return $this->agency->name;
+        $user = $this->user;
+
+        // Si l'utilisateur est de type AGENCY, on essaie de retourner le nom de son agence
+        if ($user && $user->type === \App\Enums\UserType::AGENCY) {
+            $agency = $this->agency;
+            if ($agency instanceof \App\Models\Agency) {
+                return $agency->name;
+            }
+
+            $userAgency = $user->agency;
+            if ($userAgency instanceof \App\Models\Agency) {
+                return $userAgency->name;
             }
         }
 
-        // Sinon (Bailleur individuel ou fallback), on affiche le nom de l'utilisateur
-        return $this->user ? "{$this->user->firstname} {$this->user->lastname}" : 'Anonyme';
+        // Sinon ou par défaut, on retourne le nom personnel
+        return $user ? "{$user->firstname} {$user->lastname}" : 'Anonyme';
     }
 
     /**

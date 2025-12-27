@@ -102,7 +102,7 @@ class AdResource extends Resource
                 DateTimePicker::make('expires_at'),
                 Select::make('user_id')
                     ->relationship('user', 'firstname')
-                    ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->firstname} {$record->lastname}")
+                    ->getOptionLabelFromRecordUsing(fn ($record) => $record->fullname)
                     ->searchable()
                     ->preload()
                     ->required(),
@@ -146,7 +146,7 @@ class AdResource extends Resource
                     ->dateTime()
                     ->placeholder('-'),
                 TextEntry::make('user.fullname')
-                    ->label('User'),
+                    ->label('Publié par'),
                 TextEntry::make('quarter.name')
                     ->label('Quarter'),
                 TextEntry::make('ad_type.name')
@@ -194,6 +194,7 @@ class AdResource extends Resource
                     ->dateTime()
                     ->sortable(),
                 TextColumn::make('user.fullname')
+                    ->label('Publié par')
                     ->searchable(),
                 TextColumn::make('quarter.name')
                     ->searchable(),

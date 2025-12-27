@@ -92,7 +92,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property string|null $last_login_at
  * @property string|null $last_login_ip
  * @property bool $is_active
- * @property-read City $city
+ * @property-read City|null $city
  * @property-read MediaCollection<int, Media> $media
  * @property-read Collection<int, Review> $reviews
  * @property \App\Enums\UserRole $role
@@ -215,6 +215,10 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
     public function getFullnameAttribute(): string
     {
+        if ($this->type === UserType::AGENCY && $this->agency instanceof Agency) {
+            return $this->agency->name;
+        }
+
         return trim(($this->firstname ?? '').' '.($this->lastname ?? ''));
     }
 

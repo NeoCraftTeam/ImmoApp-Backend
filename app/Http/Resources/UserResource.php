@@ -17,6 +17,9 @@ class UserResource extends JsonResource
     #[\Override]
     public function toArray(Request $request): array
     {
+        $isAgency = $this->type === \App\Enums\UserType::AGENCY;
+        $agencyName = $this->agency instanceof \App\Models\Agency ? $this->agency->name : null;
+
         return [
             'id' => $this->id,
             'firstname' => $this->firstname,
@@ -24,6 +27,8 @@ class UserResource extends JsonResource
             'phone_number' => $this->phone_number,
             'email' => $this->email,
             'avatar' => $this->getFirstMediaUrl('avatar') ?: $this->avatar,
+            'display_name' => $this->fullname,
+            'agency_name' => ($this->agency instanceof \App\Models\Agency) ? $this->agency->name : null,
 
             // Champ sensible visible seulement par un admin
             'role' => $this->when($request->user()?->isAdmin(), $this->role),
@@ -32,7 +37,7 @@ class UserResource extends JsonResource
             'created_at' => $this->when($request->user()?->isAdmin(), $this->created_at),
             'updated_at' => $this->when($request->user()?->isAdmin(), $this->updated_at),
             'city_id' => $this->city_id,
-            'city_name' => $this->city->name,
+            'city_name' => $this->city?->name,
         ];
     }
 }
