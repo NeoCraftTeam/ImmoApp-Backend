@@ -12,6 +12,9 @@ Route::get('/', function () {
 Route::get('email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
     ->name('web.verification.verify');
 
+Route::get('auth/verify-email/{id}/{hash}', \App\Http\Controllers\Auth\VerifyEmailController::class)
+    ->name('verification.verify');
+
 // Route de "Callback" pour simuler le frontend
 Route::get('/verify-email', function (\Illuminate\Http\Request $request) {
     if (! $request->has('verify_url')) {
