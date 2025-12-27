@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Filament\Agency\Resources\Reviews;
+namespace App\Filament\Bailleur\Resources\Reviews;
 
-use App\Filament\Agency\Resources\Reviews\Pages\ManageReviews;
+use App\Filament\Bailleur\Resources\Reviews\Pages\ManageReviews;
 use App\Models\Review;
 use BackedEnum;
 use Filament\Actions\ViewAction;
@@ -23,7 +23,7 @@ class ReviewResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::Star;
 
-    protected static ?string $navigationLabel = 'Avis sur mes annonces';
+    protected static ?string $navigationLabel = 'Avis clients';
 
     protected static ?string $modelLabel = 'Avis';
 
@@ -40,28 +40,20 @@ class ReviewResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('rating')
-                    ->numeric()
-                    ->sortable(),
+                    ->badge()
+                    ->color(fn ($state) => $state >= 4 ? 'success' : ($state >= 2 ? 'warning' : 'danger')),
                 TextColumn::make('ad.title')
-                    ->label('Annonce')
-                    ->searchable(),
+                    ->label('Annonce'),
                 TextColumn::make('user.fullname')
-                    ->label('Client')
-                    ->searchable(),
+                    ->label('Client'),
                 TextColumn::make('comment')
                     ->limit(50),
                 TextColumn::make('created_at')
                     ->dateTime()
-                    ->sortable(),
-            ])
-            ->filters([
-                //
+                    ->label('Posté le'),
             ])
             ->recordActions([
                 ViewAction::make(),
-            ])
-            ->toolbarActions([
-                // Les agents ne gèrent pas (suppriment) les avis généralement
             ]);
     }
 
