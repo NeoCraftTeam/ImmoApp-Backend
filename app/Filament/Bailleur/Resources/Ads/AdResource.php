@@ -1,11 +1,9 @@
 <?php
 
-namespace App\Filament\Admin\Resources\Ads;
+namespace App\Filament\Bailleur\Resources\Ads;
 
 use App\Enums\AdStatus;
-use App\Filament\Admin\Resources\Ads\Pages\ManageAds;
-use App\Filament\Exports\AdExporter;
-use App\Filament\Imports\AdImporter;
+use App\Filament\Bailleur\Resources\Ads\Pages\ManageAds;
 use App\Models\Ad;
 use BackedEnum;
 use Clickbar\Magellan\Data\Geometries\Point;
@@ -13,21 +11,18 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Actions\ExportAction;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\ForceDeleteBulkAction;
-use Filament\Actions\ImportAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Infolists\Components\IconEntry;
-use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -43,26 +38,30 @@ class AdResource extends Resource
 {
     protected static ?string $model = Ad::class;
 
+    protected static ?string $tenantOwnershipRelationshipName = 'agency';
 
-    protected static string|null|UnitEnum $navigationGroup = 'Annonces';
+    protected static string|null|UnitEnum $navigationGroup = 'Mes Biens';
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::InboxArrowDown;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::Home;
 
     protected static ?string $recordTitleAttribute = 'title';
 
-    protected static ?string $navigationLabel = 'Annonces';
+    protected static ?string $navigationLabel = 'Mes Annonces';
 
     protected static ?string $modelLabel = 'Annonce';
 
-    #[\Override]
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->where('user_id', auth()->id());
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->components([
                 TextInput::make('title')
                     ->required(),
-                TextInput::make('slug')
-                    ->visible(false),
                 Textarea::make('description')
                     ->required()
                     ->columnSpanFull(),
@@ -91,22 +90,18 @@ class AdResource extends Resource
                 TextInput::make('latitude')
                     ->numeric()
                     ->required()
+                    ->default(0.0)
                     ->formatStateUsing(fn(?Ad $record) => $record?->location?->getLatitude()),
                 TextInput::make('longitude')
                     ->numeric()
                     ->required()
+                    ->default(0.0)
                     ->formatStateUsing(fn(?Ad $record) => $record?->location?->getLongitude()),
                 Select::make('status')
                     ->options(AdStatus::class)
                     ->required()
                     ->default(AdStatus::AVAILABLE),
                 DateTimePicker::make('expires_at'),
-                Select::make('user_id')
-                    ->relationship('user', 'firstname')
-                    ->getOptionLabelFromRecordUsing(fn($record) => "{$record->firstname} {$record->lastname}")
-                    ->searchable()
-                    ->preload()
-                    ->required(),
                 Select::make('quarter_id')
                     ->relationship('quarter', 'name')
                     ->searchable()
@@ -118,53 +113,6 @@ class AdResource extends Resource
             ]);
     }
 
-    #[\Override]
-    public static function infolist(Schema $schema): Schema
-    {
-        return $schema
-            ->components([
-                TextEntry::make('title'),
-                TextEntry::make('slug')
-                    ->visible(false),
-                TextEntry::make('description')
-                    ->columnSpanFull(),
-                TextEntry::make('adresse'),
-                TextEntry::make('price')
-                    ->money()
-                    ->placeholder('-'),
-                TextEntry::make('surface_area')
-                    ->numeric(),
-                TextEntry::make('bedrooms')
-                    ->numeric(),
-                TextEntry::make('bathrooms')
-                    ->numeric(),
-                IconEntry::make('has_parking')
-                    ->boolean(),
-                TextEntry::make('location')
-                    ->placeholder('-'),
-                TextEntry::make('status'),
-                TextEntry::make('expires_at')
-                    ->dateTime()
-                    ->placeholder('-'),
-                TextEntry::make('user.fullname')
-                    ->label('User'),
-                TextEntry::make('quarter.name')
-                    ->label('Quarter'),
-                TextEntry::make('ad_type.name')
-                    ->numeric(),
-                TextEntry::make('created_at')
-                    ->dateTime()
-                    ->placeholder('-'),
-                TextEntry::make('updated_at')
-                    ->dateTime()
-                    ->placeholder('-'),
-                TextEntry::make('deleted_at')
-                    ->dateTime()
-                    ->visible(fn(Ad $record): bool => $record->trashed()),
-            ]);
-    }
-
-    #[\Override]
     public static function table(Table $table): Table
     {
         return $table
@@ -180,37 +128,10 @@ class AdResource extends Resource
                 TextColumn::make('surface_area')
                     ->numeric()
                     ->sortable(),
-                TextColumn::make('bedrooms')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('bathrooms')
-                    ->numeric()
-                    ->sortable(),
-                IconColumn::make('has_parking')
-                    ->boolean(),
-                TextColumn::make('location'),
                 TextColumn::make('status')
-                    ->searchable(),
-                TextColumn::make('expires_at')
-                    ->dateTime()
-                    ->sortable(),
-                TextColumn::make('user.fullname')
-                    ->searchable(),
-                TextColumn::make('quarter.name')
-                    ->searchable(),
-                TextColumn::make('ad_type.name')
-                    ->numeric()
-                    ->sortable(),
+                    ->badge(),
                 TextColumn::make('created_at')
                     ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('deleted_at')
-                    ->isoDate('LLLL', 'Europe/Paris')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
@@ -229,22 +150,10 @@ class AdResource extends Resource
                         return $data;
                     }),
                 DeleteAction::make(),
-                ForceDeleteAction::make(),
-                RestoreAction::make(),
-            ])->headerActions([
-                    ImportAction::make()->label('Importer')
-                        ->importer(AdImporter::class)
-                        ->icon(Heroicon::ArrowUpTray),
-
-                    ExportAction::make()->label('Exporter')
-                        ->exporter(AdExporter::class)
-                        ->icon(Heroicon::ArrowDownTray),
-                ])
+            ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
-                    ForceDeleteBulkAction::make(),
-                    RestoreBulkAction::make(),
                 ]),
             ]);
     }
@@ -262,16 +171,10 @@ class AdResource extends Resource
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
-
     }
 
     public static function getNavigationBadge(): ?string
     {
-        return (string) static::getModel()::count();
-    }
-
-    public static function getNavigationBadgeTooltip(): ?string
-    {
-        return 'The number of ads';
+        return (string) static::getModel()::where('user_id', auth()->id())->count();
     }
 }
