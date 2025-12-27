@@ -43,7 +43,6 @@ class AdResource extends Resource
 {
     protected static ?string $model = Ad::class;
 
-
     protected static string|null|UnitEnum $navigationGroup = 'Annonces';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::InboxArrowDown;
@@ -91,11 +90,11 @@ class AdResource extends Resource
                 TextInput::make('latitude')
                     ->numeric()
                     ->required()
-                    ->formatStateUsing(fn(?Ad $record) => $record?->location?->getLatitude()),
+                    ->formatStateUsing(fn (?Ad $record) => $record?->location?->getLatitude()),
                 TextInput::make('longitude')
                     ->numeric()
                     ->required()
-                    ->formatStateUsing(fn(?Ad $record) => $record?->location?->getLongitude()),
+                    ->formatStateUsing(fn (?Ad $record) => $record?->location?->getLongitude()),
                 Select::make('status')
                     ->options(AdStatus::class)
                     ->required()
@@ -103,7 +102,7 @@ class AdResource extends Resource
                 DateTimePicker::make('expires_at'),
                 Select::make('user_id')
                     ->relationship('user', 'firstname')
-                    ->getOptionLabelFromRecordUsing(fn($record) => "{$record->firstname} {$record->lastname}")
+                    ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->firstname} {$record->lastname}")
                     ->searchable()
                     ->preload()
                     ->required(),
@@ -160,7 +159,7 @@ class AdResource extends Resource
                     ->placeholder('-'),
                 TextEntry::make('deleted_at')
                     ->dateTime()
-                    ->visible(fn(Ad $record): bool => $record->trashed()),
+                    ->visible(fn (Ad $record): bool => $record->trashed()),
             ]);
     }
 
@@ -232,14 +231,14 @@ class AdResource extends Resource
                 ForceDeleteAction::make(),
                 RestoreAction::make(),
             ])->headerActions([
-                    ImportAction::make()->label('Importer')
-                        ->importer(AdImporter::class)
-                        ->icon(Heroicon::ArrowUpTray),
+                ImportAction::make()->label('Importer')
+                    ->importer(AdImporter::class)
+                    ->icon(Heroicon::ArrowUpTray),
 
-                    ExportAction::make()->label('Exporter')
-                        ->exporter(AdExporter::class)
-                        ->icon(Heroicon::ArrowDownTray),
-                ])
+                ExportAction::make()->label('Exporter')
+                    ->exporter(AdExporter::class)
+                    ->icon(Heroicon::ArrowDownTray),
+            ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),

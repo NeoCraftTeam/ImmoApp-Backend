@@ -11,12 +11,7 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Actions\ForceDeleteAction;
-use Filament\Actions\ForceDeleteBulkAction;
-use Filament\Actions\RestoreAction;
-use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
-use Filament\Facades\Filament;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
@@ -26,7 +21,6 @@ use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
@@ -50,12 +44,14 @@ class AdResource extends Resource
 
     protected static ?string $modelLabel = 'Annonce';
 
+    #[\Override]
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
             ->where('user_id', auth()->id());
     }
 
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return $schema
@@ -91,12 +87,12 @@ class AdResource extends Resource
                     ->numeric()
                     ->required()
                     ->default(0.0)
-                    ->formatStateUsing(fn(?Ad $record) => $record?->location?->getLatitude()),
+                    ->formatStateUsing(fn (?Ad $record) => $record?->location?->getLatitude()),
                 TextInput::make('longitude')
                     ->numeric()
                     ->required()
                     ->default(0.0)
-                    ->formatStateUsing(fn(?Ad $record) => $record?->location?->getLongitude()),
+                    ->formatStateUsing(fn (?Ad $record) => $record?->location?->getLongitude()),
                 Select::make('status')
                     ->options(AdStatus::class)
                     ->required()
@@ -113,6 +109,7 @@ class AdResource extends Resource
             ]);
     }
 
+    #[\Override]
     public static function table(Table $table): Table
     {
         return $table
