@@ -32,6 +32,8 @@ class CityResource extends Resource
 {
     protected static ?string $model = City::class;
 
+    protected static bool $isScopedToTenant = false;
+
     protected static string|null|\UnitEnum $navigationGroup = 'Villes & Quartiers';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::HomeModern;
