@@ -43,7 +43,7 @@ class AdminPanelProvider extends PanelProvider
             ->emailVerification()
             ->emailChangeVerification()
             ->globalSearch(false)
-            ->profile(isSimple: false)
+            ->profile(\App\Filament\Pages\Auth\EditProfile::class)
             ->sidebarCollapsibleOnDesktop()
             ->font('poppins')
             ->brandLogo(asset('images/keyhomelogo.png'))

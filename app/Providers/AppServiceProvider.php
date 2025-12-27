@@ -4,9 +4,7 @@ namespace App\Providers;
 
 use App\Models\PersonalAccessToken;
 use Illuminate\Auth\Notifications\ResetPassword;
-use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
@@ -27,7 +25,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        if (config('app.env') === 'production') {
+        if (str_starts_with((string) config('app.url'), 'https://')) {
             URL::forceScheme('https');
         }
 
@@ -35,31 +33,19 @@ class AppServiceProvider extends ServiceProvider
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
-        VerifyEmail::toMailUsing(fn (object $notifiable, string $url) => (new MailMessage)
+        // Force tous les liens de vérification (Web, Filament, API) à utiliser ma route publique sécurisée
+        \Illuminate\Auth\Notifications\VerifyEmail::createUrlUsing(fn ($notifiable) => URL::temporarySignedRoute(
+            'verification.verify',
+            now()->addMinutes(60),
+            [
+                'id' => $notifiable->getKey(),
+                'hash' => sha1((string) $notifiable->getEmailForVerification()),
+            ]
+        ));
+
+        \Illuminate\Auth\Notifications\VerifyEmail::toMailUsing(fn (object $notifiable, string $url) => (new MailMessage)
             ->subject('Vérifiez votre adresse email')
             ->view('emails.verify-email', ['url' => $url, 'user' => $notifiable]));
-
-        VerifyEmail::createUrlUsing(function ($notifiable) {
-            $frontendUrl = config('app.email_verify_callback') ?: config('app.url');
-
-            $verifyUrl = URL::temporarySignedRoute(
-                'api.verification.verify',
-                Carbon::now()->addMinutes(config('auth.verification.expire', 60)),
-                [
-                    'id' => (string) $notifiable->getKey(),
-                    'hash' => sha1((string) $notifiable->getEmailForVerification()),
-                ]
-            );
-
-            $finalUrl = $frontendUrl.'/verify-email?verify_url='.urlencode($verifyUrl);
-
-            \Log::info('Email verification URL generated', [
-                'frontend_url' => $frontendUrl,
-                'final_url' => $finalUrl,
-            ]);
-
-            return $finalUrl;
-        });
 
         ResetPassword::createUrlUsing(function (object $notifiable, string $token) {
             $frontendUrl = config('app.frontend_url', 'http://localhost:3000');
