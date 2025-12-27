@@ -34,6 +34,8 @@ class UnlockedAdResource extends Resource
 {
     protected static ?string $model = UnlockedAd::class;
 
+    protected static bool $isScopedToTenant = false;
+
     protected static string|null|\UnitEnum $navigationGroup = 'Annonces';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::LockOpen;
