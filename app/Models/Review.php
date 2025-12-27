@@ -48,13 +48,18 @@ class Review extends Model
 {
     use HasFactory, HasUuids, softDeletes;
 
-    protected $fillable = ['rating', 'comment', 'ad_id', 'user_id'];
+    protected $fillable = ['rating', 'comment', 'ad_id', 'user_id', 'agency_id'];
 
     protected $hidden = ['created_at', 'updated_at', 'deleted_at'];
 
     public function ad(): BelongsTo
     {
         return $this->belongsTo(Ad::class);
+    }
+
+    public function agency(): BelongsTo
+    {
+        return $this->belongsTo(Agency::class);
     }
 
     public function user(): BelongsTo

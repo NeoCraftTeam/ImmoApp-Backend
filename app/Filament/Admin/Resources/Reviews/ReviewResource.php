@@ -31,6 +31,8 @@ class ReviewResource extends Resource
 {
     protected static ?string $model = Review::class;
 
+    protected static bool $isScopedToTenant = false;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::Star;
 
     protected static ?string $recordTitleAttribute = 'user_id';
@@ -80,7 +82,7 @@ class ReviewResource extends Resource
                     ->placeholder('-'),
                 TextEntry::make('deleted_at')
                     ->dateTime()
-                    ->visible(fn (Review $record): bool => $record->trashed()),
+                    ->visible(fn(Review $record): bool => $record->trashed()),
             ]);
     }
 
