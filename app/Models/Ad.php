@@ -29,7 +29,7 @@ use Laravel\Scout\Searchable;
  * @method static Builder<static>|Ad withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|Ad withoutTrashed()
  *
- * @property int $id
+ * @property string $id
  * @property string $title
  * @property string $slug
  * @property string $description
@@ -42,9 +42,9 @@ use Laravel\Scout\Searchable;
  * @property Point|null $location
  * @property string $status
  * @property string|null $expires_at
- * @property int $user_id
- * @property int $quarter_id
- * @property int $type_id
+ * @property string $user_id
+ * @property string $quarter_id
+ * @property string $type_id
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property \Illuminate\Support\Carbon|null $deleted_at
@@ -99,6 +99,10 @@ class Ad extends Model implements HasMedia
         'quarter_id',
         'type_id',
         'agency_id',
+        'is_boosted',
+        'boost_score',
+        'boost_expires_at',
+        'boosted_at',
     ];
 
     protected $hidden = [
@@ -115,6 +119,9 @@ class Ad extends Model implements HasMedia
         'has_parking' => 'boolean',
         'expires_at' => 'datetime',
         'price' => 'decimal:2',
+        'is_boosted' => 'boolean',
+        'boost_expires_at' => 'datetime',
+        'boosted_at' => 'datetime',
     ];
 
     #[\Override]
@@ -189,6 +196,11 @@ class Ad extends Model implements HasMedia
             ] : null,
 
             'created_at' => $this->created_at?->timestamp,
+
+            // Boost
+            'is_boosted' => (bool) $this->is_boosted,
+            'boost_score' => (int) $this->boost_score,
+            'boost_expires_at' => $this->boost_expires_at?->timestamp,
         ];
     }
 
@@ -316,5 +328,60 @@ class Ad extends Model implements HasMedia
 
         // Return only the first image (primary)
         return $media->take(1);
+    }
+
+    /**
+     * Boost this ad with a given score and duration
+     */
+    public function boost(int $score, int $durationDays): void
+    {
+        $this->update([
+            'is_boosted' => true,
+            'boost_score' => $score,
+            'boost_expires_at' => now()->addDays($durationDays),
+            'boosted_at' => now(),
+        ]);
+    }
+
+    /**
+     * Remove boost from this ad
+     */
+    public function unboost(): void
+    {
+        $this->update([
+            'is_boosted' => false,
+            'boost_score' => 0,
+            'boost_expires_at' => null,
+        ]);
+    }
+
+    /**
+     * Check if ad is currently boosted
+     */
+    public function isBoosted(): bool
+    {
+        return $this->is_boosted
+            && $this->boost_expires_at
+            && $this->boost_expires_at->isFuture();
+    }
+
+    /**
+     * Scope to get only boosted ads
+     */
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function boosted($query)
+    {
+        return $query->where('is_boosted', true)
+            ->where('boost_expires_at', '>', now());
+    }
+
+    /**
+     * Scope to order by boost score then created_at
+     */
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function orderByBoost($query)
+    {
+        return $query->orderByDesc('boost_score')
+            ->orderByDesc('created_at');
     }
 }

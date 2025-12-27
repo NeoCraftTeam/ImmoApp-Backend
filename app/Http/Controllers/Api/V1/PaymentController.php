@@ -172,6 +172,26 @@ class PaymentController
             if (isset($event['event']) && $event['event'] === 'transaction.approved') {
                 $payment->update(['status' => PaymentStatus::SUCCESS]);
                 Log::info("Paiement #{$payment->id} validé.");
+
+                // Logique spécifique aux abonnements
+                $metadata = $event['entity']['metadata'] ?? [];
+                if (isset($metadata['payment_type']) && $metadata['payment_type'] === 'subscription') {
+                    $agencyId = $metadata['agency_id'] ?? null;
+                    $planId = $metadata['plan_id'] ?? null;
+                    $period = $metadata['period'] ?? 'monthly';
+
+                    if ($agencyId && $planId) {
+                        $agency = \App\Models\Agency::find($agencyId);
+                        $plan = \App\Models\SubscriptionPlan::find($planId);
+
+                        if ($agency && $plan) {
+                            $subscriptionService = new \App\Services\SubscriptionService;
+                            $subscription = $subscriptionService->createSubscription($agency, $plan, $period, $payment);
+                            $subscriptionService->activateSubscription($subscription);
+                            Log::info("Abonnement activé pour l'agence {$agency->id} - Plan {$plan->id} ({$period})");
+                        }
+                    }
+                }
             }
 
             // 2. Gestion de l'ÉCHEC ou ANNULATION

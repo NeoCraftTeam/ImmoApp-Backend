@@ -16,12 +16,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
- * @property int $id
+ * @property string $id
  * @property PaymentType $type
  * @property string $amount
  * @property string $transaction_id
  * @property PaymentMethod $payment_method
- * @property int $user_id
+ * @property string $user_id
  * @property PaymentStatus $status
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -46,7 +46,7 @@ use Illuminate\Support\Carbon;
  * @method static Builder<static>|Payment withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|Payment withoutTrashed()
  *
- * @property int $ad_id
+ * @property string $ad_id
  * @property-read \App\Models\Ad $ad
  *
  * @method static Builder<static>|Payment whereAdId($value)
@@ -66,6 +66,8 @@ class Payment extends Model
         'user_id',
         'ad_id',
         'agency_id',
+        'plan_id',
+        'period',
         'status',
     ];
 

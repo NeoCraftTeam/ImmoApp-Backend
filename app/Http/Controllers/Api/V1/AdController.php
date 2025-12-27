@@ -118,7 +118,7 @@ class AdController
     public function index(): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Ad::class);
-        $ads = Ad::with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')->orderBy('id', 'desc')->paginate(config('pagination.per_page', 15));
+        $ads = Ad::with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')->orderByBoost()->paginate(config('pagination.per_page', 15));
 
         return AdApiResource::collection($ads);
     }
@@ -1793,18 +1793,20 @@ class AdController
             $filters[] = "status = 'available'";
 
             // Whitelist des champs de tri
-            $allowedSorts = ['price', 'surface_area', 'created_at'];
-            if (! in_array($sortBy, $allowedSorts, true)) {
-                $sortBy = 'created_at';
-            }
+            $allowedSorts = ['price', 'surface_area', 'created_at', 'boost_score'];
 
             // Construire la requête Scout
-            $builder = Ad::search($q, function (\Meilisearch\Endpoints\Indexes $index, string $query, array $options) use ($filters, $sortBy, $sortOrder) {
+            $builder = Ad::search($q, function (\Meilisearch\Endpoints\Indexes $index, string $query, array $options) use ($filters, $sortBy, $sortOrder, $allowedSorts) {
                 // AND logic : tous les filtres doivent matcher
-                $options['filter'] = $filters;
+                $options['filter'] = implode(' AND ', $filters);
 
                 // Tri
-                $options['sort'] = [sprintf('%s:%s', $sortBy, $sortOrder)];
+                if (! in_array($sortBy, $allowedSorts, true)) {
+                    // Tri par défaut : Boost Score DESC puis Created At DESC
+                    $options['sort'] = ['boost_score:desc', 'created_at:desc'];
+                } else {
+                    $options['sort'] = [sprintf('%s:%s', $sortBy, $sortOrder)];
+                }
 
                 return $index->search($query, $options);
             })

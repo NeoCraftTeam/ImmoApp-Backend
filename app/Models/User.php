@@ -38,7 +38,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Collections\MediaCollection;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 /**
- * @property int $id
+ * @property string $id
  * @property string $firstname
  * @property string $lastname
  * @property string|null $phone_number
@@ -48,7 +48,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property string $avatar
  * @property UserType|null $type
  * @property UserRole $role
- * @property int $city_id
+ * @property string $city_id
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -402,7 +402,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'hashed',
+            'password' => 'string',
             'role' => UserRole::class,
             'type' => UserType::class,
             'is_active' => 'boolean',

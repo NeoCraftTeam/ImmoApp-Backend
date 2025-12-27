@@ -24,11 +24,11 @@ use Illuminate\Support\Carbon;
  * @method static Builder<static>|Review withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|Review withoutTrashed()
  *
- * @property int $id
+ * @property string $id
  * @property string $rating
  * @property string|null $comment
- * @property int $ad_id
- * @property int $user_id
+ * @property string $ad_id
+ * @property string $user_id
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at

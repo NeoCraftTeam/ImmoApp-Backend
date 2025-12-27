@@ -25,12 +25,12 @@ use Illuminate\Support\Carbon;
  * @method static Builder<static>|UnlockedAd withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|UnlockedAd withoutTrashed()
  *
- * @property int $id
- * @property int $ad_id
- * @property int $user_id
- * @property int $payment_id
- * @property int|null $unlocked_at
- * @property int|null $updated_at
+ * @property string $id
+ * @property string $ad_id
+ * @property string $user_id
+ * @property string $payment_id
+ * @property Carbon|null $unlocked_at
+ * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  *
  * @method static Builder<static>|UnlockedAd whereAdId($value)
