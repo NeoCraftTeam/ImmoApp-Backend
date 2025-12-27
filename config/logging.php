@@ -123,6 +123,11 @@ return [
             'handler' => NullHandler::class,
         ],
 
+        'nightwatch' => [
+            'driver' => 'nightwatch',
+            'level' => env('LOG_LEVEL', 'debug'),
+        ],
+
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
         ],
