@@ -65,6 +65,7 @@ class Payment extends Model
         'payment_method',
         'user_id',
         'ad_id',
+        'agency_id',
         'status',
     ];
 
@@ -88,6 +89,11 @@ class Payment extends Model
     public function ad(): BelongsTo
     {
         return $this->belongsTo(Ad::class);
+    }
+
+    public function agency(): BelongsTo
+    {
+        return $this->belongsTo(Agency::class);
     }
 
     public function isPaid(): bool

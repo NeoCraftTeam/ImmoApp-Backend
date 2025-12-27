@@ -36,6 +36,8 @@ class PaymentResource extends Resource
 {
     protected static ?string $model = Payment::class;
 
+    protected static bool $isScopedToTenant = false;
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::CurrencyDollar;
 
     protected static ?string $recordTitleAttribute = 'id';
