@@ -59,46 +59,53 @@ class UserResource extends Resource
         return $schema
             ->components([
                 FileUpload::make('avatar')
+                    ->disk('public')
+                    ->directory('avatars')
                     ->preserveFilenames()
                     ->avatar()
                     ->uploadingMessage('Uploading...')
                     ->image(),
-                TextInput::make('firstname'),
-                TextInput::make('lastname'),
+                TextInput::make('firstname')
+                    ->maxLength(255),
+                TextInput::make('lastname')
+                    ->maxLength(255),
                 TextInput::make('phone_number')
-                    ->tel(),
+                    ->tel()
+                    ->maxLength(20),
                 TextInput::make('email')
                     ->label('Email address')
                     ->email()
-                    ->required(),
+                    ->required()
+                    ->unique(ignoreRecord: true)
+                    ->maxLength(255),
                 DateTimePicker::make('email_verified_at'),
                 TextInput::make('password')
                     ->label('Mot de Passe')
-                    ->password() // Transforme le champ en type 'password' (masque les caractères)
-                    ->required() // Le mot de passe est obligatoire.
+                    ->password()
                     ->revealable()
-                    ->minLength(8) // Ajoutez des règles de validation (minimum 8 caractères)
-                    ->dehydrateStateUsing(fn (string $state): string => Hash::make($state)) // Hachage (Crucial!)
-                    ->dehydrated(fn (?string $state) => filled($state)), // S'assure que le champ n'est pas sauvegardé vide lors de l'édition
+                    ->required(fn (string $context): bool => $context === 'create')
+                    ->minLength(8)
+                    ->dehydrateStateUsing(fn (string $state): string => Hash::make($state))
+                    ->dehydrated(fn (?string $state) => filled($state)),
 
                 TextInput::make('password_confirmation')
                     ->label('Confirmer le mot de passe')
                     ->password()
                     ->revealable()
-                    ->required(),
-                // Utiliser la règle de validation Laravel 'same'
+                    ->required(fn (string $context): bool => $context === 'create')
+                    ->visible(fn (string $context): bool => $context === 'create'),
 
                 Select::make('type')
                     ->options(UserType::class)
                     ->native(false)
-                    ->required(),
+                    ->nullable(), // Permet de ne pas remplir si besoin
                 Select::make('role')
                     ->options(UserRole::class)
                     ->native(false)
                     ->required(),
                 Select::make('city_id')
                     ->relationship('city', 'name')
-                    ->required()
+                    ->nullable() // Permet de ne pas remplir
                     ->searchable()
                     ->placeholder('Choisir une ville')
                     ->searchDebounce(250)

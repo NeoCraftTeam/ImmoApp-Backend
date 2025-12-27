@@ -13,7 +13,9 @@ use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthentication;
 use Filament\Auth\MultiFactor\App\Contracts\HasAppAuthenticationRecovery;
 use Filament\Auth\MultiFactor\Email\Contracts\HasEmailAuthentication;
 use Filament\Models\Contracts\FilamentUser;
+use Filament\Models\Contracts\HasAvatar;
 use Filament\Models\Contracts\HasName;
+use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
@@ -26,6 +28,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -92,6 +95,9 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property-read City $city
  * @property-read MediaCollection<int, Media> $media
  * @property-read Collection<int, Review> $reviews
+ * @property \App\Enums\UserRole $role
+ * @property \App\Enums\UserType|null $type
+ * @property int|null $agency_id
  * @property-read int|null $reviews_count
  *
  * @method static Builder<static>|User whereIsActive($value)
@@ -100,10 +106,10 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  *
  * @mixin Eloquent
  */
-class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasEmailAuthentication, HasMedia, HasName, MustVerifyEmail
+class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasAvatar, HasEmailAuthentication, HasMedia, HasName, HasTenants, MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, HasUuids, Notifiable, softDeletes;
+    use HasApiTokens, HasFactory, HasUuids, \Illuminate\Auth\MustVerifyEmail, Notifiable, softDeletes;
 
     use InteractsWithMedia;
 
@@ -121,7 +127,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
      *
      * @var list<string>
      */
-    protected $hidden = ['password', 'app_authentication_secret', 'app_authentication_recovery_codes', 'remember_token', 'created_at', 'updated_at'];
+    protected $hidden = ['password', 'app_authentication_secret', 'app_authentication_recovery_codes', 'remember_token', 'location', 'created_at', 'updated_at'];
 
     #[\Override]
     protected static function booted(): void
@@ -131,6 +137,18 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         });
 
         static::creating(function ($user): void {
+            if (empty($user->role)) {
+                $user->role = UserRole::CUSTOMER;
+            }
+
+            if (empty($user->firstname)) {
+                $user->firstname = 'Nouveau';
+            }
+
+            if (empty($user->lastname)) {
+                $user->lastname = 'Utilisateur';
+            }
+
             if (empty($user->avatar)) {
                 $user->assignDefaultAvatar();
             }
@@ -247,7 +265,38 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->isAdmin() && $this->hasVerifiedEmail();
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        $panelId = $panel->getId();
+        if ($panelId === 'agency') {
+            return $this->role === UserRole::AGENT && $this->type === UserType::AGENCY;
+        }
+
+        if ($panelId === 'bailleur') {
+            return $this->role === UserRole::AGENT && $this->type === UserType::INDIVIDUAL;
+        }
+
+        return false;
+    }
+
+    public function getTenants(Panel $panel): Collection
+    {
+        if ($this->isAdmin()) {
+            return Agency::all();
+        }
+
+        return collect([$this->agency])->filter();
+    }
+
+    public function canAccessTenant(\Illuminate\Database\Eloquent\Model $tenant): bool
+    {
+        if ($this->isAdmin()) {
+            return true;
+        }
+
+        return $this->agency_id === $tenant->getKey();
     }
 
     /**
@@ -261,6 +310,23 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function getFilamentName(): string
     {
         return "{$this->firstname} {$this->lastname}";
+    }
+
+    public function getFilamentAvatarUrl(): ?string
+    {
+        if (str_starts_with($this->avatar ?? '', 'http')) {
+            return $this->avatar;
+        }
+
+        // Si le fichier existe sur le disque public, on donne son URL
+        if ($this->avatar && Storage::disk('public')->exists($this->avatar)) {
+            return Storage::disk('public')->url($this->avatar);
+        }
+
+        // Sinon, on génère un avatar avec les initiales (Fallback)
+        $name = urlencode($this->firstname.' '.$this->lastname);
+
+        return "https://ui-avatars.com/api/?name={$name}&color=7F9CF5&background=EBF4FF";
     }
 
     public function getAppAuthenticationSecret(): ?string
