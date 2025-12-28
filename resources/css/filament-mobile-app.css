@@ -1,0 +1,27 @@
+/* Masquer les éléments Web pour l'expérience App Mobile Native */
+.is-mobile-app .fi-sidebar {
+    display: none !important;
+}
+
+.is-mobile-app .fi-topbar {
+    display: none !important;
+}
+
+.is-mobile-app .fi-main {
+    padding-top: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    margin-left: 0 !important;
+}
+
+/* On retire les bordures et arrondis inutiles en mode App */
+.is-mobile-app .fi-panel {
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+}
+
+/* Optimisation de l'espace pour l'app */
+.is-mobile-app .fi-main-ctn {
+    padding: 1rem !important;
+}
