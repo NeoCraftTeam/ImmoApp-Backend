@@ -92,15 +92,18 @@ production_deploy:
     
     # 4. On définit et on injecte l'image
     - export FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:main"
-    - APP_IMAGE=$FULL_IMAGE docker compose pull app
+    - APP_IMAGE=$FULL_IMAGE docker compose pull
     - APP_IMAGE=$FULL_IMAGE docker compose up -d --no-build
-    - APP_IMAGE=$FULL_IMAGE docker compose restart web
     
     # 5. Tâches Laravel (Via Docker)
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan migrate --force
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize:clear
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan filament:upgrade
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app chmod +x resetFilamentLivewire.sh
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app bash resetFilamentLivewire.sh
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan storage:link || true
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate || true
     
     - docker logout $CI_REGISTRY
   only:

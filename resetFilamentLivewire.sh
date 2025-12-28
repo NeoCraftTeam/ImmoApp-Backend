@@ -46,6 +46,9 @@ echo "✓ Assets Livewire publiés"
 php artisan filament:assets
 echo "✓ Assets Filament compilés"
 
+php artisan filament:upgrade
+echo "✓ Filament mis à jour (upgrade)"
+
 # ==========================================
 # ÉTAPE 3: OPTIMISATION POUR LA PRODUCTION
 # ==========================================
