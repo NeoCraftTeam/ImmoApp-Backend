@@ -46,7 +46,7 @@ class ManageSubscription extends Page
         /** @var \App\Models\Agency|null $agency */
         $agency = auth()->user()->agency;
 
-        if (! $agency) {
+        if (!$agency) {
             return;
         }
 
@@ -109,7 +109,7 @@ class ManageSubscription extends Page
 
         $price = $this->period === 'yearly' ? $plan->price_yearly : $plan->price;
 
-        if (! $price) {
+        if (!$price) {
             \Filament\Notifications\Notification::make()
                 ->title('Option non disponible')
                 ->body('Ce plan ne propose pas cette fréquence de paiement.')
@@ -162,7 +162,7 @@ class ManageSubscription extends Page
 
     public function cancelSubscription()
     {
-        if (! $this->subscription) {
+        if (!$this->subscription) {
             return;
         }
 

@@ -25,7 +25,7 @@ class FedaPayService
             $key = config('services.fedapay.secret_key');
             $env = config('services.fedapay.environment', 'sandbox');
 
-            if (! $key) {
+            if (!$key) {
                 throw new \Exception('Clé secrète FedaPay manquante dans la configuration.');
             }
 
@@ -73,7 +73,7 @@ class FedaPayService
             $key = config('services.fedapay.secret_key');
             $env = config('services.fedapay.environment', 'sandbox');
 
-            if (! $key) {
+            if (!$key) {
                 throw new \Exception('Clé secrète FedaPay manquante dans la configuration.');
             }
 

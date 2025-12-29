@@ -933,7 +933,7 @@ final class AdController
         $targetUser = null;
         if ($user !== null) {
             $targetUser = User::find($user);
-            if (! $targetUser) {
+            if (!$targetUser) {
                 return response()->json([
                     'success' => false,
                     'message' => 'User not found.',
@@ -971,7 +971,7 @@ final class AdController
         $latValid = is_numeric($lat) && $lat >= -90 && $lat <= 90;
         $longValid = is_numeric($long) && $long >= -180 && $long <= 180;
 
-        if (! $latValid || ! $longValid) {
+        if (!$latValid || !$longValid) {
             return response()->json([
                 'success' => false,
                 'message' => 'Latitude and longitude are required and must be within valid ranges.',
@@ -1342,7 +1342,7 @@ final class AdController
         $field = $validated['field'] ?? null;
         $q = (string) ($validated['q'] ?? '');
 
-        if (! in_array($field, ['city', 'type', 'quarter'], true)) {
+        if (!in_array($field, ['city', 'type', 'quarter'], true)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid field. Allowed values: city, type, quarter.',
@@ -1746,18 +1746,18 @@ final class AdController
             $filters = [];
 
             // Filtres de chaînes
-            if (! empty($city)) {
+            if (!empty($city)) {
                 $filters[] = sprintf("city = '%s'", str_replace("'", "\\'", $city));
             }
-            if (! empty($type)) {
+            if (!empty($type)) {
                 $filters[] = sprintf("type = '%s'", str_replace("'", "\\'", $type));
             }
 
             // Filtres d'ID
-            if (! empty($typeId)) {
+            if (!empty($typeId)) {
                 $filters[] = sprintf('type_id = %d', (int) $typeId);
             }
-            if (! empty($quarterId)) {
+            if (!empty($quarterId)) {
                 $filters[] = sprintf('quarter_id = %d', (int) $quarterId);
             }
 
@@ -1803,7 +1803,7 @@ final class AdController
                 $options['filter'] = implode(' AND ', $filters);
 
                 // Tri
-                if (! in_array($sortBy, $allowedSorts, true)) {
+                if (!in_array($sortBy, $allowedSorts, true)) {
                     // Tri par défaut : Boost Score DESC puis Created At DESC
                     $options['sort'] = ['boost_score:desc', 'created_at:desc'];
                 } else {

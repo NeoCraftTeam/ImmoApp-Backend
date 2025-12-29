@@ -142,7 +142,7 @@ final class CityController
     public function show(string $id, ShowCityAction $action)
     {
         $city = $action->handle((int) $id);
-        if (! $city) {
+        if (!$city) {
             return response()->json([
                 'message' => 'Ville non trouvée',
             ], 404);

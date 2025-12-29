@@ -22,7 +22,7 @@ class TestMultiTenancyFlow extends Command
 
         $user = User::where('email', $email)->first();
 
-        if (! $user) {
+        if (!$user) {
             $this->info('Creating new test user...');
             $user = User::create([
                 'firstname' => 'Test',

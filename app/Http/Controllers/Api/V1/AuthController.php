@@ -594,7 +594,7 @@ final class AuthController
     {
         Log::info('VerifyEmail called with ID: '.$id);
 
-        if (! Str::isUuid($id)) {
+        if (!Str::isUuid($id)) {
             Log::warning('Invalid UUID provided: '.$id);
             if ($request->wantsJson()) {
                 return response()->json(['message' => 'ID utilisateur invalide.'], 400);
@@ -607,7 +607,7 @@ final class AuthController
             $user = User::findOrFail($id);
 
             // Vérifier le hash
-            if (! hash_equals($hash, sha1((string) $user->getEmailForVerification()))) {
+            if (!hash_equals($hash, sha1((string) $user->getEmailForVerification()))) {
                 if ($request->wantsJson()) {
                     return response()->json(['message' => 'Lien de vérification invalide'], 400);
                 }
@@ -713,7 +713,7 @@ final class AuthController
 
         $user = User::where('email', $request->email)->first();
 
-        if (! $user) {
+        if (!$user) {
             return response()->json([
                 'message' => 'Utilisateur non trouvé.',
             ], 404);
@@ -860,7 +860,7 @@ final class AuthController
             $user = User::where('email', $email)->first();
 
             // Vérification des credentials avec timing attack protection
-            if (! $user || ! Hash::check($password, $user->password)) {
+            if (!$user || !Hash::check($password, $user->password)) {
                 // Incrémenter les tentatives échouées
                 RateLimiter::hit($key, 300); // 5 minutes de blocage
 
@@ -878,7 +878,7 @@ final class AuthController
             }
 
             // Vérifier si le compte est actif
-            if (isset($user->is_active) && ! $user->is_active) {
+            if (isset($user->is_active) && !$user->is_active) {
                 Log::info('Login attempt on inactive account', [
                     'user_id' => $user->id,
                     'email' => $email,
@@ -1317,7 +1317,7 @@ final class AuthController
 
         $user = $request->user();
 
-        if (! Hash::check($request->current_password, $user->password)) {
+        if (!Hash::check($request->current_password, $user->password)) {
             return response()->json(['message' => 'Le mot de passe actuel est incorrect.'], 422);
         }
 

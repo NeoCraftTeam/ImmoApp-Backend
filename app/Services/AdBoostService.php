@@ -16,12 +16,12 @@ class AdBoostService
     {
         $user = $ad->user;
 
-        if (! $user) {
+        if (!$user) {
             return;
         }
 
         // Check if user belongs to an agency
-        if (! $user->agency_id || ! $user->agency) {
+        if (!$user->agency_id || !$user->agency) {
             return;
         }
 
@@ -29,13 +29,13 @@ class AdBoostService
         $agency = $user->agency;
 
         // Check if agency has active subscription
-        if (! $agency->hasActiveSubscription()) {
+        if (!$agency->hasActiveSubscription()) {
             return;
         }
 
         $subscription = $agency->getCurrentSubscription();
 
-        if (! $subscription || ! $subscription->plan) {
+        if (!$subscription || !$subscription->plan) {
             return;
         }
 
@@ -69,7 +69,7 @@ class AdBoostService
     {
         $subscription = $agency->getCurrentSubscription();
 
-        if (! $subscription) {
+        if (!$subscription) {
             return 0;
         }
 

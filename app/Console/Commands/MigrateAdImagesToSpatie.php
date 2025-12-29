@@ -50,7 +50,7 @@ class MigrateAdImagesToSpatie extends Command
             $ad = \App\Models\Ad::find($oldImage->ad_id);
 
             // Skip if ad deleted
-            if (! $ad) {
+            if (!$ad) {
                 $bar->advance();
 
                 continue;
@@ -63,7 +63,7 @@ class MigrateAdImagesToSpatie extends Command
                     // Check if already migrated
                     $alreadyMigrated = $ad->getMedia('images')->contains(fn ($media) => $media->getCustomProperty('old_id') === $oldImage->id);
 
-                    if (! $alreadyMigrated) {
+                    if (!$alreadyMigrated) {
                         $ad->addMediaFromDisk($relativePath, 'public')
                             ->preservingOriginal()
                             ->withCustomProperties(['old_id' => $oldImage->id])

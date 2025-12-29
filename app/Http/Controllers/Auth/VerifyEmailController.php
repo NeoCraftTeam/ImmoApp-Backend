@@ -13,13 +13,13 @@ final class VerifyEmailController
 {
     public function __invoke(Request $request, $id, $hash)
     {
-        if (! $request->hasValidSignature()) {
+        if (!$request->hasValidSignature()) {
             abort(403, 'Le lien de confirmation a expiré ou la signature est invalide.');
         }
 
         $user = User::findOrFail($id);
 
-        if (! hash_equals((string) $hash, sha1((string) $user->getEmailForVerification()))) {
+        if (!hash_equals((string) $hash, sha1((string) $user->getEmailForVerification()))) {
             abort(403, 'Lien de vérification invalide.');
         }
 

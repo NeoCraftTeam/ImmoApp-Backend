@@ -153,13 +153,13 @@ final class PaymentController
         Log::info('FedaPay Webhook reçu:', $event);
 
         $transactionId = $event['entity']['id'] ?? null;
-        if (! $transactionId) {
+        if (!$transactionId) {
             return response()->json(['status' => 'error', 'message' => 'No transaction ID'], 400);
         }
 
         $payment = Payment::where('transaction_id', (string) $transactionId)->first();
 
-        if (! $payment) {
+        if (!$payment) {
             return response()->json(['status' => 'not_found'], 404);
         }
 

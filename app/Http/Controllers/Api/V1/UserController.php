@@ -423,7 +423,7 @@ final class UserController
     {
         $this->authorize('view', User::class);
         $userId = User::find($id);
-        if (! $userId) {
+        if (!$userId) {
             return response()->json([
                 'message' => 'Utilisateur non trouvé',
             ], 404);
@@ -585,7 +585,7 @@ final class UserController
             $user->fill($data);
 
             // Si le mot de passe est présent, le hacher
-            if (! empty($data['password'])) {
+            if (!empty($data['password'])) {
                 $user->password = Hash::make($data['password']);
             }
 

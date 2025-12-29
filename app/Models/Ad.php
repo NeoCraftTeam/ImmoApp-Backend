@@ -209,7 +209,7 @@ class Ad extends Model implements HasMedia
     public function shouldBeSearchable(): bool
     {
         // N'indexer que les annonces non supprimées et actives
-        return $this->status === AdStatus::AVAILABLE && ! $this->trashed();
+        return $this->status === AdStatus::AVAILABLE && !$this->trashed();
     }
 
     /**
@@ -296,7 +296,7 @@ class Ad extends Model implements HasMedia
      */
     public function isUnlockedFor(?User $user): bool
     {
-        if (! $user) {
+        if (!$user) {
             return false;
         }
 

@@ -15,7 +15,7 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
-        if (! User::where('email', 'admin@test.com')->exists()) {
+        if (!User::where('email', 'admin@test.com')->exists()) {
             User::factory()
                 ->admin()
                 ->create(['email' => 'admin@test.com']);

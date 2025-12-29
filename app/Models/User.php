@@ -159,7 +159,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
     private function validateAgentType(): void
     {
-        if ($this->role === UserRole::AGENT && ! in_array($this->type, [UserType::INDIVIDUAL, UserType::AGENCY])) {
+        if ($this->role === UserRole::AGENT && !in_array($this->type, [UserType::INDIVIDUAL, UserType::AGENCY])) {
             throw new InvalidArgumentException('Invalid agent type. Must be either "individual" or "agency".');
         }
     }
