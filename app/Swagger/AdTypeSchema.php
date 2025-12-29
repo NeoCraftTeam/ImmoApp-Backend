@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Swagger;
 
 /**
@@ -14,4 +16,4 @@ namespace App\Swagger;
  *      @OA\Property(property="desc", type="string"),
  * )
  */
-class AdTypeSchema {}
+final class AdTypeSchema {}

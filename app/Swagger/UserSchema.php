@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Swagger;
 
 /**
@@ -31,4 +33,4 @@ namespace App\Swagger;
  *     @OA\Property(property="city_id", type="integer")
  * )
  */
-class UserSchema {}
+final class UserSchema {}

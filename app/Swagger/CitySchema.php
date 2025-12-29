@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Swagger;
 
 /**
@@ -13,4 +15,4 @@ namespace App\Swagger;
  *      @OA\Property(property="name", type="string"),
  * )
  */
-class CitySchema {}
+final class CitySchema {}
