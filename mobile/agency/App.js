@@ -138,13 +138,18 @@ export default function App() {
         </View>
       )}
 
-      {/* Overlay de chargement (Loader) */}
-      {isLoading && !showSplash && (
+      {/* Overlay de chargement (Skeleton Screen) */}
+      {isLoading && !showSplash && !error && (
         <View style={styles.loaderContainer}>
-          <View style={styles.loaderGlass}>
-            <ActivityIndicator size="large" color={APP_CONFIG.primaryColor} />
-            <Text style={styles.loaderText}>Chargement...</Text>
+          <View style={styles.skeletonCard}>
+            <View style={[styles.skeletonLine, styles.skeletonTitle]} />
+            <View style={[styles.skeletonLine, styles.skeletonSubtitle]} />
+            <View style={styles.skeletonRow}>
+              <View style={[styles.skeletonLine, styles.skeletonButton]} />
+              <View style={[styles.skeletonLine, styles.skeletonButton]} />
+            </View>
           </View>
+          <ActivityIndicator size="large" color={APP_CONFIG.primaryColor} style={{ marginTop: 20 }} />
         </View>
       )}
 
@@ -179,30 +184,43 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   
-  // Styles du Loader
+  // Styles du Loader & Skeleton
   loaderContainer: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.4)',
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
     zIndex: 10,
+    padding: 20,
   },
-  loaderGlass: {
-    padding: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 5,
+  skeletonCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 20,
+    padding: 24,
+    width: '90%',
+    maxWidth: 400,
   },
-  loaderText: {
-    marginTop: 15,
-    color: '#0f172a',
-    fontWeight: '700',
-    fontSize: 14,
+  skeletonLine: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  skeletonTitle: {
+    height: 32,
+    width: '70%',
+  },
+  skeletonSubtitle: {
+    height: 20,
+    width: '50%',
+    marginBottom: 24,
+  },
+  skeletonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  skeletonButton: {
+    height: 48,
+    flex: 1,
   },
 
   // Styles du Splash Screen
