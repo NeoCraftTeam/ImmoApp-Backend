@@ -17,7 +17,7 @@ const { width, height } = Dimensions.get('window');
 
 // CONFIGURATION
 const APP_CONFIG = {
-  baseUrl: 'https://keyhomeback.neocraft.dev/agency', 
+  baseUrl: process.env.EXPO_PUBLIC_BASE_URL || 'http://192.168.1.64:8000/agency', 
   appMode: 'native',
   primaryColor: '#2563eb', // Bleu Agence
   splashDuration: 2500,

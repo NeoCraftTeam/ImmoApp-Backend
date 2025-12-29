@@ -17,7 +17,7 @@ const { width, height } = Dimensions.get('window');
 
 // CONFIGURATION
 const APP_CONFIG = {
-  baseUrl: 'https://keyhomeback.neocraft.dev/owner', 
+  baseUrl: process.env.EXPO_PUBLIC_BASE_URL || 'http://192.168.1.64:8000/bailleur', 
   appMode: 'native',
   primaryColor: '#10b981', // Vert Owner
   splashDuration: 2500,
