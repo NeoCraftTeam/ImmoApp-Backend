@@ -34,6 +34,24 @@ services:
       - REDIS_HOST=redis
       - APP_ENV=production
 
+  # Le Worker pour les files d'attente (Mails, notifications, etc.)
+  worker:
+    image: ${APP_IMAGE:-keyhome-backend}
+    container_name: keyhome-worker
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan queue:work --tries=3 --timeout=90
+    depends_on:
+      - db
+      - redis
+      - app
+    env_file:
+      - .env
+    volumes:
+      - keyhome-app-code:/var/www
+    networks:
+      - keyhome-network
+
   # Le serveur Web (Nginx)
   web:
     image: nginx:alpine
