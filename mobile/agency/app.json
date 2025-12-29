@@ -17,16 +17,26 @@
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
-        }
+        },
+        "NSCameraUsageDescription": "Cette application utilise la caméra pour ajouter des photos aux annonces.",
+        "NSPhotoLibraryUsageDescription": "Cette application accède à vos photos pour les ajouter aux annonces.",
+        "NSLocationWhenInUseUsageDescription": "Cette application utilise votre position pour localiser les biens immobiliers."
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#3b82f6"
+        "backgroundColor": "#ffffff"
       },
       "package": "cm.neocraft.keyhome.agency",
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

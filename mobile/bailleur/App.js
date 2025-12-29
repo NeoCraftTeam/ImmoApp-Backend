@@ -1,15 +1,17 @@
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import React, { useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  View
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Image,
+    StyleSheet,
+    Text,
+    View
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import NativeService from './services/NativeService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -17,7 +19,7 @@ const { width, height } = Dimensions.get('window');
 const APP_CONFIG = {
   baseUrl: 'http://192.168.1.64:8000/bailleur', // Local IP pour test mobile en local
   appMode: 'native',
-  primaryColor: '#10b981',
+  primaryColor: '#ff4757', // Nouvelle couleur KeyHome
   splashDuration: 2500,
 };
 
@@ -32,6 +34,9 @@ export default function App() {
 
   // Animation du logo au démarrage
   React.useEffect(() => {
+    // Initialiser NativeService avec référence vide pour commencer
+    // Sera mise à jour quand ref sera disponible
+    
     // Animation de scale (apparition)
     Animated.spring(scaleAnim, {
       toValue: 1,
@@ -55,7 +60,19 @@ export default function App() {
         }),
       ])
     ).start();
+
+    return () => {
+      NativeService.cleanup();
+    };
   }, []);
+
+  // Mettre à jour la référence WebView pour NativeService quand elle change
+  const setWebViewRef = (ref) => {
+    webViewRef.current = ref;
+    if (ref) {
+      NativeService.initialize(webViewRef);
+    }
+  };
 
   // Masquer le splash screen avec une animation
   const hideSplash = () => {
@@ -85,12 +102,13 @@ export default function App() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ExpoStatusBar style="light" backgroundColor="#0f172a" />
-      
-      {/* WebView principale */}
-      <WebView 
-        ref={webViewRef}
+    <SafeAreaProvider>
+      <View style={styles.container}>
+        <ExpoStatusBar style="dark" backgroundColor="#ffffff" translucent={false} />
+        
+        <SafeAreaView style={{flex: 1}}>
+          <WebView 
+            ref={setWebViewRef}
         source={{ uri: APP_URL }}
         style={styles.webview}
         onLoadStart={() => setIsLoading(true)}
@@ -107,6 +125,9 @@ export default function App() {
         mixedContentMode="always"
         userAgent="KeyHomeBailleurMobileApp/1.0"
         onMessage={(event) => {
+          // Gérer d'abord les messages natifs
+          NativeService.handleWebViewMessage(event);
+          
           if (event.nativeEvent.data === 'AUTH_SUCCESS') {
              console.log("Login successful detected!");
           }
@@ -148,6 +169,7 @@ export default function App() {
           }
         }}
       />
+      </SafeAreaView>
 
       {/* Error Screen */}
       {error && !showSplash && (
@@ -167,18 +189,14 @@ export default function App() {
         </View>
       )}
 
-      {/* Overlay de chargement (Skeleton Screen) */}
+      {/* Overlay de chargement (Classique) */}
       {isLoading && !showSplash && !error && (
         <View style={styles.loaderContainer}>
-          <View style={styles.skeletonCard}>
-            <View style={[styles.skeletonLine, styles.skeletonTitle]} />
-            <View style={[styles.skeletonLine, styles.skeletonSubtitle]} />
-            <View style={styles.skeletonRow}>
-              <View style={[styles.skeletonLine, styles.skeletonButton]} />
-              <View style={[styles.skeletonLine, styles.skeletonButton]} />
-            </View>
-          </View>
-          <ActivityIndicator size="large" color={APP_CONFIG.primaryColor} style={{ marginTop: 20 }} />
+           <Image 
+             source={require('./assets/icon.png')} 
+             style={{ width: 100, height: 100, resizeMode: 'contain', marginBottom: 30 }} 
+           />
+           <ActivityIndicator size="large" color={APP_CONFIG.primaryColor} />
         </View>
       )}
 
@@ -186,34 +204,36 @@ export default function App() {
       {showSplash && (
         <Animated.View style={[styles.splashContainer, { opacity: fadeAnim }]}>
           <View style={styles.splashContent}>
-             <Animated.View style={[
-               styles.logoCircle,
-               {
-                 transform: [
-                   { scale: Animated.multiply(scaleAnim, pulseAnim) }
-                 ]
-               }
-             ]}>
-                <Text style={styles.logoText}>KB</Text>
-             </Animated.View>
+             <Animated.Image
+               source={require('./assets/icon.png')}
+               style={[
+                 styles.splashLogoImage,
+                 {
+                   transform: [
+                     { scale: Animated.multiply(scaleAnim, pulseAnim) }
+                   ]
+                 }
+               ]}
+             />
              <Text style={styles.splashTitle}>KeyHome Bailleur</Text>
-             <Text style={styles.splashSubtitle}>Suivi de Patrimoine & Loyers</Text>
+             <Text style={styles.splashSubtitle}>Gérez vos biens en toute sérénité</Text>
              
              <View style={styles.splashLoader}>
-                <ActivityIndicator size="small" color="#ffffff" />
+                <ActivityIndicator size="small" color={APP_CONFIG.primaryColor} />
              </View>
           </View>
-          <Text style={styles.versionText}>v1.0.0 Investor Edition</Text>
+          <Text style={styles.versionText}>v1.0.0 Pro Edition</Text>
         </Animated.View>
       )}
-    </SafeAreaView>
+      </View>
+    </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
   },
   webview: {
     flex: 1,
@@ -225,7 +245,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    backgroundColor: '#ffffff',
     zIndex: 10,
     padding: 20,
   },
@@ -262,7 +282,7 @@ const styles = StyleSheet.create({
   // Styles du Splash Screen
   splashContainer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#0f172a', // Fond sombre premium
+    backgroundColor: '#ffffff', // Fond blanc
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 100,
@@ -270,33 +290,20 @@ const styles = StyleSheet.create({
   splashContent: {
     alignItems: 'center',
   },
-  logoCircle: {
-      width: 100,
-      height: 100,
-      borderRadius: 50,
-      backgroundColor: '#10b981',
-      justifyContent: 'center',
-      alignItems: 'center',
+  splashLogoImage: {
+      width: 150,
+      height: 150,
+      resizeMode: 'contain',
       marginBottom: 20,
-      shadowColor: '#10b981',
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.5,
-      shadowRadius: 20,
-      elevation: 20,
-  },
-  logoText: {
-      color: '#ffffff',
-      fontSize: 40,
-      fontWeight: '900',
   },
   splashTitle: {
-    color: '#ffffff',
+    color: '#1e293b', // Texte foncé
     fontSize: 28,
     fontWeight: '900',
     letterSpacing: -1,
   },
   splashSubtitle: {
-    color: '#94a3b8',
+    color: '#64748b', // Gris moyen
     fontSize: 14,
     fontWeight: '500',
     marginTop: 5,
