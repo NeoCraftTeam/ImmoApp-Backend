@@ -198,6 +198,141 @@
             .cur-title { font-size: 2.5rem; }
             .current-badge-container { flex-direction: column; text-align: center; gap: 2rem; }
         }
+
+        /* ===== MOBILE RESPONSIVE STYLES ===== */
+        @media (max-width: 768px) {
+            #pricing-app {
+                padding: 1rem 0.5rem;
+            }
+
+            .bg-blob {
+                width: 300px;
+                height: 300px;
+            }
+
+            .header-box {
+                margin-bottom: 2rem;
+            }
+
+            .header-box h1 {
+                font-size: 2rem;
+                letter-spacing: -1px;
+                margin-bottom: 1rem;
+            }
+
+            .sw-container {
+                padding: 4px;
+                gap: 4px;
+            }
+
+            .sw-btn {
+                padding: 10px 16px;
+                font-size: 0.85rem;
+            }
+
+            .current-badge-container {
+                flex-direction: column;
+                align-items: flex-start;
+                padding: 1.5rem;
+                gap: 1rem;
+                margin-bottom: 2rem;
+            }
+
+            .cur-title {
+                font-size: 1.5rem;
+            }
+
+            .cur-info {
+                font-size: 0.8rem;
+            }
+
+            .cur-cancel-btn {
+                width: 100%;
+                padding: 12px;
+                font-size: 0.85rem;
+            }
+
+            .grid-layout {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+                padding: 0 0.5rem;
+            }
+
+            .card-wrap {
+                padding: 1.5rem;
+            }
+
+            .card-wrap.featured::after {
+                font-size: 0.55rem;
+                padding: 2px 8px;
+                top: 0.75rem;
+                right: 1rem;
+            }
+
+            .p-name {
+                font-size: 1.2rem;
+            }
+
+            .p-price {
+                font-size: 2rem;
+            }
+
+            .p-curr {
+                font-size: 0.8rem;
+            }
+
+            .feat-list {
+                margin: 1.5rem 0;
+            }
+
+            .feat-item {
+                font-size: 0.8rem;
+                gap: 0.5rem;
+                margin-bottom: 0.75rem;
+            }
+
+            .feat-ico {
+                width: 18px;
+                height: 18px;
+            }
+
+            .action-btn {
+                padding: 12px;
+                font-size: 0.9rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            #pricing-app {
+                padding: 0.5rem 0.25rem;
+            }
+
+            .header-box h1 {
+                font-size: 1.75rem;
+            }
+
+            .current-badge-container {
+                padding: 1.25rem;
+                border-radius: 16px;
+            }
+
+            .cur-title {
+                font-size: 1.25rem;
+            }
+
+            .card-wrap {
+                padding: 1.25rem;
+                border-radius: 16px;
+            }
+
+            .p-price {
+                font-size: 1.75rem;
+            }
+
+            .feat-item {
+                font-size: 0.75rem;
+            }
+        }
     </style>
 
     <div id="pricing-app">
