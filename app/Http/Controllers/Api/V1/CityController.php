@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\City\CreateCityAction;
@@ -13,7 +15,7 @@ use App\Models\City;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
-class CityController
+final class CityController
 {
     use AuthorizesRequests;
 

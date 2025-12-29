@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api\V1\Auth;
 
 use App\Models\User;
@@ -8,9 +10,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\URL;
 
-class EmailVerificationController
+final class EmailVerificationController
 {
-    public function verify(Request $request): JsonResponse|\Illuminate\View\View
+    public function verify(Request $request): \Illuminate\View\View
     {
         $id = $request->route('id');
         $hash = $request->route('hash');

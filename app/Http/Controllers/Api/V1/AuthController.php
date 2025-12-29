@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Requests\LoginRequest;
@@ -23,7 +25,7 @@ use Spatie\MediaLibrary\MediaCollections\Exceptions\FileDoesNotExist;
 use Spatie\MediaLibrary\MediaCollections\Exceptions\FileIsTooBig;
 use Throwable;
 
-class AuthController
+final class AuthController
 {
     /**
      * @OA\Post(
@@ -288,7 +290,6 @@ class AuthController
                 );
 
                 return ['user' => $user, 'token' => $token];
-
             });
 
             $user = $result['user'];

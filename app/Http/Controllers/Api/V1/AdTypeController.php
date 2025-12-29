@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Requests\AdTypeRequest;
@@ -8,7 +10,7 @@ use App\Models\AdType;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
-class AdTypeController
+final class AdTypeController
 {
     use AuthorizesRequests;
 

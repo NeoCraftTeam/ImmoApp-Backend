@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Auth;
 
 use App\Enums\UserType;
@@ -7,7 +9,7 @@ use App\Models\User;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
 
-class VerifyEmailController
+final class VerifyEmailController
 {
     public function __invoke(Request $request, $id, $hash)
     {

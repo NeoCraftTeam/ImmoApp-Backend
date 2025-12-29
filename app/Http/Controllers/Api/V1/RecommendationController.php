@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Resources\AdResource;
@@ -10,7 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use OpenApi\Annotations as OA;
 
-class RecommendationController
+final class RecommendationController
 {
     /**
      * Obtenir des recommandations d'annonces basées sur l'historique de l'utilisateur.

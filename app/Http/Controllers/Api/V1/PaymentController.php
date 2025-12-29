@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\PaymentMethod;
@@ -16,16 +18,11 @@ use OpenApi\Annotations as OA;
 /**
  * @OA\Tag(name="Paiements", description="Gestion des paiements FedaPay")
  */
-class PaymentController
+final class PaymentController
 {
-    protected $fedaPay;
-
     private $amount = 500;
 
-    public function __construct(FedaPayService $fedaPay)
-    {
-        $this->fedaPay = $fedaPay;
-    }
+    public function __construct(protected FedaPayService $fedaPay) {}
 
     /**
      * @OA\Post(

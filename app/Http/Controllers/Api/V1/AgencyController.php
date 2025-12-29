@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Agency\CreateAgencyAction;
@@ -11,7 +13,7 @@ use App\Http\Resources\AgencyResource;
 use App\Models\Agency;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
-class AgencyController
+final class AgencyController
 {
     use AuthorizesRequests;
 
