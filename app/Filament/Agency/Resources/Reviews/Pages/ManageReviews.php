@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Filament\Agency\Resources\Reviews\Pages;
 
 use App\Filament\Agency\Resources\Reviews\ReviewResource;

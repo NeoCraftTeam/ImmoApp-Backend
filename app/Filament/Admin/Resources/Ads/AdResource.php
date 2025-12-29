@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Filament\Admin\Resources\Ads;
 
 use App\Enums\AdStatus;
@@ -262,7 +264,6 @@ class AdResource extends Resource
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
-
     }
 
     public static function getNavigationBadge(): ?string

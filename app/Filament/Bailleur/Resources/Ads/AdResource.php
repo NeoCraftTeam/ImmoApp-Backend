@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Filament\Bailleur\Resources\Ads;
 
 use App\Enums\AdStatus;
