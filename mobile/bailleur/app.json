@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "KeyHome Owner",
-    "slug": "bailleur",
+    "slug": "keyhome-owner",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -43,7 +43,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "fdbf2115-06e8-4ef4-b074-f3715036786d"
+        "projectId": "aa2a861b-6ae4-481a-bc53-0fdf73421cb4"
       }
     }
   }
