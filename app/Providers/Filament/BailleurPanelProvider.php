@@ -27,6 +27,7 @@ class BailleurPanelProvider extends PanelProvider
             ->id('bailleur')
             ->path('bailleur')
             ->login()
+            ->passwordReset()
             ->registration(\App\Filament\Pages\Auth\CustomRegister::class)
             ->profile()
             ->emailVerification()
@@ -60,7 +61,7 @@ class BailleurPanelProvider extends PanelProvider
             ])
             ->renderHook(
                 'panels::body.start',
-                fn (): string => '<script>if(window.location.search.includes("app_mode=native") || window.ReactNativeWebView) { document.body.classList.add("is-mobile-app"); }</script>',
+                fn(): string => '<script>if(window.location.search.includes("app_mode=native") || window.ReactNativeWebView) { document.body.classList.add("is-mobile-app"); }</script>',
             )
             ->assets([
                 \Filament\Support\Assets\Css::make('filament-mobile-app', resource_path('css/filament-mobile-app.css')),
