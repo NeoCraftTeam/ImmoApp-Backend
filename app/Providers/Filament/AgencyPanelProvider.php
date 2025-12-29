@@ -11,7 +11,6 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Widgets\AccountWidget;
-use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -38,12 +37,11 @@ class AgencyPanelProvider extends PanelProvider
             ->discoverResources(in: app_path('Filament/Agency/Resources'), for: 'App\Filament\Agency\Resources')
             ->discoverPages(in: app_path('Filament/Agency/Pages'), for: 'App\Filament\Agency\Pages')
             ->pages([
-                Dashboard::class,
+                // Dashboard::class est retiré car nous avons un Dashboard personnalisé découvert automatiquement
             ])
             ->discoverWidgets(in: app_path('Filament/Agency/Widgets'), for: 'App\Filament\Agency\Widgets')
             ->widgets([
                 AccountWidget::class,
-                FilamentInfoWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -61,7 +59,11 @@ class AgencyPanelProvider extends PanelProvider
             ])
             ->renderHook(
                 'panels::body.start',
-                fn(): string => '<script>if(window.location.search.includes("app_mode=native") || window.ReactNativeWebView) { document.body.classList.add("is-mobile-app"); }</script>',
+                fn (): string => '<script>if(window.location.search.includes("app_mode=native") || window.ReactNativeWebView) { document.body.classList.add("is-mobile-app"); }</script>',
+            )
+            ->renderHook(
+                'panels::body.end',
+                fn () => view('filament.mobile-bridge'),
             )
             ->assets([
                 \Filament\Support\Assets\Css::make('filament-mobile-app', resource_path('css/filament-mobile-app.css')),
