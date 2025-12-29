@@ -23,8 +23,9 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#3b82f6"
       },
+      "package": "cm.neocraft.keyhome.agency",
       "edgeToEdgeEnabled": true
     },
     "web": {

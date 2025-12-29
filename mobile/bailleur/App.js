@@ -1,5 +1,5 @@
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
-import { useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -26,7 +26,36 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [error, setError] = useState(null);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(0.3)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
   const webViewRef = useRef(null);
+
+  // Animation du logo au démarrage
+  React.useEffect(() => {
+    // Animation de scale (apparition)
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 4,
+      tension: 40,
+      useNativeDriver: true,
+    }).start();
+
+    // Animation de pulse (battement)
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.05,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, []);
 
   // Masquer le splash screen avec une animation
   const hideSplash = () => {
@@ -57,7 +86,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ExpoStatusBar style="light" backgroundColor="#064e3b" />
+      <ExpoStatusBar style="light" backgroundColor="#0f172a" />
       
       {/* WebView principale */}
       <WebView 
@@ -157,9 +186,16 @@ export default function App() {
       {showSplash && (
         <Animated.View style={[styles.splashContainer, { opacity: fadeAnim }]}>
           <View style={styles.splashContent}>
-             <View style={styles.logoCircle}>
-                <Text style={styles.logoText}>KH</Text>
-             </View>
+             <Animated.View style={[
+               styles.logoCircle,
+               {
+                 transform: [
+                   { scale: Animated.multiply(scaleAnim, pulseAnim) }
+                 ]
+               }
+             ]}>
+                <Text style={styles.logoText}>KB</Text>
+             </Animated.View>
              <Text style={styles.splashTitle}>KeyHome Bailleur</Text>
              <Text style={styles.splashSubtitle}>Suivi de Patrimoine & Loyers</Text>
              
@@ -177,7 +213,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#064e3b',
+    backgroundColor: '#0f172a',
   },
   webview: {
     flex: 1,
@@ -226,7 +262,7 @@ const styles = StyleSheet.create({
   // Styles du Splash Screen
   splashContainer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#064e3b', // Fond sombre premium
+    backgroundColor: '#0f172a', // Fond sombre premium
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 100,
@@ -279,7 +315,7 @@ const styles = StyleSheet.create({
   // Error Screen Styles
   errorContainer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#064e3b',
+    backgroundColor: '#0f172a',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 50,
@@ -304,7 +340,7 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#064e3b',
+    color: '#0f172a',
     textAlign: 'center',
     marginBottom: 10,
   },
