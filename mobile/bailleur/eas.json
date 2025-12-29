@@ -1,0 +1,28 @@
+{
+  "cli": {
+    "version": ">= 7.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_BASE_URL": "http://192.168.1.64:8000/bailleur"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_BASE_URL": "https://keyhomeback.neocraft.dev/bailleur"
+      }
+    },
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_BASE_URL": "https://keyhomeback.neocraft.dev/bailleur"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
