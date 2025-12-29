@@ -6,11 +6,9 @@ namespace App\Providers;
 
 use App\Models\PersonalAccessToken;
 use Illuminate\Auth\Notifications\ResetPassword;
-use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
-use Laravel\Pulse\Facades\Pulse;
 use Laravel\Sanctum\Sanctum;
 
 class AppServiceProvider extends ServiceProvider
@@ -42,12 +40,12 @@ class AppServiceProvider extends ServiceProvider
             $frontendUrl = config('app.frontend_url', 'http://localhost:3000');
             $link = "{$frontendUrl}/reset-password?token={$token}&email={$notifiable->getEmailForVerification()}";
 
-            \Illuminate\Support\Facades\Log::error('PASSWORD RESET LINK: ' . $link); // Force LOG
+            \Illuminate\Support\Facades\Log::error('PASSWORD RESET LINK: '.$link); // Force LOG
 
             return $link;
         });
 
-        Gate::define('viewPulse', fn($user) => in_array($user->email, [
+        Gate::define('viewPulse', fn ($user) => in_array($user->email, [
             'cedrickfeze24@gmail.com',
         ]));
     }
