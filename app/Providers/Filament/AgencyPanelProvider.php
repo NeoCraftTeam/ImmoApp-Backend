@@ -9,7 +9,6 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\Support\Colors\Color;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -25,13 +24,15 @@ class AgencyPanelProvider extends PanelProvider
         return $panel
             ->id('agency')
             ->path('agency')
+            ->brandLogo(fn () => view('filament.agency.brand'))
+            ->brandLogoHeight('3.5rem')
             ->login()
             ->passwordReset()
             ->registration(\App\Filament\Pages\Auth\CustomRegister::class)
             ->profile()
             ->emailVerification()
             ->colors([
-                'primary' => Color::Blue,
+                'primary' => \Filament\Support\Colors\Color::hex('#2563eb'), // Bleu Agence
             ])
             ->tenant(\App\Models\Agency::class)
             ->discoverResources(in: app_path('Filament/Agency/Resources'), for: 'App\Filament\Agency\Resources')

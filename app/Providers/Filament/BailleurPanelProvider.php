@@ -9,7 +9,6 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\Support\Colors\Color;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -25,15 +24,16 @@ class BailleurPanelProvider extends PanelProvider
         return $panel
             ->id('bailleur')
             ->path('bailleur')
+            ->brandLogo(fn () => view('filament.bailleur.brand'))
+            ->brandLogoHeight('3.5rem')
             ->login()
             ->passwordReset()
             ->registration(\App\Filament\Pages\Auth\CustomRegister::class)
             ->profile()
             ->emailVerification()
             ->colors([
-                'primary' => Color::Emerald,
+                'primary' => \Filament\Support\Colors\Color::hex('#10b981'), // Vert Owner
             ])
-            ->tenant(\App\Models\Agency::class)
             ->discoverResources(in: app_path('Filament/Bailleur/Resources'), for: 'App\Filament\Bailleur\Resources')
             ->discoverPages(in: app_path('Filament/Bailleur/Pages'), for: 'App\Filament\Bailleur\Pages')
             ->pages([

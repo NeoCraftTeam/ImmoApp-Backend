@@ -1,13 +1,13 @@
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import React, { useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    Dimensions,
-    Image,
-    StyleSheet,
-    Text,
-    View
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Image,
+  StyleSheet,
+  Text,
+  View
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -17,9 +17,9 @@ const { width, height } = Dimensions.get('window');
 
 // CONFIGURATION
 const APP_CONFIG = {
-  baseUrl: 'http://192.168.1.64:8000/bailleur', // Local IP pour test mobile en local
+  baseUrl: 'https://keyhomeback.neocraft.dev/owner', 
   appMode: 'native',
-  primaryColor: '#ff4757', // Nouvelle couleur KeyHome
+  primaryColor: '#10b981', // Vert Owner
   splashDuration: 2500,
 };
 
@@ -32,12 +32,7 @@ export default function App() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const webViewRef = useRef(null);
 
-  // Animation du logo au démarrage
   React.useEffect(() => {
-    // Initialiser NativeService avec référence vide pour commencer
-    // Sera mise à jour quand ref sera disponible
-    
-    // Animation de scale (apparition)
     Animated.spring(scaleAnim, {
       toValue: 1,
       friction: 4,
@@ -45,7 +40,6 @@ export default function App() {
       useNativeDriver: true,
     }).start();
 
-    // Animation de pulse (battement)
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
@@ -66,7 +60,6 @@ export default function App() {
     };
   }, []);
 
-  // Mettre à jour la référence WebView pour NativeService quand elle change
   const setWebViewRef = (ref) => {
     webViewRef.current = ref;
     if (ref) {
@@ -74,7 +67,6 @@ export default function App() {
     }
   };
 
-  // Masquer le splash screen avec une animation
   const hideSplash = () => {
     Animated.timing(fadeAnim, {
       toValue: 0,
@@ -83,16 +75,12 @@ export default function App() {
     }).start(() => setShowSplash(false));
   };
 
-  // URL enrichie avec le mode natif
   const getAppUrl = () => {
-    const url = `${APP_CONFIG.baseUrl}?app_mode=${APP_CONFIG.appMode}`;
-    console.log('Loading URL:', url);
-    return url;
+    return `${APP_CONFIG.baseUrl}?app_mode=${APP_CONFIG.appMode}`;
   };
 
-  const APP_URL = 'http://192.168.1.64:8000/bailleur?app_mode=native';
+  const APP_URL = getAppUrl();
 
-  // Retry loading
   const handleRetry = () => {
     setError(null);
     setIsLoading(true);
@@ -106,125 +94,95 @@ export default function App() {
       <View style={styles.container}>
         <ExpoStatusBar style="dark" backgroundColor="#ffffff" translucent={false} />
         
-        <SafeAreaView style={{flex: 1}}>
+        <SafeAreaView style={{flex: 1, backgroundColor: '#ffffff'}}>
           <WebView 
             ref={setWebViewRef}
-        source={{ uri: APP_URL }}
-        style={styles.webview}
-        onLoadStart={() => setIsLoading(true)}
-        onLoadEnd={() => {
-          setIsLoading(false);
-          if (showSplash) setTimeout(hideSplash, 1000);
-        }}
-        javaScriptEnabled={true}
-        sharedCookiesEnabled={true}
-        thirdPartyCookiesEnabled={true}
-        domStorageEnabled={true}
-        cacheEnabled={true}
-        incognito={false}
-        mixedContentMode="always"
-        userAgent="KeyHomeBailleurMobileApp/1.0"
-        onMessage={(event) => {
-          // Gérer d'abord les messages natifs
-          NativeService.handleWebViewMessage(event);
-          
-          if (event.nativeEvent.data === 'AUTH_SUCCESS') {
-             console.log("Login successful detected!");
-          }
-          console.log("WebView Console:", event.nativeEvent.data);
-        }}
-        injectedJavaScript={`
-          (function() {
-            var oldLog = console.log;
-            console.log = function (message) {
-              window.ReactNativeWebView.postMessage(message);
-              oldLog.apply(console, arguments);
-            };
-          })();
-        `}
-        onShouldStartLoadWithRequest={(request) => {
-          // Allow all requests including HTTP
-          return true;
-        }}
-        onError={(syntheticEvent) => {
-          const { nativeEvent } = syntheticEvent;
-          console.error('WebView error:', nativeEvent);
-          setError({
-            type: 'network',
-            message: 'Impossible de se connecter au serveur',
-            details: nativeEvent.description || 'Vérifiez votre connexion internet'
-          });
-          setIsLoading(false);
-        }}
-        onHttpError={(syntheticEvent) => {
-          const { nativeEvent } = syntheticEvent;
-          console.warn('WebView received error status code: ', nativeEvent.statusCode);
-          if (nativeEvent.statusCode >= 500) {
-            setError({
-              type: 'server',
-              message: 'Le serveur rencontre des difficultés',
-              details: 'Veuillez réessayer dans quelques instants'
-            });
-            setIsLoading(false);
-          }
-        }}
-      />
-      </SafeAreaView>
+            source={{ uri: APP_URL }}
+            style={styles.webview}
+            onLoadStart={() => setIsLoading(true)}
+            onLoadEnd={() => {
+              setIsLoading(false);
+              if (showSplash) setTimeout(hideSplash, 1000);
+            }}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            userAgent="KeyHomeBailleurMobileApp/1.0"
+            onMessage={(event) => {
+              NativeService.handleWebViewMessage(event);
+            }}
+            injectedJavaScript={`
+              (function() {
+                var oldLog = console.log;
+                console.log = function (message) {
+                  window.ReactNativeWebView.postMessage(message);
+                  oldLog.apply(console, arguments);
+                };
+              })();
+            `}
+            onError={(syntheticEvent) => {
+              const { nativeEvent } = syntheticEvent;
+              setError({
+                type: 'network',
+                message: 'Impossible de se connecter au serveur',
+                details: nativeEvent.description || 'Vérifiez votre connexion internet'
+              });
+              setIsLoading(false);
+            }}
+          />
+        </SafeAreaView>
 
-      {/* Error Screen */}
-      {error && !showSplash && (
-        <View style={styles.errorContainer}>
-          <View style={styles.errorContent}>
-            <Text style={styles.errorIcon}>{error.type === 'network' ? '📡' : '⚠️'}</Text>
-            <Text style={styles.errorTitle}>{error.message}</Text>
-            <Text style={styles.errorDetails}>{error.details}</Text>
-            <View style={styles.buttonRow}>
-              <View style={styles.retryButton}>
-                <Text style={styles.retryButtonText} onPress={handleRetry}>
-                  🔄 Réessayer
-                </Text>
+        {error && !showSplash && (
+          <View style={styles.errorContainer}>
+            <View style={styles.errorContent}>
+              <Text style={styles.errorIcon}>{error.type === 'network' ? '📡' : '⚠️'}</Text>
+              <Text style={styles.errorTitle}>{error.message}</Text>
+              <Text style={styles.errorDetails}>{error.details}</Text>
+              <View style={styles.buttonRow}>
+                <View style={styles.retryButton}>
+                  <Text style={styles.retryButtonText} onPress={handleRetry}>
+                    🔄 Réessayer
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
-        </View>
-      )}
+        )}
 
-      {/* Overlay de chargement (Classique) */}
-      {isLoading && !showSplash && !error && (
-        <View style={styles.loaderContainer}>
-           <Image 
-             source={require('./assets/icon.png')} 
-             style={{ width: 100, height: 100, resizeMode: 'contain', marginBottom: 30 }} 
-           />
-           <ActivityIndicator size="large" color={APP_CONFIG.primaryColor} />
-        </View>
-      )}
-
-      {/* Splash Screen Custom */}
-      {showSplash && (
-        <Animated.View style={[styles.splashContainer, { opacity: fadeAnim }]}>
-          <View style={styles.splashContent}>
-             <Animated.Image
-               source={require('./assets/icon.png')}
-               style={[
-                 styles.splashLogoImage,
-                 {
-                   transform: [
-                     { scale: Animated.multiply(scaleAnim, pulseAnim) }
-                   ]
-                 }
-               ]}
+        {isLoading && !showSplash && !error && (
+          <View style={styles.loaderContainer}>
+             <Image 
+               source={require('./assets/icon.png')} 
+               style={{ width: 100, height: 100, resizeMode: 'contain', marginBottom: 30, tintColor: APP_CONFIG.primaryColor }} 
              />
-             <Text style={styles.splashTitle}>KeyHome Bailleur</Text>
-             <Text style={styles.splashSubtitle}>Gérez vos biens en toute sérénité</Text>
-             
-             <View style={styles.splashLoader}>
-                <ActivityIndicator size="small" color={APP_CONFIG.primaryColor} />
-             </View>
+             <ActivityIndicator size="large" color={APP_CONFIG.primaryColor} />
           </View>
-          <Text style={styles.versionText}>v1.0.0 Pro Edition</Text>
-        </Animated.View>
-      )}
+        )}
+
+        {showSplash && (
+          <Animated.View style={[styles.splashContainer, { opacity: fadeAnim }]}>
+            <View style={styles.splashContent}>
+               <Animated.Image
+                 source={require('./assets/icon.png')}
+                 style={[
+                   styles.splashLogoImage,
+                   {
+                     tintColor: APP_CONFIG.primaryColor,
+                     transform: [
+                       { scale: Animated.multiply(scaleAnim, pulseAnim) }
+                     ]
+                   }
+                 ]}
+               />
+               <Text style={styles.splashTitle}>KeyHome Owner</Text>
+               <Text style={styles.splashSubtitle}>Gérez vos biens en toute sérénité</Text>
+               
+               <View style={styles.splashLoader}>
+                  <ActivityIndicator size="small" color={APP_CONFIG.primaryColor} />
+               </View>
+            </View>
+            <Text style={styles.versionText}>v1.0.0 Pro Edition</Text>
+          </Animated.View>
+        )}
       </View>
     </SafeAreaProvider>
   );
@@ -239,8 +197,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
   },
-  
-  // Styles du Loader & Skeleton
   loaderContainer: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
@@ -249,40 +205,9 @@ const styles = StyleSheet.create({
     zIndex: 10,
     padding: 20,
   },
-  skeletonCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 20,
-    padding: 24,
-    width: '90%',
-    maxWidth: 400,
-  },
-  skeletonLine: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  skeletonTitle: {
-    height: 32,
-    width: '70%',
-  },
-  skeletonSubtitle: {
-    height: 20,
-    width: '50%',
-    marginBottom: 24,
-  },
-  skeletonRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  skeletonButton: {
-    height: 48,
-    flex: 1,
-  },
-
-  // Styles du Splash Screen
   splashContainer: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#ffffff', // Fond blanc
+    backgroundColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 100,
@@ -297,13 +222,13 @@ const styles = StyleSheet.create({
       marginBottom: 20,
   },
   splashTitle: {
-    color: '#1e293b', // Texte foncé
+    color: '#1e293b',
     fontSize: 28,
     fontWeight: '900',
     letterSpacing: -1,
   },
   splashSubtitle: {
-    color: '#64748b', // Gris moyen
+    color: '#64748b',
     fontSize: 14,
     fontWeight: '500',
     marginTop: 5,
@@ -318,8 +243,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-
-  // Error Screen Styles
   errorContainer: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: '#0f172a',
@@ -362,7 +285,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   retryButton: {
-    backgroundColor: '#10b981',
+    backgroundColor: '#10b981', // Vert Owner
     paddingVertical: 14,
     paddingHorizontal: 32,
     borderRadius: 12,
