@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class QuarterRequest extends FormRequest
+final class QuarterRequest extends FormRequest
 {
     public function rules(): array
     {

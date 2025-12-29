@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Requests;
 
 use Clickbar\Magellan\Data\Geometries\Point;
@@ -9,7 +11,7 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class UserRequest extends FormRequest
+final class UserRequest extends FormRequest
 {
     use TransformsGeojsonGeometry;
 

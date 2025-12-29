@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Resources;
 
 use App\Models\Quarter;
@@ -7,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /** @mixin Quarter */
-class QuarterResource extends JsonResource
+final class QuarterResource extends JsonResource
 {
     #[\Override]
     public function toArray(Request $request): array

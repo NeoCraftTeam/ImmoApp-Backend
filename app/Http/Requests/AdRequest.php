@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Http\Requests;
 
 use Clickbar\Magellan\Data\Geometries\Point;
@@ -10,7 +12,7 @@ use Illuminate\Foundation\Http\FormRequest;
 /**
  * @property-read array|null $images_to_delete
  */
-class AdRequest extends FormRequest
+final class AdRequest extends FormRequest
 {
     use TransformsGeojsonGeometry;
 
