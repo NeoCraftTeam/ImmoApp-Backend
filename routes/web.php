@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Http\Controllers\Api\V1\Auth\EmailVerificationController;
 use Illuminate\Support\Facades\Route;
 
@@ -9,11 +11,15 @@ Route::get('/', function () {
     // routes/web.php
 });
 
-Route::get('email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
-    ->name('web.verification.verify');
+Route::get('email/verify/{id}/{hash}', [
+    EmailVerificationController::class,
+    'verify',
+])->name('web.verification.verify');
 
-Route::get('auth/verify-email/{id}/{hash}', \App\Http\Controllers\Auth\VerifyEmailController::class)
-    ->name('verification.verify');
+Route::get('auth/verify-email/{id}/{hash}', [
+    \App\Http\Controllers\Auth\VerifyEmailController::class,
+    '__invoke',
+])->name('verification.verify');
 
 // Route de "Callback" pour simuler le frontend
 Route::get('/verify-email', function (\Illuminate\Http\Request $request) {

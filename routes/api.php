@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 use App\Http\Controllers\Api\V1\AdController;
 use App\Http\Controllers\Api\V1\AdTypeController;
 use App\Http\Controllers\Api\V1\AgencyController;
@@ -97,9 +99,10 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('auth:sanctum')->get('/recommendations', [RecommendationController::class, 'index']);
 
     // --- PAIEMENTS ---
-    Route::post('/payments/initialize/{ad}', [PaymentController::class, 'initialize'])->middleware('auth:sanctum');
-    Route::post('/payments/webhook', [PaymentController::class, 'webhook']); // Route publique pour FedaPay
-    Route::get('/payments/callback', [PaymentController::class, 'callback']); // Route de retour utilisateur
+    Route::post('/payments/initialize/{ad}', [PaymentController::class, 'initialize'])
+        ->middleware('auth:sanctum');
+    Route::post('/payments/webhook', [PaymentController::class, 'webhook']);
+    Route::get('/payments/callback', [PaymentController::class, 'callback']);
 
     //  Ads
     Route::prefix('ads')->controller(AdController::class)->group(function (): void {
@@ -121,7 +124,7 @@ Route::prefix('v1')->group(function (): void {
             Route::delete('/{id}', 'destroy');
         });
 
-        // Cette route DOIT être en dernier pour ne pas capturer d'autres patterns
+        // Capture l'ID de l'annonce (doit être en dernier)
         Route::get('/{id}', 'show');
     });
 });
