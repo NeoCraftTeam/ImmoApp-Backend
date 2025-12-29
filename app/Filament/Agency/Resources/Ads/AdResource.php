@@ -7,6 +7,7 @@ use App\Filament\Agency\Resources\Ads\Pages\ManageAds;
 use App\Models\Ad;
 use BackedEnum;
 use Clickbar\Magellan\Data\Geometries\Point;
+use Dotswan\MapPicker\Fields\Map;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -84,16 +85,24 @@ class AdResource extends Resource
                     ->numeric(),
                 Toggle::make('has_parking')
                     ->required(),
-                TextInput::make('latitude')
-                    ->numeric()
-                    ->required()
-                    ->default(0.0)
-                    ->formatStateUsing(fn (?Ad $record) => $record?->location?->getLatitude()),
-                TextInput::make('longitude')
-                    ->numeric()
-                    ->required()
-                    ->default(0.0)
-                    ->formatStateUsing(fn (?Ad $record) => $record?->location?->getLongitude()),
+                Map::make('location_map')
+                    ->label('Localisation')
+                    ->columnSpanFull()
+                    ->defaultLocation(latitude: 4.0511, longitude: 9.7679)
+                    ->afterStateHydrated(function ($state, $record, callable $set): void {
+                        if ($record?->location) {
+                            $set('location_map', [
+                                'lat' => $record->location->getLatitude(),
+                                'lng' => $record->location->getLongitude(),
+                            ]);
+                        }
+                    })
+                    ->showMarker()
+                    ->draggable()
+                    ->showMyLocationButton()
+                    ->showZoomControl()
+                    ->tilesUrl('https://tile.openstreetmap.org/{z}/{x}/{y}.png')
+                    ->zoom(15),
                 Select::make('status')
                     ->options(AdStatus::class)
                     ->required()
@@ -148,17 +157,17 @@ class AdResource extends Resource
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                ViewAction::make(),
-                EditAction::make()
+                ViewAction::make('view'),
+                EditAction::make('edit')
                     ->mutateFormDataUsing(function (array $data): array {
-                        if (isset($data['latitude']) && isset($data['longitude'])) {
-                            $data['location'] = Point::make($data['latitude'], $data['longitude']);
-                            unset($data['latitude'], $data['longitude']);
+                        if (isset($data['location_map']) && is_array($data['location_map'])) {
+                            $data['location'] = Point::make($data['location_map']['lat'], $data['location_map']['lng']);
+                            unset($data['location_map']);
                         }
 
                         return $data;
                     }),
-                DeleteAction::make(),
+                DeleteAction::make('delete'),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
