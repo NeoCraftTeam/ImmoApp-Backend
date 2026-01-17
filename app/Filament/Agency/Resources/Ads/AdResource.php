@@ -158,9 +158,9 @@ class AdResource extends Resource
             ->filters([
                 TrashedFilter::make(),
             ])
-            ->recordActions([
-                ViewAction::make('view'),
-                EditAction::make('edit')
+            ->actions([
+                ViewAction::make(),
+                EditAction::make()
                     ->mutateFormDataUsing(function (array $data): array {
                         if (isset($data['location_map']) && is_array($data['location_map'])) {
                             $data['location'] = Point::make($data['location_map']['lat'], $data['location_map']['lng']);
@@ -169,9 +169,9 @@ class AdResource extends Resource
 
                         return $data;
                     }),
-                DeleteAction::make('delete'),
+                DeleteAction::make(),
             ])
-            ->toolbarActions([
+            ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
