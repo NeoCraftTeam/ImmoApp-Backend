@@ -4,7 +4,7 @@ services:
   code-sync:
     image: ${APP_IMAGE:-keyhome-backend}
     container_name: keyhome-code-sync
-    command: sh -c "cp -rp /var/www/. /shared-code/ && chown -R 1000:1000 /shared-code"
+    command: sh -c "cp -rp /var/www/. /shared-code/ && ln -sf /var/www/storage/app/public /shared-code/public/storage && chown -R 1000:1000 /shared-code"
     volumes:
       - keyhome-app-code:/shared-code
     networks:
