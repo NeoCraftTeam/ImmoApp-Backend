@@ -198,7 +198,7 @@ class AdResource extends Resource
                     ->sortable(),
                 TextColumn::make('user.fullname')
                     ->label('Publié par')
-                    ->searchable(),
+                    ->searchable(['firstname', 'lastname']),
                 TextColumn::make('quarter.name')
                     ->searchable(),
                 TextColumn::make('ad_type.name')
@@ -206,13 +206,13 @@ class AdResource extends Resource
                 TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(isToggledHiddenByDefault: false),
                 TextColumn::make('updated_at')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('deleted_at')
-                    ->isoDate('LLLL', 'Europe/Paris')
+                    ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
