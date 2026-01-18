@@ -14,9 +14,7 @@ class SubscriptionSuccessEmail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public $subscription)
-    {
-    }
+    public function __construct(public $subscription) {}
 
     public function envelope(): Envelope
     {

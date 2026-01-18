@@ -160,10 +160,10 @@ class Ad extends Model implements HasMedia
         $i = 1;
         while (
             self::where('slug', $slug)
-                ->when($ignoreId, fn($query) => $query->where('id', '!=', $ignoreId))
+                ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
                 ->exists()
         ) {
-            $slug = $original . '-' . $i;
+            $slug = $original.'-'.$i;
             $i++;
         }
 
