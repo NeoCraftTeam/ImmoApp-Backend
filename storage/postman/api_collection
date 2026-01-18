@@ -1,0 +1,1910 @@
+{
+    "info": {
+        "name": "KeyHome",
+        "description": "API Documentation",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "documentation",
+            "item": [
+                {
+                    "name": "[GET] api/documentation",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/documentation",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "documentation"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "oauth2-callback",
+            "item": [
+                {
+                    "name": "[GET] api/oauth2-callback",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/oauth2-callback",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "oauth2-callback"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "v1",
+            "item": [
+                {
+                    "name": "auth",
+                    "item": [
+                        {
+                            "name": "registerCustomer",
+                            "item": [
+                                {
+                                    "name": "[POST] api/v1/auth/registerCustomer",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/auth/registerCustomer",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "auth",
+                                                "registerCustomer"
+                                            ]
+                                        },
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"firstname\": \"sample_text\",\n    \"lastname\": \"sample_text\",\n    \"email\": \"sample_text\",\n    \"phone_number\": \"sample_text\",\n    \"password\": \"sample_text\",\n    \"confirm_password\": \"sample_text\",\n    \"role\": \"sample_text\",\n    \"type\": \"sample_text\",\n    \"city_id\": \"sample_text\",\n    \"latitude\": 89,\n    \"longitude\": 28,\n    \"avatar\": \"sample_text\"\n}",
+                                            "options": []
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "registerAgent",
+                            "item": [
+                                {
+                                    "name": "[POST] api/v1/auth/registerAgent",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/auth/registerAgent",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "auth",
+                                                "registerAgent"
+                                            ]
+                                        },
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"firstname\": \"sample_text\",\n    \"lastname\": \"sample_text\",\n    \"email\": \"sample_text\",\n    \"phone_number\": \"sample_text\",\n    \"password\": \"sample_text\",\n    \"confirm_password\": \"sample_text\",\n    \"role\": \"sample_text\",\n    \"type\": \"sample_text\",\n    \"city_id\": \"sample_text\",\n    \"latitude\": 83,\n    \"longitude\": 63,\n    \"avatar\": \"sample_text\"\n}",
+                                            "options": []
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "registerAd",
+                            "item": [
+                                {
+                                    "name": "[POST] api/v1/auth/registerAd",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/auth/registerAd",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "auth",
+                                                "registerAd"
+                                            ]
+                                        },
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"firstname\": \"sample_text\",\n    \"lastname\": \"sample_text\",\n    \"email\": \"sample_text\",\n    \"phone_number\": \"sample_text\",\n    \"password\": \"sample_text\",\n    \"confirm_password\": \"sample_text\",\n    \"role\": \"sample_text\",\n    \"type\": \"sample_text\",\n    \"city_id\": \"sample_text\",\n    \"latitude\": 77,\n    \"longitude\": 12,\n    \"avatar\": \"sample_text\"\n}",
+                                            "options": []
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "login",
+                            "item": [
+                                {
+                                    "name": "[POST] api/v1/auth/login",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/auth/login",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "auth",
+                                                "login"
+                                            ]
+                                        },
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"email\": \"user80@example.com\",\n    \"password\": \"sample_text\"\n}",
+                                            "options": []
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "resend-verification",
+                            "item": [
+                                {
+                                    "name": "[POST] api/v1/auth/resend-verification",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/auth/resend-verification",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "auth",
+                                                "resend-verification"
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "email",
+                            "item": [
+                                {
+                                    "name": "verify",
+                                    "item": [
+                                        {
+                                            "name": "[GET] api/v1/auth/email/verify/{id}/{hash}",
+                                            "request": {
+                                                "method": "GET",
+                                                "header": [
+                                                    {
+                                                        "key": "Accept",
+                                                        "value": "application/json",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "Content-Type",
+                                                        "value": "application/json",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/auth/email/verify/:id/:hash",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "auth",
+                                                        "email",
+                                                        "verify",
+                                                        ":id",
+                                                        ":hash"
+                                                    ],
+                                                    "variable": []
+                                                }
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "name": "resend",
+                                    "item": [
+                                        {
+                                            "name": "[POST] api/v1/auth/email/resend",
+                                            "request": {
+                                                "method": "POST",
+                                                "header": [
+                                                    {
+                                                        "key": "Accept",
+                                                        "value": "application/json",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "Content-Type",
+                                                        "value": "application/json",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/auth/email/resend",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "auth",
+                                                        "email",
+                                                        "resend"
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "forgot-password",
+                            "item": [
+                                {
+                                    "name": "[POST] api/v1/auth/forgot-password",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/auth/forgot-password",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "auth",
+                                                "forgot-password"
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "reset-password",
+                            "item": [
+                                {
+                                    "name": "[POST] api/v1/auth/reset-password",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/auth/reset-password",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "auth",
+                                                "reset-password"
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "logout",
+                            "item": [
+                                {
+                                    "name": "[POST] api/v1/auth/logout",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/auth/logout",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "auth",
+                                                "logout"
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "refresh",
+                            "item": [
+                                {
+                                    "name": "[POST] api/v1/auth/refresh",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/auth/refresh",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "auth",
+                                                "refresh"
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "me",
+                            "item": [
+                                {
+                                    "name": "[GET] api/v1/auth/me",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/auth/me",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "auth",
+                                                "me"
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "update-password",
+                            "item": [
+                                {
+                                    "name": "[POST] api/v1/auth/update-password",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/auth/update-password",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "auth",
+                                                "update-password"
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "ad-types",
+                    "item": [
+                        {
+                            "name": "[GET] api/v1/ad-types",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/ad-types",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "ad-types"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "[GET] api/v1/ad-types/{adType}",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/ad-types/:adType",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "ad-types",
+                                        ":adType"
+                                    ],
+                                    "variable": []
+                                }
+                            }
+                        },
+                        {
+                            "name": "[POST] api/v1/ad-types",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/ad-types",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "ad-types"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "[]",
+                                    "options": []
+                                }
+                            }
+                        },
+                        {
+                            "name": "[PUT] api/v1/ad-types/{adType}",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/ad-types/:adType",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "ad-types",
+                                        ":adType"
+                                    ],
+                                    "variable": []
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "[]",
+                                    "options": []
+                                }
+                            }
+                        },
+                        {
+                            "name": "[DELETE] api/v1/ad-types/{adType}",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/ad-types/:adType",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "ad-types",
+                                        ":adType"
+                                    ],
+                                    "variable": []
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "cities",
+                    "item": [
+                        {
+                            "name": "[GET] api/v1/cities",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/cities",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "cities"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "[GET] api/v1/cities/{id}",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/cities/:id",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "cities",
+                                        ":id"
+                                    ],
+                                    "variable": []
+                                }
+                            }
+                        },
+                        {
+                            "name": "[POST] api/v1/cities",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/cities",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "cities"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"sample_text\"\n}",
+                                    "options": []
+                                }
+                            }
+                        },
+                        {
+                            "name": "[PUT] api/v1/cities/{city}",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/cities/:city",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "cities",
+                                        ":city"
+                                    ],
+                                    "variable": []
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"sample_text\"\n}",
+                                    "options": []
+                                }
+                            }
+                        },
+                        {
+                            "name": "[DELETE] api/v1/cities/{city}",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/cities/:city",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "cities",
+                                        ":city"
+                                    ],
+                                    "variable": []
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "quarters",
+                    "item": [
+                        {
+                            "name": "[GET] api/v1/quarters",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/quarters",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "quarters"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "[GET] api/v1/quarters/{id}",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/quarters/:id",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "quarters",
+                                        ":id"
+                                    ],
+                                    "variable": []
+                                }
+                            }
+                        },
+                        {
+                            "name": "[POST] api/v1/quarters",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/quarters",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "quarters"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "[]",
+                                    "options": []
+                                }
+                            }
+                        },
+                        {
+                            "name": "[PUT] api/v1/quarters/{quarter}",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/quarters/:quarter",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "quarters",
+                                        ":quarter"
+                                    ],
+                                    "variable": []
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "[]",
+                                    "options": []
+                                }
+                            }
+                        },
+                        {
+                            "name": "[DELETE] api/v1/quarters/{quarter}",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/quarters/:quarter",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "quarters",
+                                        ":quarter"
+                                    ],
+                                    "variable": []
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "agencies",
+                    "item": [
+                        {
+                            "name": "[GET] api/v1/agencies",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/agencies",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "agencies"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "[GET] api/v1/agencies/{agency}",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/agencies/:agency",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "agencies",
+                                        ":agency"
+                                    ],
+                                    "variable": []
+                                }
+                            }
+                        },
+                        {
+                            "name": "[POST] api/v1/agencies",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/agencies",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "agencies"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "[]",
+                                    "options": []
+                                }
+                            }
+                        },
+                        {
+                            "name": "[PUT] api/v1/agencies/{agency}",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/agencies/:agency",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "agencies",
+                                        ":agency"
+                                    ],
+                                    "variable": []
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "[]",
+                                    "options": []
+                                }
+                            }
+                        },
+                        {
+                            "name": "[DELETE] api/v1/agencies/{agency}",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/agencies/:agency",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "agencies",
+                                        ":agency"
+                                    ],
+                                    "variable": []
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "users",
+                    "item": [
+                        {
+                            "name": "[GET] api/v1/users",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/users",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "users"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "[GET] api/v1/users/{id}",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/users/:id",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "users",
+                                        ":id"
+                                    ],
+                                    "variable": []
+                                }
+                            }
+                        },
+                        {
+                            "name": "[POST] api/v1/users",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/users",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "users"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "[]",
+                                    "options": []
+                                }
+                            }
+                        },
+                        {
+                            "name": "[PUT] api/v1/users/{user}",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/users/:user",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "users",
+                                        ":user"
+                                    ],
+                                    "variable": []
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "[]",
+                                    "options": []
+                                }
+                            }
+                        },
+                        {
+                            "name": "[DELETE] api/v1/users/{user}",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/users/:user",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "users",
+                                        ":user"
+                                    ],
+                                    "variable": []
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "recommendations",
+                    "item": [
+                        {
+                            "name": "[GET] api/v1/recommendations",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/recommendations",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "recommendations"
+                                    ]
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "payments",
+                    "item": [
+                        {
+                            "name": "initialize",
+                            "item": [
+                                {
+                                    "name": "[POST] api/v1/payments/initialize/{ad}",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/payments/initialize/:ad",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "payments",
+                                                "initialize",
+                                                ":ad"
+                                            ],
+                                            "variable": []
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "webhook",
+                            "item": [
+                                {
+                                    "name": "[POST] api/v1/payments/webhook",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/payments/webhook",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "payments",
+                                                "webhook"
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "callback",
+                            "item": [
+                                {
+                                    "name": "[GET] api/v1/payments/callback",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/payments/callback",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "payments",
+                                                "callback"
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "ads",
+                    "item": [
+                        {
+                            "name": "[GET] api/v1/ads",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/ads",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "ads"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "nearby",
+                            "item": [
+                                {
+                                    "name": "[GET] api/v1/ads/nearby",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/ads/nearby",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "ads",
+                                                "nearby"
+                                            ]
+                                        },
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"q\": \"sample_text\",\n    \"city\": \"sample_text\",\n    \"type\": \"sample_text\",\n    \"bedrooms\": 2,\n    \"quarter_id\": \"sample_text\",\n    \"type_id\": \"sample_text\",\n    \"sort\": \"sample_text\",\n    \"order\": \"sample_text\",\n    \"per_page\": 34,\n    \"field\": \"sample_text\",\n    \"latitude\": 69,\n    \"longitude\": 18,\n    \"radius\": 56\n}",
+                                            "options": []
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "[GET] api/v1/ads/{user}/nearby",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/ads/:user/nearby",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "ads",
+                                                ":user",
+                                                "nearby"
+                                            ],
+                                            "variable": []
+                                        },
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"q\": \"sample_text\",\n    \"city\": \"sample_text\",\n    \"type\": \"sample_text\",\n    \"bedrooms\": 6,\n    \"quarter_id\": \"sample_text\",\n    \"type_id\": \"sample_text\",\n    \"sort\": \"sample_text\",\n    \"order\": \"sample_text\",\n    \"per_page\": 62,\n    \"field\": \"sample_text\",\n    \"latitude\": 39,\n    \"longitude\": 25,\n    \"radius\": 39\n}",
+                                            "options": []
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "search",
+                            "item": [
+                                {
+                                    "name": "[GET] api/v1/ads/search",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/ads/search",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "ads",
+                                                "search"
+                                            ]
+                                        },
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"q\": \"sample_text\",\n    \"city\": \"sample_text\",\n    \"type\": \"sample_text\",\n    \"bedrooms\": 8,\n    \"quarter_id\": \"sample_text\",\n    \"type_id\": \"sample_text\",\n    \"sort\": \"sample_text\",\n    \"order\": \"sample_text\",\n    \"per_page\": 56,\n    \"field\": \"sample_text\",\n    \"latitude\": 2,\n    \"longitude\": 95,\n    \"radius\": 54\n}",
+                                            "options": []
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "autocomplete",
+                            "item": [
+                                {
+                                    "name": "[GET] api/v1/ads/autocomplete",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/ads/autocomplete",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "ads",
+                                                "autocomplete"
+                                            ]
+                                        },
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"q\": \"sample_text\",\n    \"city\": \"sample_text\",\n    \"type\": \"sample_text\",\n    \"bedrooms\": 7,\n    \"quarter_id\": \"sample_text\",\n    \"type_id\": \"sample_text\",\n    \"sort\": \"sample_text\",\n    \"order\": \"sample_text\",\n    \"per_page\": 34,\n    \"field\": \"sample_text\",\n    \"latitude\": 53,\n    \"longitude\": 50,\n    \"radius\": 30\n}",
+                                            "options": []
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "facets",
+                            "item": [
+                                {
+                                    "name": "[GET] api/v1/ads/facets",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/ads/facets",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "ads",
+                                                "facets"
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "[POST] api/v1/ads",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/ads",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "ads"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"q\": \"sample_text\",\n    \"city\": \"sample_text\",\n    \"type\": \"sample_text\",\n    \"bedrooms\": 5,\n    \"quarter_id\": \"sample_text\",\n    \"type_id\": \"sample_text\",\n    \"sort\": \"sample_text\",\n    \"order\": \"sample_text\",\n    \"per_page\": 97,\n    \"field\": \"sample_text\",\n    \"latitude\": 19,\n    \"longitude\": 52,\n    \"radius\": 26\n}",
+                                    "options": []
+                                }
+                            }
+                        },
+                        {
+                            "name": "[PUT] api/v1/ads/{ad}",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/ads/:ad",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "ads",
+                                        ":ad"
+                                    ],
+                                    "variable": []
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"q\": \"sample_text\",\n    \"city\": \"sample_text\",\n    \"type\": \"sample_text\",\n    \"bedrooms\": 8,\n    \"quarter_id\": \"sample_text\",\n    \"type_id\": \"sample_text\",\n    \"sort\": \"sample_text\",\n    \"order\": \"sample_text\",\n    \"per_page\": 35,\n    \"field\": \"sample_text\",\n    \"latitude\": 22,\n    \"longitude\": 97,\n    \"radius\": 95\n}",
+                                    "options": []
+                                }
+                            }
+                        },
+                        {
+                            "name": "[DELETE] api/v1/ads/{id}",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/ads/:id",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "ads",
+                                        ":id"
+                                    ],
+                                    "variable": []
+                                }
+                            }
+                        },
+                        {
+                            "name": "[GET] api/v1/ads/{id}",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/ads/:id",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "ads",
+                                        ":id"
+                                    ],
+                                    "variable": []
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ],
+    "variable": [
+        {
+            "key": "base_url",
+            "value": "http://192.168.1.64:8000"
+        }
+    ]
+}
