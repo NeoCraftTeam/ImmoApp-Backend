@@ -14,12 +14,19 @@ RUN apk add --no-cache \
     postgresql-client \
     freetype-dev \
     libjpeg-turbo-dev \
+    libwebp-dev \
+    libavif-dev \
+    jpegoptim \
+    optipng \
+    pngquant \
+    gifsicle \
+    libwebp-tools \
+    libavif-apps \
     oniguruma-dev \
     gettext-dev \
-    shadow
-
-# Configuration et installation des extensions PHP
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    shadow \
+    $PHPIZE_DEPS \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-avif \
     && docker-php-ext-install -j$(nproc) \
     gd \
     bcmath \
@@ -29,19 +36,18 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     zip \
     opcache \
     exif \
-    gettext
-
-# Installation de Redis via PECL
-RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
+    gettext \
     && pecl install redis \
     && docker-php-ext-enable redis \
-    && apk del .build-deps
+    && apk del $PHPIZE_DEPS \
+    && rm -rf /tmp/*
 
 # Installation de Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Configuration d'Opcache pour la production
+# Configuration de PHP pour la production
 COPY .docker/php/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
+COPY .docker/php/php.ini /usr/local/etc/php/conf.d/php.ini
 
 # Définition du répertoire de travail
 WORKDIR /var/www
