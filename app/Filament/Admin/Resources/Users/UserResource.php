@@ -147,8 +147,7 @@ class UserResource extends Resource
             TextColumn::make('full_name')
                 ->label('Nom complet')
                 ->formatStateUsing(fn ($record) => $record->firstname.' '.$record->lastname)
-                ->searchable()
-                ->sortable(),
+                ->searchable(['firstname', 'lastname']),
             TextColumn::make('phone_number')
                 ->searchable()
                 ->copyable()
@@ -175,7 +174,7 @@ class UserResource extends Resource
                 ->label('Ville')
                 ->searchable(),
             TextColumn::make('created_at')
-                ->isoDateTime('LLLL', 'Europe/Paris')
+                ->dateTime()
                 ->sortable()
                 ->toggleable(isToggledHiddenByDefault: false),
             TextColumn::make('updated_at')
