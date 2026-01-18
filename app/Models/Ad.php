@@ -160,10 +160,10 @@ class Ad extends Model implements HasMedia
         $i = 1;
         while (
             self::where('slug', $slug)
-                ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
+                ->when($ignoreId, fn($query) => $query->where('id', '!=', $ignoreId))
                 ->exists()
         ) {
-            $slug = $original.'-'.$i;
+            $slug = $original . '-' . $i;
             $i++;
         }
 
@@ -285,7 +285,6 @@ class Ad extends Model implements HasMedia
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
-            ->nonQueued()
             ->width(300)
             ->height(300)
             ->sharpen(10);
