@@ -24,7 +24,7 @@ class StatsOverview extends StatsOverviewWidget
                 ->descriptionIcon('heroicon-m-user-group')
                 ->color('info'),
 
-            Stat::make('Note Moyenne', number_format(Review::avg('rating'), 1).' / 5')
+            Stat::make('Note Moyenne', number_format((float) Review::avg('rating'), 1) . ' / 5')
                 ->description('Satisfaction globale')
                 ->color('warning'),
 
@@ -33,7 +33,7 @@ class StatsOverview extends StatsOverviewWidget
                 ->descriptionIcon('heroicon-m-chat-bubble-left-right')
                 ->color('info'),
 
-            Stat::make('Revenus', number_format(Payment::sum('amount'), 0, ',', ' ').' FCFA')
+            Stat::make('Revenus', number_format((float) Payment::sum('amount'), 0, ',', ' ') . ' FCFA')
                 ->description('Gains totaux')
                 ->descriptionIcon('heroicon-m-currency-dollar')
                 ->chart([3, 5, 10, 8, 15, 12, 17])
@@ -49,7 +49,7 @@ class StatsOverview extends StatsOverviewWidget
                 ->descriptionIcon('heroicon-m-eye')
                 ->color('success'),
 
-            Stat::make('Prix Moyen', number_format(Ad::avg('price'), 0, ',', ' ').' FCFA')
+            Stat::make('Prix Moyen', number_format((float) Ad::avg('price'), 0, ',', ' ') . ' FCFA')
                 ->description('Tendance du marché')
                 ->descriptionIcon('heroicon-m-tag')
                 ->color('gray'),
