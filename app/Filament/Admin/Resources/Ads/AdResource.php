@@ -92,11 +92,11 @@ class AdResource extends Resource
                 TextInput::make('latitude')
                     ->numeric()
                     ->required()
-                    ->formatStateUsing(fn(?Ad $record) => $record?->location?->getLatitude()),
+                    ->formatStateUsing(fn (?Ad $record) => $record?->location?->getLatitude()),
                 TextInput::make('longitude')
                     ->numeric()
                     ->required()
-                    ->formatStateUsing(fn(?Ad $record) => $record?->location?->getLongitude()),
+                    ->formatStateUsing(fn (?Ad $record) => $record?->location?->getLongitude()),
                 Select::make('status')
                     ->options(AdStatus::class)
                     ->required()
@@ -104,7 +104,7 @@ class AdResource extends Resource
                 DateTimePicker::make('expires_at'),
                 Select::make('user_id')
                     ->relationship('user', 'firstname')
-                    ->getOptionLabelFromRecordUsing(fn($record) => $record->fullname)
+                    ->getOptionLabelFromRecordUsing(fn ($record) => $record->fullname)
                     ->searchable(['firstname', 'lastname'])
                     ->preload()
                     ->required(),
@@ -142,7 +142,7 @@ class AdResource extends Resource
                 IconEntry::make('has_parking')
                     ->boolean(),
                 TextEntry::make('location')
-                    ->formatStateUsing(fn(?Point $state) => $state ? $state->getLatitude() . ', ' . $state->getLongitude() : '-')
+                    ->formatStateUsing(fn (?Point $state) => $state ? $state->getLatitude().', '.$state->getLongitude() : '-')
                     ->placeholder('-'),
                 TextEntry::make('status'),
                 TextEntry::make('expires_at')
@@ -161,7 +161,7 @@ class AdResource extends Resource
                     ->placeholder('-'),
                 TextEntry::make('deleted_at')
                     ->dateTime()
-                    ->visible(fn(Ad $record): bool => $record->trashed()),
+                    ->visible(fn (Ad $record): bool => $record->trashed()),
             ]);
     }
 
@@ -190,7 +190,7 @@ class AdResource extends Resource
                 IconColumn::make('has_parking')
                     ->boolean(),
                 TextColumn::make('location')
-                    ->formatStateUsing(fn(?Point $state) => $state ? $state->getLatitude() . ', ' . $state->getLongitude() : '-'),
+                    ->formatStateUsing(fn (?Point $state) => $state ? $state->getLatitude().', '.$state->getLongitude() : '-'),
                 TextColumn::make('status')
                     ->searchable(),
                 TextColumn::make('expires_at')
@@ -234,14 +234,14 @@ class AdResource extends Resource
                 ForceDeleteAction::make(),
                 RestoreAction::make(),
             ])->headerActions([
-                    ImportAction::make()->label('Importer')
-                        ->importer(AdImporter::class)
-                        ->icon(Heroicon::ArrowUpTray),
+                ImportAction::make()->label('Importer')
+                    ->importer(AdImporter::class)
+                    ->icon(Heroicon::ArrowUpTray),
 
-                    ExportAction::make()->label('Exporter')
-                        ->exporter(AdExporter::class)
-                        ->icon(Heroicon::ArrowDownTray),
-                ])
+                ExportAction::make()->label('Exporter')
+                    ->exporter(AdExporter::class)
+                    ->icon(Heroicon::ArrowDownTray),
+            ])
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
