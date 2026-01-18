@@ -126,8 +126,9 @@ services:
     image: grafana/grafana:latest
     container_name: keyhome-grafana
     restart: unless-stopped
-    ports:
-      - "3000:3000"
+    # Port exposé uniquement en dev. En prod, utilisez un reverse proxy Nginx
+    # ports:
+    #   - "3000:3000"
     volumes:
       - keyhome-grafana-data:/var/lib/grafana
       - .docker/monitoring/grafana/provisioning:/etc/grafana/provisioning

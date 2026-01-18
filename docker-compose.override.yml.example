@@ -1,0 +1,20 @@
+# docker-compose.override.yml.example
+# 
+# Ce fichier montre comment exposer les ports de monitoring en développement local.
+# Copiez ce fichier vers docker-compose.override.yml pour l'utiliser :
+# cp docker-compose.override.yml.example docker-compose.override.yml
+
+services:
+  # Exposer les ports de monitoring en développement local uniquement
+  grafana:
+    ports:
+      - "3000:3000"
+
+  prometheus:
+    ports:
+      - "9090:9090"
+
+  # Décommenter si vous voulez accéder à pgAdmin localement
+  # pgadmin:
+  #   ports:
+  #     - "5050:80"
