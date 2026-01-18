@@ -111,7 +111,7 @@ services:
     container_name: keyhome-prometheus
     restart: unless-stopped
     volumes:
-      - .docker/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - .docker/monitoring/prometheus:/etc/prometheus
       - keyhome-prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
