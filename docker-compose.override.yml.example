@@ -8,7 +8,7 @@ services:
   # Exposer les ports de monitoring en développement local uniquement
   grafana:
     ports:
-      - "3000:3000"
+      - "3001:3000"  # Port 3001 pour éviter conflit avec autres services
 
   prometheus:
     ports:

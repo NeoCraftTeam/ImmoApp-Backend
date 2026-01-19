@@ -1,0 +1,225 @@
+groups:
+  # Alertes serveur
+  - name: server_alerts
+    interval: 30s
+    rules:
+      # CPU élevé
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: server
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value | humanize }}% on {{ $labels.instance }}"
+
+      # CPU critique
+      - alert: CriticalCPUUsage
+        expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 95
+        for: 2m
+        labels:
+          severity: critical
+          component: server
+        annotations:
+          summary: "Critical CPU usage detected"
+          description: "CPU usage is {{ $value | humanize }}% on {{ $labels.instance }}"
+
+      # Mémoire faible
+      - alert: LowMemory
+        expr: 100 * (1 - ((node_memory_MemAvailable_bytes) / (node_memory_MemTotal_bytes))) > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: server
+        annotations:
+          summary: "Low memory available"
+          description: "Memory usage is {{ $value | humanize }}% on {{ $labels.instance }}"
+
+      # Mémoire critique
+      - alert: CriticalMemory
+        expr: 100 * (1 - ((node_memory_MemAvailable_bytes) / (node_memory_MemTotal_bytes))) > 95
+        for: 2m
+        labels:
+          severity: critical
+          component: server
+        annotations:
+          summary: "Critical memory usage"
+          description: "Only {{ $value | humanize }}% memory available on {{ $labels.instance }}"
+
+      # Espace disque faible
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 20
+        for: 5m
+        labels:
+          severity: warning
+          component: server
+        annotations:
+          summary: "Low disk space"
+          description: "Only {{ $value | humanize }}% disk space available on {{ $labels.mountpoint }}"
+
+      # Espace disque critique
+      - alert: CriticalDiskSpace
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 10
+        for: 2m
+        labels:
+          severity: critical
+          component: server
+        annotations:
+          summary: "Critical disk space"
+          description: "Only {{ $value | humanize }}% disk space available on {{ $labels.mountpoint }}"
+
+  # Alertes conteneurs Docker
+  - name: docker_alerts
+    interval: 30s
+    rules:
+      # Conteneur arrêté
+      - alert: ContainerDown
+        expr: time() - container_last_seen{name=~"keyhome-.+"} > 60
+        for: 1m
+        labels:
+          severity: critical
+          component: docker
+        annotations:
+          summary: "Container is down"
+          description: "Container {{ $labels.name }} has been down for more than 1 minute"
+
+      # Utilisation CPU conteneur élevée
+      - alert: ContainerHighCPU
+        expr: rate(container_cpu_usage_seconds_total{name=~"keyhome-.+"}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: docker
+        annotations:
+          summary: "Container high CPU usage"
+          description: "Container {{ $labels.name }} CPU usage is {{ $value | humanize }}%"
+
+      # Utilisation mémoire conteneur élevée
+      - alert: ContainerHighMemory
+        expr: (container_memory_usage_bytes{name=~"keyhome-.+"} / container_spec_memory_limit_bytes{name=~"keyhome-.+"}) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: docker
+        annotations:
+          summary: "Container high memory usage"
+          description: "Container {{ $labels.name }} memory usage is {{ $value | humanize }}%"
+
+  # Alertes base de données
+  - name: database_alerts
+    interval: 30s
+    rules:
+      # Base de données inaccessible
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database is not responding"
+
+      # Trop de connexions
+      - alert: TooManyConnections
+        expr: pg_stat_database_numbackends > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Too many database connections"
+          description: "{{ $value }} connections to database {{ $labels.datname }}"
+
+      # Connexions critiques
+      - alert: CriticalConnections
+        expr: pg_stat_database_numbackends > 95
+        for: 2m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Critical number of database connections"
+          description: "{{ $value }} connections to database {{ $labels.datname }} (near max)"
+
+      # Cache hit ratio faible
+      - alert: LowCacheHitRatio
+        expr: |
+          100 * (
+            sum(pg_stat_database_blks_hit) 
+            / (sum(pg_stat_database_blks_hit) + sum(pg_stat_database_blks_read))
+          ) < 90
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Low database cache hit ratio"
+          description: "Cache hit ratio is {{ $value | humanize }}% (should be > 90%)"
+
+      # Deadlocks
+      - alert: DatabaseDeadlocks
+        expr: rate(pg_stat_database_deadlocks[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Database deadlocks detected"
+          description: "{{ $value }} deadlocks per second in database {{ $labels.datname }}"
+
+  # Alertes Redis
+  - name: redis_alerts
+    interval: 30s
+    rules:
+      # Redis inaccessible
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis is not responding"
+
+      # Utilisation mémoire Redis élevée
+      - alert: RedisHighMemory
+        expr: redis_memory_used_bytes / redis_memory_max_bytes * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is {{ $value | humanize }}%"
+
+      # Taux de miss du cache élevé
+      - alert: HighCacheMissRate
+        expr: |
+          rate(redis_keyspace_misses_total[5m]) 
+          / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) 
+          * 100 > 50
+        for: 10m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: "High cache miss rate"
+          description: "Redis cache miss rate is {{ $value | humanize }}%"
+
+  # Alertes réseau
+  - name: network_alerts
+    interval: 30s
+    rules:
+      # Trafic réseau élevé
+      - alert: HighNetworkTraffic
+        expr: rate(node_network_receive_bytes_total[5m]) > 100000000  # 100 MB/s
+        for: 5m
+        labels:
+          severity: warning
+          component: network
+        annotations:
+          summary: "High network traffic"
+          description: "Network receive rate is {{ $value | humanize }} bytes/s on {{ $labels.device }}"
