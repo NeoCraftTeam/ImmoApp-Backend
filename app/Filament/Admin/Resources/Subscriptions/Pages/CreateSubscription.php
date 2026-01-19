@@ -10,4 +10,11 @@ use Filament\Resources\Pages\CreateRecord;
 class CreateSubscription extends CreateRecord
 {
     protected static string $resource = SubscriptionResource::class;
+
+    protected function handleRecordCreation(array $data): \Illuminate\Database\Eloquent\Model
+    {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($data) {
+            return static::getModel()::create($data);
+        });
+    }
 }
