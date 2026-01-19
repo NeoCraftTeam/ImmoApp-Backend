@@ -77,6 +77,15 @@ $DOCKER_COMPOSE exec app chown -R www-data:www-data /var/www/storage
 # Correction 3: Vérifier que le volume est bien monté
 echo ""
 echo "✅ Correction 3: Vérifier les volumes Docker..."
+if docker volume ls | grep -q keyhome-storage-data; then
+    echo "   Volume 'keyhome-storage-data' trouvé ✅"
+else
+    echo "❌ Volume 'keyhome-storage-data' MANQUANT !"
+    echo "   Création du volume..."
+    docker volume create immoapp-backend_keyhome-storage-data
+    echo "⚠️  IMPORTANT: Vous devez redémarrer les conteneurs pour utiliser ce volume :"
+    echo "   docker compose down && docker compose up -d"
+fi
 docker volume ls | grep keyhome
 
 # Test final
