@@ -26,11 +26,7 @@ class ManageAds extends ManageRecords
 
                     return $data;
                 })
-                ->using(function (array $data, string $model): Ad {
-                    return \Illuminate\Support\Facades\DB::transaction(function () use ($data, $model) {
-                        return $model::create($data);
-                    });
-                }),
+                ->using(fn (array $data, string $model): Ad => \Illuminate\Support\Facades\DB::transaction(fn () => $model::create($data))),
         ];
     }
 }

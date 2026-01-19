@@ -17,11 +17,7 @@ class ManageUsers extends ManageRecords
         return [
             CreateAction::make()
                 ->label('Créer un utilisateur')
-                ->using(function (array $data, string $model): \App\Models\User {
-                    return \Illuminate\Support\Facades\DB::transaction(function () use ($data, $model) {
-                        return $model::create($data);
-                    });
-                }),
+                ->using(fn (array $data, string $model): \App\Models\User => \Illuminate\Support\Facades\DB::transaction(fn () => $model::create($data))),
         ];
     }
 }
