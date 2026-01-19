@@ -27,6 +27,7 @@ services:
       - .env
     volumes:
       - keyhome-app-code:/var/www
+      - keyhome-storage-data:/var/www/storage
     networks:
       - keyhome-network
     environment:
@@ -49,6 +50,7 @@ services:
       - .env
     volumes:
       - keyhome-app-code:/var/www
+      - keyhome-storage-data:/var/www/storage
     networks:
       - keyhome-network
 
@@ -64,6 +66,7 @@ services:
       - "9090:80" # On utilise 9090 pour sortir de la zone de conflit 808x
     volumes:
       - keyhome-app-code:/var/www
+      - keyhome-storage-data:/var/www/storage
       - .docker/nginx/conf.d:/etc/nginx/conf.d
     networks:
       - keyhome-network
@@ -194,6 +197,8 @@ volumes:
   keyhome-db-data:
     driver: local
   keyhome-app-code:
+    driver: local
+  keyhome-storage-data: # Volume persistant pour les uploads
     driver: local
   keyhome-prometheus-data:
   keyhome-grafana-data:
