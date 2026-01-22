@@ -198,7 +198,9 @@ volumes:
     driver: local
   keyhome-app-code:
     driver: local
-  keyhome-storage-data: # Volume persistant pour les uploads
+  keyhome-storage-data:
     driver: local
   keyhome-prometheus-data:
+    driver: local
   keyhome-grafana-data:
+    driver: local
