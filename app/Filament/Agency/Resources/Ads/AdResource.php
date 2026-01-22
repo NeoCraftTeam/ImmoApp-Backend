@@ -21,7 +21,11 @@ use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\SpatieMediaLibraryImageEntry;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -127,6 +131,13 @@ class AdResource extends Resource
         return $table
             ->recordTitleAttribute('title')
             ->columns([
+                \Filament\Tables\Columns\SpatieMediaLibraryImageColumn::make('images')
+                    ->collection('images')
+                    ->conversion('thumb')
+                    ->circular()
+                    ->stacked()
+                    ->limit(3)
+                    ->label('Photos'),
                 TextColumn::make('title')
                     ->searchable(),
                 TextColumn::make('adresse')
@@ -175,6 +186,35 @@ class AdResource extends Resource
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
+            ]);
+    }
+
+    #[\Override]
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Section::make('Apperçu')
+                    ->schema([
+                        SpatieMediaLibraryImageEntry::make('images')
+                            ->collection('images')
+                            ->label('Galerie Photos')
+                            ->columnSpanFull(),
+                    ]),
+                Section::make('Détails')
+                    ->schema([
+                        TextEntry::make('title')->label('Titre'),
+                        TextEntry::make('price')->money('xaf')->label('Prix'),
+                        TextEntry::make('adresse')->label('Adresse')->columnSpanFull(),
+                        TextEntry::make('description')->columnSpanFull(),
+                    ])->columns(2),
+                Section::make('Caractéristiques')
+                    ->schema([
+                        TextEntry::make('surface_area')->label('Surface')->suffix(' m²'),
+                        TextEntry::make('bedrooms')->label('Chambres'),
+                        TextEntry::make('bathrooms')->label('Salles de bain'),
+                        IconEntry::make('has_parking')->label('Parking')->boolean(),
+                    ])->columns(4),
             ]);
     }
 

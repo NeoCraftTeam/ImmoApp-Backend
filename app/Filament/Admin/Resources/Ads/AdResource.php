@@ -22,15 +22,16 @@ use Filament\Actions\ImportAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
-use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\SpatieMediaLibraryImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -101,7 +102,6 @@ class AdResource extends Resource
                     ->options(AdStatus::class)
                     ->required()
                     ->default(AdStatus::AVAILABLE),
-                DateTimePicker::make('expires_at'),
                 Select::make('user_id')
                     ->relationship('user', 'firstname')
                     ->getOptionLabelFromRecordUsing(fn ($record) => $record->fullname)
@@ -115,7 +115,10 @@ class AdResource extends Resource
                     ->required(),
                 Select::make('type_id')
                     ->relationship('ad_type', 'name')
-                    ->required(),
+                    ->required()
+                    ->searchable()
+                    ->preload(),
+
             ]);
     }
 
@@ -124,44 +127,34 @@ class AdResource extends Resource
     {
         return $schema
             ->components([
-                TextEntry::make('title'),
-                TextEntry::make('slug')
-                    ->visible(false),
-                TextEntry::make('description')
-                    ->columnSpanFull(),
-                TextEntry::make('adresse'),
-                TextEntry::make('price')
-                    ->money()
-                    ->placeholder('-'),
-                TextEntry::make('surface_area')
-                    ->numeric(),
-                TextEntry::make('bedrooms')
-                    ->numeric(),
-                TextEntry::make('bathrooms')
-                    ->numeric(),
-                IconEntry::make('has_parking')
-                    ->boolean(),
-                TextEntry::make('location')
-                    ->formatStateUsing(fn (?Point $state) => $state ? $state->getLatitude().', '.$state->getLongitude() : '-')
-                    ->placeholder('-'),
-                TextEntry::make('status'),
-                TextEntry::make('expires_at')
-                    ->dateTime()
-                    ->placeholder('-'),
-                TextEntry::make('user.fullname')
-                    ->label('Publié par'),
-                TextEntry::make('quarter.name')
-                    ->label('Quarter'),
-                TextEntry::make('ad_type.name'),
-                TextEntry::make('created_at')
-                    ->dateTime()
-                    ->placeholder('-'),
-                TextEntry::make('updated_at')
-                    ->dateTime()
-                    ->placeholder('-'),
-                TextEntry::make('deleted_at')
-                    ->dateTime()
-                    ->visible(fn (Ad $record): bool => $record->trashed()),
+                Section::make('Apperçu')
+                    ->schema([
+                        SpatieMediaLibraryImageEntry::make('images')
+                            ->collection('images')
+                            ->label('Galerie Photos')
+                            ->columnSpanFull(),
+                    ]),
+                Section::make('Détails')
+                    ->schema([
+                        TextEntry::make('title')->label('Titre'),
+                        TextEntry::make('price')->money('xaf')->label('Prix'),
+                        TextEntry::make('adresse')->label('Adresse')->columnSpanFull(),
+                        TextEntry::make('description')->columnSpanFull(),
+                    ])->columns(2),
+                Section::make('Caractéristiques')
+                    ->schema([
+                        TextEntry::make('surface_area')->label('Surface')->suffix(' m²'),
+                        TextEntry::make('bedrooms')->label('Chambres'),
+                        TextEntry::make('bathrooms')->label('Salles de bain'),
+                        IconEntry::make('has_parking')->label('Parking')->boolean(),
+                    ])->columns(4),
+                Section::make('Méta-données')
+                    ->schema([
+                        TextEntry::make('status'),
+                        TextEntry::make('user.fullname')->label('Publié par'),
+                        TextEntry::make('created_at')->dateTime(),
+                        TextEntry::make('updated_at')->dateTime(),
+                    ])->columns(4)->collapsed(),
             ]);
     }
 
@@ -171,6 +164,13 @@ class AdResource extends Resource
         return $table
             ->recordTitleAttribute('title')
             ->columns([
+                \Filament\Tables\Columns\SpatieMediaLibraryImageColumn::make('images')
+                    ->collection('images')
+                    ->conversion('thumb')
+                    ->circular()
+                    ->stacked()
+                    ->limit(3)
+                    ->label('Photos'),
                 TextColumn::make('title')
                     ->searchable(),
                 TextColumn::make('adresse')
