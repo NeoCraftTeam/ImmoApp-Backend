@@ -20,15 +20,10 @@ class AgenciesTable
     {
         return $table
             ->columns([
-                TextColumn::make('id')
-                    ->label('ID'),
                 TextColumn::make('name')
                     ->searchable(),
-                TextColumn::make('slug')
-                    ->searchable(),
-                TextColumn::make('logo')
-                    ->searchable(),
-                TextColumn::make('owner.id')
+                TextColumn::make('owner.fullname')
+                    ->label('Propriétaire')
                     ->searchable(),
                 TextColumn::make('created_at')
                     ->dateTime()
