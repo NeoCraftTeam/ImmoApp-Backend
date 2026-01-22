@@ -14,12 +14,12 @@ class AgencyPolicy
 
     public function viewAny(?User $user): bool
     {
-        return true;
+        return $user?->isAdmin() ?? false;
     }
 
     public function view(?User $user, Agency $agency): bool
     {
-        return true;
+        return $user && ($user->isAdmin() || $agency->owner_id === $user->id);
     }
 
     public function create(User $user): bool

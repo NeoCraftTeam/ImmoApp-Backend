@@ -194,7 +194,7 @@ class AdResource extends Resource
     {
         return $schema
             ->components([
-                Section::make('Apperçu')
+                Section::make('Aperçu')
                     ->schema([
                         SpatieMediaLibraryImageEntry::make('images')
                             ->collection('images')

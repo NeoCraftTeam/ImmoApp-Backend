@@ -235,7 +235,11 @@ class AdResource extends Resource
                 EditAction::make()
                     ->mutateFormDataUsing(function (array $data): array {
                         if (isset($data['location_map']) && is_array($data['location_map'])) {
-                            $data['location'] = Point::make($data['location_map']['lat'], $data['location_map']['lng']);
+                            $lat = $data['location_map']['lat'] ?? null;
+                            $lng = $data['location_map']['lng'] ?? null;
+                            if (is_numeric($lat) && is_numeric($lng)) {
+                                $data['location'] = Point::make((float) $lat, (float) $lng);
+                            }
                             unset($data['location_map']);
                         }
 
