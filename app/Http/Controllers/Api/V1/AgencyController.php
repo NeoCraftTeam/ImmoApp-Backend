@@ -68,11 +68,15 @@ final class AgencyController
      *     @OA\RequestBody(
      *         required=true,
      *
-     *         @OA\JsonContent(
-     *             required={"name"},
+     *         @OA\MediaType(
+     *             mediaType="multipart/form-data",
      *
-     *             @OA\Property(property="name", type="string", example="Mon Agence Immo"),
-     *             @OA\Property(property="logo", type="string", format="binary", description="Logo de l'agence")
+     *              @OA\Schema(
+     *                 required={"name"},
+     *
+     *                 @OA\Property(property="name", type="string", example="Mon Agence Immo"),
+     *                 @OA\Property(property="logo", type="string", format="binary", description="Logo de l'agence")
+     *             )
      *         )
      *     ),
      *
