@@ -32,9 +32,9 @@ final class UserResource extends JsonResource
             'display_name' => $this->fullname,
             'agency_name' => ($this->agency instanceof \App\Models\Agency) ? $this->agency->name : null,
 
-            // Champ sensible visible seulement par un admin
-            'role' => $this->when($request->user()?->isAdmin(), $this->role),
-            'type' => $this->when($request->user()?->isAdmin(), $this->type),
+            // Le propriétaire du compte ou un admin peut voir le role/type
+            'role' => $this->when($request->user()?->id === $this->id || $request->user()?->isAdmin(), $this->role),
+            'type' => $this->when($request->user()?->id === $this->id || $request->user()?->isAdmin(), $this->type),
 
             'created_at' => $this->when($request->user()?->isAdmin(), $this->created_at),
             'updated_at' => $this->when($request->user()?->isAdmin(), $this->updated_at),

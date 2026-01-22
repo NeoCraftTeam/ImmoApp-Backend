@@ -97,8 +97,6 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property-read City|null $city
  * @property-read MediaCollection<int, Media> $media
  * @property-read Collection<int, Review> $reviews
- * @property \App\Enums\UserRole $role
- * @property \App\Enums\UserType|null $type
  * @property int|null $agency_id
  * @property-read int|null $reviews_count
  *

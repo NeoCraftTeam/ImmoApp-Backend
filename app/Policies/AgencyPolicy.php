@@ -12,14 +12,14 @@ class AgencyPolicy
 {
     use HandlesAuthorization;
 
-    public function viewAny(User $user): bool
+    public function viewAny(?User $user): bool
     {
-        return $user->isAdmin();
+        return true;
     }
 
-    public function view(User $user, Agency $agency): bool
+    public function view(?User $user, Agency $agency): bool
     {
-        return $user->isAdmin() || $agency->owner_id === $user->id;
+        return true;
     }
 
     public function create(User $user): bool
