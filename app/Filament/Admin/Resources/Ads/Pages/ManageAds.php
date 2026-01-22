@@ -19,9 +19,9 @@ class ManageAds extends ManageRecords
         return [
             CreateAction::make()
                 ->mutateFormDataUsing(function (array $data): array {
-                    if (isset($data['latitude']) && isset($data['longitude'])) {
-                        $data['location'] = Point::make($data['latitude'], $data['longitude']);
-                        unset($data['latitude'], $data['longitude']);
+                    if (isset($data['location_map']) && is_array($data['location_map'])) {
+                        $data['location'] = Point::make($data['location_map']['lat'], $data['location_map']['lng']);
+                        unset($data['location_map']);
                     }
 
                     return $data;
