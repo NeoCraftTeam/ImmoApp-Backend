@@ -8,11 +8,10 @@ namespace App\Listeners;
 
 use Exception;
 use Illuminate\Auth\Events\Verified;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
 
-class SendWelcomeNotification implements ShouldQueue
+class SendWelcomeNotification // Executes synchronously for immediate email delivery
 {
     use InteractsWithQueue;
 
