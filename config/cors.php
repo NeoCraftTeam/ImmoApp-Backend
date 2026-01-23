@@ -19,15 +19,9 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [
-        'http://localhost:3000', // front
-        'http://localhost:8000', // localhost
-        'http://localhost:5173', // localhost
-        'https://keyhome.neocraft.dev', // prod
-        'http://127.0.0.1:3000',
-    ],
+    'allowed_origins' => [],
 
-    'allowed_origins_patterns' => ['.*'],
+    'allowed_origins_patterns' => [],
 
     'allowed_headers' => ['*'],
 
