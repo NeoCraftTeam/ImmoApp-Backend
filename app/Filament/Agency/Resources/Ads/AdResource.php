@@ -112,7 +112,9 @@ class AdResource extends Resource
                 Select::make('status')
                     ->options(AdStatus::class)
                     ->required()
-                    ->default(AdStatus::AVAILABLE),
+                    ->default(AdStatus::PENDING)
+                    ->disabled(fn (?Ad $record) => $record === null || $record->status === AdStatus::PENDING)
+                    ->dehydrated(),
                 DateTimePicker::make('expires_at'),
                 Select::make('quarter_id')
                     ->relationship('quarter', 'name')

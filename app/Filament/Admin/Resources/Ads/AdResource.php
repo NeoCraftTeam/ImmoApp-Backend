@@ -112,7 +112,7 @@ class AdResource extends Resource
                 Select::make('status')
                     ->options(AdStatus::class)
                     ->required()
-                    ->default(AdStatus::AVAILABLE),
+                    ->default(AdStatus::PENDING),
                 Select::make('user_id')
                     ->relationship('user', 'firstname')
                     ->getOptionLabelFromRecordUsing(fn ($record) => $record->fullname)
@@ -229,6 +229,9 @@ class AdResource extends Resource
             ])
             ->filters([
                 TrashedFilter::make(),
+                \Filament\Tables\Filters\SelectFilter::make('status')
+                    ->options(AdStatus::class)
+                    ->label('Statut'),
             ])
             ->recordActions([
                 ViewAction::make(),
