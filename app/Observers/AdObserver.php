@@ -4,7 +4,12 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
+use App\Enums\AdStatus;
+use App\Enums\UserRole;
+use App\Mail\NewAdSubmissionMail;
 use App\Models\Ad;
+use App\Models\User;
+use Illuminate\Support\Facades\Mail;
 
 class AdObserver
 {
@@ -15,6 +20,14 @@ class AdObserver
     {
         // Auto-boost if agency has active subscription
         app(\App\Services\AdBoostService::class)->autoBoostIfEligible($ad);
+
+        // Notify admins if status is PENDING
+        if ($ad->status === AdStatus::PENDING) {
+            $admins = User::where('role', UserRole::ADMIN)->get();
+            foreach ($admins as $admin) {
+                Mail::to($admin)->send(new NewAdSubmissionMail($ad));
+            }
+        }
     }
 
     /**
