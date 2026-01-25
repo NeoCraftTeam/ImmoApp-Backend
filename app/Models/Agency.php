@@ -23,6 +23,21 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property-read \App\Models\User $owner
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\User> $users
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Subscription> $subscriptions
+ *
+ * @OA\Schema(
+ *     schema="Agency",
+ *     type="object",
+ *     title="Agency",
+ *     description="Agence immobilière",
+ *
+ *     @OA\Property(property="id", type="string", format="uuid", description="ID unique de l'agence"),
+ *     @OA\Property(property="name", type="string", description="Nom de l'agence"),
+ *     @OA\Property(property="slug", type="string", description="Slug de l'agence"),
+ *     @OA\Property(property="logo", type="string", nullable=true, description="URL du logo"),
+ *     @OA\Property(property="owner_id", type="string", format="uuid", description="ID du propriétaire"),
+ *     @OA\Property(property="created_at", type="string", format="date-time", description="Date de création"),
+ *     @OA\Property(property="updated_at", type="string", format="date-time", description="Date de mise à jour")
+ * )
  */
 class Agency extends Model
 {
