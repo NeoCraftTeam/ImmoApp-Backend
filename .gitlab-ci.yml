@@ -92,6 +92,7 @@ production_deploy:
     
     # 4. On définit et on injecte l'image
     - export FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:main"
+    - APP_IMAGE=$FULL_IMAGE docker compose down --remove-orphans || true
     - APP_IMAGE=$FULL_IMAGE docker compose pull
     - APP_IMAGE=$FULL_IMAGE docker compose up -d --no-build
     
