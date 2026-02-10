@@ -6,6 +6,7 @@ namespace App\Filament\Admin\Widgets;
 
 use App\Models\Ad;
 use Filament\Widgets\ChartWidget;
+use Illuminate\Support\Facades\DB;
 
 class AdsByTypeChart extends ChartWidget
 {
@@ -19,7 +20,7 @@ class AdsByTypeChart extends ChartWidget
     protected function getData(): array
     {
         $data = Ad::join('ad_type', 'ad.type_id', '=', 'ad_type.id')
-            ->selectRaw('ad_type.name as type_name, count(*) as total')
+            ->select(DB::raw('ad_type.name as type_name'), DB::raw('count(*) as total'))
             ->groupBy('ad_type.name')
             ->pluck('total', 'type_name');
 

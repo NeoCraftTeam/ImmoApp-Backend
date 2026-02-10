@@ -95,31 +95,33 @@ export default function App() {
         <ExpoStatusBar style="dark" backgroundColor="#ffffff" translucent={false} />
         
         <SafeAreaView style={{flex: 1, backgroundColor: '#ffffff'}}>
-          <WebView 
-            ref={setWebViewRef}
-            source={{ uri: APP_URL }}
-            style={styles.webview}
-            onLoadStart={() => setIsLoading(true)}
-            onLoadEnd={() => {
-              setIsLoading(false);
-              if (showSplash) setTimeout(hideSplash, 1000);
-            }}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            userAgent="KeyHomeAgencyMobileApp/1.0"
-            onMessage={(event) => {
-              NativeService.handleWebViewMessage(event);
-            }}
-            injectedJavaScript={`
-              (function() {
-                var oldLog = console.log;
-                console.log = function (message) {
-                  window.ReactNativeWebView.postMessage(message);
-                  oldLog.apply(console, arguments);
-                };
-              })();
-            `}
-            onError={(syntheticEvent) => {
+            <WebView 
+	            ref={setWebViewRef}
+	            source={{ uri: APP_URL }}
+	            style={styles.webview}
+	            onLoadStart={() => setIsLoading(true)}
+	            onLoadEnd={() => {
+	              setIsLoading(false);
+	              if (showSplash) setTimeout(hideSplash, 1000);
+	            }}
+	            javaScriptEnabled={true}
+	            domStorageEnabled={true}
+	            userAgent="KeyHomeAgencyMobileApp/1.0"
+	            onMessage={(event) => {
+	              // Sécurité : Valider l'origine du message si possible
+	              NativeService.handleWebViewMessage(event);
+	            }}
+	            // Sécurité : Restreindre les origines autorisées
+	            originWhitelist={['http://*', 'https://*']}
+	            // Sécurité : Désactiver l'accès au système de fichiers
+	            allowFileAccess={false}
+	            // Sécurité : Empêcher l'exécution de JS injecté de manière non sécurisée
+	            injectedJavaScriptBeforeContentLoaded={`
+	              (function() {
+	                window.isNativeApp = true;
+	              })();
+	            `}
+	            onError={(syntheticEvent) => {
               const { nativeEvent } = syntheticEvent;
               setError({
                 type: 'network',

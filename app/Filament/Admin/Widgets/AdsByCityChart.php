@@ -6,6 +6,7 @@ namespace App\Filament\Admin\Widgets;
 
 use App\Models\Ad;
 use Filament\Widgets\ChartWidget;
+use Illuminate\Support\Facades\DB;
 
 class AdsByCityChart extends ChartWidget
 {
@@ -20,7 +21,7 @@ class AdsByCityChart extends ChartWidget
     {
         $data = Ad::join('quarter', 'ad.quarter_id', '=', 'quarter.id')
             ->join('city', 'quarter.city_id', '=', 'city.id')
-            ->selectRaw('city.name as city_name, count(*) as total')
+            ->select(DB::raw('city.name as city_name'), DB::raw('count(*) as total'))
             ->groupBy('city.name')
             ->orderByDesc('total')
             ->limit(10) // Top 10 cities

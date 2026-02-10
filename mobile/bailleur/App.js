@@ -108,15 +108,17 @@ export default function App() {
             domStorageEnabled={true}
             userAgent="KeyHomeBailleurMobileApp/1.0"
             onMessage={(event) => {
+              // Sécurité : Valider l'origine du message si possible
               NativeService.handleWebViewMessage(event);
             }}
-            injectedJavaScript={`
+            // Sécurité : Restreindre les origines autorisées
+            originWhitelist={['http://*', 'https://*']}
+            // Sécurité : Désactiver l'accès au système de fichiers
+            allowFileAccess={false}
+            // Sécurité : Empêcher l'exécution de JS injecté de manière non sécurisée
+            injectedJavaScriptBeforeContentLoaded={`
               (function() {
-                var oldLog = console.log;
-                console.log = function (message) {
-                  window.ReactNativeWebView.postMessage(message);
-                  oldLog.apply(console, arguments);
-                };
+                window.isNativeApp = true;
               })();
             `}
             onError={(syntheticEvent) => {
