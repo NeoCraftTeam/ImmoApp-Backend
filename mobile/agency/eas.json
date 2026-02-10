@@ -13,12 +13,12 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_BASE_URL": "https://keyhomeback.neocraft.dev/agency"
+        "EXPO_PUBLIC_BASE_URL": "https://api.keyhome.neocraft.dev/agency"
       }
     },
     "production": {
       "env": {
-        "EXPO_PUBLIC_BASE_URL": "https://keyhomeback.neocraft.dev/agency"
+        "EXPO_PUBLIC_BASE_URL": "https://api.keyhome.neocraft.dev/agency"
       }
     }
   },

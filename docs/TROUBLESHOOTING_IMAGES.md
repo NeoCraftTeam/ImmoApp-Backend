@@ -184,7 +184,7 @@ curl -I http://localhost/storage/48/600.jpeg
 
 ### Test 4: Depuis le navigateur
 
-Ouvrez: `https://keyhomeback.neocraft.dev/storage/48/600.jpeg`
+Ouvrez: `https://api.keyhome.neocraft.dev/storage/48/600.jpeg`
 
 ---
 

@@ -204,6 +204,31 @@ docker run hello-world
 
 **📚 Référence** : [Docker Installation Documentation](https://docs.docker.com/engine/install/ubuntu/)
 
+### Étape 2b : Installation de Portainer (Interface Docker)
+
+Portainer offre une interface web pour gérer visuellement vos conteneurs Docker.
+
+```bash
+# Créer le volume pour les données Portainer
+docker volume create portainer_data
+
+# Lancer Portainer
+docker run -d -p 9443:9443 --name portainer \
+  --restart=always \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v portainer_data:/data \
+  portainer/portainer-ce:latest
+
+# Ouvrir le port
+ufw allow 9443/tcp
+```
+
+**Accès** : `https://<IP_SERVEUR>:9443`
+
+Lors de la première connexion, créez un compte administrateur.
+
+**📚 Référence** : [Portainer Documentation](https://docs.portainer.io/)
+
 ### Étape 3 : Configuration du firewall
 
 ```bash

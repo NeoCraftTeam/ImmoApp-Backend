@@ -81,11 +81,11 @@ production_deploy:
   script:
     - echo "🚀 Déploiement via Registry (Pure Docker)..."
     # 1. On recrée la structure des dossiers
-    - mkdir -p /var/www/ImmoApp-Backend/.docker/nginx/conf.d
-    - cp docker-compose.yml /var/www/ImmoApp-Backend/docker-compose.yml
+    - mkdir -p /opt/keyhome/.docker/nginx/conf.d
+    - cp docker-compose.yml /opt/keyhome/docker-compose.yml
     # 2. On copie explicitement le contenu de la config Nginx
-    - cp -rf .docker/nginx/conf.d/. /var/www/ImmoApp-Backend/.docker/nginx/conf.d/
-    - cd /var/www/ImmoApp-Backend || exit 1
+    - cp -rf .docker/nginx/conf.d/. /opt/keyhome/.docker/nginx/conf.d/
+    - cd /opt/keyhome || exit 1
     
     # 3. Authentification au registre
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"

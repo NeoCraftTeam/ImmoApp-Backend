@@ -13,12 +13,12 @@
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_BASE_URL": "https://keyhomeback.neocraft.dev/bailleur"
+        "EXPO_PUBLIC_BASE_URL": "https://api.keyhome.neocraft.dev/bailleur"
       }
     },
     "production": {
       "env": {
-        "EXPO_PUBLIC_BASE_URL": "https://keyhomeback.neocraft.dev/bailleur"
+        "EXPO_PUBLIC_BASE_URL": "https://api.keyhome.neocraft.dev/bailleur"
       }
     }
   },

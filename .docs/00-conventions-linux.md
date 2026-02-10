@@ -321,7 +321,8 @@ docker compose down
 
 # 2. Créer la nouvelle structure
 mkdir -p /opt/keyhome
-chown -R keyhome:keyhome /opt/keyhome
+sudo chown -R gitlab-runner:gitlab-runner /opt/keyhome
+sudo chmod 755 /opt/keyhome
 
 # 3. Déplacer les fichiers
 mv /var/www/ImmoApp-Backend/* /opt/keyhome/
