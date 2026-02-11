@@ -38,7 +38,7 @@ phpstan:
   extends: .php_job
   script:
     - echo "Running PHPStan Analysis..."
-    - docker run --rm keyhome-ci:php84 ./vendor/bin/phpstan analyse
+    - docker run --rm keyhome-ci:php84 ./vendor/bin/phpstan analyse --memory-limit=512M
   only:
     - branches
 
