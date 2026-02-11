@@ -288,7 +288,7 @@ final class PaymentController
                 continue;
             }
 
-            [$key, $value] = array_map('trim', explode('=', $segment, 2));
+            [$key, $value] = array_map(trim(...), explode('=', $segment, 2));
 
             if ($key === 't') {
                 $timestamp = $value;
@@ -317,12 +317,6 @@ final class PaymentController
 
         $expectedTimestampedSignature = hash_hmac('sha256', $timestamp.'.'.$payload, $secret);
 
-        foreach ($signatures as $signature) {
-            if (hash_equals($expectedTimestampedSignature, $signature)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($signatures, fn ($signature) => hash_equals($expectedTimestampedSignature, $signature));
     }
 }
