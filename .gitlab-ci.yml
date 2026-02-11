@@ -15,39 +15,56 @@ default:
   tags:
     - self-hosted-shell
 
-# --- ÉTAPE 1 : QUALITY (Lint & Static Analysis) ---
+# Template pour les jobs PHP qui ont besoin de PHP 8.4
+.php_job:
+  before_script:
+    - |
+      docker build --pull -t keyhome-ci:php84 -f - . <<'DOCKERFILE'
+      FROM php:8.4-cli-alpine
+      RUN apk add --no-cache git libzip-dev icu-dev postgresql-dev libpng-dev oniguruma-dev $PHPIZE_DEPS \
+        && docker-php-ext-install bcmath intl pdo_pgsql mbstring zip gd \
+        && pecl install redis && docker-php-ext-enable redis \
+        && apk del $PHPIZE_DEPS && rm -rf /tmp/*
+      COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+      WORKDIR /app
+      COPY . .
+      RUN composer install --no-interaction --no-ansi
+      DOCKERFILE
+
+# --- ETAPE 1 : QUALITY (Lint & Static Analysis) ---
 phpstan:
   stage: quality
+  extends: .php_job
   script:
-    - echo "🔍 Running PHPStan Analysis..."
-    - composer install --no-interaction
-    - ./vendor/bin/phpstan analyse
+    - echo "Running PHPStan Analysis..."
+    - docker run --rm keyhome-ci:php84 ./vendor/bin/phpstan analyse
   only:
     - branches
 
 style_check:
   stage: quality
+  extends: .php_job
   script:
-    - echo "💅 Checking Code Style (Pint)..."
-    - composer install --no-interaction
-    - ./vendor/bin/pint --test
+    - echo "Checking Code Style (Pint)..."
+    - docker run --rm keyhome-ci:php84 ./vendor/bin/pint --test
   only:
     - branches
 
-# --- ÉTAPE 2 : SECURITY ---
+# --- ETAPE 2 : SECURITY ---
 composer_security:
   stage: security
+  extends: .php_job
   script:
-    - echo "🛡️ Checking PHP Dependencies Security..."
-    - composer audit
+    - echo "Checking PHP Dependencies Security..."
+    - docker run --rm keyhome-ci:php84 composer audit
   only:
     - branches
 
-# --- ÉTAPE 3 : BUILD & PUSH ---
+# --- ETAPE 3 : BUILD & PUSH ---
 build_image:
   stage: build
   script:
-    - echo "🏗️ Building Docker Image..."
+    - echo "Building Docker Image..."
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - docker build --pull -t $APP_IMAGE:$IMAGE_TAG .
     - docker push $APP_IMAGE:$IMAGE_TAG
@@ -55,7 +72,7 @@ build_image:
   only:
     - branches
 
-# --- ÉTAPE 4 : TESTS ---
+# --- ETAPE 4 : TESTS ---
 test_suite:
   stage: test
   variables:
@@ -65,13 +82,24 @@ test_suite:
     DB_DATABASE: testing
     DB_USERNAME: gitlab-runner
     DB_PASSWORD: test_pass
+  extends: .php_job
   script:
-    - echo "🧪 Running Test Suite..."
-    - composer install --no-ansi --no-interaction
-    - cp .env.example .env.testing
-    - php artisan key:generate --env=testing
-    - php artisan migrate --env=testing --force
-    - php artisan test --env=testing
+    - echo "Running Test Suite..."
+    - |
+      docker run --rm \
+        --network host \
+        -e DB_CONNECTION=$DB_CONNECTION \
+        -e DB_HOST=$DB_HOST \
+        -e DB_PORT=$DB_PORT \
+        -e DB_DATABASE=$DB_DATABASE \
+        -e DB_USERNAME=$DB_USERNAME \
+        -e DB_PASSWORD=$DB_PASSWORD \
+        keyhome-ci:php84 sh -c "
+          cp .env.example .env.testing &&
+          php artisan key:generate --env=testing &&
+          php artisan migrate --env=testing --force &&
+          php artisan test --env=testing
+        "
   only:
     - branches
 
