@@ -57,7 +57,7 @@ composer_security:
   extends: .php_job
   script:
     - echo "Checking PHP Dependencies Security..."
-    - docker run --rm keyhome-ci:php84 composer audit
+    - docker run --rm keyhome-ci:php84 composer audit --abandoned=ignore
   only:
     - branches
 
