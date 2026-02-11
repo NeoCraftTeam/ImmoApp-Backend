@@ -1,6 +1,6 @@
 stages:
+  - prepare
   - quality
-  - security
   - build
   - test
   - deploy
@@ -10,16 +10,18 @@ stages:
 variables:
   APP_IMAGE: $CI_REGISTRY_IMAGE/app
   IMAGE_TAG: $CI_COMMIT_REF_SLUG
+  CI_IMAGE: keyhome-ci:$CI_COMMIT_SHORT_SHA
 
 default:
   tags:
     - self-hosted-shell
 
-# Template pour les jobs PHP qui ont besoin de PHP 8.4
-.php_job:
-  before_script:
+# --- ETAPE 0 : BUILD IMAGE CI (une seule fois) ---
+prepare_ci_image:
+  stage: prepare
+  script:
     - |
-      docker build --pull -t keyhome-ci:php84 -f - . <<'DOCKERFILE'
+      docker build -t $CI_IMAGE -f - . <<'DOCKERFILE'
       FROM php:8.4-cli-alpine
       RUN apk add --no-cache git libzip-dev icu-dev postgresql-dev libpng-dev oniguruma-dev gettext-dev freetype-dev libjpeg-turbo-dev libwebp-dev $PHPIZE_DEPS \
         && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
@@ -31,101 +33,95 @@ default:
       COPY . .
       RUN composer install --no-interaction --no-ansi
       DOCKERFILE
+  rules:
+    - if: $CI_COMMIT_BRANCH
 
-# --- ETAPE 1 : QUALITY (Lint & Static Analysis) ---
+# --- ETAPE 1 : QUALITY (tous en parallele) ---
 phpstan:
   stage: quality
-  extends: .php_job
+  needs: [prepare_ci_image]
   script:
-    - echo "Running PHPStan Analysis..."
-    - docker run --rm keyhome-ci:php84 ./vendor/bin/phpstan analyse --memory-limit=512M
-  only:
-    - branches
+    - docker run --rm $CI_IMAGE ./vendor/bin/phpstan analyse --memory-limit=512M
+  rules:
+    - if: $CI_COMMIT_BRANCH
 
 style_check:
   stage: quality
-  extends: .php_job
+  needs: [prepare_ci_image]
   script:
-    - echo "Checking Code Style (Pint)..."
-    - docker run --rm keyhome-ci:php84 ./vendor/bin/pint --test
-  only:
-    - branches
+    - docker run --rm $CI_IMAGE ./vendor/bin/pint --test
+  rules:
+    - if: $CI_COMMIT_BRANCH
 
-# --- ETAPE 2 : SECURITY ---
 composer_security:
-  stage: security
-  extends: .php_job
+  stage: quality
+  needs: [prepare_ci_image]
   script:
-    - echo "Checking PHP Dependencies Security..."
-    - docker run --rm keyhome-ci:php84 composer audit --abandoned=ignore
-  only:
-    - branches
+    - docker run --rm $CI_IMAGE composer audit --abandoned=ignore
+  rules:
+    - if: $CI_COMMIT_BRANCH
 
-# --- ETAPE 3 : BUILD & PUSH ---
+# --- ETAPE 2 : BUILD & PUSH (prod image) ---
 build_image:
   stage: build
+  needs: [phpstan, style_check, composer_security]
   script:
-    - echo "Building Docker Image..."
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - docker build --pull -t $APP_IMAGE:$IMAGE_TAG .
     - docker push $APP_IMAGE:$IMAGE_TAG
     - docker logout $CI_REGISTRY
-  only:
-    - branches
+  rules:
+    - if: $CI_COMMIT_BRANCH
 
-# --- ETAPE 4 : TESTS ---
+# --- ETAPE 3 : TESTS ---
 test_suite:
   stage: test
-  variables:
-    DB_CONNECTION: pgsql
-    DB_HOST: 127.0.0.1
-    DB_PORT: 5432
-    DB_DATABASE: testing
-    DB_USERNAME: gitlab-runner
-    DB_PASSWORD: test_pass
-  extends: .php_job
+  needs: [prepare_ci_image]
   script:
-    - echo "Running Test Suite..."
+    - docker network create ci-net-$CI_JOB_ID || true
+    - |
+      docker run -d --name pg-$CI_JOB_ID \
+        --network ci-net-$CI_JOB_ID \
+        -e POSTGRES_DB=testing \
+        -e POSTGRES_USER=gitlab \
+        -e POSTGRES_PASSWORD=test_pass \
+        postgres:16-alpine
+    - sleep 5
     - |
       docker run --rm \
-        --network host \
-        -e DB_CONNECTION=$DB_CONNECTION \
-        -e DB_HOST=$DB_HOST \
-        -e DB_PORT=$DB_PORT \
-        -e DB_DATABASE=$DB_DATABASE \
-        -e DB_USERNAME=$DB_USERNAME \
-        -e DB_PASSWORD=$DB_PASSWORD \
-        keyhome-ci:php84 sh -c "
+        --network ci-net-$CI_JOB_ID \
+        -e DB_CONNECTION=pgsql \
+        -e DB_HOST=pg-$CI_JOB_ID \
+        -e DB_PORT=5432 \
+        -e DB_DATABASE=testing \
+        -e DB_USERNAME=gitlab \
+        -e DB_PASSWORD=test_pass \
+        $CI_IMAGE sh -c "
           cp .env.example .env.testing &&
           php artisan key:generate --env=testing &&
           php artisan migrate --env=testing --force &&
           php artisan test --env=testing
         "
-  only:
-    - branches
+  after_script:
+    - docker rm -f pg-$CI_JOB_ID 2>/dev/null || true
+    - docker network rm ci-net-$CI_JOB_ID 2>/dev/null || true
+  rules:
+    - if: $CI_COMMIT_BRANCH
 
-# --- ÉTAPE 5 : DÉPLOIEMENT ---
+# --- ETAPE 4 : DEPLOIEMENT ---
 production_deploy:
   stage: deploy
+  needs: [build_image, test_suite]
   script:
-    - echo "🚀 Déploiement via Registry (Pure Docker)..."
-    # 1. On recrée la structure des dossiers
     - mkdir -p /opt/keyhome/.docker/nginx/conf.d
     - cp docker-compose.yml /opt/keyhome/docker-compose.yml
-    # 2. On copie explicitement le contenu de la config Nginx
     - cp -rf .docker/nginx/conf.d/. /opt/keyhome/.docker/nginx/conf.d/
     - cd /opt/keyhome || exit 1
-    
-    # 3. Authentification au registre
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-    
-    # 4. On définit et on injecte l'image
     - export FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:main"
     - APP_IMAGE=$FULL_IMAGE docker compose down --remove-orphans || true
     - APP_IMAGE=$FULL_IMAGE docker compose pull
     - APP_IMAGE=$FULL_IMAGE docker compose up -d --no-build
-    
-    # 5. Tâches Laravel (Via Docker)
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan migrate --force
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize:clear
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize
@@ -134,14 +130,14 @@ production_deploy:
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app bash resetFilamentLivewire.sh
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan storage:link || true
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate || true
-    
     - docker logout $CI_REGISTRY
-  only:
-    - main
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
 
-# --- ÉTAPE 6 : NOTIFICATIONS ---
+# --- ETAPE 5 : NOTIFICATIONS ---
 notify_slack_success:
   stage: notify
+  needs: [production_deploy]
   script:
     - |
       curl -X POST -H 'Content-type: application/json' \
@@ -149,8 +145,8 @@ notify_slack_success:
         \"text\": \"✅ *[BACKEND] Déploiement Réussi !*\n\n*Auteur:* $GITLAB_USER_NAME\n*Branche:* \`$CI_COMMIT_REF_NAME\`\n*Message:* _${CI_COMMIT_TITLE}_\n\n🔗 <$CI_PROJECT_URL/-/commit/$CI_COMMIT_SHA|Voir le commit> | <$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID|Voir la pipeline>\"
       }" $SLACK_WEBHOOK_URL
   when: on_success
-  only:
-    - main
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
 
 notify_slack_failure:
   stage: notify
@@ -161,15 +157,15 @@ notify_slack_failure:
         \"text\": \"❌ *[BACKEND] Échec de la Pipeline !*\n\n*Étape:* \`$CI_JOB_STAGE\`\n*Auteur:* $GITLAB_USER_NAME\n*Branche:* \`$CI_COMMIT_REF_NAME\`\n\n🚨 <$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID|Vérifier l'erreur immédiatement>\"
       }" $SLACK_WEBHOOK_URL
   when: on_failure
-  only:
-    - branches
+  rules:
+    - if: $CI_COMMIT_BRANCH
 
-# --- ÉTAPE 7 : NETTOYAGE ---
+# --- ETAPE 6 : NETTOYAGE ---
 cleanup:
   stage: cleanup
   script:
-    - echo "🧹 Cleaning up..."
+    - docker rmi $CI_IMAGE 2>/dev/null || true
     - docker system prune -f
   when: always
-  only:
-    - main
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
