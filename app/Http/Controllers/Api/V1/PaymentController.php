@@ -10,6 +10,7 @@ use App\Enums\PaymentType;
 use App\Models\Ad;
 use App\Models\Payment;
 use App\Services\FedaPayService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -20,7 +21,7 @@ use OpenApi\Annotations as OA;
  */
 final class PaymentController
 {
-    private $amount = 500;
+    private int $amount = 500;
 
     public function __construct(protected FedaPayService $fedaPay) {}
 
@@ -56,7 +57,7 @@ final class PaymentController
      *     @OA\Response(response=404, description="L'annonce demandée n'existe pas")
      * )
      */
-    public function initialize(Request $request, Ad $ad)
+    public function initialize(Request $request, Ad $ad): JsonResponse
     {
         $user = $request->user();
 
@@ -107,14 +108,14 @@ final class PaymentController
 
                 return response()->json([
                     'message' => 'Erreur technique lors de l\'initialisation.',
-                    'error' => $e->getMessage(),
+                    'error' => config('app.debug') ? $e->getMessage() : null,
                 ], 500);
             }
         }
 
         return response()->json([
             'message' => 'Erreur lors de l\'initialisation du paiement.',
-            'error' => $paymentData['message'],
+            'error' => config('app.debug') ? ($paymentData['message'] ?? null) : null,
         ], 500);
     }
 
@@ -143,20 +144,21 @@ final class PaymentController
      *     )
      * )
      */
-    public function webhook(Request $request)
+    public function webhook(Request $request): JsonResponse
     {
         Log::info('--- WEBHOOK FEDAPAY START ---');
-        
-        // Sécurité : Vérifier la signature du webhook si configurée
-        $webhookSecret = config('services.fedapay.webhook_secret');
-        if ($webhookSecret) {
-            $signature = $request->header('X-Fedapay-Signature');
-            if (!$signature) {
-                Log::warning('Webhook FedaPay reçu sans signature.');
-                return response()->json(['status' => 'error', 'message' => 'Missing signature'], 401);
-            }
-            // Note: La validation réelle dépend de la version de la librairie FedaPay
-            // Ici on simule une validation de base ou on laisse un commentaire pour l'implémentation
+
+        $webhookSecret = (string) config('services.fedapay.webhook_secret', '');
+        if ($webhookSecret === '') {
+            Log::error('Webhook FedaPay rejeté: FEDAPAY_WEBHOOK_SECRET manquant.');
+
+            return response()->json(['status' => 'error', 'message' => 'Webhook misconfigured'], 500);
+        }
+
+        if (!$this->hasValidWebhookSignature($request, $webhookSecret)) {
+            Log::warning('Webhook FedaPay rejeté: signature invalide.');
+
+            return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
         }
 
         $event = $request->all();
@@ -214,7 +216,7 @@ final class PaymentController
             DB::rollBack();
             Log::error('Erreur lors du traitement du webhook: '.$e->getMessage());
 
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);
+            return response()->json(['status' => 'error', 'message' => 'Webhook processing failed'], 500);
         }
     }
 
@@ -246,7 +248,7 @@ final class PaymentController
      *     )
      * )
      */
-    public function callback(Request $request)
+    public function callback(Request $request): JsonResponse
     {
         $adId = $request->get('ad_id');
 
@@ -255,5 +257,72 @@ final class PaymentController
             'ad_id' => $adId,
             'status' => 'processing',
         ]);
+    }
+
+    private function hasValidWebhookSignature(Request $request, string $secret): bool
+    {
+        $signatureHeader = trim((string) $request->header('X-Fedapay-Signature', ''));
+        if ($signatureHeader === '') {
+            return false;
+        }
+
+        $payload = $request->getContent();
+        $expectedRawSignature = hash_hmac('sha256', $payload, $secret);
+
+        if (hash_equals($expectedRawSignature, $signatureHeader)) {
+            return true;
+        }
+
+        $timestamp = null;
+        $signatures = [];
+
+        foreach (explode(',', $signatureHeader) as $item) {
+            $segment = trim($item);
+            if ($segment === '') {
+                continue;
+            }
+
+            if (!str_contains($segment, '=')) {
+                $signatures[] = $segment;
+
+                continue;
+            }
+
+            [$key, $value] = array_map('trim', explode('=', $segment, 2));
+
+            if ($key === 't') {
+                $timestamp = $value;
+
+                continue;
+            }
+
+            if (in_array($key, ['v1', 'sig', 'signature'], true)) {
+                $signatures[] = $value;
+            }
+        }
+
+        if ($signatures === []) {
+            return false;
+        }
+
+        foreach ($signatures as $signature) {
+            if (hash_equals($expectedRawSignature, $signature)) {
+                return true;
+            }
+        }
+
+        if ($timestamp === null || $timestamp === '') {
+            return false;
+        }
+
+        $expectedTimestampedSignature = hash_hmac('sha256', $timestamp.'.'.$payload, $secret);
+
+        foreach ($signatures as $signature) {
+            if (hash_equals($expectedTimestampedSignature, $signature)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -25,9 +25,6 @@ Route::prefix('v1')->group(function (): void {
         Route::post('registerAgent', [AuthController::class, 'registerAgent'])
             ->middleware('throttle:5,1'); //  5 attempts per minute
 
-        Route::post('registerAd', [AuthController::class, 'registerAdmin'])
-            ->middleware('throttle:5,1'); //  5 attempts per minute
-
         Route::post('login', [AuthController::class, 'login'])
             ->middleware('throttle:5,1'); //  5 attempts per minute
 
@@ -42,6 +39,10 @@ Route::prefix('v1')->group(function (): void {
 
         // Routes protégées
         Route::middleware('auth:sanctum')->group(function (): void {
+            Route::post('registerAdmin', [AuthController::class, 'registerAdmin'])
+                ->middleware('can:admin-access');
+            Route::post('registerAd', [AuthController::class, 'registerAdmin'])
+                ->middleware('can:admin-access');
             Route::post('logout', [AuthController::class, 'logout']);
             Route::post('refresh', [AuthController::class, 'refresh']);
             Route::get('me', [AuthController::class, 'me']);

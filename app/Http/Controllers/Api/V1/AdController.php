@@ -958,13 +958,13 @@ final class AdController
 
         // Si pas de coordonnées valides en entrée et qu'on a un utilisateur cible, récupérer via SQL
         if (($lat === null || $long === null) && $targetUser?->id) {
-                $row = DB::table('users')
-                    ->where('id', $targetUser->id)
-                    ->select([
-                        DB::raw('ST_Y(location) as lat'),
-                        DB::raw('ST_X(location) as lng')
-                    ])
-                    ->first();
+            $row = DB::table('users')
+                ->where('id', $targetUser->id)
+                ->select([
+                    DB::raw('ST_Y(location) as lat'),
+                    DB::raw('ST_X(location) as lng'),
+                ])
+                ->first();
             if ($row) {
                 $lat ??= is_numeric($row->lat) ? (float) $row->lat : null;
                 $long ??= is_numeric($row->lng) ? (float) $row->lng : null;
