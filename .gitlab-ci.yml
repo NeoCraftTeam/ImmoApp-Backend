@@ -85,7 +85,7 @@ test_suite:
         -e POSTGRES_DB=testing \
         -e POSTGRES_USER=gitlab \
         -e POSTGRES_PASSWORD=test_pass \
-        postgres:16-alpine
+        postgis/postgis:16-3.5-alpine
     - sleep 5
     - |
       docker run --rm \
