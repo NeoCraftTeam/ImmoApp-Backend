@@ -219,7 +219,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             return $this->agency->name;
         }
 
-        return trim(($this->firstname ?? '').' '.($this->lastname ?? ''));
+        return trim(($this->firstname ?? '') . ' ' . ($this->lastname ?? ''));
     }
 
     /**
@@ -327,10 +327,8 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             return Storage::disk('public')->url($this->avatar);
         }
 
-        // Sinon, on génère un avatar avec les initiales (Fallback)
-        $name = urlencode($this->firstname.' '.$this->lastname);
-
-        return "https://ui-avatars.com/api/?name={$name}&color=7F9CF5&background=EBF4FF";
+        // Privacy: Return null to let Filament/Frontend handle the default placeholder
+        return null;
     }
 
     public function getAppAuthenticationSecret(): ?string
