@@ -1,13 +1,13 @@
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import React, { useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  Image,
-  StyleSheet,
-  Text,
-  View
+    ActivityIndicator,
+    Animated,
+    Dimensions,
+    Image,
+    StyleSheet,
+    Text,
+    View
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -112,7 +112,7 @@ export default function App() {
               NativeService.handleWebViewMessage(event);
             }}
             // Sécurité : Restreindre les origines autorisées
-            originWhitelist={['http://*', 'https://*']}
+	            originWhitelist={['http://localhost*', 'https://*.keyhome.neocraft.dev', 'https://api.keyhome.neocraft.dev']}
             // Sécurité : Désactiver l'accès au système de fichiers
             allowFileAccess={false}
             // Sécurité : Empêcher l'exécution de JS injecté de manière non sécurisée
