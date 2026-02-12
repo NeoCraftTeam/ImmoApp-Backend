@@ -24,16 +24,13 @@ return new class extends Migration {
         // 3. Safety: Change User Deletion Cascade to Restrict
         // This prevents accidental mass deletion of ads if a user is deleted.
         Schema::table('ad', function (Blueprint $table) {
-            // Drop existing FK constraints (names depend on how Laravel created them)
-            // Typically: table_column_foreign
+            // Drop existing FK constraints safely
             $table->dropForeign(['user_id']);
 
-            // Re-add with 'restrict' (or 'set null' if nullable, but user_id is NOT NULL per create_ad.php)
-            // Best practice here is 'restrict' so we MUST use Soft Deletes on User (already present)
-            // or migrate users before hard deleting.
-            $table->foreignUuid('user_id')
-                ->change()
-                ->constrained('users')
+            // Re-add with 'restrict' constraint
+            $table->foreign('user_id')
+                ->references('id')
+                ->on('users')
                 ->onDelete('restrict');
         });
     }
