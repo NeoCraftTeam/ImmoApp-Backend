@@ -164,8 +164,20 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
     private function assignDefaultAvatar(): void
     {
-        // Privacy enforce: Do not use external service (ui-avatars) that leaks user names.
-        // Leave avatar as null; Frontend/Filament will handle placeholders.
+        $name = trim(($this->firstname ?? '').' '.($this->lastname ?? ''));
+        if (empty($name)) {
+            $name = 'U';
+        }
+
+        $filename = 'avatars/'.$this->id.'.webp';
+        $fullPath = Storage::disk('public')->path($filename);
+
+        if (!is_dir(dirname($fullPath))) {
+            mkdir(dirname($fullPath), 0755, true);
+        }
+
+        \Laravolt\Avatar\Facade::create($name)->save($fullPath, 80);
+        $this->avatar = $filename;
     }
 
     public function canPublishAds(): bool
@@ -217,7 +229,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             return $this->agency->name;
         }
 
-        return trim(($this->firstname ?? '') . ' ' . ($this->lastname ?? ''));
+        return trim(($this->firstname ?? '').' '.($this->lastname ?? ''));
     }
 
     /**

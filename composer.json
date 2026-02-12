@@ -27,6 +27,7 @@
         "laravel/scout": "^10.21",
         "laravel/telescope": "^5.15",
         "laravel/tinker": "^2.10.1",
+        "laravolt/avatar": "^6.3",
         "livewire/livewire": "^3.0",
         "meilisearch/meilisearch-php": "^1.16",
         "sentry/sentry-laravel": "^4.20",
