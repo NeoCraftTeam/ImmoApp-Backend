@@ -117,7 +117,7 @@ Route::prefix('v1')->group(function (): void {
 
     // --- PAIEMENTS ---
     Route::post('/payments/initialize/{ad}', [PaymentController::class, 'initialize'])
-        ->middleware('auth:sanctum');
+        ->middleware(['auth:sanctum', 'throttle:10,1']);
     Route::post('/payments/verify/{ad}', [PaymentController::class, 'verify'])
         ->middleware('auth:sanctum');
     Route::post('/payments/webhook', [PaymentController::class, 'webhook']);
