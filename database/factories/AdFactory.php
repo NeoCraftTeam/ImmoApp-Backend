@@ -38,7 +38,6 @@ class AdFactory extends Factory
 
         return [
             'title' => $title,
-            'slug' => Ad::generateUniqueSlug($title),
             'description' => fake()->realText(300),
             'adresse' => $address,
             'price' => fake()->randomElement([15000, 25000, 35000, 50000, 75000, 100000, 150000, 200000, 300000, 500000]),
