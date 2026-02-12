@@ -19,7 +19,14 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['*'],
+    'allowed_origins' => [
+        'http://localhost*',
+        'https://*.keyhome.neocraft.dev',
+        'https://api.keyhome.neocraft.dev',
+        'https://agency.keyhome.neocraft.dev',
+        'https://bailleur.keyhome.neocraft.dev',
+        'https://admin.keyhome.neocraft.dev'
+    ],
 
     'allowed_origins_patterns' => [],
 
