@@ -34,24 +34,22 @@ class UserSeeder extends Seeder
         $agents->each(function ($agent) {
             // Agency creation moved to AgencySeeder
 
-            $ads = Ad::factory()->count(8)->for($agent)->create();
+            $ads = Ad::factory()->count(5)->for($agent)->create();
             $ads->each(function ($ad) {
-                $imageCount = rand(3, 6);
-                for ($i = 0; $i < $imageCount; $i++) {
-                    try {
-                        $ad->addMediaFromUrl('https://picsum.photos/seed/'.$ad->id.'-'.$i.'/800/600')
-                            ->toMediaCollection('images');
-                    } catch (\Exception $e) {
-                        \Log::warning("Impossible de charger l'image pour l'annonce {$ad->id}: ".$e->getMessage());
-                    }
+                // On utilise une image distante pour éviter l'erreur de fichier manquant sur le VPS
+                try {
+                    $ad->addMediaFromUrl('https://picsum.photos/seed/'.$ad->id.'/800/600')
+                        ->toMediaCollection('images');
+                } catch (\Exception $e) {
+                    // Si pas d'internet ou erreur, on continue sans image au lieu de faire planter le seeder
+                    \Log::warning("Impossible de charger l'image pour l'annonce {$ad->id}: ".$e->getMessage());
                 }
 
                 $customers = User::where('role', 'customer')->get();
-                if ($customers->isNotEmpty()) {
-                    Review::factory()->count(rand(1, 5))->for($ad)->create([
-                        'user_id' => $customers->random()->id,
-                    ]);
-                }
+                Review::factory()->count(3)->for($ad)->create([
+                    'user_id' => $customers->random()->id,
+                ]);
+
             });
         });
 
