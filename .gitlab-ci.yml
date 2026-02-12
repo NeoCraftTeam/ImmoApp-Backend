@@ -90,7 +90,6 @@ test_suite:
     - sleep 5
     - |
       docker run --rm \
-        --memory=512m \
         --network ci-net-$CI_JOB_ID \
         -e DB_CONNECTION=pgsql \
         -e DB_HOST=pg-$CI_JOB_ID \
@@ -99,13 +98,20 @@ test_suite:
         -e DB_USERNAME=gitlab \
         -e DB_PASSWORD=test_pass \
         -e SCOUT_DRIVER=null \
-        $CI_IMAGE sh -c "
-          cp .env.example .env &&
-          cp .env.example .env.testing &&
-          php -d memory_limit=256M artisan key:generate --env=testing &&
-          php -d memory_limit=256M artisan migrate --env=testing --force &&
-          php -d memory_limit=256M artisan test --env=testing
-        "
+        $CI_IMAGE sh -c '
+          set -e
+          cp .env.example .env
+          cp .env.example .env.testing
+          rm -f database/data/cities.sql
+          php artisan key:generate --env=testing
+          php artisan migrate --env=testing --force
+          set +e
+          echo "=== RUNNING TESTS ==="
+          php artisan test --env=testing -v 2>&1
+          TEST_RC=$?
+          echo "=== TESTS FINISHED WITH RC=$TEST_RC ==="
+          exit $TEST_RC
+        '
   after_script:
     - docker rm -f pg-$CI_JOB_ID 2>/dev/null || true
     - docker network rm ci-net-$CI_JOB_ID 2>/dev/null || true
