@@ -14,13 +14,6 @@ final class QuarterResource extends JsonResource
     #[\Override]
     public function toArray(Request $request): array
     {
-        // 🔥 DEBUG temporaire
-        \Log::info('QuarterResource data:', [
-            'resource_id' => $this->resource->id ?? 'null',
-            'resource_name' => $this->resource->name ?? 'null',
-            'this_id' => $this->id,
-            'this_name' => $this->name,
-        ]);
 
         return [
             'id' => $this->id,
