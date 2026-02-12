@@ -53,7 +53,7 @@ class AdFactory extends Factory
 
             'user_id' => User::factory(),
             'quarter_id' => $quarter?->id ?? Quarter::factory(),
-            'type_id' => AdType::inRandomOrder()->first()->id ?? AdType::factory(),
+            'type_id' => AdType::inRandomOrder()->first()?->id ?? AdType::factory(),
         ];
     }
 
@@ -61,10 +61,19 @@ class AdFactory extends Factory
     {
         if (self::$citiesData === null) {
             $path = database_path('data/cities.sql');
+
+            if (!file_exists($path)) {
+                self::$citiesData = [
+                    ['name' => 'Douala', 'latitude' => 4.0511, 'longitude' => 9.7679],
+                    ['name' => 'Yaoundé', 'latitude' => 3.8480, 'longitude' => 11.5021],
+                    ['name' => 'Bafoussam', 'latitude' => 5.4737, 'longitude' => 10.4176],
+                ];
+
+                return self::$citiesData[array_rand(self::$citiesData)];
+            }
+
             $content = file_get_contents($path);
 
-            // Pattern regex pour extraire : name (position 2), latitude (position 3), longitude (position 4)
-            // Format: (geonameid, 'name', latitude, longitude, ...)
             preg_match_all(
                 "/\(\d+,\s*'([^']+)',\s*([0-9.-]+),\s*([0-9.-]+),/",
                 $content,
@@ -80,9 +89,14 @@ class AdFactory extends Factory
                     'longitude' => (float) $match[3],
                 ];
             }
+
+            if (empty(self::$citiesData)) {
+                self::$citiesData = [
+                    ['name' => 'Douala', 'latitude' => 4.0511, 'longitude' => 9.7679],
+                ];
+            }
         }
 
-        // Retourne une ville aléatoire
         return self::$citiesData[array_rand(self::$citiesData)];
     }
 }

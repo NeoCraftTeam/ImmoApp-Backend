@@ -96,7 +96,9 @@ test_suite:
         -e DB_DATABASE=testing \
         -e DB_USERNAME=gitlab \
         -e DB_PASSWORD=test_pass \
+        -e SCOUT_DRIVER=null \
         $CI_IMAGE sh -c "
+          cp .env.example .env &&
           cp .env.example .env.testing &&
           php artisan key:generate --env=testing &&
           php artisan migrate --env=testing --force &&

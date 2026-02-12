@@ -195,8 +195,8 @@ class Ad extends Model implements HasMedia
 
             // Pour la recherche géographique (optionnel)
             '_geo' => $this->location ? [
-                'lat' => $this->location->getLatitude(),
-                'lng' => $this->location->getLongitude(),
+                'lat' => $this->location->getY(),
+                'lng' => $this->location->getX(),
             ] : null,
 
             'created_at' => $this->created_at?->timestamp,

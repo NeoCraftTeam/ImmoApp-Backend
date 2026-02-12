@@ -35,8 +35,8 @@ final class AdResource extends JsonResource
             'bathrooms' => $this->bathrooms,
             'has_parking' => $this->has_parking,
             'location' => $this->location ? [
-                'latitude' => $this->location->getLatitude(),
-                'longitude' => $this->location->getLongitude(),
+                'latitude' => $this->location->getY(),
+                'longitude' => $this->location->getX(),
             ] : null,
             'status' => $this->status,
             'is_unlocked' => $this->isUnlockedFor($request->user()),
