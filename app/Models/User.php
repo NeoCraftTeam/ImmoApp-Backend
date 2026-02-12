@@ -164,10 +164,8 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
     private function assignDefaultAvatar(): void
     {
-        if (empty($this->avatar)) {
-            $name = trim($this->firstname.' '.$this->lastname) ?: 'User';
-            $this->avatar = 'https://ui-avatars.com/api/?name='.urlencode($name).'&background=random';
-        }
+        // Privacy enforce: Do not use external service (ui-avatars) that leaks user names.
+        // Leave avatar as null; Frontend/Filament will handle placeholders.
     }
 
     public function canPublishAds(): bool
