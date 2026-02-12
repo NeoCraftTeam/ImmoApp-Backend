@@ -39,6 +39,8 @@ final class AdResource extends JsonResource
                 'longitude' => $this->location->getLongitude(),
             ] : null,
             'status' => $this->status,
+            'is_unlocked' => $this->isUnlockedFor($request->user()),
+            'total_images' => $this->getMedia('images')->count(),
             'expires_at' => $this->expires_at,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

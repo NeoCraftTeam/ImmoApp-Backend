@@ -32,12 +32,20 @@ final class AdRequest extends FormRequest
                 'quarter_id' => ['sometimes', 'exists:quarter,id'],
                 'type_id' => ['sometimes', 'exists:ad_type,id'],
 
+                // Filtres numériques
+                'bathrooms' => ['nullable', 'integer', 'min:0'],
+                'price_min' => ['nullable', 'numeric', 'min:0'],
+                'price_max' => ['nullable', 'numeric', 'min:0'],
+                'surface_min' => ['nullable', 'numeric', 'min:0'],
+                'surface_max' => ['nullable', 'numeric', 'min:0'],
+                'has_parking' => ['nullable', 'boolean'],
+
                 // Tri
                 'sort' => ['nullable', 'string', 'in:price,surface_area,created_at'],
                 'order' => ['nullable', 'string', 'in:asc,desc'],
 
                 // Pagination
-                'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+                'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
 
                 // Autocomplete
                 'field' => ['nullable', 'string', 'in:city,type,quarter'],

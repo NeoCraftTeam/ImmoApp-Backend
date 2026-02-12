@@ -37,7 +37,7 @@ class FedaPayService
                 'description' => "Déblocage de l'annonce #{$adId}",
                 'amount' => $amount,
                 'currency' => ['iso' => 'XOF'],
-                'callback_url' => config('app.email_verify_callback', config('app.url'))."/payment-success?ad_id={$adId}",
+                'callback_url' => config('app.frontend_url', config('app.url'))."/payment-success?ad_id={$adId}",
                 'customer' => [
                     'firstname' => $user->firstname,
                     'lastname' => $user->lastname,
@@ -60,6 +60,39 @@ class FedaPayService
             return [
                 'success' => false,
                 'message' => $e->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * Vérifier le statut d'une transaction FedaPay.
+     *
+     * @return array{success: bool, status: string, transaction_id: int}
+     */
+    public function retrieveTransaction(int $transactionId): array
+    {
+        try {
+            $key = config('services.fedapay.secret_key');
+            $env = config('services.fedapay.environment', 'sandbox');
+
+            FedaPay::setApiKey($key);
+            FedaPay::setEnvironment($env);
+
+            /** @var Transaction $transaction */
+            $transaction = Transaction::retrieve($transactionId);
+
+            return [
+                'success' => true,
+                'status' => (string) $transaction->status,
+                'transaction_id' => $transaction->id,
+            ];
+        } catch (\Exception $e) {
+            \Log::error('FedaPay Retrieve Error: '.$e->getMessage());
+
+            return [
+                'success' => false,
+                'status' => 'unknown',
+                'transaction_id' => $transactionId,
             ];
         }
     }

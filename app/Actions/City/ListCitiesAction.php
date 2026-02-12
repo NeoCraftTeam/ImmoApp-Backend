@@ -9,8 +9,14 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 class ListCitiesAction
 {
-    public function handle(int $perPage = 10): LengthAwarePaginator
+    public function handle(int $perPage = 50, ?string $search = null): LengthAwarePaginator
     {
-        return City::query()->paginate($perPage);
+        $query = City::query()->orderBy('name');
+
+        if ($search) {
+            $query->where('name', 'ilike', "%{$search}%");
+        }
+
+        return $query->paginate($perPage);
     }
 }

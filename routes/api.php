@@ -99,8 +99,26 @@ Route::prefix('v1')->group(function (): void {
     // --- RECOMMANDATIONS ---
     Route::middleware('auth:sanctum')->get('/recommendations', [RecommendationController::class, 'index']);
 
+    // --- MES ANNONCES DÉBLOQUÉES ---
+    Route::middleware('auth:sanctum')->get('/my/unlocked-ads', function () {
+        $user = request()->user();
+        $adIds = \App\Models\Payment::where('user_id', $user->id)
+            ->where('type', \App\Enums\PaymentType::UNLOCK)
+            ->where('status', \App\Enums\PaymentStatus::SUCCESS)
+            ->pluck('ad_id');
+
+        $ads = \App\Models\Ad::with('quarter.city', 'ad_type', 'media', 'user')
+            ->whereIn('id', $adIds)
+            ->latest()
+            ->get();
+
+        return \App\Http\Resources\AdResource::collection($ads);
+    });
+
     // --- PAIEMENTS ---
     Route::post('/payments/initialize/{ad}', [PaymentController::class, 'initialize'])
+        ->middleware('auth:sanctum');
+    Route::post('/payments/verify/{ad}', [PaymentController::class, 'verify'])
         ->middleware('auth:sanctum');
     Route::post('/payments/webhook', [PaymentController::class, 'webhook']);
     Route::get('/payments/callback', [PaymentController::class, 'callback']);

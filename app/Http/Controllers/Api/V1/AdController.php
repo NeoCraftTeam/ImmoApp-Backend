@@ -120,7 +120,19 @@ final class AdController
     public function index(): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Ad::class);
-        $ads = Ad::with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')->orderByBoost()->paginate(config('pagination.per_page', 15));
+
+        $perPage = (int) request('per_page', config('pagination.per_page', 15));
+        $type = request('type');
+
+        $query = Ad::query()
+            ->with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')
+            ->where('status', \App\Enums\AdStatus::AVAILABLE);
+
+        if ($type) {
+            $query->whereHas('ad_type', fn ($q) => $q->where('name', 'ilike', "%{$type}%"));
+        }
+
+        $ads = $query->orderByBoost()->paginate($perPage);
 
         return AdApiResource::collection($ads);
     }
@@ -1723,9 +1735,9 @@ final class AdController
      */
     public function search(AdRequest $request): JsonResponse
     {
-        try {
+        $validated = $request->validated();
 
-            $validated = $request->validated();
+        try {
 
             // Paramètres de recherche
             $q = (string) ($validated['q'] ?? '');
@@ -1826,7 +1838,7 @@ final class AdController
 
             return response()->json([
                 'success' => true,
-                'data' => $results->items(),
+                'data' => AdApiResource::collection($results->items()),
                 'meta' => [
                     'current_page' => $results->currentPage(),
                     'last_page' => $results->lastPage(),
@@ -1840,30 +1852,92 @@ final class AdController
                     'next' => $results->nextPageUrl(),
                 ],
             ], 200);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation error',
-                'errors' => $e->errors(),
-            ], 422);
+        } catch (\Meilisearch\Exceptions\ApiException|\Exception $e) {
+            Log::warning('Search fallback to Eloquent: '.$e->getMessage());
 
-        } catch (\Meilisearch\Exceptions\ApiException $e) {
-            \Log::error('Meilisearch API Error: '.$e->getMessage());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Search service error: '.$e->getMessage(),
-            ], 500);
-
-        } catch (\Exception $e) {
-            \Log::error('Search Error: '.$e->getMessage());
-            \Log::error($e->getTraceAsString());
-
-            return response()->json([
-                'success' => false,
-                'message' => 'An error occurred while searching',
-                'error' => config('app.debug') ? $e->getMessage() : null,
-            ], 500);
+            return $this->searchFallback($validated);
         }
+    }
+
+    /**
+     * Fallback Eloquent search when Meilisearch is unavailable.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private function searchFallback(array $validated): JsonResponse
+    {
+        $q = (string) ($validated['q'] ?? '');
+        $city = $validated['city'] ?? null;
+        $type = $validated['type'] ?? null;
+        $perPage = (int) ($validated['per_page'] ?? config('pagination.per_page', 15));
+        $minBedrooms = isset($validated['bedrooms']) ? (int) $validated['bedrooms'] : null;
+        $minPrice = isset($validated['price_min']) ? (float) $validated['price_min'] : null;
+        $maxPrice = isset($validated['price_max']) ? (float) $validated['price_max'] : null;
+        $minSurface = isset($validated['surface_min']) ? (float) $validated['surface_min'] : null;
+        $maxSurface = isset($validated['surface_max']) ? (float) $validated['surface_max'] : null;
+        $hasParking = isset($validated['has_parking']) ? (bool) $validated['has_parking'] : null;
+
+        $query = Ad::query()
+            ->with(['quarter.city', 'ad_type', 'media', 'user'])
+            ->where('status', \App\Enums\AdStatus::AVAILABLE);
+
+        if ($q) {
+            $query->where(function ($qb) use ($q) {
+                $qb->where('title', 'ilike', "%{$q}%")
+                    ->orWhere('description', 'ilike', "%{$q}%")
+                    ->orWhere('adresse', 'ilike', "%{$q}%");
+            });
+        }
+
+        if ($city) {
+            $query->whereHas('quarter.city', fn ($qb) => $qb->where('name', 'ilike', "%{$city}%"));
+        }
+
+        if ($type) {
+            $query->whereHas('ad_type', fn ($qb) => $qb->where('name', 'ilike', "%{$type}%"));
+        }
+
+        if ($minBedrooms !== null) {
+            $query->where('bedrooms', '>=', $minBedrooms);
+        }
+
+        if ($minPrice !== null) {
+            $query->where('price', '>=', $minPrice);
+        }
+
+        if ($maxPrice !== null) {
+            $query->where('price', '<=', $maxPrice);
+        }
+
+        if ($minSurface !== null) {
+            $query->where('surface_area', '>=', $minSurface);
+        }
+
+        if ($maxSurface !== null) {
+            $query->where('surface_area', '<=', $maxSurface);
+        }
+
+        if ($hasParking) {
+            $query->where('has_parking', true);
+        }
+
+        $results = $query->orderByBoost()->paginate($perPage);
+
+        return response()->json([
+            'success' => true,
+            'data' => AdApiResource::collection($results->items()),
+            'meta' => [
+                'current_page' => $results->currentPage(),
+                'last_page' => $results->lastPage(),
+                'per_page' => $results->perPage(),
+                'total' => $results->total(),
+            ],
+            'links' => [
+                'first' => $results->url(1),
+                'last' => $results->url($results->lastPage()),
+                'prev' => $results->previousPageUrl(),
+                'next' => $results->nextPageUrl(),
+            ],
+        ], 200);
     }
 }

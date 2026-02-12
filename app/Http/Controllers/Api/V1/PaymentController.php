@@ -259,6 +259,52 @@ final class PaymentController
         ]);
     }
 
+    /**
+     * Vérifie le statut d'un paiement auprès de FedaPay et met à jour en base.
+     */
+    public function verify(Request $request, Ad $ad): JsonResponse
+    {
+        $user = $request->user();
+
+        $payment = Payment::where('user_id', $user->id)
+            ->where('ad_id', $ad->id)
+            ->where('type', PaymentType::UNLOCK)
+            ->latest()
+            ->first();
+
+        if (!$payment) {
+            return response()->json([
+                'message' => 'Aucun paiement trouvé pour cette annonce.',
+                'is_unlocked' => false,
+            ], 404);
+        }
+
+        if ($payment->status === PaymentStatus::SUCCESS) {
+            return response()->json([
+                'message' => 'Annonce déjà débloquée.',
+                'is_unlocked' => true,
+            ]);
+        }
+
+        $result = $this->fedaPay->retrieveTransaction((int) $payment->transaction_id);
+
+        if ($result['success'] && $result['status'] === 'approved') {
+            $payment->update(['status' => PaymentStatus::SUCCESS]);
+            Log::info("Paiement #{$payment->id} vérifié et validé via API.");
+
+            return response()->json([
+                'message' => 'Paiement confirmé. Annonce débloquée.',
+                'is_unlocked' => true,
+            ]);
+        }
+
+        return response()->json([
+            'message' => 'Le paiement est en attente de confirmation.',
+            'is_unlocked' => false,
+            'payment_status' => $result['status'],
+        ]);
+    }
+
     private function hasValidWebhookSignature(Request $request, string $secret): bool
     {
         $signatureHeader = trim((string) $request->header('X-Fedapay-Signature', ''));

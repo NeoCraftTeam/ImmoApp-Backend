@@ -70,7 +70,7 @@ services:
       - .docker/nginx/conf.d:/etc/nginx/conf.d
     networks:
       - keyhome-network
-
+      - traefik-public
   # La base de données (Postgres + PostGIS)
   db:
     image: postgis/postgis:15-3.3-alpine
@@ -205,6 +205,8 @@ services:
 networks:
   keyhome-network:
     driver: bridge
+  traefik-public:
+    external: true
 
 volumes:
   keyhome-db-data:

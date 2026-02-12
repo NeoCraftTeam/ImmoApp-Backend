@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\AdStatus;
+use App\Enums\PaymentStatus;
+use App\Enums\PaymentType;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\AdFactory;
 use Eloquent;
@@ -304,30 +306,24 @@ class Ad extends Model implements HasMedia
             return true;
         }
 
-        // Check for successful unlock payment (assuming Payment model links user and ad)
         return Payment::where('user_id', $user->id)
             ->where('ad_id', $this->id)
-            ->where('type', 'unlock') // Assuming 'unlock' is the enum value or string
-            ->where('status', 'success') // Assuming 'success' is the enum value
+            ->where('type', PaymentType::UNLOCK)
+            ->where('status', PaymentStatus::SUCCESS)
             ->exists();
     }
 
     /**
-     * Get images accessible to the current user context.
+     * Get all images for the ad (images are always visible).
      */
     public function getAccessibleImages(?User $user): \Illuminate\Support\Collection
     {
         $media = $this->getMedia('images');
 
-        if ($media->isEmpty()) {
-            return collect();
-        }
-
         if ($this->isUnlockedFor($user)) {
             return $media;
         }
 
-        // Return only the first image (primary)
         return $media->take(1);
     }
 
