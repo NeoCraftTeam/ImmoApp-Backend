@@ -126,6 +126,13 @@ production_deploy:
     - mkdir -p /opt/keyhome/.docker/nginx/conf.d
     - cp docker-compose.yml /opt/keyhome/docker-compose.yml
     - cp -rf .docker/nginx/conf.d/. /opt/keyhome/.docker/nginx/conf.d/
+    # Sync codebase to VPS for reference and manual artisan commands
+    - |
+      if [ -d /opt/keyhome/codebase/.git ]; then
+        cd /opt/keyhome/codebase && git fetch origin main && git reset --hard origin/main
+      else
+        git clone --depth 1 --branch main "$CI_REPOSITORY_URL" /opt/keyhome/codebase
+      fi
     - cd /opt/keyhome || exit 1
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - export FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:main"
