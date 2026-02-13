@@ -71,13 +71,13 @@ class MassiveAdSeeder extends Seeder
     public function run(): void
     {
         $this->imageDir = storage_path('app/seed-images');
-        $this->command->info('Seeding ' . self::TOTAL_ADS . ' realistic ads with images...');
+        $this->command->info('Seeding '.self::TOTAL_ADS.' realistic ads with images...');
         $this->createUsers();
         $this->loadReferenceData();
         $this->downloadImagePool();
         $this->createAds();
         $this->cleanupImagePool();
-        $this->command->info('Seeding complete! ' . Ad::count() . ' ads in database.');
+        $this->command->info('Seeding complete! '.Ad::count().' ads in database.');
     }
 
     private function createUsers(): void
@@ -118,7 +118,7 @@ class MassiveAdSeeder extends Seeder
         $quarters = Quarter::with('city')->get();
         $this->quarterIds = $quarters->pluck('id')->toArray();
         $this->quarterNames = $quarters->mapWithKeys(
-            fn (Quarter $q) => [$q->id => $q->name . ', ' . $q->city->name]
+            fn (Quarter $q) => [$q->id => $q->name.', '.$q->city->name]
         )->toArray();
 
         $this->agentIds = User::where('role', UserRole::AGENT)->pluck('id')->toArray();
@@ -130,27 +130,29 @@ class MassiveAdSeeder extends Seeder
             }
         }
 
-        $this->command->info('  ' . count($this->quarterIds) . ' quarters, ' . count($this->agentIds) . ' agents, ' . count($this->typeMap) . ' types');
+        $this->command->info('  '.count($this->quarterIds).' quarters, '.count($this->agentIds).' agents, '.count($this->typeMap).' types');
     }
 
     private function downloadImagePool(): void
     {
         File::ensureDirectoryExists($this->imageDir);
 
-        $existing = count(glob($this->imageDir . '/*.jpg'));
+        $existing = count(glob($this->imageDir.'/*.jpg'));
         if ($existing >= self::IMAGE_POOL_SIZE) {
             $this->command->info("Image pool already has {$existing} images, skipping.");
+
             return;
         }
 
-        $this->command->info('Downloading ' . self::IMAGE_POOL_SIZE . ' images from Picsum...');
+        $this->command->info('Downloading '.self::IMAGE_POOL_SIZE.' images from Picsum...');
         $progress = $this->command->getOutput()->createProgressBar(self::IMAGE_POOL_SIZE);
         $progress->start();
 
         for ($i = 1; $i <= self::IMAGE_POOL_SIZE; $i++) {
-            $path = $this->imageDir . '/' . $i . '.jpg';
+            $path = $this->imageDir.'/'.$i.'.jpg';
             if (file_exists($path) && filesize($path) > 1000) {
                 $progress->advance();
+
                 continue;
             }
 
@@ -175,19 +177,20 @@ class MassiveAdSeeder extends Seeder
 
         $progress->finish();
         $this->command->newLine();
-        $this->command->info('  ' . count(glob($this->imageDir . '/*.jpg')) . ' images ready');
+        $this->command->info('  '.count(glob($this->imageDir.'/*.jpg')).' images ready');
     }
 
     private function createAds(): void
     {
-        $this->command->info('Creating ' . self::TOTAL_ADS . ' ads with images...');
+        $this->command->info('Creating '.self::TOTAL_ADS.' ads with images...');
 
         $typeNames = array_keys($this->typeMap);
-        $imageFiles = glob($this->imageDir . '/*.jpg');
+        $imageFiles = glob($this->imageDir.'/*.jpg');
         $imageCount = count($imageFiles);
 
         if ($imageCount === 0) {
             $this->command->error('No images available!');
+
             return;
         }
 
@@ -225,7 +228,7 @@ class MassiveAdSeeder extends Seeder
                     $ad = Ad::forceCreate([
                         'id' => (string) Str::orderedUuid(),
                         'title' => $title,
-                        'slug' => Str::slug($title) . '-' . Str::random(6),
+                        'slug' => Str::slug($title).'-'.Str::random(6),
                         'description' => $description,
                         'adresse' => $quarterLabel,
                         'price' => mt_rand($priceRange[0], $priceRange[1]),
@@ -300,6 +303,7 @@ class MassiveAdSeeder extends Seeder
     private function randomStatus(): string
     {
         $w = ['available', 'available', 'available', 'available', 'available', 'reserved', 'rent'];
+
         return $w[array_rand($w)];
     }
 
@@ -307,70 +311,71 @@ class MassiveAdSeeder extends Seeder
     {
         $name = $this->propertyNames[array_rand($this->propertyNames)];
         $short = explode(',', $quarter)[0];
+        $ref = strtoupper(Str::random(3));
 
         return match ($type) {
             'chambre simple' => $this->pick([
-                "Chambre Simple {$short}",
-                "Chambre Individuelle {$short}",
-                "Chambre Standard {$short}",
-                "Belle Chambre {$short}",
-                "Chambre Propre {$short}",
+                "Chambre Simple {$name} - {$short}",
+                "Chambre Individuelle {$short} Ref.{$ref}",
+                "Chambre Standard Residence {$name} {$short}",
+                "Belle Chambre {$short} - {$name}",
+                "Chambre Propre Cite {$name} {$short}",
             ]),
             'chambre meublee' => $this->pick([
-                "Chambre Meublee VIP {$short}",
-                "Chambre Meublee Climatisee {$short}",
-                "Chambre Tout Confort {$short}",
-                "Chambre Standing {$short}",
-                "Chambre Equipee {$short}",
+                "Chambre Meublee VIP {$name} - {$short}",
+                "Chambre Meublee Climatisee {$short} Ref.{$ref}",
+                "Chambre Tout Confort Residence {$name} {$short}",
+                "Chambre Standing {$name} - {$short}",
+                "Chambre Equipee Cite {$name} {$short}",
             ]),
             'studio simple' => $this->pick([
-                "Studio Neuf {$short}",
-                "Studio 1 Piece {$short}",
-                "Joli Studio {$short}",
-                "Studio Moderne {$short}",
-                "Studio {$short}",
+                "Studio Neuf {$name} - {$short}",
+                "Studio 1 Piece {$short} Ref.{$ref}",
+                "Joli Studio Residence {$name} {$short}",
+                "Studio Moderne {$name} - {$short}",
+                "Studio {$short} Cite {$name}",
             ]),
             'studio meuble' => $this->pick([
-                "Studio Meuble VIP {$short}",
-                "Studio Meuble Grand Standing {$short}",
-                "Studio Tout Equipe {$short}",
-                "Studio Meuble Climatise {$short}",
-                "Studio Luxe {$short}",
+                "Studio Meuble VIP {$name} - {$short}",
+                "Studio Meuble Grand Standing {$short} Ref.{$ref}",
+                "Studio Tout Equipe Residence {$name} {$short}",
+                "Studio Meuble Climatise {$name} - {$short}",
+                "Studio Luxe {$name} {$short}",
             ]),
             'appartement simple' => $this->pick([
-                "Appartement {$bedrooms} Chambres {$short}",
-                "Bel Appartement {$bedrooms}P {$short}",
-                "Residence {$name} - Appart {$bedrooms}P",
-                "Appartement Neuf {$bedrooms}P {$short}",
-                "Appartement Spacieux {$bedrooms}Ch {$short}",
+                "Appartement {$bedrooms}Ch Residence {$name} - {$short}",
+                "Bel Appartement {$bedrooms}P {$short} Ref.{$ref}",
+                "Residence {$name} - Appart {$bedrooms}P {$short}",
+                "Appartement Neuf {$bedrooms}P {$name} - {$short}",
+                "Appartement Spacieux {$bedrooms}Ch Cite {$name} {$short}",
             ]),
             'appartement meuble' => $this->pick([
-                "Residence {$name} - Appart Meuble {$bedrooms}P",
-                "Appartement Meuble Standing {$bedrooms}Ch {$short}",
-                "Appart VIP Tout Meuble {$short}",
-                "Appartement Meuble Haut Standing {$bedrooms}P",
-                "Residence {$name} - {$bedrooms}P Meublees",
+                "Residence {$name} - Appart Meuble {$bedrooms}P {$short}",
+                "Appartement Meuble Standing {$bedrooms}Ch {$short} Ref.{$ref}",
+                "Appart VIP Tout Meuble {$name} - {$short}",
+                "Appartement Meuble Haut Standing {$bedrooms}P {$name}",
+                "Residence {$name} - {$bedrooms}P Meublees {$short}",
             ]),
             'maison' => $this->pick([
-                "Villa {$name}",
                 "Villa {$name} - {$short}",
-                "Villa Duplex {$bedrooms}Ch {$short}",
-                "Belle Villa Moderne {$bedrooms}Ch {$short}",
-                "Villa Standing {$bedrooms} Chambres {$short}",
-                "Duplex de Luxe {$bedrooms}Ch {$short}",
-                "Residence {$name} - Villa {$bedrooms}Ch",
-                "Maison {$bedrooms} Chambres {$short}",
-                "Villa {$name} avec Piscine",
+                "Villa {$name} {$bedrooms}Ch - {$short}",
+                "Villa Duplex {$bedrooms}Ch {$name} {$short}",
+                "Belle Villa Moderne {$bedrooms}Ch {$short} Ref.{$ref}",
+                "Villa Standing {$bedrooms} Chambres Cite {$name} {$short}",
+                "Duplex de Luxe {$bedrooms}Ch {$name} - {$short}",
+                "Residence {$name} - Villa {$bedrooms}Ch {$short}",
+                "Maison {$bedrooms} Chambres {$name} - {$short}",
+                "Villa {$name} avec Piscine - {$short}",
             ]),
             'terrain' => $this->pick([
-                "Terrain {$surface}m2 {$short}",
-                "Parcelle Titree {$surface}m2 {$short}",
-                "Terrain Constructible {$surface}m2 {$short}",
-                "Terrain a Vendre {$surface}m2 {$short}",
-                "Lot {$surface}m2 {$short}",
-                "Terrain Plat {$surface}m2 {$short}",
+                "Terrain {$surface}m2 {$short} Ref.{$ref}",
+                "Parcelle Titree {$surface}m2 {$name} - {$short}",
+                "Terrain Constructible {$surface}m2 {$short} - Lot {$ref}",
+                "Terrain a Vendre {$surface}m2 Cite {$name} {$short}",
+                "Lot {$surface}m2 {$short} - {$name}",
+                "Terrain Plat {$surface}m2 {$short} Ref.{$ref}",
             ]),
-            default => "Propriete {$short}",
+            default => "Propriete {$name} - {$short}",
         };
     }
 
@@ -464,4 +469,3 @@ class MassiveAdSeeder extends Seeder
         }
     }
 }
-

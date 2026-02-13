@@ -289,7 +289,23 @@ class Ad extends Model implements HasMedia
         $this->addMediaConversion('thumb')
             ->width(300)
             ->height(300)
-            ->sharpen(10);
+            ->format('webp')
+            ->quality(80)
+            ->nonQueued();
+
+        $this->addMediaConversion('medium')
+            ->width(800)
+            ->height(600)
+            ->format('webp')
+            ->quality(80)
+            ->nonQueued();
+
+        $this->addMediaConversion('large')
+            ->width(1200)
+            ->height(900)
+            ->format('webp')
+            ->quality(85)
+            ->queued();
     }
 
     /**
