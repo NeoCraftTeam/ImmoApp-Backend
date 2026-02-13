@@ -4,32 +4,19 @@ declare(strict_types=1);
 
 namespace App\Filament\Agency\Resources\Ads;
 
-use App\Enums\AdStatus;
 use App\Filament\Agency\Resources\Ads\Pages\ManageAds;
+use App\Filament\Resources\Ads\Concerns\SharedAdResource;
 use App\Models\Ad;
 use BackedEnum;
-use Clickbar\Magellan\Data\Geometries\Point;
-use Dotswan\MapPicker\Fields\Map;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Toggle;
-use Filament\Infolists\Components\IconEntry;
-use Filament\Infolists\Components\SpatieMediaLibraryImageEntry;
-use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -38,6 +25,8 @@ use UnitEnum;
 
 class AdResource extends Resource
 {
+    use SharedAdResource;
+
     protected static ?string $model = Ad::class;
 
     protected static ?string $tenantOwnershipRelationshipName = 'agency';
@@ -64,69 +53,17 @@ class AdResource extends Resource
     {
         return $schema
             ->components([
-                TextInput::make('title')
-                    ->required(),
-                Textarea::make('description')
-                    ->required()
-                    ->columnSpanFull(),
-                SpatieMediaLibraryFileUpload::make('images')
-                    ->collection('images')
-                    ->multiple()
-                    ->reorderable()
-                    ->maxFiles(10)
-                    ->maxSize(5120)
-                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                    ->columnSpanFull(),
-                TextInput::make('adresse')
-                    ->required(),
-                TextInput::make('price')
-                    ->numeric()
-                    ->prefix('FCFA'),
-                TextInput::make('surface_area')
-                    ->required()
-                    ->numeric(),
-                TextInput::make('bedrooms')
-                    ->required()
-                    ->numeric(),
-                TextInput::make('bathrooms')
-                    ->required()
-                    ->numeric(),
-                Toggle::make('has_parking')
-                    ->required(),
-                Map::make('location_map')
-                    ->label('Localisation')
-                    ->columnSpanFull()
-                    ->defaultLocation(latitude: 4.0511, longitude: 9.7679)
-                    ->afterStateHydrated(function ($state, $record, callable $set): void {
-                        if ($record?->location) {
-                            $set('location_map', [
-                                'lat' => $record->location->getLatitude(),
-                                'lng' => $record->location->getLongitude(),
-                            ]);
-                        }
-                    })
-                    ->showMarker()
-                    ->draggable()
-                    ->showMyLocationButton()
-                    ->showZoomControl()
-                    ->tilesUrl('https://tile.openstreetmap.org/{z}/{x}/{y}.png')
-                    ->zoom(15),
-                Select::make('status')
-                    ->options(AdStatus::class)
-                    ->required()
-                    ->default(AdStatus::PENDING)
-                    ->disabled(fn (?Ad $record) => $record === null || $record->status === AdStatus::PENDING)
-                    ->dehydrated(),
+                ...static::getSharedFormFields(),
+                static::getStatusSelect(isAdmin: false),
                 DateTimePicker::make('expires_at'),
-                Select::make('quarter_id')
-                    ->relationship('quarter', 'name')
-                    ->searchable()
-                    ->preload()
-                    ->required(),
-                Select::make('type_id')
-                    ->relationship('ad_type', 'name')
-                    ->required(),
+                ...static::getRelationSelects(),
             ]);
+    }
+
+    #[\Override]
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema->components(static::getSharedInfolistSchema());
     }
 
     #[\Override]
@@ -134,91 +71,20 @@ class AdResource extends Resource
     {
         return $table
             ->recordTitleAttribute('title')
-            ->columns([
-                \Filament\Tables\Columns\SpatieMediaLibraryImageColumn::make('images')
-                    ->collection('images')
-                    ->conversion('thumb')
-                    ->circular()
-                    ->stacked()
-                    ->limit(3)
-                    ->label('Photos'),
-                TextColumn::make('title')
-                    ->searchable(),
-                TextColumn::make('adresse')
-                    ->searchable(),
-                TextColumn::make('price')
-                    ->money('xaf')
-                    ->sortable(),
-                TextColumn::make('surface_area')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('bedrooms')
-                    ->numeric()
-                    ->sortable(),
-                TextColumn::make('bathrooms')
-                    ->numeric()
-                    ->sortable(),
-                IconColumn::make('has_parking')
-                    ->boolean(),
-                TextColumn::make('status')
-                    ->searchable(),
-                TextColumn::make('expires_at')
-                    ->dateTime()
-                    ->sortable(),
-                TextColumn::make('created_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-            ])
+            ->columns(static::getSharedTableColumns())
             ->filters([
                 TrashedFilter::make(),
             ])
             ->actions([
                 ViewAction::make(),
                 EditAction::make()
-                    ->mutateFormDataUsing(function (array $data): array {
-                        if (isset($data['location_map']) && is_array($data['location_map'])) {
-                            $data['location'] = Point::make($data['location_map']['lat'], $data['location_map']['lng']);
-                            unset($data['location_map']);
-                        }
-
-                        return $data;
-                    }),
+                    ->mutateFormDataUsing(fn (array $data): array => static::mutateLocationMapData($data)),
                 DeleteAction::make(),
             ])
             ->bulkActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
-    }
-
-    #[\Override]
-    public static function infolist(Schema $schema): Schema
-    {
-        return $schema
-            ->components([
-                Section::make('Aperçu')
-                    ->schema([
-                        SpatieMediaLibraryImageEntry::make('images')
-                            ->collection('images')
-                            ->label('Galerie Photos')
-                            ->columnSpanFull(),
-                    ]),
-                Section::make('Détails')
-                    ->schema([
-                        TextEntry::make('title')->label('Titre'),
-                        TextEntry::make('price')->money('xaf')->label('Prix'),
-                        TextEntry::make('adresse')->label('Adresse')->columnSpanFull(),
-                        TextEntry::make('description')->columnSpanFull(),
-                    ])->columns(2),
-                Section::make('Caractéristiques')
-                    ->schema([
-                        TextEntry::make('surface_area')->label('Surface')->suffix(' m²'),
-                        TextEntry::make('bedrooms')->label('Chambres'),
-                        TextEntry::make('bathrooms')->label('Salles de bain'),
-                        IconEntry::make('has_parking')->label('Parking')->boolean(),
-                    ])->columns(4),
             ]);
     }
 

@@ -34,7 +34,7 @@ test('admin can update any ad', function (): void {
 
 test('user cannot update other user ad', function (): void {
     $owner = User::factory()->create();
-    $attacker = User::factory()->create();
+    $attacker = User::factory()->create(['role' => 'customer']);
     $ad = Ad::factory()->create(['user_id' => $owner->id]);
 
     Sanctum::actingAs($attacker);
@@ -46,7 +46,7 @@ test('user cannot update other user ad', function (): void {
 });
 
 test('owner cannot update own ad (admin only)', function (): void {
-    $user = User::factory()->create();
+    $user = User::factory()->create(['role' => 'customer']);
     $ad = Ad::factory()->create(['user_id' => $user->id]);
 
     Sanctum::actingAs($user);
