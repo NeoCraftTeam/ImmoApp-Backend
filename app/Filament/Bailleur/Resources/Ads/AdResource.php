@@ -7,6 +7,7 @@ namespace App\Filament\Bailleur\Resources\Ads;
 use App\Filament\Bailleur\Resources\Ads\Pages\ManageAds;
 use App\Filament\Resources\Ads\Concerns\SharedAdResource;
 use App\Models\Ad;
+use App\Models\Scopes\LandlordScope;
 use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -29,8 +30,6 @@ class AdResource extends Resource
 
     protected static ?string $model = Ad::class;
 
-    protected static ?string $tenantOwnershipRelationshipName = 'agency';
-
     protected static string|null|UnitEnum $navigationGroup = 'Mes Biens';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::Home;
@@ -45,7 +44,7 @@ class AdResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->where('user_id', auth()->id())
+            ->withGlobalScope('landlord', new LandlordScope)
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
@@ -108,6 +107,6 @@ class AdResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        return (string) static::getModel()::where('user_id', auth()->id())->count();
+        return (string) static::getEloquentQuery()->count();
     }
 }

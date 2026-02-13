@@ -19,8 +19,6 @@ class ReviewResource extends Resource
 {
     protected static ?string $model = Review::class;
 
-    protected static ?string $tenantOwnershipRelationshipName = 'agency';
-
     protected static string|null|UnitEnum $navigationGroup = 'Retours';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::Star;
