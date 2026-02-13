@@ -144,7 +144,9 @@ final class SubscriptionController
      */
     public function current(Request $request): JsonResponse
     {
+        /** @var \App\Models\User $user */
         $user = $request->user();
+        /** @var \App\Models\Agency|null $agency */
         $agency = $user->agency;
 
         if (!$agency) {
@@ -228,7 +230,9 @@ final class SubscriptionController
      */
     public function subscribe(SubscribeRequest $request): JsonResponse
     {
+        /** @var \App\Models\User $user */
         $user = $request->user();
+        /** @var \App\Models\Agency|null $agency */
         $agency = $user->agency;
 
         if (!$agency) {
@@ -353,7 +357,9 @@ final class SubscriptionController
      */
     public function cancel(Request $request): JsonResponse
     {
+        /** @var \App\Models\User $user */
         $user = $request->user();
+        /** @var \App\Models\Agency|null $agency */
         $agency = $user->agency;
 
         if (!$agency) {
@@ -458,7 +464,9 @@ final class SubscriptionController
      */
     public function history(Request $request): AnonymousResourceCollection
     {
+        /** @var \App\Models\User $user */
         $user = $request->user();
+        /** @var \App\Models\Agency|null $agency */
         $agency = $user->agency;
 
         if (!$agency) {

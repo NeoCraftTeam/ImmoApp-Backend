@@ -17,6 +17,9 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use UnitEnum;
 
+/**
+ * @property-read \Filament\Schemas\Schema $form
+ */
 class ManageSettings extends Page
 {
     protected static string|null|UnitEnum $navigationGroup = 'Paiements';
