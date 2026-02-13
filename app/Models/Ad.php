@@ -287,25 +287,25 @@ class Ad extends Model implements HasMedia
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
+            ->nonQueued()
             ->width(300)
             ->height(300)
             ->format('webp')
-            ->quality(80)
-            ->nonQueued();
+            ->quality(80);
 
         $this->addMediaConversion('medium')
+            ->nonQueued()
             ->width(800)
             ->height(600)
             ->format('webp')
-            ->quality(80)
-            ->nonQueued();
+            ->quality(80);
 
         $this->addMediaConversion('large')
+            ->queued()
             ->width(1200)
             ->height(900)
             ->format('webp')
-            ->quality(85)
-            ->queued();
+            ->quality(85);
     }
 
     /**
