@@ -146,7 +146,20 @@ class UserResource extends Resource
                 ->label('Avatar')
                 ->circular()
                 ->size(40)
-                ->searchable(),
+                ->getStateUsing(function ($record) {
+                    $avatar = $record->avatar;
+
+                    if (empty($avatar)) {
+                        return null;
+                    }
+
+                    if (str_starts_with($avatar, 'http')) {
+                        return $avatar;
+                    }
+
+                    return \Illuminate\Support\Facades\Storage::disk('public')->url($avatar);
+                })
+                ->defaultImageUrl(fn ($record) => 'https://ui-avatars.com/api/?name='.urlencode($record->firstname.' '.$record->lastname).'&background=F6475F&color=fff'),
             TextColumn::make('full_name')
                 ->label('Nom complet')
                 ->formatStateUsing(fn ($record) => $record->firstname.' '.$record->lastname)
