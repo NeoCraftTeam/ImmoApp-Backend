@@ -29,7 +29,9 @@ class SubscriptionService
         ?Payment $payment = null
     ): Subscription {
         return DB::transaction(function () use ($agency, $plan, $payment, $period) {
-            $this->cancelActiveSubscriptions($agency);
+            // P1-4 Fix: Don't cancel active subscription yet!
+            // Wait until payment is successful in activateSubscription.
+            // $this->cancelActiveSubscriptions($agency);
 
             return Subscription::create([
                 'agency_id' => $agency->id,
@@ -49,6 +51,9 @@ class SubscriptionService
     public function activateSubscription(Subscription $subscription): void
     {
         DB::transaction(function () use ($subscription): void {
+            // P1-4 Fix: Cancel old subscriptions only when the new one is activated
+            $this->cancelActiveSubscriptions($subscription->agency);
+
             $subscription->activate();
 
             /** @var Agency $agency */
@@ -98,7 +103,7 @@ class SubscriptionService
                 Mail::to($user->email)->send(new SubscriptionInvoiceMail($user, $invoice));
             }
         } catch (\Exception $e) {
-            Log::error('Erreur envoi emails abonnement: '.$e->getMessage());
+            Log::error('Erreur envoi emails abonnement: ' . $e->getMessage());
         }
     }
 
@@ -130,7 +135,7 @@ class SubscriptionService
                 $subscription->expire();
 
                 $subscription->agency->users->each(function (User $user): void {
-                    $user->ads->each(fn (\App\Models\Ad $ad) => $ad->unboost());
+                    $user->ads->each(fn(\App\Models\Ad $ad) => $ad->unboost());
                 });
             });
         }
@@ -169,7 +174,7 @@ class SubscriptionService
             'current_plan' => $currentSubscription?->plan->name,
             'days_remaining' => $currentSubscription?->daysRemaining() ?? 0,
             'expires_at' => $currentSubscription?->ends_at,
-            'total_boosted_ads' => $agency->users->sum(fn (User $user) => $user->ads()->where('is_boosted', true)->count()),
+            'total_boosted_ads' => $agency->users->sum(fn(User $user) => $user->ads()->where('is_boosted', true)->count()),
         ];
     }
 }
