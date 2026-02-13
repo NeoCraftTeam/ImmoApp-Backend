@@ -1,41 +1,42 @@
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        console.log("[MobileBridge] Initialized");
+        // Allowed origins: React Native WebView sends 'null', production sends our domain
+        const ALLOWED_ORIGINS = ['null', '{{ config("app.url") }}'];
 
         window.addEventListener('message', (event) => {
             try {
+                // Validate origin — only accept messages from trusted sources
+                if (!ALLOWED_ORIGINS.includes(String(event.origin))) return;
+
                 // Ignore empty messages
                 if (!event.data) return;
 
                 const message = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
 
-                console.log("[MobileBridge] Message received:", message.type);
-
                 if (message && message.type === 'LOCATION_RECEIVED') {
-                    const { latitude, longitude } = message.data;
+                    const { latitude, longitude } = message.data || {};
 
-                    // Broadcast user location to all Livewire components that might have these fields
-                    const components = Livewire.all();
-                    let updated = false;
+                    // Validate that coordinates are actual numbers
+                    if (typeof latitude !== 'number' || typeof longitude !== 'number') return;
+                    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return;
 
-                    components.forEach(component => {
-                        try {
-                            // Try setting the data on the component
-                            // We assume Filament uses 'data.*' for form state
-                            component.set('data.latitude', latitude);
-                            component.set('data.longitude', longitude);
-                            updated = true;
-                        } catch (err) {
-                            // Component might not have these properties
+                    // Target only the first Livewire component (ad form) instead of all
+                    const wireEl = document.querySelector('[wire\\:id]');
+                    if (!wireEl) return;
+
+                    const wireId = wireEl.getAttribute('wire:id');
+                    const adForm = Livewire.find(wireId);
+                    if (adForm) {
+                        adForm.set('data.latitude', latitude);
+                        adForm.set('data.longitude', longitude);
+
+                        if (window.FilamentNotification) {
+                            new FilamentNotification()
+                                .title('Position GPS reçue')
+                                .body(`Lat: ${latitude.toFixed(6)}, Lng: ${longitude.toFixed(6)}`)
+                                .success()
+                                .send();
                         }
-                    });
-
-                    if (updated && window.FilamentNotification) {
-                        new FilamentNotification()
-                            .title('Position GPS reçue')
-                            .body(`Lat: ${latitude}, Lng: ${longitude}`)
-                            .success()
-                            .send();
                     }
                 }
             } catch (e) {
