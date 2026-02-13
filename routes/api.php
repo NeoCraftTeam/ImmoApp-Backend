@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\QuarterController;
 use App\Http\Controllers\Api\V1\RecommendationController;
+use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -129,6 +130,16 @@ Route::prefix('v1')->group(function (): void {
         ->middleware('auth:sanctum');
     Route::post('/payments/webhook', [PaymentController::class, 'webhook']);
     Route::get('/payments/callback', [PaymentController::class, 'callback']);
+
+    // --- ABONNEMENTS AGENCES ---
+    Route::get('/subscriptions/plans', [SubscriptionController::class, 'plans']);
+    Route::middleware('auth:sanctum')->prefix('subscriptions')->group(function (): void {
+        Route::get('/current', [SubscriptionController::class, 'current']);
+        Route::post('/subscribe', [SubscriptionController::class, 'subscribe'])
+            ->middleware('throttle:5,1');
+        Route::post('/cancel', [SubscriptionController::class, 'cancel']);
+        Route::get('/history', [SubscriptionController::class, 'history']);
+    });
 
     //  Ads
     Route::prefix('ads')->controller(AdController::class)->group(function (): void {

@@ -5,16 +5,22 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\SubscriptionStatus;
+use App\Mail\SubscriptionInvoiceMail;
+use App\Mail\SubscriptionSuccessEmail;
 use App\Models\Agency;
+use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
+use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class SubscriptionService
 {
     /**
-     * Create a new subscription for an agency
+     * Create a new subscription for an agency.
      */
     public function createSubscription(
         Agency $agency,
@@ -23,11 +29,9 @@ class SubscriptionService
         ?Payment $payment = null
     ): Subscription {
         return DB::transaction(function () use ($agency, $plan, $payment, $period) {
-            // Cancel any existing active subscription
             $this->cancelActiveSubscriptions($agency);
 
-            // Create new subscription
-            $subscription = Subscription::create([
+            return Subscription::create([
                 'agency_id' => $agency->id,
                 'subscription_plan_id' => $plan->id,
                 'billing_period' => $period,
@@ -36,20 +40,17 @@ class SubscriptionService
                 'amount_paid' => $payment ? $payment->amount : $plan->price,
                 'auto_renew' => false,
             ]);
-
-            return $subscription;
         });
     }
 
     /**
-     * Activate a subscription
+     * Activate a subscription, boost ads, generate invoice, and send emails.
      */
     public function activateSubscription(Subscription $subscription): void
     {
         DB::transaction(function () use ($subscription): void {
             $subscription->activate();
 
-            // Boost all existing ads from this agency
             /** @var Agency $agency */
             $agency = $subscription->agency;
             /** @var SubscriptionPlan $plan */
@@ -57,20 +58,52 @@ class SubscriptionService
 
             $this->boostAgencyAds($agency, $plan);
 
-            // Envoyer l'email de confirmation
-            try {
-                foreach ($subscription->agency->users as $user) {
-                    \Illuminate\Support\Facades\Mail::to($user->email)
-                        ->send(new \App\Mail\SubscriptionSuccessEmail($subscription));
-                }
-            } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error('Erreur envoi mail succès: '.$e->getMessage());
-            }
+            $invoice = $this->generateInvoice($subscription);
+
+            $this->sendSubscriptionEmails($subscription, $invoice);
         });
     }
 
     /**
-     * Cancel active subscriptions for an agency
+     * Generate an invoice for the subscription.
+     */
+    public function generateInvoice(Subscription $subscription): Invoice
+    {
+        return Invoice::create([
+            'invoice_number' => Invoice::generateNumber(),
+            'subscription_id' => $subscription->id,
+            'agency_id' => $subscription->agency_id,
+            'payment_id' => $subscription->payment_id,
+            'plan_name' => $subscription->plan->name,
+            'billing_period' => $subscription->billing_period,
+            'amount' => (int) $subscription->amount_paid,
+            'currency' => 'XOF',
+            'issued_at' => now(),
+            'period_start' => $subscription->starts_at,
+            'period_end' => $subscription->ends_at,
+        ]);
+    }
+
+    /**
+     * Send subscription confirmation + invoice emails to all agency users.
+     */
+    protected function sendSubscriptionEmails(Subscription $subscription, Invoice $invoice): void
+    {
+        try {
+            $invoice->load('agency');
+
+            foreach ($subscription->agency->users as $user) {
+                /** @var User $user */
+                Mail::to($user->email)->send(new SubscriptionSuccessEmail($subscription));
+                Mail::to($user->email)->send(new SubscriptionInvoiceMail($user, $invoice));
+            }
+        } catch (\Exception $e) {
+            Log::error('Erreur envoi emails abonnement: '.$e->getMessage());
+        }
+    }
+
+    /**
+     * Cancel active subscriptions for an agency.
      */
     public function cancelActiveSubscriptions(Agency $agency, ?string $reason = null): void
     {
@@ -84,7 +117,7 @@ class SubscriptionService
     }
 
     /**
-     * Check and expire subscriptions
+     * Check and expire subscriptions.
      */
     public function expireSubscriptions(): int
     {
@@ -96,8 +129,7 @@ class SubscriptionService
             DB::transaction(function () use ($subscription): void {
                 $subscription->expire();
 
-                // Remove boost from all agency ads
-                $subscription->agency->users->each(function (\App\Models\User $user): void {
+                $subscription->agency->users->each(function (User $user): void {
                     $user->ads->each(fn (\App\Models\Ad $ad) => $ad->unboost());
                 });
             });
@@ -107,12 +139,12 @@ class SubscriptionService
     }
 
     /**
-     * Boost all ads from an agency
+     * Boost all ads from an agency.
      */
     protected function boostAgencyAds(Agency $agency, SubscriptionPlan $plan): void
     {
         $agency->users()->get()->each(function ($user) use ($plan): void {
-            /** @var \App\Models\User $user */
+            /** @var User $user */
             $user->ads()
                 ->where('status', \App\Enums\AdStatus::AVAILABLE)
                 ->get()
@@ -124,7 +156,9 @@ class SubscriptionService
     }
 
     /**
-     * Get subscription statistics for an agency
+     * Get subscription statistics for an agency.
+     *
+     * @return array{has_active_subscription: bool, current_plan: string|null, days_remaining: int, expires_at: \Illuminate\Support\Carbon|null, total_boosted_ads: int}
      */
     public function getAgencyStats(Agency $agency): array
     {
@@ -135,7 +169,7 @@ class SubscriptionService
             'current_plan' => $currentSubscription?->plan->name,
             'days_remaining' => $currentSubscription?->daysRemaining() ?? 0,
             'expires_at' => $currentSubscription?->ends_at,
-            'total_boosted_ads' => $agency->users->sum(fn (\App\Models\User $user) => $user->ads()->where('is_boosted', true)->count()),
+            'total_boosted_ads' => $agency->users->sum(fn (User $user) => $user->ads()->where('is_boosted', true)->count()),
         ];
     }
 }
