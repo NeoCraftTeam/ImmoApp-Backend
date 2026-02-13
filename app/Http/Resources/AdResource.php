@@ -53,7 +53,8 @@ final class AdResource extends JsonResource
             'images' => $this->getAccessibleImages($request->user())->map(fn ($media) => [
                 'id' => $media->id,
                 'url' => $media->getUrl(),
-                'thumb' => $media->getUrl('thumb'),
+                'thumb' => $media->hasGeneratedConversion('thumb') ? $media->getUrl('thumb') : $media->getUrl(),
+                'medium' => $media->hasGeneratedConversion('medium') ? $media->getUrl('medium') : $media->getUrl(),
                 'mime_type' => $media->mime_type,
                 'is_primary' => $this->getMedia('images')->first()?->id === $media->id,
             ]),
