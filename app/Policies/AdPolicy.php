@@ -29,7 +29,7 @@ class AdPolicy
 
     public function update(User $user, Ad $ad): bool
     {
-        return $user->id === $ad->user_id;
+        return $user->isAdmin() || $user->id === $ad->user_id;
     }
 
     public function delete(User $user, Ad $ad): bool
@@ -53,11 +53,7 @@ class AdPolicy
 
     public function adsNearby(?User $user): bool
     {
-        // Allow guests to access nearby ads endpoint; authenticated customers/admins also allowed
-        if ($user === null) {
-            return true;
-        }
-
-        return $user->isCustomer() || $user->isAdmin();
+        // Allow all users (including guests and agents) to access nearby ads
+        return true;
     }
 }
