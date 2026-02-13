@@ -47,6 +47,7 @@ class UserFactory extends Factory
             'location' => "POINT($longitude $latitude)",
 
             'city_id' => City::factory(),
+            'is_active' => true,
         ];
     }
 

@@ -18,6 +18,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/*',
             'api/v1/payments/webhook',
         ]);
+        $middleware->alias([
+            'active' => \App\Http\Middleware\EnsureUserIsActive::class,
+        ]);
+        // Append is_active check to all sanctum-authenticated API routes
+        $middleware->appendToGroup('api', [
+            \App\Http\Middleware\EnsureUserIsActive::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         Integration::handles($exceptions);
