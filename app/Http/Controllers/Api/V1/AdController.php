@@ -122,7 +122,8 @@ final class AdController
     {
         $this->authorize('viewAny', Ad::class);
 
-        $perPage = (int) request('per_page', config('pagination.per_page', 15));
+        // P1-3 Fix: Clamp per_page to max 100
+        $perPage = min(max((int) request('per_page', config('pagination.per_page', 15)), 1), 100);
         $type = request('type');
 
         $query = Ad::query()
@@ -968,6 +969,15 @@ final class AdController
                     'message' => 'User not found.',
                 ], 404);
             }
+
+            // P0-5 Fix: Prevent IDOR — only allow querying own location or admin
+            $authUser = auth()->user();
+            if ($authUser && $targetUser->id !== $authUser->id && !$authUser->isAdmin()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized: you can only query your own location.',
+                ], 403);
+            }
         }
 
         // Sinon, utiliser l'utilisateur authentifié uniquement si aucun utilisateur cible n'a été fourni
@@ -997,7 +1007,8 @@ final class AdController
             }
         }
 
-        $radius = (float) $request->input('radius', $defaultRadius);
+        // P0-6 Fix: Clamp radius to max 50km to prevent full-table geo scan DoS
+        $radius = min((float) $request->input('radius', $defaultRadius), 50000);
 
         // Valider la présence et les bornes des coordonnées finales
         $latValid = is_numeric($lat) && $lat >= -90 && $lat <= 90;
@@ -1772,7 +1783,8 @@ final class AdController
             // Tri et pagination
             $sortBy = $validated['sort'] ?? 'created_at';
             $sortOrder = strtolower($validated['order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
-            $perPage = (int) ($validated['per_page'] ?? config('pagination.per_page', 15));
+            // P1-3 Fix: Clamp per_page to max 100
+            $perPage = min(max((int) ($validated['per_page'] ?? config('pagination.per_page', 15)), 1), 100);
 
             // Construire les filtres Meilisearch
             $filters = [];
@@ -1883,7 +1895,8 @@ final class AdController
         $q = (string) ($validated['q'] ?? '');
         $city = $validated['city'] ?? null;
         $type = $validated['type'] ?? null;
-        $perPage = (int) ($validated['per_page'] ?? config('pagination.per_page', 15));
+        // P1-3 Fix: Clamp per_page to max 100
+        $perPage = min(max((int) ($validated['per_page'] ?? config('pagination.per_page', 15)), 1), 100);
         $minBedrooms = isset($validated['bedrooms']) ? (int) $validated['bedrooms'] : null;
         $minPrice = isset($validated['price_min']) ? (float) $validated['price_min'] : null;
         $maxPrice = isset($validated['price_max']) ? (float) $validated['price_max'] : null;

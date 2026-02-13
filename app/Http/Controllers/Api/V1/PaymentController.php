@@ -65,18 +65,6 @@ final class PaymentController
     {
         $user = $request->user();
 
-        $existingPayment = Payment::where('user_id', $user->id)
-            ->where('ad_id', $ad->id)
-            ->where('status', PaymentStatus::SUCCESS)
-            ->first();
-
-        if ($existingPayment) {
-            return response()->json([
-                'message' => 'Annonce déjà débloquée.',
-                'status' => 'already_paid',
-            ]);
-        }
-
         // Sécurité : Le propriétaire n'a pas besoin de payer pour sa propre annonce
         if ($ad->user_id === $user->id) {
             return response()->json([
@@ -85,11 +73,44 @@ final class PaymentController
             ]);
         }
 
-        $paymentData = $this->fedaPay->createPayment($this->unlockPrice(), $user, $ad->id);
+        // P0-1 Fix: Atomic check-then-create with lockForUpdate to prevent TOCTOU race
+        return DB::transaction(function () use ($user, $ad) {
+            $existingPayment = Payment::where('user_id', $user->id)
+                ->where('ad_id', $ad->id)
+                ->where('status', PaymentStatus::SUCCESS)
+                ->lockForUpdate()
+                ->first();
 
-        if ($paymentData['success']) {
-            DB::beginTransaction();
-            try {
+            if ($existingPayment) {
+                return response()->json([
+                    'message' => 'Annonce déjà débloquée.',
+                    'status' => 'already_paid',
+                ]);
+            }
+
+            // Also check for an existing PENDING payment to avoid creating duplicates
+            $pendingPayment = Payment::where('user_id', $user->id)
+                ->where('ad_id', $ad->id)
+                ->where('status', PaymentStatus::PENDING)
+                ->lockForUpdate()
+                ->first();
+
+            if ($pendingPayment) {
+                // Reuse: Verify if the existing transaction is still valid
+                $result = $this->fedaPay->retrieveTransaction((int) $pendingPayment->transaction_id);
+                if ($result['success'] && $result['status'] === 'approved') {
+                    $pendingPayment->update(['status' => PaymentStatus::SUCCESS]);
+
+                    return response()->json([
+                        'message' => 'Paiement déjà effectué. Annonce débloquée.',
+                        'status' => 'already_paid',
+                    ]);
+                }
+            }
+
+            $paymentData = $this->fedaPay->createPayment($this->unlockPrice(), $user, $ad->id);
+
+            if ($paymentData['success']) {
                 Payment::create([
                     'user_id' => $user->id,
                     'ad_id' => $ad->id,
@@ -100,27 +121,17 @@ final class PaymentController
                     'type' => PaymentType::UNLOCK,
                 ]);
 
-                DB::commit();
-
                 return response()->json([
                     'payment_url' => $paymentData['url'],
                     'message' => 'Redirigez l\'utilisateur vers cette URL pour payer.',
                 ]);
-            } catch (\Exception $e) {
-                DB::rollBack();
-                Log::error('Erreur lors de la création du paiement en base: '.$e->getMessage());
-
-                return response()->json([
-                    'message' => 'Erreur technique lors de l\'initialisation.',
-                    'error' => config('app.debug') ? $e->getMessage() : null,
-                ], 500);
             }
-        }
 
-        return response()->json([
-            'message' => 'Erreur lors de l\'initialisation du paiement.',
-            'error' => config('app.debug') ? ($paymentData['message'] ?? null) : null,
-        ], 500);
+            return response()->json([
+                'message' => 'Erreur lors de l\'initialisation du paiement.',
+                'error' => config('app.debug') ? ($paymentData['message'] ?? null) : null,
+            ], 500);
+        });
     }
 
     /**
@@ -173,14 +184,23 @@ final class PaymentController
             return response()->json(['status' => 'error', 'message' => 'No transaction ID'], 400);
         }
 
-        $payment = Payment::where('transaction_id', (string) $transactionId)->first();
+        // P0-2 Fix: lockForUpdate + idempotency guard to prevent double processing
+        return DB::transaction(function () use ($transactionId, $event) {
+            $payment = Payment::where('transaction_id', (string) $transactionId)
+                ->lockForUpdate()
+                ->first();
 
-        if (!$payment) {
-            return response()->json(['status' => 'not_found'], 404);
-        }
+            if (!$payment) {
+                return response()->json(['status' => 'not_found'], 404);
+            }
 
-        DB::beginTransaction();
-        try {
+            // Idempotency guard: skip if already in a terminal state
+            if (in_array($payment->status, [PaymentStatus::SUCCESS, PaymentStatus::FAILED], true)) {
+                Log::info("Webhook ignoré: Paiement #{$payment->id} déjà traité (status: {$payment->status->value}).");
+
+                return response()->json(['status' => 'already_processed'], 200);
+            }
+
             // 1. Gestion du SUCCÈS
             if (isset($event['event']) && $event['event'] === 'transaction.approved') {
                 $payment->update(['status' => PaymentStatus::SUCCESS]);
@@ -213,15 +233,8 @@ final class PaymentController
                 Log::info("Paiement #{$payment->id} marqué comme échoué.");
             }
 
-            DB::commit();
-
             return response()->json(['status' => 'ok']);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            Log::error('Erreur lors du traitement du webhook: '.$e->getMessage());
-
-            return response()->json(['status' => 'error', 'message' => 'Webhook processing failed'], 500);
-        }
+        });
     }
 
     /**

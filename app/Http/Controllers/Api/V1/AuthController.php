@@ -12,6 +12,7 @@ use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -213,6 +214,7 @@ final class AuthController
     {
         $data = $request->validated();
         $data['role'] = 'customer';
+        $data['type'] = 'individual'; // P1-2 Fix: Force type for customer registration
 
         // Appel de la méthode privée
         return $this->registerUser($data, $request);
@@ -255,6 +257,8 @@ final class AuthController
             }
 
             // Transaction pour assurer la cohérence
+            // P1-1 Fix: email uniqueness is also enforced by DB unique constraint;
+            // catch UniqueConstraintViolationException for clean 409 response
             $result = DB::transaction(function () use ($request, $data) {
 
                 // Créer l'utilisateur
@@ -342,6 +346,17 @@ final class AuthController
             return response()->json([
                 'message' => 'Le fichier avatar est introuvable.',
             ], 400);
+
+            // P1-1 Fix: Catch DB unique constraint violation (concurrent signup race)
+        } catch (UniqueConstraintViolationException $e) {
+            Log::warning('Registration duplicate email (DB constraint)', [
+                'email' => $data['email'] ?? 'unknown',
+                'ip' => $request->ip(),
+            ]);
+
+            return response()->json([
+                'message' => 'Cette adresse email est déjà utilisée.',
+            ], 409);
 
         } catch (Throwable $e) {
             Log::error('Registration failed', [

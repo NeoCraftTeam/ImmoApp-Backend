@@ -29,7 +29,12 @@ class AdPolicy
 
     public function update(User $user, Ad $ad): bool
     {
-        return $user->isAdmin();
+        if ($user->isAdmin()) {
+            return true;
+        }
+
+        // P0-3 Fix: Allow agents to update their own ads
+        return $user->isAgent() && $user->id === $ad->user_id;
     }
 
     public function delete(User $user, Ad $ad): bool
