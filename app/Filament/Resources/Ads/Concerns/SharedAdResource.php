@@ -276,7 +276,7 @@ trait SharedAdResource
      *
      * @return array<string, mixed>
      */
-    protected static function mutateLocationMapData(array $data): array
+    public static function mutateLocationMapData(array $data): array
     {
         if (isset($data['location_map']) && is_array($data['location_map'])) {
             $lat = $data['location_map']['lat'] ?? null;

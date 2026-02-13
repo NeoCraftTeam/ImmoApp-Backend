@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Filament\Bailleur\Resources\Ads\Pages;
 
 use App\Filament\Bailleur\Resources\Ads\AdResource;
-use Clickbar\Magellan\Data\Geometries\Point;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ManageRecords;
 
@@ -17,14 +16,7 @@ class ManageAds extends ManageRecords
     {
         return [
             CreateAction::make()
-                ->mutateFormDataUsing(function (array $data): array {
-                    if (isset($data['location_map']) && is_array($data['location_map'])) {
-                        $data['location'] = Point::make($data['location_map']['lat'], $data['location_map']['lng']);
-                        unset($data['location_map']);
-                    }
-
-                    return $data;
-                }),
+                ->mutateFormDataUsing(fn (array $data): array => AdResource::mutateLocationMapData($data)),
         ];
     }
 }
