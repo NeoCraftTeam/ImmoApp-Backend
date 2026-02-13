@@ -77,7 +77,7 @@ class Invoice extends Model
 
         $sequence = 1;
         if ($lastInvoice) {
-            $lastSequence = (int) substr($lastInvoice->invoice_number, -4);
+            $lastSequence = (int) substr((string) $lastInvoice->invoice_number, -4);
             $sequence = $lastSequence + 1;
         }
 

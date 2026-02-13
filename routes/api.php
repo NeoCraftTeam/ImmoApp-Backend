@@ -117,11 +117,9 @@ Route::prefix('v1')->group(function (): void {
     });
 
     // --- PRIX DE DÉBLOCAGE ---
-    Route::get('/payments/unlock-price', function () {
-        return response()->json([
-            'unlock_price' => (int) \App\Models\Setting::get('unlock_price', 500),
-        ]);
-    });
+    Route::get('/payments/unlock-price', fn () => response()->json([
+        'unlock_price' => (int) \App\Models\Setting::get('unlock_price', 500),
+    ]));
 
     // --- PAIEMENTS ---
     Route::post('/payments/initialize/{ad}', [PaymentController::class, 'initialize'])

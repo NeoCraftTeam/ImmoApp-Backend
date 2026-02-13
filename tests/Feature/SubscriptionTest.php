@@ -122,9 +122,7 @@ test('agent can initiate subscription payment', function (): void {
     $mock = Mockery::mock(FedaPayService::class);
     $mock->shouldReceive('createSubscriptionPayment')
         ->once()
-        ->withArgs(function ($amount, $agency, $planId, $period) {
-            return $amount === 35000 && $period === 'monthly';
-        })
+        ->withArgs(fn ($amount, $agency, $planId, $period) => $amount === 35000 && $period === 'monthly')
         ->andReturn([
             'success' => true,
             'url' => 'https://fedapay.com/pay/sub-123',
@@ -154,9 +152,7 @@ test('agent can subscribe yearly with correct amount', function (): void {
     $mock = Mockery::mock(FedaPayService::class);
     $mock->shouldReceive('createSubscriptionPayment')
         ->once()
-        ->withArgs(function ($amount) {
-            return $amount === 350000;
-        })
+        ->withArgs(fn ($amount) => $amount === 350000)
         ->andReturn([
             'success' => true,
             'url' => 'https://fedapay.com/pay/sub-yearly',
