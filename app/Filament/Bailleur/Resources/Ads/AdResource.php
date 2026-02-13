@@ -76,12 +76,14 @@ class AdResource extends Resource
                     ->multiple()
                     ->reorderable()
                     ->maxFiles(10)
+                    ->maxSize(5120)
+                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
                     ->columnSpanFull(),
                 TextInput::make('adresse')
                     ->required(),
                 TextInput::make('price')
                     ->numeric()
-                    ->prefix('$'),
+                    ->prefix('FCFA'),
                 TextInput::make('surface_area')
                     ->required()
                     ->numeric(),
@@ -187,7 +189,7 @@ class AdResource extends Resource
     {
         return $schema
             ->components([
-                Section::make('Apperçu')
+                Section::make('Aperçu')
                     ->schema([
                         SpatieMediaLibraryImageEntry::make('images')
                             ->collection('images')
