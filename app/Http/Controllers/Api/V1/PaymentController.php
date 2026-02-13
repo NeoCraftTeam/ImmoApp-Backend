@@ -23,9 +23,7 @@ final class PaymentController
 {
     private int $amount = 500;
 
-    public function __construct(protected FedaPayService $fedaPay)
-    {
-    }
+    public function __construct(protected FedaPayService $fedaPay) {}
 
     /**
      * @OA\Post(
@@ -106,7 +104,7 @@ final class PaymentController
                 ]);
             } catch (\Exception $e) {
                 DB::rollBack();
-                Log::error('Erreur lors de la création du paiement en base: ' . $e->getMessage());
+                Log::error('Erreur lors de la création du paiement en base: '.$e->getMessage());
 
                 return response()->json([
                     'message' => 'Erreur technique lors de l\'initialisation.',
@@ -216,7 +214,7 @@ final class PaymentController
             return response()->json(['status' => 'ok']);
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error('Erreur lors du traitement du webhook: ' . $e->getMessage());
+            Log::error('Erreur lors du traitement du webhook: '.$e->getMessage());
 
             return response()->json(['status' => 'error', 'message' => 'Webhook processing failed'], 500);
         }
@@ -327,6 +325,7 @@ final class PaymentController
 
             if (!str_contains($segment, '=')) {
                 $signatures[] = $segment;
+
                 continue;
             }
 
@@ -334,6 +333,7 @@ final class PaymentController
 
             if ($key === 't') {
                 $timestamp = $value;
+
                 continue;
             }
 
@@ -349,17 +349,12 @@ final class PaymentController
         // Validate timestamp (prevent replay attacks > 5 minutes)
         if (abs(time() - (int) $timestamp) > 300) {
             Log::warning("Webhook FedaPay rejeté: Timestamp expiré (t=$timestamp).");
+
             return false;
         }
 
-        $expectedTimestampedSignature = hash_hmac('sha256', $timestamp . '.' . $payload, $secret);
+        $expectedTimestampedSignature = hash_hmac('sha256', $timestamp.'.'.$payload, $secret);
 
-        foreach ($signatures as $signature) {
-            if (hash_equals($expectedTimestampedSignature, $signature)) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($signatures, fn ($signature) => hash_equals($expectedTimestampedSignature, $signature));
     }
 }

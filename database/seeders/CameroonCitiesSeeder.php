@@ -24,7 +24,7 @@ class CameroonCitiesSeeder extends Seeder
 
         $this->parseSqlFile();
 
-        $this->command->info('  Parsed ' . count($this->entries) . ' localities');
+        $this->command->info('  Parsed '.count($this->entries).' localities');
 
         $cityCandidates = [];
         $quarterCandidates = [];
@@ -39,12 +39,12 @@ class CameroonCitiesSeeder extends Seeder
 
         $uniqueCities = $this->deduplicateCities($cityCandidates, $quarterCandidates);
 
-        $this->command->info('  Cities: ' . count($uniqueCities) . ', Quarters: ' . count($quarterCandidates));
+        $this->command->info('  Cities: '.count($uniqueCities).', Quarters: '.count($quarterCandidates));
 
         $cityModels = $this->createCities($uniqueCities);
         $this->createQuarters($quarterCandidates, $cityModels);
 
-        $this->command->info('  ✅ Done — ' . count($cityModels) . ' cities, ' . count($quarterCandidates) . ' quarters');
+        $this->command->info('  ✅ Done — '.count($cityModels).' cities, '.count($quarterCandidates).' quarters');
     }
 
     private function parseSqlFile(): void
@@ -96,7 +96,7 @@ class CameroonCitiesSeeder extends Seeder
         foreach ($cityCandidates as $entry) {
             $key = mb_strtolower($entry['name']);
 
-            if (! isset($uniqueCities[$key]) || $entry['population'] > $uniqueCities[$key]['population']) {
+            if (!isset($uniqueCities[$key]) || $entry['population'] > $uniqueCities[$key]['population']) {
                 if (isset($uniqueCities[$key])) {
                     $quarterCandidates[] = $uniqueCities[$key];
                 }
@@ -128,7 +128,7 @@ class CameroonCitiesSeeder extends Seeder
                 continue;
             }
 
-            if (! isset($regionBest[$region]) || $entry['population'] > $regionBest[$region]['population']) {
+            if (!isset($regionBest[$region]) || $entry['population'] > $regionBest[$region]['population']) {
                 $regionBest[$region] = ['index' => $idx, ...$entry];
             }
         }
