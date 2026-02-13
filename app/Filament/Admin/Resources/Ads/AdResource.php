@@ -179,7 +179,6 @@ class AdResource extends Resource
             ->columns([
                 \Filament\Tables\Columns\SpatieMediaLibraryImageColumn::make('images')
                     ->collection('images')
-                    ->conversion('thumb')
                     ->circular()
                     ->stacked()
                     ->limit(3)

@@ -115,6 +115,13 @@ Route::prefix('v1')->group(function (): void {
         return \App\Http\Resources\AdResource::collection($ads);
     });
 
+    // --- PRIX DE DÉBLOCAGE ---
+    Route::get('/payments/unlock-price', function () {
+        return response()->json([
+            'unlock_price' => (int) \App\Models\Setting::get('unlock_price', 500),
+        ]);
+    });
+
     // --- PAIEMENTS ---
     Route::post('/payments/initialize/{ad}', [PaymentController::class, 'initialize'])
         ->middleware(['auth:sanctum', 'throttle:10,1']);

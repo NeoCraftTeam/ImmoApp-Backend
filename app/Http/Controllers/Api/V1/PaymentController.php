@@ -9,6 +9,7 @@ use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
 use App\Models\Ad;
 use App\Models\Payment;
+use App\Models\Setting;
 use App\Services\FedaPayService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,9 +22,12 @@ use OpenApi\Annotations as OA;
  */
 final class PaymentController
 {
-    private int $amount = 500;
-
     public function __construct(protected FedaPayService $fedaPay) {}
+
+    private function unlockPrice(): int
+    {
+        return (int) Setting::get('unlock_price', 500);
+    }
 
     /**
      * @OA\Post(
@@ -81,7 +85,7 @@ final class PaymentController
             ]);
         }
 
-        $paymentData = $this->fedaPay->createPayment($this->amount, $user, $ad->id);
+        $paymentData = $this->fedaPay->createPayment($this->unlockPrice(), $user, $ad->id);
 
         if ($paymentData['success']) {
             DB::beginTransaction();
@@ -89,7 +93,7 @@ final class PaymentController
                 Payment::create([
                     'user_id' => $user->id,
                     'ad_id' => $ad->id,
-                    'amount' => $this->amount,
+                    'amount' => $this->unlockPrice(),
                     'transaction_id' => (string) $paymentData['transaction_id'],
                     'status' => PaymentStatus::PENDING,
                     'payment_method' => PaymentMethod::FEDAPAY,
