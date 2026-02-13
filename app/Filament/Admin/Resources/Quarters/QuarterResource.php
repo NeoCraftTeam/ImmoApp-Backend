@@ -143,6 +143,6 @@ class QuarterResource extends Resource
 
     public static function getNavigationBadgeTooltip(): ?string
     {
-        return 'The number of quarters';
+        return 'Nombre de quartiers';
     }
 }

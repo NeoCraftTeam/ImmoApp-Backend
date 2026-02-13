@@ -46,7 +46,16 @@ class CreateAdminCommand extends Command
 
         $firstname = $this->option('firstname') ?? $this->ask('First name');
         $lastname = $this->option('lastname') ?? $this->ask('Last name');
-        $password = $this->option('password') ?? $this->secret('Password (min 8 characters)');
+        $password = $this->option('password');
+        while (empty($password) || strlen($password) < 8) {
+            $password = $this->ask('Password (min 8 characters)');
+            if (empty($password)) {
+                $this->error('Le mot de passe ne peut pas être vide.');
+            } elseif (strlen($password) < 8) {
+                $this->error('Le mot de passe doit contenir au moins 8 caractères.');
+                $password = null;
+            }
+        }
 
         $validator = Validator::make([
             'email' => $email,
