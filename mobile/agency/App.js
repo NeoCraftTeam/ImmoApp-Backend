@@ -126,7 +126,7 @@ export default function App() {
               setError({
                 type: 'network',
                 message: 'Impossible de se connecter au serveur',
-                details: nativeEvent.description || 'Vérifiez votre connexion internet'
+                details: 'Vérifiez votre connexion internet'
               });
               setIsLoading(false);
             }}
