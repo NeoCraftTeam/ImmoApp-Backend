@@ -112,7 +112,7 @@ export default function App() {
 	              NativeService.handleWebViewMessage(event);
 	            }}
 	            // Sécurité : Restreindre les origines autorisées
-	            originWhitelist={['http://localhost*', 'https://*.keyhome.neocraft.dev', 'https://api.keyhome.neocraft.dev']}
+	            originWhitelist={['https://*.keyhome.neocraft.dev']}
 	            // Sécurité : Désactiver l'accès au système de fichiers
 	            allowFileAccess={false}
 	            // Sécurité : Empêcher l'exécution de JS injecté de manière non sécurisée

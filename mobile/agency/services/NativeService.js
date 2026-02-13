@@ -59,7 +59,7 @@ class NativeService {
       // Security: Validate origin before processing sensitive actions
       const origin = event.nativeEvent.url || '';
       const allowedOrigins = [
-        'http://localhost', 
+        'https://keyhomeback.neocraft.dev', 
         'https://api.keyhome.neocraft.dev', 
         'https://agency.keyhome.neocraft.dev',
         'https://bailleur.keyhome.neocraft.dev'
