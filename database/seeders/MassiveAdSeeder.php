@@ -16,6 +16,8 @@ use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Spatie\MediaLibrary\Conversions\FileManipulator;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class MassiveAdSeeder extends Seeder
 {
@@ -75,9 +77,28 @@ class MassiveAdSeeder extends Seeder
         $this->createUsers();
         $this->loadReferenceData();
         $this->downloadImagePool();
+
+        $this->command->info('Disabling media conversions for faster seeding...');
+        app()->bind(FileManipulator::class, fn () => new class extends FileManipulator
+        {
+            public function createDerivedFiles(
+                Media $media,
+                array $onlyConversionNames = [],
+                bool $onlyMissing = false,
+                bool $withResponsiveImages = true,
+                bool $queueAll = false,
+            ): void {
+                // Skip conversions during seeding
+            }
+        });
+
         $this->createAds();
+
+        app()->forgetInstance(FileManipulator::class);
+
         $this->cleanupImagePool();
         $this->command->info('Seeding complete! '.Ad::count().' ads in database.');
+        $this->command->warn('Run "php artisan media-library:regenerate" to generate image conversions.');
     }
 
     private function createUsers(): void
