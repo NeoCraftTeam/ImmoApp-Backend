@@ -7,7 +7,6 @@ namespace App\Filament\Admin\Resources\ActivityLogs;
 use App\Filament\Admin\Resources\ActivityLogs\Pages\ManageActivityLogs;
 use BackedEnum;
 use Filament\Actions\ViewAction;
-use Filament\Infolists\Components\KeyValueEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
@@ -80,12 +79,16 @@ class ActivityLogResource extends Resource
 
                 Section::make('Modifications')
                     ->schema([
-                        KeyValueEntry::make('properties.old')
+                        TextEntry::make('properties.old')
                             ->label('Anciennes valeurs')
-                            ->columnSpanFull(),
-                        KeyValueEntry::make('properties.attributes')
+                            ->columnSpanFull()
+                            ->formatStateUsing(fn ($state) => '<pre style="font-size: 0.8em; overflow-x: auto;">'.json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE).'</pre>')
+                            ->html(),
+                        TextEntry::make('properties.attributes')
                             ->label('Nouvelles valeurs')
-                            ->columnSpanFull(),
+                            ->columnSpanFull()
+                            ->formatStateUsing(fn ($state) => '<pre style="font-size: 0.8em; overflow-x: auto;">'.json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE).'</pre>')
+                            ->html(),
                     ])
                     ->visible(fn ($record): bool => !empty($record->properties->get('old')) || !empty($record->properties->get('attributes')))
                     ->collapsed(),
