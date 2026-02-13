@@ -51,6 +51,9 @@ class NewAdSubmissionMail extends Mailable
             markdown: 'emails.new_ad_submission',
             with: [
                 'authorName' => $this->author->fullname,
+                'authorEmail' => $this->author->email,
+                'authorRole' => $this->author->role->getLabel(),
+                'authorType' => $this->author->type?->getLabel() ?? 'N/A',
                 'adTitle' => $this->ad->title,
                 'adPrice' => number_format((float) $this->ad->price, 0, ',', ' ').' FCFA',
                 'adType' => $this->ad->ad_type->name ?? 'N/A',

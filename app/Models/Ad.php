@@ -76,13 +76,15 @@ use Laravel\Scout\Searchable;
  *
  * @mixin Eloquent
  */
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Ad extends Model implements HasMedia
 {
-    use HasFactory, HasUuids, SoftDeletes;
+    use HasFactory, HasUuids, LogsActivity, SoftDeletes;
     use InteractsWithMedia, Searchable;
 
     protected $table = 'ad';
@@ -416,5 +418,14 @@ class Ad extends Model implements HasMedia
     {
         return $query->orderByDesc('boost_score')
             ->orderByDesc('created_at');
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $eventName): string => "Annonce « {$this->title} » {$eventName}");
     }
 }

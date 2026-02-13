@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * @property string $id
@@ -57,7 +59,7 @@ use Illuminate\Support\Carbon;
  */
 class Payment extends Model
 {
-    use HasFactory, HasUuids, SoftDeletes;
+    use HasFactory, HasUuids, LogsActivity, SoftDeletes;
 
     protected $fillable = [
 
@@ -175,5 +177,14 @@ class Payment extends Model
     public function isBoosted(): bool
     {
         return $this->type === PaymentType::BOOST;
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $eventName): string => "Paiement #{$this->transaction_id} {$eventName}");
     }
 }

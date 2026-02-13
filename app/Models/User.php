@@ -34,6 +34,8 @@ use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\PersonalAccessToken;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Collections\MediaCollection;
@@ -109,7 +111,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasAvatar, HasEmailAuthentication, HasMedia, HasName, HasTenants, MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, HasUuids, \Illuminate\Auth\MustVerifyEmail, Notifiable, softDeletes;
+    use HasApiTokens, HasFactory, HasUuids, \Illuminate\Auth\MustVerifyEmail, LogsActivity, Notifiable, softDeletes;
 
     use InteractsWithMedia;
 
@@ -419,5 +421,14 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'app_authentication_recovery_codes' => 'encrypted:array',
             'has_email_authentication' => 'boolean',
         ];
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['firstname', 'lastname', 'email', 'phone_number', 'role', 'type', 'is_active', 'avatar', 'agency_id'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $eventName): string => "Utilisateur « {$this->firstname} {$this->lastname} » {$eventName}");
     }
 }

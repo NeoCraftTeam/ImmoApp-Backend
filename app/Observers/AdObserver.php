@@ -6,6 +6,7 @@ namespace App\Observers;
 
 use App\Enums\AdStatus;
 use App\Enums\UserRole;
+use App\Mail\AdSubmissionConfirmationMail;
 use App\Mail\NewAdSubmissionMail;
 use App\Models\Ad;
 use App\Models\User;
@@ -23,6 +24,12 @@ class AdObserver
 
         // Notify admins if status is PENDING
         if ($ad->status === AdStatus::PENDING) {
+            // 1. Send confirmation to the author
+            if ($ad->user) {
+                Mail::to($ad->user)->send(new AdSubmissionConfirmationMail($ad));
+            }
+
+            // 2. Notify all admins
             $admins = User::where('role', UserRole::ADMIN)->get();
             foreach ($admins as $admin) {
                 Mail::to($admin)->send(new NewAdSubmissionMail($ad));

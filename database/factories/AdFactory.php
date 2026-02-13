@@ -6,6 +6,7 @@ use App\Models\Ad;
 use App\Models\AdType;
 use App\Models\Quarter;
 use App\Models\User;
+use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
 
@@ -38,7 +39,7 @@ class AdFactory extends Factory
             'bedrooms' => fake()->randomDigitNotNull(),
             'bathrooms' => fake()->randomDigitNotNull(),
             'has_parking' => fake()->boolean(),
-            'location' => "POINT($longitude $latitude)",
+            'location' => Point::makeGeodetic($latitude, $longitude),
             'status' => fake()->randomElement(['available', 'reserved', 'rent']),
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),

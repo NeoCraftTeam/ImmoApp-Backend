@@ -5,6 +5,12 @@
 
     Une nouvelle annonce a été soumise par **{{ $authorName }}** et nécessite votre validation.
 
+    ## Détails de l'annonceur
+    - **Nom** : {{ $authorName }}
+    - **Email** : {{ $authorEmail }}
+    - **Rôle** : {{ $authorRole }}
+    - **Type** : {{ $authorType }}
+
     ## Détails de l'annonce
     - **Titre** : {{ $adTitle }}
     - **Prix** : {{ $adPrice }}
