@@ -25,7 +25,7 @@ return [
         'https://api.keyhome.neocraft.dev',
         'https://agency.keyhome.neocraft.dev',
         'https://bailleur.keyhome.neocraft.dev',
-        'https://admin.keyhome.neocraft.dev'
+        'https://admin.keyhome.neocraft.dev',
     ],
 
     'allowed_origins_patterns' => [],
@@ -34,8 +34,8 @@ return [
 
     'exposed_headers' => [],
 
-    'max_age' => 0,  // 24 heures (améliore les performances)
+    'max_age' => 86400,  // 24 heures (améliore les performances)
 
-    'supports_credentials' => false,
+    'supports_credentials' => true,
 
 ];

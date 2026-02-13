@@ -29,7 +29,7 @@ Homestead.json
 .env.production
 .phpactor.json
 auth.json
-public/*
+# public/storage and public/hot are already listed above
 .cursor
 .idea/*
 *.DS_Store
