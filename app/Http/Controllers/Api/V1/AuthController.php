@@ -899,6 +899,13 @@ final class AuthController
             // Réinitialiser les tentatives échouées
             RateLimiter::clear($key);
 
+            // SPA Authentication: Log in the user to the session if available
+            if ($request->hasSession()) {
+                $request->session()->regenerate();
+                // Use the web guard to authenticate the session
+                \Illuminate\Support\Facades\Auth::guard('web')->login($user);
+            }
+
             // Créer le token avec expiration
             $tokenName = 'api_token_'.now()->timestamp;
 
@@ -918,6 +925,7 @@ final class AuthController
             Log::info('Successful login', [
                 'user_id' => $user->id,
                 'email' => $email,
+                'is_spa' => $request->hasSession(), // Log context check
                 'ip' => $request->ip(),
                 'user_agent' => $request->userAgent(),
             ]);
@@ -1003,16 +1011,29 @@ final class AuthController
     {
         try {
             $user = $request->user();
-            $token = $request->user()->currentAccessToken();
 
-            // Log de déconnexion
-            Log::info('User logout', [
-                'user_id' => $user->id,
-                'token_name' => $token->name,
-            ]);
+            // 1. Revoke Token (Mobile/API)
+            if ($token = $user->currentAccessToken()) {
+                // Log de déconnexion
+                Log::info('User logout (Token)', [
+                    'user_id' => $user->id,
+                    'token_name' => $token->name,
+                ]);
 
-            // Supprimer le token actuel
-            $token->delete();
+                // Supprimer le token actuel
+                $token->delete();
+            }
+
+            // 2. Invalidate Session (SPA/Web)
+            if ($request->hasSession()) {
+                Log::info('User logout (Session)', [
+                    'user_id' => $user->id,
+                ]);
+
+                \Illuminate\Support\Facades\Auth::guard('web')->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            }
 
             return response()->json([
                 'message' => 'Déconnexion réussie.',
