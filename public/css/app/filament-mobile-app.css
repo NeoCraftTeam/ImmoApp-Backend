@@ -1,0 +1,18 @@
+/* Adaptation Mobile App */
+/* Sidebar et Topbar réactivées pour navigation hamburger */
+
+.is-mobile-app .fi-main {
+    /* On laisse Filament gérer le padding pour la Topbar */
+}
+
+/* On retire les bordures et arrondis inutiles en mode App */
+.is-mobile-app .fi-panel {
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+}
+
+/* Optimisation de l'espace pour l'app */
+.is-mobile-app .fi-main-ctn {
+    padding: 1rem !important;
+}
