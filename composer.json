@@ -31,6 +31,7 @@
         "livewire/livewire": "^3.0",
         "meilisearch/meilisearch-php": "^1.16",
         "sentry/sentry-laravel": "^4.20",
+        "spatie/laravel-activitylog": "^4.11",
         "spatie/laravel-medialibrary": "^11.14"
     },
     "require-dev": {

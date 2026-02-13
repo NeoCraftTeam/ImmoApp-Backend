@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\AdStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
+use App\Exceptions\InvalidStatusTransitionException;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\AdFactory;
 use Eloquent;
@@ -44,7 +45,7 @@ use Laravel\Scout\Searchable;
  * @property int $bathrooms
  * @property bool $has_parking
  * @property Point|null $location
- * @property string $status
+ * @property AdStatus $status
  * @property string|null $expires_at
  * @property string $user_id
  * @property string $quarter_id
@@ -153,6 +154,25 @@ class Ad extends Model implements HasMedia
                 $ad->slug = self::generateUniqueSlug($ad->title, $ad->id);
             }
         });
+    }
+
+    /**
+     * Transition the ad to a new status, validating the transition.
+     *
+     * @throws InvalidStatusTransitionException
+     */
+    public function transitionTo(AdStatus $newStatus): void
+    {
+        if ($this->status === $newStatus) {
+            return; // No-op if already in the target state
+        }
+
+        if (!$this->status->canTransitionTo($newStatus)) {
+            throw new InvalidStatusTransitionException($this->status, $newStatus);
+        }
+
+        $this->status = $newStatus;
+        $this->save();
     }
 
     public static function generateUniqueSlug(string $title, ?string $ignoreId = null): string

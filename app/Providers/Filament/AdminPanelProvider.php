@@ -50,6 +50,7 @@ class AdminPanelProvider extends PanelProvider
             ->font('poppins')
             ->brandLogo(asset('images/keyhomelogo.png'))
             ->authGuard('web')
+            ->spa()
             ->unsavedChangesAlerts()
             ->collapsibleNavigationGroups(false)
             ->colors([

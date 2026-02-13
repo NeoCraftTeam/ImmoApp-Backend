@@ -98,14 +98,30 @@ trait SharedAdResource
     }
 
     /**
-     * Status select — tenant panels (Agency/Bailleur) disable it when pending.
+     * Status select — shows only valid transitions from the current status.
+     * On create, defaults to PENDING. On edit, shows current + allowed next states.
      */
     protected static function getStatusSelect(bool $isAdmin = false): Select
     {
         $select = Select::make('status')
-            ->options(AdStatus::class)
             ->required()
-            ->default(AdStatus::PENDING);
+            ->default(AdStatus::PENDING)
+            ->options(function (?Ad $record): array {
+                if ($record === null) {
+                    // Creating: only PENDING is allowed
+                    return [AdStatus::PENDING->value => AdStatus::PENDING->getLabel()];
+                }
+
+                // Editing: current status + allowed transitions
+                $options = [
+                    $record->status->value => $record->status->getLabel(),
+                ];
+                foreach ($record->status->allowedTransitions() as $status) {
+                    $options[$status->value] = $status->getLabel();
+                }
+
+                return $options;
+            });
 
         if (!$isAdmin) {
             $select

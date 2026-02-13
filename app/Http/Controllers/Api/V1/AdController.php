@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\AdStatus;
 use App\Http\Requests\AdRequest;
 use App\Http\Resources\AdResource as AdApiResource;
 use App\Models\Ad;
@@ -278,7 +279,7 @@ final class AdController
                 'bathrooms' => $data['bathrooms'],
                 'has_parking' => $data['has_parking'] ?? false,
                 'location' => Point::makeGeodetic($data['latitude'], $data['longitude']),
-                'status' => $data['status'] ?? 'pending', // Utiliser le status du request
+                'status' => AdStatus::PENDING->value, // Always start as pending — admin must approve
                 'expires_at' => $data['expires_at'],
                 'user_id' => auth()->id(), // Always use authenticated user — never trust client input
                 'quarter_id' => $data['quarter_id'],
@@ -568,6 +569,19 @@ final class AdController
             // Mise à jour des coordonnées GPS si fournies
             if (isset($data['latitude']) && isset($data['longitude'])) {
                 $data['location'] = Point::makeGeodetic($data['latitude'], $data['longitude']);
+            }
+
+            // Validate status transition if status is being changed
+            if (isset($data['status'])) {
+                $newStatus = AdStatus::from($data['status']);
+                if ($ad->status !== $newStatus) {
+                    if (!$ad->status->canTransitionTo($newStatus)) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => "Transition de statut invalide : {$ad->status->getLabel()} → {$newStatus->getLabel()}.",
+                        ], 422);
+                    }
+                }
             }
 
             // Mettre à jour l'annonce
