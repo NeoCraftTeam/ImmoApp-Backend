@@ -29,7 +29,7 @@ class AdPolicy
 
     public function update(User $user, Ad $ad): bool
     {
-        return $user->isAdmin() || $user->id === $ad->user_id;
+        return $user->isAdmin();
     }
 
     public function delete(User $user, Ad $ad): bool
