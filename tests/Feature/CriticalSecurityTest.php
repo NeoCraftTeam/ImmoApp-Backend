@@ -99,7 +99,10 @@ test('payment webhook accepts valid signature and updates payment', function ():
         'event' => 'transaction.approved',
         'entity' => ['id' => 'txn-critical-valid'],
     ], JSON_THROW_ON_ERROR);
-    $signature = hash_hmac('sha256', $payload, $secret);
+
+    // Controller expects "t=<timestamp>,v1=<hmac(timestamp.'.'.payload, secret)>"
+    $timestamp = (string) time();
+    $signature = hash_hmac('sha256', $timestamp.'.'.$payload, $secret);
 
     $response = $this->call(
         'POST',
@@ -109,7 +112,7 @@ test('payment webhook accepts valid signature and updates payment', function ():
         [],
         [
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_X_FEDAPAY_SIGNATURE' => $signature,
+            'HTTP_X_FEDAPAY_SIGNATURE' => "t={$timestamp},v1={$signature}",
         ],
         $payload
     );
