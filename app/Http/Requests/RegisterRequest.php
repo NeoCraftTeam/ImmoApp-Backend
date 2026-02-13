@@ -39,7 +39,7 @@ final class RegisterRequest extends FormRequest
                     ->symbols(),
             ],
             'confirm_password' => 'required|same:password',
-            'role' => 'nullable|string|in:customer,admin,agent',
+            'role' => 'nullable|string|in:customer,agent',
             'type' => 'nullable|string|max:50',
             'city_id' => 'nullable|string|exists:city,id',
             'latitude' => 'nullable|numeric|between:-90,90',

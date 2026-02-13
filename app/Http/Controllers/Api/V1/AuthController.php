@@ -267,7 +267,7 @@ final class AuthController
                     'location' => isset($data['latitude'], $data['longitude'])
                         ? Point::makeGeodetic((float) $data['latitude'], (float) $data['longitude'])
                         : null,
-                    'role' => $data['role'] ?? 'admin', // Valeur par défaut
+                    'role' => $data['role'] ?? 'customer', // Valeur par défaut sécurisée
                     'type' => $data['type'] ?? 'individual',
                     'city_id' => $data['city_id'] ?? null,
                     'is_active' => true,
@@ -324,7 +324,7 @@ final class AuthController
 
         } catch (FileIsTooBig $e) {
             Log::warning('File too big during registration', [
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
                 'request_data' => $request->except(['password', 'avatar']),
             ]);
 
@@ -335,7 +335,7 @@ final class AuthController
 
         } catch (FileDoesNotExist $e) {
             Log::warning('File does not exist during registration', [
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
                 'request_data' => $request->except(['password', 'avatar']),
             ]);
 
@@ -345,14 +345,14 @@ final class AuthController
 
         } catch (Throwable $e) {
             Log::error('Registration failed', [
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
                 'trace' => $e->getTraceAsString(),
                 'request_data' => $request->except(['password', 'avatar']),
             ]);
 
             return response()->json([
                 'message' => 'Une erreur est survenue lors de l\'inscription. Veuillez réessayer.',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
             ], 500);
         }
     }
@@ -644,7 +644,7 @@ final class AuthController
 
         } catch (Throwable $e) {
             Log::error('Email verification failed', [
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
                 'user_id' => $id,
             ]);
 
@@ -936,7 +936,7 @@ final class AuthController
 
         } catch (Throwable $e) {
             Log::error('Login error', [
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
                 'trace' => $e->getTraceAsString(),
                 'request_data' => $request->except(['password']),
             ]);
@@ -1020,7 +1020,7 @@ final class AuthController
 
         } catch (Throwable $e) {
             Log::error('Logout error', [
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
                 'user_id' => $request->user()?->id,
             ]);
 
@@ -1156,7 +1156,7 @@ final class AuthController
 
         } catch (Throwable $e) {
             Log::error('Token refresh error', [
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
                 'user_id' => $request->user()?->id,
             ]);
 
@@ -1263,6 +1263,9 @@ final class AuthController
 
                 $user->save();
 
+                // Revoke all existing API tokens to invalidate compromised sessions
+                $user->tokens()->delete();
+
                 event(new \Illuminate\Auth\Events\PasswordReset($user));
             }
         );
@@ -1324,6 +1327,14 @@ final class AuthController
         $user->fill([
             'password' => Hash::make($request->new_password),
         ])->save();
+
+        // Revoke all existing tokens except the current one
+        $currentToken = $user->currentAccessToken();
+        if ($currentToken instanceof \Laravel\Sanctum\PersonalAccessToken) { // @phpstan-ignore instanceof.alwaysTrue (TransientToken possible at runtime)
+            $user->tokens()->where('id', '!=', $currentToken->getKey())->delete();
+        } else {
+            $user->tokens()->delete();
+        }
 
         return response()->json(['message' => 'Mot de passe mis à jour avec succès.']);
     }
