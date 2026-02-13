@@ -127,12 +127,12 @@ Route::prefix('v1')->group(function (): void {
     Route::prefix('ads')->controller(AdController::class)->group(function (): void {
         Route::get('/', 'index');
         // Public nearby search by coordinates
-        Route::get('/nearby', 'ads_nearby_public');
+        Route::get('/nearby', 'ads_nearby_public')->middleware('throttle:60,1');
 
         // Public search endpoint (must be before catch-all ID route)
-        Route::get('/search', 'search')->name('ads.search');
-        Route::get('/autocomplete', 'autocomplete')->name('ads.autocomplete');
-        Route::get('/facets', 'facets')->name('ads.facets');
+        Route::get('/search', 'search')->name('ads.search')->middleware('throttle:60,1');
+        Route::get('/autocomplete', 'autocomplete')->name('ads.autocomplete')->middleware('throttle:60,1');
+        Route::get('/facets', 'facets')->name('ads.facets')->middleware('throttle:60,1');
 
         Route::middleware('auth:sanctum')->group(function (): void {
             // Routes spécifiques AVANT les routes avec paramètres génériques
