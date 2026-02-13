@@ -280,7 +280,7 @@ final class AdController
                 'location' => Point::makeGeodetic($data['latitude'], $data['longitude']),
                 'status' => $data['status'] ?? 'pending', // Utiliser le status du request
                 'expires_at' => $data['expires_at'],
-                'user_id' => $data['user_id'] ?? auth()->id(), // Utiliser user_id du request si présent
+                'user_id' => auth()->id(), // Always use authenticated user — never trust client input
                 'quarter_id' => $data['quarter_id'],
                 'type_id' => $data['type_id'],
             ]);
@@ -938,7 +938,7 @@ final class AdController
      *
      * @throws Throwable
      */
-    private function ads_nearby(AdRequest $request, ?int $user = null): JsonResponse
+    private function ads_nearby(AdRequest $request, ?string $user = null): JsonResponse
     {
         $this->authorize('adsNearby', Ad::class);
 
@@ -1218,7 +1218,7 @@ final class AdController
      *
      * @throws Throwable
      */
-    public function ads_nearby_user(AdRequest $request, int $user): JsonResponse
+    public function ads_nearby_user(AdRequest $request, string $user): JsonResponse
     {
         return $this->ads_nearby($request, $user);
     }
@@ -1882,7 +1882,7 @@ final class AdController
             ->where('status', \App\Enums\AdStatus::AVAILABLE);
 
         if ($q) {
-            $query->where(function ($qb) use ($q) {
+            $query->where(function ($qb) use ($q): void {
                 $qb->where('title', 'ilike', "%{$q}%")
                     ->orWhere('description', 'ilike', "%{$q}%")
                     ->orWhere('adresse', 'ilike', "%{$q}%");

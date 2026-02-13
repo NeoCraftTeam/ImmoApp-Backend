@@ -107,7 +107,7 @@ final class CityController
         } catch (Exception $e) {
             return response()->json([
                 'message' => 'Erreur lors de la création',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
             ], 500); // 500 = Internal Server Error
         }
     }
@@ -207,7 +207,7 @@ final class CityController
         } catch (Exception $e) {
             return response()->json([
                 'message' => 'Erreur lors de la mise à jour',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
             ], 500); // 500 = Internal Server Error
         }
     }
@@ -251,7 +251,7 @@ final class CityController
         } catch (Exception $e) {
             return response()->json([
                 'message' => 'Erreur lors de la suppression de la ville',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
             ], 500); // 500 = Internal Server Error
         }
     }

@@ -73,7 +73,7 @@ final class AdRequest extends FormRequest
                 'longitude' => 'required|numeric|between:-180,180',
                 'radius' => 'nullable|numeric|min:0',
                 'expires_at' => ['nullable', 'date'],
-                'user_id' => ['required', 'exists:users,id'],
+                // user_id is forced to auth()->id() server-side — not accepted from client
                 'quarter_id' => ['required', 'exists:quarter,id'],
                 'type_id' => ['required', 'exists:ad_type,id'],
 
@@ -114,7 +114,7 @@ final class AdRequest extends FormRequest
                 'latitude' => 'sometimes|numeric|between:-90,90',
                 'longitude' => 'sometimes|numeric|between:-180,180',
                 'expires_at' => ['nullable', 'date'],
-                'user_id' => ['sometimes', 'exists:users,id'],
+                // user_id cannot be changed via API — ownership is immutable
                 'quarter_id' => ['sometimes', 'exists:quarter,id'],
                 'type_id' => ['sometimes', 'exists:ad_type,id'],
 
