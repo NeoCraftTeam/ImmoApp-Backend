@@ -30,6 +30,7 @@ final class UserResource extends JsonResource
             'email' => $this->email,
             'avatar' => $this->getFirstMediaUrl('avatar') ?: $this->avatar,
             'display_name' => $this->fullname,
+            'name' => $this->fullname,
             'agency_name' => ($this->agency instanceof \App\Models\Agency) ? $this->agency->name : null,
 
             // Le propriétaire du compte ou un admin peut voir le role/type

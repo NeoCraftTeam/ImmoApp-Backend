@@ -61,7 +61,7 @@ final class AdResource extends JsonResource
             'published_by' => $this->getPublisherName(),
             'quarter' => new QuarterResource($this->whenLoaded('quarter')),
             'type' => new AdTypeResource($this->whenLoaded('ad_type')),
-            'images' => $this->getAccessibleImages($user)->map(fn($media) => [
+            'images' => $this->getAccessibleImages($user)->map(fn ($media) => [
                 'id' => $media->id,
                 'url' => $media->getUrl(),
                 'thumb' => $media->hasGeneratedConversion('thumb') ? $media->getUrl('thumb') : $media->getUrl(),
@@ -69,19 +69,7 @@ final class AdResource extends JsonResource
                 'mime_type' => $media->mime_type,
                 'is_primary' => $this->getMedia('images')->first()?->id === $media->id,
             ]),
-            'reviews' => $this->whenLoaded('reviews', function () {
-                return $this->reviews->map(fn($review) => [
-                    'id' => $review->id,
-                    'rating' => (float) $review->rating,
-                    'comment' => $review->comment,
-                    'user' => $review->relationLoaded('user') ? [
-                        'id' => $review->user?->id,
-                        'name' => $review->user?->firstname . ' ' . $review->user?->lastname,
-                        'avatar' => $review->user?->avatar,
-                    ] : null,
-                    'created_at' => $review->created_at,
-                ]);
-            }),
+            'reviews' => ReviewResource::collection($this->whenLoaded('reviews')),
         ];
     }
 }
