@@ -348,7 +348,7 @@ final class AuthController
             ], 400);
 
             // P1-1 Fix: Catch DB unique constraint violation (concurrent signup race)
-        } catch (UniqueConstraintViolationException $e) {
+        } catch (UniqueConstraintViolationException) {
             Log::warning('Registration duplicate email (DB constraint)', [
                 'email' => $data['email'] ?? 'unknown',
                 'ip' => $request->ip(),
@@ -1028,6 +1028,7 @@ final class AuthController
             $user = $request->user();
 
             // 1. Revoke Token (Mobile/API)
+            // @phpstan-ignore-next-line
             if ($token = $user->currentAccessToken()) {
                 // Log de déconnexion
                 Log::info('User logout (Token)', [

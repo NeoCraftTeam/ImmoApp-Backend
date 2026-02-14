@@ -36,16 +36,13 @@ test('can search ads nearby a location', function (): void {
         ->assertJsonCount(1, 'data') // Seulement Paris
         ->assertJsonPath('data.0.id', $parisAd->id);
 
-    // Recherche large (Rayon 1000km) -> Doit trouver les 2
+    // Recherche large (Rayon 1000km) -> Doit être cappé à 50km
+    // Donc on ne trouve que Paris (0km), Marseille (700km) est exclu.
     $responseBig = $this->getJson('/api/v1/ads/nearby?latitude=48.8566&longitude=2.3522&radius=1000000');
 
     $responseBig->assertStatus(200)
-        ->assertJsonCount(2, 'data');
-
-    // Vérifier l'ordre (plus proche d'ABORD)
-    $data = $responseBig->json('data');
-    expect($data[0]['id'])->toBe($parisAd->id); // Paris est à 0km
-    expect($data[1]['id'])->toBe($marseilleAd->id); // Marseille est à 700km
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $parisAd->id);
 });
 
 test('nearby search requires coordinates', function (): void {

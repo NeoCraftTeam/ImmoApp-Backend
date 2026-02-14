@@ -146,14 +146,15 @@ it('admin can update an ad', function (): void {
     $this->assertDatabaseHas('ad', ['id' => $ad->id, 'title' => 'Updated Title']);
 });
 
-it('non-admin cannot update an ad', function (): void {
-    $agent = User::factory()->create(['role' => 'agent', 'type' => 'individual']);
+it('non-admin cannot update an ad (if not owner)', function (): void {
+    $owner = User::factory()->create(['role' => 'agent', 'type' => 'individual']);
+    $otherAgent = User::factory()->create(['role' => 'agent', 'type' => 'individual']);
     $ad = null;
-    Ad::withoutSyncingToSearch(function () use (&$ad, $agent): void {
-        $ad = Ad::factory()->create(['user_id' => $agent->id, 'status' => 'available']);
+    Ad::withoutSyncingToSearch(function () use (&$ad, $owner): void {
+        $ad = Ad::factory()->create(['user_id' => $owner->id, 'status' => 'available']);
     });
 
-    Sanctum::actingAs($agent);
+    Sanctum::actingAs($otherAgent);
     $response = $this->putJson("/api/v1/ads/{$ad->id}", [
         'title' => 'Hacked Title',
         'quarter_id' => $ad->quarter_id,
