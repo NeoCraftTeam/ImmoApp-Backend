@@ -117,7 +117,7 @@ Route::prefix('v1')->group(function (): void {
     });
 
     // --- PRIX DE DÉBLOCAGE ---
-    Route::get('/payments/unlock-price', fn () => response()->json([
+    Route::get('/payments/unlock-price', fn() => response()->json([
         'unlock_price' => (int) \App\Models\Setting::get('unlock_price', 500),
     ]));
 
@@ -140,7 +140,7 @@ Route::prefix('v1')->group(function (): void {
     });
 
     //  Ads
-    Route::prefix('ads')->controller(AdController::class)->group(function (): void {
+    Route::prefix('ads')->controller(AdController::class)->middleware('optional.auth')->group(function (): void {
         Route::get('/', 'index');
         // Public nearby search by coordinates
         Route::get('/nearby', 'ads_nearby_public')->middleware('throttle:60,1');

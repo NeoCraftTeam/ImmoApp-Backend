@@ -40,7 +40,7 @@ final class RegisterRequest extends FormRequest
             ],
             'confirm_password' => 'required|same:password',
             'role' => 'nullable|string|in:customer,agent',
-            'type' => 'nullable|string|max:50',
+            'type' => 'nullable|string|in:individual,agency',
             'city_id' => 'nullable|string|exists:city,id',
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',

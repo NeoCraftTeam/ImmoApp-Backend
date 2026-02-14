@@ -56,7 +56,7 @@ final class CityController
     public function index(ListCitiesAction $action)
     {
         $search = request('q');
-        $perPage = (int) request('per_page', 50);
+        $perPage = min((int) request('per_page', 50), 100);
         $cities = $action->handle($perPage, $search);
 
         return CityResource::collection($cities);

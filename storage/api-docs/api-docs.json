@@ -4551,6 +4551,623 @@
                 ]
             }
         },
+        "/api/v1/subscriptions/plans": {
+            "get": {
+                "tags": [
+                    "📦 Abonnements Agences"
+                ],
+                "summary": "Lister les plans d'abonnement disponibles",
+                "description": "Retourne la liste de tous les plans d'abonnement actifs, triés par ordre de priorité. Chaque plan inclut les tarifs mensuels et annuels, les économies réalisées sur un abonnement annuel, les limites d'annonces, le score de boost, et la liste des fonctionnalités incluses. **Endpoint public** : aucune authentification requise.",
+                "operationId": "listSubscriptionPlans",
+                "responses": {
+                    "200": {
+                        "description": "Liste des plans d'abonnement actifs",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string",
+                                                        "format": "uuid",
+                                                        "example": "9e2f3a4b-5c6d-7e8f-9a0b-1c2d3e4f5a6b"
+                                                    },
+                                                    "name": {
+                                                        "type": "string",
+                                                        "example": "Premium"
+                                                    },
+                                                    "slug": {
+                                                        "type": "string",
+                                                        "example": "premium"
+                                                    },
+                                                    "description": {
+                                                        "type": "string",
+                                                        "example": "Plan premium pour les agences en croissance."
+                                                    },
+                                                    "price_monthly": {
+                                                        "description": "Prix mensuel en FCFA",
+                                                        "type": "integer",
+                                                        "example": 35000
+                                                    },
+                                                    "price_yearly": {
+                                                        "description": "Prix annuel en FCFA (null si indisponible)",
+                                                        "type": "integer",
+                                                        "example": 350000
+                                                    },
+                                                    "price_monthly_formatted": {
+                                                        "type": "string",
+                                                        "example": "35 000 FCFA"
+                                                    },
+                                                    "price_yearly_formatted": {
+                                                        "type": "string",
+                                                        "example": "350 000 FCFA"
+                                                    },
+                                                    "yearly_savings": {
+                                                        "description": "Économie annuelle en FCFA par rapport au mensuel",
+                                                        "type": "integer",
+                                                        "example": 70000
+                                                    },
+                                                    "duration_days": {
+                                                        "type": "integer",
+                                                        "example": 30
+                                                    },
+                                                    "boost_score": {
+                                                        "description": "Points de boost appliqués aux annonces de l'agence",
+                                                        "type": "integer",
+                                                        "example": 25
+                                                    },
+                                                    "boost_duration_days": {
+                                                        "description": "Durée du boost en jours",
+                                                        "type": "integer",
+                                                        "example": 14
+                                                    },
+                                                    "max_ads": {
+                                                        "description": "Nombre max d'annonces (null = illimité)",
+                                                        "type": "integer",
+                                                        "example": 50,
+                                                        "nullable": true
+                                                    },
+                                                    "is_unlimited": {
+                                                        "type": "boolean",
+                                                        "example": false
+                                                    },
+                                                    "features": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string",
+                                                            "example": "Boost de +25 points pendant 14 jours"
+                                                        }
+                                                    },
+                                                    "sort_order": {
+                                                        "type": "integer",
+                                                        "example": 2
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/subscriptions/current": {
+            "get": {
+                "tags": [
+                    "📦 Abonnements Agences"
+                ],
+                "summary": "Consulter l'abonnement actif de mon agence",
+                "description": "Retourne l'abonnement actuellement actif de l'agence à laquelle appartient l'utilisateur authentifié, avec les détails du plan, le nombre de jours restants, et des statistiques (nombre d'annonces boostées, etc.). Si aucun abonnement n'est actif, `has_subscription` vaut `false` et `subscription` est `null`.",
+                "operationId": "currentSubscription",
+                "responses": {
+                    "200": {
+                        "description": "Abonnement actif trouvé (ou aucun abonnement)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "has_subscription": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "subscription": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                },
+                                                "plan": {
+                                                    "description": "Détails du plan souscrit",
+                                                    "type": "object"
+                                                },
+                                                "billing_period": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "monthly",
+                                                        "yearly"
+                                                    ],
+                                                    "example": "monthly"
+                                                },
+                                                "status": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "pending",
+                                                        "active",
+                                                        "expired",
+                                                        "cancelled"
+                                                    ],
+                                                    "example": "active"
+                                                },
+                                                "amount_paid": {
+                                                    "type": "integer",
+                                                    "example": 35000
+                                                },
+                                                "amount_paid_formatted": {
+                                                    "type": "string",
+                                                    "example": "35 000 FCFA"
+                                                },
+                                                "starts_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                },
+                                                "ends_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                },
+                                                "days_remaining": {
+                                                    "type": "integer",
+                                                    "example": 24
+                                                },
+                                                "is_active": {
+                                                    "type": "boolean",
+                                                    "example": true
+                                                },
+                                                "auto_renew": {
+                                                    "type": "boolean",
+                                                    "example": false
+                                                }
+                                            },
+                                            "type": "object",
+                                            "nullable": true
+                                        },
+                                        "stats": {
+                                            "properties": {
+                                                "has_active_subscription": {
+                                                    "type": "boolean",
+                                                    "example": true
+                                                },
+                                                "current_plan": {
+                                                    "type": "string",
+                                                    "example": "Premium"
+                                                },
+                                                "days_remaining": {
+                                                    "type": "integer",
+                                                    "example": 24
+                                                },
+                                                "expires_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                },
+                                                "total_boosted_ads": {
+                                                    "type": "integer",
+                                                    "example": 12
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié — Token Sanctum manquant ou invalide"
+                    },
+                    "403": {
+                        "description": "L'utilisateur n'appartient à aucune agence",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Vous n'appartenez à aucune agence."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/subscriptions/subscribe": {
+            "post": {
+                "tags": [
+                    "📦 Abonnements Agences"
+                ],
+                "summary": "Souscrire à un plan d'abonnement",
+                "description": "Initie le processus de souscription à un plan d'abonnement pour l'agence de l'utilisateur. Crée une transaction de paiement FedaPay et retourne l'URL de paiement. Le frontend (mobile ou web) doit **rediriger l'utilisateur** vers `payment_url` pour finaliser le paiement. Une fois le paiement confirmé par le webhook FedaPay, l'abonnement est activé automatiquement, les annonces de l'agence sont boostées, et une **facture est envoyée par email** à tous les membres de l'agence.",
+                "operationId": "subscribe",
+                "requestBody": {
+                    "description": "Données de souscription",
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "plan_id",
+                                    "billing_period"
+                                ],
+                                "properties": {
+                                    "plan_id": {
+                                        "description": "UUID du plan choisi (obtenu via GET /subscriptions/plans)",
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "example": "9e2f3a4b-5c6d-7e8f-9a0b-1c2d3e4f5a6b"
+                                    },
+                                    "billing_period": {
+                                        "description": "Période de facturation : mensuel ou annuel (annuel = ~2 mois offerts)",
+                                        "type": "string",
+                                        "enum": [
+                                            "monthly",
+                                            "yearly"
+                                        ],
+                                        "example": "monthly"
+                                    },
+                                    "callback_url": {
+                                        "description": "URL de retour après paiement (optionnel, par défaut l'URL du frontend)",
+                                        "type": "string",
+                                        "example": "https://app.keyhome.cm/subscription/callback"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Paiement initialisé — Redirigez l'utilisateur vers payment_url",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "payment_url": {
+                                            "description": "URL FedaPay vers laquelle rediriger l'utilisateur pour payer",
+                                            "type": "string",
+                                            "example": "https://checkout.fedapay.com/pay/abc123"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Redirigez l'utilisateur vers cette URL pour payer."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "403": {
+                        "description": "L'utilisateur n'appartient à aucune agence",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Vous devez appartenir à une agence pour souscrire."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Données invalides ou plan indisponible",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Ce plan n'est plus disponible."
+                                        },
+                                        "errors": {
+                                            "description": "Détails des erreurs de validation (si applicable)",
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Erreur technique FedaPay ou serveur"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/subscriptions/cancel": {
+            "post": {
+                "tags": [
+                    "📦 Abonnements Agences"
+                ],
+                "summary": "Annuler l'abonnement actif de mon agence",
+                "description": "Annule l'abonnement actif de l'agence. **L'abonnement reste fonctionnel jusqu'à sa date d'expiration** (`ends_at`), mais ne sera pas renouvelé. L'agence conserve donc l'accès aux fonctionnalités premium jusqu'à la fin de la période payée. Une raison d'annulation peut être fournie (optionnel).",
+                "operationId": "cancelSubscription",
+                "requestBody": {
+                    "description": "Raison de l'annulation (optionnel)",
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "reason": {
+                                        "description": "Raison de l'annulation",
+                                        "type": "string",
+                                        "example": "Nous n'avons plus besoin du service pour le moment."
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Abonnement annulé avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Votre abonnement a été annulé. Il reste actif jusqu'au 15/03/2026."
+                                        },
+                                        "subscription": {
+                                            "description": "Détails de l'abonnement annulé",
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "403": {
+                        "description": "L'utilisateur n'appartient à aucune agence",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Vous n'appartenez à aucune agence."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Aucun abonnement actif trouvé pour cette agence",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Aucun abonnement actif à annuler."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/subscriptions/history": {
+            "get": {
+                "tags": [
+                    "📦 Abonnements Agences"
+                ],
+                "summary": "Historique des abonnements de mon agence",
+                "description": "Retourne l'historique paginé de tous les abonnements (actifs, expirés, annulés) de l'agence à laquelle appartient l'utilisateur. Chaque entrée inclut les détails du plan, la période de facturation, le montant payé et les dates. Utile pour afficher un récapitulatif ou un historique de facturation dans l'application mobile ou web.",
+                "operationId": "subscriptionHistory",
+                "parameters": [
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Numéro de page pour la pagination (15 éléments par page)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 1,
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Historique paginé des abonnements",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string",
+                                                        "format": "uuid"
+                                                    },
+                                                    "plan": {
+                                                        "description": "Détails du plan souscrit",
+                                                        "type": "object"
+                                                    },
+                                                    "billing_period": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "monthly",
+                                                            "yearly"
+                                                        ]
+                                                    },
+                                                    "status": {
+                                                        "type": "string",
+                                                        "enum": [
+                                                            "pending",
+                                                            "active",
+                                                            "expired",
+                                                            "cancelled"
+                                                        ]
+                                                    },
+                                                    "amount_paid": {
+                                                        "type": "integer",
+                                                        "example": 35000
+                                                    },
+                                                    "amount_paid_formatted": {
+                                                        "type": "string",
+                                                        "example": "35 000 FCFA"
+                                                    },
+                                                    "starts_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    "ends_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    },
+                                                    "days_remaining": {
+                                                        "type": "integer"
+                                                    },
+                                                    "is_active": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "cancelled_at": {
+                                                        "type": "string",
+                                                        "format": "date-time",
+                                                        "nullable": true
+                                                    },
+                                                    "created_at": {
+                                                        "type": "string",
+                                                        "format": "date-time"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        },
+                                        "links": {
+                                            "description": "Liens de pagination",
+                                            "properties": {
+                                                "first": {
+                                                    "type": "string"
+                                                },
+                                                "last": {
+                                                    "type": "string"
+                                                },
+                                                "prev": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "next": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "meta": {
+                                            "description": "Métadonnées de pagination",
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "last_page": {
+                                                    "type": "integer",
+                                                    "example": 3
+                                                },
+                                                "per_page": {
+                                                    "type": "integer",
+                                                    "example": 15
+                                                },
+                                                "total": {
+                                                    "type": "integer",
+                                                    "example": 42
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "403": {
+                        "description": "L'utilisateur n'appartient à aucune agence",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Vous n'appartenez à aucune agence."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/api/v1/users": {
             "get": {
                 "tags": [
@@ -6198,6 +6815,10 @@
         {
             "name": "⭐ Recommandations",
             "description": "Gestion des recommandations"
+        },
+        {
+            "name": "📦 Abonnements Agences",
+            "description": "Gestion des abonnements pour les agences immobilières. Permet de consulter les plans disponibles, souscrire via FedaPay, consulter l'abonnement actif, l'annuler et voir l'historique. Les agences reçoivent une facture par email à chaque souscription."
         },
         {
             "name": "🏢 Agence",

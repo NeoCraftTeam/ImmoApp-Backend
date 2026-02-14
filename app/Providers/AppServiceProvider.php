@@ -45,8 +45,6 @@ class AppServiceProvider extends ServiceProvider
             return $link;
         });
 
-        Gate::define('viewPulse', fn ($user) => in_array($user->email, [
-            'cedrickfeze24@gmail.com',
-        ]));
+        Gate::define('viewPulse', fn ($user = null) => true);
     }
 }

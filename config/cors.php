@@ -20,12 +20,10 @@ return [
     'allowed_methods' => ['*'],
 
     'allowed_origins' => [
-        'http://localhost*',
+        'http://localhost:3000',
+        'https://keyhome.test',
         'https://*.keyhome.neocraft.dev',
         'https://api.keyhome.neocraft.dev',
-        'https://agency.keyhome.neocraft.dev',
-        'https://bailleur.keyhome.neocraft.dev',
-        'https://admin.keyhome.neocraft.dev',
     ],
 
     'allowed_origins_patterns' => [],

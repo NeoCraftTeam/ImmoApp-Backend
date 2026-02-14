@@ -26,13 +26,13 @@ class ActivityLogResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedClipboardDocumentList;
 
-    protected static ?string $navigationLabel = 'Journal d\'activité';
+    protected static ?string $navigationLabel = 'Journal de Sécurité';
 
     protected static ?string $modelLabel = 'Activité';
 
     protected static ?string $pluralModelLabel = 'Activités';
 
-    protected static ?int $navigationSort = 99;
+    protected static ?int $navigationSort = 3;
 
     public static function canCreate(): bool
     {
@@ -51,7 +51,7 @@ class ActivityLogResource extends Resource
                         TextEntry::make('event')
                             ->label('Événement')
                             ->badge()
-                            ->color(fn (?string $state): string => match ($state) {
+                            ->color(fn(?string $state): string => match ($state) {
                                 'created' => 'success',
                                 'updated' => 'warning',
                                 'deleted' => 'danger',
@@ -69,7 +69,7 @@ class ActivityLogResource extends Resource
                             }),
                         TextEntry::make('subject_type')
                             ->label('Type d\'entité')
-                            ->formatStateUsing(fn (?string $state): string => $state ? class_basename($state) : '-'),
+                            ->formatStateUsing(fn(?string $state): string => $state ? class_basename($state) : '-'),
                         TextEntry::make('subject_id')
                             ->label('ID de l\'entité'),
                         TextEntry::make('created_at')
@@ -82,15 +82,15 @@ class ActivityLogResource extends Resource
                         TextEntry::make('properties.old')
                             ->label('Anciennes valeurs')
                             ->columnSpanFull()
-                            ->formatStateUsing(fn ($state) => '<pre style="font-size: 0.8em; overflow-x: auto;">'.json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE).'</pre>')
+                            ->formatStateUsing(fn($state) => '<pre style="font-size: 0.8em; overflow-x: auto;">' . json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . '</pre>')
                             ->html(),
                         TextEntry::make('properties.attributes')
                             ->label('Nouvelles valeurs')
                             ->columnSpanFull()
-                            ->formatStateUsing(fn ($state) => '<pre style="font-size: 0.8em; overflow-x: auto;">'.json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE).'</pre>')
+                            ->formatStateUsing(fn($state) => '<pre style="font-size: 0.8em; overflow-x: auto;">' . json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . '</pre>')
                             ->html(),
                     ])
-                    ->visible(fn ($record): bool => !empty($record->properties->get('old')) || !empty($record->properties->get('attributes')))
+                    ->visible(fn($record): bool => !empty($record->properties->get('old')) || !empty($record->properties->get('attributes')))
                     ->collapsed(),
             ]);
     }
@@ -113,13 +113,13 @@ class ActivityLogResource extends Resource
                 TextColumn::make('event')
                     ->label('Action')
                     ->badge()
-                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                    ->formatStateUsing(fn(?string $state): string => match ($state) {
                         'created' => 'Création',
                         'updated' => 'Modification',
                         'deleted' => 'Suppression',
                         default => $state ?? '-',
                     })
-                    ->color(fn (?string $state): string => match ($state) {
+                    ->color(fn(?string $state): string => match ($state) {
                         'created' => 'success',
                         'updated' => 'warning',
                         'deleted' => 'danger',
@@ -127,7 +127,7 @@ class ActivityLogResource extends Resource
                     }),
                 TextColumn::make('subject_type')
                     ->label('Entité')
-                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                    ->formatStateUsing(fn(?string $state): string => match ($state) {
                         \App\Models\Ad::class => 'Annonce',
                         \App\Models\User::class => 'Utilisateur',
                         \App\Models\Agency::class => 'Agence',
