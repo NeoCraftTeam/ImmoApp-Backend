@@ -38,13 +38,15 @@ class UnlockedAdResource extends Resource
 
     protected static bool $isScopedToTenant = false;
 
-    protected static string|null|\UnitEnum $navigationGroup = 'Annonces';
+    protected static string|null|\UnitEnum $navigationGroup = 'Administration';
+
+    protected static ?int $navigationSort = 2;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::LockOpen;
 
     protected static ?string $recordTitleAttribute = 'ad_id';
 
-    protected static ?string $navigationLabel = 'Annonces débloquées';
+    protected static ?string $navigationLabel = 'Déblocages (Opérations)';
 
     protected static ?string $modelLabel = 'Annonce débloquée';
 
@@ -56,11 +58,15 @@ class UnlockedAdResource extends Resource
                 Select::make('ad_id')
                     ->relationship('ad', 'title')
                     ->required(),
-                Select::make('user.fullname')
-                    ->relationship('user', 'id')
+                Select::make('user_id')
+                    ->relationship('user', 'firstname')
+                    ->getOptionLabelFromRecordUsing(fn($record) => "{$record->firstname} {$record->lastname}")
+                    ->searchable()
+                    ->preload()
                     ->required(),
                 Select::make('payment_id')
-                    ->relationship('payment', 'id')
+                    ->relationship('payment', 'transaction_id')
+                    ->searchable()
                     ->required(),
                 DateTimePicker::make('unlocked_at'),
             ]);
@@ -77,12 +83,12 @@ class UnlockedAdResource extends Resource
                 TextEntry::make('user.fullname')
                     ->label('Débloquée par'),
                 TextEntry::make('payment.transaction_id')
-                    ->label('Payment'),
+                    ->label('Payment ID'),
                 TextEntry::make('unlocked_at')
-                    ->isoDate('LLLL', 'Europe/Paris'),
+                    ->dateTime('d/m/Y H:i'),
                 TextEntry::make('deleted_at')
                     ->dateTime()
-                    ->visible(fn (UnlockedAd $record): bool => $record->trashed()),
+                    ->visible(fn(UnlockedAd $record): bool => $record->trashed()),
             ]);
     }
 
@@ -101,7 +107,7 @@ class UnlockedAdResource extends Resource
                 TextColumn::make('payment.transaction_id')->label('Payment ID')
                     ->searchable(),
                 TextColumn::make('unlocked_at')
-                    ->isoDate('LLLL', 'Europe/Paris')
+                    ->dateTime('d/m/Y H:i')
                     ->sortable(),
                 TextColumn::make('deleted_at')
                     ->dateTime()
@@ -113,26 +119,18 @@ class UnlockedAdResource extends Resource
             ])
             ->recordActions([
                 ViewAction::make()->label('Voir'),
-                EditAction::make(),
-                DeleteAction::make(),
-                ForceDeleteAction::make(),
-                RestoreAction::make(),
             ])->headerActions([
 
-                ImportAction::make()->label('Importer')
-                    ->importer(UnlockedAdImporter::class)
-                    ->icon(Heroicon::ArrowUpTray),
+                    ImportAction::make()->label('Importer')
+                        ->importer(UnlockedAdImporter::class)
+                        ->icon(Heroicon::ArrowUpTray),
 
-                ExportAction::make()->label('Exporter')
-                    ->exporter(UnlockedAdExporter::class)
-                    ->icon(Heroicon::ArrowDownTray),
-            ])
+                    ExportAction::make()->label('Exporter')
+                        ->exporter(UnlockedAdExporter::class)
+                        ->icon(Heroicon::ArrowDownTray),
+                ])
             ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                    ForceDeleteBulkAction::make(),
-                    RestoreBulkAction::make(),
-                ]),
+                // Immutable records
             ]);
     }
 

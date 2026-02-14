@@ -40,6 +40,12 @@ class PaymentResource extends Resource
 
     protected static bool $isScopedToTenant = false;
 
+    protected static string|null|\UnitEnum $navigationGroup = 'Administration';
+
+    protected static ?int $navigationSort = 1;
+
+    protected static ?string $navigationLabel = 'Transactions (Finances)';
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::CurrencyDollar;
 
     protected static ?string $recordTitleAttribute = 'id';
@@ -65,7 +71,10 @@ class PaymentResource extends Resource
                     ->relationship('ad', 'title')
                     ->required(),
                 Select::make('user_id')
-                    ->relationship('user', 'id')
+                    ->relationship('user', 'firstname')
+                    ->getOptionLabelFromRecordUsing(fn($record) => "{$record->firstname} {$record->lastname}")
+                    ->searchable()
+                    ->preload()
                     ->required(),
                 Select::make('status')
                     ->options(PaymentStatus::class)
@@ -83,7 +92,7 @@ class PaymentResource extends Resource
                 TextColumn::make('type')
                     ->badge()
                     ->searchable()
-                    ->visible(false),
+                    ->sortable(),
                 TextColumn::make('amount')
                     ->numeric()
                     ->sortable(),
@@ -118,26 +127,18 @@ class PaymentResource extends Resource
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                EditAction::make(),
                 ViewAction::make(),
-                DeleteAction::make(),
-                ForceDeleteAction::make(),
-                RestoreAction::make(),
             ])->headerActions([
-                ImportAction::make()->label('Importer')
-                    ->importer(PaymentImporter::class)
-                    ->icon(Heroicon::ArrowUpTray),
+                    ImportAction::make()->label('Importer')
+                        ->importer(PaymentImporter::class)
+                        ->icon(Heroicon::ArrowUpTray),
 
-                ExportAction::make()->label('Exporter')
-                    ->exporter(PaymentExporter::class)
-                    ->icon(Heroicon::ArrowDownTray),
-            ])
+                    ExportAction::make()->label('Exporter')
+                        ->exporter(PaymentExporter::class)
+                        ->icon(Heroicon::ArrowDownTray),
+                ])
             ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                    ForceDeleteBulkAction::make(),
-                    RestoreBulkAction::make(),
-                ]),
+                // Immutable records
             ]);
     }
 

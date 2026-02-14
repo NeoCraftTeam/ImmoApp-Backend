@@ -22,7 +22,9 @@ use OpenApi\Annotations as OA;
  */
 final class PaymentController
 {
-    public function __construct(protected FedaPayService $fedaPay) {}
+    public function __construct(protected FedaPayService $fedaPay)
+    {
+    }
 
     private function unlockPrice(): int
     {
@@ -204,6 +206,15 @@ final class PaymentController
             // 1. Gestion du SUCCÈS
             if (isset($event['event']) && $event['event'] === 'transaction.approved') {
                 $payment->update(['status' => PaymentStatus::SUCCESS]);
+
+                // Create UnlockedAd record for backoffice tracking (unlock payments only)
+                if ($payment->type === PaymentType::UNLOCK && $payment->ad_id && $payment->user_id) {
+                    \App\Models\UnlockedAd::firstOrCreate(
+                        ['ad_id' => $payment->ad_id, 'user_id' => $payment->user_id],
+                        ['payment_id' => $payment->id, 'unlocked_at' => now()]
+                    );
+                }
+
                 Log::info("Paiement #{$payment->id} validé.");
 
                 // Logique spécifique aux abonnements
@@ -307,6 +318,13 @@ final class PaymentController
 
         if ($result['success'] && $result['status'] === 'approved') {
             $payment->update(['status' => PaymentStatus::SUCCESS]);
+
+            // Create UnlockedAd record for backoffice tracking
+            \App\Models\UnlockedAd::firstOrCreate(
+                ['ad_id' => $ad->id, 'user_id' => $user->id],
+                ['payment_id' => $payment->id, 'unlocked_at' => now()]
+            );
+
             Log::info("Paiement #{$payment->id} vérifié et validé via API.");
 
             return response()->json([
@@ -370,8 +388,8 @@ final class PaymentController
             return false;
         }
 
-        $expectedTimestampedSignature = hash_hmac('sha256', $timestamp.'.'.$payload, $secret);
+        $expectedTimestampedSignature = hash_hmac('sha256', $timestamp . '.' . $payload, $secret);
 
-        return array_any($signatures, fn ($signature) => hash_equals($expectedTimestampedSignature, $signature));
+        return array_any($signatures, fn($signature) => hash_equals($expectedTimestampedSignature, $signature));
     }
 }

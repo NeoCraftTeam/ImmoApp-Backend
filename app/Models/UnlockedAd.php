@@ -47,7 +47,7 @@ use Illuminate\Support\Carbon;
  */
 class UnlockedAd extends Model
 {
-    use HasFactory, HasUuids, softDeletes;
+    use HasFactory, HasUuids, \Spatie\Activitylog\Traits\LogsActivity, softDeletes;
 
     public $timestamps = false;
 
@@ -74,6 +74,15 @@ class UnlockedAd extends Model
 
     protected function casts(): array
     {
-        return ['unlocked_at' => 'timestamp', 'updated_at' => 'timestamp'];
+        return ['unlocked_at' => 'datetime', 'updated_at' => 'datetime'];
+    }
+
+    public function getActivitylogOptions(): \Spatie\Activitylog\LogOptions
+    {
+        return \Spatie\Activitylog\LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn(string $eventName): string => "Déblocage annonce #{$this->ad_id} {$eventName}");
     }
 }
