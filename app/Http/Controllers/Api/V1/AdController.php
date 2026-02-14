@@ -133,7 +133,7 @@ final class AdController
             ->where('status', \App\Enums\AdStatus::AVAILABLE);
 
         if ($type) {
-            $query->whereHas('ad_type', fn($q) => $q->where('name', 'ilike', "%{$type}%"));
+            $query->whereHas('ad_type', fn ($q) => $q->where('name', 'ilike', "%{$type}%"));
         }
 
         $ads = $query->orderByBoost()->paginate($perPage);
@@ -289,7 +289,7 @@ final class AdController
                 'type_id' => $data['type_id'],
             ]);
 
-            Log::info('Ad created with ID: ' . $ad->id);
+            Log::info('Ad created with ID: '.$ad->id);
 
             // Gérer les images via Spatie Media Library
             if ($request->hasFile('images')) {
@@ -325,7 +325,7 @@ final class AdController
         } catch (Throwable $e) {
             DB::rollback();
 
-            Log::error('Error creating ad: ' . $e->getMessage(), [
+            Log::error('Error creating ad: '.$e->getMessage(), [
                 'user_id' => auth()->id(),
                 'trace' => $e->getTraceAsString(),
             ]);
@@ -592,7 +592,7 @@ final class AdController
             // Mettre à jour l'annonce
             $ad->update($data);
 
-            Log::info('Ad updated with ID: ' . $ad->id);
+            Log::info('Ad updated with ID: '.$ad->id);
 
             // Gérer les nouvelles images
             if ($request->hasFile('images')) {
@@ -619,7 +619,7 @@ final class AdController
                 }
             }
 
-            Log::info('Media updated for ad ID: ' . $ad->id);
+            Log::info('Media updated for ad ID: '.$ad->id);
 
             DB::commit();
 
@@ -645,7 +645,7 @@ final class AdController
         } catch (Throwable $e) {
             DB::rollback();
 
-            Log::error('Error updating ad: ' . $e->getMessage(), [
+            Log::error('Error updating ad: '.$e->getMessage(), [
                 'ad_id' => $ad->id,
                 'user_id' => auth()->id(),
                 'trace' => $e->getTraceAsString(),
@@ -786,7 +786,7 @@ final class AdController
         DB::beginTransaction();
 
         try {
-            Log::info('Starting deletion of ad with ID: ' . $id);
+            Log::info('Starting deletion of ad with ID: '.$id);
 
             // Compter les images avant suppression pour le rapport
             $imagesCount = $ad->getMedia('images')->count();
@@ -794,7 +794,7 @@ final class AdController
             // Supprimer l'annonce (Spatie supprimera automatiquement les fichiers associés)
             $ad->delete();
 
-            Log::info('Ad deleted successfully with ID: ' . $id);
+            Log::info('Ad deleted successfully with ID: '.$id);
 
             DB::commit();
 
@@ -810,7 +810,7 @@ final class AdController
         } catch (Throwable $e) {
             DB::rollBack();
 
-            Log::error('Error deleting ad: ' . $e->getMessage(), [
+            Log::error('Error deleting ad: '.$e->getMessage(), [
                 'ad_id' => $id,
                 'user_id' => auth()->id(),
                 'trace' => $e->getTraceAsString(),
@@ -1062,7 +1062,7 @@ final class AdController
                     ->get();
             }
 
-            $coordinates = $ads->map(fn(Ad $ad) => [
+            $coordinates = $ads->map(fn (Ad $ad) => [
                 'id' => $ad->id,
                 'latitude' => isset($ad->lat) ? (float) $ad->lat : null,
                 'longitude' => isset($ad->lng) ? (float) $ad->lng : null,
@@ -1085,7 +1085,7 @@ final class AdController
             ]);
 
         } catch (Throwable $e) {
-            Log::error('Error in ads_nearby: ' . $e->getMessage(), [
+            Log::error('Error in ads_nearby: '.$e->getMessage(), [
                 'line' => $e->getLine(),
                 'file' => $e->getFile(),
                 'trace' => $e->getTraceAsString(),
@@ -1403,7 +1403,7 @@ final class AdController
         try {
             $driver = DB::getDriverName();
             $likeOperator = $driver === 'pgsql' ? 'ilike' : 'like';
-            $prefix = $q !== '' ? ($q . '%') : '%';
+            $prefix = $q !== '' ? ($q.'%') : '%';
 
             // Build base query per field, counting only available ads
             if ($field === 'city') {
@@ -1456,7 +1456,7 @@ final class AdController
                 'data' => $rows,
             ]);
         } catch (Throwable $e) {
-            Log::error('Autocomplete error: ' . $e->getMessage(), [
+            Log::error('Autocomplete error: '.$e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
             ]);
 
@@ -1635,7 +1635,7 @@ final class AdController
                 ->where('status', '=', 'available')
                 ->whereNotNull('bedrooms')
                 ->groupBy('bedrooms')
-                ->select([DB::raw($bedroomsCast . ' as value'), DB::raw('COUNT(*) as count')])
+                ->select([DB::raw($bedroomsCast.' as value'), DB::raw('COUNT(*) as count')])
                 ->orderBy('value')
                 ->get();
 
@@ -1684,7 +1684,7 @@ final class AdController
                 ],
             ]);
         } catch (Throwable $e) {
-            Log::error('Facets error: ' . $e->getMessage(), [
+            Log::error('Facets error: '.$e->getMessage(), [
                 'driver' => DB::getDriverName(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
@@ -1869,7 +1869,7 @@ final class AdController
                 return $index->search($query, $options);
             })
                 // Eager load des relations
-                ->query(fn($eloquent) => $eloquent->with(['quarter.city', 'ad_type', 'media', 'user'])->withAvg('reviews', 'rating')->withCount('reviews'));
+                ->query(fn ($eloquent) => $eloquent->with(['quarter.city', 'ad_type', 'media', 'user'])->withAvg('reviews', 'rating')->withCount('reviews'));
 
             // Paginer
             $results = $builder->paginate($perPage);
@@ -1890,8 +1890,8 @@ final class AdController
                     'next' => $results->nextPageUrl(),
                 ],
             ], 200);
-        } catch (\Meilisearch\Exceptions\ApiException | \Exception $e) {
-            Log::warning('Search fallback to Eloquent: ' . $e->getMessage());
+        } catch (\Meilisearch\Exceptions\ApiException|\Exception $e) {
+            Log::warning('Search fallback to Eloquent: '.$e->getMessage());
 
             return $this->searchFallback($validated);
         }
@@ -1929,11 +1929,11 @@ final class AdController
         }
 
         if ($city) {
-            $query->whereHas('quarter.city', fn($qb) => $qb->where('name', 'ilike', "%{$city}%"));
+            $query->whereHas('quarter.city', fn ($qb) => $qb->where('name', 'ilike', "%{$city}%"));
         }
 
         if ($type) {
-            $query->whereHas('ad_type', fn($qb) => $qb->where('name', 'ilike', "%{$type}%"));
+            $query->whereHas('ad_type', fn ($qb) => $qb->where('name', 'ilike', "%{$type}%"));
         }
 
         if ($minBedrooms !== null) {

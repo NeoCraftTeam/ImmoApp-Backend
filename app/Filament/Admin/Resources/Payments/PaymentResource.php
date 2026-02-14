@@ -12,16 +12,8 @@ use App\Filament\Exports\PaymentExporter;
 use App\Filament\Imports\PaymentImporter;
 use App\Models\Payment;
 use BackedEnum;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
 use Filament\Actions\ExportAction;
-use Filament\Actions\ForceDeleteAction;
-use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\ImportAction;
-use Filament\Actions\RestoreAction;
-use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -72,7 +64,7 @@ class PaymentResource extends Resource
                     ->required(),
                 Select::make('user_id')
                     ->relationship('user', 'firstname')
-                    ->getOptionLabelFromRecordUsing(fn($record) => "{$record->firstname} {$record->lastname}")
+                    ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->firstname} {$record->lastname}")
                     ->searchable()
                     ->preload()
                     ->required(),
@@ -129,14 +121,14 @@ class PaymentResource extends Resource
             ->recordActions([
                 ViewAction::make(),
             ])->headerActions([
-                    ImportAction::make()->label('Importer')
-                        ->importer(PaymentImporter::class)
-                        ->icon(Heroicon::ArrowUpTray),
+                ImportAction::make()->label('Importer')
+                    ->importer(PaymentImporter::class)
+                    ->icon(Heroicon::ArrowUpTray),
 
-                    ExportAction::make()->label('Exporter')
-                        ->exporter(PaymentExporter::class)
-                        ->icon(Heroicon::ArrowDownTray),
-                ])
+                ExportAction::make()->label('Exporter')
+                    ->exporter(PaymentExporter::class)
+                    ->icon(Heroicon::ArrowDownTray),
+            ])
             ->toolbarActions([
                 // Immutable records
             ]);

@@ -22,9 +22,7 @@ use OpenApi\Annotations as OA;
  */
 final class PaymentController
 {
-    public function __construct(protected FedaPayService $fedaPay)
-    {
-    }
+    public function __construct(protected FedaPayService $fedaPay) {}
 
     private function unlockPrice(): int
     {
@@ -388,8 +386,8 @@ final class PaymentController
             return false;
         }
 
-        $expectedTimestampedSignature = hash_hmac('sha256', $timestamp . '.' . $payload, $secret);
+        $expectedTimestampedSignature = hash_hmac('sha256', $timestamp.'.'.$payload, $secret);
 
-        return array_any($signatures, fn($signature) => hash_equals($expectedTimestampedSignature, $signature));
+        return array_any($signatures, fn ($signature) => hash_equals($expectedTimestampedSignature, $signature));
     }
 }

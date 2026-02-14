@@ -47,7 +47,7 @@ use Illuminate\Support\Carbon;
  */
 class UnlockedAd extends Model
 {
-    use HasFactory, HasUuids, \Spatie\Activitylog\Traits\LogsActivity, softDeletes;
+    use HasFactory, HasUuids, softDeletes, \Spatie\Activitylog\Traits\LogsActivity;
 
     public $timestamps = false;
 
@@ -83,6 +83,6 @@ class UnlockedAd extends Model
             ->logAll()
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
-            ->setDescriptionForEvent(fn(string $eventName): string => "Déblocage annonce #{$this->ad_id} {$eventName}");
+            ->setDescriptionForEvent(fn (string $eventName): string => "Déblocage annonce #{$this->ad_id} {$eventName}");
     }
 }

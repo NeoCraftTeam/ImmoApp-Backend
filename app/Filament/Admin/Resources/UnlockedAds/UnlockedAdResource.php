@@ -9,16 +9,8 @@ use App\Filament\Exports\UnlockedAdExporter;
 use App\Filament\Imports\UnlockedAdImporter;
 use App\Models\UnlockedAd;
 use BackedEnum;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
 use Filament\Actions\ExportAction;
-use Filament\Actions\ForceDeleteAction;
-use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\ImportAction;
-use Filament\Actions\RestoreAction;
-use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
@@ -60,7 +52,7 @@ class UnlockedAdResource extends Resource
                     ->required(),
                 Select::make('user_id')
                     ->relationship('user', 'firstname')
-                    ->getOptionLabelFromRecordUsing(fn($record) => "{$record->firstname} {$record->lastname}")
+                    ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->firstname} {$record->lastname}")
                     ->searchable()
                     ->preload()
                     ->required(),
@@ -88,7 +80,7 @@ class UnlockedAdResource extends Resource
                     ->dateTime('d/m/Y H:i'),
                 TextEntry::make('deleted_at')
                     ->dateTime()
-                    ->visible(fn(UnlockedAd $record): bool => $record->trashed()),
+                    ->visible(fn (UnlockedAd $record): bool => $record->trashed()),
             ]);
     }
 
@@ -121,14 +113,14 @@ class UnlockedAdResource extends Resource
                 ViewAction::make()->label('Voir'),
             ])->headerActions([
 
-                    ImportAction::make()->label('Importer')
-                        ->importer(UnlockedAdImporter::class)
-                        ->icon(Heroicon::ArrowUpTray),
+                ImportAction::make()->label('Importer')
+                    ->importer(UnlockedAdImporter::class)
+                    ->icon(Heroicon::ArrowUpTray),
 
-                    ExportAction::make()->label('Exporter')
-                        ->exporter(UnlockedAdExporter::class)
-                        ->icon(Heroicon::ArrowDownTray),
-                ])
+                ExportAction::make()->label('Exporter')
+                    ->exporter(UnlockedAdExporter::class)
+                    ->icon(Heroicon::ArrowDownTray),
+            ])
             ->toolbarActions([
                 // Immutable records
             ]);
