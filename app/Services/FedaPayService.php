@@ -37,7 +37,7 @@ class FedaPayService
                 'description' => "Déblocage de l'annonce #{$adId}",
                 'amount' => $amount,
                 'currency' => ['iso' => 'XOF'],
-                'callback_url' => config('app.frontend_url', config('app.url')) . '/payment-success?ad_id=' . urlencode((string) $adId),
+                'callback_url' => config('app.frontend_url', config('app.url')).'/payment-success?ad_id='.urlencode((string) $adId),
                 'customer' => [
                     'firstname' => $user->firstname,
                     'lastname' => $user->lastname,
@@ -55,7 +55,7 @@ class FedaPayService
                 'transaction_id' => $transaction->id,
             ];
         } catch (\Exception $e) {
-            \Log::error('FedaPay Error: ' . $e->getMessage());
+            \Log::error('FedaPay Error: '.$e->getMessage());
 
             return [
                 'success' => false,
@@ -87,7 +87,7 @@ class FedaPayService
                 'transaction_id' => $transaction->id,
             ];
         } catch (\Exception $e) {
-            \Log::error('FedaPay Retrieve Error: ' . $e->getMessage());
+            \Log::error('FedaPay Retrieve Error: '.$e->getMessage());
 
             return [
                 'success' => false,
@@ -118,7 +118,7 @@ class FedaPayService
                 'description' => 'Souscription Abonnement',
                 'amount' => $amount,
                 'currency' => ['iso' => 'XOF'],
-                'callback_url' => $callbackUrl ?? (config('app.url') . '/agency/abonnement'),
+                'callback_url' => $callbackUrl ?? (config('app.url').'/agency/abonnement'),
                 'customer' => [
                     'firstname' => $agency->name ?? 'Agence',
                     'lastname' => 'Member',
@@ -142,7 +142,7 @@ class FedaPayService
                 'transaction_id' => $transaction->id,
             ];
         } catch (\Exception $e) {
-            \Log::error('FedaPay Subscription Error: ' . $e->getMessage());
+            \Log::error('FedaPay Subscription Error: '.$e->getMessage());
 
             return [
                 'success' => false,
