@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\AdController;
+use App\Http\Controllers\Api\V1\AdInteractionController;
 use App\Http\Controllers\Api\V1\AdTypeController;
 use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\AuthController;
@@ -109,13 +110,16 @@ Route::prefix('v1')->group(function (): void {
             ->where('status', \App\Enums\PaymentStatus::SUCCESS)
             ->pluck('ad_id');
 
-        $ads = \App\Models\Ad::with('quarter.city', 'ad_type', 'media', 'user')
+        $ads = \App\Models\Ad::with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')
             ->whereIn('id', $adIds)
             ->latest()
             ->get();
 
         return \App\Http\Resources\AdResource::collection($ads);
     });
+
+    // --- MES FAVORIS ---
+    Route::middleware('auth:sanctum')->get('/my/favorites', [AdInteractionController::class, 'favorites']);
 
     // --- PRIX DE DÉBLOCAGE ---
     Route::get('/payments/unlock-price', fn () => response()->json([
@@ -167,5 +171,13 @@ Route::prefix('v1')->group(function (): void {
 
         // Capture l'ID de l'annonce (doit être en dernier)
         Route::get('/{id}', 'show');
+    });
+
+    // --- INTERACTIONS (vues, favoris) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::post('/ads/{ad}/view', [AdInteractionController::class, 'trackView'])
+            ->middleware('throttle:120,1'); // 120 views per minute
+        Route::post('/ads/{ad}/favorite', [AdInteractionController::class, 'toggleFavorite'])
+            ->middleware('throttle:30,1');
     });
 });

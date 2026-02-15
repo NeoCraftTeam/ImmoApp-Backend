@@ -217,6 +217,12 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return $this->hasMany(Review::class);
     }
 
+    /** @return HasMany<AdInteraction, $this> */
+    public function adInteractions(): HasMany
+    {
+        return $this->hasMany(AdInteraction::class);
+    }
+
     /**
      * returns true if the user is an agent.
      */

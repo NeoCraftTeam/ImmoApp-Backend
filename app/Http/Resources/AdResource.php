@@ -52,6 +52,8 @@ final class AdResource extends JsonResource
             'total_images' => $this->getMedia('images')->count(),
             'rating' => $avgRating ? (float) $avgRating : null,
             'reviews_count' => (int) $reviewsCount,
+            'is_favorited' => $this->isFavoritedBy($user),
+            'view_count' => $this->views_count ?? 0,
             'expires_at' => $this->expires_at,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,

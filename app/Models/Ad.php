@@ -286,6 +286,47 @@ class Ad extends Model implements HasMedia
         return $this->hasMany(Review::class);
     }
 
+    /** @return HasMany<AdInteraction, $this> */
+    public function interactions(): HasMany
+    {
+        return $this->hasMany(AdInteraction::class);
+    }
+
+    /** @return HasMany<AdInteraction, $this> */
+    public function views(): HasMany
+    {
+        return $this->hasMany(AdInteraction::class)->where('type', AdInteraction::TYPE_VIEW);
+    }
+
+    /** Get the number of views in the last 30 days. */
+    public function recentViewCount(): int
+    {
+        return $this->interactions()
+            ->where('type', AdInteraction::TYPE_VIEW)
+            ->where('created_at', '>=', now()->subDays(30))
+            ->count();
+    }
+
+    /** Check if a user has favorited this ad. */
+    public function isFavoritedBy(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        $favorites = AdInteraction::where('user_id', $user->id)
+            ->where('ad_id', $this->id)
+            ->where('type', AdInteraction::TYPE_FAVORITE)
+            ->count();
+
+        $unfavorites = AdInteraction::where('user_id', $user->id)
+            ->where('ad_id', $this->id)
+            ->where('type', AdInteraction::TYPE_UNFAVORITE)
+            ->count();
+
+        return $favorites > $unfavorites;
+    }
+
     /**
      * @return BelongsTo<AdType, $this>
      */
