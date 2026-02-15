@@ -69,7 +69,7 @@ final class RecommendationController
 
             // 2. Cold Start : Pas d'historique ? -> Annonces récentes
             if ($lastInteractions->isEmpty()) {
-                $latestAds = Ad::with(['quarter.city', 'ad_type', 'media', 'user'])
+                $latestAds = Ad::with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])
                     ->where('status', 'available')
                     ->latest()
                     ->take(10)
@@ -87,7 +87,7 @@ final class RecommendationController
             $maxPrice = $avgPrice * 1.3;
 
             // 4. Recherche des recommandations (Content-Based Filtering)
-            $recommendations = Ad::with(['quarter.city', 'ad_type', 'media', 'user'])
+            $recommendations = Ad::with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])
                 ->whereNotIn('id', $seenAdIds)
                 ->where('status', 'available')
                 ->where(function (Builder $query) use ($preferredTypeIds, $preferredCityIds, $minPrice, $maxPrice): void {
@@ -105,7 +105,7 @@ final class RecommendationController
 
             // Fallback
             if ($recommendations->isEmpty()) {
-                $recommendations = Ad::with(['quarter.city', 'ad_type', 'media', 'user'])
+                $recommendations = Ad::with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])
                     ->whereNotIn('id', $seenAdIds)
                     ->where('status', 'available')
                     ->whereIn('type_id', $preferredTypeIds)

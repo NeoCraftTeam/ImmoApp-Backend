@@ -1869,7 +1869,7 @@ final class AdController
                 return $index->search($query, $options);
             })
                 // Eager load des relations
-                ->query(fn ($eloquent) => $eloquent->with(['quarter.city', 'ad_type', 'media', 'user'])->withAvg('reviews', 'rating')->withCount('reviews'));
+                ->query(fn ($eloquent) => $eloquent->with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])->withAvg('reviews', 'rating')->withCount('reviews'));
 
             // Paginer
             $results = $builder->paginate($perPage);
@@ -1917,7 +1917,7 @@ final class AdController
         $hasParking = isset($validated['has_parking']) ? (bool) $validated['has_parking'] : null;
 
         $query = Ad::query()
-            ->with(['quarter.city', 'ad_type', 'media', 'user'])
+            ->with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])
             ->where('status', \App\Enums\AdStatus::AVAILABLE);
 
         if ($q) {
