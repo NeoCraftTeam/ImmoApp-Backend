@@ -62,7 +62,7 @@ class NativeService {
         'https://keyhomeback.neocraft.dev', 
         'https://api.keyhome.neocraft.dev', 
         'https://agency.keyhome.neocraft.dev',
-        'https://bailleur.keyhome.neocraft.dev'
+        'https://owner.keyhome.neocraft.dev'
       ];
       
       const isAllowed = allowedOrigins.some(allowed => origin.startsWith(allowed));
