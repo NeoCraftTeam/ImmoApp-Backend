@@ -99,7 +99,9 @@ trait SharedAdResource
 
     /**
      * Status select — shows only valid transitions from the current status.
-     * On create, defaults to PENDING. On edit, shows current + allowed next states.
+     * On create, defaults to PENDING (hidden for non-admin).
+     * On edit, shows current + allowed next states.
+     * For non-admin: hidden when PENDING (awaiting admin approval), visible after approval.
      */
     protected static function getStatusSelect(bool $isAdmin = false): Select
     {
@@ -125,7 +127,9 @@ trait SharedAdResource
 
         if (!$isAdmin) {
             $select
-                ->disabled(fn (?Ad $record) => $record === null || $record->status === AdStatus::PENDING)
+                // Hidden on create (auto-set to PENDING) or while still PENDING (awaiting admin approval)
+                // Using hidden() instead of visible() so the default value is still dehydrated
+                ->hidden(fn (?Ad $record) => $record === null || $record->status === AdStatus::PENDING)
                 ->dehydrated();
         }
 

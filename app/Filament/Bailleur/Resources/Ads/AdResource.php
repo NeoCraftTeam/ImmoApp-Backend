@@ -14,7 +14,6 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
-use Filament\Forms\Components\DateTimePicker;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -57,7 +56,6 @@ class AdResource extends Resource
             ->components([
                 ...static::getSharedFormFields(),
                 static::getStatusSelect(isAdmin: false),
-                DateTimePicker::make('expires_at'),
                 ...static::getRelationSelects(),
             ]);
     }
@@ -107,6 +105,8 @@ class AdResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        return (string) static::getEloquentQuery()->count();
+        return (string) static::getModel()::query()
+            ->withGlobalScope('landlord', new LandlordScope)
+            ->count();
     }
 }
