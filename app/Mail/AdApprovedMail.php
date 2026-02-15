@@ -1,55 +1,43 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Mail;
 
 use App\Models\Ad;
-use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class AdSubmissionConfirmationMail extends Mailable
+class AdApprovedMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public User $author;
-
-    /**
-     * Create a new message instance.
-     */
     public function __construct(
         public Ad $ad
     ) {
-        $this->author = $this->ad->user;
-
-        // Queue only in production/staging environments
         if (app()->environment(['production', 'staging'])) {
             $this->onQueue('emails');
         }
     }
 
-    /**
-     * Get the message envelope.
-     */
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Confirmation de réception de votre annonce : '.$this->ad->title,
+            subject: '✅ Votre annonce a été approuvée : '.$this->ad->title,
         );
     }
 
-    /**
-     * Get the message content definition.
-     */
     public function content(): Content
     {
         return new Content(
-            view: 'emails.ad_submission_confirmation',
+            view: 'emails.ad_approved',
             with: [
-                'authorName' => $this->author->firstname, // Close/personal salutation
+                'authorName' => $this->ad->user->firstname ?? 'Utilisateur',
                 'adTitle' => $this->ad->title,
+                'adPrice' => number_format((float) $this->ad->price, 0, ',', ' ').' FCFA',
             ],
         );
     }

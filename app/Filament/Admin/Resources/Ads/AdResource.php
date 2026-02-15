@@ -44,9 +44,11 @@ class AdResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'title';
 
-    protected static ?string $navigationLabel = 'Annonces';
+    protected static ?string $navigationLabel = 'Toutes les annonces';
 
     protected static ?string $modelLabel = 'Annonce';
+
+    protected static ?int $navigationSort = 1;
 
     #[\Override]
     public static function form(Schema $schema): Schema
@@ -128,8 +130,13 @@ class AdResource extends Resource
         return (string) static::getModel()::count();
     }
 
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'gray';
+    }
+
     public static function getNavigationBadgeTooltip(): ?string
     {
-        return 'Nombre d\'annonces';
+        return 'Nombre total d\'annonces';
     }
 }

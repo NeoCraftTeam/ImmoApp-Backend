@@ -48,7 +48,7 @@ class NewAdSubmissionMail extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.new_ad_submission',
+            view: 'emails.new_ad_submission',
             with: [
                 'authorName' => $this->author->fullname,
                 'authorEmail' => $this->author->email,

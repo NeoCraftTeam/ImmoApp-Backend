@@ -51,6 +51,8 @@ class AdminPanelProvider extends PanelProvider
             ->brandLogo(asset('images/keyhomelogo.png'))
             ->authGuard('web')
             ->spa()
+            ->databaseNotifications()
+            ->databaseNotificationsPolling('30s')
             ->unsavedChangesAlerts()
             ->collapsibleNavigationGroups(false)
             ->colors([
