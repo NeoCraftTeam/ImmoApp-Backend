@@ -10,7 +10,6 @@ use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -24,7 +23,7 @@ class BailleurPanelProvider extends PanelProvider
     {
         return $panel
             ->id('bailleur')
-            ->path('bailleur')
+            ->path('owner')
             ->brandLogo(fn () => view('filament.bailleur.brand'))
             ->brandLogoHeight('3.5rem')
             ->login()
@@ -50,7 +49,6 @@ class BailleurPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Bailleur/Widgets'), for: 'App\Filament\Bailleur\Widgets')
             ->widgets([
-                AccountWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,
