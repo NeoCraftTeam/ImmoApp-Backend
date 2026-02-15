@@ -59,7 +59,7 @@ class CustomRegister extends BaseRegister
             ->maxLength(255);
     }
 
-    #[\Override]
+    #[Override]
     protected function handleRegistration(array $data): Model
     {
         $panelId = \Filament\Facades\Filament::getCurrentPanel()->getId();
@@ -76,16 +76,27 @@ class CustomRegister extends BaseRegister
             ]);
 
             // 2. On utilise le service pour lui créer son Agence/Portefeuille et le promouvoir Agent
-            $agencyService = app(AgencyService::class);
+            try {
+                $agencyService = app(AgencyService::class);
 
-            if ($panelId === 'agency') {
-                $agencyName = $data['agency_name'] ?? 'Agence de '.$user->lastname;
-                $agencyService->promoteToAgency($user, $agencyName);
-            } else {
-                $agencyService->promoteToBailleur($user);
+                if ($panelId === 'agency') {
+                    $agencyName = $data['agency_name'] ?? 'Agence de '.$user->lastname;
+                    $agencyService->promoteToAgency($user, $agencyName);
+                } else {
+                    $agencyService->promoteToBailleur($user);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Registration promotion failed', [
+                    'user_id' => $user->id,
+                    'panel' => $panelId,
+                    'error' => $e->getMessage(),
+                ]);
+
+                throw $e;
             }
 
-            return $user;
+            // 3. Recharger l'utilisateur pour avoir le rôle/type mis à jour
+            return $user->fresh();
         });
     }
 }

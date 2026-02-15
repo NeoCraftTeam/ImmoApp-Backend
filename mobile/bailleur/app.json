@@ -17,10 +17,16 @@
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false,
+          "NSAllowsArbitraryLoadsInWebContent": true,
           "NSExceptionDomains": {
             "keyhomeback.neocraft.dev": {
               "NSExceptionAllowsInsecureHTTPLoads": false,
               "NSExceptionRequiresForwardSecrecy": true
+            },
+            "keyhome.test": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
+              "NSExceptionRequiresForwardSecrecy": false
             }
           }
         },

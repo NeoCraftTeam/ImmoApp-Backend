@@ -1,14 +1,14 @@
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    BackHandler,
-    Image,
-    Platform,
-    StyleSheet,
-    Text,
-    View
+  ActivityIndicator,
+  Animated,
+  BackHandler,
+  Image,
+  Platform,
+  StyleSheet,
+  Text,
+  View
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -127,8 +127,8 @@ export default function App() {
               // Sécurité : Valider l'origine du message si possible
               NativeService.handleWebViewMessage(event);
             }}
-            // Sécurité : Restreindre les origines autorisées
-	            originWhitelist={['https://*.keyhome.neocraft.dev']}
+            // Autoriser HTTP (dev local) et HTTPS (production)
+            originWhitelist={['http://*', 'https://*']}
             // Sécurité : Désactiver l'accès au système de fichiers
             allowFileAccess={false}
             // Sécurité : Empêcher l'exécution de JS injecté de manière non sécurisée
@@ -149,6 +149,7 @@ export default function App() {
           />
         </SafeAreaView>
 
+        {/* Error overlay désactivé temporairement
         {error && !showSplash && (
           <View style={styles.errorContainer}>
             <View style={styles.errorContent}>
@@ -165,6 +166,7 @@ export default function App() {
             </View>
           </View>
         )}
+        */}
 
         {isLoading && !showSplash && !error && (
           <View style={styles.loaderContainer}>
