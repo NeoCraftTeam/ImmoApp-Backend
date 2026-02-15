@@ -45,6 +45,7 @@ class ManageSettings extends Page
     {
         $this->form->fill([
             'unlock_price' => Setting::get('unlock_price', 500),
+            'ad_lifetime_days' => Setting::get('ad_lifetime_days', 30),
         ]);
     }
 
@@ -65,6 +66,19 @@ class ManageSettings extends Page
                             ->minValue(0)
                             ->suffix('FCFA')
                             ->default(500),
+                    ]),
+                Section::make('Annonces')
+                    ->description('Configuration de la durée de vie des annonces')
+                    ->icon(Heroicon::Home)
+                    ->schema([
+                        TextInput::make('ad_lifetime_days')
+                            ->label('Durée de vie d\'une annonce (jours)')
+                            ->helperText('Nombre de jours avant qu\'une annonce n\'expire automatiquement après approbation.')
+                            ->numeric()
+                            ->required()
+                            ->minValue(1)
+                            ->suffix('jours')
+                            ->default(30),
                     ]),
             ]);
     }
@@ -174,6 +188,13 @@ class ManageSettings extends Page
             $data['unlock_price'],
             'Prix de déblocage d\'une annonce (FCFA)',
             'payments'
+        );
+
+        Setting::set(
+            'ad_lifetime_days',
+            $data['ad_lifetime_days'],
+            'Durée de vie d\'une annonce (jours)',
+            'ads'
         );
 
         $this->awaitingCode = false;
