@@ -120,7 +120,8 @@ class PaymentResource extends Resource
             ])
             ->recordActions([
                 ViewAction::make(),
-            ])->headerActions([
+            ])
+            ->headerActions([
                 ImportAction::make()->label('Importer')
                     ->importer(PaymentImporter::class)
                     ->icon(Heroicon::ArrowUpTray),

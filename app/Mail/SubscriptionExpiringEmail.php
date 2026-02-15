@@ -35,7 +35,7 @@ class SubscriptionExpiringEmail extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.subscription.expiring',
+            view: 'emails.subscription.expiring',
             with: [
                 'agencyName' => $this->subscription->agency->name,
                 'planName' => $this->subscription->plan->name,

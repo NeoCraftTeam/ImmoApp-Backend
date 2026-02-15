@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\QuarterController;
 use App\Http\Controllers\Api\V1\RecommendationController;
+use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Support\Facades\Route;
@@ -138,6 +139,11 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/cancel', [SubscriptionController::class, 'cancel']);
         Route::get('/history', [SubscriptionController::class, 'history']);
     });
+
+    // --- REVIEWS ---
+    Route::get('/ads/{ad}/reviews', [ReviewController::class, 'index']);
+    Route::post('/reviews', [ReviewController::class, 'store'])
+        ->middleware(['auth:sanctum', 'throttle:10,1']);
 
     //  Ads
     Route::prefix('ads')->controller(AdController::class)->middleware('optional.auth')->group(function (): void {

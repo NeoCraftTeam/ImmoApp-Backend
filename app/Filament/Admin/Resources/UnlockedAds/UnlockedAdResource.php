@@ -110,8 +110,9 @@ class UnlockedAdResource extends Resource
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                ViewAction::make()->label('Voir'),
-            ])->headerActions([
+                ViewAction::make(),
+            ])
+            ->headerActions([
 
                 ImportAction::make()->label('Importer')
                     ->importer(UnlockedAdImporter::class)

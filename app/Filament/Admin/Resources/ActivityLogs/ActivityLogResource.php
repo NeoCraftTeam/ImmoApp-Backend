@@ -39,6 +39,20 @@ class ActivityLogResource extends Resource
         return false;
     }
 
+    /**
+     * Scope activity log to admin-only actions.
+     */
+    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    {
+        return parent::getEloquentQuery()
+            ->where('causer_type', \App\Models\User::class)
+            ->whereIn('causer_id', function ($query): void {
+                $query->select('id')
+                    ->from('users')
+                    ->where('role', \App\Enums\UserRole::ADMIN);
+            });
+    }
+
     #[\Override]
     public static function infolist(Schema $schema): Schema
     {
@@ -182,7 +196,9 @@ class ActivityLogResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        return (string) static::getModel()::whereDate('created_at', today())->count();
+        $count = static::getEloquentQuery()->whereDate('created_at', today())->count();
+
+        return $count > 0 ? (string) $count : null;
     }
 
     public static function getNavigationBadgeTooltip(): ?string
