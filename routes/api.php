@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\V1\AdAnalyticsController;
 use App\Http\Controllers\Api\V1\AdController;
 use App\Http\Controllers\Api\V1\AdInteractionController;
 use App\Http\Controllers\Api\V1\AdTypeController;
@@ -173,11 +174,25 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/{id}', 'show');
     });
 
-    // --- INTERACTIONS (vues, favoris) ---
+    // --- INTERACTIONS (vues, favoris, impressions, partages, clics) ---
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/ads/{ad}/view', [AdInteractionController::class, 'trackView'])
-            ->middleware('throttle:120,1'); // 120 views per minute
+            ->middleware('throttle:120,1');
         Route::post('/ads/{ad}/favorite', [AdInteractionController::class, 'toggleFavorite'])
             ->middleware('throttle:30,1');
+        Route::post('/ads/{ad}/impression', [AdInteractionController::class, 'trackImpression'])
+            ->middleware('throttle:300,1');
+        Route::post('/ads/{ad}/share', [AdInteractionController::class, 'trackShare'])
+            ->middleware('throttle:30,1');
+        Route::post('/ads/{ad}/contact-click', [AdInteractionController::class, 'trackContactClick'])
+            ->middleware('throttle:30,1');
+        Route::post('/ads/{ad}/phone-click', [AdInteractionController::class, 'trackPhoneClick'])
+            ->middleware('throttle:30,1');
+    });
+
+    // --- ANALYTICS (dashboard bailleur/agence) ---
+    Route::middleware('auth:sanctum')->prefix('my/ads')->group(function (): void {
+        Route::get('/analytics', [AdAnalyticsController::class, 'overview']);
+        Route::get('/{ad}/analytics', [AdAnalyticsController::class, 'show']);
     });
 });

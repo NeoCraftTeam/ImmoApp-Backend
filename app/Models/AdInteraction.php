@@ -53,6 +53,14 @@ class AdInteraction extends Model
 
     public const TYPE_UNLOCK = 'unlock';
 
+    public const TYPE_IMPRESSION = 'impression';
+
+    public const TYPE_SHARE = 'share';
+
+    public const TYPE_CONTACT_CLICK = 'contact_click';
+
+    public const TYPE_PHONE_CLICK = 'phone_click';
+
     // ── Relations ─────────────────────────────────────────────────────
 
     /** @return BelongsTo<User, $this> */

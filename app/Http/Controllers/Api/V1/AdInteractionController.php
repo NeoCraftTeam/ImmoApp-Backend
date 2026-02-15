@@ -62,6 +62,137 @@ final class AdInteractionController
     }
 
     /**
+     * Track an ad impression (appeared in feed/list).
+     *
+     * Debounced: 1 impression per user per ad every 30 seconds.
+     *
+     * @OA\Post(
+     *     path="/api/v1/ads/{ad}/impression",
+     *     summary="Track an ad impression",
+     *     tags={"📊 Interactions"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=204, description="Impression tracked")
+     * )
+     */
+    public function trackImpression(Request $request, Ad $ad): JsonResponse
+    {
+        $user = $request->user();
+
+        $recent = AdInteraction::where('user_id', $user->id)
+            ->where('ad_id', $ad->id)
+            ->where('type', AdInteraction::TYPE_IMPRESSION)
+            ->where('created_at', '>=', now()->subSeconds(30))
+            ->exists();
+
+        if (!$recent) {
+            AdInteraction::create([
+                'user_id' => $user->id,
+                'ad_id' => $ad->id,
+                'type' => AdInteraction::TYPE_IMPRESSION,
+                'created_at' => now(),
+            ]);
+        }
+
+        return response()->json(null, 204);
+    }
+
+    /**
+     * Track an ad share.
+     *
+     * @OA\Post(
+     *     path="/api/v1/ads/{ad}/share",
+     *     summary="Track an ad share",
+     *     tags={"📊 Interactions"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=204, description="Share tracked")
+     * )
+     */
+    public function trackShare(Request $request, Ad $ad): JsonResponse
+    {
+        AdInteraction::create([
+            'user_id' => $request->user()->id,
+            'ad_id' => $ad->id,
+            'type' => AdInteraction::TYPE_SHARE,
+            'created_at' => now(),
+        ]);
+
+        return response()->json(null, 204);
+    }
+
+    /**
+     * Track a contact button click.
+     *
+     * Debounced: 1 per user per ad per minute.
+     *
+     * @OA\Post(
+     *     path="/api/v1/ads/{ad}/contact-click",
+     *     summary="Track a contact button click",
+     *     tags={"📊 Interactions"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=204, description="Contact click tracked")
+     * )
+     */
+    public function trackContactClick(Request $request, Ad $ad): JsonResponse
+    {
+        return $this->trackDebouncedInteraction($request, $ad, AdInteraction::TYPE_CONTACT_CLICK, 60);
+    }
+
+    /**
+     * Track a phone number click.
+     *
+     * Debounced: 1 per user per ad per minute.
+     *
+     * @OA\Post(
+     *     path="/api/v1/ads/{ad}/phone-click",
+     *     summary="Track a phone number click",
+     *     tags={"📊 Interactions"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=204, description="Phone click tracked")
+     * )
+     */
+    public function trackPhoneClick(Request $request, Ad $ad): JsonResponse
+    {
+        return $this->trackDebouncedInteraction($request, $ad, AdInteraction::TYPE_PHONE_CLICK, 60);
+    }
+
+    /**
+     * Generic debounced interaction tracker.
+     */
+    private function trackDebouncedInteraction(Request $request, Ad $ad, string $type, int $debounceSeconds): JsonResponse
+    {
+        $user = $request->user();
+
+        $recent = AdInteraction::where('user_id', $user->id)
+            ->where('ad_id', $ad->id)
+            ->where('type', $type)
+            ->where('created_at', '>=', now()->subSeconds($debounceSeconds))
+            ->exists();
+
+        if (!$recent) {
+            AdInteraction::create([
+                'user_id' => $user->id,
+                'ad_id' => $ad->id,
+                'type' => $type,
+                'created_at' => now(),
+            ]);
+        }
+
+        return response()->json(null, 204);
+    }
+
+    /**
      * Toggle favorite on an ad.
      *
      * Uses a simple check: count of favorites minus unfavorites.
