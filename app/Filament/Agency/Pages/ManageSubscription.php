@@ -39,7 +39,9 @@ class ManageSubscription extends Page
 
     public $plans;
 
-    public string $period = 'monthly'; // 'monthly' or 'yearly'
+    public string $period = 'monthly';
+
+    public array $stats = [];
 
     public function mount(): void
     {
@@ -57,6 +59,22 @@ class ManageSubscription extends Page
 
         $this->subscription = $agency->getCurrentSubscription();
         $this->plans = \App\Models\SubscriptionPlan::active()->orderBy('sort_order')->get();
+        $this->stats = app(\App\Services\SubscriptionService::class)->getAgencyStats($agency);
+    }
+
+    /**
+     * Progress percentage for the active subscription (0-100).
+     */
+    public function getProgressProperty(): int
+    {
+        if (!$this->subscription || !$this->subscription->starts_at || !$this->subscription->ends_at) {
+            return 0;
+        }
+
+        $total = $this->subscription->starts_at->diffInDays($this->subscription->ends_at);
+        $elapsed = $this->subscription->starts_at->diffInDays(now());
+
+        return $total > 0 ? (int) min(100, round(($elapsed / $total) * 100)) : 0;
     }
 
     protected function verifyPayment(string $transactionId)

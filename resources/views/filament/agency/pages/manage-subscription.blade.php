@@ -1,406 +1,844 @@
 <x-filament-panels::page>
-    <!-- Import Modern Font -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap" rel="stylesheet">
-
     <style>
-        #pricing-app {
-            font-family: 'Outfit', sans-serif;
-            --primary: #3b82f6;
-            --secondary: #8b5cf6;
-            --accent: #ec4899;
-            --surface: rgba(255, 255, 255, 0.85);
-            --text: #1e293b;
-            padding: 2rem 0;
+        /* ===== DESIGN TOKENS ===== */
+        :root {
+            --sub-primary: #2563eb;
+            --sub-primary-light: #3b82f6;
+            --sub-accent: #7c3aed;
+            --sub-success: #10b981;
+            --sub-warning: #f59e0b;
+            --sub-danger: #ef4444;
+            --sub-surface: #ffffff;
+            --sub-surface-alt: #f8fafc;
+            --sub-border: #e2e8f0;
+            --sub-text: #0f172a;
+            --sub-text-muted: #64748b;
+            --sub-radius: 16px;
+            --sub-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+            --sub-shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.08);
+        }
+
+        .dark {
+            --sub-surface: #1e293b;
+            --sub-surface-alt: #0f172a;
+            --sub-border: #334155;
+            --sub-text: #f1f5f9;
+            --sub-text-muted: #94a3b8;
+            --sub-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            --sub-shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        /* ===== BASE ===== */
+        .sub-page {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* ===== ACTIVE SUB BANNER ===== */
+        .sub-banner {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            border-radius: var(--sub-radius);
+            padding: 2rem;
+            color: white;
             position: relative;
+            overflow: hidden;
+            margin-bottom: 2.5rem;
+            box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.25);
+        }
+
+        .sub-banner::before {
+            content: '';
+            position: absolute;
+            top: -80px;
+            right: -80px;
+            width: 250px;
+            height: 250px;
+            background: var(--sub-primary);
+            opacity: 0.08;
+            border-radius: 50%;
+            filter: blur(60px);
+        }
+
+        .sub-banner-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .sub-banner-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(37, 99, 235, 0.2);
+            color: #60a5fa;
+            padding: 4px 12px;
+            border-radius: 8px;
+            font-size: 0.7rem;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            border: 1px solid rgba(37, 99, 235, 0.3);
+            margin-bottom: 0.75rem;
+        }
+
+        .sub-banner-tag svg {
+            width: 12px;
+            height: 12px;
+        }
+
+        .sub-banner-name {
+            font-size: 2rem;
+            font-weight: 900;
+            letter-spacing: -1px;
+            margin: 0 0 0.5rem;
+            line-height: 1;
+        }
+
+        .sub-banner-meta {
+            font-size: 0.85rem;
+            opacity: 0.6;
+            margin: 0;
+        }
+
+        /* Progress bar */
+        .sub-progress {
+            margin-top: 1.25rem;
+            max-width: 400px;
+        }
+
+        .sub-progress-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.7rem;
+            opacity: 0.5;
+            margin-bottom: 6px;
+        }
+
+        .sub-progress-track {
+            height: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 99px;
             overflow: hidden;
         }
 
-        /* Background Blobs for Visual Interest */
-        .bg-blob {
-            position: absolute;
-            width: 500px;
-            height: 500px;
-            background: radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, rgba(139, 92, 246, 0.05) 100%);
-            filter: blur(80px);
-            z-index: -1;
-            border-radius: 50%;
+        .sub-progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--sub-primary) 0%, var(--sub-accent) 100%);
+            border-radius: 99px;
+            transition: width 1s ease-out;
         }
-        .blob-1 { top: -100px; right: -100px; }
-        .blob-2 { bottom: -100px; left: -100px; background: radial-gradient(circle, rgba(236, 72, 153, 0.1) 0%, transparent 100%); }
 
-        /* Header Design */
-        .header-box {
+        /* Stats row */
+        .sub-stats-row {
+            display: flex;
+            gap: 2rem;
+            margin-top: 1.25rem;
+        }
+
+        .sub-stat-item {
             text-align: center;
-            margin-bottom: 3rem;
         }
 
-        .header-box h1 {
-            font-size: 3rem;
+        .sub-stat-value {
+            font-size: 1.5rem;
             font-weight: 900;
-            line-height: 1.1;
-            letter-spacing: -2px;
-            margin-bottom: 1.5rem;
-            background: linear-gradient(135deg, #1e293b 0%, #3b82f6 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            line-height: 1;
         }
 
-        /* Period Switcher */
-        .sw-container {
+        .sub-stat-label {
+            font-size: 0.65rem;
+            opacity: 0.5;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+
+        /* Cancel btn */
+        .sub-cancel-btn {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.5);
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .sub-cancel-btn:hover {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+
+        /* ===== HEADER ===== */
+        .sub-header {
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        .sub-header h1 {
+            font-size: 2.5rem;
+            font-weight: 900;
+            letter-spacing: -1.5px;
+            line-height: 1.1;
+            color: var(--sub-text);
+            margin: 0 0 0.5rem;
+        }
+
+        .sub-header p {
+            color: var(--sub-text-muted);
+            font-size: 1rem;
+            margin: 0 0 1.5rem;
+        }
+
+        /* ===== PERIOD SWITCHER ===== */
+        .sub-switcher {
             display: inline-flex;
-            background: #f1f5f9;
+            align-items: center;
+            background: var(--sub-surface);
+            border: 1px solid var(--sub-border);
             padding: 4px;
             border-radius: 14px;
+            box-shadow: var(--sub-shadow);
         }
-        .sw-btn {
-            padding: 8px 24px;
+
+        .sub-sw-btn {
+            padding: 10px 24px;
             border-radius: 11px;
             border: none;
             font-weight: 700;
             font-size: 0.85rem;
             cursor: pointer;
-            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: transparent;
+            color: var(--sub-text-muted);
         }
 
-        /* Pricing Cards layout - Forced 3 columns */
-        .grid-layout {
+        .sub-sw-btn.active {
+            background: var(--sub-primary);
+            color: white;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        .sub-sw-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 99px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        /* ===== PLAN CARDS ===== */
+        .sub-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 1.5rem;
-            max-width: 1100px;
-            margin: 0 auto;
+            margin-bottom: 3rem;
         }
 
-        .card-wrap {
-            background: var(--surface);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255,255,255,0.5);
-            border-radius: 24px;
+        .sub-card {
+            background: var(--sub-surface);
+            border: 1px solid var(--sub-border);
+            border-radius: var(--sub-radius);
             padding: 2rem;
-            position: relative;
-            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
             display: flex;
             flex-direction: column;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.02);
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            position: relative;
+            box-shadow: var(--sub-shadow);
         }
 
-        .card-wrap:hover {
-            transform: translateY(-10px);
-            box-shadow: 0 30px 60px rgba(0,0,0,0.08);
+        .sub-card:hover {
+            transform: translateY(-6px);
+            box-shadow: var(--sub-shadow-lg);
         }
 
-        .card-wrap.featured::after {
-            top: 1rem;
-            right: 1.5rem;
-            font-size: 0.6rem;
-            padding: 3px 10px;
+        .sub-card.featured {
+            border-color: var(--sub-primary);
+            box-shadow: 0 0 0 1px var(--sub-primary), var(--sub-shadow-lg);
         }
 
-        .p-name { font-size: 1.4rem; font-weight: 800; margin-bottom: 0.25rem; color: #0f172a; }
-        .p-price { font-size: 2.5rem; font-weight: 900; color: #0f172a; letter-spacing: -1px; }
-        .p-curr { font-size: 0.9rem; color: #64748b; font-weight: 600; }
-        .p-cycle { font-size: 0.85rem; color: #94a3b8; }
-
-        .feat-list { list-style: none; padding: 0; margin: 2rem 0; flex-grow: 1; }
-        .feat-item { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; font-size: 0.875rem; font-weight: 500; color: #334155; }
-        .feat-ico { width: 20px; height: 20px; flex-shrink: 0; background: #f1f5f9; color: var(--primary); border-radius: 6px; padding: 4px; }
-
-        .action-btn {
-            width: 100%;
-            padding: 14px;
-            border-radius: 14px;
-            font-size: 0.95rem;
-        }
-        .btn-grad {
-            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+        .sub-card-badge {
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, var(--sub-primary), var(--sub-accent));
             color: white;
-            box-shadow: 0 15px 30px rgba(59, 130, 246, 0.3);
+            font-size: 0.65rem;
+            font-weight: 800;
+            padding: 4px 16px;
+            border-radius: 99px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            white-space: nowrap;
         }
-        .btn-grad:hover { transform: scale(1.02); box-shadow: 0 20px 40px rgba(59, 130, 246, 0.4); }
-        .btn-ghost { background: #f1f5f9; color: #1e293b; }
-        .btn-curr { background: #f8fafc; color: #94a3b8; border: 2px dashed #e2e8f0; cursor: default; }
 
-        .sw-btn.active {
-            background: #fff;
-            color: var(--primary);
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        .sub-plan-name {
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: var(--sub-text);
+            margin: 0 0 0.25rem;
         }
-        .sw-btn.inactive { color: #64748b; background: transparent; }
 
-        /* Current Plan Dashboard - Compact & Sharp */
-        .current-badge-container {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-            border-radius: 20px;
-            padding: 1.25rem 2rem;
-            margin-bottom: 2.5rem;
+        .sub-plan-desc {
+            font-size: 0.8rem;
+            color: var(--sub-text-muted);
+            margin: 0 0 1.25rem;
+            line-height: 1.4;
+        }
+
+        .sub-price-row {
+            display: flex;
+            align-items: baseline;
+            gap: 4px;
+            margin-bottom: 0.25rem;
+        }
+
+        .sub-price {
+            font-size: 2.5rem;
+            font-weight: 900;
+            color: var(--sub-text);
+            letter-spacing: -1px;
+            line-height: 1;
+        }
+
+        .sub-currency {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--sub-text-muted);
+        }
+
+        .sub-cycle {
+            font-size: 0.8rem;
+            color: var(--sub-text-muted);
+            margin-bottom: 1.5rem;
+        }
+
+        .sub-divider {
+            height: 1px;
+            background: var(--sub-border);
+            margin: 0 0 1.5rem;
+        }
+
+        /* Features */
+        .sub-feat-list {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 1.5rem;
+            flex-grow: 1;
+        }
+
+        .sub-feat-item {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            color: white;
-            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.2);
-            border: 1px solid rgba(255,255,255,0.08);
-            position: relative;
-            overflow: hidden;
-            max-width: 1100px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        
-        .current-badge-container::after {
-            content: '';
-            position: absolute;
-            top: -50px;
-            right: -50px;
-            width: 150px;
-            height: 150px;
-            background: var(--primary);
-            filter: blur(70px);
-            opacity: 0.15;
+            gap: 10px;
+            padding: 6px 0;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--sub-text);
         }
 
-        .cur-title { font-size: 1.8rem; font-weight: 900; letter-spacing: -1px; margin: 0; line-height: 1; }
-        .cur-info { opacity: 0.6; font-size: 0.85rem; margin-top: 4px; }
-        .cur-tag {
-            background: rgba(59, 130, 246, 0.2);
-            color: #60a5fa;
-            padding: 3px 8px;
+        .sub-feat-icon {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
             border-radius: 6px;
-            font-size: 0.6rem;
-            font-weight: 800;
-            margin-bottom: 0.4rem;
-            display: inline-block;
-            border: 1px solid rgba(59, 130, 246, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
-        .cur-cancel-btn {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            color: rgba(255,255,255,0.6);
-            padding: 8px 16px;
-            border-radius: 10px;
-            font-size: 0.75rem;
+        .sub-feat-icon svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .sub-feat-icon.check {
+            background: rgba(16, 185, 129, 0.1);
+            color: #10b981;
+        }
+
+        .sub-feat-icon.star {
+            background: rgba(245, 158, 11, 0.1);
+            color: #f59e0b;
+        }
+
+        .sub-feat-icon.bolt {
+            background: rgba(37, 99, 235, 0.1);
+            color: var(--sub-primary);
+        }
+
+        /* CTA Buttons */
+        .sub-cta {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 0.9rem;
             font-weight: 700;
+            text-align: center;
             cursor: pointer;
-            transition: 0.3s;
-            position: relative;
-            z-index: 2;
-        }
-        .cur-cancel-btn:hover {
-            background: rgba(239, 68, 68, 0.1);
-            color: #f87171;
-            border-color: rgba(239, 68, 68, 0.2);
+            border: none;
+            transition: all 0.3s ease;
         }
 
-        @media (max-width: 768px) {
-            .header-box h1 { font-size: 3rem; }
-            .cur-title { font-size: 2.5rem; }
-            .current-badge-container { flex-direction: column; text-align: center; gap: 2rem; }
+        .sub-cta-primary {
+            background: linear-gradient(135deg, var(--sub-primary), var(--sub-accent));
+            color: white;
+            box-shadow: 0 8px 24px rgba(37, 99, 235, 0.3);
         }
 
-        /* ===== MOBILE RESPONSIVE STYLES ===== */
-        @media (max-width: 768px) {
-            #pricing-app {
-                padding: 1rem 0.5rem;
+        .sub-cta-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px rgba(37, 99, 235, 0.4);
+        }
+
+        .sub-cta-secondary {
+            background: var(--sub-surface-alt);
+            color: var(--sub-text);
+            border: 1px solid var(--sub-border);
+        }
+
+        .sub-cta-secondary:hover {
+            background: var(--sub-primary);
+            color: white;
+            border-color: var(--sub-primary);
+        }
+
+        .sub-cta-current {
+            background: var(--sub-surface-alt);
+            color: var(--sub-text-muted);
+            border: 2px dashed var(--sub-border);
+            cursor: default;
+        }
+
+        /* ===== COMPARISON TABLE ===== */
+        .sub-compare {
+            background: var(--sub-surface);
+            border: 1px solid var(--sub-border);
+            border-radius: var(--sub-radius);
+            overflow: hidden;
+            margin-bottom: 3rem;
+            box-shadow: var(--sub-shadow);
+        }
+
+        .sub-compare-title {
+            padding: 1.25rem 1.5rem;
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--sub-text);
+            border-bottom: 1px solid var(--sub-border);
+        }
+
+        .sub-compare table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .sub-compare th,
+        .sub-compare td {
+            padding: 12px 16px;
+            text-align: center;
+            font-size: 0.8rem;
+            border-bottom: 1px solid var(--sub-border);
+        }
+
+        .sub-compare th:first-child,
+        .sub-compare td:first-child {
+            text-align: left;
+            font-weight: 600;
+            color: var(--sub-text);
+        }
+
+        .sub-compare th {
+            font-weight: 800;
+            color: var(--sub-text);
+            background: var(--sub-surface-alt);
+            font-size: 0.85rem;
+        }
+
+        .sub-compare td {
+            color: var(--sub-text-muted);
+        }
+
+        .sub-compare tr:last-child td {
+            border-bottom: none;
+        }
+
+        .sub-compare .check-icon {
+            color: var(--sub-success);
+        }
+
+        .sub-compare .cross-icon {
+            color: #cbd5e1;
+        }
+
+        /* ===== FAQ ===== */
+        .sub-faq {
+            margin-bottom: 2rem;
+        }
+
+        .sub-faq-title {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--sub-text);
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .sub-faq-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .sub-faq-item {
+            background: var(--sub-surface);
+            border: 1px solid var(--sub-border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: var(--sub-shadow);
+        }
+
+        .sub-faq-q {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--sub-text);
+            margin: 0 0 0.5rem;
+        }
+
+        .sub-faq-a {
+            font-size: 0.8rem;
+            color: var(--sub-text-muted);
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 900px) {
+            .sub-grid {
+                grid-template-columns: 1fr;
+                gap: 1.25rem;
             }
 
-            .bg-blob {
-                width: 300px;
-                height: 300px;
-            }
-
-            .header-box {
-                margin-bottom: 2rem;
-            }
-
-            .header-box h1 {
-                font-size: 2rem;
-                letter-spacing: -1px;
-                margin-bottom: 1rem;
-            }
-
-            .sw-container {
-                padding: 4px;
-                gap: 4px;
-            }
-
-            .sw-btn {
-                padding: 10px 16px;
-                font-size: 0.85rem;
-            }
-
-            .current-badge-container {
+            .sub-banner-inner {
                 flex-direction: column;
                 align-items: flex-start;
-                padding: 1.5rem;
-                gap: 1rem;
-                margin-bottom: 2rem;
             }
 
-            .cur-title {
-                font-size: 1.5rem;
-            }
-
-            .cur-info {
-                font-size: 0.8rem;
-            }
-
-            .cur-cancel-btn {
-                width: 100%;
-                padding: 12px;
-                font-size: 0.85rem;
-            }
-
-            .grid-layout {
+            .sub-faq-grid {
                 grid-template-columns: 1fr;
-                gap: 1.5rem;
-                padding: 0 0.5rem;
             }
 
-            .card-wrap {
-                padding: 1.5rem;
+            .sub-compare {
+                overflow-x: auto;
             }
 
-            .card-wrap.featured::after {
-                font-size: 0.55rem;
-                padding: 2px 8px;
-                top: 0.75rem;
-                right: 1rem;
-            }
-
-            .p-name {
-                font-size: 1.2rem;
-            }
-
-            .p-price {
+            .sub-header h1 {
                 font-size: 2rem;
             }
 
-            .p-curr {
-                font-size: 0.8rem;
-            }
-
-            .feat-list {
-                margin: 1.5rem 0;
-            }
-
-            .feat-item {
-                font-size: 0.8rem;
-                gap: 0.5rem;
-                margin-bottom: 0.75rem;
-            }
-
-            .feat-ico {
-                width: 18px;
-                height: 18px;
-            }
-
-            .action-btn {
-                padding: 12px;
-                font-size: 0.9rem;
+            .sub-stats-row {
+                gap: 1.5rem;
             }
         }
 
         @media (max-width: 480px) {
-            #pricing-app {
-                padding: 0.5rem 0.25rem;
+            .sub-header h1 {
+                font-size: 1.5rem;
+                letter-spacing: -0.5px;
             }
 
-            .header-box h1 {
-                font-size: 1.75rem;
+            .sub-price {
+                font-size: 2rem;
             }
 
-            .current-badge-container {
-                padding: 1.25rem;
-                border-radius: 16px;
+            .sub-banner-name {
+                font-size: 1.5rem;
             }
 
-            .cur-title {
-                font-size: 1.25rem;
-            }
-
-            .card-wrap {
-                padding: 1.25rem;
-                border-radius: 16px;
-            }
-
-            .p-price {
-                font-size: 1.75rem;
-            }
-
-            .feat-item {
-                font-size: 0.75rem;
+            .sub-cancel-btn {
+                width: 100%;
+                text-align: center;
             }
         }
     </style>
 
-    <div id="pricing-app">
-        <div class="bg-blob blob-1"></div>
-        <div class="bg-blob blob-2"></div>
+    <div class="sub-page">
 
+        {{-- ===== ACTIVE SUBSCRIPTION BANNER ===== --}}
         @if($subscription && $subscription->isActive())
-            <div class="current-badge-container">
-                <div>
-                    <span class="cur-tag">VOTRE PACK ACTUEL</span>
-                    <h2 class="cur-title">{{ $subscription->plan->name }}</h2>
-                    <p class="cur-info">Expire le {{ $subscription->ends_at->format('d/m/Y') }} ({{ $subscription->daysRemaining() }} jours)</p>
+            <div class="sub-banner">
+                <div class="sub-banner-inner">
+                    <div>
+                        <div class="sub-banner-tag">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Abonnement actif
+                        </div>
+                        <h2 class="sub-banner-name">{{ $subscription->plan->name }}</h2>
+                        <p class="sub-banner-meta">
+                            Actif depuis le {{ $subscription->starts_at->format('d/m/Y') }}
+                            · Expire le {{ $subscription->ends_at->format('d/m/Y') }}
+                        </p>
+
+                        {{-- Progress bar --}}
+                        <div class="sub-progress">
+                            <div class="sub-progress-labels">
+                                <span>{{ $subscription->starts_at->format('d M') }}</span>
+                                <span>{{ $subscription->ends_at->format('d M Y') }}</span>
+                            </div>
+                            <div class="sub-progress-track">
+                                <div class="sub-progress-fill" style="width: {{ $this->progress }}%"></div>
+                            </div>
+                        </div>
+
+                        {{-- Quick stats --}}
+                        <div class="sub-stats-row">
+                            <div class="sub-stat-item">
+                                <div class="sub-stat-value">{{ $subscription->daysRemaining() }}</div>
+                                <div class="sub-stat-label">Jours restants</div>
+                            </div>
+                            <div class="sub-stat-item">
+                                <div class="sub-stat-value">{{ $stats['total_boosted_ads'] ?? 0 }}</div>
+                                <div class="sub-stat-label">Annonces boostées</div>
+                            </div>
+                            <div class="sub-stat-item">
+                                <div class="sub-stat-value">+{{ $subscription->plan->boost_score }}</div>
+                                <div class="sub-stat-label">Score boost</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button wire:click="cancelSubscription"
+                        wire:confirm="Êtes-vous sûr de vouloir résilier votre abonnement ? Cette action est irréversible."
+                        class="sub-cancel-btn">
+                        Résilier le forfait
+                    </button>
                 </div>
-                <button wire:click="cancelSubscription" wire:confirm="Confirmer la résiliation ?" class="cur-cancel-btn">
-                    Résilier le forfait
-                </button>
             </div>
         @endif
 
-        <div class="header-box">
-            <h1>Boostez votre visibilité.</h1>
-            <div class="sw-container">
-                <button wire:click="setPeriod('monthly')" class="sw-btn {{ $period === 'monthly' ? 'active' : 'inactive' }}">Mensuel</button>
-                <button wire:click="setPeriod('yearly')" class="sw-btn {{ $period === 'yearly' ? 'active' : 'inactive' }}">Annuel (-20%)</button>
+        {{-- ===== HEADER + PERIOD SWITCHER ===== --}}
+        <div class="sub-header">
+            <h1>Boostez votre agence</h1>
+            <p>Choisissez le forfait adapté à vos ambitions et propulsez vos annonces en tête de liste.</p>
+
+            <div class="sub-switcher">
+                <button wire:click="setPeriod('monthly')"
+                    class="sub-sw-btn {{ $period === 'monthly' ? 'active' : '' }}">
+                    Mensuel
+                </button>
+                <button wire:click="setPeriod('yearly')" class="sub-sw-btn {{ $period === 'yearly' ? 'active' : '' }}">
+                    Annuel
+                    <span class="sub-sw-badge">-20%</span>
+                </button>
             </div>
         </div>
 
-        <div class="grid-layout">
+        {{-- ===== PLAN CARDS ===== --}}
+        <div class="sub-grid">
             @foreach($plans as $plan)
-                @php 
-                    $price = $period === 'yearly' ? $plan->price_yearly : $plan->price;
-                    $isCurrent = $subscription?->plan_id === $plan->id && $subscription->isActive();
-                    $isFeatured = $plan->name === 'Premium';
+                @php
+                    $price = $period === 'yearly' && $plan->price_yearly ? $plan->price_yearly : $plan->price;
+                    $isCurrent = $subscription?->subscription_plan_id === $plan->id && $subscription->isActive();
+                    $isFeatured = $loop->index === 1; // Middle plan = featured
                 @endphp
 
-                <div class="card-wrap {{ $isFeatured ? 'featured' : '' }}">
-                    <h3 class="p-name">{{ $plan->name }}</h3>
-                    <div class="p-price">
-                        {{ number_format($price, 0, ',', ' ') }}<span class="p-curr">FCFA</span>
-                    </div>
-                    <span class="p-cycle">par {{ $period === 'monthly' ? 'mois' : 'an' }}</span>
+                <div class="sub-card {{ $isFeatured ? 'featured' : '' }}">
+                    @if($isFeatured)
+                        <div class="sub-card-badge">🔥 Le plus populaire</div>
+                    @endif
 
-                    <ul class="feat-list">
+                    <div class="sub-plan-name">{{ $plan->name }}</div>
+                    <div class="sub-plan-desc">{{ $plan->description }}</div>
+
+                    <div class="sub-price-row">
+                        <span class="sub-price">{{ number_format($price, 0, ',', ' ') }}</span>
+                        <span class="sub-currency">FCFA</span>
+                    </div>
+                    <div class="sub-cycle">par {{ $period === 'monthly' ? 'mois' : 'an' }}</div>
+
+                    <div class="sub-divider"></div>
+
+                    <ul class="sub-feat-list">
                         @foreach($plan->features ?? [] as $feature)
-                            <li class="feat-item">
-                                <svg class="feat-ico" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                            <li class="sub-feat-item">
+                                <span class="sub-feat-icon check">
+                                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"
+                                            d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </span>
                                 {{ $feature }}
                             </li>
                         @endforeach
-                        <li class="feat-item" style="color: var(--primary); font-weight: 700;">
-                            <svg class="feat-ico" style="background: rgba(59,130,246,0.1);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                            Boost Turbo +{{ $plan->boost_score }} pts
+
+                        {{-- Boost feature --}}
+                        <li class="sub-feat-item">
+                            <span class="sub-feat-icon bolt">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                            </span>
+                            <strong>Boost +{{ $plan->boost_score }} pts</strong> pendant {{ $plan->boost_duration_days }}j
+                        </li>
+
+                        {{-- Max ads --}}
+                        <li class="sub-feat-item">
+                            <span class="sub-feat-icon star">
+                                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                            </span>
+                            {{ $plan->max_ads ? $plan->max_ads . ' annonces max' : 'Annonces illimitées' }}
                         </li>
                     </ul>
 
                     @if($isCurrent)
-                        <div class="action-btn btn-curr">PACK ACTUEL</div>
+                        <div class="sub-cta sub-cta-current">✓ Votre forfait actuel</div>
                     @else
-                        <button 
-                            wire:click="subscribe('{{ $plan->id }}')" 
-                            class="action-btn {{ $isFeatured ? 'btn-grad' : 'btn-ghost' }}"
-                            wire:loading.attr="disabled"
-                        >
-                            Démarrer maintenant
+                        <button wire:click="subscribe('{{ $plan->id }}')" wire:loading.attr="disabled"
+                            class="sub-cta {{ $isFeatured ? 'sub-cta-primary' : 'sub-cta-secondary' }}">
+                            <span wire:loading.remove wire:target="subscribe('{{ $plan->id }}')">
+                                Choisir {{ $plan->name }}
+                            </span>
+                            <span wire:loading wire:target="subscribe('{{ $plan->id }}')">
+                                Redirection...
+                            </span>
                         </button>
                     @endif
                 </div>
             @endforeach
+        </div>
+
+        {{-- ===== COMPARISON TABLE ===== --}}
+        <div class="sub-compare">
+            <div class="sub-compare-title">📊 Comparaison détaillée</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fonctionnalité</th>
+                        @foreach($plans as $plan)
+                            <th>{{ $plan->name }}</th>
+                        @endforeach
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Annonces</td>
+                        @foreach($plans as $plan)
+                            <td>{{ $plan->max_ads ?? '∞' }}</td>
+                        @endforeach
+                    </tr>
+                    <tr>
+                        <td>Score Boost</td>
+                        @foreach($plans as $plan)
+                            <td><strong>+{{ $plan->boost_score }}</strong> pts</td>
+                        @endforeach
+                    </tr>
+                    <tr>
+                        <td>Durée du Boost</td>
+                        @foreach($plans as $plan)
+                            <td>{{ $plan->boost_duration_days }} jours</td>
+                        @endforeach
+                    </tr>
+                    <tr>
+                        <td>Badge agence</td>
+                        @foreach($plans as $plan)
+                            @php $hasBadge = collect($plan->features ?? [])->contains(fn($f) => str_contains(strtolower($f), 'badge')); @endphp
+                            <td>
+                                @if($hasBadge)
+                                    <span class="check-icon">✓</span>
+                                @else
+                                    <span class="cross-icon">—</span>
+                                @endif
+                            </td>
+                        @endforeach
+                    </tr>
+                    <tr>
+                        <td>Support prioritaire</td>
+                        @foreach($plans as $plan)
+                            @php $hasSupport = collect($plan->features ?? [])->contains(fn($f) => str_contains(strtolower($f), 'prioritaire') || str_contains(strtolower($f), '24/7')); @endphp
+                            <td>
+                                @if($hasSupport)
+                                    <span class="check-icon">✓</span>
+                                @else
+                                    <span class="cross-icon">—</span>
+                                @endif
+                            </td>
+                        @endforeach
+                    </tr>
+                    <tr>
+                        <td>Statistiques avancées</td>
+                        @foreach($plans as $plan)
+                            @php $hasStats = collect($plan->features ?? [])->contains(fn($f) => str_contains(strtolower($f), 'statistiques')); @endphp
+                            <td>
+                                @if($hasStats)
+                                    <span class="check-icon">✓</span>
+                                @else
+                                    <span class="cross-icon">—</span>
+                                @endif
+                            </td>
+                        @endforeach
+                    </tr>
+                    <tr>
+                        <td>API dédiée</td>
+                        @foreach($plans as $plan)
+                            @php $hasApi = collect($plan->features ?? [])->contains(fn($f) => str_contains(strtolower($f), 'api')); @endphp
+                            <td>
+                                @if($hasApi)
+                                    <span class="check-icon">✓</span>
+                                @else
+                                    <span class="cross-icon">—</span>
+                                @endif
+                            </td>
+                        @endforeach
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        {{-- ===== FAQ ===== --}}
+        <div class="sub-faq">
+            <div class="sub-faq-title">Questions fréquentes</div>
+            <div class="sub-faq-grid">
+                <div class="sub-faq-item">
+                    <div class="sub-faq-q">Puis-je changer de plan à tout moment ?</div>
+                    <div class="sub-faq-a">Oui, vous pouvez passer à un plan supérieur à tout moment. Votre ancien
+                        abonnement sera remplacé immédiatement après le paiement.</div>
+                </div>
+                <div class="sub-faq-item">
+                    <div class="sub-faq-q">Comment fonctionne le boost ?</div>
+                    <div class="sub-faq-a">Le boost augmente le score de visibilité de vos annonces, les faisant
+                        apparaître en priorité dans les résultats de recherche pendant la durée indiquée.</div>
+                </div>
+                <div class="sub-faq-item">
+                    <div class="sub-faq-q">Quand mon abonnement sera-t-il activé ?</div>
+                    <div class="sub-faq-a">Votre abonnement est activé instantanément après confirmation du paiement via
+                        FedaPay. Vous recevrez un email de confirmation avec votre facture.</div>
+                </div>
+                <div class="sub-faq-item">
+                    <div class="sub-faq-q">Que se passe-t-il à l'expiration ?</div>
+                    <div class="sub-faq-a">Vos annonces restent en ligne mais perdent leur boost de visibilité. Vous
+                        pouvez renouveler votre abonnement à tout moment pour retrouver les avantages.</div>
+                </div>
+            </div>
         </div>
     </div>
 </x-filament-panels::page>
