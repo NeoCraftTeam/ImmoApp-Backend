@@ -218,7 +218,7 @@ final class AdAnalyticsController
     /**
      * Compute total counts per interaction type for a set of ad IDs.
      *
-     * @param  \Illuminate\Support\Collection<int, string>  $adIds
+     * @param  \Illuminate\Support\Collection<int, mixed>  $adIds
      * @return array<string, int|float>
      */
     private function computeTotals($adIds, $since): array
@@ -275,7 +275,7 @@ final class AdAnalyticsController
     /**
      * Compute daily trends per metric type for overview.
      *
-     * @param  \Illuminate\Support\Collection<int, string>  $adIds
+     * @param  \Illuminate\Support\Collection<int, int|string>  $adIds
      * @return array<string, array<int, array{date: string, count: int}>>
      */
     private function computeTrends($adIds, $since): array
@@ -289,9 +289,13 @@ final class AdAnalyticsController
 
         $trends = [];
         foreach ($rows as $row) {
+            /** @var string $date */
+            $date = $row->getAttribute('date');
+            /** @var int $count */
+            $count = $row->getAttribute('count');
             $trends[$row->type][] = [
-                'date' => $row->date,
-                'count' => (int) $row->count,
+                'date' => $date,
+                'count' => (int) $count,
             ];
         }
 
@@ -313,9 +317,11 @@ final class AdAnalyticsController
             ->get();
 
         // Pivot: group by date, spread types as columns
+        /** @var array<string, array<string, mixed>> $byDate */
         $byDate = [];
         foreach ($rows as $row) {
-            $date = $row->date;
+            /** @var string $date */
+            $date = $row->getAttribute('date');
             if (!isset($byDate[$date])) {
                 $byDate[$date] = [
                     'date' => $date,
@@ -341,7 +347,7 @@ final class AdAnalyticsController
 
             $key = $mapping[$row->type] ?? null;
             if ($key) {
-                $byDate[$date][$key] = (int) $row->count;
+                $byDate[$date][$key] = (int) $row->getAttribute('count');
             }
         }
 
@@ -351,7 +357,7 @@ final class AdAnalyticsController
     /**
      * Compute top performing ads by total views.
      *
-     * @param  \Illuminate\Support\Collection<int, string>  $adIds
+     * @param  \Illuminate\Support\Collection<int, int|string>  $adIds
      * @return array<int, array<string, mixed>>
      */
     private function computeTopAds($adIds, $since, int $limit): array

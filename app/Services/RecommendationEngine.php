@@ -95,12 +95,12 @@ final class RecommendationEngine
      * Applies temporal decay: recent interactions count more.
      *
      * @return array{
-     *   type_weights: array<int, float>,
-     *   city_weights: array<int, float>,
+     *   type_weights: array<int|string, float>,
+     *   city_weights: array<int|string, float>,
      *   avg_price: float,
      *   min_price: float,
      *   max_price: float,
-     *   seen_ad_ids: array<int, string>
+     *   seen_ad_ids: array<int, int|string>
      * }|null
      */
     private function buildUserProfile(User $user): ?array
@@ -367,7 +367,7 @@ final class RecommendationEngine
     /**
      * Get ad view counts for the last 30 days (popularity signal).
      *
-     * @return array<string, int> ad_id => view_count
+     * @return array<int|string, int> ad_id => view_count
      */
     private function getPopularityMap(): array
     {

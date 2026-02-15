@@ -88,7 +88,7 @@ class PendingAdResource extends Resource
                     ->weight('bold'),
                 TextColumn::make('user.firstname')
                     ->label('Soumis par')
-                    ->formatStateUsing(fn ($record) => $record->user?->fullname ?? 'Inconnu')
+                    ->formatStateUsing(fn ($record) => $record->user->fullname ?? 'Inconnu')
                     ->searchable(['firstname', 'lastname']),
                 TextColumn::make('price')
                     ->label('Prix')

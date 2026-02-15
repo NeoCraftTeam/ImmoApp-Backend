@@ -59,7 +59,7 @@ class CustomRegister extends BaseRegister
             ->maxLength(255);
     }
 
-    #[Override]
+    #[\Override]
     protected function handleRegistration(array $data): Model
     {
         $panelId = \Filament\Facades\Filament::getCurrentPanel()->getId();
