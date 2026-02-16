@@ -10,6 +10,165 @@
         "version": "v1"
     },
     "paths": {
+        "/api/v1/my/ads/analytics": {
+            "get": {
+                "tags": [
+                    "📊 Analytics"
+                ],
+                "summary": "📊 Dashboard analytics — Vue d'ensemble (toutes mes annonces)",
+                "description": "Retourne les métriques agrégées de toutes les annonces du bailleur/agence :\n     *\n     *     - **Totaux** : impressions, vues, favoris, partages, contacts, appels, déblocages\n     *     - **Taux** : conversion (unlocks/views), engagement ((fav+shares+contacts)/impressions)\n     *     - **Tendances** : données quotidiennes par type de métrique\n     *     - **Top Ads** : les 5 annonces les plus performantes\n     *\n     *     Paramètre `period` : `7d`, `30d`, `90d` (défaut : `30d`).",
+                "operationId": "a9969044846f81d47edc5b3f2c2c9080",
+                "parameters": [
+                    {
+                        "name": "period",
+                        "in": "query",
+                        "description": "Période d'analyse : 7d, 30d, 90d",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "30d",
+                            "enum": [
+                                "7d",
+                                "30d",
+                                "90d"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Analytics overview",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "period": {
+                                                    "type": "string",
+                                                    "example": "30d"
+                                                },
+                                                "totals": {
+                                                    "properties": {
+                                                        "impressions": {
+                                                            "type": "integer",
+                                                            "example": 12450
+                                                        },
+                                                        "views": {
+                                                            "type": "integer",
+                                                            "example": 3200
+                                                        },
+                                                        "favorites": {
+                                                            "type": "integer",
+                                                            "example": 180
+                                                        },
+                                                        "shares": {
+                                                            "type": "integer",
+                                                            "example": 45
+                                                        },
+                                                        "contact_clicks": {
+                                                            "type": "integer",
+                                                            "example": 120
+                                                        },
+                                                        "phone_clicks": {
+                                                            "type": "integer",
+                                                            "example": 85
+                                                        },
+                                                        "unlocks": {
+                                                            "type": "integer",
+                                                            "example": 62
+                                                        },
+                                                        "conversion_rate": {
+                                                            "type": "number",
+                                                            "example": 1.94
+                                                        },
+                                                        "engagement_rate": {
+                                                            "type": "number",
+                                                            "example": 2.77
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "trends": {
+                                                    "type": "object"
+                                                },
+                                                "top_ads": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/my/ads/{ad}/analytics": {
+            "get": {
+                "tags": [
+                    "📊 Analytics"
+                ],
+                "summary": "📊 Analytics détaillées d'une annonce",
+                "description": "Retourne les métriques détaillées d'une annonce spécifique :\n     *\n     *     - **Totaux** : toutes les métriques d'interaction\n     *     - **Quotidien** : breakdown jour par jour\n     *     - **Entonnoir** : impressions → views → contacts → unlocks\n     *     - **Audience** : viewers uniques, récurrents, favorited_by\n     *\n     *     L'annonce doit appartenir à l'utilisateur authentifié.",
+                "operationId": "ce43460d16c9c620e7c20e505c67901a",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "period",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "30d",
+                            "enum": [
+                                "7d",
+                                "30d",
+                                "90d"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Ad analytics detail"
+                    },
+                    "403": {
+                        "description": "L'annonce ne vous appartient pas"
+                    },
+                    "404": {
+                        "description": "Annonce introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/ads": {
             "get": {
                 "tags": [
@@ -1801,6 +1960,245 @@
                         }
                     }
                 }
+            }
+        },
+        "/api/v1/ads/{ad}/view": {
+            "post": {
+                "tags": [
+                    "📊 Interactions"
+                ],
+                "summary": "Track an ad view",
+                "description": "Track an ad view.\n\nDebounced: only 1 view per user per ad every 5 minutes.",
+                "operationId": "bff00bc8f4b5fbd4fbce0d50570c2fea",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "View tracked"
+                    },
+                    "429": {
+                        "description": "View already tracked recently"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/impression": {
+            "post": {
+                "tags": [
+                    "📊 Interactions"
+                ],
+                "summary": "Track an ad impression",
+                "description": "Track an ad impression (appeared in feed/list).\n\nDebounced: 1 impression per user per ad every 30 seconds.",
+                "operationId": "9936ad951cf9c7ce695c1d68451027cb",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Impression tracked"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/share": {
+            "post": {
+                "tags": [
+                    "📊 Interactions"
+                ],
+                "summary": "Track an ad share",
+                "description": "Track an ad share.",
+                "operationId": "24a21086feeb150db1ac35ccf2edcab6",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Share tracked"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/contact-click": {
+            "post": {
+                "tags": [
+                    "📊 Interactions"
+                ],
+                "summary": "Track a contact button click",
+                "description": "Track a contact button click.\n\nDebounced: 1 per user per ad per minute.",
+                "operationId": "7a5603d4b819664fbc7e6eff036cc999",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Contact click tracked"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/phone-click": {
+            "post": {
+                "tags": [
+                    "📊 Interactions"
+                ],
+                "summary": "Track a phone number click",
+                "description": "Track a phone number click.\n\nDebounced: 1 per user per ad per minute.",
+                "operationId": "c6ea471c5d293fae52c63132a6ddc2b8",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Phone click tracked"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/favorite": {
+            "post": {
+                "tags": [
+                    "📊 Interactions"
+                ],
+                "summary": "Toggle favorite on an ad",
+                "description": "Toggle favorite on an ad.\n\nUses a simple check: count of favorites minus unfavorites.\nEven count = not favorited, odd count = favorited.",
+                "operationId": "3df3c30c7adeefb9b17b5b227d924bf8",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Favorite toggled",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "is_favorited": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/my/favorites": {
+            "get": {
+                "tags": [
+                    "📊 Interactions"
+                ],
+                "summary": "List my favorite ads",
+                "description": "List the authenticated user's favorite ads.\n\nAn ad is favorited if the number of favorite interactions\nexceeds the number of unfavorite interactions for that ad.",
+                "operationId": "fc38fa60e0ddf2437c9a1dd03943bc1c",
+                "responses": {
+                    "200": {
+                        "description": "List of favorite ads",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/AdResource"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/v1/ad-types": {
@@ -4508,8 +4906,8 @@
                 "tags": [
                     "⭐ Recommandations"
                 ],
-                "summary": "Recommandations personnalisées",
-                "description": "Retourne une liste d'annonces recommandées en fonction des précédents déblocages (paiements) de l'utilisateur.\n     *\n     *     Fonctionnement :\n     *     1. L'API identifie qui appelle ($user->id).\n     *     2. Elle récupère uniquement les paiements de ce client.\n     *     3. Elle calcule SES préférences (le type d'appartement qu'IL aime, la ville où IL cherche, SON budget moyen).\n     *     4. Elle cherche des annonces qui correspondent à SES critères.\n     *\n     *     Exemples concrets :\n     *     - Paul, qui a débloqué 2 appartements à Douala à 200.000 FCFA, verra des Appartements à Douala (~200k).\n     *     - Marie, qui a débloqué des villas à Yaoundé à 1.000.000 FCFA, verra des Villas à Yaoundé (~1M).\n     *     - Nouveau Client, qui n'a rien fait, verra les annonces les plus récentes (Cold Start).",
+                "summary": "Recommandations personnalisées (scoring pondéré v2)",
+                "description": "Retourne une liste d'annonces recommandées basée sur un algorithme de scoring pondéré.\n     *\n     *     Signaux utilisés : vues, favoris, déblocages (paiements).\n     *     Pondération : type (40%) + ville (25%) + budget (20%) + fraîcheur (10%) + popularité (5%).\n     *     Diversité : 20% d'annonces exploratoires hors profil.\n     *     Cold Start : trending + boosted + latest.",
                 "operationId": "9e1d04bb0918eedb7d013e17e448a5a0",
                 "responses": {
                     "200": {
@@ -4527,9 +4925,24 @@
                                         "meta": {
                                             "properties": {
                                                 "source": {
-                                                    "description": "Indique si les recommandations sont 'personalized' ou 'latest' (cold start)",
                                                     "type": "string",
                                                     "example": "personalized"
+                                                },
+                                                "algorithm": {
+                                                    "type": "string",
+                                                    "example": "weighted_scoring_v2"
+                                                },
+                                                "profile_signals": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "candidates_scored": {
+                                                    "type": "integer",
+                                                    "example": 42
+                                                },
+                                                "diversity_injected": {
+                                                    "type": "integer",
+                                                    "example": 3
                                                 }
                                             },
                                             "type": "object"
@@ -6819,6 +7232,14 @@
         {
             "name": "📦 Abonnements Agences",
             "description": "Gestion des abonnements pour les agences immobilières. Permet de consulter les plans disponibles, souscrire via FedaPay, consulter l'abonnement actif, l'annuler et voir l'historique. Les agences reçoivent une facture par email à chaque souscription."
+        },
+        {
+            "name": "📊 Analytics",
+            "description": "📊 Analytics"
+        },
+        {
+            "name": "📊 Interactions",
+            "description": "📊 Interactions"
         },
         {
             "name": "🏢 Agence",

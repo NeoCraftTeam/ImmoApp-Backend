@@ -51,14 +51,12 @@ final class ReviewController
             ], 422);
         }
 
-        $review = DB::transaction(function () use ($validated, $user) {
-            return Review::create([
-                'rating' => $validated['rating'],
-                'comment' => $validated['comment'] ?? null,
-                'ad_id' => $validated['ad_id'],
-                'user_id' => $user->id,
-            ]);
-        });
+        $review = DB::transaction(fn () => Review::create([
+            'rating' => $validated['rating'],
+            'comment' => $validated['comment'] ?? null,
+            'ad_id' => $validated['ad_id'],
+            'user_id' => $user->id,
+        ]));
 
         $review->load('user');
 

@@ -65,7 +65,8 @@ class ManageSubscription extends Page
     /**
      * Progress percentage for the active subscription (0-100).
      */
-    public function getProgressProperty(): int
+    #[\Livewire\Attributes\Computed]
+    public function progress(): int
     {
         if (!$this->subscription || !$this->subscription->starts_at || !$this->subscription->ends_at) {
             return 0;

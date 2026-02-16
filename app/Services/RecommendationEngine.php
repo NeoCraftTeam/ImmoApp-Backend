@@ -31,35 +31,35 @@ use Illuminate\Support\Facades\Cache;
 final class RecommendationEngine
 {
     /** Maximum number of results to return */
-    private const RESULT_LIMIT = 15;
+    private const int RESULT_LIMIT = 15;
 
     /** Number of interactions to analyze */
-    private const PROFILE_DEPTH = 30;
+    private const int PROFILE_DEPTH = 30;
 
     /** Days after which an interaction loses half its weight */
-    private const DECAY_HALF_LIFE_DAYS = 14;
+    private const int DECAY_HALF_LIFE_DAYS = 14;
 
     /** Fraction of results reserved for diversity */
-    private const DIVERSITY_RATIO = 0.2;
+    private const float DIVERSITY_RATIO = 0.2;
 
     /** Cache TTL in minutes */
-    private const CACHE_TTL_MINUTES = 10;
+    private const int CACHE_TTL_MINUTES = 10;
 
     /** Standard eager-load relations for ads */
-    private const AD_EAGER_LOADS = ['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'];
+    private const array AD_EAGER_LOADS = ['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'];
 
     // ── Weights ───────────────────────────────────────────────────────
-    private const W_TYPE = 40;
+    private const int W_TYPE = 40;
 
-    private const W_CITY = 25;
+    private const int W_CITY = 25;
 
-    private const W_BUDGET = 20;
+    private const int W_BUDGET = 20;
 
-    private const W_FRESHNESS = 10;
+    private const int W_FRESHNESS = 10;
 
-    private const W_POPULARITY = 5;
+    private const int W_POPULARITY = 5;
 
-    private const BOOST_BONUS = 15;
+    private const int BOOST_BONUS = 15;
 
     // ══════════════════════════════════════════════════════════════════
     // PUBLIC API
@@ -236,7 +236,7 @@ final class RecommendationEngine
             if ($price > 0 && $profile['avg_price'] > 0) {
                 $sigma = ($profile['max_price'] - $profile['min_price']) / 4;
                 $diff = abs($price - $profile['avg_price']);
-                $budgetFit = exp(-0.5 * pow($diff / max($sigma, 1), 2));
+                $budgetFit = exp(-0.5 * ($diff / max($sigma, 1)) ** 2);
                 $score += self::W_BUDGET * $budgetFit;
             }
 

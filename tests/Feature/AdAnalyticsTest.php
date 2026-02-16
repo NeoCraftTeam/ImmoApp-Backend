@@ -104,7 +104,7 @@ test('analytics overview aggregates all interaction types', function (): void {
             'user_id' => $viewer->id,
             'ad_id' => $ad->id,
             'type' => $type,
-            'created_at' => now()->subDays(rand(1, 10)),
+            'created_at' => now()->subDays(random_int(1, 10)),
         ]);
     }
 

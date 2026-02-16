@@ -42,6 +42,7 @@ class ActivityLogResource extends Resource
     /**
      * Scope activity log to admin-only actions.
      */
+    #[\Override]
     public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
     {
         return parent::getEloquentQuery()

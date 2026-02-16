@@ -49,6 +49,7 @@ class PendingAdResource extends Resource
     /**
      * Scope to only pending ads.
      */
+    #[\Override]
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
