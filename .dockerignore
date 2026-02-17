@@ -28,7 +28,8 @@ rector.php
 # Development helpers
 _ide_helper.php
 _ide_helper_models.php
-.docker/
+.docker/monitoring/
+.docker/nginx/
 
 # Logs & temp
 storage/logs/
