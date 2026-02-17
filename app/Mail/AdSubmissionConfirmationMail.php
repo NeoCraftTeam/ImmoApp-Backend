@@ -5,12 +5,13 @@ namespace App\Mail;
 use App\Models\Ad;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class AdSubmissionConfirmationMail extends Mailable
+class AdSubmissionConfirmationMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
@@ -22,7 +23,7 @@ class AdSubmissionConfirmationMail extends Mailable
     public function __construct(
         public Ad $ad
     ) {
-        $this->author = $this->ad->user;
+        $this->author = $this->ad->user ?? new User(['firstname' => 'Inconnu', 'lastname' => '', 'email' => 'unknown@keyhome.cm']);
 
         // Queue only in production/staging environments
         if (app()->environment(['production', 'staging'])) {

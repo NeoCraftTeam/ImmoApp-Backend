@@ -5,16 +5,20 @@ declare(strict_types=1);
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
-class SubscriptionSuccessEmail extends Mailable
+class SubscriptionSuccessEmail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public $subscription) {}
+    public function __construct(public \App\Models\Subscription $subscription)
+    {
+        $this->onQueue('emails');
+    }
 
     public function envelope(): Envelope
     {
@@ -28,11 +32,11 @@ class SubscriptionSuccessEmail extends Mailable
         return new Content(
             view: 'emails.subscription.success',
             with: [
-                'agencyName' => $this->subscription->agency->name,
-                'planName' => $this->subscription->plan->name,
+                'agencyName' => $this->subscription->agency->name ?? 'Agence',
+                'planName' => $this->subscription->plan->name ?? 'Plan',
                 'amount' => number_format((float) $this->subscription->amount_paid, 0, ',', ' '),
                 'period' => $this->subscription->billing_period === 'yearly' ? 'Annuel' : 'Mensuel',
-                'endsAt' => $this->subscription->ends_at->format('d/m/Y'),
+                'endsAt' => $this->subscription->ends_at?->format('d/m/Y') ?? 'N/A',
             ]
         );
     }
