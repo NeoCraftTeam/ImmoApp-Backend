@@ -53,7 +53,7 @@ export default function App() {
       useNativeDriver: true,
     }).start();
 
-    Animated.loop(
+    const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
           toValue: 1.05,
@@ -66,9 +66,11 @@ export default function App() {
           useNativeDriver: true,
         }),
       ])
-    ).start();
+    );
+    pulseLoop.start();
 
     return () => {
+      pulseLoop.stop();
       NativeService.cleanup();
     };
   }, []);
@@ -115,7 +117,7 @@ export default function App() {
             onLoadStart={() => setIsLoading(true)}
             onLoadEnd={() => {
               setIsLoading(false);
-              if (showSplash) setTimeout(hideSplash, 1000);
+              if (showSplash) setTimeout(hideSplash, APP_CONFIG.splashDuration);
             }}
             onNavigationStateChange={(navState) => setCanGoBack(navState.canGoBack)}
             javaScriptEnabled={true}
@@ -128,7 +130,7 @@ export default function App() {
               NativeService.handleWebViewMessage(event);
             }}
             // Autoriser HTTP (dev local) et HTTPS (production)
-            originWhitelist={['http://*', 'https://*']}
+            originWhitelist={['https://*']}
             // Sécurité : Désactiver l'accès au système de fichiers
             allowFileAccess={false}
             // Sécurité : Empêcher l'exécution de JS injecté de manière non sécurisée
@@ -149,7 +151,6 @@ export default function App() {
           />
         </SafeAreaView>
 
-        {/* Error overlay désactivé temporairement
         {error && !showSplash && (
           <View style={styles.errorContainer}>
             <View style={styles.errorContent}>
@@ -166,7 +167,6 @@ export default function App() {
             </View>
           </View>
         )}
-        */}
 
         {isLoading && !showSplash && !error && (
           <View style={styles.loaderContainer}>

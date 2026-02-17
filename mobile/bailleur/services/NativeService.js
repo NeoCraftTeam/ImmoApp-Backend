@@ -27,7 +27,9 @@ class NativeService {
    */
   initialize(webViewRef) {
     this.webViewRef = webViewRef;
-    this.setupNotificationListeners();
+    if (!this.notificationListener) {
+      this.setupNotificationListeners();
+    }
   }
 
   /**
@@ -110,11 +112,11 @@ class NativeService {
 
       // Ouvrir la galerie
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: options.allowsEditing !== false,
         aspect: options.aspect || [4, 3],
-        quality: options.quality || 0.8,
-        base64: true, // Pour envoyer à la WebView
+        quality: options.quality || 0.7,
+        base64: true,
       });
 
       if (!result.canceled) {
@@ -149,7 +151,7 @@ class NativeService {
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: options.allowsEditing !== false,
         aspect: options.aspect || [4, 3],
-        quality: options.quality || 0.8,
+        quality: options.quality || 0.7,
         base64: true,
       });
 
@@ -181,10 +183,14 @@ class NativeService {
         return;
       }
 
-      // Obtenir position
-      const location = await Location.getCurrentPositionAsync({
+      // Obtenir position avec timeout de 15 secondes
+      const locationPromise = Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('La localisation a pris trop de temps')), 15000)
+      );
+      const location = await Promise.race([locationPromise, timeoutPromise]);
 
       this.sendToWebView('LOCATION_RECEIVED', {
         latitude: location.coords.latitude,
