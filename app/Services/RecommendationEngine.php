@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\AdStatus;
 use App\Models\Ad;
 use App\Models\AdInteraction;
 use App\Models\User;
@@ -207,7 +208,7 @@ final class RecommendationEngine
 
         // ── Candidate ads ────────────────────────────────────────────
         $candidates = Ad::with(self::AD_EAGER_LOADS)
-            ->where('status', 'available')
+            ->where('status', AdStatus::AVAILABLE)
             ->whereNotIn('id', $profile['seen_ad_ids'])
             ->withCount('reviews')
             ->withAvg('reviews', 'rating')
@@ -320,7 +321,7 @@ final class RecommendationEngine
         if ($trendingIds->isNotEmpty()) {
             $trending = Ad::with(self::AD_EAGER_LOADS)
                 ->whereIn('id', $trendingIds)
-                ->where('status', 'available')
+                ->where('status', AdStatus::AVAILABLE)
                 ->get();
             $collected = $collected->merge($trending);
             $excludeIds = $collected->pluck('id')->toArray();
@@ -328,7 +329,7 @@ final class RecommendationEngine
 
         // 2. Boosted
         $boosted = Ad::with(self::AD_EAGER_LOADS)
-            ->where('status', 'available')
+            ->where('status', AdStatus::AVAILABLE)
             ->whereNotIn('id', $excludeIds)
             ->boosted()
             ->orderByBoost()
@@ -341,7 +342,7 @@ final class RecommendationEngine
         $remaining = $limit - $collected->count();
         if ($remaining > 0) {
             $latest = Ad::with(self::AD_EAGER_LOADS)
-                ->where('status', 'available')
+                ->where('status', AdStatus::AVAILABLE)
                 ->whereNotIn('id', $excludeIds)
                 ->latest()
                 ->take($remaining)
@@ -399,7 +400,7 @@ final class RecommendationEngine
         $preferredTypeIds = array_keys($profile['type_weights']);
 
         return Ad::with(self::AD_EAGER_LOADS)
-            ->where('status', 'available')
+            ->where('status', AdStatus::AVAILABLE)
             ->whereNotIn('id', $excludeIds)
             ->where(function (Builder $query) use ($preferredTypeIds, $profile): void {
                 // Outside preferred types OR outside budget range

@@ -40,8 +40,8 @@ final class UserRequest extends FormRequest
                 'location' => ['sometimes', new GeometryGeojsonRule([Point::class])],
                 'latitude' => 'nullable|numeric|between:-90,90',
                 'longitude' => 'nullable|numeric|between:-180,180',
-                'role' => ['required', 'string'],
-                'type' => ['nullable', 'string'],
+                'role' => ['required', 'string', \Illuminate\Validation\Rule::in(['customer', 'agent', 'admin'])],
+                'type' => ['nullable', 'string', \Illuminate\Validation\Rule::in(['individual', 'agency'])],
                 'city_id' => ['sometimes', 'uuid', 'exists:city,id'],
             ];
         }
@@ -50,7 +50,7 @@ final class UserRequest extends FormRequest
                 'firstname' => ['sometimes', 'string', 'max:255'],
                 'lastname' => ['sometimes', 'string', 'max:255'],
                 'phone_number' => ['sometimes', 'string', 'regex:/^\+?[0-9]{7,20}$/'],
-                'email' => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->user()?->id)], // if the user is connected, ignore their own email
+                'email' => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->route('user'))],
                 'password' => ['sometimes', 'string', 'min:8'],
                 'city_id' => ['sometimes', 'uuid', 'exists:city,id'],
                 'location' => ['sometimes', new GeometryGeojsonRule([Point::class])],

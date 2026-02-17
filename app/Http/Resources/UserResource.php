@@ -26,8 +26,14 @@ final class UserResource extends JsonResource
             'id' => $this->id,
             'firstname' => $this->firstname,
             'lastname' => $this->lastname,
-            'phone_number' => $this->phone_number,
-            'email' => $this->email,
+            'phone_number' => $this->when(
+                $request->user()?->id === $this->id || $request->user()?->isAdmin(),
+                $this->phone_number
+            ),
+            'email' => $this->when(
+                $request->user()?->id === $this->id || $request->user()?->isAdmin(),
+                $this->email
+            ),
             'avatar' => $this->getFirstMediaUrl('avatar') ?: $this->avatar,
             'display_name' => $this->fullname,
             'name' => $this->fullname,

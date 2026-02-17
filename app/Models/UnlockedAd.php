@@ -53,7 +53,7 @@ class UnlockedAd extends Model
 
     protected $table = 'unlocked_ads';
 
-    protected $fillable = ['ad_id', 'user_id', 'payment_id'];
+    protected $fillable = ['ad_id', 'user_id', 'payment_id', 'unlocked_at'];
 
     protected $hidden = ['unlocked_at', 'updated_at', 'deleted_at'];
 

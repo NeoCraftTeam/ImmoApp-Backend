@@ -576,7 +576,12 @@ final class AdController
                 $data['location'] = Point::makeGeodetic($data['latitude'], $data['longitude']);
             }
 
-            // Validate status transition if status is being changed
+            // Strip status from non-admin users to prevent privilege escalation
+            if (isset($data['status']) && !auth()->user()?->isAdmin()) {
+                unset($data['status']);
+            }
+
+            // Validate status transition if status is being changed (admin only)
             if (isset($data['status'])) {
                 $newStatus = AdStatus::from($data['status']);
                 if ($ad->status !== $newStatus) {
@@ -1030,6 +1035,7 @@ final class AdController
             $driver = DB::getDriverName();
             if ($driver === 'pgsql') {
                 $ads = Ad::query()
+                    ->where('status', AdStatus::AVAILABLE)
                     ->whereNotNull('location')
                     ->selectRaw('ad.*')
                     ->selectRaw(
@@ -1046,6 +1052,7 @@ final class AdController
                     ->get();
             } else {
                 $ads = Ad::query()
+                    ->where('status', AdStatus::AVAILABLE)
                     ->whereNotNull('location')
                     ->selectRaw('ad.*')
                     ->selectRaw(

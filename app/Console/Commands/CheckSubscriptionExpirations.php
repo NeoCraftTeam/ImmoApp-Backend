@@ -22,24 +22,27 @@ class CheckSubscriptionExpirations extends Command
      */
     protected $description = 'Vérifier les abonnements expirants et envoyer des rappels par email';
 
-    public function handle()
+    public function handle(): void
     {
         $this->info('Vérification des expirations d\'abonnement...');
 
-        // Rappels à 3 jours et 1 jour
         $daysToNotify = [3, 1];
 
         foreach ($daysToNotify as $days) {
 
             $subscriptions = \App\Models\Subscription::where('status', \App\Enums\SubscriptionStatus::ACTIVE)
                 ->whereDate('ends_at', '=', now()->addDays($days)->toDateString())
+                ->with('agency.users')
                 ->get();
 
             foreach ($subscriptions as $subscription) {
-                // Envoyer l'email à tous les utilisateurs de l'agence
                 foreach ($subscription->agency->users as $user) {
-                    \Illuminate\Support\Facades\Mail::to($user->email)
-                        ->send(new \App\Mail\SubscriptionExpiringEmail($subscription, $days));
+                    try {
+                        \Illuminate\Support\Facades\Mail::to($user->email)
+                            ->send(new \App\Mail\SubscriptionExpiringEmail($subscription, $days));
+                    } catch (\Throwable $e) {
+                        \Illuminate\Support\Facades\Log::error("Failed to send expiry email to {$user->email}: ".$e->getMessage());
+                    }
                 }
                 $this->line("Rappel de {$days} jours envoyé pour l'agence: {$subscription->agency->name}");
             }

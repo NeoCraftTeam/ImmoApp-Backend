@@ -85,6 +85,7 @@ class Payment extends Model
         'type' => PaymentType::class,
         'payment_method' => PaymentMethod::class,
         'status' => PaymentStatus::class,
+        'amount' => 'integer',
     ];
 
     public function user(): BelongsTo
