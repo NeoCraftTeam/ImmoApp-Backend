@@ -55,23 +55,36 @@ class AdFactory extends Factory
     {
         if (self::$citiesData === null) {
             $path = database_path('data/cities.sql');
-            $content = file_get_contents($path);
 
-            // Pattern regex pour extraire : name (position 2), latitude (position 3), longitude (position 4)
-            // Format: (geonameid, 'name', latitude, longitude, ...)
-            preg_match_all(
-                "/\(\d+,\s*'([^']+)',\s*([0-9.-]+),\s*([0-9.-]+),/",
-                $content,
-                $matches,
-                PREG_SET_ORDER
-            );
+            if (file_exists($path)) {
+                $content = file_get_contents($path);
 
-            self::$citiesData = [];
-            foreach ($matches as $match) {
-                self::$citiesData[] = [
-                    'name' => $match[1],
-                    'latitude' => (float) $match[2],
-                    'longitude' => (float) $match[3],
+                // Pattern regex pour extraire : name, latitude, longitude
+                preg_match_all(
+                    "/\(\d+,\s*'([^']+)',\s*([0-9.-]+),\s*([0-9.-]+),/",
+                    $content,
+                    $matches,
+                    PREG_SET_ORDER
+                );
+
+                self::$citiesData = [];
+                foreach ($matches as $match) {
+                    self::$citiesData[] = [
+                        'name' => $match[1],
+                        'latitude' => (float) $match[2],
+                        'longitude' => (float) $match[3],
+                    ];
+                }
+            }
+
+            // Fallback pour CI/testing quand cities.sql est absent
+            if (empty(self::$citiesData)) {
+                self::$citiesData = [
+                    ['name' => 'Douala', 'latitude' => 4.0511, 'longitude' => 9.7679],
+                    ['name' => 'Yaoundé', 'latitude' => 3.8667, 'longitude' => 11.5167],
+                    ['name' => 'Bafoussam', 'latitude' => 5.4737, 'longitude' => 10.4179],
+                    ['name' => 'Bamenda', 'latitude' => 5.9597, 'longitude' => 10.1597],
+                    ['name' => 'Kribi', 'latitude' => 2.9500, 'longitude' => 9.9167],
                 ];
             }
         }
