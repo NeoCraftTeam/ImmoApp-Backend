@@ -3,7 +3,10 @@
 use App\Models\Ad;
 use App\Models\AdInteraction;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+
+uses(RefreshDatabase::class);
 
 test('recommendations endpoint returns 401 for guest', function (): void {
     $response = $this->getJson('/api/v1/recommendations');

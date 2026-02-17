@@ -3,6 +3,9 @@
 use App\Enums\AdStatus;
 use App\Exceptions\InvalidStatusTransitionException;
 use App\Models\Ad;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('AdStatus defines correct allowed transitions', function (): void {
     // PENDING can only go to AVAILABLE

@@ -4,7 +4,11 @@ use App\Enums\PaymentStatus;
 use App\Enums\UserRole;
 use App\Models\Payment;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Laravel\Sanctum\Sanctum;
+
+uses(RefreshDatabase::class);
 
 test('guest cannot access admin registration endpoint', function (): void {
     $response = $this->postJson('/api/v1/auth/registerAdmin', [
@@ -36,6 +40,7 @@ test('non admin cannot access admin registration endpoint', function (): void {
 });
 
 test('admin can register another admin through protected endpoint', function (): void {
+    Mail::fake();
     $admin = User::factory()->admin()->create();
     Sanctum::actingAs($admin);
 
@@ -102,7 +107,7 @@ test('payment webhook accepts valid signature and updates payment', function ():
 
     // Controller expects "t=<timestamp>,v1=<hmac(timestamp.'.'.payload, secret)>"
     $timestamp = (string) time();
-    $signature = hash_hmac('sha256', $timestamp.'.'.$payload, $secret);
+    $signature = hash_hmac('sha256', $timestamp . '.' . $payload, $secret);
 
     $response = $this->call(
         'POST',

@@ -8,7 +8,10 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\FedaPayService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+
+uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
     $this->plan = SubscriptionPlan::create([
@@ -122,7 +125,7 @@ test('agent can initiate subscription payment', function (): void {
     $mock = Mockery::mock(FedaPayService::class);
     $mock->shouldReceive('createSubscriptionPayment')
         ->once()
-        ->withArgs(fn ($amount, $agency, $planId, $period) => $amount === 35000 && $period === 'monthly')
+        ->withArgs(fn($amount, $agency, $planId, $period) => $amount === 35000 && $period === 'monthly')
         ->andReturn([
             'success' => true,
             'url' => 'https://fedapay.com/pay/sub-123',
@@ -152,7 +155,7 @@ test('agent can subscribe yearly with correct amount', function (): void {
     $mock = Mockery::mock(FedaPayService::class);
     $mock->shouldReceive('createSubscriptionPayment')
         ->once()
-        ->withArgs(fn ($amount) => $amount === 350000)
+        ->withArgs(fn($amount) => $amount === 350000)
         ->andReturn([
             'success' => true,
             'url' => 'https://fedapay.com/pay/sub-yearly',

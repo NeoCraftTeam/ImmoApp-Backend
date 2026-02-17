@@ -1,7 +1,10 @@
 <?php
 
 use App\Models\Ad;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+
+uses(RefreshDatabase::class);
 
 // POINT(lng lat) // PostGIS utilise Longitude d'abord dans POINT() mais souvent on insert via raw geometry.
 // Attention : Laravel Factory UserFactory utilise "POINT($longitude $latitude)".

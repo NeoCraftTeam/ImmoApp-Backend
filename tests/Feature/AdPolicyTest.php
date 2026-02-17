@@ -2,7 +2,10 @@
 
 use App\Models\Ad;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+
+uses(RefreshDatabase::class);
 
 test('admin can update any ad', function (): void {
     $owner = User::factory()->create();

@@ -1,7 +1,10 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+
+uses(RefreshDatabase::class);
 
 test('customer can login with valid credentials', function (): void {
     $user = User::factory()->create([

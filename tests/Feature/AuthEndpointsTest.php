@@ -4,6 +4,7 @@ use App\Models\City;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
@@ -56,6 +57,7 @@ it('authenticated user can refresh token', function (): void {
 });
 
 it('admin can register an agent', function (): void {
+    Mail::fake();
     $admin = User::factory()->admin()->create(['password' => bcrypt('Password123@')]);
     Sanctum::actingAs($admin);
     $city = City::factory()->create();
@@ -79,6 +81,7 @@ it('admin can register an agent', function (): void {
 });
 
 it('register agent is a public route and succeeds with valid data', function (): void {
+    Mail::fake();
     $city = City::factory()->create();
 
     $response = $this->postJson('/api/v1/auth/registerAgent', [

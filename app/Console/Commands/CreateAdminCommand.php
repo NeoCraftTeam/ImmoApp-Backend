@@ -24,7 +24,7 @@ class CreateAdminCommand extends Command
     {
         $this->info('🔑 Creating admin user...');
 
-        $email = $this->option('email') ?? $this->ask('Email address');
+        $email = $this->sanitize($this->option('email') ?? $this->ask('Email address'));
         $existing = User::where('email', $email)->first();
 
         if ($existing) {
@@ -44,11 +44,11 @@ class CreateAdminCommand extends Command
             return self::FAILURE;
         }
 
-        $firstname = $this->option('firstname') ?? $this->ask('First name');
-        $lastname = $this->option('lastname') ?? $this->ask('Last name');
+        $firstname = $this->sanitize($this->option('firstname') ?? $this->ask('First name'));
+        $lastname = $this->sanitize($this->option('lastname') ?? $this->ask('Last name'));
         $password = $this->option('password');
         while (empty($password) || strlen((string) $password) < 8) {
-            $password = $this->ask('Password (min 8 characters)');
+            $password = $this->sanitize($this->ask('Password (min 8 characters)'));
             if (empty($password)) {
                 $this->error('Le mot de passe ne peut pas être vide.');
             } elseif (strlen((string) $password) < 8) {
@@ -89,5 +89,21 @@ class CreateAdminCommand extends Command
         $this->info("✅ Admin created: {$user->email} (ID: {$user->id})");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Strip invalid UTF-8 bytes and trim whitespace from input.
+     * Docker exec -T can inject garbage bytes into interactive prompts.
+     */
+    private function sanitize(?string $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        // Remove any non-UTF-8 bytes
+        $clean = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+
+        return trim($clean);
     }
 }

@@ -3,7 +3,10 @@
 use App\Models\Ad;
 use App\Models\AdInteraction;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+
+uses(RefreshDatabase::class);
 
 // ══════════════════════════════════════════════════════════════
 // TRACKING ENDPOINTS

@@ -5,7 +5,10 @@ use App\Models\AdType;
 use App\Models\City;
 use App\Models\Quarter;
 use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+
+uses(RefreshDatabase::class);
 
 test('ad list endpoint is optimized and has no N+1 queries', function (): void {
     // Setup data

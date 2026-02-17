@@ -5,7 +5,10 @@ use App\Models\Ad;
 use App\Models\Payment;
 use App\Models\User;
 use App\Services\FedaPayService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+
+uses(RefreshDatabase::class);
 
 test('authenticated user can initialize payment for ad', function (): void {
     $user = User::factory()->create(['firstname' => 'John', 'lastname' => 'Doe']);

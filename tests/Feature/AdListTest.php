@@ -1,6 +1,9 @@
 <?php
 
 use App\Models\Ad;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
 
 test('anyone can view ad list', function (): void {
     Ad::factory(3)->create(['status' => 'available']);
@@ -14,7 +17,7 @@ test('anyone can view ad list', function (): void {
 test('single ad response structure is correct', function (): void {
     $ad = Ad::factory()->create(['status' => 'available']);
 
-    $response = $this->getJson('/api/v1/ads/'.$ad->id);
+    $response = $this->getJson('/api/v1/ads/' . $ad->id);
 
     $response->assertStatus(200)
         ->assertJsonStructure([
