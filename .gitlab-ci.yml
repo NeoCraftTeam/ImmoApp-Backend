@@ -67,9 +67,11 @@ build_image:
   needs: [phpstan, style_check, composer_security]
   script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-    - docker build --pull -t $APP_IMAGE:$IMAGE_TAG .
+    - docker build --pull -t $APP_IMAGE:$IMAGE_TAG -t $APP_IMAGE:latest .
     - docker push $APP_IMAGE:$IMAGE_TAG
-    - docker logout $CI_REGISTRY
+    - docker push $APP_IMAGE:latest
+  after_script:
+    - docker logout $CI_REGISTRY 2>/dev/null || true
   rules:
     - if: $CI_COMMIT_BRANCH
 
@@ -83,11 +85,24 @@ test_suite:
     - |
       docker run -d --name pg-$CI_JOB_ID \
         --network ci-net-$CI_JOB_ID \
+        --health-cmd="pg_isready -U gitlab -d testing" \
+        --health-interval=2s \
+        --health-timeout=5s \
+        --health-retries=10 \
         -e POSTGRES_DB=testing \
         -e POSTGRES_USER=gitlab \
         -e POSTGRES_PASSWORD=test_pass \
-        postgis/postgis:16-3.5-alpine
-    - sleep 5
+        postgis/postgis:15-3.3-alpine
+    # Wait for PostgreSQL to be healthy instead of a fixed sleep
+    - |
+      echo "Waiting for PostgreSQL..."
+      for i in $(seq 1 30); do
+        if docker exec pg-$CI_JOB_ID pg_isready -U gitlab -d testing 2>/dev/null; then
+          echo "PostgreSQL is ready."
+          break
+        fi
+        sleep 1
+      done
     - |
       docker run --rm \
         --network ci-net-$CI_JOB_ID \
@@ -122,6 +137,7 @@ test_suite:
 production_deploy:
   stage: deploy
   needs: [build_image, test_suite]
+  timeout: 15 minutes
   script:
     - mkdir -p /opt/keyhome/.docker/nginx/conf.d
     - cp docker-compose.yml /opt/keyhome/docker-compose.yml
@@ -136,18 +152,28 @@ production_deploy:
     - cd /opt/keyhome || exit 1
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - export FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:main"
+    # Enable maintenance mode before deploy
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan down --retry=60 || true
     - APP_IMAGE=$FULL_IMAGE docker compose down --remove-orphans || true
     - APP_IMAGE=$FULL_IMAGE docker compose pull
     - APP_IMAGE=$FULL_IMAGE docker compose up -d --no-build
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan migrate --force
+    # Run migrations — rollback container on failure
+    - |
+      if ! APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan migrate --force; then
+        echo "Migration failed — rolling back..."
+        APP_IMAGE=$FULL_IMAGE docker compose down --remove-orphans || true
+        exit 1
+      fi
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize:clear
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan filament:upgrade
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app chmod +x resetFilamentLivewire.sh
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app bash resetFilamentLivewire.sh
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan storage:link || true
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate || true
-    - docker logout $CI_REGISTRY
+    # Disable maintenance mode
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan up
+  after_script:
+    - docker logout $CI_REGISTRY 2>/dev/null || true
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
 
@@ -167,6 +193,15 @@ notify_slack_success:
 
 notify_slack_failure:
   stage: notify
+  needs:
+    - job: production_deploy
+      optional: true
+    - job: test_suite
+      optional: true
+    - job: phpstan
+      optional: true
+    - job: style_check
+      optional: true
   script:
     - |
       curl -X POST -H 'Content-type: application/json' \
@@ -182,7 +217,7 @@ cleanup:
   stage: cleanup
   script:
     - docker rmi $CI_IMAGE 2>/dev/null || true
-    - docker system prune -f
+    - docker system prune -f --filter "until=24h"
   when: always
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH

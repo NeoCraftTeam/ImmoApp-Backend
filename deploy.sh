@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Script de déploiement pour Laravel en production
+# [DEPRECATED] Bare-metal deploy script — Docker-based CI pipeline (.gitlab-ci.yml) is the primary deploy method.
+# This script is kept for emergency manual deploys only.
 # Usage: ./deploy.sh
 
 set -e  # Arrêter le script en cas d'erreur
@@ -52,7 +53,7 @@ print_success "Code mis à jour avec succès"
 
 # 1. Mettre l'application en maintenance
 print_step "Activation du mode maintenance"
-php artisan down --retry=60 --secret="deploy-secret-$(date +%s)" || {
+php artisan down --retry=60 --secret="${DEPLOY_SECRET:-$(openssl rand -hex 16)}" || {
     print_warning "Impossible d'activer le mode maintenance (peut-être déjà actif)"
 }
 
@@ -77,14 +78,6 @@ print_step "Mise à jour des dépendances Composer"
 composer install --no-dev --optimize-autoloader --no-interaction
 print_success "Dépendances Composer mises à jour"
 
-# 3b. Nettoyage et Optimisation du code (Auto-fix)
-print_step "Nettoyage du code avec Pint"
-./vendor/bin/pint || print_warning "Pint a rencontré des problèmes mais on continue"
-
-print_step "Amélioration du code avec Rector"
-./vendor/bin/rector --no-progress-bar --no-diffs || print_warning "Rector a rencontré des problèmes mais on continue"
-
-# 4. Migration de la base de données
 # 4. Migration de la base de données
 print_step "Migration de la base de données"
 php artisan migrate --force
@@ -163,7 +156,7 @@ fi
 # 10. Test de santé de l'application
 print_step "Test de santé de l'application"
 if command -v curl &> /dev/null; then
-    DOMAIN=$(php artisan tinker --execute="echo config('app.url');" 2>/dev/null | tail -n1)
+    DOMAIN="${APP_URL:-$(grep '^APP_URL=' .env 2>/dev/null | cut -d= -f2-)}"
     if [[ -n "$DOMAIN" && "$DOMAIN" != "http://localhost" ]]; then
         HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$DOMAIN" || echo "000")
         if [[ "$HTTP_CODE" == "200" ]]; then
@@ -198,7 +191,7 @@ print_step "Désactivation du mode maintenance"
 php artisan up
 print_success "Mode maintenance désactivé"
 
-# 13. Résumé final
+# 14. Résumé final
 print_step "🎉 Déploiement terminé avec succès!"
 echo
 print_message "📊 Résumé du déploiement:"

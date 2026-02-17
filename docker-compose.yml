@@ -51,6 +51,11 @@ services:
     volumes:
       - keyhome-app-code:/var/www
       - keyhome-storage-data:/var/www/storage
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'queue:work' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     networks:
       - keyhome-network
 
@@ -106,11 +111,13 @@ services:
     networks:
       - keyhome-network
 
-  # Interface de gestion de base de données
+  # Interface de gestion de base de données (debug only — use: docker compose --profile debug up pgadmin)
   pgadmin:
     image: dpage/pgadmin4
     container_name: keyhome-pgadmin
     restart: unless-stopped
+    profiles:
+      - debug
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@admin.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
@@ -119,13 +126,15 @@ services:
     networks:
       - keyhome-network
 
-  # --- MONITORING STACK ---
+  # --- MONITORING STACK (use: docker compose --profile monitoring up -d) ---
 
   # Prometheus : Collecte les métriques
   prometheus:
     image: prom/prometheus:latest
     container_name: keyhome-prometheus
     restart: unless-stopped
+    profiles:
+      - monitoring
     volumes:
       - .docker/monitoring/prometheus:/etc/prometheus
       - keyhome-prometheus-data:/prometheus
@@ -142,6 +151,8 @@ services:
     image: grafana/grafana:latest
     container_name: keyhome-grafana
     restart: unless-stopped
+    profiles:
+      - monitoring
     # Port exposé uniquement en dev. En prod, utilisez un reverse proxy Nginx
     # ports:
     #   - "3000:3000"
@@ -158,6 +169,8 @@ services:
     image: prom/node-exporter:latest
     container_name: keyhome-node-exporter
     restart: unless-stopped
+    profiles:
+      - monitoring
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -174,6 +187,8 @@ services:
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: keyhome-cadvisor
     restart: unless-stopped
+    profiles:
+      - monitoring
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:rw
@@ -187,6 +202,8 @@ services:
     image: prometheuscommunity/postgres-exporter
     container_name: keyhome-postgres-exporter
     restart: unless-stopped
+    profiles:
+      - monitoring
     environment:
       DATA_SOURCE_NAME: "postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-password}@db:5432/${DB_DATABASE:-keyhome}?sslmode=disable"
     networks:
@@ -197,6 +214,8 @@ services:
     image: oliver006/redis_exporter
     container_name: keyhome-redis-exporter
     restart: unless-stopped
+    profiles:
+      - monitoring
     environment:
       - REDIS_ADDR=redis:6379
     networks:

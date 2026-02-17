@@ -46,8 +46,8 @@ echo "✓ Assets Livewire publiés"
 php artisan filament:assets
 echo "✓ Assets Filament compilés"
 
-php artisan filament:upgrade
-echo "✓ Filament mis à jour (upgrade)"
+# Note: filament:upgrade is NOT called here — it is handled in the CI deploy stage
+# to avoid running it twice during deployment.
 
 # ==========================================
 # ÉTAPE 3: OPTIMISATION POUR LA PRODUCTION
@@ -70,8 +70,7 @@ echo "✓ Events mis en cache"
 php artisan filament:cache-components
 echo "✓ Composants Filament mis en cache"
 
-# Optimisation générale (Laravel 11+)
-php artisan optimize 2>/dev/null || echo "✓ Optimize command skipped"
+# Note: php artisan optimize is NOT called here — it is handled separately in the CI deploy stage.
 
 # ==========================================
 # ÉTAPE 4: PERMISSIONS

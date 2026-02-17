@@ -67,6 +67,8 @@ RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 # Exposition du port FPM
 EXPOSE 9000
 
-# Script d'entrée pour assurer les permissions au runtime si nécessaire
-# CMD ["php-fpm"]
+# Health check — php-fpm responds to fcgi status
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD php-fpm -t 2>/dev/null || exit 1
+
 CMD ["php-fpm"]

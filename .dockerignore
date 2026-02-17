@@ -1,0 +1,59 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# CI/CD & infrastructure
+.gitlab-ci.yml
+docker-compose.yml
+docker-compose.override.yml
+docker-compose.override.yml.example
+Dockerfile
+
+# Sub-projects (separate repos/builds)
+keyhome-frontend-next/
+mobile/
+
+# Dependencies (rebuilt in container)
+node_modules/
+vendor/
+
+# Testing & quality
+tests/
+phpunit.xml
+phpstan.neon
+pint.json
+rector.php
+
+# Development helpers
+_ide_helper.php
+_ide_helper_models.php
+.docker/
+
+# Logs & temp
+storage/logs/
+storage/framework/cache/
+storage/framework/sessions/
+storage/framework/views/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Documentation & reports
+*.md
+audit/
+docs/
+skills/
+data.ms/
+dumps/
+
+# Build artifacts
+public/build/
+public/hot
+
+# Scripts not needed in container
+deploy.sh
+backup-db.sh
+scripts/
