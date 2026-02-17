@@ -107,7 +107,7 @@ test('payment webhook accepts valid signature and updates payment', function ():
 
     // Controller expects "t=<timestamp>,v1=<hmac(timestamp.'.'.payload, secret)>"
     $timestamp = (string) time();
-    $signature = hash_hmac('sha256', $timestamp . '.' . $payload, $secret);
+    $signature = hash_hmac('sha256', $timestamp.'.'.$payload, $secret);
 
     $response = $this->call(
         'POST',

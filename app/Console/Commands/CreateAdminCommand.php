@@ -51,7 +51,7 @@ class CreateAdminCommand extends Command
             $password = $this->sanitize($this->ask('Password (min 8 characters)'));
             if (empty($password)) {
                 $this->error('Le mot de passe ne peut pas être vide.');
-            } elseif (strlen((string) $password) < 8) {
+            } elseif (strlen($password) < 8) {
                 $this->error('Le mot de passe doit contenir au moins 8 caractères.');
                 $password = null;
             }
