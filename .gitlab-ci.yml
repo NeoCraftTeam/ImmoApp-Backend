@@ -31,7 +31,7 @@ prepare_ci_image:
       COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
       WORKDIR /app
       COPY . .
-      RUN mkdir -p storage/framework/{cache,sessions,views} storage/logs bootstrap/cache \
+      RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
         && cp .env.example .env \
         && composer install --no-interaction --no-ansi
       DOCKERFILE
