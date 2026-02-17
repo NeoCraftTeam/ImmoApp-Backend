@@ -78,41 +78,66 @@ class ManageSubscription extends Page
         return $total > 0 ? (int) min(100, round(($elapsed / $total) * 100)) : 0;
     }
 
-    protected function verifyPayment(string $transactionId)
+    protected function verifyPayment(string $transactionId): void
     {
-        $payment = \App\Models\Payment::where('transaction_id', $transactionId)->first();
+        /** @var \App\Models\Agency|null $agency */
+        $agency = auth()->user()->agency;
 
-        if ($payment && $payment->status === \App\Enums\PaymentStatus::PENDING) {
-            // Dans un environnement réel, on interrogerait l'API FedaPay ici pour confirmer
-            // Pour le moment, si on reçoit status=approved dans l'URL, on simule l'activation
-            // (La sécurité finale est gérée par le Webhook en production)
+        if (!$agency) {
+            return;
+        }
 
-            \Illuminate\Support\Facades\DB::beginTransaction();
-            try {
-                $payment->update(['status' => \App\Enums\PaymentStatus::SUCCESS]);
+        $payment = \App\Models\Payment::where('transaction_id', $transactionId)
+            ->where('agency_id', $agency->id)
+            ->where('status', \App\Enums\PaymentStatus::PENDING)
+            ->first();
 
-                // Retrouver le plan et l'agence
-                $plan = \App\Models\SubscriptionPlan::find($payment->plan_id);
-                /** @var \App\Models\Agency|null $agency */
-                $agency = $payment->agency;
+        if (!$payment) {
+            return;
+        }
 
-                if ($plan && $agency) {
-                    $subscriptionService = new \App\Services\SubscriptionService;
-                    $subscription = $subscriptionService->createSubscription($agency, $plan, $payment->period ?? 'monthly', $payment);
-                    $subscriptionService->activateSubscription($subscription);
+        // Verify payment status with FedaPay API before activating
+        try {
+            $fedaPayService = app(\App\Services\FedaPayService::class);
+            $transaction = $fedaPayService->retrieveTransaction($transactionId);
 
-                    \Filament\Notifications\Notification::make()
-                        ->title('Paiement réussi !')
-                        ->body('Votre abonnement a été activé avec succès. Bienvenue !')
-                        ->success()
-                        ->send();
-                }
+            if ($transaction['status'] !== 'approved') {
+                \Illuminate\Support\Facades\Log::warning('FedaPay verification failed for subscription payment', [
+                    'transaction_id' => $transactionId,
+                    'agency_id' => $agency->id,
+                    'fedapay_status' => $transaction['status'],
+                ]);
 
-                \Illuminate\Support\Facades\DB::commit();
-            } catch (\Exception $e) {
-                \Illuminate\Support\Facades\DB::rollBack();
-                \Illuminate\Support\Facades\Log::error('Erreur activation manuelle: '.$e->getMessage());
+                return;
             }
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('FedaPay API verification error: '.$e->getMessage());
+
+            return;
+        }
+
+        \Illuminate\Support\Facades\DB::beginTransaction();
+        try {
+            $payment->update(['status' => \App\Enums\PaymentStatus::SUCCESS]);
+
+            $plan = \App\Models\SubscriptionPlan::find($payment->plan_id);
+
+            if ($plan) {
+                $subscriptionService = new \App\Services\SubscriptionService;
+                $subscription = $subscriptionService->createSubscription($agency, $plan, $payment->period ?? 'monthly', $payment);
+                $subscriptionService->activateSubscription($subscription);
+
+                \Filament\Notifications\Notification::make()
+                    ->title('Paiement réussi !')
+                    ->body('Votre abonnement a été activé avec succès. Bienvenue !')
+                    ->success()
+                    ->send();
+            }
+
+            \Illuminate\Support\Facades\DB::commit();
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            \Illuminate\Support\Facades\Log::error('Erreur activation manuelle: '.$e->getMessage());
         }
     }
 

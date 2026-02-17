@@ -44,20 +44,34 @@ class ReviewResource extends Resource
     protected static ?string $modelLabel = 'Avis clients';
 
     #[\Override]
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with(['ad', 'user']);
+    }
+
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->components([
                 TextInput::make('rating')
                     ->required()
-                    ->numeric(),
+                    ->numeric()
+                    ->minValue(1)
+                    ->maxValue(5),
                 Textarea::make('comment')
                     ->columnSpanFull(),
                 Select::make('ad_id')
                     ->relationship('ad', 'title')
+                    ->searchable()
+                    ->preload()
                     ->required(),
-                Select::make('user.fullname')
-                    ->relationship('user', 'id')
+                Select::make('user_id')
+                    ->relationship('user', 'firstname')
+                    ->getOptionLabelFromRecordUsing(fn ($record) => $record->fullname)
+                    ->searchable()
+                    ->preload()
                     ->required(),
             ]);
     }

@@ -51,6 +51,13 @@ class AdResource extends Resource
     protected static ?int $navigationSort = 1;
 
     #[\Override]
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with(['user', 'quarter', 'ad_type', 'media']);
+    }
+
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return $schema

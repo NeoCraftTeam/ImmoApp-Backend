@@ -43,10 +43,7 @@ class AdResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->withGlobalScope('landlord', new LandlordScope)
-            ->withoutGlobalScopes([
-                SoftDeletingScope::class,
-            ]);
+            ->withGlobalScope('landlord', new LandlordScope);
     }
 
     #[\Override]

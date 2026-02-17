@@ -43,6 +43,13 @@ class UnlockedAdResource extends Resource
     protected static ?string $modelLabel = 'Annonce débloquée';
 
     #[\Override]
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with(['ad.user', 'user', 'payment']);
+    }
+
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return $schema

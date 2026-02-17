@@ -43,6 +43,13 @@ class PaymentResource extends Resource
     protected static ?string $recordTitleAttribute = 'id';
 
     #[\Override]
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with(['ad.ad_type', 'user']);
+    }
+
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return $schema

@@ -31,6 +31,13 @@ class AgencyResource extends Resource
     protected static ?string $recordTitleAttribute = 'Agency';
 
     #[\Override]
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with(['owner']);
+    }
+
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return AgencyForm::configure($schema);

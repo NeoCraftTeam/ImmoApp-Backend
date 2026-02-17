@@ -56,16 +56,21 @@ trait SharedAdResource
                 ->required(),
             TextInput::make('price')
                 ->numeric()
+                ->required()
+                ->minValue(0)
                 ->prefix('FCFA'),
             TextInput::make('surface_area')
                 ->required()
-                ->numeric(),
+                ->numeric()
+                ->minValue(1),
             TextInput::make('bedrooms')
                 ->required()
-                ->numeric(),
+                ->numeric()
+                ->minValue(0),
             TextInput::make('bathrooms')
                 ->required()
-                ->numeric(),
+                ->numeric()
+                ->minValue(0),
             Toggle::make('has_parking')
                 ->required(),
             static::getMapField(),

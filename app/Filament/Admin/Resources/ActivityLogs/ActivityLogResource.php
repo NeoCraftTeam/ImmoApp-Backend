@@ -97,12 +97,12 @@ class ActivityLogResource extends Resource
                         TextEntry::make('properties.old')
                             ->label('Anciennes valeurs')
                             ->columnSpanFull()
-                            ->formatStateUsing(fn ($state) => '<pre style="font-size: 0.8em; overflow-x: auto;">'.json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE).'</pre>')
+                            ->formatStateUsing(fn ($state) => '<pre style="font-size: 0.8em; overflow-x: auto;">'.e(json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)).'</pre>')
                             ->html(),
                         TextEntry::make('properties.attributes')
                             ->label('Nouvelles valeurs')
                             ->columnSpanFull()
-                            ->formatStateUsing(fn ($state) => '<pre style="font-size: 0.8em; overflow-x: auto;">'.json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE).'</pre>')
+                            ->formatStateUsing(fn ($state) => '<pre style="font-size: 0.8em; overflow-x: auto;">'.e(json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)).'</pre>')
                             ->html(),
                     ])
                     ->visible(fn ($record): bool => !empty($record->properties->get('old')) || !empty($record->properties->get('attributes')))
