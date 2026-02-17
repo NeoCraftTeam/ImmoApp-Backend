@@ -8,7 +8,7 @@ namespace App\Providers;
 use App\Listeners\SendWelcomeNotification;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
-use Illuminate\Support\ServiceProvider;
+use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -17,7 +17,7 @@ class EventServiceProvider extends ServiceProvider
      *
      * @var array<class-string, array<int, class-string>>
      */
-    protected array $listen = [
+    protected $listen = [
         // Événement déclenché après l'inscription
         // Registered::class => [
         //     SendEmailVerificationNotification::class,
@@ -32,6 +32,7 @@ class EventServiceProvider extends ServiceProvider
     /**
      * Register any events for your application.
      */
+    #[\Override]
     public function boot(): void
     {
         //
@@ -40,6 +41,7 @@ class EventServiceProvider extends ServiceProvider
     /**
      * Determine if events and listeners should be automatically discovered.
      */
+    #[\Override]
     public function shouldDiscoverEvents(): bool
     {
         return false;

@@ -30,22 +30,21 @@ class ReviewPolicy
 
     public function update(User $user, Review $review): bool
     {
-        // Only the author of the review can update it
-        return $user->id === $review->user_id;
+        return $user->isAdmin() || $user->id === $review->user_id;
     }
 
     public function delete(User $user, Review $review): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
     public function restore(User $user, Review $review): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 
     public function forceDelete(User $user, Review $review): bool
     {
-        return false;
+        return $user->isAdmin();
     }
 }

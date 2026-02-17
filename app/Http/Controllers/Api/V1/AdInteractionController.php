@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\AdStatus;
 use App\Http\Resources\AdResource;
 use App\Models\Ad;
 use App\Models\AdInteraction;
@@ -272,33 +273,25 @@ final class AdInteractionController
     {
         $user = $request->user();
 
-        // Get all ad_ids where this user has favorite/unfavorite interactions
-        $adIds = AdInteraction::where('user_id', $user->id)
+        // Use a single query with GROUP BY to determine favorite state, avoiding N+1
+        $favoritedAdIds = AdInteraction::where('user_id', $user->id)
             ->whereIn('type', [AdInteraction::TYPE_FAVORITE, AdInteraction::TYPE_UNFAVORITE])
             ->whereNotNull('ad_id')
-            ->pluck('ad_id')
-            ->unique();
-
-        // For each ad, check if currently favorited (favorites > unfavorites)
-        $favoritedAdIds = $adIds->filter(function (string $adId) use ($user): bool {
-            $favorites = AdInteraction::where('user_id', $user->id)
-                ->where('ad_id', $adId)
-                ->where('type', AdInteraction::TYPE_FAVORITE)
-                ->count();
-
-            $unfavorites = AdInteraction::where('user_id', $user->id)
-                ->where('ad_id', $adId)
-                ->where('type', AdInteraction::TYPE_UNFAVORITE)
-                ->count();
-
-            return $favorites > $unfavorites;
-        });
+            ->selectRaw('ad_id')
+            ->selectRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as fav_count', [AdInteraction::TYPE_FAVORITE])
+            ->selectRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as unfav_count', [AdInteraction::TYPE_UNFAVORITE])
+            ->groupBy('ad_id')
+            ->havingRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) > SUM(CASE WHEN type = ? THEN 1 ELSE 0 END)', [
+                AdInteraction::TYPE_FAVORITE,
+                AdInteraction::TYPE_UNFAVORITE,
+            ])
+            ->pluck('ad_id');
 
         $ads = Ad::with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])
             ->whereIn('id', $favoritedAdIds)
-            ->where('status', 'available')
+            ->where('status', AdStatus::AVAILABLE)
             ->latest()
-            ->get();
+            ->paginate(15);
 
         return AdResource::collection($ads);
     }

@@ -69,7 +69,7 @@ class FedaPayService
      *
      * @return array{success: bool, status: string, transaction_id: int}
      */
-    public function retrieveTransaction(int $transactionId): array
+    public function retrieveTransaction(int|string $transactionId): array
     {
         try {
             $key = config('services.fedapay.secret_key');
@@ -79,7 +79,7 @@ class FedaPayService
             FedaPay::setEnvironment($env);
 
             /** @var Transaction $transaction */
-            $transaction = Transaction::retrieve($transactionId);
+            $transaction = Transaction::retrieve((int) $transactionId);
 
             return [
                 'success' => true,
@@ -112,7 +112,7 @@ class FedaPayService
 
             FedaPay::setApiKey($key);
             FedaPay::setEnvironment($env);
-
+            $customerEmail = auth()->user()->email ?? $agency->owner->email ?? 'agency@keyhome.cm';
             /** @var Transaction $transaction */
             $transaction = Transaction::create([
                 'description' => 'Souscription Abonnement',
@@ -122,7 +122,7 @@ class FedaPayService
                 'customer' => [
                     'firstname' => $agency->name ?? 'Agence',
                     'lastname' => 'Member',
-                    'email' => auth()->user()->email,
+                    'email' => $customerEmail,
                 ],
                 // On passe les infos importantes dans les métadonnées
                 'metadata' => [

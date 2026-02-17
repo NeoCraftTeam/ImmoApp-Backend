@@ -45,8 +45,6 @@ Route::prefix('v1')->group(function (): void {
         Route::middleware('auth:sanctum')->group(function (): void {
             Route::post('registerAdmin', [AuthController::class, 'registerAdmin'])
                 ->middleware('can:admin-access');
-            Route::post('registerAd', [AuthController::class, 'registerAdmin'])
-                ->middleware('can:admin-access');
             Route::post('logout', [AuthController::class, 'logout']);
             Route::post('refresh', [AuthController::class, 'refresh']);
             Route::get('me', [AuthController::class, 'me']);

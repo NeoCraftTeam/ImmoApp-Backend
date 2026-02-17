@@ -19,7 +19,11 @@ class AdPolicy
 
     public function view(?User $user, Ad $ad): bool
     {
-        return true;
+        if ($ad->status === \App\Enums\AdStatus::AVAILABLE) {
+            return true;
+        }
+
+        return $user !== null && ($user->isAdmin() || $user->id === $ad->user_id);
     }
 
     public function create(User $user): bool

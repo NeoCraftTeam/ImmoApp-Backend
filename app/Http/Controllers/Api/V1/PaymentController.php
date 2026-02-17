@@ -292,50 +292,52 @@ final class PaymentController
     {
         $user = $request->user();
 
-        $payment = Payment::where('user_id', $user->id)
-            ->where('ad_id', $ad->id)
-            ->where('type', PaymentType::UNLOCK)
-            ->latest()
-            ->first();
+        return DB::transaction(function () use ($user, $ad) {
+            $payment = Payment::where('user_id', $user->id)
+                ->where('ad_id', $ad->id)
+                ->where('type', PaymentType::UNLOCK)
+                ->latest()
+                ->lockForUpdate()
+                ->first();
 
-        if (!$payment) {
+            if (!$payment) {
+                return response()->json([
+                    'message' => 'Aucun paiement trouvé pour cette annonce.',
+                    'is_unlocked' => false,
+                ], 404);
+            }
+
+            if ($payment->status === PaymentStatus::SUCCESS) {
+                return response()->json([
+                    'message' => 'Annonce déjà débloquée.',
+                    'is_unlocked' => true,
+                ]);
+            }
+
+            $result = $this->fedaPay->retrieveTransaction((int) $payment->transaction_id);
+
+            if ($result['success'] && $result['status'] === 'approved') {
+                $payment->update(['status' => PaymentStatus::SUCCESS]);
+
+                \App\Models\UnlockedAd::firstOrCreate(
+                    ['ad_id' => $ad->id, 'user_id' => $user->id],
+                    ['payment_id' => $payment->id, 'unlocked_at' => now()]
+                );
+
+                Log::info("Paiement #{$payment->id} vérifié et validé via API.");
+
+                return response()->json([
+                    'message' => 'Paiement confirmé. Annonce débloquée.',
+                    'is_unlocked' => true,
+                ]);
+            }
+
             return response()->json([
-                'message' => 'Aucun paiement trouvé pour cette annonce.',
+                'message' => 'Le paiement est en attente de confirmation.',
                 'is_unlocked' => false,
-            ], 404);
-        }
-
-        if ($payment->status === PaymentStatus::SUCCESS) {
-            return response()->json([
-                'message' => 'Annonce déjà débloquée.',
-                'is_unlocked' => true,
+                'payment_status' => $result['status'],
             ]);
-        }
-
-        $result = $this->fedaPay->retrieveTransaction((int) $payment->transaction_id);
-
-        if ($result['success'] && $result['status'] === 'approved') {
-            $payment->update(['status' => PaymentStatus::SUCCESS]);
-
-            // Create UnlockedAd record for backoffice tracking
-            \App\Models\UnlockedAd::firstOrCreate(
-                ['ad_id' => $ad->id, 'user_id' => $user->id],
-                ['payment_id' => $payment->id, 'unlocked_at' => now()]
-            );
-
-            Log::info("Paiement #{$payment->id} vérifié et validé via API.");
-
-            return response()->json([
-                'message' => 'Paiement confirmé. Annonce débloquée.',
-                'is_unlocked' => true,
-            ]);
-        }
-
-        return response()->json([
-            'message' => 'Le paiement est en attente de confirmation.',
-            'is_unlocked' => false,
-            'payment_status' => $result['status'],
-        ]);
+        });
     }
 
     private function hasValidWebhookSignature(Request $request, string $secret): bool

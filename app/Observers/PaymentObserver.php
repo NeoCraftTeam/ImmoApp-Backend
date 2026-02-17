@@ -33,7 +33,7 @@ class PaymentObserver
     {
         // On invalide le cache seulement si le paiement est un succès (car cela change l'historique significatif)
         if ($payment->status === PaymentStatus::SUCCESS) {
-            Cache::forget("recommendations_user_{$payment->user_id}");
+            Cache::forget("reco_v2_user_{$payment->user_id}");
         }
     }
 }

@@ -44,11 +44,13 @@ class AppServiceProvider extends ServiceProvider
             $frontendUrl = config('app.frontend_url', 'http://localhost:3000');
             $link = "{$frontendUrl}/reset-password?token={$token}&email={$notifiable->getEmailForVerification()}";
 
-            \Illuminate\Support\Facades\Log::error('PASSWORD RESET LINK: '.$link); // Force LOG
+            if (app()->isLocal()) {
+                \Illuminate\Support\Facades\Log::debug('PASSWORD RESET LINK: '.$link);
+            }
 
             return $link;
         });
 
-        Gate::define('viewPulse', fn ($user = null) => true);
+        Gate::define('viewPulse', fn (?\App\Models\User $user = null) => $user?->isAdmin() ?? false);
     }
 }

@@ -34,7 +34,7 @@ class AgencyPolicy
 
     public function delete(User $user, Agency $agency): bool
     {
-        return $user->isAnAgency();
+        return $user->isAdmin() || ($user->isAnAgency() && $agency->owner_id === $user->id);
     }
 
     public function restore(User $user, Agency $agency): bool
