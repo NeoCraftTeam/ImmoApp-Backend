@@ -12,6 +12,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class CustomRegister extends BaseRegister
@@ -63,26 +64,39 @@ class CustomRegister extends BaseRegister
     {
         $panelId = \Filament\Facades\Filament::getCurrentPanel()->getId();
 
-        // 1. On crée d'abord l'utilisateur de base
-        $user = User::create([
-            'firstname' => $data['firstname'],
-            'lastname' => $data['lastname'],
-            'email' => $data['email'],
-            'password' => Hash::make($data['password']),
-            'role' => UserRole::CUSTOMER, // Rôle temporaire avant promotion
-            'is_active' => true,
-        ]);
+        return DB::transaction(function () use ($data, $panelId) {
+            // 1. On crée d'abord l'utilisateur de base
+            $user = User::create([
+                'firstname' => $data['firstname'],
+                'lastname' => $data['lastname'],
+                'email' => $data['email'],
+                'password' => Hash::make($data['password']),
+                'role' => UserRole::CUSTOMER, // Rôle temporaire avant promotion
+                'is_active' => true,
+            ]);
 
-        // 2. On utilise le service pour lui créer son Agence/Portefeuille et le promouvoir Agent
-        $agencyService = app(AgencyService::class);
+            // 2. On utilise le service pour lui créer son Agence/Portefeuille et le promouvoir Agent
+            try {
+                $agencyService = app(AgencyService::class);
 
-        if ($panelId === 'agency') {
-            $agencyName = $data['agency_name'] ?? 'Agence de '.$user->lastname;
-            $agencyService->promoteToAgency($user, $agencyName);
-        } else {
-            $agencyService->promoteToBailleur($user);
-        }
+                if ($panelId === 'agency') {
+                    $agencyName = $data['agency_name'] ?? 'Agence de '.$user->lastname;
+                    $agencyService->promoteToAgency($user, $agencyName);
+                } else {
+                    $agencyService->promoteToBailleur($user);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::error('Registration promotion failed', [
+                    'user_id' => $user->id,
+                    'panel' => $panelId,
+                    'error' => $e->getMessage(),
+                ]);
 
-        return $user;
+                throw $e;
+            }
+
+            // 3. Recharger l'utilisateur pour avoir le rôle/type mis à jour
+            return $user->fresh();
+        });
     }
 }

@@ -6,6 +6,7 @@ use App\Models\Ad;
 use App\Models\AdType;
 use App\Models\Quarter;
 use App\Models\User;
+use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
 
@@ -18,41 +19,35 @@ class AdFactory extends Factory
 
     public function definition(): array
     {
+        $title = fake()->sentence();
         $cityData = $this->getCitiesData();
+
         $latitude = $cityData['latitude'];
         $longitude = $cityData['longitude'];
         $cityName = $cityData['name'];
 
-        $quarter = Quarter::whereHas('city')
-            ->inRandomOrder()
-            ->first();
-
-        $prefixes = [
-            'Appartement moderne', 'Belle villa', 'Studio meublé',
-            'Maison spacieuse', 'Duplex de standing', 'Chambre moderne',
-            'Local commercial', 'Terrain viabilisé', 'Appartement 3 pièces',
-            'Résidence sécurisée', 'Penthouse lumineux', 'Loft contemporain',
-        ];
-        $title = fake()->randomElement($prefixes).' à '.($quarter?->name ?? $cityName).' - '.$cityName;
-        $address = fake()->streetAddress().', '.($quarter?->name ?? $cityName).', '.$cityName;
+        // Utilise le nom de la ville dans l'adresse
+        $address = fake()->streetAddress().', '.$cityName;
 
         return [
             'title' => $title,
-            'description' => fake()->realText(300),
+            'slug' => Ad::generateUniqueSlug($title),
+            'description' => fake()->paragraph(),
             'adresse' => $address,
-            'price' => fake()->randomElement([15000, 25000, 35000, 50000, 75000, 100000, 150000, 200000, 300000, 500000]),
-            'surface_area' => fake()->randomElement([20, 35, 50, 75, 100, 150, 200, 300, 500]),
-            'bedrooms' => fake()->numberBetween(1, 6),
-            'bathrooms' => fake()->numberBetween(1, 4),
+            'price' => fake()->numberBetween(25000, 150000), // Random number with 5 digits
+            'surface_area' => fake()->randomNumber(5, false),
+            'bedrooms' => fake()->randomDigitNotNull(),
+            'bathrooms' => fake()->randomDigitNotNull(),
             'has_parking' => fake()->boolean(),
-            'location' => "POINT($longitude $latitude)",
-            'status' => fake()->randomElement(['available', 'available', 'available', 'reserved', 'rent']),
+            'location' => Point::makeGeodetic($latitude, $longitude),
+            'status' => fake()->randomElement(['available', 'reserved', 'rent']),
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
 
             'user_id' => User::factory(),
-            'quarter_id' => $quarter?->id ?? Quarter::factory(),
-            'type_id' => AdType::inRandomOrder()->first()?->id ?? AdType::factory(),
+            'quarter_id' => Quarter::factory(),
+            // Each ad is linked to a type
+            'type_id' => AdType::inRandomOrder()->first()->id ?? AdType::factory(),
         ];
     }
 
@@ -61,41 +56,40 @@ class AdFactory extends Factory
         if (self::$citiesData === null) {
             $path = database_path('data/cities.sql');
 
-            if (!file_exists($path)) {
-                self::$citiesData = [
-                    ['name' => 'Douala', 'latitude' => 4.0511, 'longitude' => 9.7679],
-                    ['name' => 'Yaoundé', 'latitude' => 3.8480, 'longitude' => 11.5021],
-                    ['name' => 'Bafoussam', 'latitude' => 5.4737, 'longitude' => 10.4176],
-                ];
+            if (file_exists($path)) {
+                $content = file_get_contents($path);
 
-                return self::$citiesData[array_rand(self::$citiesData)];
+                // Pattern regex pour extraire : name, latitude, longitude
+                preg_match_all(
+                    "/\(\d+,\s*'([^']+)',\s*([0-9.-]+),\s*([0-9.-]+),/",
+                    $content,
+                    $matches,
+                    PREG_SET_ORDER
+                );
+
+                self::$citiesData = [];
+                foreach ($matches as $match) {
+                    self::$citiesData[] = [
+                        'name' => $match[1],
+                        'latitude' => (float) $match[2],
+                        'longitude' => (float) $match[3],
+                    ];
+                }
             }
 
-            $content = file_get_contents($path);
-
-            preg_match_all(
-                "/\(\d+,\s*'([^']+)',\s*([0-9.-]+),\s*([0-9.-]+),/",
-                $content,
-                $matches,
-                PREG_SET_ORDER
-            );
-
-            self::$citiesData = [];
-            foreach ($matches as $match) {
-                self::$citiesData[] = [
-                    'name' => $match[1],
-                    'latitude' => (float) $match[2],
-                    'longitude' => (float) $match[3],
-                ];
-            }
-
+            // Fallback pour CI/testing quand cities.sql est absent
             if (empty(self::$citiesData)) {
                 self::$citiesData = [
                     ['name' => 'Douala', 'latitude' => 4.0511, 'longitude' => 9.7679],
+                    ['name' => 'Yaoundé', 'latitude' => 3.8667, 'longitude' => 11.5167],
+                    ['name' => 'Bafoussam', 'latitude' => 5.4737, 'longitude' => 10.4179],
+                    ['name' => 'Bamenda', 'latitude' => 5.9597, 'longitude' => 10.1597],
+                    ['name' => 'Kribi', 'latitude' => 2.9500, 'longitude' => 9.9167],
                 ];
             }
         }
 
+        // Retourne une ville aléatoire
         return self::$citiesData[array_rand(self::$citiesData)];
     }
 }

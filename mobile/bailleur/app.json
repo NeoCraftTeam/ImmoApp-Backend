@@ -16,7 +16,19 @@
       "supportsTablet": true,
       "infoPlist": {
         "NSAppTransportSecurity": {
-          "NSAllowsArbitraryLoads": true
+          "NSAllowsArbitraryLoads": false,
+          "NSAllowsArbitraryLoadsInWebContent": true,
+          "NSExceptionDomains": {
+            "keyhomeback.neocraft.dev": {
+              "NSExceptionAllowsInsecureHTTPLoads": false,
+              "NSExceptionRequiresForwardSecrecy": true
+            },
+            "keyhome.test": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
+              "NSExceptionRequiresForwardSecrecy": false
+            }
+          }
         },
         "NSCameraUsageDescription": "Cette application utilise la caméra pour ajouter des photos aux annonces.",
         "NSPhotoLibraryUsageDescription": "Cette application accède à vos photos pour les ajouter aux annonces.",
@@ -32,8 +44,6 @@
       "edgeToEdgeEnabled": true,
       "permissions": [
         "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ]

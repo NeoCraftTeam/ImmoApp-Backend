@@ -56,6 +56,22 @@ class NativeService {
 
       const { type, data } = content;
 
+      // Security: Validate origin before processing sensitive actions
+      const origin = event.nativeEvent.url || '';
+      const allowedOrigins = [
+        'https://keyhomeback.neocraft.dev', 
+        'https://api.keyhome.neocraft.dev', 
+        'https://agency.keyhome.neocraft.dev',
+        'https://owner.keyhome.neocraft.dev'
+      ];
+      
+      const isAllowed = allowedOrigins.some(allowed => origin.startsWith(allowed));
+      
+      if (!isAllowed) {
+        console.warn('Blocked message from untrusted origin:', origin);
+        return;
+      }
+
       switch (type) {
         case 'PICK_IMAGE':
           await this.pickImage(data);

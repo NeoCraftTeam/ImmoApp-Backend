@@ -3,8 +3,9 @@ import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
-  Dimensions,
+  BackHandler,
   Image,
+  Platform,
   StyleSheet,
   Text,
   View
@@ -13,11 +14,9 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import NativeService from './services/NativeService';
 
-const { width, height } = Dimensions.get('window');
-
 // CONFIGURATION
 const APP_CONFIG = {
-  baseUrl: process.env.EXPO_PUBLIC_BASE_URL || 'https://api.keyhome.neocraft.dev/bailleur', 
+  baseUrl: process.env.EXPO_PUBLIC_BASE_URL || 'https://api.keyhome.neocraft.dev/owner', 
   appMode: 'native',
   primaryColor: '#10b981', // Vert Owner
   splashDuration: 2500,
@@ -31,6 +30,20 @@ export default function App() {
   const scaleAnim = useRef(new Animated.Value(0.3)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const webViewRef = useRef(null);
+  const [canGoBack, setCanGoBack] = useState(false);
+
+  // Android back button → navigate back in WebView
+  React.useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const handler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (canGoBack && webViewRef.current) {
+        webViewRef.current.goBack();
+        return true;
+      }
+      return false;
+    });
+    return () => handler.remove();
+  }, [canGoBack]);
 
   React.useEffect(() => {
     Animated.spring(scaleAnim, {
@@ -104,14 +117,17 @@ export default function App() {
               setIsLoading(false);
               if (showSplash) setTimeout(hideSplash, 1000);
             }}
+            onNavigationStateChange={(navState) => setCanGoBack(navState.canGoBack)}
             javaScriptEnabled={true}
             domStorageEnabled={true}
-            userAgent="KeyHomeBailleurMobileApp/1.0"
+            cacheEnabled={true}
+            cacheMode="LOAD_DEFAULT"
+            userAgent="KeyHomeOwnerMobileApp/1.0"
             onMessage={(event) => {
               // Sécurité : Valider l'origine du message si possible
               NativeService.handleWebViewMessage(event);
             }}
-            // Sécurité : Restreindre les origines autorisées
+            // Autoriser HTTP (dev local) et HTTPS (production)
             originWhitelist={['http://*', 'https://*']}
             // Sécurité : Désactiver l'accès au système de fichiers
             allowFileAccess={false}
@@ -126,13 +142,14 @@ export default function App() {
               setError({
                 type: 'network',
                 message: 'Impossible de se connecter au serveur',
-                details: nativeEvent.description || 'Vérifiez votre connexion internet'
+                details: 'Vérifiez votre connexion internet'
               });
               setIsLoading(false);
             }}
           />
         </SafeAreaView>
 
+        {/* Error overlay désactivé temporairement
         {error && !showSplash && (
           <View style={styles.errorContainer}>
             <View style={styles.errorContent}>
@@ -149,6 +166,7 @@ export default function App() {
             </View>
           </View>
         )}
+        */}
 
         {isLoading && !showSplash && !error && (
           <View style={styles.loaderContainer}>

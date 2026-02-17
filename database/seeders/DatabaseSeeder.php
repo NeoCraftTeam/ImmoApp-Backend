@@ -16,10 +16,9 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             AdTypeSeeder::class,
-            RealCitySeeder::class,
-            UserSeeder::class,
-            AgencySeeder::class,
-            PaymentSeeder::class,
+            SubscriptionPlanSeeder::class,
+            CameroonCitiesSeeder::class,
+            MassiveAdSeeder::class,
         ]);
     }
 }

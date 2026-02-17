@@ -22,6 +22,15 @@ final class AdResource extends JsonResource
     #[\Override]
     public function toArray(Request $request): array
     {
+        $user = $request->user();
+
+        // Compute rating from eager-loaded aggregate or fallback
+        $avgRating = $this->reviews_avg_rating
+            ?? ($this->relationLoaded('reviews') && $this->reviews->count() > 0
+                ? round($this->reviews->avg('rating'), 1)
+                : null);
+        $reviewsCount = $this->reviews_count
+            ?? ($this->relationLoaded('reviews') ? $this->reviews->count() : 0);
 
         return [
             'id' => $this->id,
@@ -39,8 +48,12 @@ final class AdResource extends JsonResource
                 'longitude' => $this->location->getX(),
             ] : null,
             'status' => $this->status,
-            'is_unlocked' => $this->isUnlockedFor($request->user()),
+            'is_unlocked' => $this->isUnlockedFor($user),
             'total_images' => $this->getMedia('images')->count(),
+            'rating' => $avgRating ? (float) $avgRating : null,
+            'reviews_count' => (int) $reviewsCount,
+            'is_favorited' => $this->isFavoritedBy($user),
+            'view_count' => $this->views_count ?? 0,
             'expires_at' => $this->expires_at,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
@@ -50,13 +63,15 @@ final class AdResource extends JsonResource
             'published_by' => $this->getPublisherName(),
             'quarter' => new QuarterResource($this->whenLoaded('quarter')),
             'type' => new AdTypeResource($this->whenLoaded('ad_type')),
-            'images' => $this->getAccessibleImages($request->user())->map(fn ($media) => [
+            'images' => $this->getAccessibleImages($user)->map(fn ($media) => [
                 'id' => $media->id,
                 'url' => $media->getUrl(),
-                'thumb' => $media->getUrl('thumb'),
+                'thumb' => $media->hasGeneratedConversion('thumb') ? $media->getUrl('thumb') : $media->getUrl(),
+                'medium' => $media->hasGeneratedConversion('medium') ? $media->getUrl('medium') : $media->getUrl(),
                 'mime_type' => $media->mime_type,
                 'is_primary' => $this->getMedia('images')->first()?->id === $media->id,
             ]),
+            'reviews' => ReviewResource::collection($this->whenLoaded('reviews')),
         ];
     }
 }

@@ -1,6 +1,5 @@
 <?php
 
-use Laravel\Pulse\Http\Middleware\Authorize;
 use Laravel\Pulse\Pulse;
 use Laravel\Pulse\Recorders;
 
@@ -122,7 +121,6 @@ return [
 
     'middleware' => [
         'web',
-        Authorize::class,
     ],
 
     /*

@@ -12,16 +12,8 @@ use App\Filament\Exports\PaymentExporter;
 use App\Filament\Imports\PaymentImporter;
 use App\Models\Payment;
 use BackedEnum;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
 use Filament\Actions\ExportAction;
-use Filament\Actions\ForceDeleteAction;
-use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\ImportAction;
-use Filament\Actions\RestoreAction;
-use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -39,6 +31,12 @@ class PaymentResource extends Resource
     protected static ?string $model = Payment::class;
 
     protected static bool $isScopedToTenant = false;
+
+    protected static string|null|\UnitEnum $navigationGroup = 'Administration';
+
+    protected static ?int $navigationSort = 1;
+
+    protected static ?string $navigationLabel = 'Transactions (Finances)';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::CurrencyDollar;
 
@@ -65,7 +63,10 @@ class PaymentResource extends Resource
                     ->relationship('ad', 'title')
                     ->required(),
                 Select::make('user_id')
-                    ->relationship('user', 'id')
+                    ->relationship('user', 'firstname')
+                    ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->firstname} {$record->lastname}")
+                    ->searchable()
+                    ->preload()
                     ->required(),
                 Select::make('status')
                     ->options(PaymentStatus::class)
@@ -83,7 +84,7 @@ class PaymentResource extends Resource
                 TextColumn::make('type')
                     ->badge()
                     ->searchable()
-                    ->visible(false),
+                    ->sortable(),
                 TextColumn::make('amount')
                     ->numeric()
                     ->sortable(),
@@ -118,12 +119,9 @@ class PaymentResource extends Resource
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                EditAction::make(),
                 ViewAction::make(),
-                DeleteAction::make(),
-                ForceDeleteAction::make(),
-                RestoreAction::make(),
-            ])->headerActions([
+            ])
+            ->headerActions([
                 ImportAction::make()->label('Importer')
                     ->importer(PaymentImporter::class)
                     ->icon(Heroicon::ArrowUpTray),
@@ -133,11 +131,7 @@ class PaymentResource extends Resource
                     ->icon(Heroicon::ArrowDownTray),
             ])
             ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                    ForceDeleteBulkAction::make(),
-                    RestoreBulkAction::make(),
-                ]),
+                // Immutable records
             ]);
     }
 

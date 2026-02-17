@@ -34,6 +34,8 @@ use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\PersonalAccessToken;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Collections\MediaCollection;
@@ -109,7 +111,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasAvatar, HasEmailAuthentication, HasMedia, HasName, HasTenants, MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, HasUuids, \Illuminate\Auth\MustVerifyEmail, Notifiable, softDeletes;
+    use HasApiTokens, HasFactory, HasUuids, \Illuminate\Auth\MustVerifyEmail, LogsActivity, Notifiable, softDeletes;
 
     use InteractsWithMedia;
 
@@ -164,10 +166,20 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
     private function assignDefaultAvatar(): void
     {
-        if (empty($this->avatar)) {
-            $name = trim($this->firstname.' '.$this->lastname) ?: 'User';
-            $this->avatar = 'https://ui-avatars.com/api/?name='.urlencode($name).'&background=random';
+        $name = trim(($this->firstname ?? '').' '.($this->lastname ?? ''));
+        if (empty($name)) {
+            $name = 'U';
         }
+
+        $filename = 'avatars/'.$this->id.'.webp';
+        $fullPath = Storage::disk('public')->path($filename);
+
+        if (!is_dir(dirname($fullPath))) {
+            mkdir(dirname($fullPath), 0755, true);
+        }
+
+        \Laravolt\Avatar\Facade::create($name)->save($fullPath, 80);
+        $this->avatar = $filename;
     }
 
     public function canPublishAds(): bool
@@ -203,6 +215,12 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
+    }
+
+    /** @return HasMany<AdInteraction, $this> */
+    public function adInteractions(): HasMany
+    {
+        return $this->hasMany(AdInteraction::class);
     }
 
     /**
@@ -327,10 +345,8 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             return Storage::disk('public')->url($this->avatar);
         }
 
-        // Sinon, on génère un avatar avec les initiales (Fallback)
-        $name = urlencode($this->firstname.' '.$this->lastname);
-
-        return "https://ui-avatars.com/api/?name={$name}&color=7F9CF5&background=EBF4FF";
+        // Privacy: Return null to let Filament/Frontend handle the default placeholder
+        return null;
     }
 
     public function getAppAuthenticationSecret(): ?string
@@ -411,5 +427,14 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'app_authentication_recovery_codes' => 'encrypted:array',
             'has_email_authentication' => 'boolean',
         ];
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['firstname', 'lastname', 'email', 'phone_number', 'role', 'type', 'is_active', 'avatar', 'agency_id'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $eventName): string => "Utilisateur « {$this->firstname} {$this->lastname} » {$eventName}");
     }
 }

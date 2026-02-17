@@ -24,8 +24,8 @@ use Filament\Actions\ImportAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
-use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
@@ -63,10 +63,11 @@ class UserResource extends Resource
                 FileUpload::make('avatar')
                     ->disk('public')
                     ->directory('avatars')
-                    ->preserveFilenames()
                     ->avatar()
-                    ->uploadingMessage('Uploading...')
-                    ->image(),
+                    ->image()
+                    ->maxSize(2048)
+                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                    ->uploadingMessage('Envoi en cours...'),
                 TextInput::make('firstname')
                     ->maxLength(255),
                 TextInput::make('lastname')
@@ -80,7 +81,9 @@ class UserResource extends Resource
                     ->required()
                     ->unique(ignoreRecord: true)
                     ->maxLength(255),
-                DateTimePicker::make('email_verified_at'),
+                Placeholder::make('email_verified_at')
+                    ->label('Email vérifié le')
+                    ->content(fn ($record) => $record?->email_verified_at?->format('d/m/Y H:i') ?? 'Non vérifié'),
                 TextInput::make('password')
                     ->label('Mot de Passe')
                     ->password()
@@ -143,7 +146,8 @@ class UserResource extends Resource
                 ->label('Avatar')
                 ->circular()
                 ->size(40)
-                ->searchable(),
+                ->disk('public')
+                ->defaultImageUrl(fn ($record) => 'https://ui-avatars.com/api/?name='.urlencode($record->firstname.' '.$record->lastname).'&background=F6475F&color=fff'),
             TextColumn::make('full_name')
                 ->label('Nom complet')
                 ->formatStateUsing(fn ($record) => $record->firstname.' '.$record->lastname)
@@ -207,8 +211,8 @@ class UserResource extends Resource
             SelectFilter::make('type')
                 ->label('Filtrer par type')
                 ->options([
-                    'individual' => 'Individual',
-                    'Agency' => 'Agency',
+                    'individual' => 'Indépendant',
+                    'agency' => 'Agence',
                 ])
                 ->native(false),
         ];
@@ -282,6 +286,6 @@ class UserResource extends Resource
 
     public static function getNavigationBadgeTooltip(): ?string
     {
-        return 'The number of users';
+        return 'Nombre d\'utilisateurs';
     }
 }

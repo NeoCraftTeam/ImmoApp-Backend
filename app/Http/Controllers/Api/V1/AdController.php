@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\AdStatus;
 use App\Http\Requests\AdRequest;
 use App\Http\Resources\AdResource as AdApiResource;
 use App\Models\Ad;
@@ -121,11 +122,14 @@ final class AdController
     {
         $this->authorize('viewAny', Ad::class);
 
-        $perPage = (int) request('per_page', config('pagination.per_page', 15));
+        // P1-3 Fix: Clamp per_page to max 100
+        $perPage = min(max((int) request('per_page', config('pagination.per_page', 15)), 1), 100);
         $type = request('type');
 
         $query = Ad::query()
             ->with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')
+            ->withAvg('reviews', 'rating')
+            ->withCount('reviews')
             ->where('status', \App\Enums\AdStatus::AVAILABLE);
 
         if ($type) {
@@ -278,9 +282,9 @@ final class AdController
                 'bathrooms' => $data['bathrooms'],
                 'has_parking' => $data['has_parking'] ?? false,
                 'location' => Point::makeGeodetic($data['latitude'], $data['longitude']),
-                'status' => $data['status'] ?? 'pending', // Utiliser le status du request
+                'status' => AdStatus::PENDING->value, // Always start as pending — admin must approve
                 'expires_at' => $data['expires_at'],
-                'user_id' => $data['user_id'] ?? auth()->id(), // Utiliser user_id du request si présent
+                'user_id' => auth()->id(), // Always use authenticated user — never trust client input
                 'quarter_id' => $data['quarter_id'],
                 'type_id' => $data['type_id'],
             ]);
@@ -408,7 +412,9 @@ final class AdController
      */
     public function show(string $id): JsonResponse
     {
-        $ad = Ad::with(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency'])
+        $ad = Ad::with(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency', 'reviews.user'])
+            ->withAvg('reviews', 'rating')
+            ->withCount('reviews')
             ->findOrFail($id);
 
         $this->authorize('view', $ad);
@@ -568,6 +574,19 @@ final class AdController
             // Mise à jour des coordonnées GPS si fournies
             if (isset($data['latitude']) && isset($data['longitude'])) {
                 $data['location'] = Point::makeGeodetic($data['latitude'], $data['longitude']);
+            }
+
+            // Validate status transition if status is being changed
+            if (isset($data['status'])) {
+                $newStatus = AdStatus::from($data['status']);
+                if ($ad->status !== $newStatus) {
+                    if (!$ad->status->canTransitionTo($newStatus)) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => "Transition de statut invalide : {$ad->status->getLabel()} → {$newStatus->getLabel()}.",
+                        ], 422);
+                    }
+                }
             }
 
             // Mettre à jour l'annonce
@@ -938,7 +957,7 @@ final class AdController
      *
      * @throws Throwable
      */
-    private function ads_nearby(AdRequest $request, ?int $user = null): JsonResponse
+    private function ads_nearby(AdRequest $request, ?string $user = null): JsonResponse
     {
         $this->authorize('adsNearby', Ad::class);
 
@@ -953,6 +972,15 @@ final class AdController
                     'success' => false,
                     'message' => 'User not found.',
                 ], 404);
+            }
+
+            // P0-5 Fix: Prevent IDOR — only allow querying own location or admin
+            $authUser = auth()->user();
+            if ($authUser && $targetUser->id !== $authUser->id && !$authUser->isAdmin()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized: you can only query your own location.',
+                ], 403);
             }
         }
 
@@ -983,7 +1011,8 @@ final class AdController
             }
         }
 
-        $radius = (float) $request->input('radius', $defaultRadius);
+        // P0-6 Fix: Clamp radius to max 50km to prevent full-table geo scan DoS
+        $radius = min((float) $request->input('radius', $defaultRadius), 50000);
 
         // Valider la présence et les bornes des coordonnées finales
         $latValid = is_numeric($lat) && $lat >= -90 && $lat <= 90;
@@ -1012,6 +1041,8 @@ final class AdController
                     ->whereRaw('ST_DistanceSphere(location, ST_MakePoint(?, ?)) <= ?', [$long, $lat, $radius])
                     ->orderBy('distance', 'asc')
                     ->with(['user', 'quarter.city', 'ad_type', 'media'])
+                    ->withAvg('reviews', 'rating')
+                    ->withCount('reviews')
                     ->get();
             } else {
                 $ads = Ad::query()
@@ -1026,6 +1057,8 @@ final class AdController
                     ->whereRaw('ST_Distance_Sphere(location, ST_MakePoint(?, ?)) <= ?', [$long, $lat, $radius])
                     ->orderBy('distance', 'asc')
                     ->with(['user', 'quarter.city', 'ad_type', 'media'])
+                    ->withAvg('reviews', 'rating')
+                    ->withCount('reviews')
                     ->get();
             }
 
@@ -1218,7 +1251,7 @@ final class AdController
      *
      * @throws Throwable
      */
-    public function ads_nearby_user(AdRequest $request, int $user): JsonResponse
+    public function ads_nearby_user(AdRequest $request, string $user): JsonResponse
     {
         return $this->ads_nearby($request, $user);
     }
@@ -1738,6 +1771,10 @@ final class AdController
         $validated = $request->validated();
 
         try {
+            // P1-3 Fix: Force fallback if not using Meilisearch (collection driver ignores filters/sort callbacks)
+            if (config('scout.driver') !== 'meilisearch') {
+                return $this->searchFallback($validated);
+            }
 
             // Paramètres de recherche
             $q = (string) ($validated['q'] ?? '');
@@ -1758,7 +1795,8 @@ final class AdController
             // Tri et pagination
             $sortBy = $validated['sort'] ?? 'created_at';
             $sortOrder = strtolower($validated['order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
-            $perPage = (int) ($validated['per_page'] ?? config('pagination.per_page', 15));
+            // P1-3 Fix: Clamp per_page to max 100
+            $perPage = min(max((int) ($validated['per_page'] ?? config('pagination.per_page', 15)), 1), 100);
 
             // Construire les filtres Meilisearch
             $filters = [];
@@ -1831,7 +1869,7 @@ final class AdController
                 return $index->search($query, $options);
             })
                 // Eager load des relations
-                ->query(fn ($eloquent) => $eloquent->with(['quarter.city', 'ad_type', 'media', 'user']));
+                ->query(fn ($eloquent) => $eloquent->with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])->withAvg('reviews', 'rating')->withCount('reviews'));
 
             // Paginer
             $results = $builder->paginate($perPage);
@@ -1869,7 +1907,8 @@ final class AdController
         $q = (string) ($validated['q'] ?? '');
         $city = $validated['city'] ?? null;
         $type = $validated['type'] ?? null;
-        $perPage = (int) ($validated['per_page'] ?? config('pagination.per_page', 15));
+        // P1-3 Fix: Clamp per_page to max 100
+        $perPage = min(max((int) ($validated['per_page'] ?? config('pagination.per_page', 15)), 1), 100);
         $minBedrooms = isset($validated['bedrooms']) ? (int) $validated['bedrooms'] : null;
         $minPrice = isset($validated['price_min']) ? (float) $validated['price_min'] : null;
         $maxPrice = isset($validated['price_max']) ? (float) $validated['price_max'] : null;
@@ -1878,11 +1917,11 @@ final class AdController
         $hasParking = isset($validated['has_parking']) ? (bool) $validated['has_parking'] : null;
 
         $query = Ad::query()
-            ->with(['quarter.city', 'ad_type', 'media', 'user'])
+            ->with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])
             ->where('status', \App\Enums\AdStatus::AVAILABLE);
 
         if ($q) {
-            $query->where(function ($qb) use ($q) {
+            $query->where(function ($qb) use ($q): void {
                 $qb->where('title', 'ilike', "%{$q}%")
                     ->orWhere('description', 'ilike', "%{$q}%")
                     ->orWhere('adresse', 'ilike', "%{$q}%");
@@ -1917,11 +1956,24 @@ final class AdController
             $query->where('surface_area', '<=', $maxSurface);
         }
 
+        // Tri et pagination
+        $sortBy = $validated['sort'] ?? 'created_at';
+        $sortOrder = strtolower($validated['order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
+
         if ($hasParking) {
             $query->where('has_parking', true);
         }
 
-        $results = $query->orderByBoost()->paginate($perPage);
+        // Appliquer le tri
+        $allowedSorts = ['price', 'surface_area', 'created_at'];
+
+        if (in_array($sortBy, $allowedSorts, true)) {
+            $query->orderBy($sortBy, $sortOrder);
+        } else {
+            $query->orderByBoost();
+        }
+
+        $results = $query->paginate($perPage);
 
         return response()->json([
             'success' => true,

@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * @property string $id
@@ -41,7 +43,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Agency extends Model
 {
-    use hasFactory, HasUuids, SoftDeletes;
+    use hasFactory, HasUuids, LogsActivity, SoftDeletes;
 
     public $incrementing = false;
 
@@ -109,5 +111,14 @@ class Agency extends Model
             ->first();
 
         return $subscription;
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $eventName): string => "Agence « {$this->name} » {$eventName}");
     }
 }

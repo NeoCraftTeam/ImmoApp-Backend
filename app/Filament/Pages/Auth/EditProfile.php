@@ -19,7 +19,8 @@ class EditProfile extends BaseEditProfile
                     ->directory('avatars')
                     ->avatar()
                     ->image()
-                    ->preserveFilenames(),
+                    ->maxSize(2048)
+                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp']),
                 \Filament\Forms\Components\TextInput::make('firstname')
                     ->label('Prénom')
                     ->required()

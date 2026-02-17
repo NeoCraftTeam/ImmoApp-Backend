@@ -26,7 +26,7 @@ class SubscriptionSuccessEmail extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.subscription.success',
+            view: 'emails.subscription.success',
             with: [
                 'agencyName' => $this->subscription->agency->name,
                 'planName' => $this->subscription->plan->name,

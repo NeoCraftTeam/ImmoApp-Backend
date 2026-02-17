@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * @property string $id
@@ -23,7 +25,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class SubscriptionPlan extends Model
 {
-    use \Illuminate\Database\Eloquent\Concerns\HasUuids;
+    use \Illuminate\Database\Eloquent\Concerns\HasUuids, LogsActivity;
 
     protected $fillable = [
         'name',
@@ -78,5 +80,14 @@ class SubscriptionPlan extends Model
     public function getFormattedPriceAttribute(): string
     {
         return number_format((float) $this->price, 0, ',', ' ').' FCFA';
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $eventName): string => "Plan d'abonnement « {$this->name} » {$eventName}");
     }
 }

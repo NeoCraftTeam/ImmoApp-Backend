@@ -7,6 +7,8 @@ namespace App\Models;
 use App\Enums\SubscriptionStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * @property string $id
@@ -27,7 +29,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class Subscription extends Model
 {
-    use \Illuminate\Database\Eloquent\Concerns\HasUuids;
+    use \Illuminate\Database\Eloquent\Concerns\HasUuids, LogsActivity;
 
     protected $fillable = [
         'agency_id',
@@ -139,7 +141,7 @@ class Subscription extends Model
             return 0;
         }
 
-        return max(0, now()->diffInDays($this->ends_at, false));
+        return (int) max(0, now()->diffInDays($this->ends_at, false));
     }
 
     /**
@@ -162,5 +164,14 @@ class Subscription extends Model
             $q->where('status', SubscriptionStatus::EXPIRED)
                 ->orWhere('ends_at', '<=', now());
         });
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $eventName): string => "Abonnement #{$this->id} {$eventName}");
     }
 }

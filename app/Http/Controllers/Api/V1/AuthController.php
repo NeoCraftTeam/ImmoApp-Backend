@@ -12,6 +12,7 @@ use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -213,6 +214,7 @@ final class AuthController
     {
         $data = $request->validated();
         $data['role'] = 'customer';
+        $data['type'] = 'individual'; // P1-2 Fix: Force type for customer registration
 
         // Appel de la méthode privée
         return $this->registerUser($data, $request);
@@ -255,6 +257,8 @@ final class AuthController
             }
 
             // Transaction pour assurer la cohérence
+            // P1-1 Fix: email uniqueness is also enforced by DB unique constraint;
+            // catch UniqueConstraintViolationException for clean 409 response
             $result = DB::transaction(function () use ($request, $data) {
 
                 // Créer l'utilisateur
@@ -267,7 +271,7 @@ final class AuthController
                     'location' => isset($data['latitude'], $data['longitude'])
                         ? Point::makeGeodetic((float) $data['latitude'], (float) $data['longitude'])
                         : null,
-                    'role' => $data['role'] ?? 'admin', // Valeur par défaut
+                    'role' => $data['role'] ?? 'customer', // Valeur par défaut sécurisée
                     'type' => $data['type'] ?? 'individual',
                     'city_id' => $data['city_id'] ?? null,
                     'is_active' => true,
@@ -324,7 +328,7 @@ final class AuthController
 
         } catch (FileIsTooBig $e) {
             Log::warning('File too big during registration', [
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
                 'request_data' => $request->except(['password', 'avatar']),
             ]);
 
@@ -335,7 +339,7 @@ final class AuthController
 
         } catch (FileDoesNotExist $e) {
             Log::warning('File does not exist during registration', [
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
                 'request_data' => $request->except(['password', 'avatar']),
             ]);
 
@@ -343,16 +347,27 @@ final class AuthController
                 'message' => 'Le fichier avatar est introuvable.',
             ], 400);
 
+            // P1-1 Fix: Catch DB unique constraint violation (concurrent signup race)
+        } catch (UniqueConstraintViolationException) {
+            Log::warning('Registration duplicate email (DB constraint)', [
+                'email' => $data['email'] ?? 'unknown',
+                'ip' => $request->ip(),
+            ]);
+
+            return response()->json([
+                'message' => 'Cette adresse email est déjà utilisée.',
+            ], 409);
+
         } catch (Throwable $e) {
             Log::error('Registration failed', [
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
                 'trace' => $e->getTraceAsString(),
                 'request_data' => $request->except(['password', 'avatar']),
             ]);
 
             return response()->json([
                 'message' => 'Une erreur est survenue lors de l\'inscription. Veuillez réessayer.',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
             ], 500);
         }
     }
@@ -644,7 +659,7 @@ final class AuthController
 
         } catch (Throwable $e) {
             Log::error('Email verification failed', [
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
                 'user_id' => $id,
             ]);
 
@@ -899,6 +914,13 @@ final class AuthController
             // Réinitialiser les tentatives échouées
             RateLimiter::clear($key);
 
+            // SPA Authentication: Log in the user to the session if available
+            if ($request->hasSession()) {
+                $request->session()->regenerate();
+                // Use the web guard to authenticate the session
+                \Illuminate\Support\Facades\Auth::guard('web')->login($user);
+            }
+
             // Créer le token avec expiration
             $tokenName = 'api_token_'.now()->timestamp;
 
@@ -918,6 +940,7 @@ final class AuthController
             Log::info('Successful login', [
                 'user_id' => $user->id,
                 'email' => $email,
+                'is_spa' => $request->hasSession(), // Log context check
                 'ip' => $request->ip(),
                 'user_agent' => $request->userAgent(),
             ]);
@@ -936,7 +959,7 @@ final class AuthController
 
         } catch (Throwable $e) {
             Log::error('Login error', [
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
                 'trace' => $e->getTraceAsString(),
                 'request_data' => $request->except(['password']),
             ]);
@@ -1003,16 +1026,30 @@ final class AuthController
     {
         try {
             $user = $request->user();
-            $token = $request->user()->currentAccessToken();
 
-            // Log de déconnexion
-            Log::info('User logout', [
-                'user_id' => $user->id,
-                'token_name' => $token->name,
-            ]);
+            // 1. Revoke Token (Mobile/API)
+            // @phpstan-ignore-next-line
+            if ($token = $user->currentAccessToken()) {
+                // Log de déconnexion
+                Log::info('User logout (Token)', [
+                    'user_id' => $user->id,
+                    'token_name' => $token->name,
+                ]);
 
-            // Supprimer le token actuel
-            $token->delete();
+                // Supprimer le token actuel
+                $token->delete();
+            }
+
+            // 2. Invalidate Session (SPA/Web)
+            if ($request->hasSession()) {
+                Log::info('User logout (Session)', [
+                    'user_id' => $user->id,
+                ]);
+
+                \Illuminate\Support\Facades\Auth::guard('web')->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            }
 
             return response()->json([
                 'message' => 'Déconnexion réussie.',
@@ -1020,7 +1057,7 @@ final class AuthController
 
         } catch (Throwable $e) {
             Log::error('Logout error', [
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
                 'user_id' => $request->user()?->id,
             ]);
 
@@ -1156,7 +1193,7 @@ final class AuthController
 
         } catch (Throwable $e) {
             Log::error('Token refresh error', [
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
                 'user_id' => $request->user()?->id,
             ]);
 
@@ -1263,6 +1300,9 @@ final class AuthController
 
                 $user->save();
 
+                // Revoke all existing API tokens to invalidate compromised sessions
+                $user->tokens()->delete();
+
                 event(new \Illuminate\Auth\Events\PasswordReset($user));
             }
         );
@@ -1324,6 +1364,14 @@ final class AuthController
         $user->fill([
             'password' => Hash::make($request->new_password),
         ])->save();
+
+        // Revoke all existing tokens except the current one
+        $currentToken = $user->currentAccessToken();
+        if ($currentToken instanceof \Laravel\Sanctum\PersonalAccessToken) { // @phpstan-ignore instanceof.alwaysTrue (TransientToken possible at runtime)
+            $user->tokens()->where('id', '!=', $currentToken->getKey())->delete();
+        } else {
+            $user->tokens()->delete();
+        }
 
         return response()->json(['message' => 'Mot de passe mis à jour avec succès.']);
     }

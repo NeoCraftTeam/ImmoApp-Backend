@@ -34,7 +34,7 @@ class UserFactory extends Factory
         return [
             'firstname' => fake()->firstName(),
             'lastname' => fake()->lastName(),
-            'avatar' => fake()->imageUrl(),
+            'avatar' => null,
             'role' => $role,
             'type' => $role === UserRole::AGENT ? fake()->randomElement(UserType::cases()) : null,
             'phone_number' => fake()->phoneNumber(),
@@ -47,6 +47,7 @@ class UserFactory extends Factory
             'location' => "POINT($longitude $latitude)",
 
             'city_id' => City::factory(),
+            'is_active' => true,
         ];
     }
 

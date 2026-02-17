@@ -6,6 +6,7 @@ namespace App\Filament\Bailleur\Resources\Payments;
 
 use App\Filament\Bailleur\Resources\Payments\Pages\ManagePayments;
 use App\Models\Payment;
+use App\Models\Scopes\LandlordScope;
 use BackedEnum;
 use Filament\Actions\ViewAction;
 use Filament\Resources\Resource;
@@ -19,8 +20,6 @@ class PaymentResource extends Resource
 {
     protected static ?string $model = Payment::class;
 
-    protected static ?string $tenantOwnershipRelationshipName = 'agency';
-
     protected static string|null|UnitEnum $navigationGroup = 'Mon Compte';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::CreditCard;
@@ -33,7 +32,7 @@ class PaymentResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->where('user_id', auth()->id());
+            ->withGlobalScope('landlord', new LandlordScope);
     }
 
     #[\Override]

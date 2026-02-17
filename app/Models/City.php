@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * @property string $id
@@ -43,7 +45,7 @@ use Illuminate\Support\Carbon;
  */
 class City extends Model
 {
-    use HasFactory, HasUuids, softDeletes;
+    use HasFactory, HasUuids, LogsActivity, softDeletes;
 
     protected $table = 'city';
 
@@ -77,5 +79,13 @@ class City extends Model
     public function users(): hasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name'])
+            ->logOnlyDirty()
+            ->setDescriptionForEvent(fn (string $eventName): string => "Ville {$eventName}");
     }
 }

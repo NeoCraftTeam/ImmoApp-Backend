@@ -37,7 +37,7 @@ class FedaPayService
                 'description' => "Déblocage de l'annonce #{$adId}",
                 'amount' => $amount,
                 'currency' => ['iso' => 'XOF'],
-                'callback_url' => config('app.frontend_url', config('app.url'))."/payment-success?ad_id={$adId}",
+                'callback_url' => config('app.frontend_url', config('app.url')).'/payment-success?ad_id='.urlencode((string) $adId),
                 'customer' => [
                     'firstname' => $user->firstname,
                     'lastname' => $user->lastname,

@@ -4,16 +4,16 @@ use App\Models\Ad;
 use App\Models\User;
 use Laravel\Sanctum\Sanctum;
 
-test('user can update own ad', function (): void {
-    $user = User::factory()->create();
-    $ad = Ad::factory()->create(['user_id' => $user->id]);
+test('admin can update any ad', function (): void {
+    $owner = User::factory()->create();
+    $admin = User::factory()->create(['role' => 'admin']);
+    $ad = Ad::factory()->create(['user_id' => $owner->id]);
 
-    Sanctum::actingAs($user);
+    Sanctum::actingAs($admin);
     $response = $this->putJson("/api/v1/ads/{$ad->id}", [
         'title' => 'Updated Title',
         'description' => 'New description',
         'price' => 150000,
-        // Champs obligatoires selon AdRequest... attention si validation stricte
         'adresse' => 'New Address',
         'surface_area' => 50,
         'bedrooms' => 2,
@@ -21,11 +21,9 @@ test('user can update own ad', function (): void {
         'has_parking' => 'true',
         'quarter_id' => $ad->quarter_id,
         'type_id' => $ad->type_id,
-        'status' => 'available', // Important si validation enum
+        'status' => 'available',
     ]);
 
-    // Si ça échoue 422, c'est validation error. Si 403, c'est policy error.
-    // On veut 200 ici.
     $response->assertStatus(200);
 
     $this->assertDatabaseHas('ad', [
@@ -36,7 +34,7 @@ test('user can update own ad', function (): void {
 
 test('user cannot update other user ad', function (): void {
     $owner = User::factory()->create();
-    $attacker = User::factory()->create();
+    $attacker = User::factory()->create(['role' => 'customer']);
     $ad = Ad::factory()->create(['user_id' => $owner->id]);
 
     Sanctum::actingAs($attacker);
@@ -47,9 +45,21 @@ test('user cannot update other user ad', function (): void {
     $response->assertStatus(403); // Forbidden
 });
 
+test('owner cannot update own ad (admin only)', function (): void {
+    $user = User::factory()->create(['role' => 'customer']);
+    $ad = Ad::factory()->create(['user_id' => $user->id]);
+
+    Sanctum::actingAs($user);
+    $response = $this->putJson("/api/v1/ads/{$ad->id}", [
+        'title' => 'My Update',
+    ]);
+
+    $response->assertStatus(403); // Only admins can update
+});
+
 test('user cannot delete other user ad', function (): void {
     $owner = User::factory()->create();
-    $attacker = User::factory()->create(['role' => 'customer']); // Force Customer
+    $attacker = User::factory()->create(['role' => 'customer']);
     $ad = Ad::factory()->create(['user_id' => $owner->id]);
 
     Sanctum::actingAs($attacker);
@@ -57,6 +67,5 @@ test('user cannot delete other user ad', function (): void {
 
     $response->assertStatus(403); // Forbidden
 
-    // Vérifier qu'elle est toujours là (pas soft deleted)
     $this->assertNotSoftDeleted('ad', ['id' => $ad->id]);
 });

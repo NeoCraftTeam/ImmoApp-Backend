@@ -333,14 +333,14 @@ final class UserController
             DB::rollBack();
 
             Log::error('User creation failed', [
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
                 'data' => $data,
                 'ip' => $request->ip(),
             ]);
 
             return response()->json([
                 'message' => 'Impossible de créer l’utilisateur pour le moment.',
-                'error' => $e->getMessage(), // tu peux supprimer si tu ne veux pas exposer l'erreur
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.', // tu peux supprimer si tu ne veux pas exposer l'erreur
             ], 500);
         }
     }
@@ -421,15 +421,16 @@ final class UserController
      */
     public function show(string $id): UserResource|JsonResponse
     {
-        $this->authorize('view', User::class);
-        $userId = User::find($id);
-        if (!$userId) {
+        $user = User::find($id);
+        if (!$user) {
             return response()->json([
                 'message' => 'Utilisateur non trouvé',
             ], 404);
         }
 
-        return new UserResource($userId);
+        $this->authorize('view', $user);
+
+        return new UserResource($user);
     }
 
     /**
@@ -620,7 +621,7 @@ final class UserController
             DB::rollBack();
 
             Log::error('User update failed', [
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
                 'user_id' => $user->id,
                 'data' => $data,
                 'ip' => $request->ip(),
@@ -628,7 +629,7 @@ final class UserController
 
             return response()->json([
                 'message' => 'Impossible de mettre à jour l’utilisateur pour le moment.',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
             ], 500);
         }
     }
@@ -743,12 +744,12 @@ final class UserController
         } catch (Throwable $e) {
             Log::error('Failed to delete user', [
                 'user_id' => $user->id,
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
             ]);
 
             return response()->json([
                 'message' => 'Impossible de supprimer l’utilisateur pour le moment.',
-                'error' => $e->getMessage(), // optionnel, à cacher en prod
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.', // optionnel, à cacher en prod
             ], 500);
         }
     }

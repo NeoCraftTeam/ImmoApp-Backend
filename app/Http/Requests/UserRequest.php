@@ -52,12 +52,15 @@ final class UserRequest extends FormRequest
                 'phone_number' => ['sometimes', 'string', 'regex:/^\+?[0-9]{7,20}$/'],
                 'email' => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->user()?->id)], // if the user is connected, ignore their own email
                 'password' => ['sometimes', 'string', 'min:8'],
-                'role' => ['sometimes', 'string'],
-                'type' => ['nullable', 'string'],
                 'city_id' => ['sometimes', 'uuid', 'exists:city,id'],
                 'location' => ['sometimes', new GeometryGeojsonRule([Point::class])],
                 'latitude' => 'sometimes|nullable|numeric|between:-90,90',
                 'longitude' => 'sometimes|nullable|numeric|between:-180,180',
+                // P0-7 Fix: Only admins can update role/type to prevent privilege escalation
+                ...($this->user()?->isAdmin() ? [
+                    'role' => ['sometimes', 'string'],
+                    'type' => ['nullable', 'string'],
+                ] : []),
             ];
         }
 

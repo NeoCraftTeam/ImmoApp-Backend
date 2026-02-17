@@ -7,18 +7,18 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_BASE_URL": "http://192.168.1.64:8000/bailleur"
+        "EXPO_PUBLIC_BASE_URL": "http://192.168.1.64:8000/owner"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_BASE_URL": "https://api.keyhome.neocraft.dev/bailleur"
+        "EXPO_PUBLIC_BASE_URL": "https://api.keyhome.neocraft.dev/owner"
       }
     },
     "production": {
       "env": {
-        "EXPO_PUBLIC_BASE_URL": "https://api.keyhome.neocraft.dev/bailleur"
+        "EXPO_PUBLIC_BASE_URL": "https://api.keyhome.neocraft.dev/owner"
       }
     }
   },

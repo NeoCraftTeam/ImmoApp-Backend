@@ -35,6 +35,14 @@ class AgencyPanelProvider extends PanelProvider
             ->colors([
                 'primary' => \Filament\Support\Colors\Color::hex('#2563eb'), // Bleu Agence
             ])
+            ->multiFactorAuthentication([
+                \Filament\Auth\MultiFactor\App\AppAuthentication::make()
+                    ->recoverable()
+                    ->recoveryCodeCount(10)
+                    ->regenerableRecoveryCodes(false)
+                    ->brandName('KeyHome App'),
+                \Filament\Auth\MultiFactor\Email\EmailAuthentication::make(),
+            ], isRequired: false)
             ->tenant(\App\Models\Agency::class)
             ->discoverResources(in: app_path('Filament/Agency/Resources'), for: 'App\Filament\Agency\Resources')
             ->discoverPages(in: app_path('Filament/Agency/Pages'), for: 'App\Filament\Agency\Pages')
@@ -60,15 +68,12 @@ class AgencyPanelProvider extends PanelProvider
                 Authenticate::class,
             ])
             ->renderHook(
-                'panels::body.start',
-                fn (): string => '<script>if(window.location.search.includes("app_mode=native") || window.ReactNativeWebView) { document.body.classList.add("is-mobile-app"); }</script>',
-            )
-            ->renderHook(
                 'panels::body.end',
                 fn () => view('filament.mobile-bridge'),
             )
             ->assets([
                 \Filament\Support\Assets\Css::make('filament-mobile-app', resource_path('css/filament-mobile-app.css')),
+                \Filament\Support\Assets\Js::make('filament-mobile-detect', resource_path('js/filament-mobile-detect.js')),
             ]);
     }
 }

@@ -25,6 +25,7 @@ final class ReviewResource extends JsonResource
             'user_id' => $this->user_id,
 
             'ad' => new AdResource($this->whenLoaded('ad')),
+            'user' => new UserResource($this->whenLoaded('user')),
         ];
     }
 }

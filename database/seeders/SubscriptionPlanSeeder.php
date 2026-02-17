@@ -17,7 +17,8 @@ class SubscriptionPlanSeeder extends Seeder
                 'name' => 'Basic',
                 'slug' => 'basic',
                 'description' => 'Plan de base pour les petites agences. Boost modéré de vos annonces.',
-                'price' => 15000, // 15,000 FCFA
+                'price' => 15000, // 15,000 FCFA/mois
+                'price_yearly' => 150000, // 150,000 FCFA/an (~2 mois offerts)
                 'duration_days' => 30,
                 'boost_score' => 10,
                 'boost_duration_days' => 7,
@@ -34,7 +35,8 @@ class SubscriptionPlanSeeder extends Seeder
                 'name' => 'Premium',
                 'slug' => 'premium',
                 'description' => 'Plan premium pour les agences en croissance. Boost puissant et plus d\'annonces.',
-                'price' => 35000, // 35,000 FCFA
+                'price' => 35000, // 35,000 FCFA/mois
+                'price_yearly' => 350000, // 350,000 FCFA/an (~2 mois offerts)
                 'duration_days' => 30,
                 'boost_score' => 25,
                 'boost_duration_days' => 14,
@@ -53,7 +55,8 @@ class SubscriptionPlanSeeder extends Seeder
                 'name' => 'Enterprise',
                 'slug' => 'enterprise',
                 'description' => 'Plan entreprise pour les grandes agences. Boost maximum et annonces illimitées.',
-                'price' => 75000, // 75,000 FCFA
+                'price' => 75000, // 75,000 FCFA/mois
+                'price_yearly' => 750000, // 750,000 FCFA/an (~2 mois offerts)
                 'duration_days' => 30,
                 'boost_score' => 50,
                 'boost_duration_days' => 30,

@@ -29,7 +29,8 @@ class PaymentPolicy
 
     public function create(User $user): bool
     {
-        return $user->isCustomer() || $user->isAgent() && ($user->isAnAgency() || $user->isAnIndividual());
+        // P0-4 Fix: Explicit parentheses to prevent operator precedence confusion
+        return $user->isCustomer() || ($user->isAgent() && ($user->isAnAgency() || $user->isAnIndividual()));
     }
 
     public function update(User $user, Payment $payment): bool

@@ -8,7 +8,7 @@ use App\Models\City;
 
 class ShowCityAction
 {
-    public function handle(int $id): ?City
+    public function handle(string $id): ?City
     {
         return City::query()->find($id);
     }

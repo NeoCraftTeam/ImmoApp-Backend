@@ -130,6 +130,6 @@ class CityResource extends Resource
 
     public static function getNavigationBadgeTooltip(): ?string
     {
-        return 'The number of cities';
+        return 'Nombre de villes';
     }
 }

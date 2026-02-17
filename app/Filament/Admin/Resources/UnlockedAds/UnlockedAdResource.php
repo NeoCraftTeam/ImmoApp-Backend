@@ -9,16 +9,8 @@ use App\Filament\Exports\UnlockedAdExporter;
 use App\Filament\Imports\UnlockedAdImporter;
 use App\Models\UnlockedAd;
 use BackedEnum;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
 use Filament\Actions\ExportAction;
-use Filament\Actions\ForceDeleteAction;
-use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\ImportAction;
-use Filament\Actions\RestoreAction;
-use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
@@ -38,13 +30,15 @@ class UnlockedAdResource extends Resource
 
     protected static bool $isScopedToTenant = false;
 
-    protected static string|null|\UnitEnum $navigationGroup = 'Annonces';
+    protected static string|null|\UnitEnum $navigationGroup = 'Administration';
+
+    protected static ?int $navigationSort = 2;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::LockOpen;
 
     protected static ?string $recordTitleAttribute = 'ad_id';
 
-    protected static ?string $navigationLabel = 'Annonces débloquées';
+    protected static ?string $navigationLabel = 'Déblocages (Opérations)';
 
     protected static ?string $modelLabel = 'Annonce débloquée';
 
@@ -56,11 +50,15 @@ class UnlockedAdResource extends Resource
                 Select::make('ad_id')
                     ->relationship('ad', 'title')
                     ->required(),
-                Select::make('user.fullname')
-                    ->relationship('user', 'id')
+                Select::make('user_id')
+                    ->relationship('user', 'firstname')
+                    ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->firstname} {$record->lastname}")
+                    ->searchable()
+                    ->preload()
                     ->required(),
                 Select::make('payment_id')
-                    ->relationship('payment', 'id')
+                    ->relationship('payment', 'transaction_id')
+                    ->searchable()
                     ->required(),
                 DateTimePicker::make('unlocked_at'),
             ]);
@@ -77,9 +75,9 @@ class UnlockedAdResource extends Resource
                 TextEntry::make('user.fullname')
                     ->label('Débloquée par'),
                 TextEntry::make('payment.transaction_id')
-                    ->label('Payment'),
+                    ->label('Payment ID'),
                 TextEntry::make('unlocked_at')
-                    ->isoDate('LLLL', 'Europe/Paris'),
+                    ->dateTime('d/m/Y H:i'),
                 TextEntry::make('deleted_at')
                     ->dateTime()
                     ->visible(fn (UnlockedAd $record): bool => $record->trashed()),
@@ -101,7 +99,7 @@ class UnlockedAdResource extends Resource
                 TextColumn::make('payment.transaction_id')->label('Payment ID')
                     ->searchable(),
                 TextColumn::make('unlocked_at')
-                    ->isoDate('LLLL', 'Europe/Paris')
+                    ->dateTime('d/m/Y H:i')
                     ->sortable(),
                 TextColumn::make('deleted_at')
                     ->dateTime()
@@ -112,12 +110,9 @@ class UnlockedAdResource extends Resource
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                ViewAction::make()->label('Voir'),
-                EditAction::make(),
-                DeleteAction::make(),
-                ForceDeleteAction::make(),
-                RestoreAction::make(),
-            ])->headerActions([
+                ViewAction::make(),
+            ])
+            ->headerActions([
 
                 ImportAction::make()->label('Importer')
                     ->importer(UnlockedAdImporter::class)
@@ -128,11 +123,7 @@ class UnlockedAdResource extends Resource
                     ->icon(Heroicon::ArrowDownTray),
             ])
             ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make(),
-                    ForceDeleteBulkAction::make(),
-                    RestoreBulkAction::make(),
-                ]),
+                // Immutable records
             ]);
     }
 

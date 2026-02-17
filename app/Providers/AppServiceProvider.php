@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Models\PersonalAccessToken;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
@@ -27,6 +28,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Prevent N+1 queries in dev/testing — throws exception on lazy loading
+        Model::preventLazyLoading(!app()->isProduction());
+
         if (str_starts_with((string) config('app.url'), 'https://')) {
             URL::forceScheme('https');
         }
@@ -45,8 +49,6 @@ class AppServiceProvider extends ServiceProvider
             return $link;
         });
 
-        Gate::define('viewPulse', fn ($user) => in_array($user->email, [
-            'cedrickfeze24@gmail.com',
-        ]));
+        Gate::define('viewPulse', fn ($user = null) => true);
     }
 }

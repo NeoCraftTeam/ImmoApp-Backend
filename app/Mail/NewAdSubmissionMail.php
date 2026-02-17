@@ -20,10 +20,10 @@ class NewAdSubmissionMail extends Mailable
      * Create a new message instance.
      */
     public function __construct(/**
-     * Create a new message instance.
-     */
-        public Ad $ad)
-    {
+       * Create a new message instance.
+       */
+        public Ad $ad
+    ) {
         $this->author = $this->ad->user;
 
         // Queue only in production/staging environments
@@ -48,16 +48,32 @@ class NewAdSubmissionMail extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.new_ad_submission',
+            view: 'emails.new_ad_submission',
             with: [
                 'authorName' => $this->author->fullname,
+                'authorEmail' => $this->author->email,
+                'authorRole' => $this->author->role->getLabel(),
+                'authorType' => $this->author->type?->getLabel() ?? 'N/A',
                 'adTitle' => $this->ad->title,
                 'adPrice' => number_format((float) $this->ad->price, 0, ',', ' ').' FCFA',
                 'adType' => $this->ad->ad_type->name ?? 'N/A',
                 'adQuarter' => $this->ad->quarter->name ?? 'N/A',
-                'url' => \App\Filament\Admin\Resources\Ads\AdResource::getUrl('edit', ['record' => $this->ad]),
+                'url' => self::getAdminUrl($this->ad),
             ],
         );
+    }
+
+    /**
+     * Safely resolve the Filament admin URL for the ad.
+     * Returns '#' if Filament routes are not registered (e.g. in tests).
+     */
+    private static function getAdminUrl(Ad $ad): string
+    {
+        try {
+            return \App\Filament\Admin\Resources\Ads\AdResource::getUrl('edit', ['record' => $ad]);
+        } catch (\Symfony\Component\Routing\Exception\RouteNotFoundException|\Illuminate\Routing\Exceptions\UrlGenerationException) {
+            return '#';
+        }
     }
 
     /**

@@ -10,7 +10,6 @@ use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -24,7 +23,7 @@ class BailleurPanelProvider extends PanelProvider
     {
         return $panel
             ->id('bailleur')
-            ->path('bailleur')
+            ->path('owner')
             ->brandLogo(fn () => view('filament.bailleur.brand'))
             ->brandLogoHeight('3.5rem')
             ->login()
@@ -35,6 +34,14 @@ class BailleurPanelProvider extends PanelProvider
             ->colors([
                 'primary' => \Filament\Support\Colors\Color::hex('#10b981'), // Vert Owner
             ])
+            ->multiFactorAuthentication([
+                \Filament\Auth\MultiFactor\App\AppAuthentication::make()
+                    ->recoverable()
+                    ->recoveryCodeCount(10)
+                    ->regenerableRecoveryCodes(false)
+                    ->brandName('KeyHome App'),
+                \Filament\Auth\MultiFactor\Email\EmailAuthentication::make(),
+            ], isRequired: false)
             ->discoverResources(in: app_path('Filament/Bailleur/Resources'), for: 'App\Filament\Bailleur\Resources')
             ->discoverPages(in: app_path('Filament/Bailleur/Pages'), for: 'App\Filament\Bailleur\Pages')
             ->pages([
@@ -42,7 +49,6 @@ class BailleurPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Bailleur/Widgets'), for: 'App\Filament\Bailleur\Widgets')
             ->widgets([
-                AccountWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -59,15 +65,12 @@ class BailleurPanelProvider extends PanelProvider
                 Authenticate::class,
             ])
             ->renderHook(
-                'panels::body.start',
-                fn (): string => '<script>if(window.location.search.includes("app_mode=native") || window.ReactNativeWebView) { document.body.classList.add("is-mobile-app"); }</script>',
-            )
-            ->renderHook(
                 'panels::body.end',
                 fn () => view('filament.mobile-bridge'),
             )
             ->assets([
                 \Filament\Support\Assets\Css::make('filament-mobile-app', resource_path('css/filament-mobile-app.css')),
+                \Filament\Support\Assets\Js::make('filament-mobile-detect', resource_path('js/filament-mobile-detect.js')),
             ]);
     }
 }

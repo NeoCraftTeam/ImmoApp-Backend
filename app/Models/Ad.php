@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\AdStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
+use App\Exceptions\InvalidStatusTransitionException;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\AdFactory;
 use Eloquent;
@@ -44,7 +45,7 @@ use Laravel\Scout\Searchable;
  * @property int $bathrooms
  * @property bool $has_parking
  * @property Point|null $location
- * @property string $status
+ * @property AdStatus $status
  * @property string|null $expires_at
  * @property string $user_id
  * @property string $quarter_id
@@ -75,13 +76,15 @@ use Laravel\Scout\Searchable;
  *
  * @mixin Eloquent
  */
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Ad extends Model implements HasMedia
 {
-    use HasFactory, HasUuids, SoftDeletes;
+    use HasFactory, HasUuids, LogsActivity, SoftDeletes;
     use InteractsWithMedia, Searchable;
 
     protected $table = 'ad';
@@ -153,6 +156,25 @@ class Ad extends Model implements HasMedia
                 $ad->slug = self::generateUniqueSlug($ad->title, $ad->id);
             }
         });
+    }
+
+    /**
+     * Transition the ad to a new status, validating the transition.
+     *
+     * @throws InvalidStatusTransitionException
+     */
+    public function transitionTo(AdStatus $newStatus): void
+    {
+        if ($this->status === $newStatus) {
+            return; // No-op if already in the target state
+        }
+
+        if (!$this->status->canTransitionTo($newStatus)) {
+            throw new InvalidStatusTransitionException($this->status, $newStatus);
+        }
+
+        $this->status = $newStatus;
+        $this->save();
     }
 
     public static function generateUniqueSlug(string $title, ?string $ignoreId = null): string
@@ -264,6 +286,47 @@ class Ad extends Model implements HasMedia
         return $this->hasMany(Review::class);
     }
 
+    /** @return HasMany<AdInteraction, $this> */
+    public function interactions(): HasMany
+    {
+        return $this->hasMany(AdInteraction::class);
+    }
+
+    /** @return HasMany<AdInteraction, $this> */
+    public function views(): HasMany
+    {
+        return $this->hasMany(AdInteraction::class)->where('type', AdInteraction::TYPE_VIEW);
+    }
+
+    /** Get the number of views in the last 30 days. */
+    public function recentViewCount(): int
+    {
+        return $this->interactions()
+            ->where('type', AdInteraction::TYPE_VIEW)
+            ->where('created_at', '>=', now()->subDays(30))
+            ->count();
+    }
+
+    /** Check if a user has favorited this ad. */
+    public function isFavoritedBy(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        $favorites = AdInteraction::where('user_id', $user->id)
+            ->where('ad_id', $this->id)
+            ->where('type', AdInteraction::TYPE_FAVORITE)
+            ->count();
+
+        $unfavorites = AdInteraction::where('user_id', $user->id)
+            ->where('ad_id', $this->id)
+            ->where('type', AdInteraction::TYPE_UNFAVORITE)
+            ->count();
+
+        return $favorites > $unfavorites;
+    }
+
     /**
      * @return BelongsTo<AdType, $this>
      */
@@ -287,9 +350,25 @@ class Ad extends Model implements HasMedia
     public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
+            ->nonQueued()
             ->width(300)
             ->height(300)
-            ->sharpen(10);
+            ->format('webp')
+            ->quality(80);
+
+        $this->addMediaConversion('medium')
+            ->nonQueued()
+            ->width(800)
+            ->height(600)
+            ->format('webp')
+            ->quality(80);
+
+        $this->addMediaConversion('large')
+            ->queued()
+            ->width(1200)
+            ->height(900)
+            ->format('webp')
+            ->quality(85);
     }
 
     /**
@@ -380,5 +459,15 @@ class Ad extends Model implements HasMedia
     {
         return $query->orderByDesc('boost_score')
             ->orderByDesc('created_at');
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logExcept(['location'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $eventName): string => "Annonce « {$this->title} » {$eventName}");
     }
 }

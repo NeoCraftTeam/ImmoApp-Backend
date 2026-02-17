@@ -56,7 +56,7 @@ final class CityController
     public function index(ListCitiesAction $action)
     {
         $search = request('q');
-        $perPage = (int) request('per_page', 50);
+        $perPage = min((int) request('per_page', 50), 100);
         $cities = $action->handle($perPage, $search);
 
         return CityResource::collection($cities);
@@ -107,7 +107,7 @@ final class CityController
         } catch (Exception $e) {
             return response()->json([
                 'message' => 'Erreur lors de la création',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
             ], 500); // 500 = Internal Server Error
         }
     }
@@ -143,7 +143,7 @@ final class CityController
      */
     public function show(string $id, ShowCityAction $action)
     {
-        $city = $action->handle((int) $id);
+        $city = $action->handle($id);
         if (!$city) {
             return response()->json([
                 'message' => 'Ville non trouvée',
@@ -207,7 +207,7 @@ final class CityController
         } catch (Exception $e) {
             return response()->json([
                 'message' => 'Erreur lors de la mise à jour',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
             ], 500); // 500 = Internal Server Error
         }
     }
@@ -251,7 +251,7 @@ final class CityController
         } catch (Exception $e) {
             return response()->json([
                 'message' => 'Erreur lors de la suppression de la ville',
-                'error' => $e->getMessage(),
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
             ], 500); // 500 = Internal Server Error
         }
     }
