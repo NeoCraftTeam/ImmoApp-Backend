@@ -58,6 +58,10 @@ RUN usermod -u 1000 www-data && groupmod -g 1000 www-data
 # On copie le code (plus tard, dans le pipeline, on pourra optimiser cela)
 COPY . .
 
+# Création des répertoires storage requis par artisan package:discover
+RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs \
+    && cp .env.example .env 2>/dev/null || true
+
 # Installation des dépendances (SANS les tests/dev)
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
