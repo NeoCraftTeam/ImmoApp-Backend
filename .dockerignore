@@ -19,7 +19,7 @@ node_modules/
 vendor/
 
 # Testing (kept in context for CI image; ignored by prod Dockerfile via --no-dev)
-phpunit.xml
+# phpunit.xml — needed by CI test runner
 
 # Development helpers
 _ide_helper.php
