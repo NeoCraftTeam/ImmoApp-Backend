@@ -28,6 +28,7 @@ services:
     volumes:
       - keyhome-app-code:/var/www
       - keyhome-storage-data:/var/www/storage
+      - ./.env:/var/www/.env
     networks:
       - keyhome-network
     environment:
@@ -51,6 +52,7 @@ services:
     volumes:
       - keyhome-app-code:/var/www
       - keyhome-storage-data:/var/www/storage
+      - ./.env:/var/www/.env
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f 'queue:work' || exit 1"]
       interval: 30s
