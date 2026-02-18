@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Bailleur\Resources\Ads\Pages;
 
+use App\Enums\AdStatus;
 use App\Filament\Bailleur\Resources\Ads\AdResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ManageRecords;
@@ -16,7 +17,12 @@ class ManageAds extends ManageRecords
     {
         return [
             CreateAction::make()
-                ->mutateFormDataUsing(fn (array $data): array => AdResource::mutateLocationMapData($data)),
+                ->mutateFormDataUsing(function (array $data): array {
+                    $data = AdResource::mutateLocationMapData($data);
+                    $data['status'] ??= AdStatus::PENDING->value;
+
+                    return $data;
+                }),
         ];
     }
 }

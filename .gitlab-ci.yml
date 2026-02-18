@@ -97,15 +97,29 @@ test_suite:
         postgis/postgis:15-3.3-alpine
     # Wait for PostgreSQL container to be healthy (TCP ready)
     - |
-      echo "Waiting for PostgreSQL..."
+      echo "Waiting for PostgreSQL health check..."
       for i in $(seq 1 60); do
         STATUS=$(docker inspect --format='{{.State.Health.Status}}' pg-$CI_JOB_ID 2>/dev/null || echo "starting")
         if [ "$STATUS" = "healthy" ]; then
-          echo "PostgreSQL is healthy."
+          echo "Health check passed, verifying TCP from network..."
           break
         fi
         if [ "$i" = "60" ]; then
           echo "PostgreSQL failed to become healthy after 60s"
+          docker logs pg-$CI_JOB_ID 2>&1 | tail -20
+          exit 1
+        fi
+        sleep 1
+      done
+    # Verify actual TCP connectivity from within the Docker network (PostGIS may restart after init)
+    - |
+      for i in $(seq 1 30); do
+        if docker run --rm --network ci-net-$CI_JOB_ID postgis/postgis:15-3.3-alpine pg_isready -h pg-$CI_JOB_ID -U gitlab -d testing -q 2>/dev/null; then
+          echo "PostgreSQL is accepting TCP connections on the network."
+          break
+        fi
+        if [ "$i" = "30" ]; then
+          echo "PostgreSQL not reachable via network after 30s"
           docker logs pg-$CI_JOB_ID 2>&1 | tail -20
           exit 1
         fi

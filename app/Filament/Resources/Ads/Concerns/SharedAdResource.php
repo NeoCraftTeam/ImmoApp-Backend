@@ -112,7 +112,7 @@ trait SharedAdResource
     {
         $select = Select::make('status')
             ->required()
-            ->default(AdStatus::PENDING)
+            ->default(AdStatus::PENDING->value)
             ->options(function (?Ad $record): array {
                 if ($record === null) {
                     // Creating: only PENDING is allowed
