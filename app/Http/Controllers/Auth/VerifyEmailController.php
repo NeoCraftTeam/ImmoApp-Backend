@@ -42,7 +42,7 @@ final class VerifyEmailController
         if ($user->type === UserType::AGENCY) {
             $loginUrl = url('/agency/login');
         } elseif ($user->type === UserType::INDIVIDUAL) {
-            $loginUrl = url('/bailleur/login');
+            $loginUrl = url('/owner/login');
         }
 
         return view('auth.verified', [

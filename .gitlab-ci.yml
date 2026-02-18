@@ -95,13 +95,19 @@ test_suite:
         -e POSTGRES_USER=gitlab \
         -e POSTGRES_PASSWORD=test_pass \
         postgis/postgis:15-3.3-alpine
-    # Wait for PostgreSQL to be healthy instead of a fixed sleep
+    # Wait for PostgreSQL container to be healthy (TCP ready)
     - |
       echo "Waiting for PostgreSQL..."
-      for i in $(seq 1 30); do
-        if docker exec pg-$CI_JOB_ID pg_isready -U gitlab -d testing 2>/dev/null; then
-          echo "PostgreSQL is ready."
+      for i in $(seq 1 60); do
+        STATUS=$(docker inspect --format='{{.State.Health.Status}}' pg-$CI_JOB_ID 2>/dev/null || echo "starting")
+        if [ "$STATUS" = "healthy" ]; then
+          echo "PostgreSQL is healthy."
           break
+        fi
+        if [ "$i" = "60" ]; then
+          echo "PostgreSQL failed to become healthy after 60s"
+          docker logs pg-$CI_JOB_ID 2>&1 | tail -20
+          exit 1
         fi
         sleep 1
       done

@@ -18,12 +18,8 @@ mobile/
 node_modules/
 vendor/
 
-# Testing & quality
-tests/
+# Testing (kept in context for CI image; ignored by prod Dockerfile via --no-dev)
 phpunit.xml
-phpstan.neon
-pint.json
-rector.php
 
 # Development helpers
 _ide_helper.php
