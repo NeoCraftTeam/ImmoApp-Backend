@@ -65,6 +65,13 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'nightwatch' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/nightwatch.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
+        ],
+
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),
@@ -89,7 +96,7 @@ return [
             'handler_with' => [
                 'host' => env('PAPERTRAIL_URL'),
                 'port' => env('PAPERTRAIL_PORT'),
-                'connectionString' => 'tls://'.env('PAPERTRAIL_URL').':'.env('PAPERTRAIL_PORT'),
+                'connectionString' => 'tls://' . env('PAPERTRAIL_URL') . ':' . env('PAPERTRAIL_PORT'),
             ],
             'processors' => [PsrLogMessageProcessor::class],
         ],
@@ -123,10 +130,7 @@ return [
             'handler' => NullHandler::class,
         ],
 
-        'nightwatch' => [
-            'driver' => 'nightwatch',
-            'level' => env('LOG_LEVEL', 'debug'),
-        ],
+
 
         'emergency' => [
             'path' => storage_path('logs/laravel.log'),
