@@ -9,6 +9,8 @@ use App\Listeners\SendWelcomeNotification;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use SocialiteProviders\Apple\AppleExtendSocialite;
+use SocialiteProviders\Manager\SocialiteWasCalled;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -26,6 +28,11 @@ class EventServiceProvider extends ServiceProvider
         // Événement déclenché après vérification email
         Verified::class => [
             SendWelcomeNotification::class,
+        ],
+
+        // Socialite Apple Provider
+        SocialiteWasCalled::class => [
+            AppleExtendSocialite::class.'@handle',
         ],
     ];
 

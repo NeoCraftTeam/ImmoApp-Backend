@@ -2,6 +2,7 @@ import * as Camera from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
+import OAuthService from './OAuthService';
 
 // Configuration des notifications
 Notifications.setNotificationHandler({
@@ -27,6 +28,7 @@ class NativeService {
    */
   initialize(webViewRef) {
     this.webViewRef = webViewRef;
+    OAuthService.initialize(webViewRef);
     if (!this.notificationListener) {
       this.setupNotificationListeners();
     }
@@ -86,6 +88,9 @@ class NativeService {
           break;
         case 'REGISTER_PUSH':
           await this.registerForPushNotifications();
+          break;
+        case 'OAUTH_SIGN_IN':
+          await OAuthService.handleOAuthRequest(data);
           break;
         default:
           console.log('Unknown message type:', type);
@@ -264,6 +269,7 @@ class NativeService {
     if (this.responseListener && this.responseListener.remove) {
       this.responseListener.remove();
     }
+    OAuthService.cleanup();
   }
 }
 

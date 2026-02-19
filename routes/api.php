@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\QuarterController;
 use App\Http\Controllers\Api\V1\RecommendationController;
 use App\Http\Controllers\Api\V1\ReviewController;
+use App\Http\Controllers\Api\V1\SocialAuthController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\UserController;
 use Illuminate\Support\Facades\Route;
@@ -40,6 +41,29 @@ Route::prefix('v1')->group(function (): void {
         // Password Reset
         Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:3,10');
         Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:3,10');
+
+        // OAuth Social Authentication
+        Route::prefix('oauth')->controller(SocialAuthController::class)->group(function (): void {
+            // Public OAuth endpoints
+            Route::post('{provider}', 'authenticate')
+                ->middleware('throttle:10,1')
+                ->where('provider', 'google|facebook|apple');
+
+            Route::get('{provider}/redirect', 'redirect')
+                ->where('provider', 'google|facebook|apple');
+
+            Route::get('{provider}/callback', 'callback')
+                ->where('provider', 'google|facebook|apple');
+
+            // Authenticated OAuth endpoints (link/unlink)
+            Route::middleware('auth:sanctum')->group(function (): void {
+                Route::post('{provider}/link', 'link')
+                    ->where('provider', 'google|facebook|apple');
+
+                Route::delete('{provider}/unlink', 'unlink')
+                    ->where('provider', 'google|facebook|apple');
+            });
+        });
 
         // Routes protégées
         Route::middleware('auth:sanctum')->group(function (): void {

@@ -4964,6 +4964,283 @@
                 ]
             }
         },
+        "/api/v1/auth/oauth/{provider}": {
+            "post": {
+                "tags": [
+                    "OAuth"
+                ],
+                "summary": "Authenticate via OAuth provider",
+                "description": "Authenticate user with OAuth token from mobile SDK or web flow. Creates account if not exists.",
+                "operationId": "33ad0eb09b52e74909ac8b54f9d729b7",
+                "parameters": [
+                    {
+                        "name": "provider",
+                        "in": "path",
+                        "description": "OAuth provider (google, facebook, apple)",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "google",
+                                "facebook",
+                                "apple"
+                            ]
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "token"
+                                ],
+                                "properties": {
+                                    "token": {
+                                        "description": "OAuth access token from provider",
+                                        "type": "string"
+                                    },
+                                    "id_token": {
+                                        "description": "ID token (required for Apple)",
+                                        "type": "string"
+                                    },
+                                    "role": {
+                                        "description": "User role for new accounts",
+                                        "type": "string",
+                                        "enum": [
+                                            "customer",
+                                            "agent"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Authentication successful",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Connexion réussie"
+                                        },
+                                        "user": {
+                                            "$ref": "#/components/schemas/User"
+                                        },
+                                        "token": {
+                                            "type": "string",
+                                            "example": "1|abc123..."
+                                        },
+                                        "is_new_user": {
+                                            "type": "boolean",
+                                            "example": false
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid provider"
+                    },
+                    "401": {
+                        "description": "Invalid OAuth token"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/oauth/{provider}/redirect": {
+            "get": {
+                "tags": [
+                    "OAuth"
+                ],
+                "summary": "Get OAuth redirect URL",
+                "description": "Returns the OAuth provider authorization URL for web-based authentication flow.",
+                "operationId": "5e34d2bb04f325238ac06a19937f5c36",
+                "parameters": [
+                    {
+                        "name": "provider",
+                        "in": "path",
+                        "description": "OAuth provider",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "google",
+                                "facebook",
+                                "apple"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "redirect_uri",
+                        "in": "query",
+                        "description": "Frontend callback URL",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Redirect URL",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "redirect_url": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/oauth/{provider}/callback": {
+            "get": {
+                "tags": [
+                    "OAuth"
+                ],
+                "summary": "OAuth callback handler",
+                "description": "Handles OAuth provider callback and redirects to frontend with token.",
+                "operationId": "c12334163a39a0746d499dcdec0914c1",
+                "parameters": [
+                    {
+                        "name": "provider",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "code",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "state",
+                        "in": "query",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Redirect to frontend with token"
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/oauth/{provider}/link": {
+            "post": {
+                "tags": [
+                    "OAuth"
+                ],
+                "summary": "Link OAuth provider to account",
+                "description": "Links an OAuth provider to the authenticated user's account.",
+                "operationId": "777c91d93a2829bfda2ac80616db29a6",
+                "parameters": [
+                    {
+                        "name": "provider",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "token"
+                                ],
+                                "properties": {
+                                    "token": {
+                                        "type": "string"
+                                    },
+                                    "id_token": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Provider linked successfully"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    },
+                    "409": {
+                        "description": "Provider already linked to another account"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/auth/oauth/{provider}/unlink": {
+            "delete": {
+                "tags": [
+                    "OAuth"
+                ],
+                "summary": "Unlink OAuth provider",
+                "description": "Removes OAuth provider link from authenticated user's account.",
+                "operationId": "5001e51ac19468cb59319603bc9e42ce",
+                "parameters": [
+                    {
+                        "name": "provider",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Provider unlinked"
+                    },
+                    "400": {
+                        "description": "Cannot unlink - no password set"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/api/v1/subscriptions/plans": {
             "get": {
                 "tags": [
@@ -7228,6 +7505,10 @@
         {
             "name": "⭐ Recommandations",
             "description": "Gestion des recommandations"
+        },
+        {
+            "name": "OAuth",
+            "description": "Social authentication endpoints"
         },
         {
             "name": "📦 Abonnements Agences",

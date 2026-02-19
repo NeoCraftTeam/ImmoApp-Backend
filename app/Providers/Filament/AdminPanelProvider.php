@@ -7,6 +7,8 @@ namespace App\Providers\Filament;
 use App\Filament\Admin\Widgets\StatsOverview;
 use App\Filament\Admin\Widgets\UserChart;
 use App\Filament\Admin\Widgets\UserStatusChart;
+use DutchCodingCompany\FilamentSocialite\FilamentSocialitePlugin;
+use DutchCodingCompany\FilamentSocialite\Provider;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Auth\MultiFactor\Email\EmailAuthentication;
 use Filament\Http\Middleware\Authenticate;
@@ -82,6 +84,20 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+            ])
+            ->plugins([
+                FilamentSocialitePlugin::make()
+                    ->providers([
+                        Provider::make('google')
+                            ->label('Google')
+                            ->icon('fab-google')
+                            ->color(Color::Rose)
+                            ->outlined(false)
+                            ->stateless(false),
+                    ])
+                    ->registration(false)
+                    ->rememberLogin(true)
+                    ->showDivider(true),
             ]);
     }
 }
