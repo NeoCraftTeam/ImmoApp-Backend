@@ -191,14 +191,14 @@ final class SocialAuthController
             ], 400);
         }
 
-        // Store state for CSRF protection and redirect handling
-        $state = Str::random(40);
         $redirectUri = $request->query('redirect_uri', config('app.frontend_url').'/auth/callback');
 
-        session([
-            'oauth_state' => $state,
-            'oauth_redirect_uri' => $redirectUri,
-        ]);
+        // Encode redirect_uri in state parameter (stateless approach for API)
+        $stateData = [
+            'csrf' => Str::random(40),
+            'redirect_uri' => $redirectUri,
+        ];
+        $state = base64_encode(json_encode($stateData) ?: '');
 
         /** @phpstan-ignore method.notFound */
         $driver = Socialite::driver($provider)
@@ -239,6 +239,17 @@ final class SocialAuthController
         }
 
         try {
+            // Decode redirect_uri from state parameter
+            $redirectUri = config('app.frontend_url').'/auth/callback';
+            $state = $request->query('state');
+
+            if ($state) {
+                $stateData = json_decode(base64_decode($state), true);
+                if (is_array($stateData) && isset($stateData['redirect_uri'])) {
+                    $redirectUri = $stateData['redirect_uri'];
+                }
+            }
+
             /** @phpstan-ignore method.notFound */
             $socialUser = Socialite::driver($provider)->stateless()->user();
 
@@ -252,8 +263,6 @@ final class SocialAuthController
 
             $token = $user->createToken('oauth-'.$provider)->plainTextToken;
 
-            $redirectUri = session('oauth_redirect_uri', config('app.frontend_url').'/auth/callback');
-
             return redirect($redirectUri.'?'.http_build_query([
                 'token' => $token,
                 'is_new_user' => $result['is_new'] ? '1' : '0',
@@ -265,7 +274,9 @@ final class SocialAuthController
                 'error' => $e->getMessage(),
             ]);
 
-            return redirect(config('app.frontend_url').'/auth/error?message=oauth_failed');
+            $redirectUri = config('app.frontend_url').'/auth/error';
+
+            return redirect($redirectUri.'?message=oauth_failed');
         }
     }
 
