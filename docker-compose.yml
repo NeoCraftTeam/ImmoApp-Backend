@@ -35,6 +35,8 @@ services:
       - DB_HOST=db
       - REDIS_HOST=redis
       - APP_ENV=production
+      - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
+      - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
 
   # Le Worker pour les files d'attente (Mails, notifications, etc.)
   worker:
@@ -42,7 +44,7 @@ services:
     container_name: keyhome-worker
     restart: unless-stopped
     working_dir: /var/www
-    command: php artisan queue:work --tries=3 --timeout=90
+    command: php artisan queue:work --queue=emails,default --tries=3 --timeout=90
     depends_on:
       - db
       - redis
@@ -58,6 +60,25 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+    networks:
+      - keyhome-network
+    environment:
+      - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
+      - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+
+  # Laravel Nightwatch Agent (monitoring)
+  nightwatch-agent:
+    image: laravelphp/nightwatch-agent:latest
+    container_name: keyhome-nightwatch-agent
+    restart: unless-stopped
+    environment:
+      - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
+    healthcheck:
+      test: php nightwatch-status
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
     networks:
       - keyhome-network
 
