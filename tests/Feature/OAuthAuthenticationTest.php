@@ -16,8 +16,8 @@ uses(RefreshDatabase::class);
 |--------------------------------------------------------------------------
 */
 
-describe('OAuth Provider Validation', function () {
-    it('rejects route for unsupported OAuth providers', function () {
+describe('OAuth Provider Validation', function (): void {
+    it('rejects route for unsupported OAuth providers', function (): void {
         // Route constraint only allows google|facebook|apple, so unsupported returns 404
         $response = $this->postJson('/api/v1/auth/oauth/twitter', [
             'token' => 'fake-token',
@@ -26,7 +26,7 @@ describe('OAuth Provider Validation', function () {
         $response->assertNotFound();
     });
 
-    it('requires token for OAuth authentication', function () {
+    it('requires token for OAuth authentication', function (): void {
         $response = $this->postJson('/api/v1/auth/oauth/google', []);
 
         $response->assertStatus(422)
@@ -34,8 +34,8 @@ describe('OAuth Provider Validation', function () {
     });
 });
 
-describe('Google OAuth Authentication', function () {
-    it('authenticates existing user with Google', function () {
+describe('Google OAuth Authentication', function (): void {
+    it('authenticates existing user with Google', function (): void {
         $user = User::factory()->create([
             'email' => 'test@example.com',
             'google_id' => 'google-123',
@@ -71,7 +71,7 @@ describe('Google OAuth Authentication', function () {
             ]);
     });
 
-    it('creates new user with Google OAuth', function () {
+    it('creates new user with Google OAuth', function (): void {
         $socialiteUser = \Mockery::mock(SocialiteUser::class);
         $socialiteUser->shouldReceive('getId')->andReturn('google-new-456');
         $socialiteUser->shouldReceive('getEmail')->andReturn('newuser@example.com');
@@ -107,7 +107,7 @@ describe('Google OAuth Authentication', function () {
         ]);
     });
 
-    it('always creates customer accounts via OAuth (agents need manual setup)', function () {
+    it('always creates customer accounts via OAuth (agents need manual setup)', function (): void {
         $socialiteUser = \Mockery::mock(SocialiteUser::class);
         $socialiteUser->shouldReceive('getId')->andReturn('google-agent-789');
         $socialiteUser->shouldReceive('getEmail')->andReturn('agent@example.com');
@@ -136,7 +136,7 @@ describe('Google OAuth Authentication', function () {
         ]);
     });
 
-    it('links Google to existing email account', function () {
+    it('links Google to existing email account', function (): void {
         $existingUser = User::factory()->create([
             'email' => 'existing@example.com',
             'google_id' => null,
@@ -167,8 +167,8 @@ describe('Google OAuth Authentication', function () {
     });
 });
 
-describe('Facebook OAuth Authentication', function () {
-    it('authenticates user with Facebook', function () {
+describe('Facebook OAuth Authentication', function (): void {
+    it('authenticates user with Facebook', function (): void {
         $socialiteUser = \Mockery::mock(SocialiteUser::class);
         $socialiteUser->shouldReceive('getId')->andReturn('fb-123');
         $socialiteUser->shouldReceive('getEmail')->andReturn('fbuser@example.com');
@@ -199,8 +199,8 @@ describe('Facebook OAuth Authentication', function () {
     });
 });
 
-describe('Apple OAuth Authentication', function () {
-    it('authenticates user with Apple using id_token', function () {
+describe('Apple OAuth Authentication', function (): void {
+    it('authenticates user with Apple using id_token', function (): void {
         $socialiteUser = \Mockery::mock(SocialiteUser::class);
         $socialiteUser->shouldReceive('getId')->andReturn('apple-123');
         $socialiteUser->shouldReceive('getEmail')->andReturn('appleuser@privaterelay.appleid.com');
@@ -228,8 +228,8 @@ describe('Apple OAuth Authentication', function () {
     });
 });
 
-describe('OAuth Provider Link/Unlink', function () {
-    it('links OAuth provider to authenticated user', function () {
+describe('OAuth Provider Link/Unlink', function (): void {
+    it('links OAuth provider to authenticated user', function (): void {
         $user = User::factory()->create([
             'password' => bcrypt('password'),
             'google_id' => null,
@@ -257,7 +257,7 @@ describe('OAuth Provider Link/Unlink', function () {
         expect($user->google_id)->toBe('google-link-456');
     });
 
-    it('prevents linking provider already linked to another account', function () {
+    it('prevents linking provider already linked to another account', function (): void {
         $otherUser = User::factory()->create([
             'google_id' => 'google-existing-789',
         ]);
@@ -284,7 +284,7 @@ describe('OAuth Provider Link/Unlink', function () {
             ->assertJson(['message' => 'Ce compte google est déjà lié à un autre utilisateur']);
     });
 
-    it('unlinks OAuth provider from user with password', function () {
+    it('unlinks OAuth provider from user with password', function (): void {
         $user = User::factory()->create([
             'password' => bcrypt('password'),
             'google_id' => 'google-to-unlink',
@@ -300,7 +300,7 @@ describe('OAuth Provider Link/Unlink', function () {
         expect($user->google_id)->toBeNull();
     });
 
-    it('prevents unlinking only auth method', function () {
+    it('prevents unlinking only auth method', function (): void {
         $user = User::factory()->create([
             'password' => null,
             'google_id' => 'only-auth-method',
@@ -317,7 +317,7 @@ describe('OAuth Provider Link/Unlink', function () {
             ]);
     });
 
-    it('allows unlinking when another provider is linked', function () {
+    it('allows unlinking when another provider is linked', function (): void {
         $user = User::factory()->create([
             'password' => null,
             'google_id' => 'google-auth',
@@ -335,8 +335,8 @@ describe('OAuth Provider Link/Unlink', function () {
     });
 });
 
-describe('OAuth Redirect Flow (Web)', function () {
-    it('returns redirect URL for OAuth provider', function () {
+describe('OAuth Redirect Flow (Web)', function (): void {
+    it('returns redirect URL for OAuth provider', function (): void {
         Socialite::shouldReceive('driver')
             ->with('google')
             ->andReturnSelf();
@@ -356,8 +356,8 @@ describe('OAuth Redirect Flow (Web)', function () {
     });
 });
 
-describe('OAuth Error Handling', function () {
-    it('handles invalid OAuth token gracefully', function () {
+describe('OAuth Error Handling', function (): void {
+    it('handles invalid OAuth token gracefully', function (): void {
         Socialite::shouldReceive('driver')
             ->with('google')
             ->andReturnSelf();
@@ -372,7 +372,7 @@ describe('OAuth Error Handling', function () {
             ->assertJson(['message' => 'Échec de l\'authentification OAuth']);
     });
 
-    it('handles missing email from OAuth provider', function () {
+    it('handles missing email from OAuth provider', function (): void {
         $socialiteUser = \Mockery::mock(SocialiteUser::class);
         $socialiteUser->shouldReceive('getId')->andReturn('no-email-123');
         $socialiteUser->shouldReceive('getEmail')->andReturn(null);
@@ -394,8 +394,8 @@ describe('OAuth Error Handling', function () {
     });
 });
 
-describe('OAuth Rate Limiting', function () {
-    it('rate limits OAuth authentication attempts', function () {
+describe('OAuth Rate Limiting', function (): void {
+    it('rate limits OAuth authentication attempts', function (): void {
         Socialite::shouldReceive('driver')->andReturnSelf();
         Socialite::shouldReceive('userFromToken')
             ->andThrow(new Exception('Invalid token'));

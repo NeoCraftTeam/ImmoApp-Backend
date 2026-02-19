@@ -29,7 +29,7 @@ final class SocialAuthController
      *
      * @var array<string>
      */
-    private const SUPPORTED_PROVIDERS = ['google', 'facebook', 'apple'];
+    private const array SUPPORTED_PROVIDERS = ['google', 'facebook', 'apple'];
 
     /**
      * Handle OAuth callback for mobile/SPA apps.
@@ -200,6 +200,7 @@ final class SocialAuthController
             'oauth_redirect_uri' => $redirectUri,
         ]);
 
+        /** @phpstan-ignore method.notFound */
         $driver = Socialite::driver($provider)
             ->stateless()
             ->with(['state' => $state]);
@@ -238,6 +239,7 @@ final class SocialAuthController
         }
 
         try {
+            /** @phpstan-ignore method.notFound */
             $socialUser = Socialite::driver($provider)->stateless()->user();
 
             $result = $this->findOrCreateUser($socialUser, $provider);
@@ -400,10 +402,11 @@ final class SocialAuthController
         $driver = Socialite::driver($provider);
 
         if ($provider === 'apple' && $idToken) {
-            // Apple uses ID token instead of access token
+            /** @phpstan-ignore method.notFound */
             return $driver->userFromToken($idToken);
         }
 
+        /** @phpstan-ignore method.notFound */
         return $driver->userFromToken($token);
     }
 
@@ -481,9 +484,12 @@ final class SocialAuthController
         // Try to get from user array if available
         $user = method_exists($socialUser, 'getRaw') ? $socialUser->getRaw() : [];
 
+        $firstname = $user['given_name'] ?? $user['first_name'] ?? $parts[0];
+        $lastname = $user['family_name'] ?? $user['last_name'] ?? ($parts[1] ?? '');
+
         return [
-            'firstname' => $user['given_name'] ?? $user['first_name'] ?? $parts[0] ?? 'Utilisateur',
-            'lastname' => $user['family_name'] ?? $user['last_name'] ?? ($parts[1] ?? ''),
+            'firstname' => $firstname ?: 'Utilisateur',
+            'lastname' => $lastname,
         ];
     }
 }
