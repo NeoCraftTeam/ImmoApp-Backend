@@ -162,7 +162,7 @@ services:
     container_name: keyhome-worker
     restart: unless-stopped
     working_dir: /var/www
-    command: php artisan queue:work --tries=3 --timeout=90 --sleep=3 --max-jobs=1000
+    command: php artisan queue:work --queue=emails,default --tries=3 --timeout=90 --sleep=3 --max-jobs=1000
     depends_on:
       - db
       - redis
@@ -208,7 +208,7 @@ services:
       # Middleware CORS (optionnel)
       - "traefik.http.routers.keyhome-api.middlewares=cors-headers"
       - "traefik.http.middlewares.cors-headers.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE,PATCH"
-      - "traefik.http.middlewares.cors-headers.headers.accesscontrolalloworiginlist=https://keyhome.neocraft.dev,https://app.keyhome.neocraft.dev"
+      - "traefik.http.middlewares.cors-headers.headers.accesscontrolalloworiginlist=https://keyhome.neocraft.dev,https://preview.keyhome.neocraft.dev"
       - "traefik.http.middlewares.cors-headers.headers.accesscontrolmaxage=100"
       - "traefik.http.middlewares.cors-headers.headers.addvaryheader=true"
 
