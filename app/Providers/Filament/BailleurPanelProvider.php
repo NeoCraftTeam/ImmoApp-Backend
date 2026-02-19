@@ -81,7 +81,7 @@ class BailleurPanelProvider extends PanelProvider
                         Provider::make('google')
                             ->label('Google')
                             ->icon('fab-google')
-                            ->color(Color::Emerald)
+                            ->color(Color::Rose)
                             ->outlined(false)
                             ->stateless(false),
                     ])
