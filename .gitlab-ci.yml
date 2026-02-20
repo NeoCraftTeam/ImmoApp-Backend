@@ -174,33 +174,50 @@ production_deploy:
     - cd /opt/keyhome || exit 1
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
     - export FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:main"
+    - echo "🚀 Deploying image $FULL_IMAGE"
     # Enable maintenance mode before deploy
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan down --retry=60 || true
-    # Stop all containers but keep volumes
-    - APP_IMAGE=$FULL_IMAGE docker compose down --remove-orphans --timeout 30 || true
-    # Force remove any orphan containers still connected to the network
-    - |
-      for c in $(docker network inspect keyhome_keyhome-network -f '{{range .Containers}}{{.Name}} {{end}}' 2>/dev/null); do
-        docker rm -f "$c" 2>/dev/null || true
-      done
-    # Remove the network if it still exists
-    - docker network rm keyhome_keyhome-network 2>/dev/null || true
+    - echo "📦 Stopping existing containers..."
+    - APP_IMAGE=$FULL_IMAGE docker compose down --remove-orphans || true
+    - echo "📥 Pulling new image..."
     - APP_IMAGE=$FULL_IMAGE docker compose pull
+    - echo "🔄 Starting containers..."
     - APP_IMAGE=$FULL_IMAGE docker compose up -d --no-build
+    # Wait for app container to be healthy
+    - |
+      echo "⏳ Waiting for containers to be ready..."
+      for i in $(seq 1 60); do
+        if APP_IMAGE=$FULL_IMAGE docker compose exec -T app php -v > /dev/null 2>&1; then
+          echo "✅ App container is ready"
+          break
+        fi
+        if [ "$i" = "60" ]; then
+          echo "❌ App container failed to start"
+          APP_IMAGE=$FULL_IMAGE docker compose logs app --tail=50
+          APP_IMAGE=$FULL_IMAGE docker compose ps -a
+          exit 1
+        fi
+        sleep 2
+      done
     # Run migrations — rollback container on failure
     - |
+      echo "🗄️ Running migrations..."
       if ! APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan migrate --force; then
-        echo "Migration failed — rolling back..."
+        echo "❌ Migration failed — rolling back..."
+        APP_IMAGE=$FULL_IMAGE docker compose logs app --tail=30
         APP_IMAGE=$FULL_IMAGE docker compose down --remove-orphans || true
         exit 1
       fi
+    - echo "🧹 Clearing cache..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize:clear
+    - echo "⚡ Optimizing..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app chmod +x resetFilamentLivewire.sh
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app bash resetFilamentLivewire.sh
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan storage:link || true
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate || true
     # Disable maintenance mode
+    - echo "✅ Deployment complete, bringing app back up..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan up
   after_script:
     - docker logout $CI_REGISTRY 2>/dev/null || true
