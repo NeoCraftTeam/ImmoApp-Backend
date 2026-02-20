@@ -176,7 +176,15 @@ production_deploy:
     - export FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:main"
     # Enable maintenance mode before deploy
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan down --retry=60 || true
-    - APP_IMAGE=$FULL_IMAGE docker compose down --remove-orphans || true
+    # Stop all containers but keep volumes
+    - APP_IMAGE=$FULL_IMAGE docker compose down --remove-orphans --timeout 30 || true
+    # Force remove any orphan containers still connected to the network
+    - |
+      for c in $(docker network inspect keyhome_keyhome-network -f '{{range .Containers}}{{.Name}} {{end}}' 2>/dev/null); do
+        docker rm -f "$c" 2>/dev/null || true
+      done
+    # Remove the network if it still exists
+    - docker network rm keyhome_keyhome-network 2>/dev/null || true
     - APP_IMAGE=$FULL_IMAGE docker compose pull
     - APP_IMAGE=$FULL_IMAGE docker compose up -d --no-build
     # Run migrations — rollback container on failure
