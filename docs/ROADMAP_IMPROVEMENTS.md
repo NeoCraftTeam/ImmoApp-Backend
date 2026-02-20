@@ -5,11 +5,11 @@
 - [x] **1.** OAuth authentication via Laravel Socialite (Google, Facebook, Apple) ✅
 - [ ] **2.** Refine recommendation algorithm with AI integration
 - [ ] **3.** Enhance email templates (design moderne, responsive)
-- [ ] **4.** Ad visibility management by owner (cacher/montrer annonces)
-- [ ] **5.** Ad availability settings (dates, statut disponible/indisponible)
-- [ ] **6.** Property attributes (Wi-Fi, pets, parking, etc.)
-- [ ] **7.** Toast notifications for critical events
-- [ ] **8.** Expand payment methods (Orange Money, MTN MoMo, etc.)
+- [x] **4.** Ad availability management by owner (cacher/montrer annonces, marquer comme loué/vendu ou autres dependament dy type d'annonce) ✅
+- [x] **5.** Ad availability settings (dates, statut disponible/indisponible) ✅
+- [x] **6.** Property attributes (Wi-Fi, pets, parking, etc.) ✅
+- [x] **7.** Toast notifications for critical events ✅
+- [ ] **8.** Expand payment methods (paypal stripe and others, etc.)
 
 ## Customer Experience
 
@@ -36,8 +36,8 @@
 
 | Completed | Total | Progress |
 |-----------|-------|----------|
-| 1 | 18 | 6% |
+| 5 | 18 | 28% |
 
 ---
 
-*Dernière mise à jour: 19 février 2026*
+*Dernière mise à jour: 20 février 2026*
