@@ -236,7 +236,8 @@ smoke_test:
   timeout: 3 minutes
   script:
     - |
-      BASE_URL="https://api.keyhome.neocraft.dev"
+      # Utilise la variable CI/CD API_BASE_URL (à définir dans GitLab Settings > CI/CD > Variables)
+      BASE_URL="${API_BASE_URL:-https://api.keyhome.neocraft.dev}"
       echo "🔍 Running smoke tests on $BASE_URL..."
       
       # Test 1: Health check endpoint
@@ -248,9 +249,9 @@ smoke_test:
       fi
       echo "  ✅ Health check passed"
       
-      # Test 2: API version endpoint
+      # Test 2: API cities endpoint (public)
       echo "→ Testing API endpoint..."
-      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/v1/properties?per_page=1")
+      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/v1/cities")
       if [ "$HTTP_CODE" != "200" ]; then
         echo "❌ API endpoint failed (HTTP $HTTP_CODE)"
         exit 1
@@ -317,7 +318,7 @@ notify_slack_success:
               \"elements\": [
                 {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"🔗 Commit\"}, \"url\": \"$CI_PROJECT_URL/-/commit/$CI_COMMIT_SHA\"},
                 {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"📊 Pipeline\"}, \"url\": \"$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID\"},
-                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"🌐 API\"}, \"url\": \"https://api.keyhome.immo/up\"}
+                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"🌐 API\"}, \"url\": \"${API_BASE_URL:-https://api.keyhome.neocraft.dev}/up\"}
               ]
             }
           ]
