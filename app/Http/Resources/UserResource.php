@@ -7,6 +7,7 @@ namespace App\Http\Resources;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Storage;
 
 /** @mixin User */
 final class UserResource extends JsonResource
@@ -34,7 +35,7 @@ final class UserResource extends JsonResource
                 $request->user()?->id === $this->id || $request->user()?->isAdmin(),
                 $this->email
             ),
-            'avatar' => $this->getFirstMediaUrl('avatar') ?: $this->avatar,
+            'avatar' => $this->getFirstMediaUrl('avatars') ?: $this->getAvatarUrl(),
             'display_name' => $this->fullname,
             'name' => $this->fullname,
             'agency_name' => ($this->agency instanceof \App\Models\Agency) ? $this->agency->name : null,
@@ -48,5 +49,22 @@ final class UserResource extends JsonResource
             'city_id' => $this->city_id,
             'city_name' => $this->city?->name,
         ];
+    }
+
+    private function getAvatarUrl(): ?string
+    {
+        if (!$this->avatar) {
+            return null;
+        }
+
+        if (str_starts_with($this->avatar, 'http')) {
+            return $this->avatar;
+        }
+
+        if (Storage::disk('public')->exists($this->avatar)) {
+            return Storage::disk('public')->url($this->avatar);
+        }
+
+        return null;
     }
 }
