@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\AdTypeController;
 use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CityController;
+use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\QuarterController;
 use App\Http\Controllers\Api\V1\RecommendationController;
@@ -144,6 +145,18 @@ Route::prefix('v1')->group(function (): void {
     // --- MES FAVORIS ---
     Route::middleware('auth:sanctum')->get('/my/favorites', [AdInteractionController::class, 'favorites']);
 
+    // --- NOTIFICATIONS ---
+    Route::middleware('auth:sanctum')->prefix('notifications')->controller(NotificationController::class)->group(function (): void {
+        Route::get('/', 'index');
+        Route::get('/unread-count', 'unreadCount');
+        Route::post('/read-all', 'markAllAsRead');
+        Route::post('/{id}/read', 'markAsRead');
+        Route::delete('/{id}', 'destroy');
+    });
+
+    // --- PROPERTY ATTRIBUTES (public) ---
+    Route::get('/property-attributes', [NotificationController::class, 'propertyAttributes']);
+
     // --- PRIX DE DÉBLOCAGE ---
     Route::get('/payments/unlock-price', fn () => response()->json([
         'unlock_price' => (int) \App\Models\Setting::get('unlock_price', 500),
@@ -190,6 +203,11 @@ Route::prefix('v1')->group(function (): void {
             Route::post('', 'store');
             Route::put('/{ad}', 'update');
             Route::delete('/{id}', 'destroy');
+
+            // Ad visibility and status management (Task 4 & 5)
+            Route::post('/{ad}/toggle-visibility', 'toggleVisibility');
+            Route::post('/{ad}/set-status', 'setStatus');
+            Route::post('/{ad}/set-availability', 'setAvailability');
         });
 
         // Capture l'ID de l'annonce (doit être en dernier)
