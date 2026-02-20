@@ -287,8 +287,17 @@ notify_slack_success:
   needs: [smoke_test]
   script:
     - |
-      # Calculer la durée approximative
-      DURATION_MIN=$(( ($(date +%s) - ${CI_PIPELINE_CREATED_AT:-$(date +%s)}) / 60 ))
+      # Calculer la durée approximative (CI_PIPELINE_CREATED_AT est ISO 8601)
+      if [ -n "$CI_PIPELINE_CREATED_AT" ]; then
+        CREATED_TS=$(date -d "$CI_PIPELINE_CREATED_AT" +%s 2>/dev/null || echo "")
+        if [ -n "$CREATED_TS" ]; then
+          DURATION_MIN=$(( ($(date +%s) - CREATED_TS) / 60 ))
+        else
+          DURATION_MIN="?"
+        fi
+      else
+        DURATION_MIN="?"
+      fi
       SHORT_SHA="${CI_COMMIT_SHA:0:8}"
       
       curl -sS -X POST -H 'Content-type: application/json' \
