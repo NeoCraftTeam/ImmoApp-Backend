@@ -10,7 +10,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Middleware pour persister les sessions dans les WebViews React Native.
- * 
+ *
  * Garantit que :
  * - Les cookies de session sont correctement stockés et transmis
  * - Les tokens d'authentification sont persistés
@@ -28,11 +28,11 @@ class PersistNativeSession
         if ($isNativeWebView) {
             // Ajouter les en-têtes pour permettre la persistance des cookies
             $response->header('Set-Cookie', $this->buildSessionCookie($request), false);
-            
+
             // Permettre à la WebView de stocker les données
             $response->header('Access-Control-Allow-Credentials', 'true');
             $response->header('Access-Control-Allow-Origin', '*');
-            
+
             // Empêcher la mise en cache des pages authentifiées
             $response->header('Cache-Control', 'no-cache, no-store, must-revalidate');
             $response->header('Pragma', 'no-cache');

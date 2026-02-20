@@ -344,7 +344,18 @@ notify_slack_failure:
   script:
     - |
       SHORT_SHA="${CI_COMMIT_SHA:0:8}"
-      FAILED_JOB="${CI_JOB_NAME:-unknown}"
+      
+      # Récupérer le vrai job qui a échoué via l'API GitLab
+      FAILED_JOBS_JSON=$(curl -sS --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/jobs?scope[]=failed" 2>/dev/null || echo "[]")
+      
+      # Extraire le premier job échoué (sans jq, avec grep/sed)
+      FAILED_JOB=$(echo "$FAILED_JOBS_JSON" | grep -o '"name":"[^"]*"' | head -1 | sed 's/"name":"//;s/"//' || echo "unknown")
+      FAILED_STAGE=$(echo "$FAILED_JOBS_JSON" | grep -o '"stage":"[^"]*"' | head -1 | sed 's/"stage":"//;s/"//' || echo "unknown")
+      
+      # Fallback si l'API ne retourne rien
+      [ -z "$FAILED_JOB" ] && FAILED_JOB="Voir la pipeline"
+      [ -z "$FAILED_STAGE" ] && FAILED_STAGE="unknown"
       
       curl -sS -X POST -H 'Content-type: application/json' \
       --data "{
@@ -358,7 +369,7 @@ notify_slack_failure:
             {
               \"type\": \"section\",
               \"fields\": [
-                {\"type\": \"mrkdwn\", \"text\": \"*Étape échouée:*\n\`$CI_JOB_STAGE\`\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*Étape échouée:*\n\`$FAILED_STAGE\`\"},
                 {\"type\": \"mrkdwn\", \"text\": \"*Job:*\n\`$FAILED_JOB\`\"},
                 {\"type\": \"mrkdwn\", \"text\": \"*Branche:*\n\`$CI_COMMIT_REF_NAME\`\"},
                 {\"type\": \"mrkdwn\", \"text\": \"*Auteur:*\n$GITLAB_USER_NAME\"}
@@ -372,7 +383,7 @@ notify_slack_failure:
               \"type\": \"actions\",
               \"elements\": [
                 {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"🔴 Voir l'erreur\"}, \"style\": \"danger\", \"url\": \"$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID\"},
-                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"📋 Logs\"}, \"url\": \"$CI_PROJECT_URL/-/jobs/$CI_JOB_ID\"}
+                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"📋 Logs\"}, \"url\": \"$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID/failures\"}
               ]
             }
           ]

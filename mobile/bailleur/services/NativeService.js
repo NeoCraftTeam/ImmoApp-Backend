@@ -1,196 +1,215 @@
-import * as Camera from 'expo-camera';
+import Constants from 'expo-constants';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import OAuthService from './OAuthService';
 
-// Configuration des notifications
+// ─── Configuration des notifications ─────────────────────────────────────────
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
-    shouldSetBadge: true,
+    shouldSetBadge:  true,
   }),
 });
 
+// Origines autorisées (WebView → Native)
+const ALLOWED_ORIGINS = [
+  'https://keyhomeback.neocraft.dev',
+  'https://api.keyhome.neocraft.dev',
+  'https://agency.keyhome.neocraft.dev',
+  'https://owner.keyhome.neocraft.dev',
+];
+
 /**
- * Service de gestion des fonctionnalités natives
+ * NativeService — Bridge WebView ↔ fonctionnalités natives
+ *
+ * Messages entrants (depuis la WebView via window.KeyHomeBridge) :
+ *   PICK_IMAGE        → ouvre la galerie, retourne IMAGE_SELECTED
+ *   TAKE_PHOTO        → ouvre la caméra,  retourne PHOTO_TAKEN
+ *   REQUEST_LOCATION  → GPS,              retourne LOCATION_RECEIVED
+ *   REGISTER_PUSH     → push token,       retourne PUSH_TOKEN_RECEIVED
+ *   OAUTH_SIGN_IN     → Google OAuth,     retourne OAUTH_SUCCESS / OAUTH_ERROR
+ *
+ * Messages sortants (depuis le natif vers la WebView) :
+ *   IMAGE_SELECTED, IMAGE_PERMISSION_DENIED, IMAGE_ERROR
+ *   PHOTO_TAKEN,    CAMERA_PERMISSION_DENIED, CAMERA_ERROR
+ *   LOCATION_RECEIVED, LOCATION_PERMISSION_DENIED, LOCATION_ERROR
+ *   PUSH_TOKEN_RECEIVED, PUSH_PERMISSION_DENIED, PUSH_ERROR
+ *   NOTIFICATION_RECEIVED, NOTIFICATION_CLICKED
+ *   OAUTH_STARTED, OAUTH_SUCCESS, OAUTH_CANCELLED, OAUTH_ERROR
  */
 class NativeService {
   constructor() {
-    this.webViewRef = null;
+    this.webViewRef           = null;
     this.notificationListener = null;
-    this.responseListener = null;
+    this.responseListener     = null;
   }
 
-  /**
-   * Initialiser le service avec la référence WebView
-   */
+  // ──────────────────────────────────────────────────────────────────────────
+  // Lifecycle
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /** Appeler dès que la WebView est montée */
   initialize(webViewRef) {
     this.webViewRef = webViewRef;
     OAuthService.initialize(webViewRef);
     if (!this.notificationListener) {
-      this.setupNotificationListeners();
+      this._setupNotificationListeners();
     }
   }
 
-  /**
-   * Envoyer un message à la WebView
-   */
-  sendToWebView(type, data) {
+  /** Appeler dans le cleanup du useEffect principal */
+  cleanup() {
+    this.notificationListener?.remove();
+    this.responseListener?.remove();
+    this.notificationListener = null;
+    this.responseListener     = null;
+    OAuthService.cleanup();
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Bridge helpers
+  // ──────────────────────────────────────────────────────────────────────────
+
+  /** Envoyer un message JSON à la WebView */
+  sendToWebView(type, data = {}) {
     if (this.webViewRef?.current) {
-      const message = JSON.stringify({ type, data });
-      this.webViewRef.current.postMessage(message);
+      this.webViewRef.current.postMessage(JSON.stringify({ type, data }));
     }
   }
 
   /**
-   * Gérer les messages reçus de la WebView
+   * Point d'entrée unique : tous les messages provenant de la WebView
+   * passent ici (handler de onMessage dans la WebView).
    */
   async handleWebViewMessage(event) {
+    // 1. Parser le JSON — ignorer les messages non-JSON (ex : logs React)
+    let content;
     try {
-      let content;
-      try {
-        content = JSON.parse(event.nativeEvent.data);
-      } catch (e) {
-        // Ignorer les messages qui ne sont pas du JSON valide (ex: logs console)
-        // console.log("WebView Log:", event.nativeEvent.data);
-        return;
-      }
+      content = JSON.parse(event.nativeEvent.data);
+    } catch {
+      return;
+    }
 
-      const { type, data } = content;
+    const { type, data } = content;
 
-      // Security: Validate origin before processing sensitive actions
-      const origin = event.nativeEvent.url || '';
-      const allowedOrigins = [
-        'https://keyhomeback.neocraft.dev', 
-        'https://api.keyhome.neocraft.dev', 
-        'https://agency.keyhome.neocraft.dev',
-        'https://owner.keyhome.neocraft.dev'
-      ];
-      
-      const isAllowed = allowedOrigins.some(allowed => origin.startsWith(allowed));
-      
-      if (!isAllowed) {
-        console.warn('Blocked message from untrusted origin:', origin);
-        return;
-      }
+    // 2. Valider l'origine (FIX sécurité)
+    const origin = event.nativeEvent.url || '';
+    const isAllowed = ALLOWED_ORIGINS.some(o => origin.startsWith(o));
+    if (!isAllowed) {
+      console.warn('[NativeService] Message bloqué depuis origine non autorisée:', origin);
+      return;
+    }
 
+    // 3. Dispatcher
+    try {
       switch (type) {
-        case 'PICK_IMAGE':
-          await this.pickImage(data);
-          break;
-        case 'TAKE_PHOTO':
-          await this.takePhoto(data);
-          break;
-        case 'REQUEST_LOCATION':
-          await this.getLocation();
-          break;
-        case 'REGISTER_PUSH':
-          await this.registerForPushNotifications();
-          break;
-        case 'OAUTH_SIGN_IN':
-          await OAuthService.handleOAuthRequest(data);
-          break;
+        case 'PICK_IMAGE':        await this.pickImage(data);                        break;
+        case 'TAKE_PHOTO':        await this.takePhoto(data);                        break;
+        case 'REQUEST_LOCATION':  await this.getLocation();                          break;
+        case 'REGISTER_PUSH':     await this.registerForPushNotifications();         break;
+        case 'OAUTH_SIGN_IN':     await OAuthService.handleOAuthRequest(data);       break;
         default:
-          console.log('Unknown message type:', type);
+          console.log('[NativeService] Type inconnu:', type);
       }
-    } catch (error) {
-      console.error('Error handling WebView message:', error);
+    } catch (err) {
+      console.error('[NativeService] Erreur non gérée:', err);
     }
   }
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // Caméra / Galerie  (FIX #5 : plus de base64 dans le bridge)
+  // ──────────────────────────────────────────────────────────────────────────
+
   /**
-   * Sélectionner une image depuis la galerie
+   * Sélectionner une image depuis la galerie.
+   * Retourne l'URI locale à la WebView ; le web upload directement via fetch.
    */
   async pickImage(options = {}) {
     try {
-      // Demander permission
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
       if (status !== 'granted') {
-        this.sendToWebView('IMAGE_PERMISSION_DENIED', {
-          message: 'Permission refusée pour accéder aux photos'
+        return this.sendToWebView('IMAGE_PERMISSION_DENIED', {
+          message: 'Permission refusée pour accéder aux photos',
         });
-        return;
       }
 
-      // Ouvrir la galerie
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: options.allowsEditing !== false,
-        aspect: options.aspect || [4, 3],
-        quality: options.quality || 0.7,
-        base64: true,
+        aspect:        options.aspect || [4, 3],
+        quality:       options.quality || 0.8,
+        base64: false,  // FIX #5 : pas de base64 — on passe l'URI uniquement
       });
 
       if (!result.canceled) {
+        const asset = result.assets[0];
         this.sendToWebView('IMAGE_SELECTED', {
-          uri: result.assets[0].uri,
-          base64: result.assets[0].base64,
-          width: result.assets[0].width,
-          height: result.assets[0].height,
+          uri:      asset.uri,
+          width:    asset.width,
+          height:   asset.height,
+          mimeType: asset.mimeType || 'image/jpeg',
+          fileName: asset.fileName || `photo_${Date.now()}.jpg`,
         });
       }
-    } catch (error) {
-      this.sendToWebView('IMAGE_ERROR', { error: error.message });
+    } catch (err) {
+      this.sendToWebView('IMAGE_ERROR', { error: err.message });
     }
   }
 
   /**
-   * Prendre une photo avec la caméra
+   * Prendre une photo avec la caméra.
+   * FIX #9 : utilise ImagePicker.requestCameraPermissionsAsync (pas expo-camera).
    */
   async takePhoto(options = {}) {
     try {
-      // Demander permission
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      
+      // FIX #9 : requestCameraPermissionsAsync est disponible via expo-image-picker
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        this.sendToWebView('CAMERA_PERMISSION_DENIED', {
-          message: 'Permission refusée pour accéder à la caméra'
+        return this.sendToWebView('CAMERA_PERMISSION_DENIED', {
+          message: 'Permission refusée pour accéder à la caméra',
         });
-        return;
       }
 
-      // Ouvrir la caméra
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: options.allowsEditing !== false,
-        aspect: options.aspect || [4, 3],
-        quality: options.quality || 0.7,
-        base64: true,
+        aspect:        options.aspect || [4, 3],
+        quality:       options.quality || 0.8,
+        base64: false,  // FIX #5
       });
 
       if (!result.canceled) {
+        const asset = result.assets[0];
         this.sendToWebView('PHOTO_TAKEN', {
-          uri: result.assets[0].uri,
-          base64: result.assets[0].base64,
-          width: result.assets[0].width,
-          height: result.assets[0].height,
+          uri:      asset.uri,
+          width:    asset.width,
+          height:   asset.height,
+          mimeType: asset.mimeType || 'image/jpeg',
+          fileName: asset.fileName || `photo_${Date.now()}.jpg`,
         });
       }
-    } catch (error) {
-      this.sendToWebView('CAMERA_ERROR', { error: error.message });
+    } catch (err) {
+      this.sendToWebView('CAMERA_ERROR', { error: err.message });
     }
   }
 
-  /**
-   * Obtenir la position géographique
-   */
+  // ──────────────────────────────────────────────────────────────────────────
+  // Géolocalisation
+  // ──────────────────────────────────────────────────────────────────────────
+
   async getLocation() {
     try {
-      // Demander permission
       const { status } = await Location.requestForegroundPermissionsAsync();
-      
       if (status !== 'granted') {
-        this.sendToWebView('LOCATION_PERMISSION_DENIED', {
-          message: 'Permission refusée pour accéder à la localisation'
+        return this.sendToWebView('LOCATION_PERMISSION_DENIED', {
+          message: 'Permission refusée pour accéder à la localisation',
         });
-        return;
       }
 
-      // Obtenir position avec timeout de 15 secondes
+      // Timeout de 15 s
       const locationPromise = Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
+        accuracy: Location.Accuracy.Balanced,
       });
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('La localisation a pris trop de temps')), 15000)
@@ -198,22 +217,22 @@ class NativeService {
       const location = await Promise.race([locationPromise, timeoutPromise]);
 
       this.sendToWebView('LOCATION_RECEIVED', {
-        latitude: location.coords.latitude,
+        latitude:  location.coords.latitude,
         longitude: location.coords.longitude,
-        accuracy: location.coords.accuracy,
-        altitude: location.coords.altitude,
+        accuracy:  location.coords.accuracy,
+        altitude:  location.coords.altitude,
       });
-    } catch (error) {
-      this.sendToWebView('LOCATION_ERROR', { error: error.message });
+    } catch (err) {
+      this.sendToWebView('LOCATION_ERROR', { error: err.message });
     }
   }
 
-  /**
-   * Enregistrer pour les notifications push
-   */
+  // ──────────────────────────────────────────────────────────────────────────
+  // Notifications Push  (FIX #8 : projectId requis sur Expo SDK 50+)
+  // ──────────────────────────────────────────────────────────────────────────
+
   async registerForPushNotifications() {
     try {
-      // Demander permission
       const { status: existingStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = existingStatus;
 
@@ -223,54 +242,45 @@ class NativeService {
       }
 
       if (finalStatus !== 'granted') {
-        this.sendToWebView('PUSH_PERMISSION_DENIED', {
-          message: 'Permission refusée pour les notifications'
+        return this.sendToWebView('PUSH_PERMISSION_DENIED', {
+          message: 'Permission refusée pour les notifications push',
         });
-        return;
       }
 
-      // Obtenir le token
-      const token = (await Notifications.getExpoPushTokenAsync()).data;
+      // FIX #8 : projectId obligatoire sur SDK ≥ 50
+      const projectId =
+        Constants.expoConfig?.extra?.eas?.projectId ??
+        Constants.easConfig?.projectId;
 
+      const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
       this.sendToWebView('PUSH_TOKEN_RECEIVED', { token });
-    } catch (error) {
-      this.sendToWebView('PUSH_ERROR', { error: error.message });
+    } catch (err) {
+      this.sendToWebView('PUSH_ERROR', { error: err.message });
     }
   }
 
-  /**
-   * Configurer les listeners de notifications
-   */
-  setupNotificationListeners() {
-    // Notification reçue pendant que l'app est ouverte
-    this.notificationListener = Notifications.addNotificationReceivedListener(notification => {
+  // ──────────────────────────────────────────────────────────────────────────
+  // Listeners internes
+  // ──────────────────────────────────────────────────────────────────────────
+
+  _setupNotificationListeners() {
+    // Notification reçue en foreground
+    this.notificationListener = Notifications.addNotificationReceivedListener(n => {
       this.sendToWebView('NOTIFICATION_RECEIVED', {
-        title: notification.request.content.title,
-        body: notification.request.content.body,
-        data: notification.request.content.data,
+        title: n.request.content.title,
+        body:  n.request.content.body,
+        data:  n.request.content.data,
       });
     });
 
-    // Notification cliquée
-    this.responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+    // Notification cliquée (background / closed)
+    this.responseListener = Notifications.addNotificationResponseReceivedListener(r => {
       this.sendToWebView('NOTIFICATION_CLICKED', {
-        data: response.notification.request.content.data,
+        data: r.notification.request.content.data,
       });
     });
-  }
-
-  /**
-   * Nettoyer les listeners
-   */
-  cleanup() {
-    if (this.notificationListener && this.notificationListener.remove) {
-      this.notificationListener.remove();
-    }
-    if (this.responseListener && this.responseListener.remove) {
-      this.responseListener.remove();
-    }
-    OAuthService.cleanup();
   }
 }
 
+// Singleton — une seule instance par app
 export default new NativeService();

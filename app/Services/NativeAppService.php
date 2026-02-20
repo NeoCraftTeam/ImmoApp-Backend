@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Service pour gérer la communication entre le backend Laravel et l'application native.
- * 
+ *
  * Permet de :
  * - Envoyer des notifications push
  * - Déclencher des actions natives (géolocalisation, caméra, etc.)
@@ -108,6 +108,6 @@ class NativeAppService
      */
     public static function logNativeAction(string $action, array $context = []): void
     {
-        Log::channel('native')->info('Native action: ' . $action, $context);
+        Log::channel('native')->info('Native action: '.$action, $context);
     }
 }

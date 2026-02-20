@@ -8,12 +8,13 @@ use Dotswan\MapPicker\Fields\Map;
 
 /**
  * Composant MapPicker optimisé pour les appareils natifs.
- * 
+ *
  * En mode natif (React Native WebView), ce composant utilise les services de géolocalisation natifs
  * pour une meilleure performance et une intégration plus fluide avec l'OS.
  */
 class NativeLocationPicker extends Map
 {
+    #[\Override]
     protected function setUp(): void
     {
         parent::setUp();
@@ -22,10 +23,6 @@ class NativeLocationPicker extends Map
         $this->extraAttributes([
             'data-map-picker' => 'true',
             'data-native-location' => 'true',
-        ]);
-
-        // Ajouter une classe CSS pour les styles optimisés en mode natif
-        $this->extraImgAttributes([
             'class' => 'native-map-picker',
         ]);
     }

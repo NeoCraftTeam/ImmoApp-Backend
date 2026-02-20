@@ -1,77 +1,71 @@
 import * as AuthSession from 'expo-auth-session';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
 import * as SecureStore from 'expo-secure-store';
+import * as WebBrowser from 'expo-web-browser';
+import { Platform } from 'react-native';
 
-// Required for web browser auth session completion
+// Required for web browser auth session completion on Android
 WebBrowser.maybeCompleteAuthSession();
 
 /**
- * OAuth Service for native Google Sign-In
- * Works with Filament-Socialite backend
+ * OAuthService — Native Google Sign-In pour KeyHome Owner (Bailleur)
+ * Compatible avec Filament-Socialite backend.
+ *
+ * FIX #6 : utilise androidClientId / iosClientId selon Platform.OS
  */
 class OAuthService {
   constructor() {
     this.webViewRef = null;
     this.config = {
-      // These should be set via environment variables
       googleClientIdAndroid: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID,
-      googleClientIdIos: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS,
-      googleClientIdWeb: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB,
+      googleClientIdIos:     process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS,
+      googleClientIdWeb:     process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB,
       apiBaseUrl: process.env.EXPO_PUBLIC_BASE_URL || 'https://api.keyhome.neocraft.dev',
     };
   }
 
-  /**
-   * Initialize with WebView reference
-   */
   initialize(webViewRef) {
     this.webViewRef = webViewRef;
   }
 
-  /**
-   * Send message to WebView
-   */
   sendToWebView(type, data) {
     if (this.webViewRef?.current) {
-      const message = JSON.stringify({ type, data });
-      this.webViewRef.current.postMessage(message);
+      this.webViewRef.current.postMessage(JSON.stringify({ type, data }));
     }
   }
 
-  /**
-   * Get Google OAuth configuration based on platform
-   */
+  /** Retourne le clientId approprié selon la plateforme */
+  _getNativeClientId() {
+    if (Platform.OS === 'ios')     return this.config.googleClientIdIos;
+    if (Platform.OS === 'android') return this.config.googleClientIdAndroid;
+    return this.config.googleClientIdWeb;
+  }
+
   getGoogleConfig() {
     return {
       androidClientId: this.config.googleClientIdAndroid,
-      iosClientId: this.config.googleClientIdIos,
-      webClientId: this.config.googleClientIdWeb,
+      iosClientId:     this.config.googleClientIdIos,
+      webClientId:     this.config.googleClientIdWeb,
       scopes: ['profile', 'email'],
     };
   }
 
-  /**
-   * Perform native Google Sign-In
-   * Returns the authentication result to be sent to the backend
-   */
   async signInWithGoogle() {
     try {
-      // Start Google OAuth flow
       const discovery = {
         authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
-        tokenEndpoint: 'https://oauth2.googleapis.com/token',
-        revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
+        tokenEndpoint:         'https://oauth2.googleapis.com/token',
+        revocationEndpoint:    'https://oauth2.googleapis.com/revoke',
       };
 
-      const config = this.getGoogleConfig();
-      
+      // FIX #6 : clientId natif (pas webClientId)
+      const nativeClientId = this._getNativeClientId();
+
       const request = new AuthSession.AuthRequest({
-        clientId: config.webClientId,
-        scopes: config.scopes,
+        clientId: nativeClientId,
+        scopes: ['profile', 'email'],
         redirectUri: AuthSession.makeRedirectUri({
           scheme: 'keyhome-bailleur',
-          path: 'oauth/callback',
+          path:   'oauth/callback',
         }),
         usePKCE: true,
       });
