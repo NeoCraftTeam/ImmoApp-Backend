@@ -1,0 +1,304 @@
+import * as AuthSession from 'expo-auth-session';
+import * as Google from 'expo-auth-session/providers/google';
+import * as WebBrowser from 'expo-web-browser';
+import * as SecureStore from 'expo-secure-store';
+
+// Required for web browser auth session completion
+WebBrowser.maybeCompleteAuthSession();
+
+/**
+ * OAuth Service for native Google Sign-In
+ * Works with Filament-Socialite backend
+ */
+class OAuthService {
+  constructor() {
+    this.webViewRef = null;
+    this.config = {
+      // These should be set via environment variables
+      googleClientIdAndroid: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_ANDROID,
+      googleClientIdIos: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_IOS,
+      googleClientIdWeb: process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID_WEB,
+      apiBaseUrl: process.env.EXPO_PUBLIC_BASE_URL || 'https://api.keyhome.neocraft.dev',
+    };
+  }
+
+  /**
+   * Initialize with WebView reference
+   */
+  initialize(webViewRef) {
+    this.webViewRef = webViewRef;
+  }
+
+  /**
+   * Send message to WebView
+   */
+  sendToWebView(type, data) {
+    if (this.webViewRef?.current) {
+      const message = JSON.stringify({ type, data });
+      this.webViewRef.current.postMessage(message);
+    }
+  }
+
+  /**
+   * Get Google OAuth configuration based on platform
+   */
+  getGoogleConfig() {
+    return {
+      androidClientId: this.config.googleClientIdAndroid,
+      iosClientId: this.config.googleClientIdIos,
+      webClientId: this.config.googleClientIdWeb,
+      scopes: ['profile', 'email'],
+    };
+  }
+
+  /**
+   * Perform native Google Sign-In
+   * Returns the authentication result to be sent to the backend
+   */
+  async signInWithGoogle() {
+    try {
+      // Start Google OAuth flow
+      const discovery = {
+        authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+        tokenEndpoint: 'https://oauth2.googleapis.com/token',
+        revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
+      };
+
+      const config = this.getGoogleConfig();
+      
+      const request = new AuthSession.AuthRequest({
+        clientId: config.webClientId,
+        scopes: config.scopes,
+        redirectUri: AuthSession.makeRedirectUri({
+          scheme: 'keyhome-bailleur',
+          path: 'oauth/callback',
+        }),
+        usePKCE: true,
+      });
+
+      await request.makeAuthUrlAsync(discovery);
+      
+      const result = await request.promptAsync(discovery);
+
+      if (result.type === 'success') {
+        // Exchange code for tokens
+        const tokenResponse = await AuthSession.exchangeCodeAsync(
+          {
+            clientId: config.webClientId,
+            code: result.params.code,
+            extraParams: {
+              code_verifier: request.codeVerifier,
+            },
+            redirectUri: request.redirectUri,
+          },
+          discovery
+        );
+
+        // Get user info from Google
+        const userInfo = await this.fetchGoogleUserInfo(tokenResponse.accessToken);
+
+        return {
+          success: true,
+          provider: 'google',
+          accessToken: tokenResponse.accessToken,
+          idToken: tokenResponse.idToken,
+          user: userInfo,
+        };
+      } else if (result.type === 'cancel') {
+        return {
+          success: false,
+          error: 'cancelled',
+          message: 'Connexion annulée par l\'utilisateur',
+        };
+      } else {
+        return {
+          success: false,
+          error: 'failed',
+          message: 'Échec de la connexion Google',
+        };
+      }
+    } catch (error) {
+      console.error('Google Sign-In error:', error);
+      return {
+        success: false,
+        error: 'error',
+        message: error.message || 'Une erreur est survenue',
+      };
+    }
+  }
+
+  /**
+   * Fetch Google user info using access token
+   */
+  async fetchGoogleUserInfo(accessToken) {
+    try {
+      const response = await fetch('https://www.googleapis.com/userinfo/v2/me', {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch user info');
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching Google user info:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Authenticate with our backend using the OAuth result
+   * This creates or logs in the user via our API
+   */
+  async authenticateWithBackend(oAuthResult, panelType = 'bailleur') {
+    try {
+      const response = await fetch(`${this.config.apiBaseUrl}/api/v1/auth/social/authenticate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          provider: oAuthResult.provider,
+          access_token: oAuthResult.accessToken,
+          id_token: oAuthResult.idToken,
+          device_name: `keyhome-${panelType}-mobile`,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Store the auth token securely
+        if (data.token) {
+          await this.storeAuthToken(data.token);
+        }
+
+        return {
+          success: true,
+          user: data.user,
+          token: data.token,
+        };
+      } else {
+        return {
+          success: false,
+          error: data.message || 'Échec de l\'authentification',
+          status: response.status,
+        };
+      }
+    } catch (error) {
+      console.error('Backend authentication error:', error);
+      return {
+        success: false,
+        error: error.message || 'Erreur de connexion au serveur',
+      };
+    }
+  }
+
+  /**
+   * Complete OAuth flow: native sign-in + backend authentication
+   */
+  async performOAuthFlow(provider = 'google', panelType = 'bailleur') {
+    try {
+      this.sendToWebView('OAUTH_STARTED', { provider });
+
+      let oAuthResult;
+
+      if (provider === 'google') {
+        oAuthResult = await this.signInWithGoogle();
+      } else {
+        this.sendToWebView('OAUTH_ERROR', {
+          error: 'unsupported_provider',
+          message: `Provider "${provider}" non supporté sur mobile`,
+        });
+        return;
+      }
+
+      if (!oAuthResult.success) {
+        this.sendToWebView('OAUTH_CANCELLED', oAuthResult);
+        return;
+      }
+
+      // Authenticate with our backend
+      const backendResult = await this.authenticateWithBackend(oAuthResult, panelType);
+
+      if (backendResult.success) {
+        this.sendToWebView('OAUTH_SUCCESS', {
+          user: backendResult.user,
+          token: backendResult.token,
+        });
+      } else {
+        this.sendToWebView('OAUTH_ERROR', backendResult);
+      }
+    } catch (error) {
+      console.error('OAuth flow error:', error);
+      this.sendToWebView('OAUTH_ERROR', {
+        error: 'unknown',
+        message: error.message || 'Une erreur inattendue est survenue',
+      });
+    }
+  }
+
+  /**
+   * Store auth token securely
+   */
+  async storeAuthToken(token) {
+    try {
+      await SecureStore.setItemAsync('auth_token', token);
+    } catch (error) {
+      console.error('Error storing auth token:', error);
+    }
+  }
+
+  /**
+   * Get stored auth token
+   */
+  async getAuthToken() {
+    try {
+      return await SecureStore.getItemAsync('auth_token');
+    } catch (error) {
+      console.error('Error getting auth token:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Remove stored auth token (logout)
+   */
+  async clearAuthToken() {
+    try {
+      await SecureStore.deleteItemAsync('auth_token');
+    } catch (error) {
+      console.error('Error clearing auth token:', error);
+    }
+  }
+
+  /**
+   * Check if user is authenticated
+   */
+  async isAuthenticated() {
+    const token = await this.getAuthToken();
+    return !!token;
+  }
+
+  /**
+   * Handle OAuth request from WebView
+   */
+  async handleOAuthRequest(data) {
+    const { provider, panelType } = data || {};
+    await this.performOAuthFlow(provider || 'google', panelType || 'bailleur');
+  }
+
+  /**
+   * Cleanup resources
+   */
+  cleanup() {
+    this.webViewRef = null;
+  }
+}
+
+const oAuthService = new OAuthService();
+export default oAuthService;

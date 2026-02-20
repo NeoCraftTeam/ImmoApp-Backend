@@ -8,6 +8,7 @@ use App\Enums\AdStatus;
 use App\Filament\Bailleur\Resources\Ads\AdResource;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ManageRecords;
+use Filament\Support\Enums\Width;
 
 class ManageAds extends ManageRecords
 {
@@ -17,6 +18,8 @@ class ManageAds extends ManageRecords
     {
         return [
             CreateAction::make()
+                ->slideOver()
+                ->modalWidth(Width::FourExtraLarge)
                 ->mutateFormDataUsing(function (array $data): array {
                     $data = AdResource::mutateLocationMapData($data);
                     $data['status'] ??= AdStatus::PENDING->value;

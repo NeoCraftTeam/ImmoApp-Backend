@@ -122,14 +122,39 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
      *
      * @var list<string>
      */
-    protected $fillable = ['firstname', 'lastname', 'email', 'password', 'phone_number', 'type', 'role', 'avatar', 'city_id', 'is_active', 'location', 'agency_id', 'email_verified_at', 'last_login_ip', 'created_at', 'updated_at'];
+    protected $fillable = [
+        'firstname',
+        'lastname',
+        'email',
+        'password',
+        'phone_number',
+        'phone_is_whatsapp',
+        'type',
+        'role',
+        'avatar',
+        'city_id',
+        'is_active',
+        'location',
+        'agency_id',
+        'email_verified_at',
+        'last_login_ip',
+        'last_login_at',
+        'created_at',
+        'updated_at',
+        // OAuth fields
+        'google_id',
+        'facebook_id',
+        'apple_id',
+        'oauth_provider',
+        'oauth_avatar',
+    ];
 
     /**
      * The attributes that should be hidden for serialization.
      *
      * @var list<string>
      */
-    protected $hidden = ['password', 'app_authentication_secret', 'app_authentication_recovery_codes', 'remember_token', 'location', 'created_at', 'updated_at'];
+    protected $hidden = ['password', 'app_authentication_secret', 'app_authentication_recovery_codes', 'remember_token', 'location', 'created_at', 'updated_at', 'google_id', 'facebook_id', 'apple_id'];
 
     #[\Override]
     protected static function booted(): void
@@ -422,6 +447,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'role' => UserRole::class,
             'type' => UserType::class,
             'is_active' => 'boolean',
+            'phone_is_whatsapp' => 'boolean',
             'location' => Point::class,
             'app_authentication_secret' => 'encrypted',
             'app_authentication_recovery_codes' => 'encrypted:array',

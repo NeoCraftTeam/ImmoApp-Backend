@@ -143,6 +143,7 @@ return [
             'ad' => [
                 'filterableAttributes' => [
                     'status',
+                    'is_visible',
                     'city',
                     'type',
                     'type_id',

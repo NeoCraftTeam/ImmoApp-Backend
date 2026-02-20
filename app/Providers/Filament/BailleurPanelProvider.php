@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use DutchCodingCompany\FilamentSocialite\FilamentSocialitePlugin;
+use DutchCodingCompany\FilamentSocialite\Provider;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
+use Filament\Support\Colors\Color;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -29,7 +32,7 @@ class BailleurPanelProvider extends PanelProvider
             ->login()
             ->passwordReset()
             ->registration(\App\Filament\Pages\Auth\CustomRegister::class)
-            ->profile()
+            ->profile(\App\Filament\Pages\Auth\EditProfile::class)
             ->emailVerification()
             ->colors([
                 'primary' => \Filament\Support\Colors\Color::hex('#10b981'), // Vert Owner
@@ -39,7 +42,7 @@ class BailleurPanelProvider extends PanelProvider
                     ->recoverable()
                     ->recoveryCodeCount(10)
                     ->regenerableRecoveryCodes(false)
-                    ->brandName('KeyHome App'),
+                    ->brandName('KeyHome Owner App'),
                 \Filament\Auth\MultiFactor\Email\EmailAuthentication::make(),
             ], isRequired: false)
             ->discoverResources(in: app_path('Filament/Bailleur/Resources'), for: 'App\Filament\Bailleur\Resources')
@@ -71,6 +74,20 @@ class BailleurPanelProvider extends PanelProvider
             ->assets([
                 \Filament\Support\Assets\Css::make('filament-mobile-app', resource_path('css/filament-mobile-app.css')),
                 \Filament\Support\Assets\Js::make('filament-mobile-detect', resource_path('js/filament-mobile-detect.js')),
+            ])
+            ->plugins([
+                FilamentSocialitePlugin::make()
+                    ->providers([
+                        Provider::make('google')
+                            ->label('Google')
+                            ->icon('fab-google')
+                            ->color(Color::Rose)
+                            ->outlined(false)
+                            ->stateless(false),
+                    ])
+                    ->registration(true)
+                    ->rememberLogin(true)
+                    ->showDivider(true),
             ]);
     }
 }

@@ -8,8 +8,10 @@ use App\Enums\UserRole;
 use App\Models\User;
 use App\Services\AgencyService;
 use Filament\Auth\Pages\Register as BaseRegister;
+use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -25,6 +27,7 @@ class CustomRegister extends BaseRegister
                 $this->getFirstnameFormComponent(),
                 $this->getLastnameFormComponent(),
                 $this->getEmailFormComponent(),
+                $this->getPhoneFormComponent(),
                 $this->getAgencyNameFormComponent(),
                 $this->getPasswordFormComponent(),
                 $this->getPasswordConfirmationFormComponent(),
@@ -46,6 +49,23 @@ class CustomRegister extends BaseRegister
             ->label('Nom')
             ->required()
             ->maxLength(255);
+    }
+
+    protected function getPhoneFormComponent(): Component
+    {
+        return Fieldset::make('Téléphone')
+            ->schema([
+                TextInput::make('phone_number')
+                    ->label('Numéro de téléphone')
+                    ->tel()
+                    ->required()
+                    ->maxLength(20)
+                    ->helperText('Ce numéro sera affiché aux clients qui débloquent vos annonces'),
+                Checkbox::make('phone_is_whatsapp')
+                    ->label('Ce numéro est aussi WhatsApp')
+                    ->helperText('Permet aux clients de vous contacter via WhatsApp'),
+            ])
+            ->columns(1);
     }
 
     protected function getAgencyNameFormComponent(): Component
@@ -71,6 +91,8 @@ class CustomRegister extends BaseRegister
                 'lastname' => $data['lastname'],
                 'email' => $data['email'],
                 'password' => Hash::make($data['password']),
+                'phone_number' => $data['phone_number'] ?? null,
+                'phone_is_whatsapp' => $data['phone_is_whatsapp'] ?? false,
                 'role' => UserRole::CUSTOMER, // Rôle temporaire avant promotion
                 'is_active' => true,
             ]);

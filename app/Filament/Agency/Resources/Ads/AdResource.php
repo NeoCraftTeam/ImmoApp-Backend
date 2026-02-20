@@ -15,6 +15,7 @@ use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
@@ -76,6 +77,8 @@ class AdResource extends Resource
             ->actions([
                 ViewAction::make(),
                 EditAction::make()
+                    ->slideOver()
+                    ->modalWidth(Width::FourExtraLarge)
                     ->mutateFormDataUsing(fn (array $data): array => static::mutateLocationMapData($data)),
                 DeleteAction::make(),
             ])

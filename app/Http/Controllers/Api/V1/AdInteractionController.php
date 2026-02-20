@@ -289,6 +289,7 @@ final class AdInteractionController
 
         $ads = Ad::with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])
             ->whereIn('id', $favoritedAdIds)
+            ->visible()
             ->where('status', AdStatus::AVAILABLE)
             ->latest()
             ->paginate(15);
