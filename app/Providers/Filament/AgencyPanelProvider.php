@@ -33,7 +33,7 @@ class AgencyPanelProvider extends PanelProvider
             ->login()
             ->passwordReset()
             ->registration(\App\Filament\Pages\Auth\CustomRegister::class)
-            ->profile()
+            ->profile(\App\Filament\Pages\Auth\EditProfile::class)
             ->emailVerification()
             ->colors([
                 'primary' => \Filament\Support\Colors\Color::hex('#2563eb'), // Bleu Agence
@@ -43,7 +43,7 @@ class AgencyPanelProvider extends PanelProvider
                     ->recoverable()
                     ->recoveryCodeCount(10)
                     ->regenerableRecoveryCodes(false)
-                    ->brandName('KeyHome App'),
+                    ->brandName('KeyHome Agency App'),
                 \Filament\Auth\MultiFactor\Email\EmailAuthentication::make(),
             ], isRequired: false)
             ->tenant(\App\Models\Agency::class)

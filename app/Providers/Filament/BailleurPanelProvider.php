@@ -32,7 +32,7 @@ class BailleurPanelProvider extends PanelProvider
             ->login()
             ->passwordReset()
             ->registration(\App\Filament\Pages\Auth\CustomRegister::class)
-            ->profile()
+            ->profile(\App\Filament\Pages\Auth\EditProfile::class)
             ->emailVerification()
             ->colors([
                 'primary' => \Filament\Support\Colors\Color::hex('#10b981'), // Vert Owner
@@ -42,7 +42,7 @@ class BailleurPanelProvider extends PanelProvider
                     ->recoverable()
                     ->recoveryCodeCount(10)
                     ->regenerableRecoveryCodes(false)
-                    ->brandName('KeyHome App'),
+                    ->brandName('KeyHome Owner App'),
                 \Filament\Auth\MultiFactor\Email\EmailAuthentication::make(),
             ], isRequired: false)
             ->discoverResources(in: app_path('Filament/Bailleur/Resources'), for: 'App\Filament\Bailleur\Resources')

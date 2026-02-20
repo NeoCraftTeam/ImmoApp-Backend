@@ -40,7 +40,7 @@ class AdminPanelProvider extends PanelProvider
                     ->recoverable()
                     ->recoveryCodeCount(10)
                     ->regenerableRecoveryCodes(false)
-                    ->brandName('KeyHome App'),
+                    ->brandName('KeyHome Admin'),
                 EmailAuthentication::make(),
             ], isRequired: true)
             ->passwordReset()
