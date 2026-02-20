@@ -74,6 +74,7 @@ class BailleurPanelProvider extends PanelProvider
             ->assets([
                 \Filament\Support\Assets\Css::make('filament-mobile-app', resource_path('css/filament-mobile-app.css')),
                 \Filament\Support\Assets\Js::make('filament-mobile-detect', resource_path('js/filament-mobile-detect.js')),
+                \Filament\Support\Assets\Js::make('filament-native-bridge', resource_path('js/filament-native-bridge.js')),
             ])
             ->plugins([
                 FilamentSocialitePlugin::make()
