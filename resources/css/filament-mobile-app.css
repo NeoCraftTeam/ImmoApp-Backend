@@ -6,10 +6,32 @@
 }
 
 /* On retire les bordures et arrondis inutiles en mode App */
-.is-mobile-app .fi-panel {
+.is-mobile-app .fi-panel,
+.is-native-app .fi-panel {
     border: none !important;
     box-shadow: none !important;
     border-radius: 0 !important;
+}
+
+/* Masquer la barre de navigation supérieure si le natif gère le titre */
+.is-native-app .fi-topbar {
+    display: none !important;
+}
+
+/* Ajuster le padding principal quand la topbar est masquée */
+.is-native-app .fi-main {
+    padding-top: 0 !important;
+}
+
+/* Masquer le bouton de menu hamburger si le natif gère la navigation */
+.is-native-app .fi-sidebar-open-button {
+    display: none !important;
+}
+
+/* Optimisation des temps de réponse visuels */
+.is-native-app * {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 }
 
 /* Optimisation de l'espace pour l'app */
