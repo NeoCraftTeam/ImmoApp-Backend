@@ -1,9 +1,9 @@
 stages:
   - prepare
   - quality
-  - build
-  - test
+  - build_and_test  # Build + Test en parallèle
   - deploy
+  - smoke_test      # Vérification post-déploiement
   - notify
   - cleanup
 
@@ -63,9 +63,9 @@ composer_security:
   rules:
     - if: $CI_COMMIT_BRANCH
 
-# --- ETAPE 2 : BUILD & PUSH (prod image) ---
+# --- ETAPE 2 : BUILD & PUSH (en parallèle avec tests) ---
 build_image:
-  stage: build
+  stage: build_and_test
   needs: [phpstan, style_check, composer_security]
   script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
@@ -77,9 +77,9 @@ build_image:
   rules:
     - if: $CI_COMMIT_BRANCH
 
-# --- ETAPE 3 : TESTS ---
+# --- ETAPE 2 : TESTS (en parallèle avec build) ---
 test_suite:
-  stage: test
+  stage: build_and_test
   needs: [prepare_ci_image]
   timeout: 10 minutes
   script:
@@ -155,7 +155,7 @@ test_suite:
   rules:
     - if: $CI_COMMIT_BRANCH
 
-# --- ETAPE 4 : DEPLOIEMENT ---
+# --- ETAPE 3 : DEPLOIEMENT ---
 production_deploy:
   stage: deploy
   needs: [build_image, test_suite]
@@ -166,10 +166,13 @@ production_deploy:
     - cp -rf .docker/nginx/conf.d/. /opt/keyhome/.docker/nginx/conf.d/
     # Sync codebase to VPS for reference and manual artisan commands
     - |
+      AUTHENTICATED_URL="https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/${CI_PROJECT_PATH}.git"
       if [ -d /opt/keyhome/codebase/.git ]; then
-        cd /opt/keyhome/codebase && git fetch origin main && git reset --hard origin/main
+        cd /opt/keyhome/codebase
+        git remote set-url origin "$AUTHENTICATED_URL"
+        git fetch origin main && git reset --hard origin/main
       else
-        git clone --depth 1 --branch main "$CI_REPOSITORY_URL" /opt/keyhome/codebase
+        git clone --depth 1 --branch main "$AUTHENTICATED_URL" /opt/keyhome/codebase
       fi
     - cd /opt/keyhome || exit 1
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
@@ -226,15 +229,99 @@ production_deploy:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
 
+# --- ETAPE 4 : SMOKE TEST POST-DEPLOIEMENT ---
+smoke_test:
+  stage: smoke_test
+  needs: [production_deploy]
+  timeout: 3 minutes
+  script:
+    - |
+      BASE_URL="https://api.keyhome.neocraft.dev"
+      echo "🔍 Running smoke tests on $BASE_URL..."
+      
+      # Test 1: Health check endpoint
+      echo "→ Testing health endpoint..."
+      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/up")
+      if [ "$HTTP_CODE" != "200" ]; then
+        echo "❌ Health check failed (HTTP $HTTP_CODE)"
+        exit 1
+      fi
+      echo "  ✅ Health check passed"
+      
+      # Test 2: API version endpoint
+      echo "→ Testing API endpoint..."
+      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/v1/properties?per_page=1")
+      if [ "$HTTP_CODE" != "200" ]; then
+        echo "❌ API endpoint failed (HTTP $HTTP_CODE)"
+        exit 1
+      fi
+      echo "  ✅ API endpoint passed"
+      
+      # Test 3: Documentation accessible
+      echo "→ Testing Swagger docs..."
+      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/documentation")
+      if [ "$HTTP_CODE" != "200" ]; then
+        echo "⚠️  Swagger docs not accessible (HTTP $HTTP_CODE) - continuing anyway"
+      else
+        echo "  ✅ Swagger docs accessible"
+      fi
+      
+      # Test 4: Admin panel loads
+      echo "→ Testing Filament admin..."
+      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L "$BASE_URL/admin/login")
+      if [ "$HTTP_CODE" != "200" ]; then
+        echo "❌ Admin panel failed (HTTP $HTTP_CODE)"
+        exit 1
+      fi
+      echo "  ✅ Admin panel accessible"
+      
+      echo ""
+      echo "✅ All smoke tests passed!"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
 # --- ETAPE 5 : NOTIFICATIONS ---
 notify_slack_success:
   stage: notify
-  needs: [production_deploy]
+  needs: [smoke_test]
   script:
     - |
-      curl -X POST -H 'Content-type: application/json' \
+      # Calculer la durée approximative
+      DURATION_MIN=$(( ($(date +%s) - ${CI_PIPELINE_CREATED_AT:-$(date +%s)}) / 60 ))
+      SHORT_SHA="${CI_COMMIT_SHA:0:8}"
+      
+      curl -sS -X POST -H 'Content-type: application/json' \
       --data "{
-        \"text\": \"✅ *[BACKEND] Déploiement Réussi !*\n\n*Auteur:* $GITLAB_USER_NAME\n*Branche:* \`$CI_COMMIT_REF_NAME\`\n*Message:* _${CI_COMMIT_TITLE}_\n\n🔗 <$CI_PROJECT_URL/-/commit/$CI_COMMIT_SHA|Voir le commit> | <$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID|Voir la pipeline>\"
+        \"attachments\": [{
+          \"color\": \"#36a64f\",
+          \"blocks\": [
+            {
+              \"type\": \"header\",
+              \"text\": {\"type\": \"plain_text\", \"text\": \"✅ Déploiement Backend Réussi\", \"emoji\": true}
+            },
+            {
+              \"type\": \"section\",
+              \"fields\": [
+                {\"type\": \"mrkdwn\", \"text\": \"*Branche:*\n\`$CI_COMMIT_REF_NAME\`\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*Commit:*\n\`$SHORT_SHA\`\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*Auteur:*\n$GITLAB_USER_NAME\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*Durée:*\n~${DURATION_MIN}min\"}
+              ]
+            },
+            {
+              \"type\": \"section\",
+              \"text\": {\"type\": \"mrkdwn\", \"text\": \"📝 _${CI_COMMIT_TITLE}_\"}
+            },
+            {
+              \"type\": \"actions\",
+              \"elements\": [
+                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"🔗 Commit\"}, \"url\": \"$CI_PROJECT_URL/-/commit/$CI_COMMIT_SHA\"},
+                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"📊 Pipeline\"}, \"url\": \"$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID\"},
+                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"🌐 API\"}, \"url\": \"https://api.keyhome.immo/up\"}
+              ]
+            }
+          ]
+        }]
       }" $SLACK_WEBHOOK_URL
   when: on_success
   rules:
@@ -243,6 +330,8 @@ notify_slack_success:
 notify_slack_failure:
   stage: notify
   needs:
+    - job: smoke_test
+      optional: true
     - job: production_deploy
       optional: true
     - job: test_suite
@@ -253,20 +342,86 @@ notify_slack_failure:
       optional: true
   script:
     - |
-      curl -X POST -H 'Content-type: application/json' \
+      SHORT_SHA="${CI_COMMIT_SHA:0:8}"
+      FAILED_JOB="${CI_JOB_NAME:-unknown}"
+      
+      curl -sS -X POST -H 'Content-type: application/json' \
       --data "{
-        \"text\": \"❌ *[BACKEND] Échec de la Pipeline !*\n\n*Étape:* \`$CI_JOB_STAGE\`\n*Auteur:* $GITLAB_USER_NAME\n*Branche:* \`$CI_COMMIT_REF_NAME\`\n\n🚨 <$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID|Vérifier l'erreur immédiatement>\"
+        \"attachments\": [{
+          \"color\": \"#dc3545\",
+          \"blocks\": [
+            {
+              \"type\": \"header\",
+              \"text\": {\"type\": \"plain_text\", \"text\": \"🚨 Pipeline Backend Échouée\", \"emoji\": true}
+            },
+            {
+              \"type\": \"section\",
+              \"fields\": [
+                {\"type\": \"mrkdwn\", \"text\": \"*Étape échouée:*\n\`$CI_JOB_STAGE\`\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*Job:*\n\`$FAILED_JOB\`\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*Branche:*\n\`$CI_COMMIT_REF_NAME\`\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*Auteur:*\n$GITLAB_USER_NAME\"}
+              ]
+            },
+            {
+              \"type\": \"section\",
+              \"text\": {\"type\": \"mrkdwn\", \"text\": \"📝 _${CI_COMMIT_TITLE}_\"}
+            },
+            {
+              \"type\": \"actions\",
+              \"elements\": [
+                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"🔴 Voir l'erreur\"}, \"style\": \"danger\", \"url\": \"$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID\"},
+                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"📋 Logs\"}, \"url\": \"$CI_PROJECT_URL/-/jobs/$CI_JOB_ID\"}
+              ]
+            }
+          ]
+        }]
       }" $SLACK_WEBHOOK_URL
   when: on_failure
   rules:
     - if: $CI_COMMIT_BRANCH
 
-# --- ETAPE 6 : NETTOYAGE ---
+# --- ETAPE 6 : NETTOYAGE INTELLIGENT ---
 cleanup:
   stage: cleanup
   script:
-    - docker rmi $CI_IMAGE 2>/dev/null || true
-    - docker system prune -f --filter "until=24h"
+    - |
+      echo "🧹 Starting cleanup..."
+      
+      # 1. Supprimer l'image CI de ce pipeline
+      if docker images -q $CI_IMAGE 2>/dev/null | grep -q .; then
+        docker rmi $CI_IMAGE && echo "  ✓ Removed CI image: $CI_IMAGE"
+      fi
+      
+      # 2. Nettoyer les images dangling (sans tag)
+      DANGLING=$(docker images -f "dangling=true" -q 2>/dev/null | wc -l | tr -d ' ')
+      if [ "$DANGLING" -gt 0 ]; then
+        docker rmi $(docker images -f "dangling=true" -q) 2>/dev/null || true
+        echo "  ✓ Removed $DANGLING dangling images"
+      fi
+      
+      # 3. Nettoyer les containers arrêtés depuis plus de 1h
+      STOPPED=$(docker ps -a -f "status=exited" --format '{{.ID}}' 2>/dev/null | wc -l | tr -d ' ')
+      if [ "$STOPPED" -gt 0 ]; then
+        docker container prune -f --filter "until=1h" 2>/dev/null
+        echo "  ✓ Cleaned stopped containers"
+      fi
+      
+      # 4. Nettoyer les networks orphelins (sauf ceux en cours d'utilisation)
+      docker network prune -f --filter "until=1h" 2>/dev/null || true
+      echo "  ✓ Cleaned unused networks"
+      
+      # 5. Nettoyer les volumes orphelins (attention: pas les données!)
+      # docker volume prune -f --filter "label!=keep" 2>/dev/null || true
+      
+      # 6. Nettoyer le build cache Docker (garde 10GB)
+      docker builder prune -f --keep-storage=10GB 2>/dev/null || true
+      echo "  ✓ Cleaned build cache (keeping 10GB)"
+      
+      # 7. Rapport final
+      echo ""
+      echo "📊 Disk usage after cleanup:"
+      docker system df 2>/dev/null || true
   when: always
   rules:
     - if: $CI_COMMIT_BRANCH
