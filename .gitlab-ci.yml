@@ -69,7 +69,7 @@ build_image:
   needs: [phpstan, style_check, composer_security]
   script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-    - docker build --pull --no-cache -t $APP_IMAGE:$IMAGE_TAG -t $APP_IMAGE:latest .
+    - docker build --pull -t $APP_IMAGE:$IMAGE_TAG -t $APP_IMAGE:latest .
     - docker push $APP_IMAGE:$IMAGE_TAG
     - docker push $APP_IMAGE:latest
   after_script:
@@ -199,6 +199,10 @@ production_deploy:
         fi
         sleep 2
       done
+    # Clear cache BEFORE migrations to ensure fresh config is loaded
+    - echo "🧹 Clearing cache before migrations..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize:clear
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan config:cache
     # Run migrations — rollback container on failure
     - |
       echo "🗄️ Running migrations..."
@@ -208,8 +212,6 @@ production_deploy:
         APP_IMAGE=$FULL_IMAGE docker compose down --remove-orphans || true
         exit 1
       fi
-    - echo "🧹 Clearing cache..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize:clear
     - echo "⚡ Optimizing..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app chmod +x resetFilamentLivewire.sh
