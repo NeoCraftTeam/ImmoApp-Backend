@@ -101,6 +101,10 @@ class Ad extends Model implements HasMedia
         'has_parking',
         'location',
         'status',
+        'is_visible',
+        'available_from',
+        'available_to',
+        'attributes',
         'expires_at',
         'user_id',
         'quarter_id',
@@ -110,6 +114,9 @@ class Ad extends Model implements HasMedia
         'boost_score',
         'boost_expires_at',
         'boosted_at',
+        'deposit_amount',
+        'minimum_lease_duration',
+        'detailed_charges',
     ];
 
     protected $hidden = [
@@ -124,6 +131,10 @@ class Ad extends Model implements HasMedia
         'location' => Point::class, // Assuming 'point' is a custom cast for PostGIS
         'status' => \App\Enums\AdStatus::class,
         'has_parking' => 'boolean',
+        'is_visible' => 'boolean',
+        'available_from' => 'date',
+        'available_to' => 'date',
+        'attributes' => 'array',
         'expires_at' => 'datetime',
         'price' => 'decimal:2',
         'is_boosted' => 'boolean',
@@ -207,6 +218,7 @@ class Ad extends Model implements HasMedia
             'bathrooms' => (int) $this->bathrooms,
             'has_parking' => (bool) $this->has_parking,
             'status' => $this->status,
+            'is_visible' => (bool) $this->is_visible,
 
             // Relations — vérifier qu'elles existent
             'city' => $this->quarter?->city?->name,
@@ -232,8 +244,8 @@ class Ad extends Model implements HasMedia
 
     public function shouldBeSearchable(): bool
     {
-        // N'indexer que les annonces non supprimées et actives
-        return $this->status === AdStatus::AVAILABLE && !$this->trashed();
+        // N'indexer que les annonces visibles, disponibles et non supprimées
+        return $this->is_visible && $this->status === AdStatus::AVAILABLE && !$this->trashed();
     }
 
     /**
@@ -344,6 +356,11 @@ class Ad extends Model implements HasMedia
     {
         $this->addMediaCollection('images')
             ->onlyKeepLatest(10)
+            ->useDisk('public');
+
+        $this->addMediaCollection('property_condition')
+            ->singleFile()
+            ->acceptsMimeTypes(['application/pdf'])
             ->useDisk('public');
     }
 
@@ -459,6 +476,136 @@ class Ad extends Model implements HasMedia
     {
         return $query->orderByDesc('boost_score')
             ->orderByDesc('created_at');
+    }
+
+    /**
+     * Scope to get only visible ads
+     */
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function visible($query)
+    {
+        return $query->where('is_visible', true);
+    }
+
+    /**
+     * Scope to get only currently available ads based on date range
+     */
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function currentlyAvailable($query)
+    {
+        $today = now()->toDateString();
+
+        return $query
+            ->where(function ($q) use ($today): void {
+                $q->whereNull('available_from')
+                    ->orWhere('available_from', '<=', $today);
+            })
+            ->where(function ($q) use ($today): void {
+                $q->whereNull('available_to')
+                    ->orWhere('available_to', '>=', $today);
+            });
+    }
+
+    /**
+     * Scope to filter by property attributes
+     */
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function withAttributes($query, array $attributes)
+    {
+        foreach ($attributes as $attribute) {
+            $query->whereJsonContains('attributes', $attribute);
+        }
+
+        return $query;
+    }
+
+    /**
+     * Toggle ad visibility
+     */
+    public function toggleVisibility(): void
+    {
+        $this->update(['is_visible' => !$this->is_visible]);
+    }
+
+    /**
+     * Hide the ad
+     */
+    public function hide(): void
+    {
+        $this->update(['is_visible' => false]);
+    }
+
+    /**
+     * Show the ad
+     */
+    public function show(): void
+    {
+        $this->update(['is_visible' => true]);
+    }
+
+    /**
+     * Set availability period
+     */
+    public function setAvailability(?\DateTimeInterface $from = null, ?\DateTimeInterface $to = null): void
+    {
+        $this->update([
+            'available_from' => $from,
+            'available_to' => $to,
+        ]);
+    }
+
+    /**
+     * Check if ad has a specific property attribute
+     */
+    public function hasPropertyAttribute(string $attribute): bool
+    {
+        $attributes = $this->getAttribute('attributes') ?? [];
+
+        return in_array($attribute, $attributes, true);
+    }
+
+    /**
+     * Add attributes to the ad
+     *
+     * @param  array<string>  $newAttributes
+     */
+    public function addPropertyAttributes(array $newAttributes): void
+    {
+        $currentAttributes = $this->getAttribute('attributes') ?? [];
+        $this->update([
+            'attributes' => array_unique(array_merge($currentAttributes, $newAttributes)),
+        ]);
+    }
+
+    /**
+     * Remove attributes from the ad
+     *
+     * @param  array<string>  $attributesToRemove
+     */
+    public function removePropertyAttributes(array $attributesToRemove): void
+    {
+        $currentAttributes = $this->getAttribute('attributes') ?? [];
+        $this->update([
+            'attributes' => array_values(array_diff($currentAttributes, $attributesToRemove)),
+        ]);
+    }
+
+    /**
+     * Check if ad is currently available based on date range
+     */
+    public function isCurrentlyAvailable(): bool
+    {
+        $today = now()->toDateString();
+
+        if ($this->available_from && $this->available_from->toDateString() > $today) {
+            return false;
+        }
+
+        if ($this->available_to && $this->available_to->toDateString() < $today) {
+            return false;
+        }
+
+        return true;
     }
 
     public function getActivitylogOptions(): LogOptions

@@ -118,6 +118,13 @@ final class AdRequest extends FormRequest
                 'expires_at' => ['nullable', 'date'],
                 // P2-8 Fix: Allow status updates (validated against enum)
                 'status' => ['sometimes', Rule::enum(AdStatus::class)],
+                // Task 4 & 5: Visibility and availability management
+                'is_visible' => ['sometimes', 'boolean'],
+                'available_from' => ['nullable', 'date'],
+                'available_to' => ['nullable', 'date', 'after_or_equal:available_from'],
+                // Task 6: Property attributes
+                'attributes' => ['sometimes', 'array'],
+                'attributes.*' => ['string', Rule::in(array_column(\App\Enums\PropertyAttribute::cases(), 'value'))],
                 // user_id cannot be changed via API — ownership is immutable
                 'quarter_id' => ['sometimes', 'exists:quarter,id'],
                 'type_id' => ['sometimes', 'exists:ad_type,id'],
@@ -173,6 +180,10 @@ final class AdRequest extends FormRequest
             'type_id.exists' => "Le type sélectionné n'existe pas.",
             'bedrooms.integer' => 'Le nombre de chambres doit être un entier.',
             'bathrooms.integer' => 'Le nombre de salles de bains doit être un entier.',
+
+            // Availability validation messages
+            'available_to.after_or_equal' => 'La date de fin de disponibilité doit être après ou égale à la date de début.',
+            'attributes.*.in' => 'Un ou plusieurs attributs sélectionnés ne sont pas valides.',
 
             'images.max' => 'You can upload a maximum of 10 images.',
             'images.*.image' => 'Each file must be an image.',

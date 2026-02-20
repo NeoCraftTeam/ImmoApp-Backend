@@ -16,3 +16,22 @@
 .is-mobile-app .fi-main-ctn {
     padding: 1rem !important;
 }
+
+/* OAuth Buttons Styling - Rounded like frontend */
+.fi-simple-page .filament-socialite-buttons button,
+.fi-simple-page .filament-socialite-buttons a {
+    border-radius: 9999px !important;
+    transition: all 0.2s ease-in-out !important;
+}
+
+.fi-simple-page .filament-socialite-buttons button:hover,
+.fi-simple-page .filament-socialite-buttons a:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Hide the divider text "Or" and show styled version */
+.filament-socialite-buttons .text-gray-500 {
+    font-size: 0.875rem;
+    color: #6b7280;
+}
