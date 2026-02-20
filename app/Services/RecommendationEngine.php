@@ -208,6 +208,7 @@ final class RecommendationEngine
 
         // ── Candidate ads ────────────────────────────────────────────
         $candidates = Ad::with(self::AD_EAGER_LOADS)
+            ->visible()
             ->where('status', AdStatus::AVAILABLE)
             ->whereNotIn('id', $profile['seen_ad_ids'])
             ->withCount('reviews')
@@ -321,6 +322,7 @@ final class RecommendationEngine
         if ($trendingIds->isNotEmpty()) {
             $trending = Ad::with(self::AD_EAGER_LOADS)
                 ->whereIn('id', $trendingIds)
+                ->visible()
                 ->where('status', AdStatus::AVAILABLE)
                 ->get();
             $collected = $collected->merge($trending);
@@ -329,6 +331,7 @@ final class RecommendationEngine
 
         // 2. Boosted
         $boosted = Ad::with(self::AD_EAGER_LOADS)
+            ->visible()
             ->where('status', AdStatus::AVAILABLE)
             ->whereNotIn('id', $excludeIds)
             ->boosted()
@@ -342,6 +345,7 @@ final class RecommendationEngine
         $remaining = $limit - $collected->count();
         if ($remaining > 0) {
             $latest = Ad::with(self::AD_EAGER_LOADS)
+                ->visible()
                 ->where('status', AdStatus::AVAILABLE)
                 ->whereNotIn('id', $excludeIds)
                 ->latest()
@@ -400,6 +404,7 @@ final class RecommendationEngine
         $preferredTypeIds = array_keys($profile['type_weights']);
 
         return Ad::with(self::AD_EAGER_LOADS)
+            ->visible()
             ->where('status', AdStatus::AVAILABLE)
             ->whereNotIn('id', $excludeIds)
             ->where(function (Builder $query) use ($preferredTypeIds, $profile): void {
