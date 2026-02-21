@@ -8,13 +8,14 @@ import {
     BackHandler,
     Easing,
     Image,
+    KeyboardAvoidingView, // Fix #2
     Platform,
     Pressable,
     StyleSheet,
     Text,
     View,
 } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import NativeService from './services/NativeService';
 
@@ -26,6 +27,9 @@ const APP_CONFIG = {
   accentColor:  '#059669',
   splashBg:     '#ffffff',
 };
+
+// Fix #17 — userAgent précis sans révéler le framework interne
+const USER_AGENT = `KeyHome/1.0 (Owner; ${Platform.OS === 'ios' ? 'iOS' : 'Android'})`;
 
 // JS injecté dans la WebView pour exposer le bridge natif
 const INJECTED_JS = `
@@ -43,26 +47,32 @@ const INJECTED_JS = `
       getLocation: ()     => window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'REQUEST_LOCATION',  data: {} })),
       registerPush:()     => window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'REGISTER_PUSH',     data: {} })),
       signInGoogle:(p)    => window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'OAUTH_SIGN_IN',     data: { provider: 'google', panelType: p || 'bailleur' } })),
+      // Fix #11 — Haptics depuis la WebView
+      haptic:      (style) => window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'HAPTIC', data: { style: style || 'light' } })),
+      // Fix #14 — StatusBar depuis la WebView
+      setStatusBar:(style) => window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SET_STATUS_BAR', data: { style } })),
     };
     true;
   })();
 `;
 
-// ─── COMPOSANT PRINCIPAL ──────────────────────────────────────────────────────
-export default function App() {
+// ─── COMPOSANT INTERNE (accès aux insets) ─────────────────────────────────────
+function AppContent() {
   // ── États ──────────────────────────────────────────────────────────────────
-  const [showSplash,   setShowSplash]   = useState(true);
-  const [isLoading,    setIsLoading]    = useState(true);
-  const [isFirstLoad,  setIsFirstLoad]  = useState(true);   // FIX #3 : loader nav
-  const [error,        setError]        = useState(null);
-  const [isOffline,    setIsOffline]    = useState(false);
-  const [canGoBack,    setCanGoBack]    = useState(false);
+  const [showSplash,    setShowSplash]    = useState(true);
+  const [isLoading,     setIsLoading]     = useState(true);
+  const [isFirstLoad,   setIsFirstLoad]   = useState(true);
+  const [error,         setError]         = useState(null);
+  const [isOffline,     setIsOffline]     = useState(false);
+  const [canGoBack,     setCanGoBack]     = useState(false);
+  const [statusBarStyle, setStatusBarStyle] = useState('dark'); // Fix #14
 
   // ── Refs ───────────────────────────────────────────────────────────────────
   const webViewRef     = useRef(null);
-  const splashTimer    = useRef(null);                       // FIX #2 : memory leak
+  const splashTimer    = useRef(null);
   const fadeAnim       = useRef(new Animated.Value(1)).current;
   const scaleAnim      = useRef(new Animated.Value(0.3)).current;
+  const insets         = useSafeAreaInsets(); // Fix #1
 
   // ── Bouton back Android ────────────────────────────────────────────────────
   useEffect(() => {
@@ -92,7 +102,7 @@ export default function App() {
 
     return () => {
       unsubscribeNet();
-      clearTimeout(splashTimer.current);   // FIX #2 : cleanup timer
+      clearTimeout(splashTimer.current);
       NativeService.cleanup();
     };
   }, []);
@@ -129,10 +139,18 @@ export default function App() {
     if (isFirstLoad) setIsLoading(true);
   }, [isFirstLoad]);
 
-  // FIX #7 : capturer les erreurs HTTP (4xx / 5xx)
   const handleHttpError = useCallback((syntheticEvent) => {
     const { statusCode, url } = syntheticEvent.nativeEvent;
     console.warn(`[WebView] HTTP Error ${statusCode} on ${url}`);
+
+    // Fix #7 — Rediriger vers login si session expirée
+    if (statusCode === 401) {
+      webViewRef.current?.injectJavaScript(
+        `window.location.href = '${APP_CONFIG.baseUrl}/login'; true;`
+      );
+      return;
+    }
+
     if (statusCode >= 500) {
       setError({
         type: 'server',
@@ -155,7 +173,6 @@ export default function App() {
     setIsLoading(false);
   }, []);
 
-  // FIX #4 : retry avec Haptics
   const handleRetry = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setError(null);
@@ -164,113 +181,152 @@ export default function App() {
     webViewRef.current?.reload();
   }, []);
 
+  // Fix #14 — Handler de messages natifs étendu (StatusBar, Haptics)
+  const handleMessage = useCallback((event) => {
+    try {
+      const msg = JSON.parse(event.nativeEvent.data);
+      if (msg?.type === 'SET_STATUS_BAR') {
+        setStatusBarStyle(msg.data?.style || 'dark');
+        return;
+      }
+    } catch {
+      // message non-JSON — relayer au NativeService
+    }
+    NativeService.handleWebViewMessage(event);
+  }, []);
+
   // ── URL ────────────────────────────────────────────────────────────────────
   const APP_URL = `${APP_CONFIG.baseUrl}?app_mode=${APP_CONFIG.appMode}&platform=${Platform.OS}`;
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <SafeAreaProvider>
-      <View style={styles.container}>
-        <ExpoStatusBar style="dark" backgroundColor={APP_CONFIG.splashBg} translucent={false} />
+    <View style={styles.container}>
+      {/* Fix #14 — StatusBar adaptive au contenu dark/light */}
+      <ExpoStatusBar style={statusBarStyle} backgroundColor={APP_CONFIG.splashBg} translucent={false} />
 
-        {/* ── Bannière hors-ligne ── */}
-        {isOffline && (
-          <View style={styles.offlineBanner}>
-            <Text style={styles.offlineText}>📶 Hors ligne — données en cache</Text>
+      {/* Fix #1 — Bannière hors-ligne dans la safe area (paddingTop = inset top) */}
+      {isOffline && (
+        <View style={[styles.offlineBanner, { marginTop: insets.top }]}>
+          <Text style={styles.offlineText}>📶 Hors ligne — données en cache</Text>
+        </View>
+      )}
+
+      {/* Fix #2 — KeyboardAvoidingView pour que les formulaires Filament restent visibles */}
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={insets.top}
+      >
+        <WebView
+          ref={setWebViewRef}
+          source={{ uri: APP_URL }}
+          style={styles.webview}
+
+          onLoadStart={handleLoadStart}
+          onLoadEnd={handleLoadEnd}
+          onError={handleError}
+          onHttpError={handleHttpError}
+          onNavigationStateChange={(s) => setCanGoBack(s.canGoBack)}
+
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          cacheEnabled={true}
+          cacheMode="LOAD_DEFAULT"
+          allowFileAccess={false}
+          allowsBackForwardNavigationGestures={true}
+          pullToRefreshEnabled={false}
+          scrollEnabled={true}
+          bounces={Platform.OS === 'ios'}              // rebond natif iOS
+          overScrollMode={Platform.OS === 'android' ? 'always' : undefined}
+          keyboardShouldPersistTaps="handled"
+
+          // Fix #4 — dataDetectorTypes iOS uniquement (crash Android New Arch)
+          dataDetectorTypes={Platform.OS === 'ios' ? ['phoneNumber', 'link'] : 'none'}
+
+          injectedJavaScriptBeforeContentLoaded={INJECTED_JS}
+          onMessage={handleMessage}                   // Fix #14
+
+          originWhitelist={['https://*', 'http://localhost:*']}
+          // Fix #17 — userAgent sans révéler le framework
+          userAgent={USER_AGENT}
+
+          renderLoading={() => null}
+          startInLoadingState={false}
+        />
+      </KeyboardAvoidingView>
+
+      {/* Fix #1 — Écran d'erreur respectant les insets */}
+      {error && !showSplash && (
+        <View style={[styles.errorContainer, {
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+        }]}>
+          <View style={styles.errorCard}>
+            <Text style={styles.errorEmoji}>
+              {error.type === 'network' ? '📡' : '⚠️'}
+            </Text>
+            <Text style={styles.errorTitle}>{error.message}</Text>
+            <Text style={styles.errorDetails}>{error.details}</Text>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.retryButton,
+                pressed && styles.retryButtonPressed,
+              ]}
+              onPress={handleRetry}
+              accessibilityRole="button"
+              accessibilityLabel="Réessayer"
+            >
+              <Text style={styles.retryButtonText}>🔄 Réessayer</Text>
+            </Pressable>
           </View>
-        )}
+        </View>
+      )}
 
-        <SafeAreaView style={styles.safeArea}>
-          <WebView
-            ref={setWebViewRef}
-            source={{ uri: APP_URL }}
-            style={styles.webview}
-
-            onLoadStart={handleLoadStart}
-            onLoadEnd={handleLoadEnd}
-            onError={handleError}
-            onHttpError={handleHttpError}               // FIX #7
-            onNavigationStateChange={(s) => setCanGoBack(s.canGoBack)}
-
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            cacheEnabled={true}
-            cacheMode="LOAD_DEFAULT"
-            allowFileAccess={false}
-            allowsBackForwardNavigationGestures={true}
-            pullToRefreshEnabled={false}
-
-            injectedJavaScriptBeforeContentLoaded={INJECTED_JS}
-            onMessage={(event) => NativeService.handleWebViewMessage(event)}
-
-            originWhitelist={['https://*', 'http://localhost:*']}
-            userAgent="KeyHomeOwnerMobileApp/1.0 (Expo; React-Native)"
-
-            renderLoading={() => null}
-            startInLoadingState={false}
+      {/* Loader navigation (hors-splash) */}
+      {isLoading && !showSplash && !error && (
+        <View style={styles.loaderContainer}>
+          <Image
+            source={require('./assets/icon.png')}
+            style={styles.loaderLogo}
+            tintColor={APP_CONFIG.primaryColor}
           />
-        </SafeAreaView>
+          <ActivityIndicator size="large" color={APP_CONFIG.primaryColor} />
+        </View>
+      )}
 
-        {/* ── Écran d'erreur ─────────────────────────────────────────────── */}
-        {error && !showSplash && (
-          <View style={styles.errorContainer}>
-            <View style={styles.errorCard}>
-              <Text style={styles.errorEmoji}>
-                {error.type === 'network' ? '📡' : '⚠️'}
-              </Text>
-              <Text style={styles.errorTitle}>{error.message}</Text>
-              <Text style={styles.errorDetails}>{error.details}</Text>
-
-              {/* FIX #4 : Pressable au lieu de Text onPress */}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.retryButton,
-                  pressed && styles.retryButtonPressed,
-                ]}
-                onPress={handleRetry}
-                accessibilityRole="button"
-                accessibilityLabel="Réessayer"
-              >
-                <Text style={styles.retryButtonText}>🔄 Réessayer</Text>
-              </Pressable>
-            </View>
-          </View>
-        )}
-
-        {/* ── Loader navigation (hors-splash) ───────────────────────────── */}
-        {isLoading && !showSplash && !error && (
-          <View style={styles.loaderContainer}>
-            <Image
+      {/* Splash screen */}
+      {showSplash && (
+        <Animated.View style={[styles.splashContainer, { opacity: fadeAnim }]}>
+          <View style={styles.splashContent}>
+            <Animated.Image
               source={require('./assets/icon.png')}
-              style={styles.loaderLogo}
+              style={[
+                styles.splashLogo,
+                { transform: [{ scale: scaleAnim }] },
+              ]}
               tintColor={APP_CONFIG.primaryColor}
             />
-            <ActivityIndicator size="large" color={APP_CONFIG.primaryColor} />
-          </View>
-        )}
-
-        {/* ── Splash screen ─────────────────────────────────────────────── */}
-        {showSplash && (
-          <Animated.View style={[styles.splashContainer, { opacity: fadeAnim }]}>
-            <View style={styles.splashContent}>
-              <Animated.Image
-                source={require('./assets/icon.png')}
-                style={[
-                  styles.splashLogo,
-                  { transform: [{ scale: scaleAnim }] },
-                ]}
-                tintColor={APP_CONFIG.primaryColor}
-              />
-              <Text style={styles.splashTitle}>KeyHome Owner</Text>
-              <Text style={styles.splashSubtitle}>Gérez vos biens en toute sérénité</Text>
-              <View style={styles.splashLoader}>
-                <ActivityIndicator size="small" color={APP_CONFIG.primaryColor} />
-              </View>
+            <Text style={styles.splashTitle}>KeyHome Owner</Text>
+            <Text style={styles.splashSubtitle}>Gérez vos biens en toute sérénité</Text>
+            <View style={styles.splashLoader}>
+              <ActivityIndicator size="small" color={APP_CONFIG.primaryColor} />
             </View>
-            <Text style={styles.splashVersion}>v1.0.0 Pro Edition</Text>
-          </Animated.View>
-        )}
-      </View>
+          </View>
+          <Text style={[styles.splashVersion, { bottom: 48 + insets.bottom }]}>
+            v1.0.0 Pro Edition
+          </Text>
+        </Animated.View>
+      )}
+    </View>
+  );
+}
+
+// ─── COMPOSANT PRINCIPAL ──────────────────────────────────────────────────────
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
     </SafeAreaProvider>
   );
 }
@@ -281,9 +337,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
   },
-  safeArea: {
+  keyboardView: {
     flex: 1,
-    backgroundColor: '#ffffff',
   },
   webview: {
     flex: 1,
@@ -350,7 +405,6 @@ const styles = StyleSheet.create({
   },
   splashVersion: {
     position: 'absolute',
-    bottom: 48,
     fontSize: 12,
     fontWeight: '700',
     color: 'rgba(148,163,184,0.5)',
@@ -396,7 +450,7 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
   retryButton: {
-    backgroundColor: '#10b981',   // Vert Owner
+    backgroundColor: '#10b981',
     width: '100%',
     paddingVertical: 14,
     borderRadius: 14,
