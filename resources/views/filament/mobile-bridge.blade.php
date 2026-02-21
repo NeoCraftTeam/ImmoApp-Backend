@@ -1,15 +1,24 @@
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        // Fix #6 — Privilégier window.isNativeApp (injecté par le bridge RN)
-        // L'origin 'null' est envoyée par la WebView RN mais aussi par des iframes sandboxées.
-        // On utilise donc isNativeApp pour sécuriser la validation en production.
         const ALLOWED_ORIGINS = ['null', '{{ config("app.url") }}'];
 
+        /**
+         * Fix #6 — Validation origin via window.isNativeApp (plus sûr que 'null' brut)
+         */
         function isFromNativeApp(event) {
-            // Si le bridge RN a injecté isNativeApp, on fait confiance sans vérifier l'origin
             if (window.isNativeApp === true) return true;
-            // Sinon, vérifier l'origin (fallback pour dev / debug WebView)
             return ALLOWED_ORIGINS.includes(String(event.origin));
+        }
+
+        /**
+         * Fix #5 — sendWithRetry ACK : accusé réception vers le natif
+         */
+        function sendAck(ackKey) {
+            if (window.ReactNativeWebView && ackKey) {
+                window.ReactNativeWebView.postMessage(
+                    JSON.stringify({ type: 'ACK_RECEIVED', data: { _ackKey: ackKey } })
+                );
+            }
         }
 
         window.addEventListener('message', (event) => {
@@ -24,12 +33,14 @@
                 switch (message.type) {
                     case 'LOCATION_RECEIVED':
                         handleLocationReceived(message.data);
+                        sendAck(message.data?._ackKey); // Fix #5
                         break;
 
                     // Fix #16 — Gérer les images sélectionnées depuis la galerie/caméra native
                     case 'IMAGE_SELECTED':
                     case 'PHOTO_TAKEN':
                         handleImageReceived(message.data);
+                        sendAck(message.data?._ackKey); // Fix #5
                         break;
 
                     default:

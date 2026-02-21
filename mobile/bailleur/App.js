@@ -3,17 +3,17 @@ import * as Haptics from 'expo-haptics';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-    ActivityIndicator,
-    Animated,
-    BackHandler,
-    Easing,
-    Image,
-    KeyboardAvoidingView, // Fix #2
-    Platform,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Animated,
+  BackHandler,
+  Easing,
+  Image,
+  KeyboardAvoidingView, // Fix #2
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -133,7 +133,41 @@ function AppContent() {
       clearTimeout(splashTimer.current);
       splashTimer.current = setTimeout(hideSplash, 600);
     }
-  }, [isFirstLoad, showSplash, hideSplash]);
+
+    // FIX Dynamic Island — injecter la valeur PIXEL exacte (React Native connaît toujours
+    // la vraie hauteur de la Dynamic Island / Notch, indépendamment du CSS env()).
+    // env(safe-area-inset-top) échoue si le viewport meta est déjà défini sans viewport-fit=cover.
+    if (insets.top > 0 && webViewRef.current) {
+      const top    = insets.top;
+      const bottom = insets.bottom;
+      webViewRef.current.injectJavaScript(`
+        (function() {
+          // Injecter les valeurs RN comme CSS variables
+          document.documentElement.style.setProperty('--rn-safe-top',    '${top}px');
+          document.documentElement.style.setProperty('--rn-safe-bottom', '${bottom}px');
+
+          // Appliquer directement sur les éléments Filament
+          var topbar = document.querySelector('.fi-topbar');
+          if (topbar) topbar.style.paddingTop = '${top}px';
+
+          var sidebarHeader = document.querySelector('.fi-sidebar-header');
+          if (sidebarHeader) sidebarHeader.style.paddingTop = '${top + 16}px';
+
+          // Observer les navigations SPA (Livewire) pour ré-appliquer après chaque changement de page
+          if (!window.__rnSafeAreaObserver) {
+            window.__rnSafeAreaObserver = true;
+            document.addEventListener('livewire:navigated', function() {
+              var tb = document.querySelector('.fi-topbar');
+              if (tb) tb.style.paddingTop = '${top}px';
+              var sh = document.querySelector('.fi-sidebar-header');
+              if (sh) sh.style.paddingTop = '${top + 16}px';
+            });
+          }
+          true;
+        })();
+      `);
+    }
+  }, [isFirstLoad, showSplash, hideSplash, insets.top, insets.bottom]);
 
   const handleLoadStart = useCallback(() => {
     if (isFirstLoad) setIsLoading(true);
@@ -240,8 +274,8 @@ function AppContent() {
           overScrollMode={Platform.OS === 'android' ? 'always' : undefined}
           keyboardShouldPersistTaps="handled"
 
-          // Fix #4 — dataDetectorTypes iOS uniquement (crash Android New Arch)
-          dataDetectorTypes={Platform.OS === 'ios' ? ['phoneNumber', 'link'] : 'none'}
+          // dataDetectorTypes est iOS uniquement — ne pas passer sur Android (crash New Arch)
+          {...(Platform.OS === 'ios' && { dataDetectorTypes: ['phoneNumber', 'link'] })}
 
           injectedJavaScriptBeforeContentLoaded={INJECTED_JS}
           onMessage={handleMessage}                   // Fix #14

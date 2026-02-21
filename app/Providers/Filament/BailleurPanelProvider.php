@@ -31,6 +31,7 @@ class BailleurPanelProvider extends PanelProvider
             ->brandLogoHeight('3.5rem')
             ->login()
             ->passwordReset()
+            ->globalSearch(false)
             ->registration(\App\Filament\Pages\Auth\CustomRegister::class)
             ->profile(\App\Filament\Pages\Auth\EditProfile::class)
             ->emailVerification()
