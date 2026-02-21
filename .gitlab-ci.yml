@@ -1,9 +1,9 @@
 stages:
   - prepare
   - quality
-  - build_and_test  # Build + Test en parallèle
+  - build_and_test # Build + Test en parallèle
   - deploy
-  - smoke_test      # Vérification post-déploiement
+  - smoke_test # Vérification post-déploiement
   - notify
   - cleanup
 
@@ -217,6 +217,7 @@ production_deploy:
       fi
     - echo "⚡ Optimizing..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan filament:assets
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app chmod +x resetFilamentLivewire.sh
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app bash resetFilamentLivewire.sh
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan storage:link || true
@@ -239,7 +240,7 @@ smoke_test:
       # Utilise la variable CI/CD API_BASE_URL (à définir dans GitLab Settings > CI/CD > Variables)
       BASE_URL="${API_BASE_URL:-https://api.keyhome.neocraft.dev}"
       echo "🔍 Running smoke tests on $BASE_URL..."
-      
+
       # Test 1: Health check endpoint
       echo "→ Testing health endpoint..."
       HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/up")
@@ -248,7 +249,7 @@ smoke_test:
         exit 1
       fi
       echo "  ✅ Health check passed"
-      
+
       # Test 2: API cities endpoint (public)
       echo "→ Testing API endpoint..."
       HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/v1/cities")
@@ -257,7 +258,7 @@ smoke_test:
         exit 1
       fi
       echo "  ✅ API endpoint passed"
-      
+
       # Test 3: Documentation accessible
       echo "→ Testing Swagger docs..."
       HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/documentation")
@@ -266,7 +267,7 @@ smoke_test:
       else
         echo "  ✅ Swagger docs accessible"
       fi
-      
+
       # Test 4: Admin panel loads
       echo "→ Testing Filament admin..."
       HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L "$BASE_URL/admin/login")
@@ -275,7 +276,7 @@ smoke_test:
         exit 1
       fi
       echo "  ✅ Admin panel accessible"
-      
+
       echo ""
       echo "✅ All smoke tests passed!"
   rules:
@@ -299,7 +300,7 @@ notify_slack_success:
         DURATION_MIN="?"
       fi
       SHORT_SHA="${CI_COMMIT_SHA:0:8}"
-      
+
       curl -sS -X POST -H 'Content-type: application/json' \
       --data "{
         \"attachments\": [{
@@ -353,19 +354,19 @@ notify_slack_failure:
   script:
     - |
       SHORT_SHA="${CI_COMMIT_SHA:0:8}"
-      
+
       # Récupérer le vrai job qui a échoué via l'API GitLab
       FAILED_JOBS_JSON=$(curl -sS --header "JOB-TOKEN: $CI_JOB_TOKEN" \
         "$CI_API_V4_URL/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/jobs?scope[]=failed" 2>/dev/null || echo "[]")
-      
+
       # Extraire le premier job échoué (sans jq, avec grep/sed)
       FAILED_JOB=$(echo "$FAILED_JOBS_JSON" | grep -o '"name":"[^"]*"' | head -1 | sed 's/"name":"//;s/"//' || echo "unknown")
       FAILED_STAGE=$(echo "$FAILED_JOBS_JSON" | grep -o '"stage":"[^"]*"' | head -1 | sed 's/"stage":"//;s/"//' || echo "unknown")
-      
+
       # Fallback si l'API ne retourne rien
       [ -z "$FAILED_JOB" ] && FAILED_JOB="Voir la pipeline"
       [ -z "$FAILED_STAGE" ] && FAILED_STAGE="unknown"
-      
+
       curl -sS -X POST -H 'Content-type: application/json' \
       --data "{
         \"attachments\": [{
@@ -408,37 +409,37 @@ cleanup:
   script:
     - |
       echo "🧹 Starting cleanup..."
-      
+
       # 1. Supprimer l'image CI de ce pipeline
       if docker images -q $CI_IMAGE 2>/dev/null | grep -q .; then
         docker rmi $CI_IMAGE && echo "  ✓ Removed CI image: $CI_IMAGE"
       fi
-      
+
       # 2. Nettoyer les images dangling (sans tag)
       DANGLING=$(docker images -f "dangling=true" -q 2>/dev/null | wc -l | tr -d ' ')
       if [ "$DANGLING" -gt 0 ]; then
         docker rmi $(docker images -f "dangling=true" -q) 2>/dev/null || true
         echo "  ✓ Removed $DANGLING dangling images"
       fi
-      
+
       # 3. Nettoyer les containers arrêtés depuis plus de 1h
       STOPPED=$(docker ps -a -f "status=exited" --format '{{.ID}}' 2>/dev/null | wc -l | tr -d ' ')
       if [ "$STOPPED" -gt 0 ]; then
         docker container prune -f --filter "until=1h" 2>/dev/null
         echo "  ✓ Cleaned stopped containers"
       fi
-      
+
       # 4. Nettoyer les networks orphelins (sauf ceux en cours d'utilisation)
       docker network prune -f --filter "until=1h" 2>/dev/null || true
       echo "  ✓ Cleaned unused networks"
-      
+
       # 5. Nettoyer les volumes orphelins (attention: pas les données!)
       # docker volume prune -f --filter "label!=keep" 2>/dev/null || true
-      
+
       # 6. Nettoyer le build cache Docker (garde 10GB)
       docker builder prune -f --keep-storage=10GB 2>/dev/null || true
       echo "  ✓ Cleaned build cache (keeping 10GB)"
-      
+
       # 7. Rapport final
       echo ""
       echo "📊 Disk usage after cleanup:"
