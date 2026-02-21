@@ -72,14 +72,8 @@ class BailleurPanelProvider extends PanelProvider
                 fn () => view('filament.mobile-bridge'),
             )
             ->assets([
-                \Filament\Support\Assets\Css::make('filament-mobile-app', resource_path('css/filament-mobile-app.css')),
-                \Filament\Support\Assets\Css::make('native-ui', resource_path('css/native-ui.css')),
-                \Filament\Support\Assets\Js::make('filament-mobile-detect', resource_path('js/filament-mobile-detect.js')),
+                // Bridge natif minimal — CSS et JS uniquement pour l'app mobile
                 \Filament\Support\Assets\Js::make('filament-native-bridge', resource_path('js/filament-native-bridge.js')),
-                \Filament\Support\Assets\Js::make('session-persistence', resource_path('js/session-persistence.js')),
-                \Filament\Support\Assets\Js::make('animations-loader', resource_path('js/animations-loader.js')),
-                \Filament\Support\Assets\Js::make('connectivity-manager', resource_path('js/connectivity-manager.js')),
-                \Filament\Support\Assets\Js::make('webview-performance', resource_path('js/webview-performance.js')),
             ])
             ->renderHook(
                 'panels::body.end',
