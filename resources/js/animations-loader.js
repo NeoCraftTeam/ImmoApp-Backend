@@ -309,20 +309,56 @@
 
         /**
          * Vérifier si une transition est nécessaire.
+         * IMPORTANT: ne jamais interférer avec Alpine.js / Livewire / Filament UI.
          */
         shouldTransition(element) {
-            // Ne pas transitionner pour les liens externes
+            // Liens externes / nouveaux onglets → pas de transition
             if (element.target === '_blank' || element.target === '_external') {
                 return false;
             }
 
-            // Ne pas transitionner pour les ancres
+            // Ancres (#) → pas de transition
             if (element.href && element.href.startsWith('#')) {
+                return false;
+            }
+
+            // Liens javascript: ou href vide → Alpine.js triggers, ne pas intercepter
+            if (!element.href || element.href.startsWith('javascript:')) {
+                return false;
+            }
+
+            // Boutons → jamais (Filament action buttons, modal triggers)
+            if (element.tagName === 'BUTTON') {
+                return false;
+            }
+
+            // Composants Alpine.js (x-data) ou Livewire → ne pas intercepter
+            if (element.closest('[x-data]') ||
+                element.closest('[wire\\:click]') ||
+                element.hasAttribute('wire:click') ||
+                element.hasAttribute('x-on:click') ||
+                element.hasAttribute('@click')) {
+                return false;
+            }
+
+            // Éléments Filament UI (modals, sidebar, topbar, actions) → ne pas intercepter
+            if (element.closest('.fi-modal') ||
+                element.closest('.fi-slide-over') ||
+                element.closest('.fi-topbar') ||
+                element.closest('.fi-sidebar') ||
+                element.closest('.fi-ta-row') ||
+                element.closest('[role="dialog"]')) {
+                return false;
+            }
+
+            // Uniquement les vrais liens de navigation avec URL absolue
+            if (!element.href.startsWith('http')) {
                 return false;
             }
 
             return true;
         }
+
 
         /**
          * Naviguer avec transition.
