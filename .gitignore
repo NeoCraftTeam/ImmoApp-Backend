@@ -36,3 +36,7 @@ auth.json
 *.DS_Store
 docker-compose.override.yml
 data.ms/
+
+# Generated assets
+public/css/app/
+public/js/app/
