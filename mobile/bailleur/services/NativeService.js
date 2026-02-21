@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
@@ -110,9 +111,41 @@ class NativeService {
         case 'REQUEST_LOCATION':  await this.getLocation();                          break;
         case 'REGISTER_PUSH':     await this.registerForPushNotifications();         break;
         case 'OAUTH_SIGN_IN':     await OAuthService.handleOAuthRequest(data);       break;
+
+        // Fix #11 — Haptics déclenché depuis la WebView Filament
+        case 'HAPTIC': {
+          const styleMap = {
+            light:  Haptics.ImpactFeedbackStyle.Light,
+            medium: Haptics.ImpactFeedbackStyle.Medium,
+            heavy:  Haptics.ImpactFeedbackStyle.Heavy,
+            success: Haptics.NotificationFeedbackType.Success,
+            error:   Haptics.NotificationFeedbackType.Error,
+            warning: Haptics.NotificationFeedbackType.Warning,
+          };
+          const style = styleMap[data?.style] ?? Haptics.ImpactFeedbackStyle.Light;
+          if (['success', 'error', 'warning'].includes(data?.style)) {
+            Haptics.notificationAsync(style);
+          } else {
+            Haptics.impactAsync(style);
+          }
+          break;
+        }
+
+        // Fix #5 — Messages informatifs Filament (pas d'action native requise)
+        case 'PAGE_LOADED':
+        case 'PERFORMANCE_METRICS':
+        case 'APP_READY':
+        case 'LOADER_SHOWN':
+        case 'LOADER_HIDDEN':
+        case 'MODAL_OPENED':
+        case 'FOCUS_TEL_INPUT':
+        case 'SET_STATUS_BAR':   // géré dans App.js, silencé ici
+          break;
+
         default:
-          console.log('[NativeService] Type inconnu:', type);
+          if (__DEV__) console.log('[NativeService] Type non géré:', type);
       }
+
     } catch (err) {
       console.error('[NativeService] Erreur non gérée:', err);
     }

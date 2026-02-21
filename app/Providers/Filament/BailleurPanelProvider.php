@@ -31,6 +31,7 @@ class BailleurPanelProvider extends PanelProvider
             ->brandLogoHeight('3.5rem')
             ->login()
             ->passwordReset()
+            ->globalSearch(false)
             ->registration(\App\Filament\Pages\Auth\CustomRegister::class)
             ->profile(\App\Filament\Pages\Auth\EditProfile::class)
             ->emailVerification()
@@ -67,6 +68,27 @@ class BailleurPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ])
+            ->renderHook(
+                'panels::head.end',
+                fn () => new \Illuminate\Support\HtmlString('
+                    <!-- Dynamic Island / Notch — viewport-fit=cover requis pour env(safe-area-inset-top) -->
+                    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+                    <style>
+                        /* Repousse la navbar Filament sous la Dynamic Island / Notch */
+                        .fi-topbar {
+                            padding-top: env(safe-area-inset-top) !important;
+                        }
+                        /* Sidebar : header aligné avec la topbar */
+                        .fi-sidebar-header {
+                            padding-top: calc(env(safe-area-inset-top) + 1rem) !important;
+                        }
+                        /* Espace en bas pour la home bar iOS */
+                        body {
+                            padding-bottom: env(safe-area-inset-bottom);
+                        }
+                    </style>
+                '),
+            )
             ->renderHook(
                 'panels::body.end',
                 fn () => view('filament.mobile-bridge'),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages\Auth;
 
+use App\Filament\Forms\Components\NativePhoneInput;
 use Filament\Auth\Pages\EditProfile as BaseEditProfile;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\FileUpload;
@@ -27,7 +28,11 @@ class EditProfile extends BaseEditProfile
                     ->imageEditor()
                     ->circleCropper()
                     ->maxSize(2048)
-                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp']),
+                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                    ->extraAttributes([
+                        'data-native-input' => 'image',
+                        'data-native-type' => 'avatar',
+                    ]),
                 TextInput::make('firstname')
                     ->label('Prénom')
                     ->required()
@@ -39,9 +44,8 @@ class EditProfile extends BaseEditProfile
                 $this->getEmailFormComponent(),
                 Section::make('Téléphone')
                     ->schema([
-                        TextInput::make('phone_number')
+                        NativePhoneInput::make('phone_number')
                             ->label('Numéro de téléphone')
-                            ->tel()
                             ->required()
                             ->placeholder('+237 6XX XXX XXX')
                             ->helperText('Numéro que les clients utiliseront pour vous contacter'),
