@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Requests\UserRequest;
 use App\Http\Resources\UserResource;
+use App\Mail\EmailUpdatedMail;
 use App\Models\User;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -14,6 +15,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Throwable;
 
 final class UserController
@@ -567,6 +569,8 @@ final class UserController
         try {
             DB::beginTransaction();
 
+            $oldEmail = $user->email;
+
             // Vérifier si l'email change et existe déjà
             if (isset($data['email']) && $data['email'] !== $user->email) {
                 if (User::where('email', $data['email'])->exists()) {
@@ -611,6 +615,12 @@ final class UserController
             }
 
             DB::commit();
+
+            // Notifier l'ancienne adresse si l'email a changé
+            if (isset($data['email']) && $data['email'] !== $oldEmail) {
+                Mail::to($oldEmail, $user->firstname)
+                    ->queue(new EmailUpdatedMail($data['email']));
+            }
 
             return response()->json([
                 'message' => 'Utilisateur mis à jour avec succès.',

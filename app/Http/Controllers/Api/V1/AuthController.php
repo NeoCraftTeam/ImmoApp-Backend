@@ -4,10 +4,18 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\UserRole;
+use App\Http\Requests\Api\V1\ClerkExchangeRequest;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
+use App\Mail\NewDeviceSignInMail;
+use App\Mail\PasswordChangedMail;
+use App\Mail\VerificationCodeMail;
+use App\Mail\WelcomeEmail;
 use App\Models\User;
+use App\Services\ClerkJwtService;
+use App\Services\UserAgentParser;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
@@ -15,11 +23,14 @@ use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Spatie\MediaLibrary\MediaCollections\Exceptions\FileDoesNotExist;
@@ -605,9 +616,18 @@ final class AuthController
      *     )
      * )
      */
-    public function verifyEmail($id, $hash, Request $request)
+    public function verifyEmail(string $id, string $hash, Request $request): JsonResponse|\Illuminate\Http\Response|\Illuminate\Contracts\View\View
     {
         Log::info('VerifyEmail called with ID: '.$id);
+
+        // Validate the signed URL (checks signature + expiry)
+        if (!$request->hasValidSignature()) {
+            if ($request->wantsJson()) {
+                return response()->json(['message' => 'Lien de vérification invalide ou expiré.'], 400);
+            }
+
+            return abort(400, 'Lien de vérification invalide ou expiré.');
+        }
 
         if (!Str::isUuid($id)) {
             Log::warning('Invalid UUID provided: '.$id);
@@ -621,8 +641,11 @@ final class AuthController
         try {
             $user = User::findOrFail($id);
 
-            // Vérifier le hash
-            if (!hash_equals($hash, sha1((string) $user->getEmailForVerification()))) {
+            // Defense-in-depth: verify hash matches user's email via HMAC-SHA256
+            if (!hash_equals(
+                hash_hmac('sha256', (string) $user->getEmailForVerification(), (string) config('app.key')),
+                $hash
+            )) {
                 if ($request->wantsJson()) {
                     return response()->json(['message' => 'Lien de vérification invalide'], 400);
                 }
@@ -633,7 +656,11 @@ final class AuthController
             if ($user->hasVerifiedEmail()) {
                 return $request->wantsJson()
                     ? response()->json(['message' => 'Email déjà vérifié.', 'verified' => true])
-                    : view('auth.verified');
+                    : view('auth.verified', [
+                        'loginUrl' => $user->role === \App\Enums\UserRole::ADMIN
+                            ? config('app.url').'/admin'
+                            : config('app.frontend_url').'/login',
+                    ]);
             }
 
             if ($user->markEmailAsVerified()) {
@@ -648,7 +675,11 @@ final class AuthController
 
             return $request->wantsJson()
                 ? response()->json(['message' => 'Email vérifié avec succès.', 'verified' => true])
-                : view('auth.verified');
+                : view('auth.verified', [
+                    'loginUrl' => $user->role === \App\Enums\UserRole::ADMIN
+                        ? config('app.url').'/admin'
+                        : config('app.frontend_url').'/login',
+                ]);
 
         } catch (ModelNotFoundException) {
             if ($request->wantsJson()) {
@@ -726,23 +757,9 @@ final class AuthController
             'email' => 'required|email',
         ]);
 
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user) {
-            return response()->json([
-                'message' => 'Utilisateur non trouvé.',
-            ], 404);
-        }
-
-        if ($user->hasVerifiedEmail()) {
-            return response()->json([
-                'message' => 'Email déjà vérifié.',
-            ]);
-        }
-
-        // Rate limiting pour éviter le spam
-        $key = 'resend-verification:'.$request->ip().':'.$user->id;
-        if (RateLimiter::tooManyAttempts($key, 2)) {
+        // Rate limiting keyed on IP to protect against enumeration
+        $key = 'resend-verification:'.$request->ip();
+        if (RateLimiter::tooManyAttempts($key, 3)) {
             $seconds = RateLimiter::availableIn($key);
 
             return response()->json([
@@ -750,11 +767,21 @@ final class AuthController
             ], 429);
         }
 
-        $user->sendEmailVerificationNotification();
         RateLimiter::hit($key, 300); // 5 minutes
 
+        $user = User::where('email', $request->email)->first();
+
+        // Always return 200 to prevent account enumeration
+        if (!$user || $user->hasVerifiedEmail()) {
+            return response()->json([
+                'message' => 'Si cette adresse est enregistrée et non vérifiée, un email a été envoyé.',
+            ]);
+        }
+
+        $user->sendEmailVerificationNotification();
+
         return response()->json([
-            'message' => 'Email de vérification renvoyé.',
+            'message' => 'Si cette adresse est enregistrée et non vérifiée, un email a été envoyé.',
         ]);
     }
 
@@ -924,16 +951,36 @@ final class AuthController
             // Créer le token avec expiration
             $tokenName = 'api_token_'.now()->timestamp;
 
+            // Limit simultaneous tokens: revoke old api_token_ tokens
+            $user->tokens()->where('name', 'like', 'api_token_%')->delete();
+
             $token = $user->createToken(
                 $tokenName,
                 ['*'], // abilities (permissions du token)
                 now()->addDays(7) // expiration dans 7 jours
             );
 
+            // Détecter une connexion depuis un nouvel appareil / IP
+            $currentIp = $request->ip();
+            if ($user->last_login_ip !== null && $user->last_login_ip !== $currentIp) {
+                $ua = UserAgentParser::parse($request->userAgent());
+                Mail::to($user->email, $user->firstname)->queue(new NewDeviceSignInMail(
+                    deviceType: $ua['device_type'],
+                    browserName: $ua['browser_name'],
+                    operatingSystem: $ua['operating_system'],
+                    location: $currentIp,
+                    ipAddress: $currentIp,
+                    sessionCreatedAt: now()->translatedFormat('d F Y à H:i'),
+                    signInMethod: 'Email / Mot de passe',
+                    revokeSessionUrl: config('app.frontend_url').'/security/sessions',
+                    supportEmail: config('mail.from.address'),
+                ));
+            }
+
             // Mettre à jour les informations de connexion
             $user->update([
                 'last_login_at' => now(),
-                'last_login_ip' => $request->ip(),
+                'last_login_ip' => $currentIp,
             ]);
 
             // Log de connexion réussie
@@ -1022,7 +1069,7 @@ final class AuthController
      *     )
      * )
      */
-    public function logout(Request $request)
+    public function logout(Request $request): JsonResponse
     {
         try {
             $user = $request->user();
@@ -1110,7 +1157,7 @@ final class AuthController
      *     )
      * )
      */
-    public function me(Request $request)
+    public function me(Request $request): \App\Http\Resources\UserResource
     {
         return new UserResource($request->user());
     }
@@ -1169,16 +1216,16 @@ final class AuthController
      *     )
      * )
      */
-    public function refresh(Request $request)
+    public function refresh(Request $request): JsonResponse
     {
         try {
             $user = $request->user();
             $currentToken = $request->user()->currentAccessToken();
 
-            // Créer un nouveau token
+            // Créer un nouveau token avec abilities normalisées
             $newToken = $user->createToken(
                 'refreshed_token_'.now()->timestamp,
-                $currentToken->abilities,
+                ['*'],
                 now()->addDays(7)
             );
 
@@ -1240,11 +1287,10 @@ final class AuthController
     {
         $request->validate(['email' => 'required|email']);
 
-        $status = Password::sendResetLink($request->only('email'));
+        // Send reset link — always return 200 to prevent account enumeration
+        Password::sendResetLink($request->only('email'));
 
-        return $status === Password::RESET_LINK_SENT
-            ? response()->json(['message' => __($status)])
-            : response()->json(['message' => __($status)], 422);
+        return response()->json(['message' => 'Si cette adresse est enregistrée, un email de réinitialisation a été envoyé.']);
     }
 
     /**
@@ -1302,6 +1348,9 @@ final class AuthController
 
                 // Revoke all existing API tokens to invalidate compromised sessions
                 $user->tokens()->delete();
+
+                Mail::to($user->email, $user->firstname)
+                    ->queue(new PasswordChangedMail($user->email, $user->firstname));
 
                 event(new \Illuminate\Auth\Events\PasswordReset($user));
             }
@@ -1373,6 +1422,284 @@ final class AuthController
             $user->tokens()->delete();
         }
 
+        Mail::to($user->email, $user->firstname)
+            ->queue(new PasswordChangedMail($user->email, $user->firstname));
+
         return response()->json(['message' => 'Mot de passe mis à jour avec succès.']);
+    }
+
+    public function clerkExchange(ClerkExchangeRequest $request, ClerkJwtService $clerk): JsonResponse
+    {
+        /** @var string $bearerToken */
+        $bearerToken = $request->bearerToken();
+
+        $clerkUser = $clerk->verifyAndFetchUser($bearerToken);
+
+        if ($clerkUser === null) {
+            return response()->json(['message' => 'Token Clerk invalide ou expiré.'], 401);
+        }
+
+        $clerkId = (string) ($clerkUser['id'] ?? '');
+        $firstName = (string) ($clerkUser['first_name'] ?? 'Utilisateur');
+        $lastName = (string) ($clerkUser['last_name'] ?? '');
+        $avatar = isset($clerkUser['image_url']) ? (string) $clerkUser['image_url'] : null;
+
+        $emailAddresses = $clerkUser['email_addresses'] ?? [];
+        $primaryEmailId = $clerkUser['primary_email_address_id'] ?? null;
+
+        $email = null;
+        foreach ($emailAddresses as $addr) {
+            if ($primaryEmailId !== null && ($addr['id'] ?? null) === $primaryEmailId) {
+                $email = $addr['email_address'];
+                break;
+            }
+        }
+
+        if ($email === null && count($emailAddresses) > 0) {
+            $email = $emailAddresses[0]['email_address'] ?? null;
+        }
+
+        // Priority: match by clerk_id first; fallback to email for cross-provider linking
+        $user = User::query()->where('clerk_id', $clerkId)->first()
+            ?? ($email !== null ? User::query()->where('email', $email)->first() : null);
+
+        // ── Existing user ─────────────────────────────────────────────────────
+        if ($user !== null) {
+            // Update clerk_id if missing or if user signed in via a different OAuth provider
+            if ($user->clerk_id === null || $user->clerk_id !== $clerkId) {
+                $user->update(['clerk_id' => $clerkId]);
+            }
+
+            $token = $user->createToken('clerk-exchange', ['*'], now()->addDays(7));
+
+            auth()->setUser($user);
+
+            return response()->json([
+                'access_token' => $token->plainTextToken,
+                'user' => new UserResource($user),
+                'panel_sso_url' => $this->buildPanelSsoUrl($user),
+            ]);
+        }
+
+        // ── New user — Send OTP to verify email before profile creation ─────────
+        $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        Cache::put('clerk_otp_'.$clerkId, $otp, now()->addMinutes(10));
+        Cache::put('clerk_pending_'.$clerkId, [
+            'firstname' => $firstName,
+            'lastname' => $lastName,
+            'email' => $email,
+            'avatar' => $avatar,
+        ], now()->addMinutes(15));
+
+        if ($email !== null) {
+            $requestedFrom = request()->ip() ?? 'inconnu';
+            $requestedAt = now()->translatedFormat('d F Y à H:i');
+
+            Mail::to($email, $firstName)
+                ->queue(new VerificationCodeMail($otp, $requestedFrom, $requestedAt));
+        }
+
+        return response()->json([
+            'state' => 'otp_required',
+            'email_hint' => $email !== null ? $this->maskEmail($email) : null,
+        ]);
+    }
+
+    /**
+     * Verify the 6-digit OTP sent after a new OAuth sign-in.
+     * Returns either an authenticated state (existing user) or profile_required (new user).
+     */
+    public function verifyClerkOtp(Request $request, ClerkJwtService $clerk): JsonResponse
+    {
+        $bearerToken = $request->bearerToken();
+
+        if ($bearerToken === null) {
+            return response()->json(['message' => 'Token non fourni.'], 401);
+        }
+
+        $clerkUser = $clerk->verifyAndFetchUser($bearerToken);
+
+        if ($clerkUser === null) {
+            return response()->json(['message' => 'Token Clerk invalide ou expiré.'], 401);
+        }
+
+        $clerkId = (string) ($clerkUser['id'] ?? '');
+        $otp = (string) ($request->input('otp', ''));
+        $cachedOtp = Cache::get('clerk_otp_'.$clerkId);
+
+        if ($cachedOtp === null || !hash_equals($cachedOtp, $otp)) {
+            return response()->json(['message' => 'Code invalide ou expiré.'], 422);
+        }
+
+        Cache::forget('clerk_otp_'.$clerkId);
+        Cache::put('clerk_verified_'.$clerkId, true, now()->addMinutes(15));
+
+        // Resolve email from Clerk payload
+        $emailAddresses = $clerkUser['email_addresses'] ?? [];
+        $primaryEmailId = $clerkUser['primary_email_address_id'] ?? null;
+        $email = null;
+
+        foreach ($emailAddresses as $addr) {
+            if ($primaryEmailId !== null && ($addr['id'] ?? null) === $primaryEmailId) {
+                $email = $addr['email_address'];
+                break;
+            }
+        }
+
+        if ($email === null && count($emailAddresses) > 0) {
+            $email = $emailAddresses[0]['email_address'] ?? null;
+        }
+
+        // Priority: match by clerk_id first; fallback to email only for accounts not yet linked
+        $user = User::query()->where('clerk_id', $clerkId)->first()
+            ?? ($email !== null ? User::query()->whereNull('clerk_id')->where('email', $email)->first() : null);
+
+        if ($user !== null) {
+            if ($user->clerk_id === null) {
+                $user->update(['clerk_id' => $clerkId]);
+            }
+
+            Cache::forget('clerk_verified_'.$clerkId);
+            Cache::forget('clerk_pending_'.$clerkId);
+
+            $token = $user->createToken('clerk-exchange', ['*'], now()->addDays(7));
+            auth()->setUser($user);
+
+            return response()->json([
+                'state' => 'authenticated',
+                'access_token' => $token->plainTextToken,
+                'user' => new UserResource($user),
+                'panel_sso_url' => $this->buildPanelSsoUrl($user),
+            ]);
+        }
+
+        /** @var array{firstname: string, lastname: string, email: string|null, avatar: string|null} $pending */
+        $pending = Cache::get('clerk_pending_'.$clerkId, []);
+
+        return response()->json([
+            'state' => 'profile_required',
+            'prefill' => $pending,
+        ]);
+    }
+
+    /**
+     * Complete profile creation for a new OAuth user after OTP verification.
+     * Creates the Laravel account, sends a welcome email, and returns a Sanctum token.
+     */
+    public function completeClerkProfile(ClerkExchangeRequest $request, ClerkJwtService $clerk): JsonResponse
+    {
+        $bearerToken = $request->bearerToken();
+
+        $clerkUser = $clerk->verifyAndFetchUser($bearerToken);
+
+        if ($clerkUser === null) {
+            return response()->json(['message' => 'Token Clerk invalide ou expiré.'], 401);
+        }
+
+        $clerkId = (string) ($clerkUser['id'] ?? '');
+
+        if (!Cache::get('clerk_verified_'.$clerkId)) {
+            return response()->json(['message' => 'Vérification email requise.'], 403);
+        }
+
+        if (!$request->filled('phone_number')) {
+            return response()->json(['message' => 'Le numéro de téléphone est obligatoire.'], 422);
+        }
+
+        /** @var array{firstname?: string, lastname?: string, email?: string|null, avatar?: string|null} $pending */
+        $pending = Cache::get('clerk_pending_'.$clerkId, []);
+        $firstName = (string) ($pending['firstname'] ?? $clerkUser['first_name'] ?? 'Utilisateur');
+        $lastName = (string) ($pending['lastname'] ?? $clerkUser['last_name'] ?? '');
+        $avatar = $pending['avatar'] ?? (isset($clerkUser['image_url']) ? (string) $clerkUser['image_url'] : null);
+        $email = $pending['email'] ?? null;
+
+        if ($email === null) {
+            $emailAddresses = $clerkUser['email_addresses'] ?? [];
+            $primaryEmailId = $clerkUser['primary_email_address_id'] ?? null;
+
+            foreach ($emailAddresses as $addr) {
+                if ($primaryEmailId !== null && ($addr['id'] ?? null) === $primaryEmailId) {
+                    $email = $addr['email_address'];
+                    break;
+                }
+            }
+
+            if ($email === null && count($emailAddresses) > 0) {
+                $email = $emailAddresses[0]['email_address'] ?? null;
+            }
+        }
+
+        // Guard against race-condition double-creation
+        // Priority: match by clerk_id first; fallback to email only for accounts not yet linked
+        $user = User::query()->where('clerk_id', $clerkId)->first()
+            ?? ($email !== null ? User::query()->whereNull('clerk_id')->where('email', $email)->first() : null);
+
+        $isNew = false;
+
+        if ($user === null) {
+            $user = User::create([
+                'clerk_id' => $clerkId,
+                'firstname' => $firstName,
+                'lastname' => $lastName,
+                'email' => $email ?? $clerkId.'@clerk.local',
+                'phone_number' => $request->input('phone_number'),
+                'city_id' => $request->input('city_id'),
+                'role' => 'customer',
+                'is_active' => true,
+                'avatar' => $avatar,
+                'email_verified_at' => now(),
+            ]);
+
+            $isNew = true;
+
+            if ($email !== null && !str_ends_with($email, '@clerk.local')) {
+                Mail::to($email, $firstName)->queue(new WelcomeEmail($user));
+            }
+        } else {
+            if ($user->clerk_id === null) {
+                $user->update(['clerk_id' => $clerkId]);
+            }
+        }
+
+        Cache::forget('clerk_verified_'.$clerkId);
+        Cache::forget('clerk_pending_'.$clerkId);
+
+        $token = $user->createToken('clerk-exchange', ['*'], now()->addDays(7));
+        auth()->setUser($user);
+
+        return response()->json([
+            'access_token' => $token->plainTextToken,
+            'user' => new UserResource($user),
+            'panel_sso_url' => $this->buildPanelSsoUrl($user),
+        ], $isNew ? 201 : 200);
+    }
+
+    /**
+     * Mask an email address for display: j***@gmail.com
+     */
+    private function maskEmail(string $email): string
+    {
+        [$local, $domain] = explode('@', $email, 2);
+        $masked = mb_substr($local, 0, 1).str_repeat('*', max(3, mb_strlen($local) - 1));
+
+        return $masked.'@'.$domain;
+    }
+
+    /**
+     * Generate a short-lived signed URL for panel auto-login.
+     * Returns null for customer accounts (they stay on the frontend).
+     */
+    private function buildPanelSsoUrl(User $user): ?string
+    {
+        if ($user->role === UserRole::CUSTOMER) {
+            return null;
+        }
+
+        return URL::temporarySignedRoute(
+            'panel.sso',
+            now()->addSeconds(60),
+            ['user_id' => $user->id]
+        );
     }
 }
