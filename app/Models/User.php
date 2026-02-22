@@ -8,6 +8,7 @@ namespace App\Models;
 
 use App\Enums\UserRole;
 use App\Enums\UserType;
+use App\Mail\VerifyEmailMail;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\UserFactory;
 use Eloquent;
@@ -30,7 +31,9 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use InvalidArgumentException;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -145,6 +148,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'google_id',
         'facebook_id',
         'apple_id',
+        'clerk_id',
         'oauth_provider',
         'oauth_avatar',
     ];
@@ -462,5 +466,40 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->setDescriptionForEvent(fn (string $eventName): string => "Utilisateur « {$this->firstname} {$this->lastname} » {$eventName}");
+    }
+
+    /**
+     * Send the password reset notification using our styled email template.
+     */
+    public function sendPasswordResetNotification(mixed $token): void
+    {
+        $resetUrl = config('app.frontend_url').'/reset-password?token='.urlencode((string) $token).'&email='.urlencode($this->email);
+
+        $requestedFrom = request()->ip() ?? 'inconnu';
+        $requestedAt = now()->translatedFormat('d F Y à H:i');
+
+        \Illuminate\Support\Facades\Mail::to($this->email, $this->firstname)
+            ->queue(new \App\Mail\ForgotPasswordMail($resetUrl, $requestedFrom, $requestedAt));
+    }
+
+    /**
+     * Send the email verification notification using our styled template.
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+        $verifyUrl = URL::temporarySignedRoute(
+            'api.verification.verify',
+            now()->addMinutes((int) config('auth.verification.expire', 60)),
+            [
+                'id' => $this->id,
+                'hash' => hash_hmac('sha256', $this->getEmailForVerification(), (string) config('app.key')),
+            ]
+        );
+
+        $requestedFrom = request()->ip() ?? 'inconnu';
+        $requestedAt = now()->translatedFormat('d F Y à H:i');
+
+        Mail::to($this->email, $this->firstname)
+            ->queue(new VerifyEmailMail($verifyUrl, (int) config('auth.verification.expire', 60), $requestedFrom, $requestedAt));
     }
 }
