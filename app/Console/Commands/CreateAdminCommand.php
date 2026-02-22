@@ -83,10 +83,14 @@ class CreateAdminCommand extends Command
             'email' => $email,
             'password' => Hash::make($password),
             'role' => UserRole::ADMIN,
-            'email_verified_at' => now(),
         ]);
 
+        // Trigger email verification — VerifyEmailMail is queued via sendEmailVerificationNotification()
+        $user->sendEmailVerificationNotification();
+
         $this->info("✅ Admin created: {$user->email} (ID: {$user->id})");
+        $this->info("📧 A verification email has been sent to {$user->email}.");
+        $this->line('   The admin will receive a welcome email automatically after verifying their address.');
 
         return self::SUCCESS;
     }

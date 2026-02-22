@@ -1,16 +1,17 @@
 <?php
 
+use App\Mail\ForgotPasswordMail;
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 
 uses(RefreshDatabase::class);
 
 test('a user can request a password reset link', function (): void {
-    Notification::fake();
+    Mail::fake();
     $user = User::factory()->create();
 
     $response = $this->postJson('/api/v1/auth/forgot-password', [
@@ -18,10 +19,10 @@ test('a user can request a password reset link', function (): void {
     ]);
 
     $response->assertStatus(200)
-        ->assertJson(['message' => __('passwords.sent')]); // ou 'Nous vous avons envoyé par email le lien...'
+        ->assertJson(['message' => 'Si cette adresse est enregistrée, un email de réinitialisation a été envoyé.']);
 
-    // Vérifier que la notification ResetPassword a été envoyée
-    Notification::assertSentTo($user, ResetPassword::class);
+    // Vérifier que notre mail stylisé a bien été mis en file
+    Mail::assertQueued(ForgotPasswordMail::class, fn ($mail) => $mail->hasTo($user->email));
 });
 
 test('a user can reset password with valid token', function (): void {
