@@ -1962,6 +1962,166 @@
                 }
             }
         },
+        "/api/v1/ads/{ad}/toggle-visibility": {
+            "post": {
+                "tags": [
+                    "🏠 Annonces"
+                ],
+                "summary": "Toggle ad visibility",
+                "description": "Hide or show an ad. Hidden ads are not visible to other users but remain in the database.",
+                "operationId": "toggleAdVisibility",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Visibility toggled successfully"
+                    },
+                    "403": {
+                        "description": "Forbidden - not the owner"
+                    },
+                    "404": {
+                        "description": "Ad not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/set-status": {
+            "post": {
+                "tags": [
+                    "🏠 Annonces"
+                ],
+                "summary": "Set ad status",
+                "description": "Update the ad status to available, reserved, rent, or sold.",
+                "operationId": "setAdStatus",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "status"
+                                ],
+                                "properties": {
+                                    "status": {
+                                        "type": "string",
+                                        "enum": [
+                                            "available",
+                                            "reserved",
+                                            "rent",
+                                            "sold"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Status updated successfully"
+                    },
+                    "400": {
+                        "description": "Invalid status transition"
+                    },
+                    "403": {
+                        "description": "Forbidden - not the owner"
+                    },
+                    "404": {
+                        "description": "Ad not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/set-availability": {
+            "post": {
+                "tags": [
+                    "🏠 Annonces"
+                ],
+                "summary": "Set ad availability dates",
+                "description": "Set when the ad/property is available (from/to dates).",
+                "operationId": "setAdAvailability",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "available_from": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "nullable": true
+                                    },
+                                    "available_to": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Availability updated successfully"
+                    },
+                    "403": {
+                        "description": "Forbidden - not the owner"
+                    },
+                    "404": {
+                        "description": "Ad not found"
+                    },
+                    "422": {
+                        "description": "Validation error"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/ads/{ad}/view": {
             "post": {
                 "tags": [
@@ -4148,6 +4308,167 @@
                         "bearerAuth": []
                     }
                 ]
+            }
+        },
+        "/api/v1/notifications": {
+            "get": {
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Get user notifications",
+                "description": "Returns paginated list of notifications for the authenticated user.",
+                "operationId": "cac3bdde44f0be0512f7d05c0a6064e4",
+                "parameters": [
+                    {
+                        "name": "unread_only",
+                        "in": "query",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 15
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Notifications retrieved successfully"
+                    },
+                    "401": {
+                        "description": "Unauthenticated"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/notifications/unread-count": {
+            "get": {
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Get unread notifications count",
+                "description": "Get unread notifications count.",
+                "operationId": "9fd717daa9c0cfd209252ee25d0715ea",
+                "responses": {
+                    "200": {
+                        "description": "Count retrieved successfully"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/notifications/{id}/read": {
+            "post": {
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Mark notification as read",
+                "description": "Mark a notification as read.",
+                "operationId": "fc1834c084071515133aef066568ee30",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Notification marked as read"
+                    },
+                    "404": {
+                        "description": "Notification not found"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/notifications/read-all": {
+            "post": {
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Mark all notifications as read",
+                "description": "Mark all notifications as read.",
+                "operationId": "70c7b85e5d099a20c739e15aa0ca5fc6",
+                "responses": {
+                    "200": {
+                        "description": "All notifications marked as read"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/notifications/{id}": {
+            "delete": {
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Delete a notification",
+                "description": "Delete a notification.",
+                "operationId": "3f8fe68ea04e79015d8aad5912cadbc1",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Notification deleted"
+                    },
+                    "404": {
+                        "description": "Notification not found"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/property-attributes": {
+            "get": {
+                "tags": [
+                    "Ads"
+                ],
+                "summary": "Get available property attributes",
+                "description": "Returns list of available property attributes (Wi-Fi, parking, etc.) for ads.",
+                "operationId": "fe1dd6bd39c72b74099ecb9385013870",
+                "responses": {
+                    "200": {
+                        "description": "Property attributes retrieved successfully"
+                    }
+                }
             }
         },
         "/api/v1/payments/initialize/{ad}": {
@@ -7525,6 +7846,14 @@
         {
             "name": "🏢 Agence",
             "description": "🏢 Agence"
+        },
+        {
+            "name": "Notifications",
+            "description": "Notifications"
+        },
+        {
+            "name": "Ads",
+            "description": "Ads"
         }
     ]
 }
