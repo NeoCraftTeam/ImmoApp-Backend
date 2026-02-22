@@ -6,11 +6,14 @@ declare(strict_types=1);
 
 namespace App\Listeners;
 
+use App\Enums\UserRole;
+use App\Mail\WelcomeEmail;
 use Exception;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class SendWelcomeNotification implements ShouldQueue
 {
@@ -33,13 +36,9 @@ class SendWelcomeNotification implements ShouldQueue
                 'role' => $user->role ?? 'unknown',
             ]);
 
-            // 2. Envoyer email de bienvenue (optionnel)
-            // Décommente si tu créés une classe WelcomeEmail
             // 2. Envoyer email de bienvenue
-            if (class_exists(\App\Mail\WelcomeEmail::class)) {
-                \Illuminate\Support\Facades\Mail::to($user->email)->send(new \App\Mail\WelcomeEmail($user));
-                Log::info('Welcome email sent', ['user_id' => $user->id]);
-            }
+            Mail::to($user->email, $user->firstname)->queue(new WelcomeEmail($user));
+            Log::info('Welcome email queued', ['user_id' => $user->id]);
 
             // 3. Autres actions automatiques que tu peux ajouter :
 
@@ -93,22 +92,16 @@ class SendWelcomeNotification implements ShouldQueue
     {
         try {
             match ($user->role) {
-                // Actions pour les clients
-                'customer' => Log::info('Customer welcome actions triggered', [
+                UserRole::CUSTOMER => Log::info('Customer welcome actions triggered', [
                     'user_id' => $user->id,
                 ]),
-                // Actions pour les agents
-                'agent' => Log::info('Agent welcome actions triggered', [
+                UserRole::AGENT => Log::info('Agent welcome actions triggered', [
                     'user_id' => $user->id,
                 ]),
-                // Actions pour les admins
-                'admin' => Log::info('Admin welcome actions triggered', [
+                UserRole::ADMIN => Log::info('Admin welcome actions triggered', [
                     'user_id' => $user->id,
                 ]),
-                default => Log::info('Default welcome actions triggered', [
-                    'user_id' => $user->id,
-                    'role' => $user->role,
-                ]),
+                default => null,
             };
 
         } catch (Exception $e) {
