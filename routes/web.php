@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\Auth\EmailVerificationController;
+use App\Http\Controllers\PanelSsoController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -10,6 +11,9 @@ Route::get('/', function () {
 
     // routes/web.php
 });
+
+// Clerk → Filament panel SSO (URL signée, valide 60 secondes)
+Route::get('/auth/panel-sso', PanelSsoController::class)->name('panel.sso');
 
 Route::get('email/verify/{id}/{hash}', [
     EmailVerificationController::class,
