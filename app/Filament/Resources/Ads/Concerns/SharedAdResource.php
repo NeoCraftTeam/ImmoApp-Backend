@@ -57,26 +57,34 @@ trait SharedAdResource
                 ->maxSize(5120)
                 ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
                 ->imagePreviewHeight('80')
-                ->columnSpan(1),
+                ->columnSpan(1)
+                ->extraAttributes([
+                    'data-native-image' => 'true',
+                    'data-native-image-camera' => 'true',
+                ]),
             TextInput::make('adresse')
                 ->required(),
             TextInput::make('price')
                 ->numeric()
                 ->required()
                 ->minValue(0)
-                ->prefix('FCFA'),
+                ->prefix('FCFA')
+                ->extraInputAttributes(['inputmode' => 'numeric']),
             TextInput::make('surface_area')
                 ->required()
                 ->numeric()
-                ->minValue(1),
+                ->minValue(1)
+                ->extraInputAttributes(['inputmode' => 'numeric']),
             TextInput::make('bedrooms')
                 ->required()
                 ->numeric()
-                ->minValue(0),
+                ->minValue(0)
+                ->extraInputAttributes(['inputmode' => 'numeric']),
             TextInput::make('bathrooms')
                 ->required()
                 ->numeric()
-                ->minValue(0),
+                ->minValue(0)
+                ->extraInputAttributes(['inputmode' => 'numeric']),
             Toggle::make('has_parking')
                 ->label('Parking inclus'),
             Section::make('Équipements & Services')

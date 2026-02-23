@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Pages\Auth;
 
 use App\Enums\UserRole;
+use App\Filament\Forms\Components\NativePhoneInput;
 use App\Models\User;
 use App\Services\AgencyService;
 use Filament\Auth\Pages\Register as BaseRegister;
@@ -55,9 +56,8 @@ class CustomRegister extends BaseRegister
     {
         return Fieldset::make('Téléphone')
             ->schema([
-                TextInput::make('phone_number')
+                NativePhoneInput::make('phone_number')
                     ->label('Numéro de téléphone')
-                    ->tel()
                     ->required()
                     ->maxLength(20)
                     ->helperText('Ce numéro sera affiché aux clients qui débloquent vos annonces'),

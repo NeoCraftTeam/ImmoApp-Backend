@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\AdTypeController;
 use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CityController;
+use App\Http\Controllers\Api\V1\ClerkWebhookController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\QuarterController;
@@ -37,11 +38,18 @@ Route::prefix('v1')->group(function (): void {
         Route::post('resend-verification', [AuthController::class, 'resendVerificationEmail'])
             ->middleware('throttle:2,5'); // 2 attempts every 5 minutes
 
-        Route::get('email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])->name('api.verification.verify');
+        Route::get('email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
+            ->middleware('throttle:5,10')
+            ->name('api.verification.verify');
 
         // Password Reset
         Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:3,10');
         Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:3,10');
+
+        // Clerk JWT → Sanctum token exchange
+        Route::post('clerk/exchange', [AuthController::class, 'clerkExchange'])->middleware('throttle:10,1');
+        Route::post('clerk/verify-otp', [AuthController::class, 'verifyClerkOtp'])->middleware('throttle:5,1');
+        Route::post('clerk/complete-profile', [AuthController::class, 'completeClerkProfile'])->middleware('throttle:5,1');
 
         // OAuth Social Authentication
         Route::prefix('oauth')->controller(SocialAuthController::class)->group(function (): void {
@@ -74,7 +82,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('refresh', [AuthController::class, 'refresh']);
             Route::get('me', [AuthController::class, 'me']);
             Route::post('email/resend', [AuthController::class, 'resendVerificationEmail'])->middleware('auth:sanctum');
-            Route::post('update-password', [AuthController::class, 'updatePassword']);
+            Route::post('update-password', [AuthController::class, 'updatePassword'])->middleware('throttle:5,10');
         });
     });
 
@@ -161,6 +169,10 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/payments/unlock-price', fn () => response()->json([
         'unlock_price' => (int) \App\Models\Setting::get('unlock_price', 500),
     ]));
+
+    // --- CLERK WEBHOOKS ---
+    Route::post('/clerk/webhook', [ClerkWebhookController::class, 'handle'])
+        ->middleware('throttle:60,1');
 
     // --- PAIEMENTS ---
     Route::post('/payments/initialize/{ad}', [PaymentController::class, 'initialize'])
