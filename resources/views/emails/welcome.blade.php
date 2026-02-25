@@ -4,7 +4,7 @@
 
 @section('content')
 
-    <h1>Bienvenue, {{ $user->firstname }} 👋</h1>
+    <h1>Bienvenue, {{ $user->lastname }}</h1>
 
     <p class="text">
         Votre compte <strong>KeyHome</strong> est maintenant activé. Vous faites officiellement partie
@@ -12,6 +12,7 @@
     </p>
 
     <p class="text" style="margin-top: 24px; font-weight: 600; color: #000;">
+        Nous avons conçu cette plateforme pour vous simplifier la vie immobilière.
         Voici ce que vous pouvez faire dès maintenant :
     </p>
 
@@ -48,13 +49,13 @@
 
     <div class="btn-wrapper">
         <a href="{{ config('app.frontend_url', config('app.url')) }}/home" class="btn">
-            Accéder à mon espace
+            Faire le tour du propriétaire
         </a>
     </div>
 
     <p class="fallback" style="margin-top: 24px;">
         Si vous avez des questions, notre équipe est disponible à
-        <a href="mailto:support@neocraft.dev" class="link">support@neocraft.dev</a>.
+        <a href="mailto:support@keyhome.app" class="link">support@keyhome.app</a>.
     </p>
 
 @endsection
