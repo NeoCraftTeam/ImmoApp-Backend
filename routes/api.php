@@ -222,8 +222,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/{ad}/set-availability', 'setAvailability');
         });
 
-        // Capture l'ID de l'annonce (doit être en dernier)
-        Route::get('/{id}', 'show');
+        // Capture le slug de l'annonce (doit être en dernier)
+        Route::get('/{slug}', 'show');
     });
 
     // --- INTERACTIONS (vues, favoris, impressions, partages, clics) ---
