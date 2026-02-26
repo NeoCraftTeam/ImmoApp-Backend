@@ -300,7 +300,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     {
         $this->addMediaCollection('avatars')
             ->singleFile()
-            ->acceptsMimeTypes(['image/jpeg', 'image/png']);
+            ->acceptsMimeTypes(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
     }
 
     /**
