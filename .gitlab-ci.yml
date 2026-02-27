@@ -230,6 +230,107 @@ production_deploy:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
 
+# --- DEPLOIEMENT PREPROD ---
+preprod_deploy:
+  stage: deploy
+  needs: [build_image, test_suite]
+  timeout: 15 minutes
+  script:
+    - mkdir -p /opt/keyhome-preprod/.docker/nginx/conf.d
+    # Utilise le docker-compose.preprod.yml (services app uniquement, pas de DB/Redis/Meilisearch)
+    - cp docker-compose.preprod.yml /opt/keyhome-preprod/docker-compose.yml
+    - cp -rf .docker/nginx/conf.d/. /opt/keyhome-preprod/.docker/nginx/conf.d/
+    # Sync codebase from preprod branch
+    - |
+      AUTHENTICATED_URL="https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/${CI_PROJECT_PATH}.git"
+      if [ -d /opt/keyhome-preprod/codebase/.git ]; then
+        cd /opt/keyhome-preprod/codebase
+        git remote set-url origin "$AUTHENTICATED_URL"
+        git fetch origin preprod && git reset --hard origin/preprod
+      else
+        git clone --depth 1 --branch preprod "$AUTHENTICATED_URL" /opt/keyhome-preprod/codebase
+      fi
+    - cd /opt/keyhome-preprod || exit 1
+    - |
+      if [ ! -f .env ]; then
+        echo "❌ /opt/keyhome-preprod/.env n'existe pas."
+        echo "   Créez-le à partir de .env.preprod.example avant le premier déploiement."
+        echo "   Variables critiques : COMPOSE_PREFIX=keyhome-preprod, WEB_PORT=9091, DB_HOST=keyhome-db"
+        exit 1
+      fi
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - export APP_IMAGE="${CI_REGISTRY_IMAGE}/app:preprod"
+    - echo "🚀 Deploying PREPROD image $APP_IMAGE (shared infra with prod)"
+    # Ensure the prod network exists (needed for shared DB/Redis/Meilisearch)
+    - |
+      if ! docker network inspect keyhome_keyhome-network > /dev/null 2>&1; then
+        echo "❌ Le réseau keyhome_keyhome-network n'existe pas. La prod doit tourner d'abord."
+        exit 1
+      fi
+    # Create preprod database in prod's PostgreSQL if it doesn't exist
+    - |
+      echo "🗄️ Vérification de la base preprod..."
+      DB_EXISTS=$(docker exec keyhome-db psql -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'keyhome_preprod'" 2>/dev/null || echo "0")
+      if [ "$DB_EXISTS" != "1" ]; then
+        echo "  → Création de la base keyhome_preprod..."
+        docker exec keyhome-db psql -U postgres -c "CREATE DATABASE keyhome_preprod"
+        docker exec keyhome-db psql -U postgres -d keyhome_preprod -c "CREATE EXTENSION IF NOT EXISTS postgis"
+        echo "  ✅ Base keyhome_preprod créée avec PostGIS"
+      else
+        echo "  ✅ Base keyhome_preprod existe déjà"
+      fi
+    # Enable maintenance mode before deploy
+    - docker compose exec -T app php artisan down --retry=60 || true
+    - echo "📦 Stopping existing containers..."
+    - docker compose down --remove-orphans || true
+    - echo "📥 Pulling new image..."
+    - APP_IMAGE=$APP_IMAGE docker compose pull
+    - echo "🔄 Starting containers..."
+    - APP_IMAGE=$APP_IMAGE docker compose up -d --no-build
+    # Wait for app container to be healthy
+    - |
+      echo "⏳ Waiting for containers to be ready..."
+      for i in $(seq 1 60); do
+        if docker compose exec -T app php -v > /dev/null 2>&1; then
+          echo "✅ App container is ready"
+          break
+        fi
+        if [ "$i" = "60" ]; then
+          echo "❌ App container failed to start"
+          docker compose logs app --tail=50
+          docker compose ps -a
+          exit 1
+        fi
+        sleep 2
+      done
+    # Clear cache BEFORE migrations
+    - echo "🧹 Clearing cache before migrations..."
+    - docker compose exec -T app php artisan optimize:clear
+    - docker compose exec -T app php artisan config:cache
+    # Run migrations on the preprod database
+    - |
+      echo "🗄️ Running migrations..."
+      if ! docker compose exec -T app php artisan migrate --force; then
+        echo "❌ Migration failed — rolling back..."
+        docker compose logs app --tail=30
+        docker compose down --remove-orphans || true
+        exit 1
+      fi
+    - echo "⚡ Optimizing..."
+    - docker compose exec -T app php artisan optimize
+    - docker compose exec -T app php artisan filament:assets
+    - docker compose exec -T app chmod +x resetFilamentLivewire.sh
+    - docker compose exec -T app bash resetFilamentLivewire.sh
+    - docker compose exec -T app php artisan storage:link || true
+    - docker compose exec -T app php artisan l5-swagger:generate || true
+    # Disable maintenance mode
+    - echo "✅ Preprod deployment complete, bringing app back up..."
+    - docker compose exec -T app php artisan up
+  after_script:
+    - docker logout $CI_REGISTRY 2>/dev/null || true
+  rules:
+    - if: $CI_COMMIT_BRANCH == "preprod"
+
 # --- ETAPE 4 : SMOKE TEST POST-DEPLOIEMENT ---
 smoke_test:
   stage: smoke_test
@@ -282,13 +383,67 @@ smoke_test:
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
 
+# --- SMOKE TEST PREPROD ---
+preprod_smoke_test:
+  stage: smoke_test
+  needs: [preprod_deploy]
+  timeout: 3 minutes
+  script:
+    - |
+      BASE_URL="${PREPROD_API_BASE_URL:-https://preprod-api.keyhome.neocraft.dev}"
+      echo "🔍 Running PREPROD smoke tests on $BASE_URL..."
+
+      echo "→ Testing health endpoint..."
+      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/up")
+      if [ "$HTTP_CODE" != "200" ]; then
+        echo "❌ Health check failed (HTTP $HTTP_CODE)"
+        exit 1
+      fi
+      echo "  ✅ Health check passed"
+
+      echo "→ Testing API endpoint..."
+      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/v1/cities")
+      if [ "$HTTP_CODE" != "200" ]; then
+        echo "❌ API endpoint failed (HTTP $HTTP_CODE)"
+        exit 1
+      fi
+      echo "  ✅ API endpoint passed"
+
+      echo "→ Testing Filament admin..."
+      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L "$BASE_URL/admin/login")
+      if [ "$HTTP_CODE" != "200" ]; then
+        echo "❌ Admin panel failed (HTTP $HTTP_CODE)"
+        exit 1
+      fi
+      echo "  ✅ Admin panel accessible"
+
+      echo ""
+      echo "✅ All preprod smoke tests passed!"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "preprod"
+
 # --- ETAPE 5 : NOTIFICATIONS ---
 notify_slack_success:
   stage: notify
-  needs: [smoke_test]
+  needs:
+    - job: smoke_test
+      optional: true
+    - job: preprod_smoke_test
+      optional: true
   script:
     - |
-      # Calculer la durée approximative (CI_PIPELINE_CREATED_AT est ISO 8601)
+      # Déterminer l'environnement
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        ENV_LABEL="Production"
+        ENV_EMOJI="🚀"
+        API_URL="${API_BASE_URL:-https://api.keyhome.neocraft.dev}"
+      else
+        ENV_LABEL="Preprod"
+        ENV_EMOJI="🧪"
+        API_URL="${PREPROD_API_BASE_URL:-https://preprod-api.keyhome.neocraft.dev}"
+      fi
+
+      # Calculer la durée approximative
       if [ -n "$CI_PIPELINE_CREATED_AT" ]; then
         CREATED_TS=$(date -d "$CI_PIPELINE_CREATED_AT" +%s 2>/dev/null || echo "")
         if [ -n "$CREATED_TS" ]; then
@@ -308,7 +463,7 @@ notify_slack_success:
           \"blocks\": [
             {
               \"type\": \"header\",
-              \"text\": {\"type\": \"plain_text\", \"text\": \"✅ Déploiement Backend Réussi\", \"emoji\": true}
+              \"text\": {\"type\": \"plain_text\", \"text\": \"$ENV_EMOJI Déploiement Backend $ENV_LABEL Réussi\", \"emoji\": true}
             },
             {
               \"type\": \"section\",
@@ -328,7 +483,7 @@ notify_slack_success:
               \"elements\": [
                 {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"🔗 Commit\"}, \"url\": \"$CI_PROJECT_URL/-/commit/$CI_COMMIT_SHA\"},
                 {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"📊 Pipeline\"}, \"url\": \"$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID\"},
-                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"🌐 API\"}, \"url\": \"${API_BASE_URL:-https://api.keyhome.neocraft.dev}/up\"}
+                {"type": "button", "text": {"type": "plain_text", "text": "🌐 API"}, "url": "$API_URL/up"}
               ]
             }
           ]
@@ -337,13 +492,18 @@ notify_slack_success:
   when: on_success
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
+    - if: $CI_COMMIT_BRANCH == "preprod"
 
 notify_slack_failure:
   stage: notify
   needs:
     - job: smoke_test
       optional: true
+    - job: preprod_smoke_test
+      optional: true
     - job: production_deploy
+      optional: true
+    - job: preprod_deploy
       optional: true
     - job: test_suite
       optional: true
