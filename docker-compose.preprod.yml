@@ -1,0 +1,115 @@
+# ============================================================
+# PREPROD — Services applicatifs uniquement
+# ============================================================
+# DB, Redis et Meilisearch sont partagés avec la prod
+# (containers keyhome-db, keyhome-redis, keyhome-meilisearch)
+# via le réseau externe keyhome_keyhome-network.
+#
+# Utilisation : placé dans /opt/keyhome-preprod/
+# Les variables sont lues depuis /opt/keyhome-preprod/.env
+# ============================================================
+
+services:
+  code-sync:
+    image: ${APP_IMAGE:-keyhome-backend}
+    container_name: ${COMPOSE_PREFIX:-keyhome-preprod}-code-sync
+    command: sh -c "rm -rf /shared-code/bootstrap/cache/* && cp -rp /var/www/. /shared-code/ && chmod -R 755 /shared-code && chown -R 1000:1000 /shared-code"
+    volumes:
+      - preprod-app-code:/shared-code
+    networks:
+      - preprod-network
+
+  app:
+    image: ${APP_IMAGE:-keyhome-backend}
+    container_name: ${COMPOSE_PREFIX:-keyhome-preprod}-backend
+    restart: unless-stopped
+    working_dir: /var/www
+    depends_on:
+      code-sync:
+        condition: service_completed_successfully
+    env_file:
+      - .env
+    volumes:
+      - preprod-app-code:/var/www
+      - preprod-storage-data:/var/www/storage
+      - ./.env:/var/www/.env
+    networks:
+      - preprod-network
+      - keyhome-prod-network
+    environment:
+      - APP_ENV=${APP_ENV:-staging}
+      - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
+      - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+
+  worker:
+    image: ${APP_IMAGE:-keyhome-backend}
+    container_name: ${COMPOSE_PREFIX:-keyhome-preprod}-worker
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan queue:work --queue=emails,default --tries=3 --timeout=90
+    depends_on:
+      - app
+    env_file:
+      - .env
+    volumes:
+      - preprod-app-code:/var/www
+      - preprod-storage-data:/var/www/storage
+      - ./.env:/var/www/.env
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'queue:work' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - preprod-network
+      - keyhome-prod-network
+    environment:
+      - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
+      - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+
+  nightwatch-agent:
+    image: laravelphp/nightwatch-agent:latest
+    container_name: ${COMPOSE_PREFIX:-keyhome-preprod}-nightwatch-agent
+    restart: unless-stopped
+    environment:
+      - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
+    healthcheck:
+      test: php nightwatch-status
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - preprod-network
+
+  web:
+    image: nginx:alpine
+    container_name: ${COMPOSE_PREFIX:-keyhome-preprod}-web
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_started
+    ports:
+      - "${WEB_PORT:-9091}:80"
+    volumes:
+      - preprod-app-code:/var/www
+      - preprod-storage-data:/var/www/storage
+      - .docker/nginx/conf.d:/etc/nginx/conf.d
+    networks:
+      - preprod-network
+      - traefik-public
+
+networks:
+  preprod-network:
+    driver: bridge
+  keyhome-prod-network:
+    external: true
+    name: keyhome_keyhome-network
+  traefik-public:
+    external: true
+
+volumes:
+  preprod-app-code:
+    driver: local
+  preprod-storage-data:
+    driver: local
