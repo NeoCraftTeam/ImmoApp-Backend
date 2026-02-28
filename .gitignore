@@ -41,3 +41,6 @@ data.ms/
 # Generated assets
 public/css/app/
 public/js/app/
+
+# IDE helper files (dev only)
+_ide_helper*.php

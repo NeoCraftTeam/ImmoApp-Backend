@@ -144,7 +144,7 @@ test_suite:
           php artisan migrate --env=testing --force
           set +e
           echo "=== RUNNING TESTS ==="
-          php artisan test --env=testing -v 2>&1
+          php -d memory_limit=512M artisan test --env=testing -v 2>&1
           TEST_RC=$?
           echo "=== TESTS FINISHED WITH RC=$TEST_RC ==="
           exit $TEST_RC
