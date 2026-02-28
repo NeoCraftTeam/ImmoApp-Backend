@@ -9,6 +9,7 @@ use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
 
@@ -39,6 +40,15 @@ class AppServiceProvider extends ServiceProvider
         \App\Models\Ad::observe(\App\Observers\AdObserver::class);
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
+
+        // Partage le logo encodé en base64 avec toutes les vues emails.*
+        View::composer('emails.*', function ($view): void {
+            $logoPath = public_path('images/keyhomelogo_transparent.png');
+            $view->with('emailLogoBase64', file_exists($logoPath)
+                ? base64_encode((string) file_get_contents($logoPath))
+                : ''
+            );
+        });
 
         ResetPassword::createUrlUsing(function (object $notifiable, string $token) {
             $frontendUrl = config('app.frontend_url', 'http://localhost:3000');
