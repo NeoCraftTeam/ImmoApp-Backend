@@ -390,7 +390,7 @@ preprod_smoke_test:
   timeout: 3 minutes
   script:
     - |
-      BASE_URL="${PREPROD_API_BASE_URL:-https://preprod-api.keyhome.neocraft.dev}"
+      BASE_URL="${PREPROD_API_BASE_URL:-https://api.keyhome.neocraft.dev}"
       echo "🔍 Running PREPROD smoke tests on $BASE_URL..."
 
       echo "→ Testing health endpoint..."
@@ -440,7 +440,7 @@ notify_slack_success:
       else
         ENV_LABEL="Preprod"
         ENV_EMOJI="🧪"
-        API_URL="${PREPROD_API_BASE_URL:-https://preprod-api.keyhome.neocraft.dev}"
+        API_URL="${PREPROD_API_BASE_URL:-https://api.keyhome.neocraft.dev}"
       fi
 
       # Calculer la durée approximative
