@@ -14,6 +14,8 @@ return new class extends Migration
         Schema::table('users', function (Blueprint $table) {
             $table->timestamp('last_login_at')->nullable();
             $table->string('last_login_ip')->nullable();
+            $table->string('last_login_country', 5)->nullable()->comment('ISO-3166-1 alpha-2 or CF-IPCountry value');
+            $table->string('last_login_city')->nullable();
             $table->boolean('is_active')->default(true);
         });
     }
@@ -24,9 +26,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
-            $table->timestamp('last_login_at')->nullable();
-            $table->string('last_login_ip')->nullable();
-            $table->boolean('is_active')->default(true);
+            $table->dropColumn(['last_login_at', 'last_login_ip', 'last_login_country', 'last_login_city', 'is_active']);
         });
     }
 };

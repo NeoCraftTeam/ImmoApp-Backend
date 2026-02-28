@@ -98,6 +98,8 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  *
  * @property string|null $last_login_at
  * @property string|null $last_login_ip
+ * @property string|null $last_login_country
+ * @property string|null $last_login_city
  * @property bool $is_active
  * @property-read City|null $city
  * @property-read MediaCollection<int, Media> $media
@@ -142,6 +144,8 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'email_verified_at',
         'last_login_ip',
         'last_login_at',
+        'last_login_country',
+        'last_login_city',
         'created_at',
         'updated_at',
         // OAuth fields

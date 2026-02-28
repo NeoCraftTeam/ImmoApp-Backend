@@ -10,6 +10,7 @@ use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
 use App\Mail\NewDeviceSignInMail;
+use App\Mail\NewLocationSignInMail;
 use App\Mail\PasswordChangedMail;
 use App\Mail\VerificationCodeMail;
 use App\Mail\WelcomeEmail;
@@ -642,10 +643,12 @@ final class AuthController
             $user = User::findOrFail($id);
 
             // Defense-in-depth: verify hash matches user's email via HMAC-SHA256
-            if (!hash_equals(
-                hash_hmac('sha256', (string) $user->getEmailForVerification(), (string) config('app.key')),
-                $hash
-            )) {
+            if (
+                !hash_equals(
+                    hash_hmac('sha256', (string) $user->getEmailForVerification(), (string) config('app.key')),
+                    $hash
+                )
+            ) {
                 if ($request->wantsJson()) {
                     return response()->json(['message' => 'Lien de vérification invalide'], 400);
                 }
@@ -960,17 +963,53 @@ final class AuthController
                 now()->addDays(7) // expiration dans 7 jours
             );
 
-            // Détecter une connexion depuis un nouvel appareil / IP
+            // ── Detect new geographic location (style Binance) ──────────────────────
+            // Priority order for location data:
+            //   1. Cloudflare headers (CF-IPCountry / CF-IPCity) – free & accurate
+            //   2. Stevebauman/location or manual GeoIP – not installed, skip
+            //   3. Fallback: raw IP comparison (legacy NewDeviceSignInMail)
             $currentIp = $request->ip();
-            if ($user->last_login_ip !== null && $user->last_login_ip !== $currentIp) {
-                $ua = UserAgentParser::parse($request->userAgent());
+            $cfCountry = $request->header('CF-IPCountry', '');
+            $cfCity = $request->header('CF-IPCity', '');
+
+            // Normalise location strings
+            $currentCountry = strtoupper(trim($cfCountry));
+            $currentCity = mb_convert_case(trim($cfCity), MB_CASE_TITLE);
+
+            $knownCountry = $user->last_login_country ?? '';
+            $knownCity = $user->last_login_city ?? '';
+            $knownIp = $user->last_login_ip ?? '';
+
+            $locationChanged = $knownCountry !== '' && (
+                $currentCountry !== $knownCountry ||
+                ($currentCity !== '' && $currentCity !== $knownCity)
+            );
+
+            $ua = UserAgentParser::parse($request->userAgent() ?? '');
+
+            if ($locationChanged) {
+                // New country or city → send the "new location" security email
+                Mail::to($user->email, $user->firstname)->queue(new NewLocationSignInMail(
+                    userName: $user->firstname ?? $user->email,
+                    city: $currentCity ?: 'Inconnue',
+                    country: $currentCountry ?: 'Inconnu',
+                    ipAddress: $currentIp,
+                    device: $ua['device_type'],
+                    browser: $ua['browser_name'],
+                    operatingSystem: $ua['operating_system'],
+                    loginAt: now()->translatedFormat('d F Y \\à H:i'),
+                    secureAccountUrl: config('app.frontend_url').'/security/sessions',
+                    supportEmail: config('mail.from.address'),
+                ));
+            } elseif ($currentIp !== $knownIp && $knownIp !== '') {
+                // Same country/city but different IP (e.g. new ISP) → existing device mail
                 Mail::to($user->email, $user->firstname)->queue(new NewDeviceSignInMail(
                     deviceType: $ua['device_type'],
                     browserName: $ua['browser_name'],
                     operatingSystem: $ua['operating_system'],
-                    location: $currentIp,
+                    location: ($currentCity ?: $currentIp).', '.$currentCountry,
                     ipAddress: $currentIp,
-                    sessionCreatedAt: now()->translatedFormat('d F Y à H:i'),
+                    sessionCreatedAt: now()->translatedFormat('d F Y \\à H:i'),
                     signInMethod: 'Email / Mot de passe',
                     revokeSessionUrl: config('app.frontend_url').'/security/sessions',
                     supportEmail: config('mail.from.address'),
@@ -981,6 +1020,8 @@ final class AuthController
             $user->update([
                 'last_login_at' => now(),
                 'last_login_ip' => $currentIp,
+                'last_login_country' => $currentCountry ?: null,
+                'last_login_city' => $currentCity ?: null,
             ]);
 
             // Log de connexion réussie
