@@ -13,7 +13,7 @@ use App\Models\Ad;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
-use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\MarkdownEditor;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -147,17 +147,21 @@ class PendingAdResource extends Resource
                 Action::make('decline')
                     ->label('Décliner')
                     ->icon('heroicon-m-x-circle')
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->modalIcon('heroicon-o-x-circle')
-                    ->modalIconColor('danger')
-                    ->modalHeading('Décliner cette annonce')
-                    ->modalDescription(fn (Ad $record) => "L'annonce \"{$record->title}\" sera supprimée et l'auteur sera notifié par email.")
+                    ->color('warning')
+                    ->requiresConfirmation(false)
+                    ->modalIcon('heroicon-o-exclamation-triangle')
+                    ->modalIconColor('warning')
+                    ->modalHeading('Motif de refus de l\'annonce')
+                    ->modalDescription(fn (Ad $record) => "Rédigez un motif clair et professionnel pour l'auteur de \"".$record->title.'".')
                     ->form([
-                        Textarea::make('reason')
-                            ->label('Motif du refus (optionnel)')
-                            ->placeholder('Ex: Photos floues, description incomplète, prix irréaliste…')
-                            ->rows(3),
+                        MarkdownEditor::make('reason')
+                            ->label('Motif du refus')
+                            ->placeholder('Décrivez les raisons du refus : photos insuffisantes, description incomplète, prix incohérent…')
+                            ->helperText('L\'auteur recevra ce message mis en forme dans son email.')
+                            ->toolbarButtons(['bold', 'italic', 'bulletList', 'orderedList', 'undo', 'redo'])
+                            ->required()
+                            ->minLength(20)
+                            ->columnSpanFull(),
                     ])
                     ->action(function (Ad $record, array $data): void {
                         $reason = $data['reason'] ?? '';
@@ -175,9 +179,9 @@ class PendingAdResource extends Resource
                         $record->delete();
 
                         Notification::make()
-                            ->danger()
-                            ->title('Annonce déclinée ❌')
-                            ->body("\"{$title}\" a été supprimée. Un email a été envoyé à l'auteur.")
+                            ->warning()
+                            ->title('Annonce déclinée')
+                            ->body("\"{$title}\" a été supprimée. L'auteur a été notifié par email.")
                             ->send();
                     }),
             ])
