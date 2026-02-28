@@ -12,6 +12,7 @@
         "php": "^8.4",
         "ext-gettext": "*",
         "ext-pdo": "*",
+        "barryvdh/laravel-dompdf": "^3.1",
         "clickbar/laravel-magellan": "^2.0",
         "darkaonline/l5-swagger": "^9.0",
         "dotswan/filament-map-picker": "^2.1",
