@@ -25,7 +25,7 @@ class SubscriptionInvoiceMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: "KeyHome — Facture {$this->invoice->invoice_number}",
+            subject: config('app.name').' — Facture '.$this->invoice->invoice_number,
         );
     }
 

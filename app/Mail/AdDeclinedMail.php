@@ -11,10 +11,14 @@ use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Str;
 
 class AdDeclinedMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
+
+    /** Markdown reason rendered to safe HTML for the email template. */
+    public readonly string $reasonHtml;
 
     public function __construct(
         public Ad $ad,
@@ -23,12 +27,18 @@ class AdDeclinedMail extends Mailable implements ShouldQueue
         if (app()->environment(['production', 'staging'])) {
             $this->onQueue('emails');
         }
+
+        // Convert the Markdown written by the admin into sanitised HTML.
+        // str()->markdown() uses league/commonmark (bundled with Laravel).
+        $this->reasonHtml = $reason !== ''
+            ? (string) Str::markdown($reason, ['html_input' => 'strip', 'allow_unsafe_links' => false])
+            : '';
     }
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: '❌ Votre annonce n\'a pas été approuvée : '.$this->ad->title,
+            subject: 'Votre annonce KeyHome n\'a pas été approuvée : '.$this->ad->title,
         );
     }
 
@@ -39,7 +49,7 @@ class AdDeclinedMail extends Mailable implements ShouldQueue
             with: [
                 'authorName' => $this->ad->user->firstname ?? 'Utilisateur',
                 'adTitle' => $this->ad->title,
-                'reason' => $this->reason,
+                'reasonHtml' => $this->reasonHtml,
             ],
         );
     }

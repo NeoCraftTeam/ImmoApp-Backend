@@ -27,7 +27,7 @@ class AdApprovedMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: '✅ Votre annonce a été approuvée : '.$this->ad->title,
+            subject: 'Votre annonce a été approuvée : '.$this->ad->title,
         );
     }
 
