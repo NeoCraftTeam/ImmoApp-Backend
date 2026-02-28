@@ -1,0 +1,60 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Filament\Admin\Resources\PointTransactions;
+
+use App\Filament\Admin\Resources\PointTransactions\Pages\ListPointTransactions;
+use App\Models\PointTransaction;
+use BackedEnum;
+use Filament\Resources\Resource;
+use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Table;
+
+class PointTransactionResource extends Resource
+{
+    protected static ?string $model = PointTransaction::class;
+
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowsRightLeft;
+
+    protected static \UnitEnum|string|null $navigationGroup = 'Système de Points';
+
+    protected static ?string $navigationLabel = 'Transactions';
+
+    protected static ?string $modelLabel = 'Transaction';
+
+    protected static ?string $pluralModelLabel = 'Transactions de Points';
+
+    protected static ?int $navigationSort = 2;
+
+    #[\Override]
+    public static function form(Schema $schema): Schema
+    {
+        return $schema;
+    }
+
+    #[\Override]
+    public static function table(Table $table): Table
+    {
+        return PointTransactionsTable::configure($table);
+    }
+
+    #[\Override]
+    public static function getRelations(): array
+    {
+        return [];
+    }
+
+    public static function getPages(): array
+    {
+        return [
+            'index' => ListPointTransactions::route('/'),
+        ];
+    }
+
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+}

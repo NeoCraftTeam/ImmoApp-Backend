@@ -48,6 +48,10 @@ final class UserResource extends JsonResource
             'updated_at' => $this->when($request->user()?->isAdmin(), $this->updated_at),
             'city_id' => $this->city_id,
             'city_name' => $this->city?->name,
+            'point_balance' => $this->when(
+                $request->user()?->id === $this->id,
+                (int) $this->point_balance
+            ),
         ];
     }
 
