@@ -270,10 +270,10 @@ preprod_deploy:
     # Create preprod database in prod's PostgreSQL if it doesn't exist
     - |
       echo "🗄️ Vérification de la base preprod..."
-      DB_EXISTS=$(docker exec keyhome-prod-db psql -U ${DB_ADMIN_USER:-cedrick} -tAc "SELECT 1 FROM pg_database WHERE datname = 'keyhome_preprod'" 2>/dev/null || echo "0")
+      DB_EXISTS=$(docker exec keyhome-prod-db psql -U ${DB_ADMIN_USER:-cedrick} -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'keyhome_preprod'" 2>/dev/null || echo "0")
       if [ "$DB_EXISTS" != "1" ]; then
         echo "  → Création de la base keyhome_preprod..."
-        docker exec keyhome-prod-db psql -U ${DB_ADMIN_USER:-cedrick} -c "CREATE DATABASE keyhome_preprod"
+        docker exec keyhome-prod-db psql -U ${DB_ADMIN_USER:-cedrick} -d postgres -c "CREATE DATABASE keyhome_preprod"
         docker exec keyhome-prod-db psql -U ${DB_ADMIN_USER:-cedrick} -d keyhome_preprod -c "CREATE EXTENSION IF NOT EXISTS postgis"
         echo "  ✅ Base keyhome_preprod créée avec PostGIS"
       else
@@ -339,7 +339,7 @@ smoke_test:
   script:
     - |
       # Utilise la variable CI/CD API_BASE_URL (à définir dans GitLab Settings > CI/CD > Variables)
-      BASE_URL="${API_BASE_URL:-https://api.keyhome.app}"
+      BASE_URL="${API_BASE_URL:-https://api.keyhome.neocraft.dev}"
       echo "🔍 Running smoke tests on $BASE_URL..."
 
       # Test 1: Health check endpoint
@@ -390,7 +390,7 @@ preprod_smoke_test:
   timeout: 3 minutes
   script:
     - |
-      BASE_URL="${PREPROD_API_BASE_URL:-https://api.keyhome.neocraft.dev}"
+      BASE_URL="${PREPROD_API_BASE_URL:-https://preprod-api.keyhome.neocraft.dev}"
       echo "🔍 Running PREPROD smoke tests on $BASE_URL..."
 
       echo "→ Testing health endpoint..."
@@ -436,11 +436,11 @@ notify_slack_success:
       if [ "$CI_COMMIT_BRANCH" = "main" ]; then
         ENV_LABEL="Production"
         ENV_EMOJI="🚀"
-        API_URL="${API_BASE_URL:-https://api.keyhome.app}"
+        API_URL="${API_BASE_URL:-https://api.keyhome.neocraft.dev}"
       else
         ENV_LABEL="Preprod"
         ENV_EMOJI="🧪"
-        API_URL="${PREPROD_API_BASE_URL:-https://api.keyhome.neocraft.dev}"
+        API_URL="${PREPROD_API_BASE_URL:-https://preprod-api.keyhome.neocraft.dev}"
       fi
 
       # Calculer la durée approximative
@@ -455,11 +455,6 @@ notify_slack_success:
         DURATION_MIN="?"
       fi
       SHORT_SHA="${CI_COMMIT_SHA:0:8}"
-
-      if [ -z "$SLACK_WEBHOOK_URL" ]; then
-        echo "⚠️  SLACK_WEBHOOK_URL not set, skipping notification."
-        exit 0
-      fi
 
       curl -sS -X POST -H 'Content-type: application/json' \
       --data "{
@@ -519,11 +514,6 @@ notify_slack_failure:
   script:
     - |
       SHORT_SHA="${CI_COMMIT_SHA:0:8}"
-
-      if [ -z "$SLACK_WEBHOOK_URL" ]; then
-        echo "⚠️  SLACK_WEBHOOK_URL not set, skipping notification."
-        exit 0
-      fi
 
       # Récupérer le vrai job qui a échoué via l'API GitLab
       FAILED_JOBS_JSON=$(curl -sS --header "JOB-TOKEN: $CI_JOB_TOKEN" \
