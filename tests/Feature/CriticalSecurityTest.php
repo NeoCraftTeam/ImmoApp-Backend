@@ -101,7 +101,7 @@ test('payment webhook accepts valid signature and updates payment', function ():
     ]);
 
     $payload = json_encode([
-        'event' => 'transaction.approved',
+        'name' => 'transaction.approved',
         'entity' => ['id' => 'txn-critical-valid'],
     ], JSON_THROW_ON_ERROR);
 

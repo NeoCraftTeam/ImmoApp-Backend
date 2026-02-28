@@ -7,14 +7,17 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
+use App\Mail\AdUnlockConfirmationMail;
 use App\Models\Ad;
 use App\Models\Payment;
 use App\Models\Setting;
+use App\Models\User;
 use App\Services\FedaPayService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use OpenApi\Annotations as OA;
 
 /**
@@ -177,7 +180,7 @@ final class PaymentController
         }
 
         $event = $request->all();
-        Log::info('FedaPay Webhook reçu:', ['event' => $event['event'] ?? 'unknown']);
+        Log::info('FedaPay Webhook reçu:', ['event' => $event['name'] ?? 'unknown']);
 
         $transactionId = $event['entity']['id'] ?? null;
         if (!$transactionId) {
@@ -202,7 +205,7 @@ final class PaymentController
             }
 
             // 1. Gestion du SUCCÈS
-            if (isset($event['event']) && $event['event'] === 'transaction.approved') {
+            if (isset($event['name']) && $event['name'] === 'transaction.approved') {
                 $payment->update(['status' => PaymentStatus::SUCCESS]);
 
                 // Create UnlockedAd record for backoffice tracking (unlock payments only)
@@ -211,6 +214,17 @@ final class PaymentController
                         ['ad_id' => $payment->ad_id, 'user_id' => $payment->user_id],
                         ['payment_id' => $payment->id, 'unlocked_at' => now()]
                     );
+
+                    // Send confirmation email to the buyer
+                    try {
+                        $ad = \App\Models\Ad::with('user')->find($payment->ad_id);
+                        $buyer = User::find($payment->user_id);
+                        if ($ad && $buyer) {
+                            Mail::to($buyer->email)->send(new AdUnlockConfirmationMail($buyer, $ad, $payment));
+                        }
+                    } catch (\Exception $e) {
+                        Log::error('Erreur envoi email déblocage annonce: '.$e->getMessage());
+                    }
                 }
 
                 Log::info("Paiement #{$payment->id} validé.");
@@ -237,7 +251,7 @@ final class PaymentController
             }
 
             // 2. Gestion de l'ÉCHEC ou ANNULATION
-            elseif (isset($event['event']) && in_array($event['event'], ['transaction.canceled', 'transaction.declined'])) {
+            elseif (isset($event['name']) && in_array($event['name'], ['transaction.canceled', 'transaction.declined'])) {
                 $payment->update(['status' => PaymentStatus::FAILED]);
                 Log::info("Paiement #{$payment->id} marqué comme échoué.");
             }
@@ -324,6 +338,14 @@ final class PaymentController
                     ['payment_id' => $payment->id, 'unlocked_at' => now()]
                 );
 
+                // Send confirmation email — webhook may not have fired yet
+                try {
+                    $payment->refresh();
+                    Mail::to($user->email)->send(new AdUnlockConfirmationMail($user, $ad, $payment));
+                } catch (\Exception $e) {
+                    Log::error('Erreur envoi email déblocage annonce (verify): '.$e->getMessage());
+                }
+
                 Log::info("Paiement #{$payment->id} vérifié et validé via API.");
 
                 return response()->json([
@@ -372,7 +394,7 @@ final class PaymentController
                 continue;
             }
 
-            if (in_array($key, ['v1', 'sig', 'signature'], true)) {
+            if (in_array($key, ['v1', 's', 'sig', 'signature'], true)) {
                 $signatures[] = $value;
             }
         }
