@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\ClerkWebhookController;
+use App\Http\Controllers\Api\V1\InvoiceController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\QuarterController;
@@ -192,6 +193,13 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/history', [SubscriptionController::class, 'history']);
     });
 
+    // --- FACTURES ---
+    Route::middleware('auth:sanctum')->prefix('invoices')->group(function (): void {
+        Route::get('/', [InvoiceController::class, 'index']);
+        Route::get('/{invoice}', [InvoiceController::class, 'show']);
+        Route::get('/{invoice}/download', [InvoiceController::class, 'download'])->name('invoices.download');
+    });
+
     // --- REVIEWS ---
     Route::get('/ads/{ad}/reviews', [ReviewController::class, 'index']);
     Route::post('/reviews', [ReviewController::class, 'store'])
@@ -222,8 +230,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/{ad}/set-availability', 'setAvailability');
         });
 
-        // Capture le slug de l'annonce (doit être en dernier)
-        Route::get('/{slug}', 'show');
+        // Capture l'ID de l'annonce (doit être en dernier)
+        Route::get('/{id}', 'show');
     });
 
     // --- INTERACTIONS (vues, favoris, impressions, partages, clics) ---
@@ -246,5 +254,12 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('auth:sanctum')->prefix('my/ads')->group(function (): void {
         Route::get('/analytics', [AdAnalyticsController::class, 'overview']);
         Route::get('/{ad}/analytics', [AdAnalyticsController::class, 'show']);
+    });
+
+    // --- FACTURES ---
+    Route::middleware('auth:sanctum')->prefix('invoices')->group(function (): void {
+        Route::get('/', [InvoiceController::class, 'index']);
+        Route::get('/{invoice}', [InvoiceController::class, 'show']);
+        Route::get('/{invoice}/download', [InvoiceController::class, 'download'])->name('invoices.download');
     });
 });
