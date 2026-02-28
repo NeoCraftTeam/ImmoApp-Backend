@@ -139,7 +139,7 @@ final class AdController
 
         // Allow callers (e.g. home page) to exclude specific IDs already shown in recommendations
         if ($excludeIds = request()->input('exclude_ids')) {
-            $ids = array_filter(array_map('intval', (array) $excludeIds));
+            $ids = array_filter(array_map(intval(...), (array) $excludeIds));
             if ($ids !== []) {
                 $query->whereNotIn('id', $ids);
             }
