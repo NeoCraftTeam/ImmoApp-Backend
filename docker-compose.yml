@@ -3,7 +3,7 @@ services:
   # Cela règle le problème des 404 lors des mises à jour
   code-sync:
     image: ${APP_IMAGE:-keyhome-backend}
-    container_name: ${COMPOSE_PREFIX:-keyhome}-code-sync
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-code-sync
     command: sh -c "rm -rf /shared-code/bootstrap/cache/* && cp -rp /var/www/. /shared-code/ && chmod -R 755 /shared-code && chown -R 1000:1000 /shared-code"
     volumes:
       - keyhome-app-code:/shared-code
@@ -16,7 +16,7 @@ services:
       context: .
       dockerfile: Dockerfile
     image: ${APP_IMAGE:-keyhome-backend}
-    container_name: ${COMPOSE_PREFIX:-keyhome}-backend
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-backend
     restart: unless-stopped
     working_dir: /var/www
     depends_on:
@@ -41,7 +41,7 @@ services:
   # Le Worker pour les files d'attente (Mails, notifications, etc.)
   worker:
     image: ${APP_IMAGE:-keyhome-backend}
-    container_name: ${COMPOSE_PREFIX:-keyhome}-worker
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-worker
     restart: unless-stopped
     working_dir: /var/www
     command: php artisan queue:work --queue=emails,default --tries=3 --timeout=90
@@ -69,7 +69,7 @@ services:
   # Laravel Nightwatch Agent (monitoring)
   nightwatch-agent:
     image: laravelphp/nightwatch-agent:latest
-    container_name: ${COMPOSE_PREFIX:-keyhome}-nightwatch-agent
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-nightwatch-agent
     restart: unless-stopped
     environment:
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
@@ -85,7 +85,7 @@ services:
   # Le serveur Web (Nginx)
   web:
     image: nginx:alpine
-    container_name: ${COMPOSE_PREFIX:-keyhome}-web
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-web
     restart: unless-stopped
     depends_on:
       app:
@@ -102,7 +102,7 @@ services:
   # La base de données (Postgres + PostGIS)
   db:
     image: postgis/postgis:15-3.3-alpine
-    container_name: ${COMPOSE_PREFIX:-keyhome}-db
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_DATABASE:-keyhome}
@@ -116,7 +116,7 @@ services:
   # Cache (Redis)
   redis:
     image: redis:alpine
-    container_name: ${COMPOSE_PREFIX:-keyhome}-redis
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-redis
     restart: unless-stopped
     networks:
       - keyhome-network
@@ -124,7 +124,7 @@ services:
   # Moteur de recherche (Meilisearch)
   meilisearch:
     image: getmeili/meilisearch:v1.10
-    container_name: ${COMPOSE_PREFIX:-keyhome}-meilisearch
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-meilisearch
     restart: unless-stopped
     environment:
       - MEILI_MASTER_KEY=${MEILISEARCH_KEY:-masterKey}
@@ -137,7 +137,7 @@ services:
   # Interface de gestion de base de données (debug only — use: docker compose --profile debug up pgadmin)
   pgadmin:
     image: dpage/pgadmin4
-    container_name: ${COMPOSE_PREFIX:-keyhome}-pgadmin
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-pgadmin
     restart: unless-stopped
     profiles:
       - debug
@@ -154,7 +154,7 @@ services:
   # Prometheus : Collecte les métriques
   prometheus:
     image: prom/prometheus:latest
-    container_name: ${COMPOSE_PREFIX:-keyhome}-prometheus
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-prometheus
     restart: unless-stopped
     profiles:
       - monitoring
@@ -172,7 +172,7 @@ services:
   # Grafana : Visualisation des données
   grafana:
     image: grafana/grafana:latest
-    container_name: ${COMPOSE_PREFIX:-keyhome}-grafana
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-grafana
     restart: unless-stopped
     profiles:
       - monitoring
@@ -190,7 +190,7 @@ services:
   # Node Exporter : Métriques du serveur (CPU, RAM, Disque du VPS)
   node-exporter:
     image: prom/node-exporter:latest
-    container_name: ${COMPOSE_PREFIX:-keyhome}-node-exporter
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-node-exporter
     restart: unless-stopped
     profiles:
       - monitoring
@@ -208,7 +208,7 @@ services:
   # cAdvisor : Métriques de chaque conteneur Docker
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
-    container_name: ${COMPOSE_PREFIX:-keyhome}-cadvisor
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-cadvisor
     restart: unless-stopped
     profiles:
       - monitoring
@@ -223,7 +223,7 @@ services:
   # Postgres Exporter : Métriques spécifiques à la DB
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter
-    container_name: ${COMPOSE_PREFIX:-keyhome}-postgres-exporter
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-postgres-exporter
     restart: unless-stopped
     profiles:
       - monitoring
@@ -235,7 +235,7 @@ services:
   # Redis Exporter
   redis-exporter:
     image: oliver006/redis_exporter
-    container_name: ${COMPOSE_PREFIX:-keyhome}-redis-exporter
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-redis-exporter
     restart: unless-stopped
     profiles:
       - monitoring
