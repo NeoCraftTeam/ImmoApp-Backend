@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\ClerkWebhookController;
+use App\Http\Controllers\Api\V1\CreditController;
 use App\Http\Controllers\Api\V1\InvoiceController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PaymentController;
@@ -191,6 +192,14 @@ Route::prefix('v1')->group(function (): void {
             ->middleware('throttle:5,1');
         Route::post('/cancel', [SubscriptionController::class, 'cancel']);
         Route::get('/history', [SubscriptionController::class, 'history']);
+    });
+
+    // --- CRÉDITS / POINTS ---
+    Route::get('/credits/packages', [CreditController::class, 'packages']);
+    Route::middleware('auth:sanctum')->prefix('credits')->group(function (): void {
+        Route::get('/balance', [CreditController::class, 'balance']);
+        Route::post('/purchase/{package}', [CreditController::class, 'purchase'])
+            ->middleware('throttle:10,1');
     });
 
     // --- FACTURES ---

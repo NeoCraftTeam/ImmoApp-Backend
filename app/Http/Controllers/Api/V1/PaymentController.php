@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
+use App\Enums\PointTransactionType;
 use App\Mail\AdUnlockConfirmationMail;
 use App\Models\Ad;
 use App\Models\Payment;
+use App\Models\PointPackage;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\FedaPayService;
+use App\Services\PointService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -25,7 +27,10 @@ use OpenApi\Annotations as OA;
  */
 final class PaymentController
 {
-    public function __construct(protected FedaPayService $fedaPay) {}
+    public function __construct(
+        protected FedaPayService $fedaPay,
+        protected PointService $pointService,
+    ) {}
 
     private function unlockPrice(): int
     {
@@ -68,7 +73,7 @@ final class PaymentController
     {
         $user = $request->user();
 
-        // Sécurité : Le propriétaire n'a pas besoin de payer pour sa propre annonce
+        // Owner never needs to pay for their own ad
         if ($ad->user_id === $user->id) {
             return response()->json([
                 'message' => 'Vous êtes le propriétaire de cette annonce.',
@@ -76,65 +81,59 @@ final class PaymentController
             ]);
         }
 
-        // P0-1 Fix: Atomic check-then-create with lockForUpdate to prevent TOCTOU race
-        return DB::transaction(function () use ($user, $ad) {
-            $existingPayment = Payment::where('user_id', $user->id)
-                ->where('ad_id', $ad->id)
-                ->where('status', PaymentStatus::SUCCESS)
-                ->lockForUpdate()
-                ->first();
+        // Already unlocked check
+        $alreadyUnlocked = \App\Models\UnlockedAd::where('user_id', $user->id)
+            ->where('ad_id', $ad->id)
+            ->exists();
 
-            if ($existingPayment) {
-                return response()->json([
-                    'message' => 'Annonce déjà débloquée.',
-                    'status' => 'already_paid',
-                ]);
-            }
-
-            // Also check for an existing PENDING payment to avoid creating duplicates
-            $pendingPayment = Payment::where('user_id', $user->id)
-                ->where('ad_id', $ad->id)
-                ->where('status', PaymentStatus::PENDING)
-                ->lockForUpdate()
-                ->first();
-
-            if ($pendingPayment) {
-                // Reuse: Verify if the existing transaction is still valid
-                $result = $this->fedaPay->retrieveTransaction((int) $pendingPayment->transaction_id);
-                if ($result['success'] && $result['status'] === 'approved') {
-                    $pendingPayment->update(['status' => PaymentStatus::SUCCESS]);
-
-                    return response()->json([
-                        'message' => 'Paiement déjà effectué. Annonce débloquée.',
-                        'status' => 'already_paid',
-                    ]);
-                }
-            }
-
-            $paymentData = $this->fedaPay->createPayment($this->unlockPrice(), $user, $ad->id);
-
-            if ($paymentData['success']) {
-                Payment::create([
-                    'user_id' => $user->id,
-                    'ad_id' => $ad->id,
-                    'amount' => $this->unlockPrice(),
-                    'transaction_id' => (string) $paymentData['transaction_id'],
-                    'status' => PaymentStatus::PENDING,
-                    'payment_method' => PaymentMethod::FEDAPAY,
-                    'type' => PaymentType::UNLOCK,
-                ]);
-
-                return response()->json([
-                    'payment_url' => $paymentData['url'],
-                    'message' => 'Redirigez l\'utilisateur vers cette URL pour payer.',
-                ]);
-            }
-
+        if ($alreadyUnlocked) {
             return response()->json([
-                'message' => 'Erreur lors de l\'initialisation du paiement.',
-                'error' => config('app.debug') ? ($paymentData['message'] ?? null) : null,
-            ], 500);
-        });
+                'message' => 'Annonce déjà débloquée.',
+                'status' => 'already_unlocked',
+            ]);
+        }
+
+        $cost = $this->pointService->unlockCost();
+
+        // User has enough points — instant unlock
+        if ($this->pointService->hasEnough($user, $cost)) {
+            try {
+                $this->pointService->deduct(
+                    $user,
+                    $cost,
+                    "Déblocage annonce #{$ad->id}",
+                    $ad->id
+                );
+
+                \App\Models\UnlockedAd::firstOrCreate(
+                    ['ad_id' => $ad->id, 'user_id' => $user->id],
+                    ['unlocked_at' => now()]
+                );
+
+                return response()->json([
+                    'status' => 'unlocked',
+                    'message' => 'Annonce débloquée avec succès.',
+                    'points_used' => $cost,
+                    'points_balance' => $user->fresh()->point_balance,
+                ]);
+            } catch (\RuntimeException $e) {
+                return response()->json([
+                    'status' => 'insufficient_points',
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+        }
+
+        // Not enough points — return available packages
+        $packages = PointPackage::active()->get(['id', 'name', 'price', 'points_awarded', 'sort_order']);
+
+        return response()->json([
+            'status' => 'insufficient_points',
+            'message' => 'Solde de points insuffisant. Achetez un pack pour continuer.',
+            'required_points' => $cost,
+            'current_balance' => $user->point_balance,
+            'packages' => $packages,
+        ], 402);
     }
 
     /**
@@ -246,6 +245,23 @@ final class PaymentController
                             $subscriptionService->activateSubscription($subscription);
                             Log::info("Abonnement activé pour l'agence {$agency->id} - Plan {$plan->id} ({$period})");
                         }
+                    }
+                }
+                // Point package credit handling
+                if ($payment->type === PaymentType::CREDIT) {
+                    $packageId = $metadata['package_id'] ?? null;
+                    $package = PointPackage::find($packageId);
+                    $buyer = User::find($payment->user_id);
+
+                    if ($package && $buyer) {
+                        $this->pointService->credit(
+                            $buyer,
+                            $package->points_awarded,
+                            PointTransactionType::PURCHASE,
+                            "Achat pack: {$package->name}",
+                            $payment->id
+                        );
+                        Log::info("Points crédités: {$package->points_awarded} pour l'utilisateur {$buyer->id}");
                     }
                 }
             }

@@ -482,25 +482,42 @@ Authorization:
 | Metric | Value |
 |--------|-------|
 | Framework | Pest v4 (PHP), Vitest (TypeScript) |
-| Feature tests | 26 |
-| Unit tests | 3 |
-| Frontend tests | Not found (Vitest configured but no test files found) |
-| Total PHP tests | ~29 |
-| Coverage | Unknown (no coverage report in repo) |
+| Feature tests | 27 files — 189 tests |
+| Unit tests | 3 files — 23 tests |
+| Frontend tests | 0 (Vitest configured, no test files written) |
+| Total PHP tests | **192 tests — 508 assertions** |
+| Last run | ✅ All passing (28/02/2026) |
 | Types coverage | Pest type coverage plugin installed |
 
 ### Test Coverage by Domain
 
-| Domain | Coverage |
-|--------|---------|
-| Authentication | ✅ Feature tests exist |
-| Ad CRUD | ✅ Feature tests exist |
-| Payments/FedaPay | ⚠️ Uncertain — critical path |
-| Recommendations | ⚠️ Unknown |
-| Admin/Filament | ❌ No Filament tests found |
-| Frontend components | ❌ No Vitest tests found |
+| Domain | Test file | Tests | Status |
+|--------|-----------|-------|--------|
+| Authentication (email/password) | `AuthTest`, `AuthEndpointsTest` | 13 | ✅ |
+| Authentication (OAuth / Clerk) | `OAuthAuthenticationTest`, `ClerkExchangeTest`, `SpaAuthenticationTest` | 26 | ✅ |
+| Email verification & password reset | `EmailVerificationFlowTest`, `PasswordResetTest` | 14 | ✅ |
+| Ad CRUD | `AdCrudTest`, `AdListTest` | 14 | ✅ |
+| Ad status transitions | `AdStatusTransitionTest` | 7 | ✅ |
+| Ad nearby / geo search | `AdNearbyTest` | 2 | ✅ |
+| Ad policies & authorization | `AdPolicyTest` | 4 | ✅ |
+| Ad analytics & interactions | `AdAnalyticsTest` | 10 | ✅ |
+| Bailleur data isolation | `BailleurIsolationTest` | 6 | ✅ |
+| Payments (initialization & verify) | `PaymentTest`, `PaymentFlowTest` | 7 | ✅ |
+| Payments (FedaPay webhook security) | `CriticalSecurityTest` | 5 | ✅ |
+| Payments (webhook edge cases) | `PaymentWebhookEdgeCasesTest` | 9 | ✅ |
+| Subscriptions | `SubscriptionTest` | 11 | ✅ |
+| Invoices (list / show / PDF download) | `InvoiceTest` | 12 | ✅ |
+| Recommendations | `RecommendationTest` | 6 | ✅ |
+| Email templates (queuing) | `MailTemplatesTest` | 5 | ✅ |
+| MFA configuration | `MfaConfigurationTest` | 3 | ✅ |
+| Security (rate limiting, headers) | `SecurityTest` | 2 | ✅ |
+| CRUD endpoints (cities, quarters…) | `CrudEndpointsTest` | 10 | ✅ |
+| N+1 performance | `PerformanceTest` | 1 | ✅ |
+| Models (User, Payment, Subscription, Ad) | `ModelsTest` | 20 | ✅ |
+| Admin/Filament panels | — | — | ❌ no tests |
+| Frontend components | — | — | ❌ no Vitest tests |
 
-> **Critical untested areas:** Payment webhook processing (financial logic), Recommendation engine (complex algorithm), Subscription lifecycle, Filament panel access control.
+> **Remaining untested areas:** Filament panel access control (admin/agency/bailleur), Recommendation engine edge cases, React Native mobile app, and Next.js components (Vitest configured but zero test files).
 
 ---
 
@@ -585,22 +602,93 @@ The pipeline is comprehensive with multiple stages:
 
 ## 11. KEY RISKS & TECHNICAL DEBT
 
-| # | Risk | Severity | Description | Suggested Fix |
-|---|------|---------|-------------|---------------|
-| 1 | **No payment webhook HMAC validation** | 🔴 Critical | `/payments/webhook` accepts any POST — spoofed events could mark payments SUCCESS | Validate `X-FedaPay-Signature` on every webhook request |
-| 2 | **Insufficient test coverage on payment flow** | 🔴 Critical | The entire money flow (initialize → webhook → unlock) has no automated regression tests | Write Pest feature tests covering all FedaPay event types |
-| 3 | **Single payment provider (FedaPay only)** | 🟠 High | Any FedaPay outage = zero revenue. API is `0.4.x` (unstable) | Abstract behind `PaymentGatewayInterface`; add MTN MoMo fallback |
-| 4 | **No frontend tests** | 🟠 High | Vitest configured but zero test files — regressions go undetected | Write Vitest tests for AuthProvider, payment flow, ad detail |
-| 5 | **Redirect loop race condition on refresh** | 🟠 High | Dashboard layout may redirect authenticated users to /login under slow API → /home — partially fixed in this session | Monitor with Sentry; consider token refresh mechanism |
-| 6 | **Media storage on local disk** | 🟠 High | All property images stored to Docker volume — no CDN, no redundancy, data loss risk | Migrate to S3/Cloudflare R2 with CloudFront/Cloudflare CDN |
-| 7 | **Duplicate invoice routes** | 🟡 Medium | `/invoices` routes declared twice in `api.php` | Remove duplicate (lines 259-264) |
-| 8 | **No CSP nonce — `unsafe-inline` scripts** | 🟡 Medium | `next.config.ts` uses `unsafe-inline` which weakens XSS protection | Implement per-request nonces |
-| 9 | **Clerk dependency lock-in** | 🟡 Medium | Auth tightly coupled to Clerk SDK; price changes or ToS changes are breaking | Ensure Sanctum path remains functional as fallback |
-| 10 | **No mobile push notifications** | 🟡 Medium | Mobile app cannot receive real-time alerts | Integrate FCM/APNs via `laravel-notification-channels/fcm` |
-| 11 | **French-only frontend** | 🟡 Medium | Hard-coded fr_FR limits expansion to anglophone Africa | Integrate next-intl; extract all strings |
-| 12 | **Recommendation cold start quality** | 🟢 Low | Cold start users get generic trending content | Add explicit onboarding preferences (property type, city) |
-| 13 | **`_ide_helper.php` committed** | 🟢 Low | 1.1 MB dev file committed to repo | Add to `.gitignore` |
-| 14 | **`data.ms/` (MeiliSearch data) in repo** | 🟢 Low | Search engine data directory tracked | Add `data.ms/` to `.gitignore` |
+> **Statut inspecté le 28/02/2026** — chaque risque a été vérifié dans la codebase réelle.
+
+| # | Risk | Severity | Statut réel | Description | Fix |
+|---|------|---------|-------------|-------------|-----|
+| 1 | **Webhook HMAC validation** | 🔴 Critical | ✅ **Résolu** | `hasValidWebhookSignature()` implémentée dans `PaymentController` — valide `X-Fedapay-Signature`, timestamp anti-replay (±5 min), `hash_equals` timing-safe | — |
+| 2 | **Test coverage payment flow** | 🔴 Critical | ✅ **Résolu** | `PaymentWebhookEdgeCasesTest` ajouté (9 tests / 23 assertions) : webhook subscription, declined, canceled, idempotency guard, replay attack, unknown transaction, missing secret | — |
+| 3 | **Single payment provider** | 🟠 High | ❌ **Open** | Pas de `app/Contracts/PaymentGatewayInterface`, pas de `app/Contracts/`. Tout le code paiement est couplé à `FedaPayService`. API `0.4.x` (unstable) | Créer `PaymentGatewayInterface`; brancher `FedaPayService` dessus; préparer `MoMoService` |
+| 4 | **No frontend tests** | 🟠 High | ❌ **Open** | Vitest + Playwright configurés dans `package.json` mais zéro fichier de test dans `src/` | Écrire tests Vitest : `AuthProvider`, `PaymentSuccessPage`, `AdDetailPage` |
+| 5 | **Redirect loop race condition** | 🟠 High | ⚠️ **Partiel** | `sessionStorage.setItem('kh_redirect_after_login', ...)` en place dans le dashboard layout. Le cas edge "API lente + Clerk token expiré" non résolu | Ajouter retry + Sentry alert sur redirect loops |
+| 6 | **Media storage sur disque local** | 🟠 High | ❌ **Open** | `MEDIA_DISK=public` → disque local Docker. `config/filesystems.php` a un disk `s3` configuré mais non activé. Perte de données si volume supprimé | Définir `FILESYSTEM_DISK=s3` + `MEDIA_DISK=s3`; configurer Cloudflare R2 |
+| 7 | **Duplicate invoice routes** | 🟡 Medium | ❌ **Open** | Bloc `prefix('invoices')` déclaré deux fois dans `routes/api.php` aux lignes 197 et 260. La seconde déclaration est un no-op pour Laravel mais crée une ambiguïté | Supprimer le bloc dupliqué (lignes 260-265) |
+| 8 | **CSP `unsafe-inline` scripts** | 🟡 Medium | ❌ **Open** | `next.config.ts` — `script-src` contient `'unsafe-inline'`. Pas de nonce par requête. CSP actuelle atténue mais ne bloque pas les XSS inline | Implémenter nonces per-request via middleware Next.js |
+| 9 | **Clerk lock-in** | 🟡 Medium | ⚠️ **Partiel** | Le path email/password Sanctum est fonctionnel en fallback (`/auth/login`). Mais les panneaux Filament ne supportent pas Clerk — ils ont leur propre auth | Documenter explicitement le fallback; ajouter test E2E sur `/auth/login` |
+| 10 | **No mobile push notifications** | 🟡 Medium | ❌ **Open** | Pas de `laravel-notification-channels/fcm` dans `composer.json`. Aucune table `device_tokens`. Mobile ne reçoit pas d'alertes temps réel | Intégrer FCM via `laravel-notification-channels/fcm`; ajouter `device_tokens` table |
+| 11 | **Frontend French-only** | 🟡 Medium | ❌ **Open** | `fr_FR` hardcodé dans `src/lib/constants.ts` et `src/app/layout.tsx`. Pas de `next-intl`. Expansion vers anglophone Africa nécessite un refactor complet | Intégrer `next-intl`; extraire toutes les chaînes |
+| 12 | **Recommendation cold start** | 🟢 Low | ✅ **Résolu** | Cold start géré dans `RecommendationEngine.php` : mix trending (7j) + boosted + latest quand `$interactions->isEmpty()` | — |
+| 13 | **`_ide_helper.php` committé** | 🟢 Low | ❌ **Open** | `git ls-files` confirme que `_ide_helper.php` (1.1 MB) et `_ide_helper_models.php` sont trackés. Alourdissent le repo inutilement | `git rm --cached _ide_helper*.php`; ajouter `_ide_helper*.php` dans `.gitignore` |
+| 14 | **`data.ms/` dans le repo** | 🟢 Low | ✅ **Résolu** | `data.ms/` est dans `.gitignore` et non tracké (`git ls-files data.ms/` → vide) | — |
+
+---
+
+### TODO LIST — Priorité décroissante
+
+> Travail restant après inspection complète de la codebase. 6 risques résolus, 7 ouverts, 1 partiel.
+
+#### 🔴 CRITICAL
+
+- [x] **[RISK-2]** ~~Écrire les tests Pest manquants sur le flow paiement~~ ✅ `PaymentWebhookEdgeCasesTest.php` — 9 tests couvrant subscription, declined, canceled, idempotency, replay attack
+
+#### 🟠 HIGH
+
+- [ ] **[RISK-3]** Créer `PaymentGatewayInterface` et refactorer FedaPayService
+  - `php artisan make:interface Contracts/PaymentGatewayInterface`
+  - Méthodes : `createPayment()`, `retrieveTransaction()`, `createSubscriptionPayment()`
+  - Lier `FedaPayService implements PaymentGatewayInterface`
+  - Binder l'interface dans `AppServiceProvider`
+  - Préparer `MoMoService` stub (vide) pour documenter la voie de fallback
+
+- [ ] **[RISK-4]** Écrire les premiers tests Vitest frontend
+  - `src/__tests__/auth/AuthProvider.test.tsx` — token stocké, refresh, logout
+  - `src/__tests__/pages/PaymentSuccess.test.tsx` — polling, states (pending/success/error)
+  - `src/__tests__/pages/AdDetail.test.tsx` — rendu annonce, bouton unlock
+
+- [ ] **[RISK-5]** Améliorer la gestion du redirect loop
+  - Ajouter un compteur de tentatives dans `sessionStorage` (max 3 redirects en 5s → log Sentry)
+  - Implémenter un mécanisme de token refresh silencieux via Clerk avant redirection
+
+- [ ] **[RISK-6]** Migrer le stockage médias vers S3/Cloudflare R2
+  - Configurer les variables `AWS_*` dans `.env.example` et `.env.preprod.example`
+  - Définir `FILESYSTEM_DISK=s3` et `MEDIA_DISK=s3` en production
+  - Migrer les fichiers existants avec `php artisan media-library:move-to-other-disk`
+  - Ajouter le CDN URL dans `config/media-library.php`
+
+#### 🟡 MEDIUM
+
+- [ ] **[RISK-7]** Supprimer la route `/invoices` dupliquée
+  - Retirer le bloc `Route::middleware('auth:sanctum')->prefix('invoices')` aux lignes 260-265 de `routes/api.php`
+  - Conserver uniquement le bloc à la ligne 197
+
+- [ ] **[RISK-8]** Implémenter CSP nonces dans Next.js
+  - Créer `src/middleware.ts` (ou enrichir l'existant) pour générer un nonce cryptographique par requête
+  - Passer le nonce via `headers()` et remplacer `'unsafe-inline'` par `'nonce-{nonce}'`
+  - Mettre à jour `next.config.ts` en conséquence
+
+- [ ] **[RISK-9]** Documenter et tester le fallback Sanctum
+  - Ajouter un test `tests/Feature/AuthFallbackTest.php` — login classique email/password sans Clerk
+  - Documenter dans `CLAUDE.md` : "Primary = Clerk; Fallback = Sanctum email/password"
+
+- [ ] **[RISK-10]** Intégrer les push notifications mobile
+  - `composer require laravel-notification-channels/fcm`
+  - Créer migration `create_device_tokens_table` (user_id, token, platform, last_used_at)
+  - Créer `DeviceToken` model + notification channel `FcmChannel`
+  - Notifications ciblées : annonce approuvée, paiement confirmé, nouveau message
+
+- [ ] **[RISK-11]** Préparer i18n frontend
+  - `pnpm add next-intl` dans `keyhome-frontend-next`
+  - Créer `messages/fr.json` avec toutes les chaînes hardcodées actuelles
+  - Préparer structure `messages/en.json` pour l'expansion future
+
+#### 🟢 LOW
+
+- [ ] **[RISK-13]** Supprimer les fichiers `_ide_helper.php` du tracking git
+  ```bash
+  git rm --cached _ide_helper.php _ide_helper_models.php
+  echo "_ide_helper*.php" >> .gitignore
+  git commit -m "chore: untrack ide helper files from git"
+  ```
 
 ---
 
@@ -616,10 +704,10 @@ The pipeline is comprehensive with multiple stages:
 | **Filament panels** | 3 (Admin, Agency, Bailleur) |
 | **Client pages** | 18 routes |
 | **Reusable components** | ~30 |
-| **PHP tests** | 29 (26 Feature + 3 Unit) |
-| **Frontend tests** | 0 (Vitest configured) |
-| **PHPStan errors** | 0 (after this session) |
-| **Pint errors** | 0 (after this session) |
+| **PHP tests** | 192 tests / 508 assertions (27 Feature + 3 Unit files) |
+| **Frontend tests** | 0 (Vitest configured, no files) |
+| **PHPStan errors** | 0 |
+| **Pint errors** | 0 |
 | **External services** | 8 (Clerk, FedaPay, Google/Facebook/Apple OAuth, MeiliSearch, Sentry, Mapbox, Vercel Analytics) |
 | **Code quality (1-10)** | **8.5** |
 | **Test coverage** | ~30% (estimated, critical paths undertested) |

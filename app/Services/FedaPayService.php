@@ -100,8 +100,58 @@ class FedaPayService
     /**
      * Créer une transaction de paiement pour un abonnement d'agence.
      */
+    public function createCreditPayment($amount, $user, $packageId, $callbackUrl = null): array
+    {
+        try {
+            $key = config('services.fedapay.secret_key');
+            $env = config('services.fedapay.environment', 'sandbox');
+
+            if (!$key) {
+                throw new \Exception('Clé secrète FedaPay manquante dans la configuration.');
+            }
+
+            FedaPay::setApiKey($key);
+            FedaPay::setEnvironment($env);
+
+            /** @var Transaction $transaction */
+            $transaction = Transaction::create([
+                'description' => 'Achat de points',
+                'amount' => $amount,
+                'currency' => ['iso' => 'XOF'],
+                'callback_url' => $callbackUrl ?? (config('app.frontend_url', config('app.url')).'/credits/callback'),
+                'customer' => [
+                    'firstname' => $user->firstname ?? 'Utilisateur',
+                    'lastname' => $user->lastname ?? '',
+                    'email' => $user->email,
+                ],
+                'metadata' => [
+                    'payment_type' => 'credit',
+                    'user_id' => $user->id,
+                    'package_id' => $packageId,
+                ],
+            ]);
+
+            /** @var \FedaPay\FedaPayObject $token */
+            $token = $transaction->generateToken();
+
+            return [
+                'success' => true,
+                'url' => (string) ($token->url ?? ''),
+                'transaction_id' => $transaction->id,
+            ];
+        } catch (\Exception $e) {
+            \Log::error('FedaPay Credit Error: '.$e->getMessage());
+
+            return [
+                'success' => false,
+                'message' => $e->getMessage(),
+            ];
+        }
+    }
+
     public function createSubscriptionPayment($amount, $agency, $planId, $period = 'monthly', $callbackUrl = null)
     {
+
         try {
             $key = config('services.fedapay.secret_key');
             $env = config('services.fedapay.environment', 'sandbox');

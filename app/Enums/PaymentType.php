@@ -9,4 +9,5 @@ enum PaymentType: string
     case UNLOCK = 'unlock';
     case SUBSCRIPTION = 'subscription';
     case BOOST = 'boost';
+    case CREDIT = 'credit';
 }

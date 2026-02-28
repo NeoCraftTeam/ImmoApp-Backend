@@ -153,7 +153,7 @@ Dans **GitLab > Settings > CI/CD > Variables** :
 | Variable | Valeur | Scope |
 |---|---|---|
 | `API_BASE_URL` | `https://api.keyhome.neocraft.dev` | `main` |
-| `PREPROD_API_BASE_URL` | `https://preprod-api.keyhome.neocraft.dev` | `preprod` |
+| `PREPROD_API_BASE_URL` | `https://api.keyhome.neocraft.dev` | `preprod` |
 | `SLACK_WEBHOOK_URL` | URL Slack webhook | Tous |
 
 ---

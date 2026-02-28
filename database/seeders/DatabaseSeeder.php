@@ -17,6 +17,7 @@ class DatabaseSeeder extends Seeder
         $this->call([
             AdTypeSeeder::class,
             SubscriptionPlanSeeder::class,
+            PointSystemSeeder::class,
             CameroonCitiesSeeder::class,
             MassiveAdSeeder::class,
         ]);

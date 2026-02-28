@@ -6,6 +6,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 
+use App\Enums\PointTransactionType;
 use App\Enums\UserRole;
 use App\Enums\UserType;
 use App\Mail\VerifyEmailMail;
@@ -96,6 +97,9 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @method static Builder<static>|User withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|User withoutTrashed()
  *
+ * @property int $point_balance
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, PointTransaction> $pointTransactions
+ * @property-read int|null $point_transactions_count
  * @property string|null $last_login_at
  * @property string|null $last_login_ip
  * @property string|null $last_login_country
@@ -155,6 +159,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'clerk_id',
         'oauth_provider',
         'oauth_avatar',
+        'point_balance',
     ];
 
     /**
@@ -186,6 +191,18 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
             if (empty($user->avatar)) {
                 $user->assignDefaultAvatar();
+            }
+        });
+
+        static::created(function (User $user): void {
+            $bonus = (int) Setting::get('welcome_bonus_points', 5);
+            if ($bonus > 0) {
+                app(\App\Services\PointService::class)->credit(
+                    $user,
+                    $bonus,
+                    PointTransactionType::BONUS,
+                    'Bonus de bienvenue'
+                );
             }
         });
     }
@@ -238,6 +255,12 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function unlockedAds(): HasMany
     {
         return $this->hasMany(UnlockedAd::class);
+    }
+
+    /** @return HasMany<PointTransaction, $this> */
+    public function pointTransactions(): HasMany
+    {
+        return $this->hasMany(PointTransaction::class);
     }
 
     public function city(): BelongsTo
