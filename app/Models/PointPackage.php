@@ -67,6 +67,6 @@ class PointPackage extends Model
             ->logAll()
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
-            ->setDescriptionForEvent(fn (string $eventName): string => "Pack de points \u00ab {$this->name} \u00bb {$eventName}");
+            ->setDescriptionForEvent(fn (string $eventName): string => "Pack de points « {$this->name} » {$eventName}");
     }
 }

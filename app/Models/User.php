@@ -279,7 +279,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
     public function getFullnameAttribute(): string
     {
-        if ($this->type === UserType::AGENCY && $this->agency instanceof Agency) {
+        if ($this->type === UserType::AGENCY && $this->relationLoaded('agency') && $this->agency instanceof Agency) {
             return $this->agency->name;
         }
 

@@ -7,6 +7,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * Property attributes for ad amenities (Wi-Fi, Parking, Pool, etc.).
@@ -23,7 +25,7 @@ use Illuminate\Database\Eloquent\Model;
 class PropertyAttribute extends Model
 {
     /** @use HasFactory<\Database\Factories\PropertyAttributeFactory> */
-    use HasFactory;
+    use HasFactory, LogsActivity;
 
     protected $fillable = [
         'name',
@@ -47,6 +49,15 @@ class PropertyAttribute extends Model
     /**
      * Scope: only active attributes.
      */
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name', 'slug', 'icon', 'is_active', 'sort_order'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $eventName): string => "Attribut « {$this->name} » {$eventName}");
+    }
+
     #[\Illuminate\Database\Eloquent\Attributes\Scope]
     protected function active(Builder $query): Builder
     {
