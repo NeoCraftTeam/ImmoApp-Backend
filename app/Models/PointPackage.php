@@ -25,16 +25,22 @@ class PointPackage extends Model
 
     protected $fillable = [
         'name',
+        'description',
+        'badge',
         'price',
         'points_awarded',
+        'features',
         'is_active',
+        'is_popular',
         'sort_order',
     ];
 
     protected $casts = [
         'price' => 'integer',
         'points_awarded' => 'integer',
+        'features' => 'array',
         'is_active' => 'boolean',
+        'is_popular' => 'boolean',
         'sort_order' => 'integer',
     ];
 

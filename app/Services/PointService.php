@@ -52,7 +52,7 @@ class PointService
             }
 
             $freshUser->decrement('point_balance', $cost);
-            $user->point_balance = $freshUser->point_balance - $cost; // keep local reference fresh
+            $user->point_balance = $freshUser->point_balance; // decrement() already updates in-memory
 
             return PointTransaction::create([
                 'user_id' => $user->id,
