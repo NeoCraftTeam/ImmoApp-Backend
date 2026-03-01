@@ -22,7 +22,7 @@ class PaymentResource extends Resource
 
     protected static string|null|UnitEnum $navigationGroup = 'Mon Compte';
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::CreditCard;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::Banknotes;
 
     protected static ?string $navigationLabel = 'Mes Paiements';
 
@@ -41,13 +41,21 @@ class PaymentResource extends Resource
         return $table
             ->columns([
                 TextColumn::make('created_at')
-                    ->dateTime()
+                    ->dateTime('d/m/Y à H:i')
                     ->label('Date')
                     ->sortable(),
+                TextColumn::make('ad.title')
+                    ->label('Annonce')
+                    ->limit(40)
+                    ->placeholder('—'),
+                TextColumn::make('type')
+                    ->label('Type')
+                    ->badge(),
                 TextColumn::make('amount')
                     ->money('xaf')
                     ->label('Montant'),
                 TextColumn::make('status')
+                    ->label('Statut')
                     ->badge(),
                 TextColumn::make('transaction_id')
                     ->label('Réf'),

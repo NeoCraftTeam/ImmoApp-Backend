@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Widgets;
 
 use App\Enums\AdStatus;
+use App\Filament\Admin\Resources\PendingAds\PendingAdResource;
 use App\Models\Ad;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -23,12 +24,13 @@ class PendingAdsStats extends StatsOverviewWidget
         }
 
         return [
-            Stat::make('🔔 Annonces à valider', $pendingCount)
-                ->description('Cliquez sur "À valider" dans la barre latérale')
-                ->descriptionIcon('heroicon-m-arrow-left')
+            Stat::make('Annonces à valider', $pendingCount)
+                ->description('En attente de validation')
+                ->descriptionIcon('heroicon-m-exclamation-triangle')
                 ->color('danger')
+                ->url(PendingAdResource::getUrl())
                 ->extraAttributes([
-                    'class' => 'cursor-pointer',
+                    'class' => 'cursor-pointer ring-1 ring-danger-300 dark:ring-danger-700',
                 ]),
         ];
     }

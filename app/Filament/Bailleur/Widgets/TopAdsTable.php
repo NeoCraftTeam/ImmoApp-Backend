@@ -57,15 +57,18 @@ class TopAdsTable extends BaseWidget
                         default => 'gray',
                     }),
                 TextColumn::make('views_count')
-                    ->label('👁 Vues')
+                    ->label('Vues')
+                    ->icon('heroicon-o-eye')
                     ->sortable()
                     ->alignCenter(),
                 TextColumn::make('favorites_count')
-                    ->label('❤️ Favoris')
+                    ->label('Favoris')
+                    ->icon('heroicon-o-heart')
                     ->sortable()
                     ->alignCenter(),
                 TextColumn::make('contacts_count')
-                    ->label('📞 Contacts')
+                    ->label('Contacts')
+                    ->icon('heroicon-o-phone')
                     ->sortable()
                     ->alignCenter(),
             ])

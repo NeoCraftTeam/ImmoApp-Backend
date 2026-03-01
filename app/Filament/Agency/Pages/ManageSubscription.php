@@ -123,7 +123,7 @@ class ManageSubscription extends Page
             $plan = \App\Models\SubscriptionPlan::find($payment->plan_id);
 
             if ($plan) {
-                $subscriptionService = new \App\Services\SubscriptionService;
+                $subscriptionService = app(\App\Services\SubscriptionService::class);
                 $subscription = $subscriptionService->createSubscription($agency, $plan, $payment->period ?? 'monthly', $payment);
                 $subscriptionService->activateSubscription($subscription);
 
@@ -212,7 +212,7 @@ class ManageSubscription extends Page
             return;
         }
 
-        $service = new \App\Services\SubscriptionService;
+        $service = app(\App\Services\SubscriptionService::class);
         /** @var \App\Models\Agency $agency */
         $agency = auth()->user()->agency;
         $service->cancelActiveSubscriptions($agency, 'Annulation par l\'utilisateur');

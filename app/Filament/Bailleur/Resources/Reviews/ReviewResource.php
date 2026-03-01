@@ -40,7 +40,7 @@ class ReviewResource extends Resource
     {
         return parent::getEloquentQuery()
             ->whereHas('ad', fn ($q) => $q->where('user_id', auth()->id()))
-            ->with(['user', 'ad']);
+            ->with(['user.agency', 'ad']);
     }
 
     public static function getNavigationBadge(): ?string
@@ -96,7 +96,7 @@ class ReviewResource extends Resource
                             ->icon('heroicon-o-document-text'),
                         TextEntry::make('ad.price')
                             ->label('Prix')
-                            ->money('XOF')
+                            ->money('XAF')
                             ->icon('heroicon-o-banknotes'),
                     ]),
             ]);
@@ -125,7 +125,7 @@ class ReviewResource extends Resource
             ->columns([
                 TextColumn::make('rating')
                     ->label('Note')
-                    ->formatStateUsing(fn ($state) => str_repeat('★', (int) $state).str_repeat('☆', 5 - (int) $state))
+                    ->formatStateUsing(fn ($state) => str_repeat('★', (int) $state).str_repeat('☆', 5 - (int) $state)." ({$state}/5)")
                     ->color(fn ($state) => match (true) {
                         $state >= 4 => 'success',
                         $state >= 3 => 'warning',

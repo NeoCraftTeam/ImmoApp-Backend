@@ -575,11 +575,11 @@
         }
     </style>
 
-    <div class="sub-page">
+    <div class="sub-page" role="main" aria-label="Gestion de l'abonnement">
 
         {{-- ===== ACTIVE SUBSCRIPTION BANNER ===== --}}
         @if($subscription && $subscription->isActive())
-            <div class="sub-banner">
+            <section class="sub-banner" aria-label="Abonnement actif">
                 <div class="sub-banner-inner">
                     <div>
                         <div class="sub-banner-tag">
@@ -629,11 +629,11 @@
                         Résilier le forfait
                     </button>
                 </div>
-            </div>
+            </section>
         @endif
 
         {{-- ===== HEADER + PERIOD SWITCHER ===== --}}
-        <div class="sub-header">
+        <section class="sub-header" aria-label="Choix de la période">
             <h1>Boostez votre agence</h1>
             <p>Choisissez le forfait adapté à vos ambitions et propulsez vos annonces en tête de liste.</p>
 
@@ -647,10 +647,10 @@
                     <span class="sub-sw-badge">-20%</span>
                 </button>
             </div>
-        </div>
+        </section>
 
         {{-- ===== PLAN CARDS ===== --}}
-        <div class="sub-grid">
+        <section class="sub-grid" aria-label="Offres disponibles">
             @foreach($plans as $plan)
                 @php
                     $price = $period === 'yearly' && $plan->price_yearly ? $plan->price_yearly : $plan->price;
@@ -725,17 +725,18 @@
                     @endif
                 </div>
             @endforeach
-        </div>
+        </section>
 
         {{-- ===== COMPARISON TABLE ===== --}}
-        <div class="sub-compare">
+        <section class="sub-compare" aria-label="Comparaison des forfaits">
             <div class="sub-compare-title">📊 Comparaison détaillée</div>
             <table>
+                <caption class="sr-only">Comparaison des fonctionnalités par forfait</caption>
                 <thead>
                     <tr>
-                        <th>Fonctionnalité</th>
+                        <th scope="col">Fonctionnalité</th>
                         @foreach($plans as $plan)
-                            <th>{{ $plan->name }}</th>
+                            <th scope="col">{{ $plan->name }}</th>
                         @endforeach
                     </tr>
                 </thead>
@@ -812,10 +813,10 @@
                     </tr>
                 </tbody>
             </table>
-        </div>
+        </section>
 
         {{-- ===== FAQ ===== --}}
-        <div class="sub-faq">
+        <section class="sub-faq" aria-label="Questions fréquentes">
             <div class="sub-faq-title">Questions fréquentes</div>
             <div class="sub-faq-grid">
                 <div class="sub-faq-item">
@@ -839,6 +840,6 @@
                         pouvez renouveler votre abonnement à tout moment pour retrouver les avantages.</div>
                 </div>
             </div>
-        </div>
+        </section>
     </div>
 </x-filament-panels::page>
