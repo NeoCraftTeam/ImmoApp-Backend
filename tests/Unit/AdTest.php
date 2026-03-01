@@ -1,9 +1,7 @@
 <?php
 
-use App\Enums\PaymentStatus;
-use App\Enums\PaymentType;
 use App\Models\Ad;
-use App\Models\Payment;
+use App\Models\UnlockedAd;
 use App\Models\User;
 
 test('owner can always view full ad', function (): void {
@@ -20,15 +18,13 @@ test('guest cannot view locked ad', function (): void {
     expect($ad->isUnlockedFor($guest))->toBeFalse();
 });
 
-test('user who paid can view ad', function (): void {
+test('user who unlocked can view ad', function (): void {
     $user = User::factory()->create();
     $ad = Ad::factory()->create();
 
-    Payment::factory()->create([
+    UnlockedAd::create([
         'user_id' => $user->id,
         'ad_id' => $ad->id,
-        'type' => PaymentType::UNLOCK,
-        'status' => PaymentStatus::SUCCESS,
     ]);
 
     expect($ad->isUnlockedFor($user))->toBeTrue();

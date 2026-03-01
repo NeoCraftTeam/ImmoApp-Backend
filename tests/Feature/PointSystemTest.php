@@ -199,3 +199,40 @@ it('approved webhook for CREDIT payment credits points to the user', function ()
     expect($tx)->not->toBeNull()
         ->and($tx->points)->toBe(50);
 });
+
+// ── VERIFY CREDIT PURCHASE ─────────────────────────────────────────────────────
+
+it('verify-purchase returns completed when credit payment is already successful', function (): void {
+    Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
+
+    $user = User::factory()->create(['point_balance' => 50]);
+
+    Payment::factory()->create([
+        'user_id' => $user->id,
+        'transaction_id' => 'txn-verify-completed',
+        'status' => PaymentStatus::SUCCESS,
+        'type' => PaymentType::CREDIT,
+        'payment_method' => PaymentMethod::FEDAPAY,
+    ]);
+
+    $this->actingAs($user)
+        ->postJson('/api/v1/credits/verify-purchase')
+        ->assertOk()
+        ->assertJsonPath('status', 'completed')
+        ->assertJsonPath('point_balance', 50);
+});
+
+it('verify-purchase returns not_found when no credit payment exists', function (): void {
+    Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
+
+    $user = User::factory()->create(['point_balance' => 0]);
+
+    $this->actingAs($user)
+        ->postJson('/api/v1/credits/verify-purchase')
+        ->assertNotFound()
+        ->assertJsonPath('status', 'not_found');
+});
+
+it('verify-purchase requires authentication', function (): void {
+    $this->postJson('/api/v1/credits/verify-purchase')->assertUnauthorized();
+});
