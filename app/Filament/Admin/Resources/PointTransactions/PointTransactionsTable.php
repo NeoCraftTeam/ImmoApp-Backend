@@ -7,6 +7,7 @@ namespace App\Filament\Admin\Resources\PointTransactions;
 use App\Enums\PointTransactionType;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 
 class PointTransactionsTable
@@ -14,20 +15,42 @@ class PointTransactionsTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn ($query) => $query->with(['user', 'ad']))
+            ->defaultGroup(
+                Group::make('user_id')
+                    ->label('Utilisateur')
+                    ->collapsible()
+                    ->titlePrefixedWithLabel(false)
+                    ->getTitleFromRecordUsing(fn ($record): string => $record->user
+                        ? "{$record->user->fullname} — Solde : {$record->user->point_balance} crédits"
+                        : 'Utilisateur inconnu'
+                    )
+            )
+            ->groups([
+                Group::make('user_id')
+                    ->label('Par utilisateur')
+                    ->collapsible()
+                    ->titlePrefixedWithLabel(false)
+                    ->getTitleFromRecordUsing(fn ($record): string => $record->user
+                        ? "{$record->user->fullname} — Solde : {$record->user->point_balance} crédits"
+                        : 'Utilisateur inconnu'
+                    ),
+                Group::make('type')
+                    ->label('Par type')
+                    ->collapsible()
+                    ->getTitleFromRecordUsing(fn ($record): string => match ($record->type) {
+                        PointTransactionType::PURCHASE => 'Achats',
+                        PointTransactionType::UNLOCK => 'Déblocages',
+                        PointTransactionType::BONUS => 'Bonus',
+                        PointTransactionType::REFUND => 'Remboursements',
+                        default => 'Autre',
+                    }),
+            ])
             ->columns([
                 TextColumn::make('created_at')
                     ->label('Date')
                     ->dateTime('d/m/Y H:i')
                     ->sortable(),
-
-                TextColumn::make('user.fullname')
-                    ->label('Utilisateur')
-                    ->searchable(['firstname', 'lastname'])
-                    ->sortable()
-                    ->url(fn ($record): ?string => $record->user
-                        ? route('filament.admin.resources.users.edit', $record->user)
-                        : null
-                    ),
 
                 TextColumn::make('type')
                     ->label('Type')
@@ -46,7 +69,7 @@ class PointTransactionsTable
                     }),
 
                 TextColumn::make('points')
-                    ->label('Points')
+                    ->label('Crédits')
                     ->color(fn (int $state): string => $state >= 0 ? 'success' : 'danger')
                     ->formatStateUsing(fn (int $state): string => $state >= 0 ? "+{$state}" : (string) $state)
                     ->weight('bold')
@@ -54,17 +77,13 @@ class PointTransactionsTable
 
                 TextColumn::make('description')
                     ->label('Description')
-                    ->limit(40)
+                    ->limit(50)
                     ->tooltip(fn ($record): string => $record->description),
 
                 TextColumn::make('ad.id')
                     ->label('Annonce')
                     ->placeholder('—')
-                    ->limit(8)
-                    ->url(fn ($record): ?string => $record->ad
-                        ? route('filament.admin.resources.ads.edit', $record->ad)
-                        : null
-                    ),
+                    ->limit(8),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([

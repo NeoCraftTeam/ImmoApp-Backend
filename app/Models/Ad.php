@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\AdStatus;
-use App\Enums\PaymentStatus;
-use App\Enums\PaymentType;
 use App\Exceptions\InvalidStatusTransitionException;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\AdFactory;
@@ -402,10 +400,9 @@ class Ad extends Model implements HasMedia
             return true;
         }
 
-        return Payment::where('user_id', $user->id)
+        // Check UnlockedAd record (covers both point-based and payment-based unlocks)
+        return \App\Models\UnlockedAd::where('user_id', $user->id)
             ->where('ad_id', $this->id)
-            ->where('type', PaymentType::UNLOCK)
-            ->where('status', PaymentStatus::SUCCESS)
             ->exists();
     }
 
