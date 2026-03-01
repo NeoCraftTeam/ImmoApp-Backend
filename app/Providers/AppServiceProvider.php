@@ -38,6 +38,7 @@ class AppServiceProvider extends ServiceProvider
 
         \App\Models\Payment::observe(\App\Observers\PaymentObserver::class);
         \App\Models\Ad::observe(\App\Observers\AdObserver::class);
+        \Spatie\Activitylog\Models\Activity::observe(\App\Observers\ActivityObserver::class);
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
