@@ -33,7 +33,7 @@ class AdResource extends Resource
 
     protected static string|null|UnitEnum $navigationGroup = 'Gestion';
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::InboxArrowDown;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::Home;
 
     protected static ?string $recordTitleAttribute = 'title';
 
@@ -79,8 +79,10 @@ class AdResource extends Resource
                 EditAction::make()
                     ->slideOver()
                     ->modalWidth(Width::FourExtraLarge)
+                    ->successNotificationTitle('Annonce mise à jour')
                     ->mutateFormDataUsing(fn (array $data): array => static::mutateLocationMapData($data)),
-                DeleteAction::make(),
+                DeleteAction::make()
+                    ->successNotificationTitle('Annonce supprimée'),
             ])
             ->bulkActions([
                 BulkActionGroup::make([

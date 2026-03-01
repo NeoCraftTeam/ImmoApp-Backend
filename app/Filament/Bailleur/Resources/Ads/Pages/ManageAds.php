@@ -20,6 +20,7 @@ class ManageAds extends ManageRecords
             CreateAction::make()
                 ->slideOver()
                 ->modalWidth(Width::FourExtraLarge)
+                ->successNotificationTitle('Annonce créée avec succès')
                 ->mutateFormDataUsing(function (array $data): array {
                     $data = AdResource::mutateLocationMapData($data);
                     $data['status'] ??= AdStatus::PENDING->value;

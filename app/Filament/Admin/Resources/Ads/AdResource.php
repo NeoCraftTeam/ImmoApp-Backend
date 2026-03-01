@@ -40,7 +40,7 @@ class AdResource extends Resource
 
     protected static string|null|UnitEnum $navigationGroup = 'Annonces';
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::InboxArrowDown;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::Home;
 
     protected static ?string $recordTitleAttribute = 'title';
 
@@ -54,7 +54,7 @@ class AdResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['user', 'quarter', 'ad_type', 'media']);
+            ->with(['user.agency', 'quarter', 'ad_type', 'media']);
     }
 
     #[\Override]
@@ -65,6 +65,7 @@ class AdResource extends Resource
                 ...static::getSharedFormFields(),
                 static::getStatusSelect(isAdmin: true),
                 Select::make('user_id')
+                    ->label('Propriétaire')
                     ->relationship('user', 'firstname')
                     ->getOptionLabelFromRecordUsing(fn ($record) => $record->fullname)
                     ->searchable(['firstname', 'lastname'])
@@ -95,10 +96,14 @@ class AdResource extends Resource
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make()
+                    ->successNotificationTitle('Annonce mise à jour')
                     ->mutateFormDataUsing(fn (array $data): array => static::mutateLocationMapData($data)),
-                DeleteAction::make(),
-                ForceDeleteAction::make(),
-                RestoreAction::make(),
+                DeleteAction::make()
+                    ->successNotificationTitle('Annonce supprimée'),
+                ForceDeleteAction::make()
+                    ->successNotificationTitle('Annonce supprimée définitivement'),
+                RestoreAction::make()
+                    ->successNotificationTitle('Annonce restaurée'),
             ])->headerActions([
                 ImportAction::make()->label('Importer')
                     ->importer(AdImporter::class)

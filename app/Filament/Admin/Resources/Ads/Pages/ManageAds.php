@@ -17,6 +17,7 @@ class ManageAds extends ManageRecords
     {
         return [
             CreateAction::make()
+                ->successNotificationTitle('Annonce créée avec succès')
                 ->mutateFormDataUsing(fn (array $data): array => AdResource::mutateLocationMapData($data))
                 ->using(fn (array $data, string $model): Ad => \Illuminate\Support\Facades\DB::transaction(fn () => $model::create($data))),
         ];

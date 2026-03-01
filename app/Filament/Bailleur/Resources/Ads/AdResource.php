@@ -78,8 +78,10 @@ class AdResource extends Resource
                 EditAction::make()
                     ->slideOver()
                     ->modalWidth(Width::FourExtraLarge)
+                    ->successNotificationTitle('Annonce mise à jour')
                     ->mutateFormDataUsing(fn (array $data): array => static::mutateLocationMapData($data)),
-                DeleteAction::make(),
+                DeleteAction::make()
+                    ->successNotificationTitle('Annonce supprimée'),
             ])
             ->bulkActions([
                 BulkActionGroup::make([

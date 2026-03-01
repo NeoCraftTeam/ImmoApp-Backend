@@ -44,11 +44,14 @@ trait SharedAdResource
     {
         return [
             TextInput::make('title')
+                ->label('Titre')
                 ->required(),
             Textarea::make('description')
+                ->label('Description')
                 ->required()
                 ->columnSpanFull(),
             SpatieMediaLibraryFileUpload::make('images')
+                ->label('Photos')
                 ->collection('images')
                 ->multiple()
                 ->reorderable()
@@ -63,24 +66,29 @@ trait SharedAdResource
                     'data-native-image-camera' => 'true',
                 ]),
             TextInput::make('adresse')
+                ->label('Adresse')
                 ->required(),
             TextInput::make('price')
+                ->label('Prix')
                 ->numeric()
                 ->required()
                 ->minValue(0)
                 ->prefix('FCFA')
                 ->extraInputAttributes(['inputmode' => 'numeric']),
             TextInput::make('surface_area')
+                ->label('Surface (m²)')
                 ->required()
                 ->numeric()
                 ->minValue(1)
                 ->extraInputAttributes(['inputmode' => 'numeric']),
             TextInput::make('bedrooms')
+                ->label('Chambres')
                 ->required()
                 ->numeric()
                 ->minValue(0)
                 ->extraInputAttributes(['inputmode' => 'numeric']),
             TextInput::make('bathrooms')
+                ->label('Salles de bain')
                 ->required()
                 ->numeric()
                 ->minValue(0)
@@ -221,6 +229,7 @@ trait SharedAdResource
     protected static function getStatusSelect(bool $isAdmin = false): Select
     {
         $select = Select::make('status')
+            ->label('Statut')
             ->required()
             ->default(AdStatus::PENDING->value)
             ->options(function (?Ad $record): array {
@@ -260,11 +269,13 @@ trait SharedAdResource
     {
         return [
             Select::make('quarter_id')
+                ->label('Quartier')
                 ->relationship('quarter', 'name')
                 ->searchable()
                 ->preload()
                 ->required(),
             Select::make('type_id')
+                ->label('Catégorie d\'annonce')
                 ->relationship('ad_type', 'name')
                 ->required()
                 ->searchable()
@@ -390,10 +401,10 @@ trait SharedAdResource
         if ($showMeta) {
             $sections[] = Section::make('Méta-données')
                 ->schema([
-                    TextEntry::make('status'),
+                    TextEntry::make('status')->label('Statut'),
                     TextEntry::make('user.fullname')->label('Publié par'),
-                    TextEntry::make('created_at')->dateTime(),
-                    TextEntry::make('updated_at')->dateTime(),
+                    TextEntry::make('created_at')->label('Créé le')->dateTime(),
+                    TextEntry::make('updated_at')->label('Modifié le')->dateTime(),
                 ])->columns(4)->collapsed();
         }
 
@@ -421,26 +432,32 @@ trait SharedAdResource
                 ->size(40)
                 ->label('Photos'),
             TextColumn::make('title')
+                ->label('Titre')
                 ->searchable(),
             TextColumn::make('adresse')
+                ->label('Adresse')
                 ->searchable(),
             TextColumn::make('price')
+                ->label('Prix')
                 ->money('xaf')
                 ->sortable(),
             TextColumn::make('surface_area')
+                ->label('Surface (m²)')
                 ->numeric()
                 ->sortable(),
         ];
 
         if ($isAdmin) {
-            $columns[] = TextColumn::make('bedrooms')->numeric()->sortable();
-            $columns[] = TextColumn::make('bathrooms')->numeric()->sortable();
-            $columns[] = IconColumn::make('has_parking')->boolean();
+            $columns[] = TextColumn::make('bedrooms')->label('Chambres')->numeric()->sortable();
+            $columns[] = TextColumn::make('bathrooms')->label('Salles de bain')->numeric()->sortable();
+            $columns[] = IconColumn::make('has_parking')->label('Parking')->boolean();
             $columns[] = TextColumn::make('location')
+                ->label('Localisation')
                 ->formatStateUsing(fn (?Point $state) => $state ? $state->getLatitude().', '.$state->getLongitude() : '-');
         }
 
         $columns[] = TextColumn::make('status')
+            ->label('Statut')
             ->searchable()
             ->badge();
 
@@ -467,24 +484,27 @@ trait SharedAdResource
         }
 
         if ($isAdmin) {
-            $columns[] = TextColumn::make('expires_at')->dateTime()->sortable();
+            $columns[] = TextColumn::make('expires_at')->label('Expiration')->dateTime()->sortable();
             $columns[] = TextColumn::make('user.fullname')
                 ->label('Publié par')
                 ->searchable(['firstname', 'lastname']);
-            $columns[] = TextColumn::make('quarter.name')->searchable();
-            $columns[] = TextColumn::make('ad_type.name')->sortable();
+            $columns[] = TextColumn::make('quarter.name')->label('Quartier')->searchable();
+            $columns[] = TextColumn::make('ad_type.name')->label('Catégorie')->sortable();
         }
 
         $columns[] = TextColumn::make('created_at')
+            ->label('Créé le')
             ->dateTime()
             ->sortable()
             ->toggleable(isToggledHiddenByDefault: !$isAdmin);
 
         if ($isAdmin) {
             $columns[] = TextColumn::make('updated_at')
+                ->label('Modifié le')
                 ->dateTime()->sortable()
                 ->toggleable(isToggledHiddenByDefault: true);
             $columns[] = TextColumn::make('deleted_at')
+                ->label('Supprimé le')
                 ->dateTime()->sortable()
                 ->toggleable(isToggledHiddenByDefault: true);
         }

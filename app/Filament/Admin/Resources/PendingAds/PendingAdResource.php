@@ -176,6 +176,7 @@ class PendingAdResource extends Resource
                         }
 
                         $title = $record->title;
+                        $record->forceFill(['status' => \App\Enums\AdStatus::DECLINED])->save();
                         $record->delete();
 
                         Notification::make()
