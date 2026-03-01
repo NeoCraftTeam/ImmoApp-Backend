@@ -13,6 +13,7 @@ enum AdStatus: string implements HasLabel
     case RENT = 'rent';
     case PENDING = 'pending';
     case SOLD = 'sold';
+    case DECLINED = 'declined';
 
     public function getLabel(): string
     {
@@ -22,6 +23,7 @@ enum AdStatus: string implements HasLabel
             self::RENT => 'En location',
             self::PENDING => 'En attente',
             self::SOLD => 'Vendu',
+            self::DECLINED => 'Refusée',
         };
     }
 
@@ -33,11 +35,12 @@ enum AdStatus: string implements HasLabel
     public function allowedTransitions(): array
     {
         return match ($this) {
-            self::PENDING => [self::AVAILABLE],
+            self::PENDING => [self::AVAILABLE, self::DECLINED],
             self::AVAILABLE => [self::RESERVED, self::RENT, self::SOLD],
             self::RESERVED => [self::AVAILABLE, self::RENT, self::SOLD],
             self::RENT => [self::AVAILABLE],
             self::SOLD => [self::AVAILABLE],
+            self::DECLINED => [self::PENDING, self::AVAILABLE],
         };
     }
 

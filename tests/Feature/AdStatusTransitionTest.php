@@ -8,8 +8,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 test('AdStatus defines correct allowed transitions', function (): void {
-    // PENDING can only go to AVAILABLE
-    expect(AdStatus::PENDING->allowedTransitions())->toBe([AdStatus::AVAILABLE]);
+    // PENDING can go to AVAILABLE or DECLINED
+    expect(AdStatus::PENDING->allowedTransitions())->toBe([AdStatus::AVAILABLE, AdStatus::DECLINED]);
 
     // AVAILABLE can go to RESERVED, RENT, SOLD
     expect(AdStatus::AVAILABLE->allowedTransitions())->toBe([AdStatus::RESERVED, AdStatus::RENT, AdStatus::SOLD]);
@@ -20,15 +20,21 @@ test('AdStatus defines correct allowed transitions', function (): void {
     // RENT and SOLD can only go back to AVAILABLE
     expect(AdStatus::RENT->allowedTransitions())->toBe([AdStatus::AVAILABLE]);
     expect(AdStatus::SOLD->allowedTransitions())->toBe([AdStatus::AVAILABLE]);
+
+    // DECLINED can go to PENDING or AVAILABLE
+    expect(AdStatus::DECLINED->allowedTransitions())->toBe([AdStatus::PENDING, AdStatus::AVAILABLE]);
 });
 
 test('canTransitionTo returns correct boolean', function (): void {
     expect(AdStatus::PENDING->canTransitionTo(AdStatus::AVAILABLE))->toBeTrue();
+    expect(AdStatus::PENDING->canTransitionTo(AdStatus::DECLINED))->toBeTrue();
     expect(AdStatus::PENDING->canTransitionTo(AdStatus::SOLD))->toBeFalse();
     expect(AdStatus::AVAILABLE->canTransitionTo(AdStatus::RESERVED))->toBeTrue();
     expect(AdStatus::AVAILABLE->canTransitionTo(AdStatus::PENDING))->toBeFalse();
     expect(AdStatus::SOLD->canTransitionTo(AdStatus::AVAILABLE))->toBeTrue();
     expect(AdStatus::SOLD->canTransitionTo(AdStatus::RENT))->toBeFalse();
+    expect(AdStatus::DECLINED->canTransitionTo(AdStatus::PENDING))->toBeTrue();
+    expect(AdStatus::DECLINED->canTransitionTo(AdStatus::SOLD))->toBeFalse();
 });
 
 test('Ad can transition from PENDING to AVAILABLE', function (): void {
