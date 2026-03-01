@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\PropertyAttribute;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
@@ -150,26 +149,6 @@ final class NotificationController
         return response()->json([
             'success' => true,
             'message' => 'Notification supprimée',
-        ]);
-    }
-
-    /**
-     * Get available property attributes.
-     */
-    #[OA\Get(
-        path: '/api/v1/property-attributes',
-        summary: 'Get available property attributes',
-        description: 'Returns list of available property attributes (Wi-Fi, parking, etc.) for ads.',
-        tags: ['Ads'],
-        responses: [
-            new OA\Response(response: 200, description: 'Property attributes retrieved successfully'),
-        ]
-    )]
-    public function propertyAttributes(): JsonResponse
-    {
-        return response()->json([
-            'success' => true,
-            'data' => PropertyAttribute::toSelectArray(),
         ]);
     }
 }

@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\CreditController;
 use App\Http\Controllers\Api\V1\InvoiceController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PaymentController;
+use App\Http\Controllers\Api\V1\PropertyAttributeController;
 use App\Http\Controllers\Api\V1\QuarterController;
 use App\Http\Controllers\Api\V1\RecommendationController;
 use App\Http\Controllers\Api\V1\ReviewController;
@@ -137,20 +138,7 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('auth:sanctum')->get('/recommendations', [RecommendationController::class, 'index']);
 
     // --- MES ANNONCES DÉBLOQUÉES ---
-    Route::middleware('auth:sanctum')->get('/my/unlocked-ads', function () {
-        $user = request()->user();
-        $adIds = \App\Models\Payment::where('user_id', $user->id)
-            ->where('type', \App\Enums\PaymentType::UNLOCK)
-            ->where('status', \App\Enums\PaymentStatus::SUCCESS)
-            ->pluck('ad_id');
-
-        $ads = \App\Models\Ad::with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')
-            ->whereIn('id', $adIds)
-            ->latest()
-            ->get();
-
-        return \App\Http\Resources\AdResource::collection($ads);
-    });
+    Route::middleware('auth:sanctum')->get('/my/unlocked-ads', [UserController::class, 'unlockedAds']);
 
     // --- MES FAVORIS ---
     Route::middleware('auth:sanctum')->get('/my/favorites', [AdInteractionController::class, 'favorites']);
@@ -165,12 +153,10 @@ Route::prefix('v1')->group(function (): void {
     });
 
     // --- PROPERTY ATTRIBUTES (public) ---
-    Route::get('/property-attributes', [NotificationController::class, 'propertyAttributes']);
+    Route::get('/property-attributes', [PropertyAttributeController::class, 'index']);
 
     // --- PRIX DE DÉBLOCAGE ---
-    Route::get('/payments/unlock-price', fn () => response()->json([
-        'unlock_price' => (int) \App\Models\Setting::get('unlock_price', 500),
-    ]));
+    Route::get('/payments/unlock-price', [PaymentController::class, 'getUnlockPrice']);
 
     // --- CLERK WEBHOOKS ---
     Route::post('/clerk/webhook', [ClerkWebhookController::class, 'handle'])
@@ -178,7 +164,7 @@ Route::prefix('v1')->group(function (): void {
 
     // --- PAIEMENTS ---
     Route::post('/payments/initialize/{ad}', [PaymentController::class, 'initialize'])
-        ->middleware(['auth:sanctum', 'throttle:10,1']);
+        ->middleware(['auth:sanctum', 'throttle:30,1']);
     Route::post('/payments/verify/{ad}', [PaymentController::class, 'verify'])
         ->middleware('auth:sanctum');
     Route::post('/payments/webhook', [PaymentController::class, 'webhook']);
@@ -200,6 +186,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/balance', [CreditController::class, 'balance']);
         Route::post('/purchase/{package}', [CreditController::class, 'purchase'])
             ->middleware('throttle:10,1');
+        Route::post('/verify-purchase', [CreditController::class, 'verifyPurchase']);
     });
 
     // --- FACTURES ---
@@ -263,12 +250,5 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('auth:sanctum')->prefix('my/ads')->group(function (): void {
         Route::get('/analytics', [AdAnalyticsController::class, 'overview']);
         Route::get('/{ad}/analytics', [AdAnalyticsController::class, 'show']);
-    });
-
-    // --- FACTURES ---
-    Route::middleware('auth:sanctum')->prefix('invoices')->group(function (): void {
-        Route::get('/', [InvoiceController::class, 'index']);
-        Route::get('/{invoice}', [InvoiceController::class, 'show']);
-        Route::get('/{invoice}/download', [InvoiceController::class, 'download'])->name('invoices.download');
     });
 });

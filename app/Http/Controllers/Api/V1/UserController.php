@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\PaymentStatus;
+use App\Enums\PaymentType;
 use App\Http\Requests\UserRequest;
+use App\Http\Resources\AdResource;
 use App\Http\Resources\UserResource;
 use App\Mail\EmailUpdatedMail;
+use App\Models\Ad;
+use App\Models\Payment;
 use App\Models\User;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -762,5 +767,42 @@ final class UserController
                 'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.', // optionnel, à cacher en prod
             ], 500);
         }
+    }
+
+    /**
+     * List the authenticated user's unlocked ads.
+     *
+     * @OA\Get(
+     *     path="/api/v1/my/unlocked-ads",
+     *     summary="Mes annonces débloquées",
+     *     description="Retourne les annonces que l'utilisateur a débloquées via un paiement réussi.",
+     *     tags={"👤 Utilisateur"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste des annonces débloquées",
+     *
+     *         @OA\JsonContent(type="array", @OA\Items(ref="#/components/schemas/AdResource"))
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Non authentifié")
+     * )
+     */
+    public function unlockedAds(): AnonymousResourceCollection
+    {
+        $user = request()->user();
+
+        $adIds = Payment::where('user_id', $user->id)
+            ->where('type', PaymentType::UNLOCK)
+            ->where('status', PaymentStatus::SUCCESS)
+            ->pluck('ad_id');
+
+        $ads = Ad::with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')
+            ->whereIn('id', $adIds)
+            ->latest()
+            ->get();
+
+        return AdResource::collection($ads);
     }
 }
