@@ -10,6 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use OpenApi\Annotations as OA;
 
 /**
  * Handles inbound Clerk webhook events (delivered via Svix).
@@ -17,9 +18,23 @@ use Illuminate\Support\Facades\Mail;
  * Supported events:
  *   - invitation.created             → InvitationMail
  *   - organizationInvitation.created → InvitationMail
+ *
+ * @OA\Tag(name="🔗 Webhooks", description="Points d'entrée pour les webhooks externes")
  */
 final class ClerkWebhookController
 {
+    /**
+     * @OA\Post(
+     *     path="/api/v1/clerk/webhook",
+     *     summary="Webhook Clerk (Svix)",
+     *     description="Reçoit les événements Clerk/Svix (invitation.created, organizationInvitation.created). Vérifie la signature HMAC avant traitement.",
+     *     tags={"🔗 Webhooks"},
+     *
+     *     @OA\Response(response=200, description="Événement traité"),
+     *     @OA\Response(response=401, description="Signature invalide"),
+     *     @OA\Response(response=422, description="Données manquantes")
+     * )
+     */
     public function handle(Request $request): JsonResponse
     {
         $rawBody = $request->getContent();

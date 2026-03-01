@@ -558,6 +558,22 @@ final class AuthController
         return $this->registerUser($data, $request);
     }
 
+    /**
+     * @OA\Post(
+     *     path="/api/v1/auth/registerAdmin",
+     *     summary="Enregistrer un administrateur",
+     *     description="Crée un nouveau compte administrateur. Route protégée, accessible uniquement par un admin existant.",
+     *     tags={"🔐 Authentification"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\RequestBody(required=true, @OA\JsonContent(ref="#/components/schemas/RegisterRequest")),
+     *
+     *     @OA\Response(response=201, description="Admin créé"),
+     *     @OA\Response(response=401, description="Non authentifié"),
+     *     @OA\Response(response=403, description="Accès interdit"),
+     *     @OA\Response(response=422, description="Validation échouée")
+     * )
+     */
     public function registerAdmin(RegisterRequest $request): JsonResponse
     {
         $data = $request->validated();
@@ -1469,6 +1485,31 @@ final class AuthController
         return response()->json(['message' => 'Mot de passe mis à jour avec succès.']);
     }
 
+    /**
+     * Exchange a Clerk JWT for a Sanctum token.
+     * Creates a new user account or returns an existing one.
+     *
+     * @OA\Post(
+     *     path="/api/v1/auth/clerk/exchange",
+     *     summary="Échanger un token Clerk contre un token Sanctum",
+     *     description="Valide le JWT Clerk et retourne un token Sanctum. Si l'utilisateur n'existe pas, déclenche un flux OTP pour vérifier l'email avant création.",
+     *     tags={"🔐 Authentification"},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Authentification réussie ou OTP requis",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="access_token", type="string", nullable=true),
+     *             @OA\Property(property="state", type="string", enum={"authenticated", "otp_required"}),
+     *             @OA\Property(property="email_hint", type="string", nullable=true, example="j***@gmail.com")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Token Clerk invalide")
+     * )
+     */
     public function clerkExchange(ClerkExchangeRequest $request, ClerkJwtService $clerk): JsonResponse
     {
         /** @var string $bearerToken */
@@ -1550,6 +1591,38 @@ final class AuthController
     /**
      * Verify the 6-digit OTP sent after a new OAuth sign-in.
      * Returns either an authenticated state (existing user) or profile_required (new user).
+     *
+     * @OA\Post(
+     *     path="/api/v1/auth/clerk/verify-otp",
+     *     summary="Vérifier le code OTP Clerk",
+     *     description="Valide le code OTP reçu par email après un premier échange Clerk. Si l'utilisateur existe, retourne un token. Sinon, demande de compléter le profil.",
+     *     tags={"🔐 Authentification"},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"otp"},
+     *
+     *             @OA\Property(property="otp", type="string", example="123456", description="Code OTP à 6 chiffres")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="OTP validé",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="state", type="string", enum={"authenticated", "profile_required"}),
+     *             @OA\Property(property="access_token", type="string", nullable=true),
+     *             @OA\Property(property="prefill", type="object", nullable=true)
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Token Clerk invalide"),
+     *     @OA\Response(response=422, description="Code OTP invalide ou expiré")
+     * )
      */
     public function verifyClerkOtp(Request $request, ClerkJwtService $clerk): JsonResponse
     {
@@ -1627,6 +1700,39 @@ final class AuthController
     /**
      * Complete profile creation for a new OAuth user after OTP verification.
      * Creates the Laravel account, sends a welcome email, and returns a Sanctum token.
+     *
+     * @OA\Post(
+     *     path="/api/v1/auth/clerk/complete-profile",
+     *     summary="Compléter le profil après vérification OTP",
+     *     description="Crée le compte utilisateur Laravel après que l'email ait été vérifié par OTP. Retourne un token Sanctum et les infos utilisateur.",
+     *     tags={"🔐 Authentification"},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"phone_number"},
+     *
+     *             @OA\Property(property="phone_number", type="string", example="+229 97 00 00 00"),
+     *             @OA\Property(property="city_id", type="string", format="uuid", nullable=true)
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=201,
+     *         description="Compte créé avec succès",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="access_token", type="string"),
+     *             @OA\Property(property="user", ref="#/components/schemas/UserResource")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Token Clerk invalide"),
+     *     @OA\Response(response=403, description="Vérification email requise"),
+     *     @OA\Response(response=422, description="Numéro de téléphone manquant")
+     * )
      */
     public function completeClerkProfile(ClerkExchangeRequest $request, ClerkJwtService $clerk): JsonResponse
     {

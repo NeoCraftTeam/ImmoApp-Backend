@@ -32,9 +32,33 @@ final class PaymentController
         protected PointService $pointService,
     ) {}
 
-    private function unlockPrice(): int
+    /**
+     * Return the current unlock pricing configuration (public).
+     *
+     * @OA\Get(
+     *     path="/api/v1/payments/unlock-price",
+     *     summary="Obtenir le prix de déblocage",
+     *     description="Retourne le prix de déblocage en FCFA et le coût en crédits/points.",
+     *     tags={"💰 Paiements"},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Prix de déblocage",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="unlock_price", type="integer", example=500),
+     *             @OA\Property(property="unlock_cost_points", type="integer", example=2)
+     *         )
+     *     )
+     * )
+     */
+    public function getUnlockPrice(): JsonResponse
     {
-        return (int) Setting::get('unlock_price', 500);
+        return response()->json([
+            'unlock_price' => (int) Setting::get('unlock_price', 500),
+            'unlock_cost_points' => (int) Setting::get('unlock_cost_points', 2),
+        ]);
     }
 
     /**
@@ -102,7 +126,7 @@ final class PaymentController
                     $user,
                     $cost,
                     "Déblocage annonce #{$ad->id}",
-                    $ad->id
+                    (string) $ad->id
                 );
 
                 \App\Models\UnlockedAd::firstOrCreate(
@@ -317,6 +341,30 @@ final class PaymentController
 
     /**
      * Vérifie le statut d'un paiement auprès de FedaPay et met à jour en base.
+     *
+     * @OA\Post(
+     *     path="/api/v1/payments/verify/{ad}",
+     *     summary="Vérifier le statut d'un paiement",
+     *     description="Vérifie le paiement le plus récent pour une annonce auprès de FedaPay. Débloque l'annonce si le paiement est approuvé.",
+     *     tags={"💰 Paiements"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, description="UUID de l'annonce", @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Statut du paiement",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string"),
+     *             @OA\Property(property="is_unlocked", type="boolean")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Non authentifié"),
+     *     @OA\Response(response=404, description="Aucun paiement trouvé")
+     * )
      */
     public function verify(Request $request, Ad $ad): JsonResponse
     {
