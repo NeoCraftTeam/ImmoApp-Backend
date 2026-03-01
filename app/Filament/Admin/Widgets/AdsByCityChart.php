@@ -6,26 +6,29 @@ namespace App\Filament\Admin\Widgets;
 
 use App\Models\Ad;
 use Filament\Widgets\ChartWidget;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class AdsByCityChart extends ChartWidget
 {
     protected static ?int $sort = 6;
 
-    // protected static ?string $heading = 'Annonces par Ville';
+    protected ?string $heading = 'Annonces par Ville';
+
+    protected ?string $pollingInterval = '60s';
 
     protected int|string|array $columnSpan = 1;
 
     #[\Override]
     protected function getData(): array
     {
-        $data = Ad::join('quarter', 'ad.quarter_id', '=', 'quarter.id')
+        $data = Cache::remember('admin_ads_by_city_chart', 300, fn () => Ad::join('quarter', 'ad.quarter_id', '=', 'quarter.id')
             ->join('city', 'quarter.city_id', '=', 'city.id')
             ->select(DB::raw('city.name as city_name'), DB::raw('count(*) as total'))
             ->groupBy('city.name')
             ->orderByDesc('total')
-            ->limit(10) // Top 10 cities
-            ->pluck('total', 'city_name');
+            ->limit(10)
+            ->pluck('total', 'city_name'));
 
         return [
             'datasets' => [

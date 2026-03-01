@@ -47,11 +47,11 @@ class AdObserver
 
             // 3. Send Filament Database Notification to admins
             try {
-                $url = '#';
+                $url = '/admin/pending-ads';
                 try {
-                    $url = \App\Filament\Admin\Resources\Ads\AdResource::getUrl('edit', ['record' => $ad]);
+                    $url = \App\Filament\Admin\Resources\PendingAds\PendingAdResource::getUrl();
                 } catch (\Exception $e) {
-                    // Fallback if route invalid (e.g. testing)
+                    // Fallback if route generation fails (e.g. testing)
                 }
 
                 \Filament\Notifications\Notification::make()
@@ -63,6 +63,7 @@ class AdObserver
                         NotificationAction::make('review')
                             ->label('Examiner')
                             ->url($url)
+                            ->color('warning')
                             ->button()
                             ->markAsRead(),
                     ])
