@@ -7,7 +7,6 @@ namespace App\Console\Commands;
 use App\Models\User;
 use App\Services\AgencyService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Hash;
 
 class TestMultiTenancyFlow extends Command
 {
@@ -28,10 +27,12 @@ class TestMultiTenancyFlow extends Command
                 'firstname' => 'Test',
                 'lastname' => ucfirst($type),
                 'email' => $email,
-                'password' => Hash::make('password'),
+                'password' => 'password',
+            ]);
+            $user->forceFill([
                 'role' => \App\Enums\UserRole::CUSTOMER,
                 'email_verified_at' => now(),
-            ]);
+            ])->save();
         }
 
         $this->info("Current status: Role: {$user->role->value}, Type: ".($user->type !== null ? $user->type->value : 'none'));

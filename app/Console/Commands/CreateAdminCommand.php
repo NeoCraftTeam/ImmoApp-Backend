@@ -7,7 +7,6 @@ namespace App\Console\Commands;
 use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 
 class CreateAdminCommand extends Command
@@ -35,7 +34,7 @@ class CreateAdminCommand extends Command
             }
 
             if ($this->confirm("User {$email} exists as {$existing->role->value}. Promote to admin?", true)) {
-                $existing->update(['role' => UserRole::ADMIN]);
+                $existing->forceFill(['role' => UserRole::ADMIN])->save();
                 $this->info("✅ User {$email} promoted to admin.");
 
                 return self::SUCCESS;
@@ -77,13 +76,15 @@ class CreateAdminCommand extends Command
             return self::FAILURE;
         }
 
-        $user = User::create([
+        $user = new User;
+        $user->fill([
             'firstname' => $firstname,
             'lastname' => $lastname,
             'email' => $email,
-            'password' => Hash::make($password),
-            'role' => UserRole::ADMIN,
+            'password' => $password,
         ]);
+        $user->forceFill(['role' => UserRole::ADMIN]);
+        $user->save();
 
         // Trigger email verification — VerifyEmailMail is queued via sendEmailVerificationNotification()
         $user->sendEmailVerificationNotification();

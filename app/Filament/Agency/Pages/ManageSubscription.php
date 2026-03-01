@@ -118,7 +118,7 @@ class ManageSubscription extends Page
 
         \Illuminate\Support\Facades\DB::beginTransaction();
         try {
-            $payment->update(['status' => \App\Enums\PaymentStatus::SUCCESS]);
+            $payment->forceFill(['status' => \App\Enums\PaymentStatus::SUCCESS])->save();
 
             $plan = \App\Models\SubscriptionPlan::find($payment->plan_id);
 
@@ -181,7 +181,8 @@ class ManageSubscription extends Page
             $agency = auth()->user()->agency;
 
             // Créer le paiement en attente dans notre base pour le suivi
-            \App\Models\Payment::create([
+            $payment = new \App\Models\Payment;
+            $payment->forceFill([
                 'user_id' => auth()->id(),
                 'agency_id' => $agency->id,
                 'type' => \App\Enums\PaymentType::SUBSCRIPTION,
@@ -192,6 +193,7 @@ class ManageSubscription extends Page
                 'status' => \App\Enums\PaymentStatus::PENDING,
                 'payment_method' => \App\Enums\PaymentMethod::FEDAPAY,
             ]);
+            $payment->save();
 
             // Rediriger vers FedaPay
             return redirect()->away($result['url']);

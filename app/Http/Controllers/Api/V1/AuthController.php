@@ -264,8 +264,8 @@ final class AuthController
                 ]);
 
                 return response()->json([
-                    'message' => 'Cette adresse email est déjà utilisée.',
-                ], 409);
+                    'message' => 'Les informations fournies sont invalides.',
+                ], 422);
             }
 
             // Transaction pour assurer la cohérence
@@ -274,23 +274,26 @@ final class AuthController
             $result = DB::transaction(function () use ($request, $data) {
 
                 // Créer l'utilisateur
-                $user = User::create([
+                $user = new User;
+                $user->fill([
                     'firstname' => $data['firstname'],
                     'lastname' => $data['lastname'],
                     'email' => $data['email'],
                     'phone_number' => $data['phone_number'],
-                    'password' => Hash::make($data['password']),
+                    'password' => $data['password'],
                     'location' => isset($data['latitude'], $data['longitude'])
                         ? Point::makeGeodetic((float) $data['latitude'], (float) $data['longitude'])
                         : null,
-                    'role' => $data['role'] ?? 'customer', // Valeur par défaut sécurisée
                     'type' => $data['type'] ?? 'individual',
                     'city_id' => $data['city_id'] ?? null,
-                    'is_active' => true,
-                    'email_verified_at' => null, // Forcer la vérification email
-                    'last_login_ip' => $request->ip(),
-                    'created_at' => now(),
                 ]);
+                $user->forceFill([
+                    'role' => $data['role'],
+                    'is_active' => true,
+                    'email_verified_at' => null,
+                    'last_login_ip' => $request->ip(),
+                ]);
+                $user->save();
 
                 // Gestion de l'avatar avec validation approfondie
                 if ($request->hasFile('avatar')) {
@@ -303,6 +306,8 @@ final class AuthController
                 // Créer le token d'accès
                 $token = $user->createToken(
                     'registration_token_'.now()->timestamp,
+                    ['*'],
+                    now()->addDays(7)
                 );
 
                 return ['user' => $user, 'token' => $token];
@@ -1033,12 +1038,12 @@ final class AuthController
             }
 
             // Mettre à jour les informations de connexion
-            $user->update([
+            $user->forceFill([
                 'last_login_at' => now(),
                 'last_login_ip' => $currentIp,
                 'last_login_country' => $currentCountry ?: null,
                 'last_login_city' => $currentCity ?: null,
-            ]);
+            ])->save();
 
             // Log de connexion réussie
             Log::info('Successful login', [
@@ -1785,18 +1790,22 @@ final class AuthController
         $isNew = false;
 
         if ($user === null) {
-            $user = User::create([
+            $user = new User;
+            $user->fill([
                 'clerk_id' => $clerkId,
                 'firstname' => $firstName,
                 'lastname' => $lastName,
                 'email' => $email ?? $clerkId.'@clerk.local',
                 'phone_number' => $request->input('phone_number'),
                 'city_id' => $request->input('city_id'),
-                'role' => 'customer',
-                'is_active' => true,
                 'avatar' => $avatar,
+            ]);
+            $user->forceFill([
+                'role' => UserRole::CUSTOMER,
+                'is_active' => true,
                 'email_verified_at' => now(),
             ]);
+            $user->save();
 
             $isNew = true;
 

@@ -16,7 +16,6 @@ use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 
 class CustomRegister extends BaseRegister
 {
@@ -86,16 +85,19 @@ class CustomRegister extends BaseRegister
 
         return DB::transaction(function () use ($data, $panelId) {
             // 1. On crée d'abord l'utilisateur de base
-            $user = User::create([
+            $user = new User;
+            $user->fill([
                 'firstname' => $data['firstname'],
                 'lastname' => $data['lastname'],
                 'email' => $data['email'],
-                'password' => Hash::make($data['password']),
+                'password' => $data['password'],
                 'phone_number' => $data['phone_number'] ?? null,
-                'phone_is_whatsapp' => $data['phone_is_whatsapp'] ?? false,
-                'role' => UserRole::CUSTOMER, // Rôle temporaire avant promotion
+            ]);
+            $user->forceFill([
+                'role' => UserRole::CUSTOMER,
                 'is_active' => true,
             ]);
+            $user->save();
 
             // 2. On utilise le service pour lui créer son Agence/Portefeuille et le promouvoir Agent
             try {

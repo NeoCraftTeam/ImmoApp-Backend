@@ -108,7 +108,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property-read City|null $city
  * @property-read MediaCollection<int, Media> $media
  * @property-read Collection<int, Review> $reviews
- * @property int|null $agency_id
+ * @property string|null $agency_id
  * @property-read int|null $reviews_count
  *
  * @method static Builder<static>|User whereIsActive($value)
@@ -139,19 +139,10 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'phone_number',
         'phone_is_whatsapp',
         'type',
-        'role',
         'avatar',
         'city_id',
-        'is_active',
         'location',
         'agency_id',
-        'email_verified_at',
-        'last_login_ip',
-        'last_login_at',
-        'last_login_country',
-        'last_login_city',
-        'created_at',
-        'updated_at',
         // OAuth fields
         'google_id',
         'facebook_id',
@@ -159,7 +150,6 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'clerk_id',
         'oauth_provider',
         'oauth_avatar',
-        'point_balance',
     ];
 
     /**
@@ -474,7 +464,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     {
         return [
             'email_verified_at' => 'datetime',
-            'password' => 'string',
+            'password' => 'hashed',
             'role' => UserRole::class,
             'type' => UserType::class,
             'is_active' => 'boolean',

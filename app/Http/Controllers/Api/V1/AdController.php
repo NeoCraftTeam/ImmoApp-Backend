@@ -281,7 +281,8 @@ final class AdController
             Log::info('Files received:', $request->allFiles());
 
             // Créer l'annonce
-            $ad = Ad::create([
+            $ad = new Ad;
+            $ad->fill([
                 'title' => $data['title'],
                 'description' => $data['description'],
                 'adresse' => $data['adresse'],
@@ -291,12 +292,13 @@ final class AdController
                 'bathrooms' => $data['bathrooms'],
                 'has_parking' => $data['has_parking'] ?? false,
                 'location' => Point::makeGeodetic($data['latitude'], $data['longitude']),
-                'status' => AdStatus::PENDING->value, // Always start as pending — admin must approve
                 'expires_at' => $data['expires_at'],
-                'user_id' => auth()->id(), // Always use authenticated user — never trust client input
+                'user_id' => auth()->id(),
                 'quarter_id' => $data['quarter_id'],
                 'type_id' => $data['type_id'],
             ]);
+            $ad->forceFill(['status' => AdStatus::PENDING]);
+            $ad->save();
 
             Log::info('Ad created with ID: '.$ad->id);
 
@@ -591,6 +593,7 @@ final class AdController
             }
 
             // Validate status transition if status is being changed (admin only)
+            $newStatus = null;
             if (isset($data['status'])) {
                 $newStatus = AdStatus::from($data['status']);
                 if ($ad->status !== $newStatus) {
@@ -601,10 +604,15 @@ final class AdController
                         ], 422);
                     }
                 }
+                unset($data['status']);
             }
 
             // Mettre à jour l'annonce
             $ad->update($data);
+
+            if ($newStatus !== null) {
+                $ad->forceFill(['status' => $newStatus])->save();
+            }
 
             Log::info('Ad updated with ID: '.$ad->id);
 

@@ -62,17 +62,13 @@ class Payment extends Model
     use HasFactory, HasUuids, LogsActivity, SoftDeletes;
 
     protected $fillable = [
-
         'type',
-        'amount',
-        'transaction_id',
         'payment_method',
         'user_id',
         'ad_id',
         'agency_id',
         'plan_id',
         'period',
-        'status',
     ];
 
     protected $hidden = [

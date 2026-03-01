@@ -202,7 +202,7 @@ final class PaymentController
             return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
         }
 
-        $event = $request->all();
+        $event = $request->only(['name', 'entity']);
         Log::info('FedaPay Webhook reçu:', ['event' => $event['name'] ?? 'unknown']);
 
         $transactionId = $event['entity']['id'] ?? null;
@@ -229,7 +229,7 @@ final class PaymentController
 
             // 1. Gestion du SUCCÈS
             if (isset($event['name']) && $event['name'] === 'transaction.approved') {
-                $payment->update(['status' => PaymentStatus::SUCCESS]);
+                $payment->forceFill(['status' => PaymentStatus::SUCCESS])->save();
 
                 // Create UnlockedAd record for backoffice tracking (unlock payments only)
                 if ($payment->type === PaymentType::UNLOCK && $payment->ad_id && $payment->user_id) {
@@ -292,7 +292,7 @@ final class PaymentController
 
             // 2. Gestion de l'ÉCHEC ou ANNULATION
             elseif (isset($event['name']) && in_array($event['name'], ['transaction.canceled', 'transaction.declined'])) {
-                $payment->update(['status' => PaymentStatus::FAILED]);
+                $payment->forceFill(['status' => PaymentStatus::FAILED])->save();
                 Log::info("Paiement #{$payment->id} marqué comme échoué.");
             }
 
@@ -395,7 +395,7 @@ final class PaymentController
             $result = $this->fedaPay->retrieveTransaction((int) $payment->transaction_id);
 
             if ($result['success'] && $result['status'] === 'approved') {
-                $payment->update(['status' => PaymentStatus::SUCCESS]);
+                $payment->forceFill(['status' => PaymentStatus::SUCCESS])->save();
 
                 \App\Models\UnlockedAd::firstOrCreate(
                     ['ad_id' => $ad->id, 'user_id' => $user->id],

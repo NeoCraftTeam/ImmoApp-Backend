@@ -151,7 +151,8 @@ final class CreditController
         }
 
         try {
-            Payment::create([
+            $payment = new Payment;
+            $payment->forceFill([
                 'user_id' => $user->id,
                 'amount' => $package->price,
                 'transaction_id' => (string) $paymentData['transaction_id'],
@@ -159,6 +160,7 @@ final class CreditController
                 'payment_method' => PaymentMethod::FEDAPAY,
                 'type' => PaymentType::CREDIT,
             ]);
+            $payment->save();
         } catch (\Exception $e) {
             Log::error('Erreur création paiement crédits: '.$e->getMessage());
 
@@ -240,7 +242,7 @@ final class CreditController
         $result = $this->fedaPay->retrieveTransaction((int) $payment->transaction_id);
 
         if ($result['success'] && $result['status'] === 'approved') {
-            $payment->update(['status' => PaymentStatus::SUCCESS]);
+            $payment->forceFill(['status' => PaymentStatus::SUCCESS])->save();
 
             // Credit points if not already done (idempotency via unique transaction check)
             $alreadyCredited = $user->pointTransactions()
@@ -285,7 +287,7 @@ final class CreditController
         }
 
         if ($result['success'] && in_array($result['status'], ['canceled', 'declined', 'refunded'])) {
-            $payment->update(['status' => PaymentStatus::FAILED]);
+            $payment->forceFill(['status' => PaymentStatus::FAILED])->save();
 
             return response()->json([
                 'status' => 'failed',

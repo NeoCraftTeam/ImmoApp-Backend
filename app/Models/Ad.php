@@ -98,7 +98,6 @@ class Ad extends Model implements HasMedia
         'bathrooms',
         'has_parking',
         'location',
-        'status',
         'is_visible',
         'available_from',
         'available_to',
@@ -108,10 +107,6 @@ class Ad extends Model implements HasMedia
         'quarter_id',
         'type_id',
         'agency_id',
-        'is_boosted',
-        'boost_score',
-        'boost_expires_at',
-        'boosted_at',
         'deposit_amount',
         'minimum_lease_duration',
         'detailed_charges',
@@ -425,12 +420,12 @@ class Ad extends Model implements HasMedia
      */
     public function boost(int $score, int $durationDays): void
     {
-        $this->update([
+        $this->forceFill([
             'is_boosted' => true,
             'boost_score' => $score,
             'boost_expires_at' => now()->addDays($durationDays),
             'boosted_at' => now(),
-        ]);
+        ])->save();
     }
 
     /**
@@ -438,11 +433,11 @@ class Ad extends Model implements HasMedia
      */
     public function unboost(): void
     {
-        $this->update([
+        $this->forceFill([
             'is_boosted' => false,
             'boost_score' => 0,
             'boost_expires_at' => null,
-        ]);
+        ])->save();
     }
 
     /**

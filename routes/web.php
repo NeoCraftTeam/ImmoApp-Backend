@@ -13,7 +13,9 @@ Route::get('/', function () {
 });
 
 // Clerk → Filament panel SSO (URL signée, valide 60 secondes)
-Route::get('/auth/panel-sso', PanelSsoController::class)->name('panel.sso');
+Route::get('/auth/panel-sso', PanelSsoController::class)
+    ->middleware('throttle:5,1')
+    ->name('panel.sso');
 
 Route::get('email/verify/{id}/{hash}', [
     EmailVerificationController::class,
@@ -32,6 +34,11 @@ Route::get('/verify-email', function (\Illuminate\Http\Request $request) {
     }
 
     $verifyUrl = $request->query('verify_url');
+
+    if (!is_string($verifyUrl) || !filter_var($verifyUrl, FILTER_VALIDATE_URL)) {
+        abort(403, 'Invalid URL format.');
+    }
+
     $allowedHosts = [
         'keyhome.neocraft.dev',
         'api.keyhome.neocraft.dev',
@@ -41,7 +48,11 @@ Route::get('/verify-email', function (\Illuminate\Http\Request $request) {
     ];
 
     $parsedHost = parse_url($verifyUrl, PHP_URL_HOST);
-    if (!$parsedHost || !in_array($parsedHost, $allowedHosts, true)) {
+    $parsedScheme = parse_url($verifyUrl, PHP_URL_SCHEME);
+
+    if (!$parsedHost
+        || !in_array($parsedHost, $allowedHosts, true)
+        || !in_array($parsedScheme, ['http', 'https'], true)) {
         abort(403, 'Redirect to untrusted domain is not allowed.');
     }
 

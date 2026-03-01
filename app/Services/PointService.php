@@ -75,7 +75,13 @@ class PointService
         ?string $paymentId = null
     ): PointTransaction {
         return DB::transaction(function () use ($user, $points, $type, $description, $paymentId): PointTransaction {
-            $user->increment('point_balance', $points);
+            /** @var \App\Models\User $freshUser */
+            $freshUser = User::query()
+                ->lockForUpdate()
+                ->findOrFail($user->id);
+
+            $freshUser->increment('point_balance', $points);
+            $user->point_balance = $freshUser->point_balance;
 
             return PointTransaction::create([
                 'user_id' => $user->id,

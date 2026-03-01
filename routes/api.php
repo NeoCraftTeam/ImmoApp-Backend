@@ -62,9 +62,11 @@ Route::prefix('v1')->group(function (): void {
                 ->where('provider', 'google|facebook|apple');
 
             Route::get('{provider}/redirect', 'redirect')
+                ->middleware('throttle:10,1')
                 ->where('provider', 'google|facebook|apple');
 
             Route::get('{provider}/callback', 'callback')
+                ->middleware('throttle:10,1')
                 ->where('provider', 'google|facebook|apple');
 
             // Authenticated OAuth endpoints (link/unlink)
@@ -166,9 +168,11 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/payments/initialize/{ad}', [PaymentController::class, 'initialize'])
         ->middleware(['auth:sanctum', 'throttle:30,1']);
     Route::post('/payments/verify/{ad}', [PaymentController::class, 'verify'])
-        ->middleware('auth:sanctum');
-    Route::post('/payments/webhook', [PaymentController::class, 'webhook']);
-    Route::get('/payments/callback', [PaymentController::class, 'callback']);
+        ->middleware(['auth:sanctum', 'throttle:30,1']);
+    Route::post('/payments/webhook', [PaymentController::class, 'webhook'])
+        ->middleware('throttle:120,1');
+    Route::get('/payments/callback', [PaymentController::class, 'callback'])
+        ->middleware('throttle:30,1');
 
     // --- ABONNEMENTS AGENCES ---
     Route::get('/subscriptions/plans', [SubscriptionController::class, 'plans']);
@@ -176,7 +180,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/current', [SubscriptionController::class, 'current']);
         Route::post('/subscribe', [SubscriptionController::class, 'subscribe'])
             ->middleware('throttle:5,1');
-        Route::post('/cancel', [SubscriptionController::class, 'cancel']);
+        Route::post('/cancel', [SubscriptionController::class, 'cancel'])
+            ->middleware('throttle:5,1');
         Route::get('/history', [SubscriptionController::class, 'history']);
     });
 
@@ -186,7 +191,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/balance', [CreditController::class, 'balance']);
         Route::post('/purchase/{package}', [CreditController::class, 'purchase'])
             ->middleware('throttle:10,1');
-        Route::post('/verify-purchase', [CreditController::class, 'verifyPurchase']);
+        Route::post('/verify-purchase', [CreditController::class, 'verifyPurchase'])
+            ->middleware('throttle:30,1');
     });
 
     // --- FACTURES ---

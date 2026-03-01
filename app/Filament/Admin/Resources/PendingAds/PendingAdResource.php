@@ -125,7 +125,7 @@ class PendingAdResource extends Resource
                     ->modalHeading('Approuver cette annonce')
                     ->modalDescription(fn (Ad $record) => "L'annonce \"{$record->title}\" sera publiée et un email de confirmation sera envoyé à l'auteur.")
                     ->action(function (Ad $record): void {
-                        $record->update(['status' => AdStatus::AVAILABLE]);
+                        $record->forceFill(['status' => AdStatus::AVAILABLE])->save();
 
                         // Send approval email to author
                         if ($record->user) {

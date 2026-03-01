@@ -112,10 +112,10 @@ final class SocialAuthController
             $isNewUser = $result['is_new'];
 
             // Update last login info
-            $user->update([
+            $user->forceFill([
                 'last_login_at' => now(),
                 'last_login_ip' => $request->ip(),
-            ]);
+            ])->save();
 
             // Create Sanctum token
             $token = $user->createToken('oauth-'.$provider)->plainTextToken;
@@ -256,10 +256,10 @@ final class SocialAuthController
             $result = $this->findOrCreateUser($socialUser, $provider);
             $user = $result['user'];
 
-            $user->update([
+            $user->forceFill([
                 'last_login_at' => now(),
                 'last_login_ip' => $request->ip(),
-            ]);
+            ])->save();
 
             $token = $user->createToken('oauth-'.$provider)->plainTextToken;
 
@@ -452,8 +452,10 @@ final class SocialAuthController
                     $providerIdField => $socialUser->getId(),
                     'oauth_provider' => $provider,
                     'oauth_avatar' => $socialUser->getAvatar(),
-                    'email_verified_at' => $user->email_verified_at ?? now(),
                 ]);
+                if ($user->email_verified_at === null) {
+                    $user->forceFill(['email_verified_at' => now()])->save();
+                }
 
                 return ['user' => $user, 'is_new' => false];
             }
@@ -464,19 +466,23 @@ final class SocialAuthController
             // Users can request agent upgrade through the app after completing their profile.
             $names = $this->parseNames($socialUser);
 
-            $user = User::create([
+            $user = new User;
+            $user->fill([
                 'firstname' => $names['firstname'],
                 'lastname' => $names['lastname'],
                 'email' => $socialUser->getEmail(),
-                'password' => null, // OAuth users don't need password
+                'password' => null,
                 $providerIdField => $socialUser->getId(),
                 'oauth_provider' => $provider,
                 'oauth_avatar' => $socialUser->getAvatar(),
                 'avatar' => $socialUser->getAvatar() ?? 'avatars/default.png',
-                'email_verified_at' => now(), // OAuth emails are pre-verified
-                'role' => UserRole::CUSTOMER, // Always customer - agents need manual setup
+            ]);
+            $user->forceFill([
+                'email_verified_at' => now(),
+                'role' => UserRole::CUSTOMER,
                 'is_active' => true,
             ]);
+            $user->save();
 
             return ['user' => $user, 'is_new' => true];
         });

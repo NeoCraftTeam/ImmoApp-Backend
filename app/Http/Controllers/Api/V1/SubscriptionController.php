@@ -280,7 +280,8 @@ final class SubscriptionController
 
         DB::beginTransaction();
         try {
-            Payment::create([
+            $payment = new Payment;
+            $payment->forceFill([
                 'user_id' => $user->id,
                 'agency_id' => $agency->id,
                 'plan_id' => $plan->id,
@@ -291,6 +292,7 @@ final class SubscriptionController
                 'payment_method' => PaymentMethod::FEDAPAY,
                 'type' => PaymentType::SUBSCRIPTION,
             ]);
+            $payment->save();
 
             DB::commit();
 

@@ -302,20 +302,24 @@ final class UserController
             DB::beginTransaction();
 
             // Création de l'utilisateur
-            $user = User::create([
+            $user = new User;
+            $user->fill([
                 'firstname' => $data['firstname'],
                 'lastname' => $data['lastname'],
                 'email' => $data['email'],
-                'password' => Hash::make($data['password']),
+                'password' => $data['password'],
                 'phone_number' => $data['phone_number'],
-                'role' => $data['role'],
                 'location' => isset($data['latitude'], $data['longitude'])
                     ? Point::makeGeodetic((float) $data['latitude'], (float) $data['longitude'])
                     : null,
                 'type' => $data['type'] ?? null,
                 'city_id' => $data['city_id'],
+            ]);
+            $user->forceFill([
+                'role' => $data['role'],
                 'is_active' => true,
             ]);
+            $user->save();
 
             // Gestion de l'avatar (le modèle gère le default)
             if ($request->hasFile('avatar')) {
