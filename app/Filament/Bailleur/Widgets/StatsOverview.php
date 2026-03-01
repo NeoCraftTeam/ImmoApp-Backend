@@ -34,26 +34,19 @@ class StatsOverview extends BaseWidget
             ];
         }
 
-        // Real stats from ad_interactions
-        $views = AdInteraction::whereIn('ad_id', $adIds)
-            ->where('type', AdInteraction::TYPE_VIEW)
+        /** @var object{views: int|null, favorites: int|null, contacts: int|null, impressions: int|null} $stats */
+        $stats = AdInteraction::whereIn('ad_id', $adIds)
             ->where('created_at', '>=', $since)
-            ->count();
+            ->selectRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as views', [AdInteraction::TYPE_VIEW])
+            ->selectRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as favorites', [AdInteraction::TYPE_FAVORITE])
+            ->selectRaw('SUM(CASE WHEN type IN (?, ?) THEN 1 ELSE 0 END) as contacts', [AdInteraction::TYPE_CONTACT_CLICK, AdInteraction::TYPE_PHONE_CLICK])
+            ->selectRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as impressions', [AdInteraction::TYPE_IMPRESSION])
+            ->first();
 
-        $favorites = AdInteraction::whereIn('ad_id', $adIds)
-            ->where('type', AdInteraction::TYPE_FAVORITE)
-            ->where('created_at', '>=', $since)
-            ->count();
-
-        $contacts = AdInteraction::whereIn('ad_id', $adIds)
-            ->whereIn('type', [AdInteraction::TYPE_CONTACT_CLICK, AdInteraction::TYPE_PHONE_CLICK])
-            ->where('created_at', '>=', $since)
-            ->count();
-
-        $impressions = AdInteraction::whereIn('ad_id', $adIds)
-            ->where('type', AdInteraction::TYPE_IMPRESSION)
-            ->where('created_at', '>=', $since)
-            ->count();
+        $views = (int) $stats->views;
+        $favorites = (int) $stats->favorites;
+        $contacts = (int) $stats->contacts;
+        $impressions = (int) $stats->impressions;
 
         $engagementRate = $impressions > 0
             ? round(($favorites + $contacts) / $impressions * 100, 1)
@@ -81,7 +74,7 @@ class StatsOverview extends BaseWidget
                 ->color('warning'),
 
             Stat::make('Engagement', $engagementRate.'%')
-                ->description('(Favoris + contacts) / impressions')
+                ->description($engagementRate > 5 ? 'Bon engagement' : 'Engagement faible')
                 ->descriptionIcon('heroicon-m-chart-bar')
                 ->color($engagementRate > 5 ? 'success' : 'gray'),
         ];
