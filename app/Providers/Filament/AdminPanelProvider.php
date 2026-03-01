@@ -46,17 +46,48 @@ class AdminPanelProvider extends PanelProvider
             ->passwordReset()
             ->emailVerification()
             ->emailChangeVerification()
-            ->globalSearch(false)
+            ->globalSearch(true)
             ->profile(\App\Filament\Pages\Auth\EditProfile::class)
             ->sidebarCollapsibleOnDesktop()
             ->font('poppins')
-            ->brandLogo(asset('images/keyhomelogo.png'))
+            ->brandLogo(fn () => view('filament.admin.brand'))
+            ->brandLogoHeight('2.25rem')
             ->authGuard('web')
             ->spa()
+            ->renderHook(
+                'panels::scripts.after',
+                fn () => new \Illuminate\Support\HtmlString('
+                    <script>
+                        window.addEventListener("error", function(e) {
+                            if (e.message && e.message.includes("this.getChart().destroy")) {
+                                e.preventDefault();
+                            }
+                        });
+                    </script>
+                '),
+            )
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')
             ->unsavedChangesAlerts()
-            ->collapsibleNavigationGroups(false)
+            ->collapsibleNavigationGroups(true)
+            ->navigationGroups([
+                \Filament\Navigation\NavigationGroup::make('Annonces')
+                    ->icon('heroicon-o-home'),
+                \Filament\Navigation\NavigationGroup::make('Villes & Quartiers')
+                    ->icon('heroicon-o-map-pin'),
+                \Filament\Navigation\NavigationGroup::make('Utilisateurs')
+                    ->icon('heroicon-o-users'),
+                \Filament\Navigation\NavigationGroup::make('Abonnements')
+                    ->icon('heroicon-o-credit-card'),
+                \Filament\Navigation\NavigationGroup::make('Système de Crédits')
+                    ->icon('heroicon-o-star'),
+                \Filament\Navigation\NavigationGroup::make('Configuration')
+                    ->icon('heroicon-o-cog-6-tooth')
+                    ->collapsed(),
+                \Filament\Navigation\NavigationGroup::make('Administration')
+                    ->icon('heroicon-o-shield-check')
+                    ->collapsed(),
+            ])
             ->colors([
                 'primary' => Color::Amber,
             ])
