@@ -36,17 +36,19 @@ class UnlockedAdResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::LockOpen;
 
-    protected static ?string $recordTitleAttribute = 'ad_id';
+    protected static ?string $recordTitleAttribute = 'id';
 
     protected static ?string $navigationLabel = 'Déblocages (Opérations)';
 
     protected static ?string $modelLabel = 'Annonce débloquée';
 
+    protected static ?string $pluralModelLabel = 'Annonces débloquées';
+
     #[\Override]
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['ad.user', 'user', 'payment']);
+            ->with(['ad.user.agency', 'user.agency', 'payment']);
     }
 
     #[\Override]
@@ -55,19 +57,23 @@ class UnlockedAdResource extends Resource
         return $schema
             ->components([
                 Select::make('ad_id')
+                    ->label('Annonce')
                     ->relationship('ad', 'title')
                     ->required(),
                 Select::make('user_id')
+                    ->label('Utilisateur')
                     ->relationship('user', 'firstname')
                     ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->firstname} {$record->lastname}")
                     ->searchable()
                     ->preload()
                     ->required(),
                 Select::make('payment_id')
+                    ->label('Paiement')
                     ->relationship('payment', 'transaction_id')
                     ->searchable()
                     ->required(),
-                DateTimePicker::make('unlocked_at'),
+                DateTimePicker::make('unlocked_at')
+                    ->label('Débloqué le'),
             ]);
     }
 
@@ -78,15 +84,17 @@ class UnlockedAdResource extends Resource
             ->components([
                 TextEntry::make('ad.user.fullname')->label('Propriétaire'),
                 TextEntry::make('ad.title')
-                    ->label('Ad'),
+                    ->label('Annonce'),
                 TextEntry::make('user.fullname')
                     ->label('Débloquée par'),
                 TextEntry::make('payment.transaction_id')
-                    ->label('Payment ID'),
+                    ->label('ID Paiement'),
                 TextEntry::make('unlocked_at')
-                    ->dateTime('d/m/Y H:i'),
+                    ->label('Débloqué le')
+                    ->dateTime('d/m/Y à H:i'),
                 TextEntry::make('deleted_at')
-                    ->dateTime()
+                    ->label('Supprimé le')
+                    ->dateTime('d/m/Y à H:i')
                     ->visible(fn (UnlockedAd $record): bool => $record->trashed()),
             ]);
     }
@@ -95,6 +103,9 @@ class UnlockedAdResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->heading('Annonces débloquées')
+            ->description('Historique des déblocages d\'annonces')
+            ->striped()
             ->recordTitleAttribute('id')
             ->columns([
                 TextColumn::make('ad.user.fullname')->label('Propriétaire')
@@ -103,13 +114,15 @@ class UnlockedAdResource extends Resource
                     ->searchable(),
                 TextColumn::make('user.fullname')->label('Débloquée par')
                     ->searchable(),
-                TextColumn::make('payment.transaction_id')->label('Payment ID')
+                TextColumn::make('payment.transaction_id')->label('ID Paiement')
                     ->searchable(),
                 TextColumn::make('unlocked_at')
-                    ->dateTime('d/m/Y H:i')
+                    ->label('Débloqué le')
+                    ->dateTime('d/m/Y à H:i')
                     ->sortable(),
                 TextColumn::make('deleted_at')
-                    ->dateTime()
+                    ->label('Supprimé le')
+                    ->dateTime('d/m/Y à H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])

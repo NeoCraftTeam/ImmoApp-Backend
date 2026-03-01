@@ -24,11 +24,13 @@ class PropertyAttributeResource extends Resource
 
     protected static string|null|\UnitEnum $navigationGroup = 'Configuration';
 
+    protected static ?string $navigationLabel = 'Attributs';
+
     protected static ?string $modelLabel = 'Attribut';
 
     protected static ?string $pluralModelLabel = 'Attributs';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 1;
 
     #[\Override]
     public static function form(Schema $schema): Schema

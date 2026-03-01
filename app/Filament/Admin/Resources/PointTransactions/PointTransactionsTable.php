@@ -15,7 +15,10 @@ class PointTransactionsTable
     public static function configure(Table $table): Table
     {
         return $table
-            ->modifyQueryUsing(fn ($query) => $query->with(['user', 'ad']))
+            ->heading('Transactions de crédits')
+            ->description('Historique des achats, déblocages et bonus')
+            ->striped()
+            ->modifyQueryUsing(fn ($query) => $query->with(['user.agency', 'ad']))
             ->defaultGroup(
                 Group::make('user_id')
                     ->label('Utilisateur')
@@ -80,10 +83,10 @@ class PointTransactionsTable
                     ->limit(50)
                     ->tooltip(fn ($record): string => $record->description),
 
-                TextColumn::make('ad.id')
+                TextColumn::make('ad.title')
                     ->label('Annonce')
                     ->placeholder('—')
-                    ->limit(8),
+                    ->limit(40),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([

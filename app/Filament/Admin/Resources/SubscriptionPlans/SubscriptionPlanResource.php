@@ -60,4 +60,14 @@ class SubscriptionPlanResource extends Resource
             'edit' => EditSubscriptionPlan::route('/{record}/edit'),
         ];
     }
+
+    public static function getNavigationBadge(): ?string
+    {
+        return (string) static::getModel()::count();
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'Nombre de plans';
+    }
 }

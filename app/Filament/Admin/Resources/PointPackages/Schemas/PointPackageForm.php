@@ -8,6 +8,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 
 class PointPackageForm
 {
@@ -16,6 +17,7 @@ class PointPackageForm
         return $schema
             ->components([
                 Section::make('Informations du pack')
+                    ->icon(Heroicon::Star)
                     ->schema([
                         TextInput::make('name')
                             ->label('Nom du pack')
@@ -62,6 +64,7 @@ class PointPackageForm
                     ->columns(2),
 
                 Section::make('Paramètres')
+                    ->icon(Heroicon::Cog6Tooth)
                     ->schema([
                         Toggle::make('is_active')
                             ->label('Pack actif')

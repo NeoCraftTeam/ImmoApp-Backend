@@ -26,15 +26,25 @@ class AgencyResource extends Resource
 
     protected static bool $isScopedToTenant = false;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|null|\UnitEnum $navigationGroup = 'Utilisateurs';
 
-    protected static ?string $recordTitleAttribute = 'Agency';
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;
+
+    protected static ?string $navigationLabel = 'Agences';
+
+    protected static ?string $modelLabel = 'Agence';
+
+    protected static ?string $pluralModelLabel = 'Agences';
+
+    protected static ?int $navigationSort = 2;
+
+    protected static ?string $recordTitleAttribute = 'name';
 
     #[\Override]
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['owner']);
+            ->with(['owner.agency']);
     }
 
     #[\Override]
@@ -79,5 +89,15 @@ class AgencyResource extends Resource
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        return (string) static::getModel()::count();
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'Nombre d\'agences';
     }
 }

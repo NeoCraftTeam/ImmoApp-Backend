@@ -19,6 +19,9 @@ class PropertyAttributesTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->heading('Attributs de propriété')
+            ->description('Caractéristiques disponibles pour les annonces')
+            ->striped()
             ->columns([
                 TextColumn::make('name')
                     ->label('Nom')
@@ -54,8 +57,10 @@ class PropertyAttributesTable
                     ->native(false),
             ])
             ->recordActions([
-                EditAction::make(),
-                DeleteAction::make(),
+                EditAction::make()
+                    ->successNotificationTitle('Attribut mis à jour'),
+                DeleteAction::make()
+                    ->successNotificationTitle('Attribut supprimé'),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

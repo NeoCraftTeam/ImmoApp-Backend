@@ -57,4 +57,14 @@ class PointTransactionResource extends Resource
     {
         return false;
     }
+
+    public static function getNavigationBadge(): ?string
+    {
+        return (string) static::getModel()::count();
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'Nombre de transactions';
+    }
 }

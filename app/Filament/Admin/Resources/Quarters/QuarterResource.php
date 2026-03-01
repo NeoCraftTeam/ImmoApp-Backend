@@ -45,7 +45,11 @@ class QuarterResource extends Resource
 
     protected static ?string $navigationLabel = 'Quartiers';
 
+    protected static ?int $navigationSort = 2;
+
     protected static ?string $modelLabel = 'Quartier';
+
+    protected static ?string $pluralModelLabel = 'Quartiers';
 
     #[\Override]
     public static function form(Schema $schema): Schema
@@ -53,8 +57,11 @@ class QuarterResource extends Resource
         return $schema
             ->components([
                 TextInput::make('name')
-                    ->required(),
+                    ->label('Nom')
+                    ->required()
+                    ->helperText('Nom du quartier'),
                 Select::make('city_id')
+                    ->label('Ville')
                     ->relationship('city', 'name')
                     ->required()
                     ->searchable()
@@ -72,22 +79,32 @@ class QuarterResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->heading('Quartiers')
+            ->description('Liste des quartiers par ville')
+            ->striped()
             ->recordTitleAttribute('name')
             ->columns([
                 TextColumn::make('name')
-                    ->searchable(),
-                TextColumn::make('city.name')->label('Ville')
-                    ->searchable(),
+                    ->label('Nom')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('city.name')
+                    ->label('Ville')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('created_at')
-                    ->dateTime()
+                    ->label('Créé le')
+                    ->dateTime('d/m/Y à H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
-                    ->dateTime()
+                    ->label('Modifié le')
+                    ->dateTime('d/m/Y à H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('deleted_at')
-                    ->dateTime()
+                    ->label('Supprimé le')
+                    ->dateTime('d/m/Y à H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
@@ -95,10 +112,14 @@ class QuarterResource extends Resource
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                EditAction::make(),
-                DeleteAction::make(),
-                ForceDeleteAction::make(),
-                RestoreAction::make(),
+                EditAction::make()
+                    ->successNotificationTitle('Quartier mis à jour'),
+                DeleteAction::make()
+                    ->successNotificationTitle('Quartier supprimé'),
+                ForceDeleteAction::make()
+                    ->successNotificationTitle('Quartier supprimé définitivement'),
+                RestoreAction::make()
+                    ->successNotificationTitle('Quartier restauré'),
             ])->headerActions([
                 ImportAction::make()->label('Importer')
                     ->importer(QuarterImporter::class)

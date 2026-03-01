@@ -29,6 +29,7 @@ use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\ImageColumn;
@@ -39,7 +40,6 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Illuminate\Support\Facades\Hash;
 
 class UserResource extends Resource
 {
@@ -49,77 +49,115 @@ class UserResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::Users;
 
+    protected static ?int $navigationSort = 1;
+
     protected static ?string $recordTitleAttribute = 'firstname';
 
     protected static ?string $navigationLabel = 'Utilisateurs';
 
     protected static ?string $modelLabel = 'Utilisateur';
 
+    protected static ?string $pluralModelLabel = 'Utilisateurs';
+
     #[\Override]
     public static function form(Schema $schema): Schema
     {
         return $schema
             ->components([
-                FileUpload::make('avatar')
-                    ->disk('public')
-                    ->directory('avatars')
-                    ->avatar()
-                    ->image()
-                    ->maxSize(2048)
-                    ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                    ->uploadingMessage('Envoi en cours...'),
-                TextInput::make('firstname')
-                    ->maxLength(255),
-                TextInput::make('lastname')
-                    ->maxLength(255),
-                TextInput::make('phone_number')
-                    ->tel()
-                    ->maxLength(20),
-                TextInput::make('email')
-                    ->label('Email address')
-                    ->email()
-                    ->required()
-                    ->unique(ignoreRecord: true)
-                    ->maxLength(255),
-                Placeholder::make('email_verified_at')
-                    ->label('Email vérifié le')
-                    ->content(fn ($record) => $record?->email_verified_at?->format('d/m/Y H:i') ?? 'Non vérifié'),
-                TextInput::make('password')
-                    ->label('Mot de Passe')
-                    ->password()
-                    ->revealable()
-                    ->confirmed()
-                    ->required(fn (string $context): bool => $context === 'create')
-                    ->minLength(8)
-                    ->dehydrateStateUsing(fn (string $state): string => Hash::make($state))
-                    ->dehydrated(fn (?string $state) => filled($state)),
+                Section::make('Photo de profil')
+                    ->icon(Heroicon::Camera)
+                    ->schema([
+                        FileUpload::make('avatar')
+                            ->label('Avatar')
+                            ->disk('public')
+                            ->directory('avatars')
+                            ->avatar()
+                            ->image()
+                            ->maxSize(2048)
+                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                            ->uploadingMessage('Envoi en cours...')
+                            ->helperText('Formats acceptés : JPEG, PNG, WebP (max 2 Mo)'),
+                    ]),
 
-                TextInput::make('password_confirmation')
-                    ->label('Confirmer le mot de passe')
-                    ->password()
-                    ->revealable()
-                    ->required(fn (string $context): bool => $context === 'create')
-                    ->visible(fn (string $context): bool => $context === 'create'),
+                Section::make('Informations personnelles')
+                    ->icon(Heroicon::User)
+                    ->columns(2)
+                    ->schema([
+                        TextInput::make('firstname')
+                            ->label('Prénom')
+                            ->maxLength(255)
+                            ->prefixIcon(Heroicon::User),
+                        TextInput::make('lastname')
+                            ->label('Nom')
+                            ->maxLength(255)
+                            ->prefixIcon(Heroicon::User),
+                        Select::make('type')
+                            ->label('Type')
+                            ->options(UserType::class)
+                            ->native(false)
+                            ->nullable()
+                            ->helperText('Type de compte utilisateur'),
+                        Select::make('role')
+                            ->label('Rôle')
+                            ->options(UserRole::class)
+                            ->native(false)
+                            ->required()
+                            ->helperText('Définit les permissions de l\'utilisateur'),
+                    ]),
 
-                Select::make('type')
-                    ->options(UserType::class)
-                    ->native(false)
-                    ->nullable(), // Permet de ne pas remplir si besoin
-                Select::make('role')
-                    ->options(UserRole::class)
-                    ->native(false)
-                    ->required(),
-                Select::make('city_id')
-                    ->relationship('city', 'name')
-                    ->nullable() // Permet de ne pas remplir
-                    ->searchable()
-                    ->placeholder('Choisir une ville')
-                    ->searchDebounce(250)
-                    ->preload()
-                    ->suffixIcon(Heroicon::HomeModern)
-                    ->loadingMessage('Chargement des villes...')
-                    ->noSearchResultsMessage('Aucun résultat trouvé')
-                    ->native(false),
+                Section::make('Contact')
+                    ->icon(Heroicon::Phone)
+                    ->columns(2)
+                    ->schema([
+                        TextInput::make('email')
+                            ->label('Adresse email')
+                            ->email()
+                            ->required()
+                            ->unique(ignoreRecord: true)
+                            ->maxLength(255)
+                            ->prefixIcon(Heroicon::Envelope),
+                        TextInput::make('phone_number')
+                            ->label('Téléphone')
+                            ->tel()
+                            ->maxLength(20)
+                            ->prefixIcon(Heroicon::Phone),
+                        Placeholder::make('email_verified_at')
+                            ->label('Email vérifié le')
+                            ->content(fn ($record) => $record?->email_verified_at?->format('d/m/Y H:i') ?? 'Non vérifié'),
+                        Select::make('city_id')
+                            ->label('Ville')
+                            ->relationship('city', 'name')
+                            ->nullable()
+                            ->searchable()
+                            ->placeholder('Choisir une ville')
+                            ->searchDebounce(250)
+                            ->preload()
+                            ->suffixIcon(Heroicon::HomeModern)
+                            ->loadingMessage('Chargement des villes...')
+                            ->noSearchResultsMessage('Aucun résultat trouvé')
+                            ->native(false),
+                    ]),
+
+                Section::make('Sécurité')
+                    ->icon(Heroicon::LockClosed)
+                    ->columns(2)
+                    ->schema([
+                        TextInput::make('password')
+                            ->label('Mot de passe')
+                            ->password()
+                            ->revealable()
+                            ->confirmed()
+                            ->required(fn (string $context): bool => $context === 'create')
+                            ->minLength(8)
+                            ->dehydrated(fn (?string $state) => filled($state))
+                            ->helperText('Minimum 8 caractères'),
+                        TextInput::make('password_confirmation')
+                            ->label('Confirmer le mot de passe')
+                            ->password()
+                            ->revealable()
+                            ->required(fn (string $context): bool => $context === 'create')
+                            ->visible(fn (string $context): bool => $context === 'create'),
+                    ]),
             ]);
     }
 
@@ -154,40 +192,47 @@ class UserResource extends Resource
                 ->formatStateUsing(fn ($record) => $record->firstname.' '.$record->lastname)
                 ->searchable(['firstname', 'lastname']),
             TextColumn::make('phone_number')
+                ->label('Téléphone')
                 ->searchable()
                 ->copyable()
-                ->copyMessage('Phone number copied to clipboard!')
+                ->copyMessage('Numéro copié !')
                 ->copyMessageDuration(1500),
             TextColumn::make('email')
-                ->label('Email address')
+                ->label('Email')
                 ->searchable()
                 ->copyable()
-                ->copyMessage('Email copied to clipboard!')
+                ->copyMessage('Email copié !')
                 ->copyMessageDuration(1500),
             TextColumn::make('email_verified_at')
-                ->dateTime('M j, Y H:i')
+                ->label('Email vérifié le')
+                ->dateTime('d/m/Y à H:i')
                 ->sortable(),
             TextColumn::make('type')
+                ->label('Type')
                 ->badge()
                 ->searchable()
-                ->visible(false),
+                ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('role')
+                ->label('Rôle')
                 ->badge()
                 ->searchable()
-                ->visible(false),
+                ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('city.name')
                 ->label('Ville')
                 ->searchable(),
             TextColumn::make('created_at')
-                ->dateTime()
+                ->label('Créé le')
+                ->dateTime('d/m/Y à H:i')
                 ->sortable()
                 ->toggleable(isToggledHiddenByDefault: false),
             TextColumn::make('updated_at')
-                ->dateTime('M j, Y H:i')
+                ->label('Modifié le')
+                ->dateTime('d/m/Y à H:i')
                 ->sortable()
                 ->toggleable(isToggledHiddenByDefault: false),
             TextColumn::make('deleted_at')
-                ->dateTime('M j, Y H:i')
+                ->label('Supprimé le')
+                ->dateTime('d/m/Y à H:i')
                 ->sortable()
                 ->toggleable(isToggledHiddenByDefault: false),
         ];
@@ -225,11 +270,15 @@ class UserResource extends Resource
             ViewAction::make()
                 ->iconButton(),
             EditAction::make()
-                ->iconButton(),
+                ->iconButton()
+                ->successNotificationTitle('Utilisateur mis à jour'),
             DeleteAction::make()
-                ->iconButton(),
-            ForceDeleteAction::make(),
-            RestoreAction::make(),
+                ->iconButton()
+                ->successNotificationTitle('Utilisateur supprimé'),
+            ForceDeleteAction::make()
+                ->successNotificationTitle('Utilisateur supprimé définitivement'),
+            RestoreAction::make()
+                ->successNotificationTitle('Utilisateur restauré'),
         ];
     }
 

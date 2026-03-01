@@ -17,6 +17,9 @@ class PointPackagesTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->heading('Packs de Crédits')
+            ->description('Offres de crédits disponibles à l\'achat')
+            ->striped()
             ->columns([
                 TextColumn::make('sort_order')
                     ->label('#')
@@ -59,14 +62,16 @@ class PointPackagesTable
 
                 TextColumn::make('created_at')
                     ->label('Créé le')
-                    ->dateTime()
+                    ->dateTime('d/m/Y à H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('sort_order')
             ->recordActions([
-                EditAction::make(),
-                DeleteAction::make(),
+                EditAction::make()
+                    ->successNotificationTitle('Pack de crédits mis à jour'),
+                DeleteAction::make()
+                    ->successNotificationTitle('Pack de crédits supprimé'),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

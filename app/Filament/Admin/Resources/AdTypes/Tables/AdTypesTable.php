@@ -19,20 +19,27 @@ class AdTypesTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->heading('Catégories d\'annonces')
+            ->description('Types d\'annonces disponibles sur la plateforme')
+            ->striped()
             ->columns([
-                TextColumn::make('name')->label('label')
+                TextColumn::make('name')->label('Nom')
                     ->description(fn (AdType $record): string => $record->desc)
-                    ->searchable(),
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('created_at')
-                    ->dateTime()
+                    ->label('Créé le')
+                    ->dateTime('d/m/Y à H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
-                    ->dateTime()
+                    ->label('Modifié le')
+                    ->dateTime('d/m/Y à H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('deleted_at')
-                    ->dateTime()
+                    ->label('Supprimé le')
+                    ->dateTime('d/m/Y à H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
@@ -40,7 +47,8 @@ class AdTypesTable
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                EditAction::make(),
+                EditAction::make()
+                    ->successNotificationTitle('Type d\'annonce mis à jour'),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

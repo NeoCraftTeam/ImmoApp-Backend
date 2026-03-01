@@ -29,11 +29,15 @@ class AdTypeResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::CursorArrowRipple;
 
-    protected static ?string $recordTitleAttribute = 'categorie -annonce';
+    protected static ?string $recordTitleAttribute = 'name';
 
     protected static ?string $navigationLabel = 'Categories des annonces';
 
-    protected static ?string $modelLabel = 'Categorie d\'annonce';
+    protected static ?int $navigationSort = 2;
+
+    protected static ?string $modelLabel = 'Catégorie d\'annonce';
+
+    protected static ?string $pluralModelLabel = 'Catégories d\'annonces';
 
     #[\Override]
     public static function form(Schema $schema): Schema
@@ -47,8 +51,10 @@ class AdTypeResource extends Resource
         return AdTypesTable::configure($table)
             ->recordActions([
                 ViewAction::make(),
-                EditAction::make(),
-                DeleteAction::make(),
+                EditAction::make()
+                    ->successNotificationTitle('Type d\'annonce mis à jour'),
+                DeleteAction::make()
+                    ->successNotificationTitle('Type d\'annonce supprimé'),
             ]);
     }
 
@@ -73,5 +79,15 @@ class AdTypeResource extends Resource
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        return (string) static::getModel()::count();
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'Nombre de catégories';
     }
 }

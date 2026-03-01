@@ -16,21 +16,27 @@ class AgencyInfolist
             ->components([
                 TextEntry::make('id')
                     ->label('ID'),
-                TextEntry::make('name'),
-                TextEntry::make('slug'),
+                TextEntry::make('name')
+                    ->label('Nom'),
+                TextEntry::make('slug')
+                    ->label('Slug'),
                 TextEntry::make('logo')
+                    ->label('Logo')
                     ->placeholder('-'),
-                TextEntry::make('owner.id')
-                    ->label('Owner')
+                TextEntry::make('owner.fullname')
+                    ->label('Propriétaire')
                     ->placeholder('-'),
                 TextEntry::make('created_at')
-                    ->dateTime()
+                    ->label('Créé le')
+                    ->dateTime('d/m/Y à H:i')
                     ->placeholder('-'),
                 TextEntry::make('updated_at')
-                    ->dateTime()
+                    ->label('Modifié le')
+                    ->dateTime('d/m/Y à H:i')
                     ->placeholder('-'),
                 TextEntry::make('deleted_at')
-                    ->dateTime()
+                    ->label('Supprimé le')
+                    ->dateTime('d/m/Y à H:i')
                     ->visible(fn (Agency $record): bool => $record->trashed()),
             ]);
     }
