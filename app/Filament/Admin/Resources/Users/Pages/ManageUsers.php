@@ -17,6 +17,7 @@ class ManageUsers extends ManageRecords
         return [
             CreateAction::make()
                 ->label('Créer un utilisateur')
+                ->successNotificationTitle('Utilisateur créé avec succès')
                 ->using(fn (array $data, string $model): \App\Models\User => \Illuminate\Support\Facades\DB::transaction(fn () => $model::create($data))),
         ];
     }

@@ -15,7 +15,8 @@ class ManageSubscriptions extends ManageRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make()->label('Créer un abonnement'),
+            CreateAction::make()->label('Créer un abonnement')
+                ->successNotificationTitle('Abonnement créé avec succès'),
         ];
     }
 }

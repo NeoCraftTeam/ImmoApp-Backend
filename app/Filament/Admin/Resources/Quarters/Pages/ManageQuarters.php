@@ -15,7 +15,8 @@ class ManageQuarters extends ManageRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            CreateAction::make()
+                ->successNotificationTitle('Quartier créé avec succès'),
         ];
     }
 }

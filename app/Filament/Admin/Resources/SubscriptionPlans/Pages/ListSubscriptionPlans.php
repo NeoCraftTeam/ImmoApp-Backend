@@ -15,7 +15,8 @@ class ListSubscriptionPlans extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            CreateAction::make()
+                ->successNotificationTitle('Plan d\'abonnement créé avec succès'),
         ];
     }
 }

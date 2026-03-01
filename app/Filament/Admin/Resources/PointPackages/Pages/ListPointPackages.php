@@ -15,7 +15,8 @@ class ListPointPackages extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            CreateAction::make()
+                ->successNotificationTitle('Pack de crédits créé avec succès'),
         ];
     }
 }

@@ -13,6 +13,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -21,11 +22,13 @@ class SubscriptionResource extends Resource
 {
     protected static ?string $model = Subscription::class;
 
-    protected static string|null|\UnitEnum $navigationGroup = 'Ventes';
+    protected static string|null|\UnitEnum $navigationGroup = 'Abonnements';
 
-    protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-credit-card';
+    protected static string|null|\BackedEnum $navigationIcon = Heroicon::OutlinedCreditCard;
 
     protected static ?string $navigationLabel = 'Abonnements';
+
+    protected static ?int $navigationSort = 2;
 
     protected static ?string $modelLabel = 'Abonnement';
 
@@ -49,8 +52,11 @@ class SubscriptionResource extends Resource
                         'cancelled' => 'Annulé',
                     ])
                     ->required(),
-                DateTimePicker::make('starts_at'),
-                DateTimePicker::make('ends_at'),
+                DateTimePicker::make('starts_at')
+                    ->label('Début'),
+                DateTimePicker::make('ends_at')
+                    ->label('Fin')
+                    ->after('starts_at'),
                 TextInput::make('amount_paid')
                     ->numeric()
                     ->prefix('FCFA'),
@@ -86,11 +92,11 @@ class SubscriptionResource extends Resource
                     }),
                 TextColumn::make('starts_at')
                     ->label('Début')
-                    ->dateTime('d/m/Y H:i')
+                    ->dateTime('d/m/Y à H:i')
                     ->sortable(),
                 TextColumn::make('ends_at')
                     ->label('Fin')
-                    ->dateTime('d/m/Y H:i')
+                    ->dateTime('d/m/Y à H:i')
                     ->sortable(),
                 TextColumn::make('billing_period')
                     ->label('Période')
@@ -98,7 +104,7 @@ class SubscriptionResource extends Resource
                     ->formatStateUsing(fn (string $state): string => $state === 'yearly' ? 'Annuel' : 'Mensuel'),
                 TextColumn::make('amount_paid')
                     ->label('Montant')
-                    ->money('XOF', divideBy: 1, locale: 'fr_FR')
+                    ->money('XAF')
                     ->sortable(),
             ])
             ->filters([
@@ -111,8 +117,10 @@ class SubscriptionResource extends Resource
                     ]),
             ])
             ->recordActions([
-                EditAction::make(),
-                DeleteAction::make(),
+                EditAction::make()
+                    ->successNotificationTitle('Abonnement mis à jour'),
+                DeleteAction::make()
+                    ->successNotificationTitle('Abonnement supprimé'),
             ]);
     }
 

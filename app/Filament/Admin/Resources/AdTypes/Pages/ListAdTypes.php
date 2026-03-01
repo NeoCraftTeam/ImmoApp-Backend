@@ -17,6 +17,7 @@ class ListAdTypes extends ListRecords
         return [
             CreateAction::make()->label('Créer un type d\'annonce')
                 ->modalHeading('Créer un nouveau type d\'annonce')
+                ->successNotificationTitle('Type d\'annonce créé avec succès')
                 ->mutateDataUsing(function (array $data): array { // Lier l'ID de l'utilisateur
                     $data['user_id'] = auth()->id();
 

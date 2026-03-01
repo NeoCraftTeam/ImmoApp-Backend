@@ -15,7 +15,8 @@ class ListAgencies extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            CreateAction::make()
+                ->successNotificationTitle('Agence créée avec succès'),
         ];
     }
 }

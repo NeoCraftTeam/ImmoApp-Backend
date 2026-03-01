@@ -15,7 +15,8 @@ class ManagePayments extends ManageRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            CreateAction::make()
+                ->successNotificationTitle('Paiement créé avec succès'),
         ];
     }
 }
