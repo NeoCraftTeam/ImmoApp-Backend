@@ -23,6 +23,17 @@ class PointPackageForm
                             ->maxLength(255)
                             ->placeholder('Pack Starter'),
 
+                        TextInput::make('description')
+                            ->label('Description courte')
+                            ->maxLength(255)
+                            ->placeholder('Idéal pour découvrir la plateforme'),
+
+                        TextInput::make('badge')
+                            ->label('Badge')
+                            ->maxLength(50)
+                            ->placeholder('Le + populaire')
+                            ->helperText('Texte du badge affiché sur la carte (ex: "Le + populaire", "Meilleur rapport")'),
+
                         TextInput::make('price')
                             ->label('Prix')
                             ->numeric()
@@ -31,11 +42,16 @@ class PointPackageForm
                             ->minValue(0),
 
                         TextInput::make('points_awarded')
-                            ->label('Points accordés')
+                            ->label('Crédits accordés')
                             ->numeric()
                             ->required()
                             ->minValue(1)
-                            ->helperText('Nombre de points crédités à l\'achat'),
+                            ->helperText('Nombre de crédits accordés à l\'achat'),
+
+                        \Filament\Forms\Components\TagsInput::make('features')
+                            ->label('Fonctionnalités')
+                            ->placeholder('Ajouter une fonctionnalité')
+                            ->helperText('Liste des avantages affichés sur la carte du pack'),
 
                         TextInput::make('sort_order')
                             ->label('Ordre d\'affichage')
@@ -51,6 +67,10 @@ class PointPackageForm
                             ->label('Pack actif')
                             ->default(true)
                             ->helperText('Les packs inactifs ne sont pas visibles dans l\'application'),
+                        Toggle::make('is_popular')
+                            ->label('Mise en avant')
+                            ->default(false)
+                            ->helperText('Met ce pack en avant avec un style différent (bordure accentuée)'),
                     ]),
             ]);
     }

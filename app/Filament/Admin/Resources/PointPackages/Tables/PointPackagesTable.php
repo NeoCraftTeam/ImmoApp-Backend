@@ -35,11 +35,22 @@ class PointPackagesTable
                     ->sortable(),
 
                 TextColumn::make('points_awarded')
-                    ->label('Points')
+                    ->label('Crédits')
                     ->badge()
                     ->color('success')
-                    ->formatStateUsing(fn ($state): string => "{$state} pts")
+                    ->formatStateUsing(fn ($state): string => "{$state} crédits")
                     ->sortable(),
+
+                TextColumn::make('badge')
+                    ->label('Badge')
+                    ->placeholder('—')
+                    ->toggleable(),
+
+                IconColumn::make('is_popular')
+                    ->label('Populaire')
+                    ->boolean()
+                    ->sortable()
+                    ->toggleable(),
 
                 IconColumn::make('is_active')
                     ->label('Actif')

@@ -45,6 +45,8 @@ class ManageSettings extends Page
     {
         $this->form->fill([
             'unlock_price' => Setting::get('unlock_price', 500),
+            'unlock_cost_points' => Setting::get('unlock_cost_points', 2),
+            'welcome_bonus_points' => Setting::get('welcome_bonus_points', 5),
             'ad_lifetime_days' => Setting::get('ad_lifetime_days', 30),
         ]);
     }
@@ -67,6 +69,28 @@ class ManageSettings extends Page
                             ->suffix('FCFA')
                             ->default(500),
                     ]),
+                Section::make('Système de crédits')
+                    ->description('Configuration du système de crédits utilisé pour débloquer les annonces')
+                    ->icon(Heroicon::Star)
+                    ->schema([
+                        TextInput::make('unlock_cost_points')
+                            ->label('Coût de déblocage (crédits)')
+                            ->helperText('Nombre de crédits nécessaires pour débloquer une annonce.')
+                            ->numeric()
+                            ->required()
+                            ->minValue(1)
+                            ->suffix('crédits')
+                            ->default(2),
+                        TextInput::make('welcome_bonus_points')
+                            ->label('Bonus de bienvenue (crédits)')
+                            ->helperText('Nombre de crédits offerts automatiquement aux nouveaux utilisateurs à l\'inscription.')
+                            ->numeric()
+                            ->required()
+                            ->minValue(0)
+                            ->suffix('crédits')
+                            ->default(5),
+                    ])
+                    ->columns(2),
                 Section::make('Annonces')
                     ->description('Configuration de la durée de vie des annonces')
                     ->icon(Heroicon::Home)
@@ -191,6 +215,20 @@ class ManageSettings extends Page
         );
 
         Setting::set(
+            'unlock_cost_points',
+            $data['unlock_cost_points'],
+            'Coût de déblocage en crédits',
+            'credits'
+        );
+
+        Setting::set(
+            'welcome_bonus_points',
+            $data['welcome_bonus_points'],
+            'Bonus de bienvenue (crédits)',
+            'credits'
+        );
+
+        Setting::set(
             'ad_lifetime_days',
             $data['ad_lifetime_days'],
             'Durée de vie d\'une annonce (jours)',
@@ -202,7 +240,7 @@ class ManageSettings extends Page
 
         Notification::make()
             ->title('Tarification mise à jour')
-            ->body("Le prix de déblocage est maintenant de {$data['unlock_price']} FCFA.")
+            ->body("Le prix de déblocage est maintenant de {$data['unlock_price']} FCFA et {$data['unlock_cost_points']} crédits. Bonus de bienvenue : {$data['welcome_bonus_points']} crédits.")
             ->success()
             ->send();
     }

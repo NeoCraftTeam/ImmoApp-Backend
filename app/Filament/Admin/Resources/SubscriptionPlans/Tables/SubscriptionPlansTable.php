@@ -39,7 +39,7 @@ class SubscriptionPlansTable
                     ->label('Boost')
                     ->badge()
                     ->color('success')
-                    ->formatStateUsing(fn ($state) => "+{$state} pts")
+                    ->formatStateUsing(fn ($state) => "+{$state} crédits")
                     ->sortable(),
 
                 TextColumn::make('boost_duration_days')

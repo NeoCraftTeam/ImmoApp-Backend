@@ -22,13 +22,13 @@ class PointPackageResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedStar;
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Système de Points';
+    protected static \UnitEnum|string|null $navigationGroup = 'Système de Crédits';
 
-    protected static ?string $navigationLabel = 'Packs de Points';
+    protected static ?string $navigationLabel = 'Packs de Crédits';
 
-    protected static ?string $modelLabel = 'Pack de Points';
+    protected static ?string $modelLabel = 'Pack de Crédits';
 
-    protected static ?string $pluralModelLabel = 'Packs de Points';
+    protected static ?string $pluralModelLabel = 'Packs de Crédits';
 
     protected static ?int $navigationSort = 1;
 
