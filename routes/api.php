@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\InvoiceController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\PropertyAttributeController;
+use App\Http\Controllers\Api\V1\PwaController;
 use App\Http\Controllers\Api\V1\QuarterController;
 use App\Http\Controllers\Api\V1\RecommendationController;
 use App\Http\Controllers\Api\V1\ReviewController;
@@ -256,5 +257,14 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('auth:sanctum')->prefix('my/ads')->group(function (): void {
         Route::get('/analytics', [AdAnalyticsController::class, 'overview']);
         Route::get('/{ad}/analytics', [AdAnalyticsController::class, 'show']);
+    });
+
+    // --- PWA (Push Subscriptions & Session Validation) ---
+    Route::prefix('pwa')->middleware('web')->group(function (): void {
+        Route::middleware('auth:web,sanctum')->group(function (): void {
+            Route::post('/push/subscribe', [PwaController::class, 'subscribe']);
+            Route::post('/push/unsubscribe', [PwaController::class, 'unsubscribe']);
+        });
+        Route::get('/session/validate', [PwaController::class, 'validateSession']);
     });
 });
