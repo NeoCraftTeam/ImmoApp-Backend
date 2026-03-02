@@ -22,6 +22,7 @@ class EditAdType extends EditRecord
         return 'Type d\'annonce mis à jour';
     }
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

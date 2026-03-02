@@ -50,6 +50,7 @@ class PointPackageResource extends Resource
         return [];
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [
@@ -64,6 +65,7 @@ class PointPackageResource extends Resource
         return (string) static::getModel()::count();
     }
 
+    #[\Override]
     public static function getNavigationBadgeTooltip(): ?string
     {
         return 'Nombre de packs';

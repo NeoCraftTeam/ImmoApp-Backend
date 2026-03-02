@@ -64,12 +64,12 @@ class Agency extends Model
         'id' => 'string',
     ];
 
-    public function owner(): belongsTo
+    public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_id', 'id');
     }
 
-    public function users(): hasMany
+    public function users(): HasMany
     {
         return $this->hasMany(User::class);
     }

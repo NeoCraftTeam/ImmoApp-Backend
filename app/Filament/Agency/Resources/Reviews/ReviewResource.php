@@ -171,6 +171,7 @@ class ReviewResource extends Resource
             ->emptyStateIcon('heroicon-o-star');
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [

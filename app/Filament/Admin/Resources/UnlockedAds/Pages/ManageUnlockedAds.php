@@ -12,6 +12,7 @@ class ManageUnlockedAds extends ManageRecords
 {
     protected static string $resource = UnlockedAdResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

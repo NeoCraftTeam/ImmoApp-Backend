@@ -20,6 +20,7 @@ class EditSubscriptionPlan extends EditRecord
         return 'Plan d\'abonnement mis à jour';
     }
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

@@ -53,6 +53,7 @@ class ActivityLogResource extends Resource
         \App\Models\Setting::class => 'Paramètre',
     ];
 
+    #[\Override]
     public static function canCreate(): bool
     {
         return false;
@@ -238,6 +239,7 @@ class ActivityLogResource extends Resource
             ]);
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [
@@ -257,6 +259,7 @@ class ActivityLogResource extends Resource
         return 'warning';
     }
 
+    #[\Override]
     public static function getNavigationBadgeTooltip(): ?string
     {
         return 'Activités admin aujourd\'hui';

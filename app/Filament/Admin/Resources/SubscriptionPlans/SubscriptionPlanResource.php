@@ -52,6 +52,7 @@ class SubscriptionPlanResource extends Resource
         ];
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [
@@ -66,6 +67,7 @@ class SubscriptionPlanResource extends Resource
         return (string) static::getModel()::count();
     }
 
+    #[\Override]
     public static function getNavigationBadgeTooltip(): ?string
     {
         return 'Nombre de plans';

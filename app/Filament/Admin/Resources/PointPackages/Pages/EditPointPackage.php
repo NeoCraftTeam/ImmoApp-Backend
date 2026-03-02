@@ -20,6 +20,7 @@ class EditPointPackage extends EditRecord
         return 'Pack de crédits mis à jour';
     }
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

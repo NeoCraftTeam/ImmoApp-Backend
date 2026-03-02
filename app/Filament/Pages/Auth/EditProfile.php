@@ -22,6 +22,7 @@ class EditProfile extends BaseEditProfile
         return false;
     }
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

@@ -23,6 +23,7 @@ class EditAgency extends EditRecord
         return 'Agence mise à jour';
     }
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

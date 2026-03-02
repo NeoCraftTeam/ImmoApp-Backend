@@ -72,6 +72,7 @@ class UnlockedAd extends Model
         return $this->belongsTo(Payment::class);
     }
 
+    #[\Override]
     protected function casts(): array
     {
         return ['unlocked_at' => 'datetime', 'updated_at' => 'datetime'];

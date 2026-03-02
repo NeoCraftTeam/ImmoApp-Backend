@@ -122,6 +122,7 @@ class AdResource extends Resource
             ]);
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [
@@ -129,6 +130,7 @@ class AdResource extends Resource
         ];
     }
 
+    #[\Override]
     public static function getRecordRouteBindingEloquentQuery(): Builder
     {
         return parent::getRecordRouteBindingEloquentQuery()
@@ -147,6 +149,7 @@ class AdResource extends Resource
         return 'gray';
     }
 
+    #[\Override]
     public static function getNavigationBadgeTooltip(): ?string
     {
         return 'Nombre total d\'annonces';

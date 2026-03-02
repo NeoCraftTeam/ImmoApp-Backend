@@ -14,6 +14,7 @@ class ViewAgency extends ViewRecord
 {
     protected static string $resource = AgencyResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

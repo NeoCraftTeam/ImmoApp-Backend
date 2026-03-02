@@ -200,9 +200,8 @@ final class SocialAuthController
         ];
         $state = base64_encode(json_encode($stateData) ?: '');
 
-        /** @phpstan-ignore method.notFound */
         $driver = Socialite::driver($provider)
-            ->stateless()
+            ->stateless() // @phpstan-ignore method.notFound
             ->with(['state' => $state]);
 
         // Apple requires additional scopes

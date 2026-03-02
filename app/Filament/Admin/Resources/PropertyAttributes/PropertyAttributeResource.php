@@ -50,6 +50,7 @@ class PropertyAttributeResource extends Resource
         return [];
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [

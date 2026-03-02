@@ -17,6 +17,7 @@ class CreatePropertyAttribute extends CreateRecord
         return 'Attribut créé avec succès';
     }
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

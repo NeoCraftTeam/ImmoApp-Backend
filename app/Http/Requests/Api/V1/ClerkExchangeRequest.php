@@ -33,6 +33,7 @@ class ClerkExchangeRequest extends FormRequest
         ];
     }
 
+    #[\Override]
     protected function passedValidation(): void
     {
         if (!$this->bearerToken()) {

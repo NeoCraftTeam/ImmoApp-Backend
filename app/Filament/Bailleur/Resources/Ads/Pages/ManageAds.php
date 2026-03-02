@@ -14,6 +14,7 @@ class ManageAds extends ManageRecords
 {
     protected static string $resource = AdResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

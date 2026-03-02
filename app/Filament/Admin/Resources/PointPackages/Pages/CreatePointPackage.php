@@ -19,6 +19,7 @@ class CreatePointPackage extends CreateRecord
         return 'Pack de crédits créé avec succès';
     }
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

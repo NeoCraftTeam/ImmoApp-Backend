@@ -11,6 +11,7 @@ class ListPointTransactions extends ListRecords
 {
     protected static string $resource = PointTransactionResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [];

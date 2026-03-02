@@ -58,6 +58,7 @@ class PendingAdResource extends Resource
             ->latest();
     }
 
+    #[\Override]
     public static function canCreate(): bool
     {
         return false;
@@ -192,6 +193,7 @@ class PendingAdResource extends Resource
             ->poll('15s');
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [
@@ -211,6 +213,7 @@ class PendingAdResource extends Resource
         return 'danger';
     }
 
+    #[\Override]
     public static function getNavigationBadgeTooltip(): ?string
     {
         return 'Annonces à valider';

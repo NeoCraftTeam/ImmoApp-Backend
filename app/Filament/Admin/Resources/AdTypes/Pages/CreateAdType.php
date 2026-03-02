@@ -19,6 +19,7 @@ class CreateAdType extends CreateRecord
         return 'Type d\'annonce créé avec succès';
     }
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

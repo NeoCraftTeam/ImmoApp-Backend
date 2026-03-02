@@ -12,6 +12,7 @@ class ListAgencies extends ListRecords
 {
     protected static string $resource = AgencyResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

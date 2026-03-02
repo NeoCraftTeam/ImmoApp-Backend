@@ -19,6 +19,7 @@ class CreateAgency extends CreateRecord
         return 'Agence créée avec succès';
     }
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

@@ -10,6 +10,7 @@ class ListPropertyAttributes extends ListRecords
 {
     protected static string $resource = PropertyAttributeResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

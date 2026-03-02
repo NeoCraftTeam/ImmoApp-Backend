@@ -12,6 +12,7 @@ class ManageQuarters extends ManageRecords
 {
     protected static string $resource = QuarterResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

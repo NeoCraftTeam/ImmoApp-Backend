@@ -12,6 +12,7 @@ class ListAdTypes extends ListRecords
 {
     protected static string $resource = AdTypeResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

@@ -12,6 +12,7 @@ class ManageReviews extends ManageRecords
 {
     protected static string $resource = ReviewResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

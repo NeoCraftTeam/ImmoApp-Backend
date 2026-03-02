@@ -20,6 +20,7 @@ class TopAdsTable extends BaseWidget
 
     protected int|string|array $columnSpan = 'full';
 
+    #[\Override]
     public function table(Table $table): Table
     {
         $user = Auth::user();

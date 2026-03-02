@@ -18,6 +18,7 @@ class EditPropertyAttribute extends EditRecord
         return 'Attribut mis à jour';
     }
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [

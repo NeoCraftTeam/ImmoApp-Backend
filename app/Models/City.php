@@ -71,12 +71,12 @@ class City extends Model
     /**
      * Get all of the quarters for the City
      */
-    public function quarters(): hasMany
+    public function quarters(): HasMany
     {
         return $this->hasMany(Quarter::class);
     }
 
-    public function users(): hasMany
+    public function users(): HasMany
     {
         return $this->hasMany(User::class);
     }

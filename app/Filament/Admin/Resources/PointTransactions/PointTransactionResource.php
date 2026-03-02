@@ -46,6 +46,7 @@ class PointTransactionResource extends Resource
         return [];
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [
@@ -53,6 +54,7 @@ class PointTransactionResource extends Resource
         ];
     }
 
+    #[\Override]
     public static function canCreate(): bool
     {
         return false;
@@ -63,6 +65,7 @@ class PointTransactionResource extends Resource
         return (string) static::getModel()::count();
     }
 
+    #[\Override]
     public static function getNavigationBadgeTooltip(): ?string
     {
         return 'Nombre de transactions';

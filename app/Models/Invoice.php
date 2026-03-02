@@ -40,6 +40,7 @@ class Invoice extends Model
         'period_end',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [

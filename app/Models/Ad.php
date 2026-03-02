@@ -286,7 +286,7 @@ class Ad extends Model implements HasMedia
         return $this->belongsTo(Quarter::class);
     }
 
-    public function reviews(): hasMany
+    public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
     }

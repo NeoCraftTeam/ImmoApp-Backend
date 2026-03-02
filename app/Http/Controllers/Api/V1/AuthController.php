@@ -1809,7 +1809,7 @@ final class AuthController
 
             $isNew = true;
 
-            if ($email !== null && !str_ends_with($email, '@clerk.local')) {
+            if ($email !== null && !str_ends_with((string) $email, '@clerk.local')) {
                 Mail::to($email, $firstName)->queue(new WelcomeEmail($user));
             }
         } else {

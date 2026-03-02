@@ -19,6 +19,7 @@ class CreateSubscriptionPlan extends CreateRecord
         return 'Plan d\'abonnement créé avec succès';
     }
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [
