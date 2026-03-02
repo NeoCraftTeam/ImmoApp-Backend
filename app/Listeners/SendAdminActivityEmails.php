@@ -5,18 +5,19 @@ declare(strict_types=1);
 namespace App\Listeners;
 
 use App\Enums\UserRole;
-use App\Mail\AdminActionNotifyMail;
 use App\Mail\AdminActionPerformedMail;
 use App\Models\User;
+use App\Notifications\AdminCrudAction;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 use Spatie\Activitylog\Models\Activity;
 
 /**
  * Listens for Spatie activity log events.
  * When an admin performs a CRUD action, this listener:
  *   1. Sends a confirmation email to the acting admin
- *   2. Sends a notification email to all other admins
+ *   2. Sends a notification (mail + Filament DB + WebPush) to all other admins
  */
 class SendAdminActivityEmails
 {
@@ -66,24 +67,26 @@ class SendAdminActivityEmails
             'date' => $activity->created_at->format('d/m/Y à H:i:s'),
         ];
 
+        // 1. Confirmation email to the acting admin
         try {
             Mail::to($causer->email)->send(new AdminActionPerformedMail($causer, $details));
         } catch (\Throwable $e) {
             Log::error('Failed to send admin action confirmation email: '.$e->getMessage());
         }
 
-        $otherAdmins = User::query()
-            ->where('role', UserRole::ADMIN)
-            ->where('id', '!=', $causer->id)
-            ->whereNotNull('email')
-            ->get();
+        // 2. Notify other admins (mail + Filament DB notification + WebPush)
+        try {
+            $otherAdmins = User::query()
+                ->where('role', UserRole::ADMIN)
+                ->where('id', '!=', $causer->id)
+                ->whereNotNull('email')
+                ->get();
 
-        foreach ($otherAdmins as $admin) {
-            try {
-                Mail::to($admin->email)->send(new AdminActionNotifyMail($causer, $admin, $details));
-            } catch (\Throwable $e) {
-                Log::error("Failed to send admin action notify email to {$admin->email}: ".$e->getMessage());
+            if ($otherAdmins->isNotEmpty()) {
+                Notification::send($otherAdmins, new AdminCrudAction($causer, $details));
             }
+        } catch (\Throwable $e) {
+            Log::error('Failed to send admin action notifications: '.$e->getMessage());
         }
     }
 

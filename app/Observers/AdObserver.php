@@ -7,12 +7,11 @@ namespace App\Observers;
 use App\Enums\AdStatus;
 use App\Enums\UserRole;
 use App\Mail\AdSubmissionConfirmationMail;
-use App\Mail\NewAdSubmissionMail;
 use App\Models\Ad;
 use App\Models\User;
-use Filament\Actions\Action as NotificationAction;
-use Filament\Notifications\Notification;
+use App\Notifications\NewAdPending;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Notification;
 
 class AdObserver
 {
@@ -35,42 +34,12 @@ class AdObserver
                 }
             }
 
-            // 2. Notify all admins
-            $admins = User::where('role', UserRole::ADMIN)->get();
-            foreach ($admins as $admin) {
-                try {
-                    Mail::to($admin)->send(new NewAdSubmissionMail($ad));
-                } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::error("Failed to send admin notification email to {$admin->email}: ".$e->getMessage());
-                }
-            }
-
-            // 3. Send Filament Database Notification to admins
+            // 2. Notify all admins (mail + Filament DB notification + WebPush)
             try {
-                $url = '/admin/pending-ads';
-                try {
-                    $url = \App\Filament\Admin\Resources\PendingAds\PendingAdResource::getUrl();
-                } catch (\Exception $e) {
-                    // Fallback if route generation fails (e.g. testing)
-                }
-
-                \Filament\Notifications\Notification::make()
-                    ->title('Nouvelle annonce en attente')
-                    ->body("L'annonce \"{$ad->title}\" (par ".($ad->user->fullname ?? 'Inconnu').') nécessite votre validation.')
-                    ->warning()
-                    ->icon('heroicon-o-home-modern')
-                    ->actions([
-                        NotificationAction::make('review')
-                            ->label('Examiner')
-                            ->url($url)
-                            ->color('warning')
-                            ->button()
-                            ->markAsRead(),
-                    ])
-                    ->sendToDatabase($admins);
-
+                $admins = User::where('role', UserRole::ADMIN)->get();
+                Notification::send($admins, new NewAdPending($ad));
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::error('Failed to send Filament database notification: '.$e->getMessage());
+                \Illuminate\Support\Facades\Log::error('Failed to send admin notifications for new ad: '.$e->getMessage());
             }
         }
     }
