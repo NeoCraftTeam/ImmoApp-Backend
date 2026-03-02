@@ -40,6 +40,10 @@ class AdResource extends Resource
 
     protected static ?string $modelLabel = 'Annonce';
 
+    protected static ?string $pluralModelLabel = 'Annonces';
+
+    protected static ?int $navigationSort = 1;
+
     #[\Override]
     public static function getEloquentQuery(): Builder
     {
@@ -53,7 +57,7 @@ class AdResource extends Resource
         return $schema
             ->components([
                 ...static::getSharedFormFields(),
-                static::getStatusSelect(isAdmin: false),
+                static::getOwnerStatusSection(),
                 ...static::getRelationSelects(),
             ]);
     }
@@ -112,5 +116,11 @@ class AdResource extends Resource
         return (string) static::getModel()::query()
             ->withGlobalScope('landlord', new LandlordScope)
             ->count();
+    }
+
+    #[\Override]
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'Nombre d\'annonces';
     }
 }

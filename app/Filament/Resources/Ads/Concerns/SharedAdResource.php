@@ -16,9 +16,12 @@ use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\SpatieMediaLibraryImageEntry;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Components\Fieldset;
+use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -43,58 +46,102 @@ trait SharedAdResource
     protected static function getSharedFormFields(): array
     {
         return [
-            TextInput::make('title')
-                ->label('Titre')
-                ->required(),
-            Textarea::make('description')
-                ->label('Description')
-                ->required()
+            // ── Section 1: Informations principales ──────────────
+            Section::make('Informations principales')
+                ->icon('heroicon-o-home-modern')
+                ->description('Titre, description et catégorisation de votre bien')
+                ->schema([
+                    TextInput::make('title')
+                        ->label('Titre de l\'annonce')
+                        ->placeholder('Ex: Appartement 3 pièces vue mer — Bonanjo')
+                        ->required()
+                        ->columnSpanFull(),
+                    Textarea::make('description')
+                        ->label('Description')
+                        ->placeholder('Décrivez votre bien en détail : état, environnement, commodités à proximité…')
+                        ->required()
+                        ->rows(4)
+                        ->columnSpanFull(),
+                ])
+                ->columns(2)
                 ->columnSpanFull(),
-            SpatieMediaLibraryFileUpload::make('images')
-                ->label('Photos')
-                ->collection('images')
-                ->multiple()
-                ->reorderable()
-                ->appendFiles()
-                ->maxFiles(10)
-                ->maxSize(5120)
-                ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                ->imagePreviewHeight('80')
-                ->columnSpan(1)
-                ->extraAttributes([
-                    'data-native-image' => 'true',
-                    'data-native-image-camera' => 'true',
-                ]),
-            TextInput::make('adresse')
-                ->label('Adresse')
-                ->required(),
-            TextInput::make('price')
-                ->label('Prix')
-                ->numeric()
-                ->required()
-                ->minValue(0)
-                ->prefix('FCFA')
-                ->extraInputAttributes(['inputmode' => 'numeric']),
-            TextInput::make('surface_area')
-                ->label('Surface (m²)')
-                ->required()
-                ->numeric()
-                ->minValue(1)
-                ->extraInputAttributes(['inputmode' => 'numeric']),
-            TextInput::make('bedrooms')
-                ->label('Chambres')
-                ->required()
-                ->numeric()
-                ->minValue(0)
-                ->extraInputAttributes(['inputmode' => 'numeric']),
-            TextInput::make('bathrooms')
-                ->label('Salles de bain')
-                ->required()
-                ->numeric()
-                ->minValue(0)
-                ->extraInputAttributes(['inputmode' => 'numeric']),
-            Toggle::make('has_parking')
-                ->label('Parking inclus'),
+
+            // ── Section 2: Photos du bien ────────────────────────
+            Section::make('Photos du bien')
+                ->icon('heroicon-o-camera')
+                ->description('Ajoutez jusqu\'à 10 photos (JPEG, PNG, WebP — max 5 Mo chacune). Glissez pour réordonner.')
+                ->schema([
+                    SpatieMediaLibraryFileUpload::make('images')
+                        ->label('')
+                        ->collection('images')
+                        ->multiple()
+                        ->reorderable()
+                        ->appendFiles()
+                        ->maxFiles(10)
+                        ->maxSize(5120)
+                        ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                        ->imagePreviewHeight('150')
+                        ->panelLayout('grid')
+                        ->columnSpanFull()
+                        ->extraAttributes([
+                            'data-native-image' => 'true',
+                            'data-native-image-camera' => 'true',
+                        ]),
+                ])
+                ->collapsed(false)
+                ->columnSpanFull(),
+
+            // ── Section 3: Caractéristiques du bien ──────────────
+            Section::make('Caractéristiques')
+                ->icon('heroicon-o-squares-2x2')
+                ->description('Surface, pièces et tarification')
+                ->schema([
+                    TextInput::make('adresse')
+                        ->label('Adresse')
+                        ->placeholder('Ex: Rue de la Liberté, Bonanjo')
+                        ->required()
+                        ->columnSpanFull(),
+                    Grid::make(4)
+                        ->schema([
+                            TextInput::make('price')
+                                ->label('Prix')
+                                ->numeric()
+                                ->required()
+                                ->minValue(0)
+                                ->prefix('FCFA')
+                                ->extraInputAttributes(['inputmode' => 'numeric']),
+                            TextInput::make('surface_area')
+                                ->label('Surface (m²)')
+                                ->required()
+                                ->numeric()
+                                ->minValue(1)
+                                ->suffix('m²')
+                                ->extraInputAttributes(['inputmode' => 'numeric']),
+                            TextInput::make('bedrooms')
+                                ->label('Chambres')
+                                ->required()
+                                ->numeric()
+                                ->minValue(0)
+                                ->suffix('🛏️')
+                                ->extraInputAttributes(['inputmode' => 'numeric']),
+                            TextInput::make('bathrooms')
+                                ->label('Salles de bain')
+                                ->required()
+                                ->numeric()
+                                ->minValue(0)
+                                ->suffix('🚿')
+                                ->extraInputAttributes(['inputmode' => 'numeric']),
+                        ]),
+                    Toggle::make('has_parking')
+                        ->label('Parking inclus')
+                        ->onIcon('heroicon-o-check')
+                        ->offIcon('heroicon-o-x-mark')
+                        ->onColor('success'),
+                ])
+                ->columns(1)
+                ->columnSpanFull(),
+
+            // ── Section 4: Équipements ──────────────────────────
             Section::make('Équipements & Services')
                 ->icon('heroicon-o-check-circle')
                 ->description('Sélectionnez les équipements disponibles dans ce bien')
@@ -125,7 +172,10 @@ trait SharedAdResource
                         }),
                 ])
                 ->collapsed(false)
+                ->collapsible()
                 ->columnSpanFull(),
+
+            // ── Section 5: Visibilité & Disponibilité ────────────
             Section::make('Visibilité & Disponibilité')
                 ->icon('heroicon-o-eye')
                 ->description('Contrôlez quand votre annonce est visible')
@@ -133,7 +183,10 @@ trait SharedAdResource
                     Toggle::make('is_visible')
                         ->label('Annonce visible')
                         ->helperText('Désactivez pour masquer temporairement votre annonce')
-                        ->default(true),
+                        ->default(true)
+                        ->onIcon('heroicon-o-eye')
+                        ->offIcon('heroicon-o-eye-slash')
+                        ->onColor('success'),
                     DatePicker::make('available_from')
                         ->label('Disponible à partir de')
                         ->native(false)
@@ -147,33 +200,40 @@ trait SharedAdResource
                         ->helperText('Laissez vide pour "Indéfiniment"'),
                 ])
                 ->columns(3)
+                ->collapsible()
                 ->collapsed(false)
                 ->columnSpanFull(),
+
+            // ── Section 6: Informations Premium ──────────────────
             Section::make('Informations Premium')
                 ->icon('heroicon-o-lock-closed')
                 ->description('Ces informations seront visibles uniquement après paiement par les utilisateurs')
                 ->schema([
-                    Select::make('deposit_amount')
-                        ->label('Dépôt de garantie')
-                        ->options([
-                            '1 mois' => '1 mois',
-                            '2 mois' => '2 mois',
-                            '3 mois' => '3 mois',
-                            '4 mois' => '4 mois',
-                            '5 mois' => '5 mois',
+                    Fieldset::make('Conditions du bail')
+                        ->schema([
+                            Select::make('deposit_amount')
+                                ->label('Dépôt de garantie')
+                                ->options([
+                                    '1 mois' => '1 mois',
+                                    '2 mois' => '2 mois',
+                                    '3 mois' => '3 mois',
+                                    '4 mois' => '4 mois',
+                                    '5 mois' => '5 mois',
+                                ])
+                                ->placeholder('Sélectionnez le dépôt requis')
+                                ->native(false),
+                            Select::make('minimum_lease_duration')
+                                ->label('Durée minimum du bail')
+                                ->options([
+                                    '6 mois' => '6 mois',
+                                    '1 an renouvelable' => '1 an renouvelable',
+                                    '2 ans renouvelable' => '2 ans renouvelable',
+                                    '3 ans renouvelable' => '3 ans renouvelable',
+                                ])
+                                ->placeholder('Sélectionnez la durée minimale')
+                                ->native(false),
                         ])
-                        ->placeholder('Sélectionnez le dépôt requis')
-                        ->native(false),
-                    Select::make('minimum_lease_duration')
-                        ->label('Durée minimum du bail')
-                        ->options([
-                            '6 mois' => '6 mois',
-                            '1 an renouvelable' => '1 an renouvelable',
-                            '2 ans renouvelable' => '2 ans renouvelable',
-                            '3 ans renouvelable' => '3 ans renouvelable',
-                        ])
-                        ->placeholder('Sélectionnez la durée minimale')
-                        ->native(false),
+                        ->columns(2),
                     Textarea::make('detailed_charges')
                         ->label('Charges détaillées')
                         ->placeholder('Ex: Eau/électricité: 15 000 FCFA/mois, Gardiennage: 5 000 FCFA/mois')
@@ -188,10 +248,20 @@ trait SharedAdResource
                         ->helperText('Document PDF de l\'état des lieux')
                         ->columnSpanFull(),
                 ])
-                ->columns(2)
+                ->collapsible()
                 ->collapsed(true)
                 ->columnSpanFull(),
-            static::getMapField(),
+
+            // ── Section 7: Localisation ──────────────────────────
+            Section::make('Localisation sur la carte')
+                ->icon('heroicon-o-map-pin')
+                ->description('Positionnez votre bien sur la carte ou activez la géolocalisation')
+                ->schema([
+                    static::getMapField(),
+                ])
+                ->collapsible()
+                ->collapsed(false)
+                ->columnSpanFull(),
         ];
     }
 
@@ -258,6 +328,59 @@ trait SharedAdResource
         }
 
         return $select;
+    }
+
+    /**
+     * Owner-facing status section using ToggleButtons with colors & icons.
+     * Hidden on create (auto PENDING) and while PENDING (awaiting admin approval).
+     * Shown once the admin has approved the ad, allowing the owner to manage availability.
+     */
+    protected static function getOwnerStatusSection(): Section
+    {
+        return Section::make('Statut de l\'annonce')
+            ->icon('heroicon-o-signal')
+            ->description('Mettez à jour le statut de votre bien en fonction de sa disponibilité')
+            ->schema([
+                ToggleButtons::make('status')
+                    ->label('')
+                    ->required()
+                    ->default(AdStatus::PENDING->value)
+                    ->options(function (?Ad $record): array {
+                        if ($record === null) {
+                            return [AdStatus::PENDING->value => AdStatus::PENDING->getLabel()];
+                        }
+
+                        $options = [
+                            $record->status->value => $record->status->getLabel(),
+                        ];
+
+                        foreach ($record->status->allowedTransitions() as $status) {
+                            $options[$status->value] = $status->getLabel();
+                        }
+
+                        return $options;
+                    })
+                    ->colors([
+                        AdStatus::AVAILABLE->value => 'success',
+                        AdStatus::RESERVED->value => 'warning',
+                        AdStatus::RENT->value => 'info',
+                        AdStatus::SOLD->value => 'gray',
+                        AdStatus::PENDING->value => 'gray',
+                        AdStatus::DECLINED->value => 'danger',
+                    ])
+                    ->icons([
+                        AdStatus::AVAILABLE->value => 'heroicon-o-check-circle',
+                        AdStatus::RESERVED->value => 'heroicon-o-clock',
+                        AdStatus::RENT->value => 'heroicon-o-key',
+                        AdStatus::SOLD->value => 'heroicon-o-lock-closed',
+                        AdStatus::PENDING->value => 'heroicon-o-ellipsis-horizontal-circle',
+                        AdStatus::DECLINED->value => 'heroicon-o-x-circle',
+                    ])
+                    ->inline()
+                    ->columnSpanFull(),
+            ])
+            ->hidden(fn (?Ad $record) => $record === null || $record->status === AdStatus::PENDING)
+            ->columnSpanFull();
     }
 
     /**
@@ -459,7 +582,17 @@ trait SharedAdResource
         $columns[] = TextColumn::make('status')
             ->label('Statut')
             ->searchable()
-            ->badge();
+            ->badge()
+            ->formatStateUsing(fn ($state) => $state instanceof AdStatus ? $state->getLabel() : (AdStatus::tryFrom($state)?->getLabel() ?? $state))
+            ->color(fn ($state) => match ($state instanceof AdStatus ? $state : AdStatus::tryFrom($state)) {
+                AdStatus::AVAILABLE => 'success',
+                AdStatus::RESERVED => 'warning',
+                AdStatus::RENT => 'info',
+                AdStatus::SOLD => 'gray',
+                AdStatus::DECLINED => 'danger',
+                AdStatus::PENDING => 'secondary',
+                default => 'secondary',
+            });
 
         // Views count for bailleurs/agencies
         if (!$isAdmin) {
