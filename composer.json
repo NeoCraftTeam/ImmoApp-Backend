@@ -22,6 +22,7 @@
         "filament/spatie-laravel-media-library-plugin": "^4.3",
         "flowframe/laravel-trend": "^0.4",
         "http-interop/http-factory-guzzle": "^1.2",
+        "laravel-notification-channels/webpush": "^10.5",
         "laravel/framework": "^12.0",
         "laravel/nightwatch": "^1.21",
         "laravel/pulse": "^1.4",
@@ -71,7 +72,8 @@
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi",
-            "@php artisan filament:upgrade"
+            "@php artisan filament:upgrade",
+            "@php scripts/patch-webpush.php"
         ],
         "post-update-cmd": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
