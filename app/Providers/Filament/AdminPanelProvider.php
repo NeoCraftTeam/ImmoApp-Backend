@@ -55,6 +55,14 @@ class AdminPanelProvider extends PanelProvider
             ->authGuard('web')
             ->spa()
             ->renderHook(
+                'panels::head.end',
+                fn () => view('pwa.head-meta', ['themeColor' => '#F6475F']),
+            )
+            ->renderHook(
+                'panels::body.end',
+                fn () => view('pwa.splash'),
+            )
+            ->renderHook(
                 'panels::scripts.after',
                 fn () => new \Illuminate\Support\HtmlString('
                     <script>
@@ -65,6 +73,10 @@ class AdminPanelProvider extends PanelProvider
                         });
                     </script>
                 '),
+            )
+            ->renderHook(
+                'panels::scripts.after',
+                fn () => view('pwa.register-sw'),
             )
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')

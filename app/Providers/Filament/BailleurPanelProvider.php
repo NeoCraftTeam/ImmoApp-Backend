@@ -70,6 +70,10 @@ class BailleurPanelProvider extends PanelProvider
             ])
             ->renderHook(
                 'panels::head.end',
+                fn () => view('pwa.head-meta', ['themeColor' => '#10b981']),
+            )
+            ->renderHook(
+                'panels::head.end',
                 fn () => new \Illuminate\Support\HtmlString('
                     <!-- Dynamic Island / Notch — viewport-fit=cover requis pour env(safe-area-inset-top) -->
                     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -91,7 +95,15 @@ class BailleurPanelProvider extends PanelProvider
             )
             ->renderHook(
                 'panels::body.end',
+                fn () => view('pwa.splash'),
+            )
+            ->renderHook(
+                'panels::body.end',
                 fn () => view('filament.mobile-bridge'),
+            )
+            ->renderHook(
+                'panels::scripts.after',
+                fn () => view('pwa.register-sw'),
             )
             ->assets([
                 // Bridge natif minimal — CSS et JS uniquement pour l'app mobile

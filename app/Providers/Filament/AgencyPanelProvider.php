@@ -71,8 +71,20 @@ class AgencyPanelProvider extends PanelProvider
                 Authenticate::class,
             ])
             ->renderHook(
+                'panels::head.end',
+                fn () => view('pwa.head-meta', ['themeColor' => '#2563eb']),
+            )
+            ->renderHook(
+                'panels::body.end',
+                fn () => view('pwa.splash'),
+            )
+            ->renderHook(
                 'panels::body.end',
                 fn () => view('filament.mobile-bridge'),
+            )
+            ->renderHook(
+                'panels::scripts.after',
+                fn () => view('pwa.register-sw'),
             )
             ->assets([
                 // Bridge natif minimal
