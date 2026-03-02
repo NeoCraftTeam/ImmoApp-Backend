@@ -14,7 +14,7 @@ class PaymentPolicy
 
     public function viewAny(User $user): bool
     {
-        return $user->isAdmin();
+        return $user->isAdmin() || $user->isAgent();
     }
 
     public function view(User $user, Payment $payment): bool
