@@ -38,6 +38,7 @@ use Illuminate\Support\Facades\URL;
 use InvalidArgumentException;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\PersonalAccessToken;
+use NotificationChannels\WebPush\HasPushSubscriptions;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\MediaLibrary\HasMedia;
@@ -120,7 +121,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasAvatar, HasEmailAuthentication, HasMedia, HasName, HasTenants, MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, HasUuids, \Illuminate\Auth\MustVerifyEmail, LogsActivity, Notifiable, softDeletes;
+    use HasApiTokens, HasFactory, HasPushSubscriptions, HasUuids, \Illuminate\Auth\MustVerifyEmail, LogsActivity, Notifiable, softDeletes;
 
     use InteractsWithMedia;
 
@@ -460,6 +461,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
      *
      * @return array<string, string>
      */
+    #[\Override]
     protected function casts(): array
     {
         return [
@@ -488,6 +490,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     /**
      * Send the password reset notification using our styled email template.
      */
+    #[\Override]
     public function sendPasswordResetNotification(mixed $token): void
     {
         $resetUrl = config('app.frontend_url').'/reset-password?token='.urlencode((string) $token).'&email='.urlencode($this->email);
@@ -502,6 +505,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     /**
      * Send the email verification notification using our styled template.
      */
+    #[\Override]
     public function sendEmailVerificationNotification(): void
     {
         $verifyUrl = URL::temporarySignedRoute(

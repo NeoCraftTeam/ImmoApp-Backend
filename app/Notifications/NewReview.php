@@ -10,6 +10,8 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use NotificationChannels\WebPush\WebPushChannel;
+use NotificationChannels\WebPush\WebPushMessage;
 
 class NewReview extends Notification implements ShouldQueue
 {
@@ -25,7 +27,13 @@ class NewReview extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        $channels = ['database', 'mail'];
+
+        if ($notifiable->pushSubscriptions()->exists()) {
+            $channels[] = WebPushChannel::class;
+        }
+
+        return $channels;
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -41,6 +49,20 @@ class NewReview extends Notification implements ShouldQueue
             ->when($this->review->comment, fn ($mail) => $mail->line('Commentaire: "'.$this->review->comment.'"'))
             ->action('Voir l\'avis', config('app.frontend_url').'/ads/'.$this->ad->slug)
             ->line('Merci d\'utiliser KeyHome !');
+    }
+
+    public function toWebPush(object $notifiable, Notification $notification): WebPushMessage
+    {
+        $rating = (int) $this->review->rating;
+        $stars = str_repeat('★', $rating).str_repeat('☆', 5 - $rating);
+
+        return (new WebPushMessage)
+            ->title('Nouvel avis - KeyHome')
+            ->icon('/pwa/icons/icon-192x192.png')
+            ->badge('/pwa/icons/icon-72x72.png')
+            ->body('Nouvel avis '.$stars.' sur "'.$this->ad->title.'"')
+            ->tag('review-'.$this->review->id)
+            ->data(['url' => config('app.frontend_url').'/ads/'.$this->ad->slug]);
     }
 
     /**

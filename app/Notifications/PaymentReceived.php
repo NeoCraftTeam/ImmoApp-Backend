@@ -9,6 +9,8 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use NotificationChannels\WebPush\WebPushChannel;
+use NotificationChannels\WebPush\WebPushMessage;
 
 class PaymentReceived extends Notification implements ShouldQueue
 {
@@ -24,7 +26,13 @@ class PaymentReceived extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        $channels = ['database', 'mail'];
+
+        if ($notifiable->pushSubscriptions()->exists()) {
+            $channels[] = WebPushChannel::class;
+        }
+
+        return $channels;
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -38,6 +46,17 @@ class PaymentReceived extends Notification implements ShouldQueue
             ->when($this->description !== '', fn ($mail) => $mail->line($this->description))
             ->action('Voir mes paiements', config('app.frontend_url').'/profile/payments')
             ->line('Merci de votre confiance !');
+    }
+
+    public function toWebPush(object $notifiable, Notification $notification): WebPushMessage
+    {
+        return (new WebPushMessage)
+            ->title('Paiement reçu - KeyHome')
+            ->icon('/pwa/icons/icon-192x192.png')
+            ->badge('/pwa/icons/icon-72x72.png')
+            ->body('Paiement de '.number_format((float) $this->payment->amount, 0, ',', ' ').' FCFA reçu')
+            ->tag('payment-'.$this->payment->id)
+            ->data(['url' => config('app.frontend_url').'/profile/payments']);
     }
 
     /**

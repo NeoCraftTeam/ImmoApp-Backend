@@ -9,6 +9,8 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use NotificationChannels\WebPush\WebPushChannel;
+use NotificationChannels\WebPush\WebPushMessage;
 
 class AdExpiring extends Notification implements ShouldQueue
 {
@@ -24,7 +26,13 @@ class AdExpiring extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        $channels = ['database', 'mail'];
+
+        if ($notifiable->pushSubscriptions()->exists()) {
+            $channels[] = WebPushChannel::class;
+        }
+
+        return $channels;
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -40,6 +48,21 @@ class AdExpiring extends Notification implements ShouldQueue
             ->line('Annonce: "'.$this->ad->title.'"')
             ->action('Renouveler l\'annonce', config('app.frontend_url').'/ads/'.$this->ad->slug.'/renew')
             ->line('Ne manquez pas l\'opportunité de continuer à attirer des clients !');
+    }
+
+    public function toWebPush(object $notifiable, Notification $notification): WebPushMessage
+    {
+        $message = $this->daysUntilExpiry === 0
+            ? 'Votre annonce "'.$this->ad->title.'" expire aujourd\'hui'
+            : 'Votre annonce "'.$this->ad->title.'" expire dans '.$this->daysUntilExpiry.' jour(s)';
+
+        return (new WebPushMessage)
+            ->title('Annonce expirante - KeyHome')
+            ->icon('/pwa/icons/icon-192x192.png')
+            ->badge('/pwa/icons/icon-72x72.png')
+            ->body($message)
+            ->tag('ad-expiring-'.$this->ad->id)
+            ->data(['url' => config('app.frontend_url').'/ads/'.$this->ad->slug.'/renew']);
     }
 
     /**
