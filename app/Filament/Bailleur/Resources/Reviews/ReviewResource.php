@@ -35,6 +35,8 @@ class ReviewResource extends Resource
 
     protected static ?string $pluralModelLabel = 'Avis';
 
+    protected static ?int $navigationSort = 1;
+
     #[\Override]
     public static function getEloquentQuery(): Builder
     {
@@ -49,6 +51,12 @@ class ReviewResource extends Resource
     }
 
     #[\Override]
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'Nombre d\'avis';
+    }
+
+    #[\Override]
     public static function infolist(Schema $schema): Schema
     {
         return $schema
@@ -59,7 +67,7 @@ class ReviewResource extends Resource
                     ->schema([
                         TextEntry::make('rating')
                             ->label('Note')
-                            ->formatStateUsing(fn ($state) => str_repeat('★', (int) $state).str_repeat('☆', 5 - (int) $state)." ({$state}/5)")
+                            ->formatStateUsing(fn ($state) => str_repeat('★', (int) $state).str_repeat('☆', 5 - (int) $state))
                             ->color(fn ($state) => match (true) {
                                 $state >= 4 => 'success',
                                 $state >= 3 => 'warning',
@@ -125,7 +133,7 @@ class ReviewResource extends Resource
             ->columns([
                 TextColumn::make('rating')
                     ->label('Note')
-                    ->formatStateUsing(fn ($state) => str_repeat('★', (int) $state).str_repeat('☆', 5 - (int) $state)." ({$state}/5)")
+                    ->formatStateUsing(fn ($state) => str_repeat('★', (int) $state).str_repeat('☆', 5 - (int) $state))
                     ->color(fn ($state) => match (true) {
                         $state >= 4 => 'success',
                         $state >= 3 => 'warning',
@@ -137,12 +145,6 @@ class ReviewResource extends Resource
                     ->label('Client')
                     ->searchable()
                     ->icon('heroicon-o-user-circle'),
-                TextColumn::make('comment')
-                    ->label('Commentaire')
-                    ->limit(80)
-                    ->wrap()
-                    ->placeholder('—')
-                    ->tooltip(fn ($record) => $record->comment),
                 TextColumn::make('created_at')
                     ->label('Date')
                     ->since()
