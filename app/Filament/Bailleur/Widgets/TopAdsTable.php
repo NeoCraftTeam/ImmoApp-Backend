@@ -37,9 +37,6 @@ class TopAdsTable extends BaseWidget
                         'interactions as favorites_count' => fn (Builder $q) => $q
                             ->where('type', AdInteraction::TYPE_FAVORITE)
                             ->where('created_at', '>=', $since),
-                        'interactions as contacts_count' => fn (Builder $q) => $q
-                            ->whereIn('type', [AdInteraction::TYPE_CONTACT_CLICK, AdInteraction::TYPE_PHONE_CLICK])
-                            ->where('created_at', '>=', $since),
                     ])
                     ->orderByDesc('views_count')
             )
@@ -65,11 +62,6 @@ class TopAdsTable extends BaseWidget
                 TextColumn::make('favorites_count')
                     ->label('Favoris')
                     ->icon('heroicon-o-heart')
-                    ->sortable()
-                    ->alignCenter(),
-                TextColumn::make('contacts_count')
-                    ->label('Contacts')
-                    ->icon('heroicon-o-phone')
                     ->sortable()
                     ->alignCenter(),
             ])
