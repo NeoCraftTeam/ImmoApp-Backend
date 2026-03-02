@@ -9,7 +9,9 @@ use App\Enums\UserRole;
 use App\Mail\AdSubmissionConfirmationMail;
 use App\Models\Ad;
 use App\Models\User;
+use App\Notifications\AdStatusChanged;
 use App\Notifications\NewAdPending;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 
@@ -46,10 +48,24 @@ class AdObserver
 
     /**
      * Handle the Ad "updated" event.
+     *
+     * Notify the ad owner when their ad status changes (e.g. approved / rejected by admin).
      */
     public function updated(Ad $ad): void
     {
-        //
+        if ($ad->wasChanged('status') && $ad->user) {
+            $original = $ad->getOriginal('status');
+            $oldStatus = $original instanceof AdStatus ? $original : AdStatus::tryFrom($original);
+            $newStatus = $ad->status;
+
+            if ($oldStatus && $oldStatus !== $newStatus) {
+                try {
+                    $ad->user->notify(new AdStatusChanged($ad, $oldStatus, $newStatus));
+                } catch (\Throwable $e) {
+                    Log::error("Failed to send AdStatusChanged notification for ad {$ad->id}: ".$e->getMessage());
+                }
+            }
+        }
     }
 
     /**
