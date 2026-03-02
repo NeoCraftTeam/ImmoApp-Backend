@@ -131,7 +131,7 @@ final class AdController
             ->withAvg('reviews', 'rating')
             ->withCount('reviews')
             ->visible()
-            ->where('status', \App\Enums\AdStatus::AVAILABLE);
+            ->publiclyListed();
 
         if ($type) {
             $query->whereHas('ad_type', fn ($q) => $q->where('name', 'ilike', "%{$type}%"));
@@ -1053,7 +1053,7 @@ final class AdController
             if ($driver === 'pgsql') {
                 $ads = Ad::query()
                     ->visible()
-                    ->where('status', AdStatus::AVAILABLE)
+                    ->publiclyListed()
                     ->whereNotNull('location')
                     ->selectRaw('ad.*')
                     ->selectRaw(
@@ -1071,7 +1071,7 @@ final class AdController
             } else {
                 $ads = Ad::query()
                     ->visible()
-                    ->where('status', AdStatus::AVAILABLE)
+                    ->publiclyListed()
                     ->whereNotNull('location')
                     ->selectRaw('ad.*')
                     ->selectRaw(
@@ -1431,13 +1431,15 @@ final class AdController
             $likeOperator = $driver === 'pgsql' ? 'ilike' : 'like';
             $prefix = $q !== '' ? ($q.'%') : '%';
 
-            // Build base query per field, counting only available ads
+            // Build base query per field, counting only publicly listed ads
+            $publicStatuses = array_map(fn (AdStatus $s) => $s->value, Ad::PUBLIC_STATUSES);
+
             if ($field === 'city') {
                 $rows = DB::table('city')
                     ->join('quarter', 'quarter.city_id', '=', 'city.id')
-                    ->join('ad', function ($join): void {
+                    ->join('ad', function ($join) use ($publicStatuses): void {
                         $join->on('ad.quarter_id', '=', 'quarter.id')
-                            ->where('ad.status', '=', 'available');
+                            ->whereIn('ad.status', $publicStatuses);
                     })
                     ->when($q !== '', function ($query) use ($likeOperator, $prefix): void {
                         $query->where('city.name', $likeOperator, $prefix);
@@ -1449,9 +1451,9 @@ final class AdController
                     ->get();
             } elseif ($field === 'type') {
                 $rows = DB::table('ad_type')
-                    ->join('ad', function ($join): void {
+                    ->join('ad', function ($join) use ($publicStatuses): void {
                         $join->on('ad.type_id', '=', 'ad_type.id')
-                            ->where('ad.status', '=', 'available');
+                            ->whereIn('ad.status', $publicStatuses);
                     })
                     ->when($q !== '', function ($query) use ($likeOperator, $prefix): void {
                         $query->where('ad_type.name', $likeOperator, $prefix);
@@ -1463,9 +1465,9 @@ final class AdController
                     ->get();
             } else { // quarter
                 $rows = DB::table('quarter')
-                    ->join('ad', function ($join): void {
+                    ->join('ad', function ($join) use ($publicStatuses): void {
                         $join->on('ad.quarter_id', '=', 'quarter.id')
-                            ->where('ad.status', '=', 'available');
+                            ->whereIn('ad.status', $publicStatuses);
                     })
                     ->when($q !== '', function ($query) use ($likeOperator, $prefix): void {
                         $query->where('quarter.name', $likeOperator, $prefix);
@@ -1633,11 +1635,13 @@ final class AdController
                 default => 'CAST(bedrooms as signed)', // MySQL / MariaDB
             };
 
-            // Villes (top 20 par nombre d'annonces disponibles)
+            $publicStatuses = array_map(fn (AdStatus $s) => $s->value, Ad::PUBLIC_STATUSES);
+
+            // Villes (top 20 par nombre d'annonces publiquement listées)
             $cities = DB::table('ad')
                 ->join('quarter', 'ad.quarter_id', '=', 'quarter.id')
                 ->join('city', 'quarter.city_id', '=', 'city.id')
-                ->where('ad.status', '=', 'available')
+                ->whereIn('ad.status', $publicStatuses)
                 ->whereNotNull('city.name')
                 ->groupBy('city.name')
                 ->select(['city.name as name', DB::raw('COUNT(*) as count')])
@@ -1648,7 +1652,7 @@ final class AdController
             // Types (top 20)
             $types = DB::table('ad')
                 ->join('ad_type', 'ad.type_id', '=', 'ad_type.id')
-                ->where('ad.status', '=', 'available')
+                ->whereIn('ad.status', $publicStatuses)
                 ->whereNotNull('ad_type.name')
                 ->groupBy('ad_type.name')
                 ->select(['ad_type.name as name', DB::raw('COUNT(*) as count')])
@@ -1658,7 +1662,7 @@ final class AdController
 
             // Chambres (toutes les valeurs présentes, tri croissant)
             $bedrooms = DB::table('ad')
-                ->where('status', '=', 'available')
+                ->whereIn('status', $publicStatuses)
                 ->whereNotNull('bedrooms')
                 ->groupBy('bedrooms')
                 ->select([DB::raw($bedroomsCast.' as value'), DB::raw('COUNT(*) as count')])
@@ -1667,25 +1671,25 @@ final class AdController
 
             // Plages min/max (ignorer les NULL)
             $priceRange = DB::table('ad')
-                ->where('status', '=', 'available')
+                ->whereIn('status', $publicStatuses)
                 ->whereNotNull('price')
                 ->selectRaw('MIN(price) as min, MAX(price) as max')
                 ->first();
 
             $surfaceRange = DB::table('ad')
-                ->where('status', '=', 'available')
+                ->whereIn('status', $publicStatuses)
                 ->whereNotNull('surface_area')
                 ->selectRaw('MIN(surface_area) as min, MAX(surface_area) as max')
                 ->first();
 
             // Parking (attention aux différences booléennes entre SGBD)
             $withParking = DB::table('ad')
-                ->where('status', '=', 'available')
+                ->whereIn('status', $publicStatuses)
                 ->where('has_parking', '=', $driver === 'pgsql' ? DB::raw('TRUE') : 1)
                 ->count();
 
             $withoutParking = DB::table('ad')
-                ->where('status', '=', 'available')
+                ->whereIn('status', $publicStatuses)
                 ->where('has_parking', '=', $driver === 'pgsql' ? DB::raw('FALSE') : 0)
                 ->count();
 
@@ -1946,7 +1950,7 @@ final class AdController
         $query = Ad::query()
             ->with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])
             ->visible()
-            ->where('status', \App\Enums\AdStatus::AVAILABLE);
+            ->publiclyListed();
 
         if ($q) {
             $query->where(function ($qb) use ($q): void {
@@ -2097,10 +2101,7 @@ final class AdController
 
             $ad->transitionTo($newStatus);
 
-            // Send notification to owner
-            if ($ad->user) {
-                $ad->user->notify(new \App\Notifications\AdStatusChanged($ad, $oldStatus, $newStatus));
-            }
+            // Notification is now handled by AdObserver::updated()
 
             return response()->json([
                 'success' => true,

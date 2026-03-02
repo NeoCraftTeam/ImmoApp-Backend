@@ -49,6 +49,7 @@ final class AdResource extends JsonResource
                 'longitude' => $this->location->getX(),
             ] : null,
             'status' => $this->status,
+            'status_label' => $this->status->getLabel(),
             'is_visible' => $this->is_visible,
             'available_from' => $this->available_from?->format('Y-m-d'),
             'available_to' => $this->available_to?->format('Y-m-d'),

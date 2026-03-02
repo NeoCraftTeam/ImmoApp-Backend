@@ -85,6 +85,16 @@ class Ad extends Model implements HasMedia
     use HasFactory, HasUuids, LogsActivity, SoftDeletes;
     use InteractsWithMedia, Searchable;
 
+    /**
+     * Statuses that are visible on the public frontend.
+     *
+     * @var array<int, AdStatus>
+     */
+    public const array PUBLIC_STATUSES = [
+        AdStatus::AVAILABLE,
+        AdStatus::RESERVED,
+    ];
+
     protected $table = 'ad';
 
     protected $fillable = [
@@ -98,6 +108,7 @@ class Ad extends Model implements HasMedia
         'bathrooms',
         'has_parking',
         'location',
+        'status',
         'is_visible',
         'available_from',
         'available_to',
@@ -237,8 +248,8 @@ class Ad extends Model implements HasMedia
 
     public function shouldBeSearchable(): bool
     {
-        // N'indexer que les annonces visibles, disponibles et non supprimées
-        return $this->is_visible && $this->status === AdStatus::AVAILABLE && !$this->trashed();
+        // N'indexer que les annonces visibles, publiquement listées et non supprimées
+        return $this->is_visible && in_array($this->status, self::PUBLIC_STATUSES, true) && !$this->trashed();
     }
 
     /**
@@ -477,6 +488,15 @@ class Ad extends Model implements HasMedia
     protected function visible($query)
     {
         return $query->where('is_visible', true);
+    }
+
+    /**
+     * Scope to get only publicly listed ads (available + reserved).
+     */
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function publiclyListed($query)
+    {
+        return $query->whereIn('status', array_map(fn (AdStatus $s) => $s->value, self::PUBLIC_STATUSES));
     }
 
     /**

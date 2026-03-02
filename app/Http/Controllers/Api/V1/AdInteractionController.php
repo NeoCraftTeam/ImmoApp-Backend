@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\AdStatus;
 use App\Http\Resources\AdResource;
 use App\Models\Ad;
 use App\Models\AdInteraction;
@@ -290,7 +289,7 @@ final class AdInteractionController
         $ads = Ad::with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])
             ->whereIn('id', $favoritedAdIds)
             ->visible()
-            ->where('status', AdStatus::AVAILABLE)
+            ->publiclyListed()
             ->latest()
             ->paginate(15);
 
