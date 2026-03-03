@@ -8,6 +8,9 @@ use App\Enums\AdStatus;
 use App\Http\Requests\AdRequest;
 use App\Http\Resources\AdResource as AdApiResource;
 use App\Models\Ad;
+use App\Models\AdType;
+use App\Models\City;
+use App\Models\Quarter;
 use App\Models\User;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -1020,12 +1023,9 @@ final class AdController
 
         // Si pas de coordonnées valides en entrée et qu'on a un utilisateur cible, récupérer via SQL
         if (($lat === null || $long === null) && $targetUser?->id) {
-            $row = DB::table('users')
+            $row = User::query()
                 ->where('id', $targetUser->id)
-                ->select([
-                    DB::raw('ST_Y(location) as lat'),
-                    DB::raw('ST_X(location) as lng'),
-                ])
+                ->selectRaw('ST_Y(location) as lat, ST_X(location) as lng')
                 ->first();
             if ($row) {
                 $lat ??= is_numeric($row->lat) ? (float) $row->lat : null;
@@ -1435,45 +1435,39 @@ final class AdController
             $publicStatuses = array_map(fn (AdStatus $s) => $s->value, Ad::PUBLIC_STATUSES);
 
             if ($field === 'city') {
-                $rows = DB::table('city')
+                $rows = City::query()
                     ->join('quarter', 'quarter.city_id', '=', 'city.id')
                     ->join('ad', function ($join) use ($publicStatuses): void {
                         $join->on('ad.quarter_id', '=', 'quarter.id')
                             ->whereIn('ad.status', $publicStatuses);
                     })
-                    ->when($q !== '', function ($query) use ($likeOperator, $prefix): void {
-                        $query->where('city.name', $likeOperator, $prefix);
-                    })
+                    ->when($q !== '', fn ($query) => $query->where('city.name', $likeOperator, $prefix))
                     ->groupBy('city.name')
-                    ->select(['city.name as value', DB::raw('COUNT(ad.id) as count')])
+                    ->selectRaw('city.name as value, COUNT(ad.id) as count')
                     ->orderByDesc('count')
                     ->limit(10)
                     ->get();
             } elseif ($field === 'type') {
-                $rows = DB::table('ad_type')
+                $rows = AdType::query()
                     ->join('ad', function ($join) use ($publicStatuses): void {
                         $join->on('ad.type_id', '=', 'ad_type.id')
                             ->whereIn('ad.status', $publicStatuses);
                     })
-                    ->when($q !== '', function ($query) use ($likeOperator, $prefix): void {
-                        $query->where('ad_type.name', $likeOperator, $prefix);
-                    })
+                    ->when($q !== '', fn ($query) => $query->where('ad_type.name', $likeOperator, $prefix))
                     ->groupBy('ad_type.name')
-                    ->select(['ad_type.name as value', DB::raw('COUNT(ad.id) as count')])
+                    ->selectRaw('ad_type.name as value, COUNT(ad.id) as count')
                     ->orderByDesc('count')
                     ->limit(10)
                     ->get();
             } else { // quarter
-                $rows = DB::table('quarter')
+                $rows = Quarter::query()
                     ->join('ad', function ($join) use ($publicStatuses): void {
                         $join->on('ad.quarter_id', '=', 'quarter.id')
                             ->whereIn('ad.status', $publicStatuses);
                     })
-                    ->when($q !== '', function ($query) use ($likeOperator, $prefix): void {
-                        $query->where('quarter.name', $likeOperator, $prefix);
-                    })
+                    ->when($q !== '', fn ($query) => $query->where('quarter.name', $likeOperator, $prefix))
                     ->groupBy('quarter.name')
-                    ->select(['quarter.name as value', DB::raw('COUNT(ad.id) as count')])
+                    ->selectRaw('quarter.name as value, COUNT(ad.id) as count')
                     ->orderByDesc('count')
                     ->limit(10)
                     ->get();
@@ -1638,59 +1632,59 @@ final class AdController
             $publicStatuses = array_map(fn (AdStatus $s) => $s->value, Ad::PUBLIC_STATUSES);
 
             // Villes (top 20 par nombre d'annonces publiquement listées)
-            $cities = DB::table('ad')
+            $cities = Ad::query()
                 ->join('quarter', 'ad.quarter_id', '=', 'quarter.id')
                 ->join('city', 'quarter.city_id', '=', 'city.id')
                 ->whereIn('ad.status', $publicStatuses)
                 ->whereNotNull('city.name')
                 ->groupBy('city.name')
-                ->select(['city.name as name', DB::raw('COUNT(*) as count')])
+                ->selectRaw('city.name as name, COUNT(*) as count')
                 ->orderByDesc('count')
                 ->limit(20)
                 ->get();
 
             // Types (top 20)
-            $types = DB::table('ad')
+            $types = Ad::query()
                 ->join('ad_type', 'ad.type_id', '=', 'ad_type.id')
                 ->whereIn('ad.status', $publicStatuses)
                 ->whereNotNull('ad_type.name')
                 ->groupBy('ad_type.name')
-                ->select(['ad_type.name as name', DB::raw('COUNT(*) as count')])
+                ->selectRaw('ad_type.name as name, COUNT(*) as count')
                 ->orderByDesc('count')
                 ->limit(20)
                 ->get();
 
             // Chambres (toutes les valeurs présentes, tri croissant)
-            $bedrooms = DB::table('ad')
+            $bedrooms = Ad::query()
                 ->whereIn('status', $publicStatuses)
                 ->whereNotNull('bedrooms')
                 ->groupBy('bedrooms')
-                ->select([DB::raw($bedroomsCast.' as value'), DB::raw('COUNT(*) as count')])
+                ->selectRaw($bedroomsCast.' as value, COUNT(*) as count')
                 ->orderBy('value')
                 ->get();
 
             // Plages min/max (ignorer les NULL)
-            $priceRange = DB::table('ad')
+            $priceRange = Ad::query()
                 ->whereIn('status', $publicStatuses)
                 ->whereNotNull('price')
                 ->selectRaw('MIN(price) as min, MAX(price) as max')
                 ->first();
 
-            $surfaceRange = DB::table('ad')
+            $surfaceRange = Ad::query()
                 ->whereIn('status', $publicStatuses)
                 ->whereNotNull('surface_area')
                 ->selectRaw('MIN(surface_area) as min, MAX(surface_area) as max')
                 ->first();
 
-            // Parking (attention aux différences booléennes entre SGBD)
-            $withParking = DB::table('ad')
+            // Parking — PDO binds PHP booleans correctly for both pgsql and MySQL
+            $withParking = Ad::query()
                 ->whereIn('status', $publicStatuses)
-                ->where('has_parking', '=', $driver === 'pgsql' ? DB::raw('TRUE') : 1)
+                ->where('has_parking', true)
                 ->count();
 
-            $withoutParking = DB::table('ad')
+            $withoutParking = Ad::query()
                 ->whereIn('status', $publicStatuses)
-                ->where('has_parking', '=', $driver === 'pgsql' ? DB::raw('FALSE') : 0)
+                ->where('has_parking', false)
                 ->count();
 
             return response()->json([
