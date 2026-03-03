@@ -2,7 +2,7 @@
 # PREPROD — Services applicatifs uniquement
 # ============================================================
 # DB, Redis et Meilisearch sont partagés avec la prod
-# (containers keyhome-db, keyhome-redis, keyhome-meilisearch)
+# (containers keyhome-prod-db, keyhome-prod-redis, keyhome-prod-meilisearch)
 # via le réseau externe keyhome_keyhome-network.
 #
 # Utilisation : placé dans /opt/keyhome-preprod/
@@ -40,6 +40,13 @@ services:
       - APP_ENV=${APP_ENV:-staging}
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+    # FIX: healthcheck manquant — web et worker ne peuvent pas dépendre de app proprement sans ça
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'php-fpm' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   worker:
     image: ${APP_IMAGE:-keyhome-backend}
@@ -47,8 +54,12 @@ services:
     restart: unless-stopped
     working_dir: /var/www
     command: php artisan queue:work --queue=emails,default --tries=3 --timeout=90
+    # FIX: depends_on sans condition → le worker pouvait démarrer avant que app et code-sync soient prêts
     depends_on:
-      - app
+      code-sync:
+        condition: service_completed_successfully
+      app:
+        condition: service_healthy
     env_file:
       - .env
     volumes:
@@ -86,9 +97,10 @@ services:
     image: nginx:alpine
     container_name: ${COMPOSE_PREFIX:-keyhome-preprod}-web
     restart: unless-stopped
+    # FIX: condition service_started → service_healthy pour ne pas accepter de trafic avant que PHP-FPM soit up
     depends_on:
       app:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "${WEB_PORT:-9091}:80"
     volumes:
@@ -98,6 +110,22 @@ services:
     networks:
       - preprod-network
       - traefik-public
+    # FIX: healthcheck manquant sur le point d'entrée public
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/up || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    # FIX: labels Traefik manquants — sans eux Traefik ne sait pas router vers ce service
+    # et ne peut pas choisir le bon réseau (traefik-public vs preprod-network)
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.keyhome-preprod.rule=Host(`${APP_URL:-api.keyhome.neocraft.dev}`)"
+      - "traefik.http.routers.keyhome-preprod.entrypoints=websecure"
+      - "traefik.http.routers.keyhome-preprod.tls.certresolver=letsencrypt"
+      - "traefik.http.services.keyhome-preprod.loadbalancer.server.port=80"
 
 networks:
   preprod-network:

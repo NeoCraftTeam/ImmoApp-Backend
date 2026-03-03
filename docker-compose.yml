@@ -22,7 +22,10 @@ services:
     depends_on:
       code-sync:
         condition: service_completed_successfully
-    # On utilise le fichier .env du VPS pour configurer le conteneur
+      db:
+        condition: service_healthy   # FIX: attendre que la DB soit prête avant de démarrer
+      redis:
+        condition: service_healthy   # FIX: attendre que Redis soit prêt avant de démarrer
     env_file:
       - .env
     volumes:
@@ -37,6 +40,13 @@ services:
       - APP_ENV=${APP_ENV:-production}
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+    # FIX: healthcheck sur le process PHP-FPM pour que le web puisse dépendre de app proprement
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'php-fpm' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   # Le Worker pour les files d'attente (Mails, notifications, etc.)
   worker:
@@ -45,10 +55,17 @@ services:
     restart: unless-stopped
     working_dir: /var/www
     command: php artisan queue:work --queue=emails,default --tries=3 --timeout=90
+    # FIX: dépend de code-sync (condition completed) + db/redis healthy
+    # Sans ça, le worker peut démarrer sur un volume partiellement peuplé
     depends_on:
-      - db
-      - redis
-      - app
+      code-sync:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      app:
+        condition: service_healthy
     env_file:
       - .env
     volumes:
@@ -87,9 +104,10 @@ services:
     image: nginx:alpine
     container_name: ${COMPOSE_PREFIX:-keyhome-prod}-web
     restart: unless-stopped
+    # FIX: attendre que app soit healthy (PHP-FPM up) avant d'accepter du trafic
     depends_on:
       app:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "${WEB_PORT:-9090}:80"
     volumes:
@@ -99,6 +117,21 @@ services:
     networks:
       - keyhome-network
       - traefik-public
+    # FIX: healthcheck sur le port 80 pour surveiller nginx lui-même
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/up || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.keyhome-prod.rule=Host(`${APP_URL:-api.keyhome.app}`)"
+      - "traefik.http.routers.keyhome-prod.entrypoints=websecure"
+      - "traefik.http.routers.keyhome-prod.tls.certresolver=letsencrypt"
+      - "traefik.http.services.keyhome-prod.loadbalancer.server.port=80"
+
   # La base de données (Postgres + PostGIS)
   db:
     image: postgis/postgis:15-3.3-alpine
@@ -112,6 +145,13 @@ services:
       - keyhome-db-data:/var/lib/postgresql/data
     networks:
       - keyhome-network
+    # FIX: healthcheck manquant — app et worker ne peuvent pas savoir si la DB est prête
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-keyhome}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   # Cache (Redis)
   redis:
@@ -120,6 +160,12 @@ services:
     restart: unless-stopped
     networks:
       - keyhome-network
+    # FIX: healthcheck manquant — app et worker ne peuvent pas savoir si Redis est prêt
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
 
   # Moteur de recherche (Meilisearch)
   meilisearch:
@@ -133,6 +179,12 @@ services:
       - keyhome-meilisearch-data:/meili_data
     networks:
       - keyhome-network
+    # FIX: healthcheck sur l'API Meilisearch
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7700/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   # Interface de gestion de base de données (debug only — use: docker compose --profile debug up pgadmin)
   pgadmin:

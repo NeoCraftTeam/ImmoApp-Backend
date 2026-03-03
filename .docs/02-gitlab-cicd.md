@@ -378,7 +378,7 @@ notify_slack_success:
       curl -X POST -H 'Content-type: application/json' \
       --data "{
         \"text\": \"✅ *Déploiement Réussi !*\n*Auteur:* $GITLAB_USER_NAME\n*Message:* $CI_COMMIT_TITLE\"
-      }" $SLACK_WEBHOOK_URL
+      }" $SLACK_WEBHOOK_PREPROD
   when: on_success
   only:
     - main
@@ -410,7 +410,7 @@ cleanup:
 | `CI_REGISTRY_IMAGE` | `registry.gitlab.com/neocraftteam/immoapp-backend` | ✅ | ❌ | build, deploy |
 | `CI_REGISTRY_USER` | Votre username GitLab | ✅ | ❌ | build, deploy |
 | `CI_REGISTRY_PASSWORD` | Personal Access Token | ✅ | ✅ | build, deploy |
-| `SLACK_WEBHOOK_URL` | `https://hooks.slack.com/...` | ✅ | ✅ | notify |
+| `SLACK_WEBHOOK_PREPROD` | `https://hooks.slack.com/...` | ✅ | ✅ | notify |
 
 ### Variables prédéfinies par GitLab
 
@@ -554,7 +554,7 @@ php artisan test --env=testing --testdox
 
 - **URL** : `https://gitlab.com/NeoCraftTeam/ImmoApp-Backend/-/pipelines`
 - **Notifications email** : Configurées par défaut sur echec
-- **Slack** : Configuré via `SLACK_WEBHOOK_URL`
+- **Slack** : Configuré via `SLACK_WEBHOOK_PREPROD`
 
 ### Métriques à surveiller
 
