@@ -421,7 +421,7 @@ Aller sur GitLab : **Settings > CI/CD > Variables**
 | `CI_REGISTRY_IMAGE` | `registry.gitlab.com/neocraftteam/immoapp-backend` | ✅ | ❌ |
 | `CI_REGISTRY_USER` | Votre username GitLab | ✅ | ❌ |
 | `CI_REGISTRY_PASSWORD` | Votre Personal Access Token | ✅ | ✅ |
-| `SLACK_WEBHOOK_URL` | URL webhook Slack (optionnel) | ✅ | ✅ |
+| `SLACK_WEBHOOK_PREPROD` | URL webhook Slack (optionnel) | ✅ | ✅ |
 
 **📚 Référence** : [GitLab CI/CD Variables](https://docs.gitlab.com/ee/ci/variables/)
 
