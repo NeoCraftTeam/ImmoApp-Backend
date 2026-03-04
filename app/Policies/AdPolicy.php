@@ -19,7 +19,7 @@ class AdPolicy
 
     public function view(?User $user, Ad $ad): bool
     {
-        if ($ad->status === \App\Enums\AdStatus::AVAILABLE) {
+        if (in_array($ad->status, Ad::PUBLIC_STATUSES, true)) {
             return true;
         }
 
