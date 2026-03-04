@@ -122,7 +122,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik-public"
-      - "traefik.http.routers.keyhome-preprod.rule=Host(`${APP_URL:-api.keyhome.neocraft.dev}`)"
+      - "traefik.http.routers.keyhome-preprod.rule=Host(`${APP_DOMAIN:-api.keyhome.neocraft.dev}`)"
       - "traefik.http.routers.keyhome-preprod.entrypoints=websecure"
       - "traefik.http.routers.keyhome-preprod.tls.certresolver=letsencrypt"
       - "traefik.http.services.keyhome-preprod.loadbalancer.server.port=80"

@@ -127,7 +127,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik-public"
-      - "traefik.http.routers.keyhome-prod.rule=Host(`${APP_URL:-api.keyhome.app}`)"
+      - "traefik.http.routers.keyhome-prod.rule=Host(`${APP_DOMAIN:-api.keyhome.app}`)"
       - "traefik.http.routers.keyhome-prod.entrypoints=websecure"
       - "traefik.http.routers.keyhome-prod.tls.certresolver=letsencrypt"
       - "traefik.http.services.keyhome-prod.loadbalancer.server.port=80"
