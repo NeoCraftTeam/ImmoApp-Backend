@@ -53,7 +53,7 @@ final class AdResource extends JsonResource
             'is_visible' => $this->is_visible,
             'available_from' => $this->available_from?->format('Y-m-d'),
             'available_to' => $this->available_to?->format('Y-m-d'),
-            'attributes' => $this->attributes ?? [],
+            'attributes' => $this->resource->getAttribute('attributes') ?? [],
             'is_currently_available' => $this->isCurrentlyAvailable(),
             'is_unlocked' => $this->isUnlockedFor($user),
             'total_images' => $this->getMedia('images')->count(),
