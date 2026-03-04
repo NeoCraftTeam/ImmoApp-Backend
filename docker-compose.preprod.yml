@@ -112,7 +112,7 @@ services:
       - traefik-public
     # FIX: healthcheck manquant sur le point d'entrée public
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost/up || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/up || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
