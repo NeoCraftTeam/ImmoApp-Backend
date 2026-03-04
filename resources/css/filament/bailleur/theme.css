@@ -1,0 +1,601 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../app/Filament/Bailleur/**/*';
+@source '../../../../resources/views/filament/bailleur/**/*';
+
+/* ──────────────────────────────────────────────────────────
+   KeyHome Owner Panel — Custom Theme
+   Design system: Primary #0D9488 (Teal), Inter font, 12px radius
+   ────────────────────────────────────────────────────────── */
+
+/* === Design Tokens === */
+:root {
+    --kh-primary: #0D9488;
+    --kh-primary-dark: #0F766E;
+    --kh-primary-light: #14B8A6;
+    --kh-bg-light: #F7F7F7;
+    --kh-bg-dark: #222222;
+    --kh-surface-dark: #2A2A2A;
+    --kh-radius: 12px;
+    --kh-radius-sm: 8px;
+    --kh-radius-lg: 16px;
+    --kh-shadow-card: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
+    --kh-shadow-card-hover: 0 10px 25px rgba(0, 0, 0, 0.08);
+    --kh-shadow-primary: 0 4px 12px rgba(13, 148, 136, 0.25);
+    --kh-gradient-primary: linear-gradient(135deg, #0D9488, #0F766E);
+}
+
+/* === Global === */
+body {
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* === Layout Background === */
+.fi-body {
+    background-color: var(--kh-bg-light) !important;
+}
+.dark .fi-body {
+    background-color: var(--kh-bg-dark) !important;
+}
+
+/* === Sidebar === */
+.fi-sidebar {
+    background: white !important;
+    border-right: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+.dark .fi-sidebar {
+    background: var(--kh-surface-dark) !important;
+    border-right-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.fi-sidebar-nav-groups {
+    padding: 0.5rem !important;
+}
+
+/* Sidebar items */
+.fi-sidebar-item-button {
+    border-radius: var(--kh-radius-sm) !important;
+    transition: background-color 0.2s ease, color 0.2s ease;
+    margin-bottom: 2px;
+}
+.fi-sidebar-item-button:hover {
+    background-color: rgba(13, 148, 136, 0.06) !important;
+}
+.fi-sidebar-item-active .fi-sidebar-item-button {
+    background: var(--kh-gradient-primary) !important;
+    color: white !important;
+    box-shadow: var(--kh-shadow-primary);
+}
+.fi-sidebar-item-active .fi-sidebar-item-button * {
+    color: white !important;
+}
+.dark .fi-sidebar-item-button:hover {
+    background-color: rgba(13, 148, 136, 0.12) !important;
+}
+
+/* === Topbar === */
+.fi-topbar {
+    background: white !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06) !important;
+}
+.dark .fi-topbar {
+    background: var(--kh-surface-dark) !important;
+    border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* === Cards & Sections — no transform/animation to avoid stacking context === */
+.fi-section,
+.fi-wi-stats-overview-stat,
+.fi-ta,
+.fi-wi-chart {
+    border-radius: var(--kh-radius) !important;
+}
+
+.fi-section {
+    box-shadow: var(--kh-shadow-card) !important;
+    border: 1px solid rgba(0, 0, 0, 0.04) !important;
+}
+.dark .fi-section {
+    border-color: rgba(255, 255, 255, 0.06) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* === Stat Cards === */
+.fi-wi-stats-overview-stat {
+    box-shadow: var(--kh-shadow-card) !important;
+    border: 1px solid rgba(0, 0, 0, 0.04) !important;
+    background: white !important;
+}
+.fi-wi-stats-overview-stat:hover {
+    box-shadow: var(--kh-shadow-card-hover) !important;
+}
+.dark .fi-wi-stats-overview-stat {
+    background: var(--kh-surface-dark) !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.fi-wi-stats-overview-stat-chart {
+    opacity: 0.8;
+}
+
+/* === Chart Widget === */
+.fi-wi-chart {
+    box-shadow: var(--kh-shadow-card) !important;
+    border: 1px solid rgba(0, 0, 0, 0.04) !important;
+    background: white !important;
+}
+.dark .fi-wi-chart {
+    background: var(--kh-surface-dark) !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* === Table Widget === */
+.fi-ta {
+    box-shadow: var(--kh-shadow-card) !important;
+    border: 1px solid rgba(0, 0, 0, 0.04) !important;
+}
+.dark .fi-ta {
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+.fi-ta-row:hover {
+    background-color: rgba(13, 148, 136, 0.04) !important;
+}
+.dark .fi-ta-row:hover {
+    background-color: rgba(13, 148, 136, 0.08) !important;
+}
+
+/* Table row focus — light teal highlight */
+.fi-ta-row:focus,
+.fi-ta-row:focus-within {
+    background-color: rgba(13, 148, 136, 0.06) !important;
+    outline: none !important;
+}
+.dark .fi-ta-row:focus,
+.dark .fi-ta-row:focus-within {
+    background-color: rgba(13, 148, 136, 0.1) !important;
+}
+
+/* Active/selected table rows */
+.fi-ta-row.fi-ta-row-selected {
+    background-color: rgba(13, 148, 136, 0.08) !important;
+}
+.dark .fi-ta-row.fi-ta-row-selected {
+    background-color: rgba(13, 148, 136, 0.12) !important;
+}
+
+/* Table header cells */
+.fi-ta-header-cell {
+    font-size: 0.75rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    color: #6B7280 !important;
+}
+.dark .fi-ta-header-cell {
+    color: #9CA3AF !important;
+}
+
+/* Table cell focus */
+.fi-ta-cell:focus-within {
+    box-shadow: inset 0 0 0 2px rgba(13, 148, 136, 0.2) !important;
+    border-radius: 4px;
+}
+
+/* Table search input */
+.fi-ta-search-field .fi-input-wrp:focus-within {
+    border-color: var(--kh-primary) !important;
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1) !important;
+}
+
+/* Striped table rows (subtle) */
+.fi-ta-row:nth-child(even) {
+    background-color: rgba(0, 0, 0, 0.01);
+}
+.dark .fi-ta-row:nth-child(even) {
+    background-color: rgba(255, 255, 255, 0.01);
+}
+.fi-ta-row:nth-child(even):hover {
+    background-color: rgba(13, 148, 136, 0.04) !important;
+}
+
+/* === Buttons === */
+.fi-btn-primary {
+    border-radius: var(--kh-radius-sm) !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.01em;
+}
+
+/* Global focus ring — teal accent */
+*:focus-visible {
+    outline: 2px solid rgba(13, 148, 136, 0.4) !important;
+    outline-offset: 2px !important;
+}
+
+/* === Form Inputs === */
+.fi-input-wrp {
+    border-radius: var(--kh-radius-sm) !important;
+}
+.fi-input-wrp:focus-within {
+    border-color: var(--kh-primary) !important;
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12) !important;
+}
+
+/* Compact form fields for auth pages — sleeker premium feel */
+.fi-simple-page .fi-input-wrp {
+    border-radius: 10px !important;
+    border: 1.5px solid rgba(0, 0, 0, 0.1) !important;
+    background: #FAFAFA !important;
+    padding: 0 !important;
+}
+.dark .fi-simple-page .fi-input-wrp {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    background: rgba(255, 255, 255, 0.04) !important;
+}
+.fi-simple-page .fi-input-wrp:focus-within {
+    border-color: var(--kh-primary) !important;
+    background: white !important;
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1) !important;
+}
+.dark .fi-simple-page .fi-input-wrp:focus-within {
+    background: var(--kh-surface-dark) !important;
+}
+
+/* Aggressively reduce input height */
+.fi-simple-page .fi-input-wrp input,
+.fi-simple-page .fi-input-wrp select,
+.fi-simple-page .fi-input-wrp textarea,
+.fi-simple-page .fi-input {
+    font-size: 0.8125rem !important;
+    padding: 0.45rem 0.75rem !important;
+    height: auto !important;
+    min-height: 0 !important;
+    line-height: 1.4 !important;
+}
+
+/* Reduce spacing between form fields */
+.fi-simple-page .fi-fo-field-wrp {
+    gap: 0.25rem !important;
+}
+.fi-simple-page .fi-form-component {
+    gap: 0.25rem !important;
+}
+.fi-simple-page .fi-form > .grid {
+    gap: 0.75rem !important;
+}
+
+/* Labels — smaller and elegant */
+.fi-simple-page .fi-fo-field-wrp label {
+    font-size: 0.75rem !important;
+    font-weight: 600 !important;
+    color: #4B5563 !important;
+    letter-spacing: 0.02em;
+}
+.dark .fi-simple-page .fi-fo-field-wrp label {
+    color: #D1D5DB !important;
+}
+
+/* Sections inside auth forms — tighter */
+.fi-simple-page .fi-section {
+    box-shadow: none !important;
+    border: 1px solid rgba(0, 0, 0, 0.06) !important;
+    border-radius: 12px !important;
+}
+.fi-simple-page .fi-section-content-ctn {
+    padding: 0.75rem !important;
+}
+.fi-simple-page .fi-section-header {
+    padding: 0.5rem 0.75rem !important;
+}
+.fi-simple-page .fi-section-header-heading {
+    font-size: 0.8125rem !important;
+}
+
+/* === Badges === */
+.fi-badge {
+    border-radius: 9999px !important;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+}
+
+/* === Simple Pages (Login / Register) — Premium Design === */
+.fi-simple-page {
+    min-height: 100vh;
+    background: linear-gradient(160deg, #F0FDFA 0%, #F7F7F7 40%, #F0FDFA 100%) !important;
+}
+.dark .fi-simple-page {
+    background: linear-gradient(160deg, #1a2e2b 0%, #222222 40%, #1a2e2b 100%) !important;
+}
+
+/* Subtle decorative gradient orbs */
+.fi-simple-page::before {
+    content: '';
+    position: fixed;
+    top: -20%;
+    right: -10%;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(13, 148, 136, 0.08) 0%, transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+}
+.fi-simple-page::after {
+    content: '';
+    position: fixed;
+    bottom: -15%;
+    left: -10%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(15, 118, 110, 0.06) 0%, transparent 70%);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Main card — floating glass-like card */
+.fi-simple-main,
+.fi-simple-page .fi-simple-main {
+    position: relative;
+    z-index: 1;
+    border-radius: 20px !important;
+    box-shadow:
+        0 0 0 1px rgba(13, 148, 136, 0.06),
+        0 4px 6px rgba(0, 0, 0, 0.02),
+        0 20px 50px rgba(0, 0, 0, 0.06) !important;
+    border: none !important;
+    background: rgba(255, 255, 255, 0.88) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    max-width: 380px !important;
+    width: 380px !important;
+    padding: 1.5rem 1.75rem !important;
+}
+.dark .fi-simple-main,
+.dark .fi-simple-page .fi-simple-main {
+    background: rgba(42, 42, 42, 0.92) !important;
+    box-shadow:
+        0 0 0 1px rgba(13, 148, 136, 0.1),
+        0 4px 6px rgba(0, 0, 0, 0.1),
+        0 20px 50px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Override Filament's max-w utility on the container */
+.fi-simple-main-ctn {
+    max-width: 380px !important;
+}
+@media (max-width: 480px) {
+    .fi-simple-main,
+    .fi-simple-page .fi-simple-main {
+        max-width: 100% !important;
+        width: 100% !important;
+        border-radius: 16px !important;
+        padding: 1.25rem !important;
+    }
+}
+
+/* Teal accent line at the top of the card */
+.fi-simple-main::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 60%;
+    height: 3px;
+    background: var(--kh-gradient-primary);
+    border-radius: 0 0 3px 3px;
+}
+
+.fi-simple-header {
+    position: relative;
+    padding-bottom: 1rem;
+}
+/* Remove old underline */
+.fi-simple-header::after {
+    display: none;
+}
+
+/* Submit button — premium gradient */
+.fi-simple-page .fi-btn-primary {
+    background: var(--kh-gradient-primary) !important;
+    border: none !important;
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    font-size: 0.8125rem !important;
+    letter-spacing: 0.02em;
+    padding: 0.5rem 1rem !important;
+    box-shadow: 0 4px 12px rgba(13, 148, 136, 0.25) !important;
+}
+.fi-simple-page .fi-btn-primary:hover {
+    box-shadow: 0 6px 20px rgba(13, 148, 136, 0.35) !important;
+    filter: brightness(1.05);
+}
+
+/* OAuth buttons — elegant shape */
+.fi-simple-page .filament-socialite-buttons button,
+.fi-simple-page .filament-socialite-buttons a {
+    border-radius: 10px !important;
+    font-weight: 500;
+    font-size: 0.8125rem !important;
+    border: 1.5px solid rgba(0, 0, 0, 0.1) !important;
+    background: #FAFAFA !important;
+    color: #374151 !important;
+    box-shadow: none !important;
+    padding-top: 0.45rem !important;
+    padding-bottom: 0.45rem !important;
+}
+.dark .fi-simple-page .filament-socialite-buttons button,
+.dark .fi-simple-page .filament-socialite-buttons a {
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    background: var(--kh-surface-dark) !important;
+    color: #D1D5DB !important;
+}
+.fi-simple-page .filament-socialite-buttons button:hover,
+.fi-simple-page .filament-socialite-buttons a:hover {
+    border-color: var(--kh-primary) !important;
+    box-shadow: 0 2px 8px rgba(13, 148, 136, 0.12) !important;
+}
+
+/* Divider styling */
+.fi-simple-page .filament-socialite-buttons .text-gray-500 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 600;
+    color: #9CA3AF;
+}
+
+/* Links (forgot password, register) */
+.fi-simple-page .fi-link {
+    color: var(--kh-primary) !important;
+    font-weight: 500;
+    font-size: 0.8125rem !important;
+}
+.fi-simple-page .fi-link:hover {
+    color: var(--kh-primary-dark) !important;
+}
+
+/* Checkbox (remember me) */
+.fi-simple-page .fi-checkbox-input:checked {
+    background-color: var(--kh-primary) !important;
+    border-color: var(--kh-primary) !important;
+}
+.fi-simple-page .fi-fo-field-wrp .fi-checkbox label span {
+    font-size: 0.8125rem !important;
+}
+
+/* === Modals — no custom styles, let Filament handle z-index === */
+.fi-modal-window {
+    border-radius: var(--kh-radius-lg) !important;
+}
+
+/* === Notifications === */
+.fi-no {
+    border-radius: var(--kh-radius) !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* === Breadcrumbs === */
+.fi-breadcrumbs {
+    font-size: 0.8125rem;
+    letter-spacing: 0.01em;
+}
+
+/* === Tabs === */
+.fi-tabs-item-button {
+    border-radius: var(--kh-radius-sm) !important;
+}
+.fi-tabs-item-active .fi-tabs-item-button {
+    background-color: rgba(13, 148, 136, 0.08) !important;
+}
+
+/* === Scrollbar Styling === */
+.fi-sidebar::-webkit-scrollbar {
+    width: 4px;
+}
+.fi-sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+.fi-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+}
+.dark .fi-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* === Navigation Group Labels === */
+.fi-sidebar-group-label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #9CA3AF;
+    padding: 0.75rem 0.75rem 0.375rem;
+}
+
+/* === Empty State === */
+.fi-ta-empty-state {
+    padding: 3rem 1.5rem !important;
+}
+.fi-ta-empty-state-icon {
+    color: var(--kh-primary) !important;
+    opacity: 0.5;
+}
+
+/* === Widget Headings === */
+.fi-wi-chart .fi-header-heading,
+.fi-ta .fi-header-heading {
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: -0.01em;
+}
+
+/* === Dark Mode Toggle === */
+.fi-theme-switcher-btn {
+    border-radius: var(--kh-radius-sm) !important;
+}
+.fi-theme-switcher-btn:hover {
+    background-color: rgba(13, 148, 136, 0.06) !important;
+}
+
+/* === Pagination === */
+.fi-pagination-item-btn {
+    border-radius: var(--kh-radius-sm) !important;
+}
+
+/* === Premium Global Polish === */
+
+/* Smooth transitions on interactive elements */
+.fi-btn,
+.fi-sidebar-item-button,
+.fi-tabs-item-button,
+.fi-pagination-item-btn,
+.fi-link {
+    transition: all 0.15s ease !important;
+}
+
+/* Content area spacing */
+.fi-page-header {
+    margin-bottom: 0.5rem;
+}
+
+/* Dashboard grid — tighter gaps */
+.fi-wi-stats-overview {
+    gap: 1rem !important;
+}
+
+/* Select & dropdown focus */
+.fi-select-trigger:focus,
+.fi-select-trigger:focus-within {
+    border-color: var(--kh-primary) !important;
+    box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1) !important;
+}
+
+/* Action buttons in tables/forms — subtle hover */
+.fi-ta-actions .fi-icon-btn:hover,
+.fi-fo-actions .fi-icon-btn:hover {
+    background-color: rgba(13, 148, 136, 0.06) !important;
+    color: var(--kh-primary) !important;
+}
+
+/* Card content padding — breathing room */
+.fi-section-content-ctn {
+    padding: 1rem 1.25rem !important;
+}
+
+/* Widget description text */
+.fi-wi-stats-overview-stat-description {
+    font-size: 0.75rem;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+}
+
+/* Stat value — larger and bolder */
+.fi-wi-stats-overview-stat-value {
+    font-size: 1.5rem !important;
+    font-weight: 800 !important;
+    letter-spacing: -0.02em;
+}

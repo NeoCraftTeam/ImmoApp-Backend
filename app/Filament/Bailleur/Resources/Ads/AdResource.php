@@ -81,6 +81,10 @@ class AdResource extends Resource
                 ViewAction::make(),
                 EditAction::make()
                     ->slideOver()
+                    ->stickyModalHeader()
+                    ->stickyModalFooter()
+                    ->modalAutofocus(false)
+                    ->closeModalByClickingAway(false)
                     ->modalWidth(Width::FourExtraLarge)
                     ->successNotificationTitle('Annonce mise à jour')
                     ->mutateFormDataUsing(fn (array $data): array => static::mutateLocationMapData($data)),

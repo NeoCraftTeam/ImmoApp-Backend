@@ -50,6 +50,7 @@ class EditProfile extends BaseEditProfile
                             ->directory('avatars')
                             ->avatar()
                             ->image()
+                            ->optimize('webp', 85)
                             ->imageEditor()
                             ->circleCropper()
                             ->maxSize(2048)

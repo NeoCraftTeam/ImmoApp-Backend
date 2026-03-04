@@ -10,8 +10,7 @@ parameters:
     # Level 10 is the highest level
     level: 5
 
-#    ignoreErrors:
-#        - '#PHPDoc tag @var#'
-#
-#    excludePaths:
-#        - ./*/*/FileToBeExcluded.php
+    ignoreErrors:
+        # danihidayatx/image-optimizer extends FileUpload via macros — PHPStan can't see them
+        - '#Call to an undefined method Filament\\Forms\\Components\\FileUpload::(optimize|resize|maxImageWidth|maxImageHeight)\(\)#'
+        - '#Call to an undefined method Filament\\Forms\\Components\\SpatieMediaLibraryFileUpload::(optimize|resize|maxImageWidth|maxImageHeight)\(\)#'

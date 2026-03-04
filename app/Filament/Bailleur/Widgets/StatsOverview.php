@@ -26,15 +26,13 @@ class StatsOverview extends BaseWidget
                 Stat::make('Mes Biens', $adCount)
                     ->description('Biens mis en location')
                     ->icon('heroicon-o-home')
-                    ->color('success')
-                    ->chart([0, 0, 0, 0, 0, 0, 0])
-                    ->extraAttributes(['class' => 'ring-1 ring-gray-200 dark:ring-gray-700']),
+                    ->color('primary')
+                    ->chart([0, 0, 0, 0, 0, 0, 0]),
                 Stat::make('Vues', 0)
                     ->description('Aucune annonce pour le moment')
                     ->icon('heroicon-o-eye')
                     ->color('gray')
-                    ->chart([0, 0, 0, 0, 0, 0, 0])
-                    ->extraAttributes(['class' => 'ring-1 ring-gray-200 dark:ring-gray-700']),
+                    ->chart([0, 0, 0, 0, 0, 0, 0]),
             ];
         }
 
@@ -62,30 +60,26 @@ class StatsOverview extends BaseWidget
             Stat::make('Mes Biens', $adCount)
                 ->description('Biens mis en location')
                 ->icon('heroicon-o-home')
-                ->color('success')
-                ->chart($adsTrend)
-                ->extraAttributes(['class' => 'ring-1 ring-gray-200 dark:ring-gray-700']),
+                ->color('primary')
+                ->chart($adsTrend),
 
             Stat::make('Vues', number_format($views))
                 ->description('30 derniers jours')
                 ->descriptionIcon('heroicon-m-eye')
                 ->color('info')
-                ->chart($viewsTrend)
-                ->extraAttributes(['class' => 'ring-1 ring-gray-200 dark:ring-gray-700']),
+                ->chart($viewsTrend),
 
             Stat::make('Favoris', number_format($favorites))
                 ->description('30 derniers jours')
                 ->descriptionIcon('heroicon-m-heart')
                 ->color('danger')
-                ->chart($favoritesTrend)
-                ->extraAttributes(['class' => 'ring-1 ring-gray-200 dark:ring-gray-700']),
+                ->chart($favoritesTrend),
 
             Stat::make('Engagement', $engagementRate.'%')
                 ->description($engagementRate > 5 ? 'Bon engagement 📈' : 'Engagement faible 📉')
                 ->descriptionIcon('heroicon-m-chart-bar')
                 ->color($engagementRate > 5 ? 'success' : 'gray')
-                ->chart($viewsTrend)
-                ->extraAttributes(['class' => 'ring-1 ring-gray-200 dark:ring-gray-700']),
+                ->chart($viewsTrend),
         ];
     }
 

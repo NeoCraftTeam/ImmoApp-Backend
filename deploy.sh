@@ -78,6 +78,16 @@ print_step "Mise à jour des dépendances Composer"
 composer install --no-dev --optimize-autoloader --no-interaction
 print_success "Dépendances Composer mises à jour"
 
+# 3b. Build des assets Vite (Filament theme CSS + JS)
+print_step "Build des assets Vite/Filament"
+if command -v npm &> /dev/null; then
+    npm ci
+    npm run build
+    print_success "Assets Vite construits"
+else
+    print_warning "npm non disponible — assets Vite non reconstruits"
+fi
+
 # 4. Migration de la base de données
 print_step "Migration de la base de données"
 php artisan migrate --force

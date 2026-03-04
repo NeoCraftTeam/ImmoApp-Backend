@@ -52,18 +52,28 @@ class AdViewsChart extends ChartWidget
                 [
                     'label' => 'Vues',
                     'data' => $dates->map(fn (string $date) => (int) ($views[$date] ?? 0)),
-                    'borderColor' => 'rgb(59, 130, 246)',
-                    'backgroundColor' => 'rgba(59, 130, 246, 0.1)',
+                    'borderColor' => 'rgb(13, 148, 136)',
+                    'backgroundColor' => 'rgba(13, 148, 136, 0.08)',
                     'fill' => true,
                     'tension' => 0.4,
+                    'pointBackgroundColor' => 'rgb(13, 148, 136)',
+                    'pointBorderColor' => '#fff',
+                    'pointBorderWidth' => 2,
+                    'pointRadius' => 3,
+                    'pointHoverRadius' => 6,
                 ],
                 [
                     'label' => 'Favoris',
                     'data' => $dates->map(fn (string $date) => (int) ($favorites[$date] ?? 0)),
-                    'borderColor' => 'rgb(239, 68, 68)',
-                    'backgroundColor' => 'rgba(239, 68, 68, 0.1)',
+                    'borderColor' => 'rgb(59, 130, 246)',
+                    'backgroundColor' => 'rgba(59, 130, 246, 0.08)',
                     'fill' => true,
                     'tension' => 0.4,
+                    'pointBackgroundColor' => 'rgb(59, 130, 246)',
+                    'pointBorderColor' => '#fff',
+                    'pointBorderWidth' => 2,
+                    'pointRadius' => 3,
+                    'pointHoverRadius' => 6,
                 ],
             ],
             'labels' => $dates->map(fn (string $date) => \Carbon\Carbon::parse($date)->format('d/m')),
@@ -83,11 +93,42 @@ class AdViewsChart extends ChartWidget
             'plugins' => [
                 'legend' => [
                     'display' => true,
+                    'labels' => [
+                        'usePointStyle' => true,
+                        'pointStyle' => 'circle',
+                        'padding' => 16,
+                        'font' => [
+                            'family' => 'Inter',
+                            'size' => 12,
+                            'weight' => '500',
+                        ],
+                    ],
                 ],
             ],
             'scales' => [
-                'y' => ['beginAtZero' => true, 'grid' => ['display' => false]],
-                'x' => ['grid' => ['display' => false]],
+                'y' => [
+                    'beginAtZero' => true,
+                    'grid' => ['display' => false],
+                    'ticks' => [
+                        'font' => ['family' => 'Inter', 'size' => 11],
+                    ],
+                ],
+                'x' => [
+                    'grid' => ['display' => false],
+                    'ticks' => [
+                        'font' => ['family' => 'Inter', 'size' => 11],
+                        'maxRotation' => 0,
+                    ],
+                ],
+            ],
+            'interaction' => [
+                'intersect' => false,
+                'mode' => 'index',
+            ],
+            'elements' => [
+                'line' => [
+                    'borderWidth' => 2.5,
+                ],
             ],
         ];
     }

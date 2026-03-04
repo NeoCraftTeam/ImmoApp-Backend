@@ -34,6 +34,7 @@ class AgencyForm
                             ->disk('public')
                             ->directory('agency-logos')
                             ->image()
+                            ->optimize('webp', 85)
                             ->avatar()
                             ->imageEditor()
                             ->helperText('Logo de l\'agence (format carré recommandé)'),

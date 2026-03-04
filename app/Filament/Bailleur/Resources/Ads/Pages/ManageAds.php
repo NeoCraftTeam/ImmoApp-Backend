@@ -18,8 +18,12 @@ class ManageAds extends ManageRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make()
+            CreateAction::make()->label('Créer une annonce')
                 ->slideOver()
+                ->stickyModalHeader()
+                ->stickyModalFooter()
+                ->modalAutofocus(false)
+                ->closeModalByClickingAway(false)
                 ->modalWidth(Width::FourExtraLarge)
                 ->successNotificationTitle('Annonce créée avec succès')
                 ->mutateFormDataUsing(function (array $data): array {

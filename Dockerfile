@@ -42,6 +42,9 @@ RUN apk add --no-cache \
     && apk del $PHPIZE_DEPS \
     && rm -rf /tmp/*
 
+# Installation de Node.js et npm (requis pour Vite / Filament assets)
+RUN apk add --no-cache nodejs npm
+
 # Installation de Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
@@ -64,6 +67,9 @@ RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framewor
 
 # Installation des dépendances (SANS les tests/dev)
 RUN composer install --no-dev --optimize-autoloader --no-interaction
+
+# Build des assets Vite (Filament theme CSS + JS)
+RUN npm ci && npm run build && npm cache clean --force
 
 # Attribution des permissions
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache

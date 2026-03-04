@@ -73,6 +73,7 @@ class UserResource extends Resource
                             ->directory('avatars')
                             ->avatar()
                             ->image()
+                            ->optimize('webp', 85)
                             ->maxSize(2048)
                             ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
                             ->uploadingMessage('Envoi en cours...')

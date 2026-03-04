@@ -13,6 +13,7 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Hammadzafar05\MobileBottomNav\MobileBottomNav;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -27,8 +28,10 @@ class BailleurPanelProvider extends PanelProvider
         return $panel
             ->id('bailleur')
             ->path('owner')
+            ->viteTheme('resources/css/filament/bailleur/theme.css')
             ->brandLogo(fn () => view('filament.bailleur.brand'))
             ->brandLogoHeight('3.5rem')
+            ->font('Inter')
             ->login()
             ->passwordReset()
             ->globalSearch(false)
@@ -39,7 +42,12 @@ class BailleurPanelProvider extends PanelProvider
             ->profile(\App\Filament\Pages\Auth\EditProfile::class)
             ->emailVerification()
             ->colors([
-                'primary' => \Filament\Support\Colors\Color::hex('#10b981'), // Vert Owner
+                'primary' => Color::hex('#0D9488'),
+                'danger' => Color::hex('#EF4444'),
+                'gray' => Color::Slate,
+                'info' => Color::hex('#3B82F6'),
+                'success' => Color::hex('#22C55E'),
+                'warning' => Color::hex('#F59E0B'),
             ])
             ->multiFactorAuthentication([
                 \Filament\Auth\MultiFactor\App\AppAuthentication::make()
@@ -73,7 +81,7 @@ class BailleurPanelProvider extends PanelProvider
             ])
             ->renderHook(
                 'panels::head.end',
-                fn () => view('pwa.head-meta', ['themeColor' => '#10b981']),
+                fn () => view('pwa.head-meta', ['themeColor' => '#0D9488']),
             )
             ->renderHook(
                 'panels::head.end',
@@ -117,13 +125,17 @@ class BailleurPanelProvider extends PanelProvider
                 fn () => view('filament.native-init'),
             )
             ->plugins([
+                MobileBottomNav::make()
+                    ->fromNavigation(5)
+                    ->moreButton(true)
+                    ->moreButtonLabel('Menu'),
                 FilamentSocialitePlugin::make()
                     ->providers([
                         Provider::make('google')
                             ->label('Google')
                             ->icon('fab-google')
-                            ->color(Color::Rose)
-                            ->outlined(false)
+                            ->color(Color::Teal)
+                            ->outlined(true)
                             ->stateless(false),
                     ])
                     ->registration(true)

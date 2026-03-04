@@ -77,6 +77,8 @@ trait SharedAdResource
                         ->multiple()
                         ->reorderable()
                         ->appendFiles()
+                        ->optimize('webp', 85)
+                        ->resize(50)
                         ->maxFiles(10)
                         ->maxSize(5120)
                         ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
@@ -260,7 +262,7 @@ trait SharedAdResource
                     static::getMapField(),
                 ])
                 ->collapsible()
-                ->collapsed(false)
+                ->collapsed(true)
                 ->columnSpanFull(),
         ];
     }
