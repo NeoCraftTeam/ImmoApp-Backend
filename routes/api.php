@@ -163,13 +163,11 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/property-attributes', [PropertyAttributeController::class, 'index']);
 
     // --- PUBLIC LANDING STATS ---
-    Route::get('/stats/landing', function () {
-        return response()->json([
-            'ads_count' => \App\Models\Ad::query()->publiclyListed()->where('is_visible', true)->count(),
-            'cities_count' => \App\Models\City::query()->count(),
-            'users_count' => \App\Models\User::query()->count(),
-        ]);
-    })->middleware('throttle:30,1');
+    Route::get('/stats/landing', fn () => response()->json([
+        'ads_count' => \App\Models\Ad::query()->publiclyListed()->where('is_visible', true)->count(),
+        'cities_count' => \App\Models\City::query()->count(),
+        'users_count' => \App\Models\User::query()->count(),
+    ]))->middleware('throttle:30,1');
 
     // --- PRIX DE DÉBLOCAGE ---
     Route::get('/payments/unlock-price', [PaymentController::class, 'getUnlockPrice']);

@@ -1023,6 +1023,7 @@ final class AdController
 
         // Si pas de coordonnées valides en entrée et qu'on a un utilisateur cible, récupérer via SQL
         if (($lat === null || $long === null) && $targetUser?->id) {
+            /** @var object{lat: string|null, lng: string|null}|null $row */
             $row = User::query()
                 ->where('id', $targetUser->id)
                 ->selectRaw('ST_Y(location) as lat, ST_X(location) as lng')
@@ -1663,13 +1664,14 @@ final class AdController
                 ->orderBy('value')
                 ->get();
 
-            // Plages min/max (ignorer les NULL)
+            /** @var object{min: string|null, max: string|null}|null $priceRange */
             $priceRange = Ad::query()
                 ->whereIn('status', $publicStatuses)
                 ->whereNotNull('price')
                 ->selectRaw('MIN(price) as min, MAX(price) as max')
                 ->first();
 
+            /** @var object{min: string|null, max: string|null}|null $surfaceRange */
             $surfaceRange = Ad::query()
                 ->whereIn('status', $publicStatuses)
                 ->whereNotNull('surface_area')

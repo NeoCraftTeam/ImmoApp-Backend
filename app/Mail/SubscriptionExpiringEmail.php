@@ -46,10 +46,10 @@ class SubscriptionExpiringEmail extends Mailable implements ShouldQueue
             with: [
                 'agencyName' => $agency->name ?? 'Agence',
                 'planName' => $this->subscription->plan->name ?? 'Plan',
-                'planPrice' => number_format((float) ($this->subscription->plan?->price ?? 0), 0, ',', ' '),
+                'planPrice' => number_format((float) ($this->subscription->plan->price ?? 0), 0, ',', ' '),
                 'days' => $this->daysLeft,
                 'endsAt' => $this->subscription->ends_at?->format('d/m/Y') ?? 'N/A',
-                'renewalUrl' => rtrim(config('app.url'), '/').'/agency/'.($agency?->slug ?? $agency?->id ?? '').'/abonnement',
+                'renewalUrl' => rtrim((string) config('app.url'), '/').'/agency/'.($agency->slug ?? $agency->id ?? '').'/abonnement',
             ]
         );
     }
