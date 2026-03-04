@@ -179,12 +179,14 @@ services:
       - keyhome-meilisearch-data:/meili_data
     networks:
       - keyhome-network
-    # FIX: healthcheck sur l'API Meilisearch
+    # FIX: healthcheck sur l'API Meilisearch — utilise 127.0.0.1 (IPv4)
+    # car localhost peut se résoudre en ::1 (IPv6) dans certains conteneurs
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:7700/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:7700/health || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 20s
 
   # Interface de gestion de base de données (debug only — use: docker compose --profile debug up pgadmin)
   pgadmin:
