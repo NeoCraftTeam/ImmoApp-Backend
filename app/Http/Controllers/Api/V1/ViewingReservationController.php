@@ -46,8 +46,10 @@ final readonly class ViewingReservationController
      */
     public function slots(Request $request, Ad $ad): JsonResponse
     {
-        $from = $request->input('from', now()->toDateString());
-        $to = $request->input('to', now()->addDays(14)->toDateString());
+        // Accept a single ?date=YYYY-MM-DD alias in addition to ?from/to.
+        $singleDate = $request->input('date');
+        $from = $singleDate ?? $request->input('from', now()->toDateString());
+        $to = $singleDate ?? $request->input('to', now()->addDays(14)->toDateString());
 
         $cacheKey = "slots:{$ad->id}:{$from}:{$to}";
 
@@ -149,7 +151,7 @@ final readonly class ViewingReservationController
      */
     public function myReservations(Request $request): AnonymousResourceCollection
     {
-        $paginator = $this->reservationService->listForClient($request->user(), $request->only(['status']));
+        $paginator = $this->reservationService->listForClient($request->user(), $request->only(['status', 'ad_id']));
 
         return TentativeReservationResource::collection($paginator);
     }

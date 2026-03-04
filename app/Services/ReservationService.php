@@ -14,6 +14,9 @@ use App\Models\Ad;
 use App\Models\TentativeReservation;
 use App\Models\User;
 use App\Models\Zap\Schedule;
+use App\Notifications\ReservationCancelledNotification;
+use App\Notifications\ReservationCreatedClientNotification;
+use App\Notifications\ReservationCreatedLandlordNotification;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
 use Carbon\Carbon;
@@ -50,7 +53,7 @@ final readonly class ReservationService implements ReservationServiceInterface
         $this->assertSlotIsAvailable($ad, $data);
 
         try {
-            return DB::transaction(function () use ($ad, $client, $data): TentativeReservation {
+            $reservation = DB::transaction(function () use ($ad, $client, $data): TentativeReservation {
                 // Re-verify inside the transaction to guard against race conditions.
                 $this->assertSlotIsAvailable($ad, $data);
 
@@ -81,6 +84,12 @@ final readonly class ReservationService implements ReservationServiceInterface
         } catch (UniqueConstraintViolationException) {
             throw new SlotAlreadyReservedException;
         }
+
+        // Dispatch notifications after the transaction commits.
+        $client->notify(new ReservationCreatedClientNotification($reservation));
+        $ad->user->notify(new ReservationCreatedLandlordNotification($reservation));
+
+        return $reservation;
     }
 
     /**
@@ -104,6 +113,15 @@ final readonly class ReservationService implements ReservationServiceInterface
                 $this->viewingScheduleService->releaseSlot($reservation->appointmentSchedule);
             }
         });
+
+        // Notify the other party after the transaction commits.
+        $reservation->loadMissing(['client', 'ad.user']);
+
+        if ($cancelledBy === CancelledBy::Landlord) {
+            $reservation->client->notify(new ReservationCancelledNotification($reservation));
+        } else {
+            $reservation->ad->user->notify(new ReservationCancelledNotification($reservation));
+        }
 
         return $reservation->fresh();
     }
@@ -192,6 +210,10 @@ final readonly class ReservationService implements ReservationServiceInterface
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['ad_id'])) {
+            $query->where('ad_id', $filters['ad_id']);
         }
 
         return $query->paginate(15);

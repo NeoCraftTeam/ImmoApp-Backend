@@ -9,6 +9,8 @@ use App\Enums\ReservationStatus;
 use App\Filament\Bailleur\Resources\Viewings\Pages\ManageViewingReservations;
 use App\Models\Ad;
 use App\Models\TentativeReservation;
+use App\Notifications\ReservationConfirmedClientNotification;
+use App\Services\Contracts\ReservationServiceInterface;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
@@ -271,10 +273,12 @@ class ViewingReservationResource extends Resource
                     ->modalIconColor('success')
                     ->action(function (TentativeReservation $record): void {
                         $record->update(['status' => ReservationStatus::Confirmed]);
+                        $record->loadMissing('client');
+                        $record->client->notify(new ReservationConfirmedClientNotification($record));
 
                         Notification::make()
                             ->title('Visite confirmée')
-                            ->body("La visite du {$record->slot_date->format('d/m/Y')} a été confirmée.")
+                            ->body("La visite du {$record->slot_date->format('d/m/Y')} a été confirmée. Le locataire a été notifié.")
                             ->success()
                             ->send();
                     }),
@@ -316,15 +320,15 @@ class ViewingReservationResource extends Resource
                             ->placeholder('Ex: Bien déjà réservé, indisponibilité…'),
                     ])
                     ->action(function (TentativeReservation $record, array $data): void {
-                        $record->update([
-                            'status' => ReservationStatus::Cancelled,
-                            'cancelled_by' => CancelledBy::Landlord,
-                            'cancellation_reason' => $data['cancellation_reason'] ?? null,
-                        ]);
+                        app(ReservationServiceInterface::class)->cancel(
+                            $record,
+                            auth()->user(),
+                            $data['cancellation_reason'] ?? null
+                        );
 
                         Notification::make()
                             ->title('Visite annulée')
-                            ->body('Le locataire a été notifié.')
+                            ->body('Le locataire a été notifié par e-mail et notification.')
                             ->warning()
                             ->send();
                     }),
