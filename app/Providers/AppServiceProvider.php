@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Models\PersonalAccessToken;
+use App\Services\Contracts\ReservationServiceInterface;
+use App\Services\Contracts\ViewingScheduleServiceInterface;
+use App\Services\ReservationService;
+use App\Services\ViewingScheduleService;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
@@ -21,7 +25,8 @@ class AppServiceProvider extends ServiceProvider
     #[\Override]
     public function register(): void
     {
-        //
+        $this->app->bind(ViewingScheduleServiceInterface::class, ViewingScheduleService::class);
+        $this->app->bind(ReservationServiceInterface::class, ReservationService::class);
     }
 
     /**
@@ -38,6 +43,7 @@ class AppServiceProvider extends ServiceProvider
 
         \App\Models\Payment::observe(\App\Observers\PaymentObserver::class);
         \App\Models\Ad::observe(\App\Observers\AdObserver::class);
+        \App\Models\TentativeReservation::observe(\App\Observers\TentativeReservationObserver::class);
         \Spatie\Activitylog\Models\Activity::observe(\App\Observers\ActivityObserver::class);
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);

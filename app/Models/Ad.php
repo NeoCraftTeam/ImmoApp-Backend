@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
 use Laravel\Scout\Searchable;
+use Spatie\Activitylog\LogOptions;
 /**
  * @property-read \App\Models\Quarter|null $quarter
  * @property-read \App\Models\User|null $user
@@ -74,15 +75,15 @@ use Laravel\Scout\Searchable;
  *
  * @mixin Eloquent
  */
-use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Zap\Models\Concerns\HasSchedules;
 
 class Ad extends Model implements HasMedia
 {
-    use HasFactory, HasUuids, LogsActivity, SoftDeletes;
+    use HasFactory, HasSchedules, HasUuids, LogsActivity, SoftDeletes;
     use InteractsWithMedia, Searchable;
 
     /**

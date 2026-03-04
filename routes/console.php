@@ -11,3 +11,4 @@ Artisan::command('inspire', function (): void {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('app:check-subscription-expirations')->daily();
+Schedule::job(\App\Jobs\ExpireStaleReservationsJob::class)->everyThirtyMinutes();

@@ -22,6 +22,8 @@ use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\SocialAuthController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\UserController;
+use App\Http\Controllers\Api\V1\ViewingAvailabilityController;
+use App\Http\Controllers\Api\V1\ViewingReservationController;
 use Illuminate\Support\Facades\Route;
 
 // Prefix routes
@@ -268,6 +270,32 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('auth:sanctum')->prefix('my/ads')->group(function (): void {
         Route::get('/analytics', [AdAnalyticsController::class, 'overview']);
         Route::get('/{ad}/analytics', [AdAnalyticsController::class, 'show']);
+    });
+
+    // --- VIEWING AVAILABILITY (landlord) ---
+    Route::middleware('auth:sanctum')->prefix('ads/{ad}')->group(function (): void {
+        Route::get('/availability', [ViewingAvailabilityController::class, 'index']);
+        Route::post('/availability', [ViewingAvailabilityController::class, 'store'])
+            ->middleware('throttle:20,1');
+        Route::put('/availability/{schedule}', [ViewingAvailabilityController::class, 'update'])
+            ->middleware('throttle:20,1');
+        Route::delete('/availability/{schedule}', [ViewingAvailabilityController::class, 'destroy'])
+            ->middleware('throttle:20,1');
+        Route::get('/availability/calendar', [ViewingAvailabilityController::class, 'calendar']);
+        Route::get('/reservations', [ViewingAvailabilityController::class, 'reservations']);
+    });
+
+    // --- VIEWING SLOTS (public) ---
+    Route::get('/ads/{ad}/slots', [ViewingReservationController::class, 'slots'])
+        ->middleware('throttle:60,1');
+
+    // --- TENTATIVE RESERVATIONS (client) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::post('/ads/{ad}/reservations', [ViewingReservationController::class, 'store'])
+            ->middleware('throttle:5,1');
+        Route::get('/my/reservations', [ViewingReservationController::class, 'myReservations']);
+        Route::delete('/reservations/{reservation}', [ViewingReservationController::class, 'cancel'])
+            ->middleware('throttle:20,1');
     });
 
     // --- PWA (Push Subscriptions & Session Validation) ---
