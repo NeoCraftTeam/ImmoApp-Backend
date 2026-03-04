@@ -43,6 +43,9 @@ class ManageSubscription extends Page
 
     public array $stats = [];
 
+    /** Set to true while awaiting FedaPay webhook confirmation after payment redirect. */
+    public bool $awaitingConfirmation = false;
+
     public function mount(): void
     {
         /** @var \App\Models\Agency|null $agency */
@@ -60,6 +63,13 @@ class ManageSubscription extends Page
         $this->subscription = $agency->getCurrentSubscription();
         $this->plans = \App\Models\SubscriptionPlan::active()->orderBy('sort_order')->get();
         $this->stats = app(\App\Services\SubscriptionService::class)->getAgencyStats($agency);
+
+        // If there's a pending payment in session and no active subscription, start polling.
+        if (!$this->subscription?->isActive() && session()->has('keyhome_pending_transaction')) {
+            $this->awaitingConfirmation = true;
+        } else {
+            session()->forget('keyhome_pending_transaction');
+        }
     }
 
     /**
@@ -141,6 +151,47 @@ class ManageSubscription extends Page
         }
     }
 
+    /**
+     * Poll every 5 seconds while awaitingConfirmation is true.
+     * Called by wire:poll in the Blade view.
+     */
+    public function refreshSubscriptionStatus(): void
+    {
+        /** @var \App\Models\Agency|null $agency */
+        $agency = auth()->user()->agency;
+
+        if (!$agency) {
+            return;
+        }
+
+        $transactionId = session('keyhome_pending_transaction');
+
+        // Try to verify via FedaPay API if we still have a pending transaction ID.
+        if ($transactionId) {
+            $this->verifyPayment($transactionId);
+        }
+
+        $this->subscription = $agency->getCurrentSubscription();
+        $this->stats = app(\App\Services\SubscriptionService::class)->getAgencyStats($agency);
+
+        if ($this->subscription?->isActive()) {
+            $this->awaitingConfirmation = false;
+            session()->forget('keyhome_pending_transaction');
+
+            \Filament\Notifications\Notification::make()
+                ->title('Abonnement activé !')
+                ->body('Votre abonnement '.($this->subscription->plan->name ?? '').' est maintenant actif. Vos annonces vont être boostées.')
+                ->success()
+                ->send();
+        }
+    }
+
+    public function cancelWaiting(): void
+    {
+        $this->awaitingConfirmation = false;
+        session()->forget('keyhome_pending_transaction');
+    }
+
     public function setPeriod(string $period)
     {
         $this->period = $period;
@@ -194,6 +245,9 @@ class ManageSubscription extends Page
                 'payment_method' => \App\Enums\PaymentMethod::FEDAPAY,
             ]);
             $payment->save();
+
+            // Persist transaction ID so the polling screen can verify on return.
+            session(['keyhome_pending_transaction' => $result['transaction_id']]);
 
             // Rediriger vers FedaPay
             return redirect()->away($result['url']);

@@ -26,7 +26,7 @@ class CheckSubscriptionExpirations extends Command
     {
         $this->info('Vérification des expirations d\'abonnement...');
 
-        $daysToNotify = [3, 1];
+        $daysToNotify = [7, 3, 1];
 
         foreach ($daysToNotify as $days) {
 
