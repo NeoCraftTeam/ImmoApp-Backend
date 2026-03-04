@@ -52,6 +52,10 @@ final class UserResource extends JsonResource
                 $request->user()?->id === $this->id,
                 (int) $this->point_balance
             ),
+            'onboarding_completed_at' => $this->when(
+                $request->user()?->id === $this->id,
+                $this->onboarding_completed_at,
+            ),
         ];
     }
 

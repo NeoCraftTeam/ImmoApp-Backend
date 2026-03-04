@@ -9,7 +9,7 @@ namespace App\Models;
 use App\Enums\PointTransactionType;
 use App\Enums\UserRole;
 use App\Enums\UserType;
-use App\Mail\VerifyEmailMail;
+use App\Mail\VerificationCodeMail;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\UserFactory;
 use Eloquent;
@@ -32,6 +32,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -106,6 +107,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property string|null $last_login_country
  * @property string|null $last_login_city
  * @property bool $is_active
+ * @property Carbon|null $onboarding_completed_at
  * @property-read City|null $city
  * @property-read MediaCollection<int, Media> $media
  * @property-read Collection<int, Review> $reviews
@@ -151,6 +153,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'clerk_id',
         'oauth_provider',
         'oauth_avatar',
+        'onboarding_completed_at',
     ];
 
     /**
@@ -475,6 +478,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'app_authentication_secret' => 'encrypted',
             'app_authentication_recovery_codes' => 'encrypted:array',
             'has_email_authentication' => 'boolean',
+            'onboarding_completed_at' => 'datetime',
         ];
     }
 
@@ -503,24 +507,21 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
-     * Send the email verification notification using our styled template.
+     * Send a 6-digit OTP code for email verification instead of a magic link.
+     *
+     * The OTP is stored in cache with a 10-minute TTL keyed by the user's ID.
      */
     #[\Override]
     public function sendEmailVerificationNotification(): void
     {
-        $verifyUrl = URL::temporarySignedRoute(
-            'api.verification.verify',
-            now()->addMinutes((int) config('auth.verification.expire', 60)),
-            [
-                'id' => $this->id,
-                'hash' => hash_hmac('sha256', $this->getEmailForVerification(), (string) config('app.key')),
-            ]
-        );
+        $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+
+        Cache::put('email_otp_'.$this->id, $otp, now()->addMinutes(10));
 
         $requestedFrom = request()->ip() ?? 'inconnu';
         $requestedAt = now()->translatedFormat('d F Y à H:i');
 
         Mail::to($this->email, $this->firstname)
-            ->queue(new VerifyEmailMail($verifyUrl, (int) config('auth.verification.expire', 60), $requestedFrom, $requestedAt));
+            ->queue(new VerificationCodeMail($otp, $requestedFrom, $requestedAt));
     }
 }

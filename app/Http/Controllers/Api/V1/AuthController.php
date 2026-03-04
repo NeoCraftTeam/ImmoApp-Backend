@@ -727,6 +727,117 @@ final class AuthController
     }
 
     /**
+     * Verify a 6-digit OTP code sent to the user's email after registration.
+     *
+     * On success the email is marked as verified, a Sanctum token is issued,
+     * and the user is returned so the frontend can auto-login.
+     *
+     * @OA\Post(
+     *     path="/api/v1/auth/verify-email-otp",
+     *     tags={"🔐 Authentification"},
+     *     summary="Vérifier le code OTP email",
+     *     description="Vérifie le code OTP à 6 chiffres envoyé par email après l'inscription et connecte automatiquement l'utilisateur.",
+     *     operationId="verifyEmailOtp",
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"email", "otp"},
+     *
+     *             @OA\Property(property="email", type="string", format="email", example="jean.dupont@example.com"),
+     *             @OA\Property(property="otp", type="string", example="123456", description="Code OTP à 6 chiffres")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Email vérifié avec succès",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="Email vérifié avec succès."),
+     *             @OA\Property(property="verified", type="boolean", example=true),
+     *             @OA\Property(property="access_token", type="string"),
+     *             @OA\Property(property="user", type="object")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=400, description="Code invalide ou expiré"),
+     *     @OA\Response(response=422, description="Erreur de validation"),
+     *     @OA\Response(response=429, description="Trop de tentatives")
+     * )
+     */
+    public function verifyEmailOtp(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'otp' => 'required|string|size:6',
+        ]);
+
+        $rateLimitKey = 'verify-email-otp:'.$request->ip();
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
+            $seconds = RateLimiter::availableIn($rateLimitKey);
+
+            return response()->json([
+                'message' => 'Trop de tentatives. Réessayez dans '.$seconds.' secondes.',
+            ], 429);
+        }
+
+        $user = User::where('email', $request->input('email'))->first();
+
+        if (!$user) {
+            RateLimiter::hit($rateLimitKey, 300);
+
+            return response()->json([
+                'message' => 'Code invalide ou expiré.',
+            ], 400);
+        }
+
+        if ($user->hasVerifiedEmail()) {
+            return response()->json([
+                'message' => 'Email déjà vérifié.',
+                'verified' => true,
+            ]);
+        }
+
+        $cachedOtp = Cache::get('email_otp_'.$user->id);
+
+        if (!$cachedOtp || !hash_equals((string) $cachedOtp, $request->input('otp'))) {
+            RateLimiter::hit($rateLimitKey, 300);
+
+            return response()->json([
+                'message' => 'Code invalide ou expiré.',
+            ], 400);
+        }
+
+        Cache::forget('email_otp_'.$user->id);
+        $user->markEmailAsVerified();
+        event(new Verified($user));
+
+        RateLimiter::clear($rateLimitKey);
+
+        Log::info('Email verified via OTP', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+        ]);
+
+        $user->tokens()->delete();
+        $token = $user->createToken(
+            'auth_token_'.now()->timestamp,
+            ['*'],
+            now()->addDays(7)
+        );
+
+        return response()->json([
+            'message' => 'Email vérifié avec succès.',
+            'verified' => true,
+            'access_token' => $token->plainTextToken,
+            'user' => new UserResource($user),
+        ]);
+    }
+
+    /**
      * @OA\Post(
      *     path="/api/v1/auth/resendVerificationEmail",
      *     tags={"🔐 Authentification"},
@@ -1222,6 +1333,25 @@ final class AuthController
     public function me(Request $request): \App\Http\Resources\UserResource
     {
         return new UserResource($request->user());
+    }
+
+    /**
+     * Mark the authenticated user's onboarding as completed.
+     *
+     * Called by the frontend after the WelcomeModal is dismissed.
+     * Idempotent — subsequent calls are no-ops.
+     */
+    public function completeOnboarding(Request $request): \Illuminate\Http\JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+
+        if (!$user->onboarding_completed_at) {
+            $user->onboarding_completed_at = now();
+            $user->save();
+        }
+
+        return response()->json(['message' => 'Onboarding complété.']);
     }
 
     /**
