@@ -29,11 +29,11 @@ prepare_ci_image:
   stage: prepare
   script:
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - docker pull $CI_REGISTRY_IMAGE/ci-cache:latest || true
     - |
-      docker buildx build \
-        --cache-from type=registry,ref=$CI_REGISTRY_IMAGE/ci-cache:latest \
-        --cache-to   type=registry,ref=$CI_REGISTRY_IMAGE/ci-cache:latest,mode=max \
-        --load \
+      docker build \
+        --cache-from $CI_REGISTRY_IMAGE/ci-cache:latest \
+        --build-arg BUILDKIT_INLINE_CACHE=1 \
         -t $CI_IMAGE \
         -f - . <<'DOCKERFILE'
       FROM php:8.4-cli-alpine
@@ -50,6 +50,8 @@ prepare_ci_image:
         && cp .env.example .env \
         && composer install --no-interaction --no-ansi
       DOCKERFILE
+    - docker tag $CI_IMAGE $CI_REGISTRY_IMAGE/ci-cache:latest
+    - docker push $CI_REGISTRY_IMAGE/ci-cache:latest
   after_script:
     - docker logout $CI_REGISTRY 2>/dev/null || true
   # FIX: restreint à main et preprod — inutile sur les feature branches
