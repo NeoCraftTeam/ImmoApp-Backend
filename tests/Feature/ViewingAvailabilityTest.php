@@ -323,7 +323,7 @@ it('returns the slot calendar for the owner with reservation overlays', function
     $this->mock(ViewingScheduleServiceInterface::class)
         ->shouldReceive('getBookableSlotsForRange')
         ->once()
-        ->andReturn([$tomorrow => [['starts_at' => '10:00', 'ends_at' => '10:30']]]);
+        ->andReturn([$tomorrow => [['start_time' => '10:00', 'end_time' => '10:30']]]);
 
     Sanctum::actingAs($owner);
 

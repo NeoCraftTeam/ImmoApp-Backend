@@ -8,6 +8,7 @@ use App\Exceptions\Viewing\SlotAlreadyReservedException;
 use App\Exceptions\Viewing\SlotNotAvailableException;
 use App\Models\Ad;
 use App\Models\TentativeReservation;
+use App\Models\UnlockedAd;
 use App\Models\User;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
@@ -48,8 +49,8 @@ it('returns available slots for an ad without authentication', function (): void
         ->once()
         ->andReturn([
             now()->addDay()->toDateString() => [
-                ['starts_at' => '10:00', 'ends_at' => '10:30'],
-                ['starts_at' => '10:30', 'ends_at' => '11:00'],
+                ['start_time' => '10:00', 'end_time' => '10:30'],
+                ['start_time' => '10:30', 'end_time' => '11:00'],
             ],
         ])
         ->shouldReceive('getSlotDuration')
@@ -85,7 +86,7 @@ it('marks an already-reserved slot as unavailable in the slots response', functi
     $this->mock(ViewingScheduleServiceInterface::class)
         ->shouldReceive('getBookableSlotsForRange')
         ->once()
-        ->andReturn([$tomorrow => [['starts_at' => '10:00', 'ends_at' => '10:30']]])
+        ->andReturn([$tomorrow => [['start_time' => '10:00', 'end_time' => '10:30']]])
         ->shouldReceive('getSlotDuration')
         ->once()
         ->andReturn(30);
@@ -185,13 +186,33 @@ it('rejects a client_message exceeding 500 characters', function (): void {
 });
 
 // ===========================================================================
-// TC-RES-08 — POST reservation: happy path → 201
+// TC-RES-08 — POST reservation: ad not unlocked → 403
+// ===========================================================================
+
+it('returns 403 when the client has not unlocked the ad', function (): void {
+    $owner = User::factory()->create();
+    $client = User::factory()->create();
+    $ad = makeAd($owner);
+    // No UnlockedAd record created for $client
+
+    Sanctum::actingAs($client);
+
+    $this->postJson("/api/v1/ads/{$ad->id}/reservations", [
+        'slot_date' => now()->addDay()->toDateString(),
+        'slot_starts_at' => '10:00',
+        'slot_ends_at' => '10:30',
+    ])->assertForbidden();
+});
+
+// ===========================================================================
+// TC-RES-09 — POST reservation: happy path → 201
 // ===========================================================================
 
 it('creates a tentative reservation successfully and returns 201', function (): void {
     $owner = User::factory()->create();
     $client = User::factory()->create();
     $ad = makeAd($owner);
+    UnlockedAd::factory()->create(['user_id' => $client->id, 'ad_id' => $ad->id, 'payment_id' => null]);
 
     $reservation = TentativeReservation::factory()->create([
         'ad_id' => $ad->id,
@@ -247,6 +268,7 @@ it('returns 410 Gone when the slot is not offered by the availability schedule',
     $owner = User::factory()->create();
     $client = User::factory()->create();
     $ad = makeAd($owner);
+    UnlockedAd::factory()->create(['user_id' => $client->id, 'ad_id' => $ad->id, 'payment_id' => null]);
 
     $this->mock(ReservationServiceInterface::class)
         ->shouldReceive('reserve')
@@ -271,6 +293,7 @@ it('returns 409 Conflict when the slot is taken by a concurrent booking', functi
     $owner = User::factory()->create();
     $client = User::factory()->create();
     $ad = makeAd($owner);
+    UnlockedAd::factory()->create(['user_id' => $client->id, 'ad_id' => $ad->id, 'payment_id' => null]);
 
     $this->mock(ReservationServiceInterface::class)
         ->shouldReceive('reserve')
