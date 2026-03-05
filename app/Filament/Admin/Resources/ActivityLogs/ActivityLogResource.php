@@ -96,7 +96,7 @@ class ActivityLogResource extends Resource
                             default => ucfirst($record->event ?? '—'),
                         };
                         $eventColor = match ($record->event) {
-                            'created' => '#16a34a',
+                            'created' => '#0D9488',
                             'updated' => '#d97706',
                             'deleted' => '#dc2626',
                             default => '#64748b',

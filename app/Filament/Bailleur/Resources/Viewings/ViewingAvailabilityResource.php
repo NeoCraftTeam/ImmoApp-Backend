@@ -12,6 +12,7 @@ use App\Models\Zap\Schedule;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Repeater;
@@ -24,7 +25,6 @@ use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -215,11 +215,11 @@ class ViewingAvailabilityResource extends Resource
                         'starts_on' => $record->start_date->toDateString(),
                         'ends_on' => $record->end_date?->toDateString(),
                         'periods' => $record->periods->map(fn ($p): array => [
-                            'starts_at' => $p->start_time->format('H:i'),
-                            'ends_at' => $p->end_time->format('H:i'),
+                            'starts_at' => \Carbon\Carbon::parse($p->start_time)->format('H:i'),
+                            'ends_at' => \Carbon\Carbon::parse($p->end_time)->format('H:i'),
                         ])->toArray(),
                     ])
-                    ->action(function (Schedule $record, array $data): void {
+                    ->action(function (Schedule $record, array $data, \Livewire\Component $livewire): void {
                         try {
                             app(ReservationServiceInterface::class)->assertNoActiveReservationsForSchedule($record);
                         } catch (\App\Exceptions\Viewing\ScheduleHasActiveReservationsException) {
@@ -248,6 +248,10 @@ class ViewingAvailabilityResource extends Resource
                             ->title('Disponibilité mise à jour ✓')
                             ->success()
                             ->send();
+
+                        // The old Schedule record was deleted and recreated with a new ID.
+                        // Redirect so Filament does not try to reload the now-deleted record.
+                        $livewire->redirect(ManageViewingAvailabilities::getUrl(), navigate: true);
                     }),
 
                 DeleteAction::make()
