@@ -48,8 +48,8 @@ class AppServiceProvider extends ServiceProvider
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
-        // Partage le logo encodé en base64 avec toutes les vues emails.*
-        View::composer('emails.*', function ($view): void {
+        // Partage le logo encodé en base64 avec toutes les vues emails.* (y compris sous-dossiers)
+        View::composer(['emails.*', 'emails.reservation.*'], function ($view): void {
             $logoPath = public_path('images/keyhomelogo_transparent.png');
             $view->with('emailLogoBase64', file_exists($logoPath)
                 ? base64_encode((string) file_get_contents($logoPath))

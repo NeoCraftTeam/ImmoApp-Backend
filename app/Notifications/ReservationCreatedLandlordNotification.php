@@ -34,25 +34,14 @@ class ReservationCreatedLandlordNotification extends Notification implements Sho
 
     public function toMail(mixed $notifiable): MailMessage
     {
-        $clientName = $this->reservation->client->firstname.' '.$this->reservation->client->lastname;
         $adTitle = $this->reservation->ad->title;
-        $date = $this->reservation->slot_date->translatedFormat('l d F Y');
-        $time = $this->reservation->slot_starts_at.' – '.$this->reservation->slot_ends_at;
-        $panelUrl = config('app.url').'/owner/viewings/viewing-reservations';
 
         return (new MailMessage)
             ->subject("Nouvelle demande de visite — {$adTitle}")
-            ->greeting('Bonjour '.$notifiable->firstname.' !')
-            ->line("**{$clientName}** souhaite visiter votre bien **« {$adTitle} »**.")
-            ->line("📅 **Date :** {$date}")
-            ->line("⏰ **Horaire :** {$time}")
-            ->when(
-                $this->reservation->client_message,
-                fn ($mail) => $mail->line("💬 **Message :** « {$this->reservation->client_message} »")
-            )
-            ->action('Voir la demande sur KeyHome Owner', $panelUrl)
-            ->line('Confirmez ou annulez rapidement — la demande expire dans **24h**.')
-            ->line('Merci d\'utiliser KeyHome !');
+            ->view('emails.reservation.created-landlord', [
+                'reservation' => $this->reservation,
+                'notifiable' => $notifiable,
+            ]);
     }
 
     public function toWebPush(mixed $notifiable, Notification $notification): WebPushMessage

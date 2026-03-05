@@ -35,20 +35,13 @@ class ReservationConfirmedClientNotification extends Notification implements Sho
     public function toMail(mixed $notifiable): MailMessage
     {
         $adTitle = $this->reservation->ad->title;
-        $date = $this->reservation->slot_date->translatedFormat('l d F Y');
-        $time = $this->reservation->slot_starts_at.' – '.$this->reservation->slot_ends_at;
-        $landlordName = $this->reservation->ad->user->firstname.' '.$this->reservation->ad->user->lastname;
 
         return (new MailMessage)
             ->subject("Visite confirmée ! — {$adTitle}")
-            ->greeting('Bonjour '.$notifiable->firstname.' !')
-            ->line("**Bonne nouvelle !** {$landlordName} a confirmé votre visite.")
-            ->line("🏠 **Bien :** {$adTitle}")
-            ->line("📅 **Date :** {$date}")
-            ->line("⏰ **Horaire :** {$time}")
-            ->line('Pensez à vous présenter à l\'heure et à apporter vos pièces justificatives.')
-            ->action('Voir mes visites', config('app.frontend_url').'/my/reservations')
-            ->line('Merci de faire confiance à KeyHome !');
+            ->view('emails.reservation.confirmed-client', [
+                'reservation' => $this->reservation,
+                'notifiable' => $notifiable,
+            ]);
     }
 
     public function toWebPush(mixed $notifiable, Notification $notification): WebPushMessage

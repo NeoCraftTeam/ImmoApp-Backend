@@ -35,20 +35,13 @@ class ReservationCreatedClientNotification extends Notification implements Shoul
     public function toMail(mixed $notifiable): MailMessage
     {
         $adTitle = $this->reservation->ad->title;
-        $date = $this->reservation->slot_date->translatedFormat('l d F Y');
-        $time = $this->reservation->slot_starts_at.' – '.$this->reservation->slot_ends_at;
-        $expires = $this->reservation->expires_at->translatedFormat('l d F Y à H:i');
 
         return (new MailMessage)
             ->subject("Visite en attente de confirmation — {$adTitle}")
-            ->greeting('Bonjour '.$notifiable->firstname.' !')
-            ->line("Votre demande de visite pour **« {$adTitle} »** a bien été reçue.")
-            ->line("📅 **Date :** {$date}")
-            ->line("⏰ **Horaire :** {$time}")
-            ->line("⏳ **Créneau réservé jusqu'au :** {$expires}")
-            ->line('Le propriétaire va confirmer votre demande. Vous recevrez une notification dès que c\'est fait.')
-            ->action('Voir mes demandes de visite', config('app.frontend_url').'/my/reservations')
-            ->line('Merci de faire confiance à KeyHome !');
+            ->view('emails.reservation.created-client', [
+                'reservation' => $this->reservation,
+                'notifiable' => $notifiable,
+            ]);
     }
 
     public function toWebPush(mixed $notifiable, Notification $notification): WebPushMessage

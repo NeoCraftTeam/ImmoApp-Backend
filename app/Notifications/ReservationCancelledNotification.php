@@ -35,20 +35,14 @@ class ReservationCancelledNotification extends Notification implements ShouldQue
     public function toMail(mixed $notifiable): MailMessage
     {
         $adTitle = $this->reservation->ad->title;
-        $date = $this->reservation->slot_date->translatedFormat('l d F Y');
-        $time = $this->reservation->slot_starts_at.' – '.$this->reservation->slot_ends_at;
-        $cancelledByLabel = $this->cancelledByLabel();
 
         return (new MailMessage)
             ->subject("Visite annulée — {$adTitle}")
-            ->greeting('Bonjour '.$notifiable->firstname.' !')
-            ->line("La visite pour **« {$adTitle} »** le {$date} de {$time} a été annulée par {$cancelledByLabel}.")
-            ->when(
-                $this->reservation->cancellation_reason,
-                fn ($mail) => $mail->line("**Motif :** {$this->reservation->cancellation_reason}")
-            )
-            ->action('Voir les annonces disponibles', config('app.frontend_url'))
-            ->line('Merci de faire confiance à KeyHome !');
+            ->view('emails.reservation.cancelled', [
+                'reservation' => $this->reservation,
+                'notifiable' => $notifiable,
+                'cancelledByLabel' => $this->cancelledByLabel(),
+            ]);
     }
 
     public function toWebPush(mixed $notifiable, Notification $notification): WebPushMessage
