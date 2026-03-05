@@ -204,7 +204,7 @@ final readonly class ReservationService implements ReservationServiceInterface
     {
         $query = TentativeReservation::query()
             ->where('client_id', $client->id)
-            ->with(['ad'])
+            ->with(['ad.quarter', 'ad.media'])
             ->orderByDesc('slot_date')
             ->orderBy('slot_starts_at');
 
