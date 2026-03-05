@@ -53,7 +53,7 @@ final readonly class ViewingReservationController
 
         $cacheKey = "slots:{$ad->id}:{$from}:{$to}";
 
-        $data = Cache::tags(['slots', "ad:{$ad->id}"])->remember($cacheKey, 60, function () use ($ad, $from, $to): array {
+        $data = Cache::remember($cacheKey, 60, function () use ($ad, $from, $to): array {
             $slotsRaw = $this->scheduleService->getBookableSlotsForRange($ad, $from, $to);
 
             // Fetch active reservations in range to overlay status.
@@ -69,12 +69,12 @@ final readonly class ViewingReservationController
             foreach ($slotsRaw as $date => $daySlots) {
                 $slotsByDate[$date] = collect($daySlots)->map(function (array $slot) use ($date, $activeReservations): array {
                     $isReserved = $activeReservations->get($date)?->contains(
-                        fn (\App\Models\TentativeReservation $r): bool => \Carbon\Carbon::parse($r->slot_starts_at)->format('H:i') === $slot['starts_at']
+                        fn (\App\Models\TentativeReservation $r): bool => \Carbon\Carbon::parse($r->slot_starts_at)->format('H:i') === $slot['start_time']
                     ) ?? false;
 
                     return [
-                        'starts_at' => $slot['starts_at'],
-                        'ends_at' => $slot['ends_at'],
+                        'starts_at' => $slot['start_time'],
+                        'ends_at' => $slot['end_time'],
                         'is_available' => !$isReserved,
                     ];
                 })->values()->toArray();
@@ -118,16 +118,20 @@ final readonly class ViewingReservationController
      *     ),
      *
      *     @OA\Response(response=201, description="Réservation provisoire créée"),
-     *     @OA\Response(response=403, description="Auto-réservation non autorisée"),
+     *     @OA\Response(response=403, description="Annonce non débloquée ou auto-réservation non autorisée"),
      *     @OA\Response(response=409, description="Créneau déjà réservé"),
      *     @OA\Response(response=422, description="Erreur de validation")
      * )
      */
     public function store(StoreTentativeReservationRequest $request, Ad $ad): JsonResponse
     {
-        $reservation = $this->reservationService->reserve($ad, $request->user(), $request->validated());
+        abort_unless(
+            $ad->isUnlockedFor($request->user()),
+            403,
+            'Vous devez débloquer cette annonce avant de pouvoir réserver une visite.'
+        );
 
-        Cache::tags(['slots', "ad:{$ad->id}"])->flush();
+        $reservation = $this->reservationService->reserve($ad, $request->user(), $request->validated());
 
         return response()->json([
             'data' => new TentativeReservationResource($reservation->load('ad')),
@@ -184,8 +188,6 @@ final readonly class ViewingReservationController
             $request->user(),
             $request->input('cancellation_reason')
         );
-
-        Cache::tags(['slots', "ad:{$cancelled->ad_id}"])->flush();
 
         return response()->json([
             'data' => new TentativeReservationResource($cancelled->load('ad')),

@@ -197,12 +197,12 @@ final readonly class ViewingAvailabilityController
                 'slots' => collect($daySlots)->map(function (array $slot) use ($date, $activeReservations): array {
                     /** @var TentativeReservation|null $reservation */
                     $reservation = $activeReservations->get($date)?->first(
-                        fn (TentativeReservation $r): bool => \Carbon\Carbon::parse($r->slot_starts_at)->format('H:i') === $slot['starts_at']
+                        fn (TentativeReservation $r): bool => \Carbon\Carbon::parse($r->slot_starts_at)->format('H:i') === $slot['start_time']
                     );
 
                     $entry = [
-                        'starts_at' => $slot['starts_at'],
-                        'ends_at' => $slot['ends_at'],
+                        'starts_at' => $slot['start_time'],
+                        'ends_at' => $slot['end_time'],
                         'status' => $reservation ? 'tentatively_reserved' : 'available',
                     ];
 

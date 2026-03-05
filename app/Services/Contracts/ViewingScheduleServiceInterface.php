@@ -45,7 +45,7 @@ interface ViewingScheduleServiceInterface
     /**
      * Return bookable slots grouped by date for a date range.
      *
-     * @return array<string, list<array{starts_at: string, ends_at: string}>>
+     * @return array<string, list<array{start_time: string, end_time: string}>>
      */
     public function getBookableSlotsForRange(Ad $ad, string $from, string $to): array;
 

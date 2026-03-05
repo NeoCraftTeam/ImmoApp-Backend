@@ -38,11 +38,14 @@ final class ViewingScheduleService implements ViewingScheduleServiceInterface
                 'buffer_minutes' => $data['buffer_minutes'],
             ]);
 
+        // Apply date range BEFORE addPeriod so that the period's `date` column
+        // is set from start_date rather than falling back to now().
+        $this->applyDateRange($builder, $data);
+
         foreach ($data['periods'] as $period) {
             $builder->addPeriod($period['starts_at'], $period['ends_at']);
         }
 
-        $this->applyDateRange($builder, $data);
         $this->applyRecurrence($builder, $data);
 
         /** @var Schedule $saved */
@@ -76,8 +79,8 @@ final class ViewingScheduleService implements ViewingScheduleServiceInterface
             'starts_on' => $schedule->start_date->toDateString(),
             'ends_on' => $schedule->end_date?->toDateString(),
             'periods' => $schedule->periods->map(fn ($p): array => [
-                'starts_at' => $p->start_time->format('H:i'),
-                'ends_at' => $p->end_time->format('H:i'),
+                'starts_at' => \Carbon\Carbon::parse($p->start_time)->format('H:i'),
+                'ends_at' => \Carbon\Carbon::parse($p->end_time)->format('H:i'),
             ])->toArray(),
             'recurrence' => null,
             'slot_duration' => $schedule->metadata['slot_duration'] ?? 30,
@@ -130,7 +133,7 @@ final class ViewingScheduleService implements ViewingScheduleServiceInterface
     /**
      * Return bookable slots grouped by date for a date range (calendar view).
      *
-     * @return array<string, list<array{starts_at: string, ends_at: string, is_available: bool}>>
+     * @return array<string, list<array{start_time: string, end_time: string}>>
      */
     public function getBookableSlotsForRange(Ad $ad, string $from, string $to): array
     {
