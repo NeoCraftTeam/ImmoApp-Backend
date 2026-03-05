@@ -85,7 +85,7 @@
             100% { opacity: 1; transform: scale(1); }
         }
 
-        .icon-circle svg { width: 44px; height: 44px; color: #16a34a; }
+        .icon-circle svg { width: 44px; height: 44px; color: #0D9488; }
 
         h1 {
             font-size: 26px;

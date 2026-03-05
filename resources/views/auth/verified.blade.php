@@ -102,7 +102,7 @@
         .icon-circle svg {
             width: 44px;
             height: 44px;
-            color: #16a34a;
+            color: #0D9488;
         }
 
         h1 {
