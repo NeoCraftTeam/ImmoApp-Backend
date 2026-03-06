@@ -10,7 +10,7 @@ stages:
 variables:
   APP_IMAGE: $CI_REGISTRY_IMAGE/app
   IMAGE_TAG: $CI_COMMIT_REF_SLUG
-  CI_IMAGE: keyhome-ci:$CI_COMMIT_SHORT_SHA
+  CI_IMAGE: $CI_REGISTRY_IMAGE/ci:$CI_COMMIT_REF_SLUG
 
 default:
   tags:
@@ -26,7 +26,7 @@ prepare_ci_image:
     - |
       # Mise en cache de l'image CI
       docker pull $CI_IMAGE || true
-      docker build --cache-from $CI_IMAGE -t $CI_IMAGE -f - . <<\'DOCKERFILE'
+      docker build --cache-from $CI_IMAGE -t $CI_IMAGE -f - . <<'DOCKERFILE'
       FROM php:8.4-cli-alpine
       RUN apk add --no-cache git libzip-dev icu-dev postgresql-dev libpng-dev oniguruma-dev gettext-dev freetype-dev libjpeg-turbo-dev libwebp-dev $PHPIZE_DEPS \
         && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
@@ -40,6 +40,7 @@ prepare_ci_image:
         && cp .env.example .env \
         && composer install --no-interaction --no-ansi
       DOCKERFILE
+      docker push $CI_IMAGE || true
   rules:
     - if: $CI_COMMIT_BRANCH
 
@@ -348,7 +349,7 @@ slack_success:
             }
           ]
         }]
-      }" $SLACK_WEBHOOK_URL
+      }" $SLACK_WEBHOOK_PROD
   when: on_success
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
@@ -417,7 +418,7 @@ slack_failure:
             }
           ]
         }]
-      }" $SLACK_WEBHOOK_URL
+      }" $SLACK_WEBHOOK_PREPROD
   when: on_failure
   rules:
     - if: $CI_COMMIT_BRANCH
