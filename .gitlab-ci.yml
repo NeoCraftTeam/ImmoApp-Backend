@@ -38,7 +38,8 @@ prepare_ci_image:
       COPY . .
       RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
         && cp .env.example .env \
-        && composer install --no-interaction --no-ansi
+        && composer install --no-interaction --no-ansi \
+        && php artisan key:generate --no-interaction
       DOCKERFILE
       docker push $CI_IMAGE || true
   rules:
