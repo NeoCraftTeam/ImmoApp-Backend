@@ -7,9 +7,21 @@ use App\Http\Controllers\PanelSsoController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('welcome');
+    $host = request()->getHost();
 
-    // routes/web.php
+    if (config('filament.panels.admin_domain') && $host === config('filament.panels.admin_domain')) {
+        return redirect('/admin');
+    }
+
+    if (config('filament.panels.agency_domain') && $host === config('filament.panels.agency_domain')) {
+        return redirect('/agency');
+    }
+
+    if (config('filament.panels.owner_domain') && $host === config('filament.panels.owner_domain')) {
+        return redirect('/owner');
+    }
+
+    return view('welcome');
 });
 
 // Clerk → Filament panel SSO (URL signée, valide 60 secondes)
