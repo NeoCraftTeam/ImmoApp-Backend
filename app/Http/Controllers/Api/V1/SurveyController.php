@@ -22,7 +22,30 @@ use Illuminate\Validation\Rule;
 final readonly class SurveyController
 {
     /**
-     * Retourne le sondage actif le plus récent (pour affichage du prompt).
+     * @OA\Get(
+     *     path="/api/v1/surveys/active",
+     *     summary="Sondage actif en cours",
+     *     description="Retourne le sondage actif le plus récent à afficher à l'utilisateur.",
+     *     tags={"📋 Sondages"},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Sondage actif trouvé",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="id", type="string", format="uuid"),
+     *                 @OA\Property(property="slug", type="string"),
+     *                 @OA\Property(property="title", type="string"),
+     *                 @OA\Property(property="description", type="string", nullable=true),
+     *                 @OA\Property(property="is_active", type="boolean")
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=404, description="Aucun sondage actif")
+     * )
      */
     public function active(): JsonResponse|SurveyResource
     {
@@ -36,7 +59,46 @@ final readonly class SurveyController
     }
 
     /**
-     * Affiche un sondage actif avec ses questions.
+     * @OA\Get(
+     *     path="/api/v1/surveys/{survey}",
+     *     summary="Afficher un sondage avec ses questions",
+     *     description="Retourne un sondage actif avec la liste de ses questions.",
+     *     tags={"📋 Sondages"},
+     *
+     *     @OA\Parameter(
+     *         name="survey",
+     *         in="path",
+     *         required=true,
+     *         description="ID (UUID) du sondage",
+     *
+     *         @OA\Schema(type="string", format="uuid")
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Sondage trouvé",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="id", type="string", format="uuid"),
+     *                 @OA\Property(property="slug", type="string"),
+     *                 @OA\Property(property="title", type="string"),
+     *                 @OA\Property(property="description", type="string", nullable=true),
+     *                 @OA\Property(property="is_active", type="boolean"),
+     *                 @OA\Property(property="questions", type="array", @OA\Items(
+     *                     @OA\Property(property="id", type="string", format="uuid"),
+     *                     @OA\Property(property="text", type="string"),
+     *                     @OA\Property(property="type", type="string"),
+     *                     @OA\Property(property="options", type="array", nullable=true, @OA\Items(type="string")),
+     *                     @OA\Property(property="order", type="integer")
+     *                 ))
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=404, description="Sondage introuvable ou inactif")
+     * )
      */
     public function show(Survey $survey): JsonResponse|SurveyResource
     {
@@ -50,7 +112,47 @@ final readonly class SurveyController
     }
 
     /**
-     * Soumet les réponses à un sondage (une réponse par question par utilisateur).
+     * @OA\Post(
+     *     path="/api/v1/surveys/{survey}/responses",
+     *     summary="Soumettre des réponses à un sondage",
+     *     description="Enregistre les réponses de l'utilisateur authentifié. Une réponse par question par utilisateur (upsert). Limité à 10 soumissions par minute.",
+     *     tags={"📋 Sondages"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="survey",
+     *         in="path",
+     *         required=true,
+     *         description="ID (UUID) du sondage",
+     *
+     *         @OA\Schema(type="string", format="uuid")
+     *     ),
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"answers"},
+     *
+     *             @OA\Property(property="answers", type="array", minItems=1, @OA\Items(
+     *                 required={"question_id", "answer"},
+     *                 @OA\Property(property="question_id", type="string", format="uuid"),
+     *                 @OA\Property(property="answer", description="Texte ou tableau selon le type de question")
+     *             ))
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=201,
+     *         description="Réponses enregistrées",
+     *
+     *         @OA\JsonContent(@OA\Property(property="message", type="string", example="Merci pour votre participation !"))
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Non authentifié"),
+     *     @OA\Response(response=422, description="Sondage inactif ou données invalides"),
+     *     @OA\Response(response=429, description="Trop de soumissions")
+     * )
      */
     public function submitResponse(Request $request, Survey $survey): JsonResponse
     {
@@ -97,7 +199,31 @@ final readonly class SurveyController
     }
 
     /**
-     * Checks whether the authenticated user has already answered a given survey.
+     * @OA\Get(
+     *     path="/api/v1/surveys/{survey}/has-answered",
+     *     summary="Vérifier si l'utilisateur a déjà répondu",
+     *     description="Indique si l'utilisateur authentifié a déjà soumis des réponses pour ce sondage.",
+     *     tags={"📋 Sondages"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="survey",
+     *         in="path",
+     *         required=true,
+     *         description="ID (UUID) du sondage",
+     *
+     *         @OA\Schema(type="string", format="uuid")
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Statut de participation",
+     *
+     *         @OA\JsonContent(@OA\Property(property="has_answered", type="boolean", example=false))
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Non authentifié")
+     * )
      */
     public function hasAnswered(Request $request, Survey $survey): JsonResponse
     {

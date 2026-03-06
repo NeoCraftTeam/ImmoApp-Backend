@@ -3287,6 +3287,45 @@
                 }
             }
         },
+        "/api/v1/auth/registerAdmin": {
+            "post": {
+                "tags": [
+                    "🔐 Authentification"
+                ],
+                "summary": "Enregistrer un administrateur",
+                "description": "Crée un nouveau compte administrateur. Route protégée, accessible uniquement par un admin existant.",
+                "operationId": "efebeb673ea0b103d22adf57cf580afa",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RegisterRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Admin créé"
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "403": {
+                        "description": "Accès interdit"
+                    },
+                    "422": {
+                        "description": "Validation échouée"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/api/v1/auth/verifyEmail": {
             "post": {
                 "tags": [
@@ -3369,6 +3408,79 @@
                                 }
                             }
                         }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/verify-email-otp": {
+            "post": {
+                "tags": [
+                    "🔐 Authentification"
+                ],
+                "summary": "Vérifier le code OTP email",
+                "description": "Vérifie le code OTP à 6 chiffres envoyé par email après l'inscription et connecte automatiquement l'utilisateur.",
+                "operationId": "verifyEmailOtp",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "email",
+                                    "otp"
+                                ],
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "jean.dupont@example.com"
+                                    },
+                                    "otp": {
+                                        "description": "Code OTP à 6 chiffres",
+                                        "type": "string",
+                                        "example": "123456"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Email vérifié avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Email vérifié avec succès."
+                                        },
+                                        "verified": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "access_token": {
+                                            "type": "string"
+                                        },
+                                        "user": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Code invalide ou expiré"
+                    },
+                    "422": {
+                        "description": "Erreur de validation"
+                    },
+                    "429": {
+                        "description": "Trop de tentatives"
                     }
                 }
             }
@@ -4064,6 +4176,177 @@
                 ]
             }
         },
+        "/api/v1/auth/clerk/exchange": {
+            "post": {
+                "tags": [
+                    "🔐 Authentification"
+                ],
+                "summary": "Échanger un token Clerk contre un token Sanctum",
+                "description": "Valide le JWT Clerk et retourne un token Sanctum. Si l'utilisateur n'existe pas, déclenche un flux OTP pour vérifier l'email avant création.",
+                "operationId": "b4662baed494f09f260a319d77a38060",
+                "responses": {
+                    "200": {
+                        "description": "Authentification réussie ou OTP requis",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "access_token": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "state": {
+                                            "type": "string",
+                                            "enum": [
+                                                "authenticated",
+                                                "otp_required"
+                                            ]
+                                        },
+                                        "email_hint": {
+                                            "type": "string",
+                                            "example": "j***@gmail.com",
+                                            "nullable": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Token Clerk invalide"
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/clerk/verify-otp": {
+            "post": {
+                "tags": [
+                    "🔐 Authentification"
+                ],
+                "summary": "Vérifier le code OTP Clerk",
+                "description": "Valide le code OTP reçu par email après un premier échange Clerk. Si l'utilisateur existe, retourne un token. Sinon, demande de compléter le profil.",
+                "operationId": "f61736527607cbc306f6554448a59a40",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "otp"
+                                ],
+                                "properties": {
+                                    "otp": {
+                                        "description": "Code OTP à 6 chiffres",
+                                        "type": "string",
+                                        "example": "123456"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "OTP validé",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "state": {
+                                            "type": "string",
+                                            "enum": [
+                                                "authenticated",
+                                                "profile_required"
+                                            ]
+                                        },
+                                        "access_token": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "prefill": {
+                                            "type": "object",
+                                            "nullable": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Token Clerk invalide"
+                    },
+                    "422": {
+                        "description": "Code OTP invalide ou expiré"
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/clerk/complete-profile": {
+            "post": {
+                "tags": [
+                    "🔐 Authentification"
+                ],
+                "summary": "Compléter le profil après vérification OTP",
+                "description": "Crée le compte utilisateur Laravel après que l'email ait été vérifié par OTP. Retourne un token Sanctum et les infos utilisateur.",
+                "operationId": "e232def666ea956fb79b9bc776d3c01f",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "phone_number"
+                                ],
+                                "properties": {
+                                    "phone_number": {
+                                        "type": "string",
+                                        "example": "+229 97 00 00 00"
+                                    },
+                                    "city_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Compte créé avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "access_token": {
+                                            "type": "string"
+                                        },
+                                        "user": {
+                                            "$ref": "#/components/schemas/UserResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Token Clerk invalide"
+                    },
+                    "403": {
+                        "description": "Vérification email requise"
+                    },
+                    "422": {
+                        "description": "Numéro de téléphone manquant"
+                    }
+                }
+            }
+        },
         "/api/v1/cities": {
             "get": {
                 "tags": [
@@ -4310,6 +4593,360 @@
                 ]
             }
         },
+        "/api/v1/clerk/webhook": {
+            "post": {
+                "tags": [
+                    "🔗 Webhooks"
+                ],
+                "summary": "Webhook Clerk (Svix)",
+                "description": "Reçoit les événements Clerk/Svix (invitation.created, organizationInvitation.created). Vérifie la signature HMAC avant traitement.",
+                "operationId": "8be553be4742ac5bb78389605d7a59bc",
+                "responses": {
+                    "200": {
+                        "description": "Événement traité"
+                    },
+                    "401": {
+                        "description": "Signature invalide"
+                    },
+                    "422": {
+                        "description": "Données manquantes"
+                    }
+                }
+            }
+        },
+        "/api/v1/credits/packages": {
+            "get": {
+                "tags": [
+                    "🎯 Crédits / Points"
+                ],
+                "summary": "Lister les packs de crédits disponibles",
+                "description": "Retourne tous les packs de points actifs avec leurs prix et avantages.",
+                "operationId": "0fa5d13ea79e33b253981539e903e9d2",
+                "responses": {
+                    "200": {
+                        "description": "Liste des packs",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/PointPackageResource"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/credits/balance": {
+            "get": {
+                "tags": [
+                    "🎯 Crédits / Points"
+                ],
+                "summary": "Obtenir le solde de crédits",
+                "description": "Retourne le solde de points/crédits de l'utilisateur authentifié.",
+                "operationId": "28a5972e4476e9b0cd4ac95d2e57b41a",
+                "responses": {
+                    "200": {
+                        "description": "Solde actuel",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "point_balance": {
+                                            "type": "integer",
+                                            "example": 25
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/credits/purchase/{package}": {
+            "post": {
+                "tags": [
+                    "🎯 Crédits / Points"
+                ],
+                "summary": "Acheter un pack de crédits",
+                "description": "Initialise un paiement FedaPay pour acheter le pack de crédits sélectionné. Retourne une URL de paiement.",
+                "operationId": "ef3e1d1ea064d546e32a29ad07d366fb",
+                "parameters": [
+                    {
+                        "name": "package",
+                        "in": "path",
+                        "description": "UUID du pack",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "callback_url": {
+                                        "description": "URL de retour après paiement",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Lien de paiement généré",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "payment_url": {
+                                            "type": "string"
+                                        },
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "422": {
+                        "description": "Pack non disponible"
+                    },
+                    "500": {
+                        "description": "Erreur FedaPay"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/credits/verify-purchase": {
+            "post": {
+                "tags": [
+                    "🎯 Crédits / Points"
+                ],
+                "summary": "Vérifier un achat de crédits",
+                "description": "Vérifie le dernier achat de crédits de l'utilisateur auprès de FedaPay. Si le paiement est approuvé, crédite les points.",
+                "operationId": "235014727746381b2fdabd0a491edd20",
+                "responses": {
+                    "200": {
+                        "description": "Statut de l'achat",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "enum": [
+                                                "completed",
+                                                "pending",
+                                                "failed",
+                                                "not_found"
+                                            ]
+                                        },
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "point_balance": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "404": {
+                        "description": "Aucun achat trouvé"
+                    },
+                    "422": {
+                        "description": "Paiement échoué"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/invoices": {
+            "get": {
+                "tags": [
+                    "🧾 Factures"
+                ],
+                "summary": "Lister les factures de mon agence",
+                "description": "Retourne la liste paginée des factures générées pour l'agence de l'utilisateur authentifié, triées de la plus récente à la plus ancienne. Chaque facture inclut un lien de téléchargement PDF.",
+                "operationId": "listInvoices",
+                "responses": {
+                    "200": {
+                        "description": "Liste paginée des factures",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string",
+                                                        "format": "uuid"
+                                                    },
+                                                    "invoice_number": {
+                                                        "type": "string",
+                                                        "example": "KH-202602-0001"
+                                                    },
+                                                    "plan_name": {
+                                                        "type": "string",
+                                                        "example": "Premium"
+                                                    },
+                                                    "amount_formatted": {
+                                                        "type": "string",
+                                                        "example": "35 000 XOF"
+                                                    },
+                                                    "status": {
+                                                        "type": "string",
+                                                        "example": "paid"
+                                                    },
+                                                    "issued_at_formatted": {
+                                                        "type": "string",
+                                                        "example": "01/02/2026"
+                                                    },
+                                                    "download_url": {
+                                                        "type": "string",
+                                                        "example": "https://api.keyhome.cm/api/v1/invoices/uuid/download"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "403": {
+                        "description": "L'utilisateur n'appartient à aucune agence"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/invoices/{invoice}": {
+            "get": {
+                "tags": [
+                    "🧾 Factures"
+                ],
+                "summary": "Détails d'une facture",
+                "description": "Retourne les détails complets d'une facture identifiée par son UUID. L'utilisateur doit appartenir à l'agence concernée.",
+                "operationId": "showInvoice",
+                "parameters": [
+                    {
+                        "name": "invoice",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Détails de la facture"
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    },
+                    "404": {
+                        "description": "Facture introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/invoices/{invoice}/download": {
+            "get": {
+                "tags": [
+                    "🧾 Factures"
+                ],
+                "summary": "Télécharger une facture en PDF",
+                "description": "Génère et retourne la facture au format PDF, prête à être téléchargée ou affichée dans l'application.",
+                "operationId": "downloadInvoice",
+                "parameters": [
+                    {
+                        "name": "invoice",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Fichier PDF de la facture",
+                        "content": {
+                            "application/pdf": {}
+                        }
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    },
+                    "404": {
+                        "description": "Facture introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/api/v1/notifications": {
             "get": {
                 "tags": [
@@ -4456,17 +5093,34 @@
                 ]
             }
         },
-        "/api/v1/property-attributes": {
+        "/api/v1/payments/unlock-price": {
             "get": {
                 "tags": [
-                    "Ads"
+                    "💰 Paiements"
                 ],
-                "summary": "Get available property attributes",
-                "description": "Returns list of available property attributes (Wi-Fi, parking, etc.) for ads.",
-                "operationId": "fe1dd6bd39c72b74099ecb9385013870",
+                "summary": "Obtenir le prix de déblocage",
+                "description": "Retourne le prix de déblocage en FCFA et le coût en crédits/points.",
+                "operationId": "cf0b294c676fef0aeaccd05920066fb3",
                 "responses": {
                     "200": {
-                        "description": "Property attributes retrieved successfully"
+                        "description": "Prix de déblocage",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "unlock_price": {
+                                            "type": "integer",
+                                            "example": 500
+                                        },
+                                        "unlock_cost_points": {
+                                            "type": "integer",
+                                            "example": 2
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -4604,6 +5258,508 @@
                                         },
                                         "status": {
                                             "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/payments/verify/{ad}": {
+            "post": {
+                "tags": [
+                    "💰 Paiements"
+                ],
+                "summary": "Vérifier le statut d'un paiement",
+                "description": "Vérifie le paiement le plus récent pour une annonce auprès de FedaPay. Débloque l'annonce si le paiement est approuvé.",
+                "operationId": "b53480b176f0c3dd0ddeee5c8bd82602",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "description": "UUID de l'annonce",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Statut du paiement",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string"
+                                        },
+                                        "is_unlocked": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "404": {
+                        "description": "Aucun paiement trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/property-attributes": {
+            "get": {
+                "tags": [
+                    "🏠 Annonces"
+                ],
+                "summary": "Attributs de propriété disponibles",
+                "description": "Retourne la liste des attributs disponibles (Wi-Fi, parking, etc.) pour les annonces.",
+                "operationId": "d5f08b90b7aa26aca53d871f61a2bfc6",
+                "responses": {
+                    "200": {
+                        "description": "Attributs récupérés avec succès"
+                    }
+                }
+            }
+        },
+        "/api/v1/public/surveys": {
+            "get": {
+                "tags": [
+                    "📋 Sondages publics"
+                ],
+                "summary": "Lister les sondages publics actifs",
+                "description": "Retourne la liste de tous les sondages actifs et publics.",
+                "operationId": "36e9f27fc2f1b01eb21304b027b96023",
+                "responses": {
+                    "200": {
+                        "description": "Liste des sondages",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string",
+                                                        "format": "uuid"
+                                                    },
+                                                    "slug": {
+                                                        "type": "string"
+                                                    },
+                                                    "title": {
+                                                        "type": "string"
+                                                    },
+                                                    "description": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    },
+                                                    "is_active": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "questions_count": {
+                                                        "type": "integer"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/public/surveys/{slug}": {
+            "get": {
+                "tags": [
+                    "📋 Sondages publics"
+                ],
+                "summary": "Afficher un sondage public par slug",
+                "description": "Retourne les détails d'un sondage public avec ses questions. Vérifie si le client a déjà soumis via `client_token`.",
+                "operationId": "c25ff0ee66c25811739076fc0c40e8ce",
+                "parameters": [
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "description": "Slug unique du sondage",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "client_token",
+                        "in": "query",
+                        "description": "UUID généré côté client pour détecter les doublons",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Sondage trouvé",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "id": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
+                                        "slug": {
+                                            "type": "string"
+                                        },
+                                        "title": {
+                                            "type": "string"
+                                        },
+                                        "description": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "is_active": {
+                                            "type": "boolean"
+                                        },
+                                        "is_public": {
+                                            "type": "boolean"
+                                        },
+                                        "already_submitted": {
+                                            "type": "boolean"
+                                        },
+                                        "questions": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string",
+                                                        "format": "uuid"
+                                                    },
+                                                    "text": {
+                                                        "type": "string"
+                                                    },
+                                                    "type": {
+                                                        "type": "string"
+                                                    },
+                                                    "options": {
+                                                        "type": "array",
+                                                        "items": {
+                                                            "type": "string"
+                                                        },
+                                                        "nullable": true
+                                                    },
+                                                    "order": {
+                                                        "type": "integer"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Sondage introuvable ou inactif"
+                    }
+                }
+            }
+        },
+        "/api/v1/public/surveys/{slug}/respond": {
+            "post": {
+                "tags": [
+                    "📋 Sondages publics"
+                ],
+                "summary": "Soumettre des réponses anonymes",
+                "description": "Soumet des réponses anonymes à un sondage public. La déduplication est assurée par `client_token`. Limité à 10 soumissions par minute.",
+                "operationId": "1d70d757e7aa9a5209b5ed24b356985f",
+                "parameters": [
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "description": "Slug unique du sondage",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "client_token",
+                                    "answers"
+                                ],
+                                "properties": {
+                                    "client_token": {
+                                        "description": "UUID généré côté client pour prévenir les doublons",
+                                        "type": "string",
+                                        "format": "uuid"
+                                    },
+                                    "answers": {
+                                        "type": "array",
+                                        "items": {
+                                            "required": [
+                                                "question_id",
+                                                "answer"
+                                            ],
+                                            "properties": {
+                                                "question_id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                },
+                                                "answer": {
+                                                    "description": "Texte ou tableau de réponses selon le type de question"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "minItems": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Réponses enregistrées",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "submitted": {
+                                            "type": "boolean",
+                                            "example": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "Réponse déjà soumise (doublon détecté)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "already_submitted": {
+                                            "type": "boolean",
+                                            "example": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Sondage introuvable ou inactif"
+                    },
+                    "422": {
+                        "description": "Données de validation invalides"
+                    },
+                    "429": {
+                        "description": "Trop de soumissions"
+                    }
+                }
+            }
+        },
+        "/api/v1/pwa/push/subscribe": {
+            "post": {
+                "tags": [
+                    "PWA"
+                ],
+                "summary": "Enregistrer un abonnement push",
+                "description": "Enregistre ou met à jour l'abonnement aux notifications push pour l'utilisateur authentifié.",
+                "operationId": "2720cf41bdcaa4c66b12c7c17385c61a",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "endpoint",
+                                    "keys"
+                                ],
+                                "properties": {
+                                    "endpoint": {
+                                        "description": "URL d'abonnement push",
+                                        "type": "string",
+                                        "format": "url"
+                                    },
+                                    "keys": {
+                                        "properties": {
+                                            "p256dh": {
+                                                "type": "string"
+                                            },
+                                            "auth": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "type": "object"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Abonnement enregistré",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Abonnement push enregistré."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "422": {
+                        "description": "Données invalides"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/pwa/push/unsubscribe": {
+            "post": {
+                "tags": [
+                    "PWA"
+                ],
+                "summary": "Supprimer un abonnement push",
+                "description": "Supprime l'abonnement push pour l'endpoint fourni.",
+                "operationId": "9394e6a8a2212c0fca471f4277732a28",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "endpoint"
+                                ],
+                                "properties": {
+                                    "endpoint": {
+                                        "type": "string",
+                                        "format": "url"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Abonnement supprimé",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Abonnement push supprimé."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "422": {
+                        "description": "Données invalides"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/pwa/session/validate": {
+            "get": {
+                "tags": [
+                    "PWA"
+                ],
+                "summary": "Valider la session PWA",
+                "description": "Vérifie que la session courante est toujours active. Utilisé par la PWA pour imposer une re-authentification au démarrage.",
+                "operationId": "abc5de5abb1855a80b42fa9bdd7aa519",
+                "responses": {
+                    "200": {
+                        "description": "Session valide",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "valid": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "user": {
+                                            "description": "ID de l'utilisateur",
+                                            "type": "string",
+                                            "format": "uuid"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Session invalide ou expirée",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "valid": {
+                                            "type": "boolean",
+                                            "example": false
                                         }
                                     },
                                     "type": "object"
@@ -5281,6 +6437,124 @@
                 "security": [
                     {
                         "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/reviews": {
+            "get": {
+                "tags": [
+                    "⭐ Avis"
+                ],
+                "summary": "Lister les avis d'une annonce",
+                "description": "Retourne les avis paginés pour une annonce donnée, triés par date décroissante.",
+                "operationId": "5eb9415c91da682a35a14291698156b3",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "description": "UUID de l'annonce",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste paginée des avis",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ReviewResource"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Annonce introuvable"
+                    }
+                }
+            }
+        },
+        "/api/v1/reviews": {
+            "post": {
+                "tags": [
+                    "⭐ Avis"
+                ],
+                "summary": "Ajouter un avis",
+                "description": "Crée un avis pour une annonce. Un seul avis par utilisateur et par annonce.",
+                "operationId": "20f4daafc07903e8535348e0047f7920",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "rating",
+                                    "ad_id"
+                                ],
+                                "properties": {
+                                    "rating": {
+                                        "type": "integer",
+                                        "maximum": 5,
+                                        "minimum": 1,
+                                        "example": 4
+                                    },
+                                    "comment": {
+                                        "type": "string",
+                                        "maxLength": 1000,
+                                        "example": "Très bon logement, propre et bien situé."
+                                    },
+                                    "ad_id": {
+                                        "type": "string",
+                                        "format": "uuid"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Avis créé",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Avis ajouté avec succès."
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/ReviewResource"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "422": {
+                        "description": "Validation échouée ou avis déjà déposé"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
                     }
                 ]
             }
@@ -6179,6 +7453,281 @@
                 ]
             }
         },
+        "/api/v1/surveys/active": {
+            "get": {
+                "tags": [
+                    "📋 Sondages"
+                ],
+                "summary": "Sondage actif en cours",
+                "description": "Retourne le sondage actif le plus récent à afficher à l'utilisateur.",
+                "operationId": "d02d94fbdcdc229c04d813717a21555c",
+                "responses": {
+                    "200": {
+                        "description": "Sondage actif trouvé",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                },
+                                                "slug": {
+                                                    "type": "string"
+                                                },
+                                                "title": {
+                                                    "type": "string"
+                                                },
+                                                "description": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "is_active": {
+                                                    "type": "boolean"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Aucun sondage actif"
+                    }
+                }
+            }
+        },
+        "/api/v1/surveys/{survey}": {
+            "get": {
+                "tags": [
+                    "📋 Sondages"
+                ],
+                "summary": "Afficher un sondage avec ses questions",
+                "description": "Retourne un sondage actif avec la liste de ses questions.",
+                "operationId": "a96881f0de77a2d6a6d3baf87e5827a8",
+                "parameters": [
+                    {
+                        "name": "survey",
+                        "in": "path",
+                        "description": "ID (UUID) du sondage",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Sondage trouvé",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                },
+                                                "slug": {
+                                                    "type": "string"
+                                                },
+                                                "title": {
+                                                    "type": "string"
+                                                },
+                                                "description": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "is_active": {
+                                                    "type": "boolean"
+                                                },
+                                                "questions": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "string",
+                                                                "format": "uuid"
+                                                            },
+                                                            "text": {
+                                                                "type": "string"
+                                                            },
+                                                            "type": {
+                                                                "type": "string"
+                                                            },
+                                                            "options": {
+                                                                "type": "array",
+                                                                "items": {
+                                                                    "type": "string"
+                                                                },
+                                                                "nullable": true
+                                                            },
+                                                            "order": {
+                                                                "type": "integer"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Sondage introuvable ou inactif"
+                    }
+                }
+            }
+        },
+        "/api/v1/surveys/{survey}/responses": {
+            "post": {
+                "tags": [
+                    "📋 Sondages"
+                ],
+                "summary": "Soumettre des réponses à un sondage",
+                "description": "Enregistre les réponses de l'utilisateur authentifié. Une réponse par question par utilisateur (upsert). Limité à 10 soumissions par minute.",
+                "operationId": "f5a19d4f4e6349b256dcc8e64474c1c9",
+                "parameters": [
+                    {
+                        "name": "survey",
+                        "in": "path",
+                        "description": "ID (UUID) du sondage",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "answers"
+                                ],
+                                "properties": {
+                                    "answers": {
+                                        "type": "array",
+                                        "items": {
+                                            "required": [
+                                                "question_id",
+                                                "answer"
+                                            ],
+                                            "properties": {
+                                                "question_id": {
+                                                    "type": "string",
+                                                    "format": "uuid"
+                                                },
+                                                "answer": {
+                                                    "description": "Texte ou tableau selon le type de question"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "minItems": 1
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Réponses enregistrées",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Merci pour votre participation !"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "422": {
+                        "description": "Sondage inactif ou données invalides"
+                    },
+                    "429": {
+                        "description": "Trop de soumissions"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/surveys/{survey}/has-answered": {
+            "get": {
+                "tags": [
+                    "📋 Sondages"
+                ],
+                "summary": "Vérifier si l'utilisateur a déjà répondu",
+                "description": "Indique si l'utilisateur authentifié a déjà soumis des réponses pour ce sondage.",
+                "operationId": "8ca0df22b859ce977c987b6c5d2f0640",
+                "parameters": [
+                    {
+                        "name": "survey",
+                        "in": "path",
+                        "description": "ID (UUID) du sondage",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Statut de participation",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "has_answered": {
+                                            "type": "boolean",
+                                            "example": false
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/api/v1/users": {
             "get": {
                 "tags": [
@@ -7054,10 +8603,651 @@
                     }
                 ]
             }
+        },
+        "/api/v1/my/unlocked-ads": {
+            "get": {
+                "tags": [
+                    "👤 Utilisateur"
+                ],
+                "summary": "Mes annonces débloquées",
+                "description": "Retourne les annonces que l'utilisateur a débloquées via un paiement réussi.",
+                "operationId": "9b65a3f5ab2151d081bdc04e572e99c9",
+                "responses": {
+                    "200": {
+                        "description": "Liste des annonces débloquées",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/AdResource"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/availability": {
+            "get": {
+                "tags": [
+                    "📅 Disponibilités"
+                ],
+                "summary": "Lister les plannings de disponibilité",
+                "description": "List all availability schedules for a property.",
+                "operationId": "bc14004ea8bd3a3eaedc03297a084f9b",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste des plannings"
+                    },
+                    "403": {
+                        "description": "Non autorisé"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "📅 Disponibilités"
+                ],
+                "summary": "Créer un planning de disponibilité",
+                "description": "Create a new availability schedule.",
+                "operationId": "affe677653f0d81fb1a2ecd6459abe90",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Planning créé"
+                    },
+                    "403": {
+                        "description": "Non autorisé"
+                    },
+                    "422": {
+                        "description": "Erreur de validation"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/availability/{schedule}": {
+            "put": {
+                "tags": [
+                    "📅 Disponibilités"
+                ],
+                "summary": "Modifier un planning de disponibilité",
+                "description": "Update an existing availability schedule.",
+                "operationId": "972e2b08df5ea68df1bac66baf22fe86",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "schedule",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Planning mis à jour"
+                    },
+                    "403": {
+                        "description": "Non autorisé"
+                    },
+                    "409": {
+                        "description": "Réservations actives existent"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "📅 Disponibilités"
+                ],
+                "summary": "Supprimer un planning de disponibilité",
+                "description": "Delete an availability schedule.",
+                "operationId": "4189d587a8f2ae72c9de6eb9e7e151c3",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "schedule",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Supprimé"
+                    },
+                    "403": {
+                        "description": "Non autorisé"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/availability/calendar": {
+            "get": {
+                "tags": [
+                    "📅 Disponibilités"
+                ],
+                "summary": "Calendrier des créneaux avec statuts",
+                "description": "Get the slot-status calendar view for a date range (landlord dashboard).",
+                "operationId": "e0de8189cb6c466e275fa522d3de73d4",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Calendrier des disponibilités"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/reservations": {
+            "get": {
+                "tags": [
+                    "📅 Disponibilités"
+                ],
+                "summary": "Lister les réservations provisoires d'une annonce",
+                "description": "List reservations for a property (landlord view).",
+                "operationId": "4a593ccdc67f4e806825c7d6d1f43e69",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste paginée des réservations"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "🗓️ Réservations"
+                ],
+                "summary": "Réserver provisoirement un créneau de visite",
+                "description": "Crée une réservation provisoire pour un créneau de visite. Valide 24h.",
+                "operationId": "87f89a253787f4da936928d134e66575",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "slot_date",
+                                    "slot_starts_at",
+                                    "slot_ends_at"
+                                ],
+                                "properties": {
+                                    "slot_date": {
+                                        "type": "string",
+                                        "format": "date"
+                                    },
+                                    "slot_starts_at": {
+                                        "type": "string",
+                                        "example": "10:00"
+                                    },
+                                    "slot_ends_at": {
+                                        "type": "string",
+                                        "example": "10:30"
+                                    },
+                                    "client_message": {
+                                        "type": "string",
+                                        "maxLength": 500
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Réservation provisoire créée"
+                    },
+                    "403": {
+                        "description": "Annonce non débloquée ou auto-réservation non autorisée"
+                    },
+                    "409": {
+                        "description": "Créneau déjà réservé"
+                    },
+                    "422": {
+                        "description": "Erreur de validation"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/slots": {
+            "get": {
+                "tags": [
+                    "🗓️ Réservations"
+                ],
+                "summary": "Créneaux disponibles pour une annonce",
+                "description": "Retourne tous les créneaux de visite disponibles pour une annonce sur une plage de dates.",
+                "operationId": "11c88685573728c7bde5407d5285c99b",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "description": "Date de début (défaut: aujourd'hui)",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "description": "Date de fin (défaut: +14 jours)",
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Créneaux disponibles par date"
+                    }
+                }
+            }
+        },
+        "/api/v1/my/reservations": {
+            "get": {
+                "tags": [
+                    "🗓️ Réservations"
+                ],
+                "summary": "Mes réservations provisoires",
+                "description": "List the authenticated client's reservations.",
+                "operationId": "bf3181b4acf4b864190a8890efe6bc9b",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "pending",
+                                "confirmed",
+                                "cancelled",
+                                "expired"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste paginée de mes réservations"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/reservations/{reservation}": {
+            "delete": {
+                "tags": [
+                    "🗓️ Réservations"
+                ],
+                "summary": "Annuler une réservation provisoire",
+                "description": "Cancel a tentative reservation.",
+                "operationId": "73f1fdaacb916512f33b89abb04e18b2",
+                "parameters": [
+                    {
+                        "name": "reservation",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Réservation annulée"
+                    },
+                    "403": {
+                        "description": "Non autorisé"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
         }
     },
     "components": {
         "schemas": {
+            "RegisterRequest": {
+                "required": [
+                    "firstname",
+                    "lastname",
+                    "email",
+                    "phone_number",
+                    "password",
+                    "confirm_password"
+                ],
+                "properties": {
+                    "firstname": {
+                        "type": "string",
+                        "maxLength": 50,
+                        "example": "Jean"
+                    },
+                    "lastname": {
+                        "type": "string",
+                        "maxLength": 50,
+                        "example": "Dupont"
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "jean@example.com"
+                    },
+                    "phone_number": {
+                        "type": "string",
+                        "example": "+237600000000"
+                    },
+                    "password": {
+                        "type": "string",
+                        "format": "password",
+                        "minLength": 8,
+                        "example": "Secret@123"
+                    },
+                    "confirm_password": {
+                        "type": "string",
+                        "format": "password",
+                        "example": "Secret@123"
+                    },
+                    "role": {
+                        "type": "string",
+                        "enum": [
+                            "customer",
+                            "agent"
+                        ],
+                        "nullable": true
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "individual",
+                            "agency"
+                        ],
+                        "nullable": true
+                    },
+                    "city_id": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "latitude": {
+                        "type": "number",
+                        "format": "float",
+                        "nullable": true
+                    },
+                    "longitude": {
+                        "type": "number",
+                        "format": "float",
+                        "nullable": true
+                    },
+                    "avatar": {
+                        "type": "string",
+                        "format": "binary",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "PointPackageResource": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "badge": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "price": {
+                        "type": "number",
+                        "format": "float"
+                    },
+                    "price_formatted": {
+                        "type": "string"
+                    },
+                    "points_awarded": {
+                        "type": "integer"
+                    },
+                    "features": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "ReviewResource": {
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "rating": {
+                        "type": "integer"
+                    },
+                    "comment": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "ad_id": {
+                        "type": "integer"
+                    },
+                    "user_id": {
+                        "type": "string"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "UserResource": {
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "firstname": {
+                        "type": "string"
+                    },
+                    "lastname": {
+                        "type": "string"
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email"
+                    },
+                    "phone_number": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "avatar": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "is_verified": {
+                        "type": "boolean"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
             "Agency": {
                 "title": "Agency",
                 "description": "Agence immobilière",
@@ -7792,6 +9982,14 @@
     },
     "tags": [
         {
+            "name": "🔗 Webhooks",
+            "description": "Points d'entrée pour les webhooks externes"
+        },
+        {
+            "name": "🎯 Crédits / Points",
+            "description": "Gestion des packs de points et achats"
+        },
+        {
             "name": "🏷️ Type d'annonce",
             "description": "Gestion des types d'annonces"
         },
@@ -7828,12 +10026,40 @@
             "description": "Gestion des recommandations"
         },
         {
+            "name": "🧾 Factures",
+            "description": "Consultation et téléchargement des factures d'abonnement"
+        },
+        {
+            "name": "📋 Sondages publics",
+            "description": "Sondages accessibles sans authentification"
+        },
+        {
+            "name": "PWA",
+            "description": "Push notifications et validation de session PWA"
+        },
+        {
+            "name": "⭐ Avis",
+            "description": "Gestion des avis sur les annonces"
+        },
+        {
             "name": "OAuth",
             "description": "Social authentication endpoints"
         },
         {
             "name": "📦 Abonnements Agences",
             "description": "Gestion des abonnements pour les agences immobilières. Permet de consulter les plans disponibles, souscrire via FedaPay, consulter l'abonnement actif, l'annuler et voir l'historique. Les agences reçoivent une facture par email à chaque souscription."
+        },
+        {
+            "name": "📋 Sondages",
+            "description": "Sondages de satisfaction (clients)"
+        },
+        {
+            "name": "📅 Disponibilités",
+            "description": "Gestion des disponibilités de visite (propriétaires)"
+        },
+        {
+            "name": "🗓️ Réservations",
+            "description": "Réservations provisoires de créneaux de visite (clients)"
         },
         {
             "name": "📊 Analytics",
@@ -7850,10 +10076,6 @@
         {
             "name": "Notifications",
             "description": "Notifications"
-        },
-        {
-            "name": "Ads",
-            "description": "Ads"
         }
     ]
 }
