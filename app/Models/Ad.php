@@ -395,6 +395,9 @@ class Ad extends Model implements HasMedia
 
     /**
      * Check if the ad is unlocked for a specific user.
+     *
+     * Result is memoized per request in a static array to avoid N+1 queries
+     * when AdResource calls this method multiple times for the same ad/user pair.
      */
     public function isUnlockedFor(?User $user): bool
     {
@@ -407,10 +410,18 @@ class Ad extends Model implements HasMedia
             return true;
         }
 
-        // Check UnlockedAd record (covers both point-based and payment-based unlocks)
-        return \App\Models\UnlockedAd::where('user_id', $user->id)
-            ->where('ad_id', $this->id)
-            ->exists();
+        /** @var array<string, bool> $cache */
+        static $cache = [];
+
+        $key = $user->id.':'.$this->id;
+
+        if (!array_key_exists($key, $cache)) {
+            $cache[$key] = \App\Models\UnlockedAd::where('user_id', $user->id)
+                ->where('ad_id', $this->id)
+                ->exists();
+        }
+
+        return $cache[$key];
     }
 
     /**
