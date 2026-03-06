@@ -44,3 +44,6 @@ public/js/app/
 
 # IDE helper files (dev only)
 _ide_helper*.php
+
+# Accidental shell redirect artifact
+/count

@@ -15,12 +15,14 @@ use App\Http\Controllers\Api\V1\InvoiceController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\PropertyAttributeController;
+use App\Http\Controllers\Api\V1\PublicSurveyController;
 use App\Http\Controllers\Api\V1\PwaController;
 use App\Http\Controllers\Api\V1\QuarterController;
 use App\Http\Controllers\Api\V1\RecommendationController;
 use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\SocialAuthController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
+use App\Http\Controllers\Api\V1\SurveyController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\ViewingAvailabilityController;
 use App\Http\Controllers\Api\V1\ViewingReservationController;
@@ -296,6 +298,23 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/my/reservations', [ViewingReservationController::class, 'myReservations']);
         Route::delete('/reservations/{reservation}', [ViewingReservationController::class, 'cancel'])
             ->middleware('throttle:20,1');
+    });
+
+    // --- PUBLIC SURVEYS (no auth required) ---
+    Route::prefix('public')->group(function (): void {
+        Route::get('/surveys', [PublicSurveyController::class, 'index']);
+        Route::get('/surveys/{survey:slug}', [PublicSurveyController::class, 'show']);
+        Route::post('/surveys/{survey:slug}/respond', [PublicSurveyController::class, 'submit'])
+            ->middleware('throttle:10,1');
+    });
+
+    // --- SURVEYS ---
+    Route::get('/surveys/active', [SurveyController::class, 'active']);
+    Route::get('/surveys/{survey}', [SurveyController::class, 'show']);
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::post('/surveys/{survey}/responses', [SurveyController::class, 'submitResponse'])
+            ->middleware('throttle:10,1');
+        Route::get('/surveys/{survey}/has-answered', [SurveyController::class, 'hasAnswered']);
     });
 
     // --- PWA (Push Subscriptions & Session Validation) ---
