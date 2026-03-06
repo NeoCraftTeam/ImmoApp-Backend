@@ -96,37 +96,54 @@ test_suite:
   stage: build_and_test
   needs: [prepare_ci_image]
   timeout: 10 minutes
-  services:
-    - name: postgis/postgis:15-3.3-alpine
-      alias: pg-test
-      variables:
-        POSTGRES_DB: testing
-        POSTGRES_USER: gitlab
-        POSTGRES_PASSWORD: test_pass
   script:
     - |
+      # Create isolated network for this job
+      docker network create ci-net-$CI_JOB_ID
+
+      # Start PostgreSQL with PostGIS
+      docker run -d \
+        --name pg-$CI_JOB_ID \
+        --network ci-net-$CI_JOB_ID \
+        -e POSTGRES_DB=testing \
+        -e POSTGRES_USER=gitlab \
+        -e POSTGRES_PASSWORD=test_pass \
+        postgis/postgis:15-3.3-alpine
+
+      # Wait until PostgreSQL accepts connections
+      echo "Waiting for PostgreSQL..."
+      for i in $(seq 1 30); do
+        docker exec pg-$CI_JOB_ID pg_isready -U gitlab -d testing && break
+        [ "$i" = "30" ] && echo "PostgreSQL failed to start" && exit 1
+        sleep 2
+      done
+
+      # Run test suite inside CI image
       docker run --rm \
         --network ci-net-$CI_JOB_ID \
         -e DB_CONNECTION=pgsql \
-        -e DB_HOST=pg-test \
+        -e DB_HOST=pg-$CI_JOB_ID \
         -e DB_PORT=5432 \
         -e DB_DATABASE=testing \
         -e DB_USERNAME=gitlab \
         -e DB_PASSWORD=test_pass \
         -e SCOUT_DRIVER=null \
         $CI_IMAGE sh -c \
-        'set -e && \
-        cp .env.example .env && \
-        cp .env.example .env.testing && \
-        rm -f database/data/cities.sql && \
-        php artisan key:generate --env=testing && \
-        php artisan migrate --env=testing --force && \
-        set +e && \
-        echo "=== RUNNING TESTS ===" && \
-        php artisan test --env=testing -v 2>&1 && \
-        TEST_RC=$? && \
-        echo "=== TESTS FINISHED WITH RC=$TEST_RC ===" && \
+        'set -e
+        cp .env.example .env
+        cp .env.example .env.testing
+        rm -f database/data/cities.sql
+        php artisan key:generate --env=testing
+        php artisan migrate --env=testing --force
+        echo "=== RUNNING TESTS ==="
+        set +e
+        php artisan test --env=testing -v 2>&1
+        TEST_RC=$?
+        echo "=== TESTS FINISHED WITH RC=$TEST_RC ==="
         exit $TEST_RC'
+  after_script:
+    - docker rm -f pg-$CI_JOB_ID 2>/dev/null || true
+    - docker network rm ci-net-$CI_JOB_ID 2>/dev/null || true
   rules:
     - if: $CI_COMMIT_BRANCH
 
