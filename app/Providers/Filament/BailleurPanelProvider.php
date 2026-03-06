@@ -28,7 +28,10 @@ class BailleurPanelProvider extends PanelProvider
         return $panel
             ->id('bailleur')
             ->path('owner')
-            ->when(config('filament.panels.owner_domain'), fn (Panel $p) => $p->domain(config('filament.panels.owner_domain')))
+            ->when(
+                config('filament.panels.owner_domain'),
+                fn (Panel $p) => $p->domain(config('filament.panels.owner_domain'))->path(''),
+            )
             ->viteTheme('resources/css/filament/bailleur/theme.css')
             ->brandLogo(fn () => view('filament.bailleur.brand'))
             ->brandLogoHeight('3.5rem')

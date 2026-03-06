@@ -10,15 +10,15 @@ Route::get('/', function () {
     $host = request()->getHost();
 
     if (config('filament.panels.admin_domain') && $host === config('filament.panels.admin_domain')) {
-        return redirect('/admin');
+        return redirect('/login');
     }
 
     if (config('filament.panels.agency_domain') && $host === config('filament.panels.agency_domain')) {
-        return redirect('/agency');
+        return redirect('/login');
     }
 
     if (config('filament.panels.owner_domain') && $host === config('filament.panels.owner_domain')) {
-        return redirect('/owner');
+        return redirect('/login');
     }
 
     return view('welcome');
