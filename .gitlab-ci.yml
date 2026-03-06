@@ -313,7 +313,7 @@ production_smoke_test:
     - echo "Running smoke tests on production..."
     - |
       for i in $(seq 1 10); do
-        RESPONSE=$(curl --silent --write-out "\nHTTP_STATUS:%{http_code}" "https://keyhome.fr/api/health")
+        RESPONSE=$(curl --silent --write-out "\nHTTP_STATUS:%{http_code}" "https://keyhome.fr/api/health" 2>/dev/null) || RESPONSE="HTTP_STATUS:000"
         STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
         BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS:")
         echo "Attempt $i — HTTP $STATUS — $BODY"
@@ -335,7 +335,7 @@ preprod_smoke_test:
     - echo "Running smoke tests on preproduction..."
     - |
       for i in $(seq 1 10); do
-        RESPONSE=$(curl --silent --write-out "\nHTTP_STATUS:%{http_code}" "https://preprod.keyhome.fr/api/health")
+        RESPONSE=$(curl --silent --write-out "\nHTTP_STATUS:%{http_code}" "https://preprod.keyhome.fr/api/health" 2>/dev/null) || RESPONSE="HTTP_STATUS:000"
         STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
         BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS:")
         echo "Attempt $i — HTTP $STATUS — $BODY"
