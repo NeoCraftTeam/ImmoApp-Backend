@@ -76,7 +76,12 @@ composer_security:
 # --- ETAPE 2 : BUILD & PUSH (en parallèle avec tests) ---
 build_image:
   stage: build_and_test
-  needs: [phpstan, style_check, composer_security]
+  needs:
+    - job: phpstan
+      optional: true
+    - job: style_check
+      optional: true
+    - job: composer_security
   script:
     - docker build --pull -t $APP_IMAGE:$IMAGE_TAG -t $APP_IMAGE:latest .
     - docker push $APP_IMAGE:$IMAGE_TAG
