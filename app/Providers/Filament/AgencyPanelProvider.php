@@ -28,6 +28,7 @@ class AgencyPanelProvider extends PanelProvider
         return $panel
             ->id('agency')
             ->path('agency')
+            ->when(config('filament.panels.agency_domain'), fn (Panel $p) => $p->domain(config('filament.panels.agency_domain')))
             ->brandLogo(fn () => view('filament.agency.brand'))
             ->brandLogoHeight('3.5rem')
             ->login()

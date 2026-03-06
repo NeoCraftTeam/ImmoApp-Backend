@@ -34,6 +34,7 @@ class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            ->when(config('filament.panels.admin_domain'), fn (Panel $p) => $p->domain(config('filament.panels.admin_domain')))
             ->login()
             ->multiFactorAuthentication([
                 AppAuthentication::make()
