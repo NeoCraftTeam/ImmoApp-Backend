@@ -334,8 +334,11 @@ preprod_smoke_test:
     - echo "Running smoke tests on preproduction..."
     - |
       set +e
+      PREPROD_PORT=$(grep -E "^WEB_PORT=" /opt/keyhome-preprod/.env 2>/dev/null | cut -d= -f2 | tr -d '[:space:]')
+      PREPROD_PORT=${PREPROD_PORT:-9091}
+      echo "Using port: $PREPROD_PORT"
       for i in $(seq 1 10); do
-        STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" "https://preprod.keyhome.fr/api/health" 2>/dev/null)
+        STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" "http://localhost:${PREPROD_PORT}/api/health" 2>/dev/null)
         echo "Attempt $i — HTTP $STATUS"
         if [ "$STATUS" = "200" ]; then
           echo "✅ Smoke test passed"
