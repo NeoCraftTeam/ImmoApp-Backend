@@ -247,8 +247,8 @@ preprod_deploy:
         echo "   Variables critiques : COMPOSE_PREFIX=keyhome-preprod, WEB_PORT=9091, DB_HOST=keyhome-db"
         exit 1
       fi
-    - export APP_IMAGE="${CI_REGISTRY_IMAGE}/app:preprod"
-    - echo "🚀 Deploying PREPROD image $APP_IMAGE (shared infra with prod)"
+    - export FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:preprod"
+    - echo "🚀 Deploying PREPROD image $FULL_IMAGE (shared infra with prod)"
     # Ensure the prod network exists (needed for shared DB/Redis/Meilisearch)
     - |
       if ! docker network inspect keyhome_keyhome-network > /dev/null 2>&1; then
