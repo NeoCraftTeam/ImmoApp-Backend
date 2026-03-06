@@ -9,6 +9,20 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /** @mixin Review */
+
+/**
+ * @OA\Schema(
+ *     schema="ReviewResource",
+ *
+ *     @OA\Property(property="id", type="integer"),
+ *     @OA\Property(property="rating", type="integer"),
+ *     @OA\Property(property="comment", type="string", nullable=true),
+ *     @OA\Property(property="ad_id", type="integer"),
+ *     @OA\Property(property="user_id", type="string"),
+ *     @OA\Property(property="created_at", type="string", format="date-time", nullable=true),
+ *     @OA\Property(property="updated_at", type="string", format="date-time", nullable=true)
+ * )
+ */
 final class ReviewResource extends JsonResource
 {
     #[\Override]

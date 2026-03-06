@@ -10,6 +10,24 @@ use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Storage;
 
 /** @mixin User */
+
+/**
+ * @OA\Schema(
+ *     schema="UserResource",
+ *
+ *     @OA\Property(property="id", type="string"),
+ *     @OA\Property(property="firstname", type="string"),
+ *     @OA\Property(property="lastname", type="string"),
+ *     @OA\Property(property="email", type="string", format="email"),
+ *     @OA\Property(property="phone_number", type="string", nullable=true),
+ *     @OA\Property(property="role", type="string"),
+ *     @OA\Property(property="type", type="string", nullable=true),
+ *     @OA\Property(property="avatar", type="string", nullable=true),
+ *     @OA\Property(property="is_verified", type="boolean"),
+ *     @OA\Property(property="created_at", type="string", format="date-time", nullable=true),
+ *     @OA\Property(property="updated_at", type="string", format="date-time", nullable=true)
+ * )
+ */
 final class UserResource extends JsonResource
 {
     /**

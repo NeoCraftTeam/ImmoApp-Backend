@@ -11,6 +11,21 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * @mixin PointPackage
  */
+
+/**
+ * @OA\Schema(
+ *     schema="PointPackageResource",
+ *
+ *     @OA\Property(property="id", type="integer"),
+ *     @OA\Property(property="name", type="string"),
+ *     @OA\Property(property="description", type="string", nullable=true),
+ *     @OA\Property(property="badge", type="string", nullable=true),
+ *     @OA\Property(property="price", type="number", format="float"),
+ *     @OA\Property(property="price_formatted", type="string"),
+ *     @OA\Property(property="points_awarded", type="integer"),
+ *     @OA\Property(property="features", type="array", @OA\Items(type="string"))
+ * )
+ */
 class PointPackageResource extends JsonResource
 {
     /**

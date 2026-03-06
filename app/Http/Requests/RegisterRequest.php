@@ -8,6 +8,25 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Password;
 
+/**
+ * @OA\Schema(
+ *     schema="RegisterRequest",
+ *     required={"firstname","lastname","email","phone_number","password","confirm_password"},
+ *
+ *     @OA\Property(property="firstname", type="string", maxLength=50, example="Jean"),
+ *     @OA\Property(property="lastname", type="string", maxLength=50, example="Dupont"),
+ *     @OA\Property(property="email", type="string", format="email", example="jean@example.com"),
+ *     @OA\Property(property="phone_number", type="string", example="+237600000000"),
+ *     @OA\Property(property="password", type="string", format="password", minLength=8, example="Secret@123"),
+ *     @OA\Property(property="confirm_password", type="string", format="password", example="Secret@123"),
+ *     @OA\Property(property="role", type="string", enum={"customer","agent"}, nullable=true),
+ *     @OA\Property(property="type", type="string", enum={"individual","agency"}, nullable=true),
+ *     @OA\Property(property="city_id", type="string", nullable=true),
+ *     @OA\Property(property="latitude", type="number", format="float", nullable=true),
+ *     @OA\Property(property="longitude", type="number", format="float", nullable=true),
+ *     @OA\Property(property="avatar", type="string", format="binary", nullable=true)
+ * )
+ */
 final class RegisterRequest extends FormRequest
 {
     /**
