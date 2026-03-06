@@ -8,9 +8,9 @@ use App\Models\Review;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/** @mixin Review */
-
 /**
+ * @mixin Review
+ *
  * @OA\Schema(
  *     schema="ReviewResource",
  *

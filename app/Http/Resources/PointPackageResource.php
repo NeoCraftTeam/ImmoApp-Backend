@@ -10,9 +10,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * @mixin PointPackage
- */
-
-/**
+ *
  * @OA\Schema(
  *     schema="PointPackageResource",
  *
