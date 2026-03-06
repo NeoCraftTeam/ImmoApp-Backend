@@ -238,52 +238,70 @@ final class CreditController
             ], 422);
         }
 
-        // Payment is still PENDING — check with FedaPay
+        // Payment is still PENDING — check with FedaPay, then apply the same
+        // lock+transaction guard used by the webhook handler to prevent double-crediting
+        // when both paths run concurrently.
         $result = $this->fedaPay->retrieveTransaction((int) $payment->transaction_id);
 
         if ($result['success'] && $result['status'] === 'approved') {
-            $payment->forceFill(['status' => PaymentStatus::SUCCESS])->save();
+            return \Illuminate\Support\Facades\DB::transaction(function () use ($user, $payment): JsonResponse {
+                /** @var Payment $lockedPayment */
+                $lockedPayment = Payment::where('id', $payment->id)
+                    ->lockForUpdate()
+                    ->first();
 
-            // Credit points if not already done (idempotency via unique transaction check)
-            $alreadyCredited = $user->pointTransactions()
-                ->where('payment_id', $payment->id)
-                ->exists();
-
-            if (!$alreadyCredited) {
-                $metadata = [];
-                try {
-                    $transaction = \FedaPay\Transaction::retrieve((int) $payment->transaction_id);
-                    /** @var array<string, mixed> $metadata */
-                    $metadata = (array) ($transaction->metadata ?? []); // @phpstan-ignore class.notFound
-                } catch (\Exception) {
-                    // fall back to amount-based lookup
+                // Re-check inside the lock: webhook may have already committed
+                if ($lockedPayment->status === PaymentStatus::SUCCESS) {
+                    return response()->json([
+                        'status' => 'completed',
+                        'message' => 'Achat de crédits confirmé.',
+                        'point_balance' => (int) $user->fresh()->point_balance,
+                    ]);
                 }
 
-                $packageId = $metadata['package_id'] ?? null;
-                $package = $packageId ? PointPackage::find($packageId) : null;
+                $lockedPayment->forceFill(['status' => PaymentStatus::SUCCESS])->save();
 
-                if (!$package) {
-                    $package = PointPackage::where('price', $payment->amount)
-                        ->where('is_active', true)
-                        ->first();
+                // Idempotency check — safe inside the lock
+                $alreadyCredited = $user->pointTransactions()
+                    ->where('payment_id', $lockedPayment->id)
+                    ->exists();
+
+                if (!$alreadyCredited) {
+                    $metadata = [];
+                    try {
+                        $transaction = \FedaPay\Transaction::retrieve((int) $lockedPayment->transaction_id);
+                        /** @var array<string, mixed> $metadata */
+                        $metadata = (array) ($transaction->metadata ?? []); // @phpstan-ignore class.notFound
+                    } catch (\Exception) {
+                        // fall back to amount-based lookup
+                    }
+
+                    $packageId = $metadata['package_id'] ?? null;
+                    $package = $packageId ? PointPackage::find($packageId) : null;
+
+                    if (!$package) {
+                        $package = PointPackage::where('price', $lockedPayment->amount)
+                            ->where('is_active', true)
+                            ->first();
+                    }
+
+                    if ($package) {
+                        $this->pointService->credit(
+                            $user,
+                            $package->points_awarded,
+                            PointTransactionType::PURCHASE,
+                            "Achat pack: {$package->name}",
+                            $lockedPayment->id,
+                        );
+                    }
                 }
 
-                if ($package) {
-                    $this->pointService->credit(
-                        $user,
-                        $package->points_awarded,
-                        PointTransactionType::PURCHASE,
-                        "Achat pack: {$package->name}",
-                        $payment->id,
-                    );
-                }
-            }
-
-            return response()->json([
-                'status' => 'completed',
-                'message' => 'Achat de crédits confirmé.',
-                'point_balance' => (int) $user->fresh()->point_balance,
-            ]);
+                return response()->json([
+                    'status' => 'completed',
+                    'message' => 'Achat de crédits confirmé.',
+                    'point_balance' => (int) $user->fresh()->point_balance,
+                ]);
+            });
         }
 
         if ($result['success'] && in_array($result['status'], ['canceled', 'declined', 'refunded'])) {
