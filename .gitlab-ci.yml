@@ -113,7 +113,7 @@ test_suite:
       # Wait until PostgreSQL accepts connections
       echo "Waiting for PostgreSQL..."
       for i in $(seq 1 30); do
-        docker exec pg-$CI_JOB_ID pg_isready -U gitlab -d testing && break
+        docker exec pg-$CI_JOB_ID pg_isready -h 127.0.0.1 -p 5432 -U gitlab -d testing && break
         [ "$i" = "30" ] && echo "PostgreSQL failed to start" && exit 1
         sleep 2
       done
