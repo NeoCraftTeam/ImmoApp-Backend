@@ -28,6 +28,9 @@ use App\Http\Controllers\Api\V1\ViewingAvailabilityController;
 use App\Http\Controllers\Api\V1\ViewingReservationController;
 use Illuminate\Support\Facades\Route;
 
+// Health check endpoint (used by CI/CD smoke tests)
+Route::get('/health', fn () => response()->json(['status' => 'ok']));
+
 // Prefix routes
 Route::prefix('v1')->group(function (): void {
 

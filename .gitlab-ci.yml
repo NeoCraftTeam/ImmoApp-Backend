@@ -310,7 +310,20 @@ production_smoke_test:
   needs: [production_deploy]
   script:
     - echo "Running smoke tests on production..."
-    - curl --fail --silent "https://keyhome.fr/api/health" || (echo "Production smoke test failed!" && exit 1)
+    - |
+      for i in $(seq 1 10); do
+        RESPONSE=$(curl --silent --write-out "\nHTTP_STATUS:%{http_code}" "https://keyhome.fr/api/health")
+        STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
+        BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS:")
+        echo "Attempt $i — HTTP $STATUS — $BODY"
+        if [ "$STATUS" = "200" ]; then
+          echo "✅ Smoke test passed"
+          exit 0
+        fi
+        sleep 5
+      done
+      echo "❌ Production smoke test failed after 10 attempts"
+      exit 1
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
 
@@ -319,7 +332,20 @@ preprod_smoke_test:
   needs: [preprod_deploy]
   script:
     - echo "Running smoke tests on preproduction..."
-    - curl --fail --silent "https://preprod.keyhome.fr/api/health" || (echo "Preproduction smoke test failed!" && exit 1)
+    - |
+      for i in $(seq 1 10); do
+        RESPONSE=$(curl --silent --write-out "\nHTTP_STATUS:%{http_code}" "https://preprod.keyhome.fr/api/health")
+        STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
+        BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS:")
+        echo "Attempt $i — HTTP $STATUS — $BODY"
+        if [ "$STATUS" = "200" ]; then
+          echo "✅ Smoke test passed"
+          exit 0
+        fi
+        sleep 5
+      done
+      echo "❌ Preproduction smoke test failed after 10 attempts"
+      exit 1
   rules:
     - if: $CI_COMMIT_BRANCH == "preprod"
 
