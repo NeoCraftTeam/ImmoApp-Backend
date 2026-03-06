@@ -312,11 +312,10 @@ production_smoke_test:
   script:
     - echo "Running smoke tests on production..."
     - |
+      set +e
       for i in $(seq 1 10); do
-        RESPONSE=$(curl --silent --write-out "\nHTTP_STATUS:%{http_code}" "https://keyhome.fr/api/health" 2>/dev/null) || RESPONSE="HTTP_STATUS:000"
-        STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
-        BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS:")
-        echo "Attempt $i — HTTP $STATUS — $BODY"
+        STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" "https://keyhome.fr/api/health" 2>/dev/null)
+        echo "Attempt $i — HTTP $STATUS"
         if [ "$STATUS" = "200" ]; then
           echo "✅ Smoke test passed"
           exit 0
@@ -334,11 +333,10 @@ preprod_smoke_test:
   script:
     - echo "Running smoke tests on preproduction..."
     - |
+      set +e
       for i in $(seq 1 10); do
-        RESPONSE=$(curl --silent --write-out "\nHTTP_STATUS:%{http_code}" "https://preprod.keyhome.fr/api/health" 2>/dev/null) || RESPONSE="HTTP_STATUS:000"
-        STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
-        BODY=$(echo "$RESPONSE" | grep -v "HTTP_STATUS:")
-        echo "Attempt $i — HTTP $STATUS — $BODY"
+        STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" "https://preprod.keyhome.fr/api/health" 2>/dev/null)
+        echo "Attempt $i — HTTP $STATUS"
         if [ "$STATUS" = "200" ]; then
           echo "✅ Smoke test passed"
           exit 0
@@ -353,6 +351,7 @@ preprod_smoke_test:
 # --- ETAPE 5 : NOTIFICATION SLACK ---
 slack_success:
   stage: notify
+  allow_failure: true
   needs:
     - job: production_deploy
       optional: true
@@ -360,9 +359,12 @@ slack_success:
       optional: true
   script:
     - |
+      if [ -z "$SLACK_WEBHOOK_PROD" ]; then
+        echo "SLACK_WEBHOOK_PROD not set, skipping notification"
+        exit 0
+      fi
       SHORT_SHA="${CI_COMMIT_SHA:0:8}"
       DEPLOY_ENV=""
-      if [ "$CI_COMMIT_BRANCH" == "main" ]; then
         DEPLOY_ENV="Production"
       elif [ "$CI_COMMIT_BRANCH" == "preprod" ]; then
         DEPLOY_ENV="Preproduction"
@@ -405,6 +407,7 @@ slack_success:
 
 slack_failure:
   stage: notify
+  allow_failure: true
   needs:
     - job: production_smoke_test
       optional: true
@@ -422,6 +425,10 @@ slack_failure:
       optional: true
   script:
     - |
+      if [ -z "$SLACK_WEBHOOK_PREPROD" ]; then
+        echo "SLACK_WEBHOOK_PREPROD not set, skipping notification"
+        exit 0
+      fi
       SHORT_SHA="${CI_COMMIT_SHA:0:8}"
 
       # Récupérer le vrai job qui a échoué via l'API GitLab
