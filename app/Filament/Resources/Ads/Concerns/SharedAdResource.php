@@ -7,8 +7,10 @@ namespace App\Filament\Resources\Ads\Concerns;
 use App\Enums\AdStatus;
 use App\Models\Ad;
 use App\Models\PropertyAttribute;
+use App\Services\AiDescriptionEnhancer;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Dotswan\MapPicker\Fields\Map;
+use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -23,6 +25,7 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Illuminate\Database\Eloquent\Builder;
@@ -61,7 +64,33 @@ trait SharedAdResource
                         ->placeholder('Décrivez votre bien en détail : état, environnement, commodités à proximité…')
                         ->required()
                         ->rows(4)
-                        ->columnSpanFull(),
+                        ->columnSpanFull()
+                        ->hintAction(
+                            Action::make('enhance_with_ai')
+                                ->label('Améliorer avec l\'IA')
+                                ->icon(Heroicon::Sparkles)
+                                ->color('info')
+                                ->tooltip('Utilisez l\'IA pour améliorer votre description en français professionnel')
+                                ->action(function ($state, $set): void {
+                                    if (empty(trim((string) $state))) {
+                                        \Filament\Notifications\Notification::make()
+                                            ->title('Description vide')
+                                            ->body('Veuillez d\'abord saisir une description avant de l\'améliorer avec l\'IA.')
+                                            ->warning()
+                                            ->send();
+
+                                        return;
+                                    }
+
+                                    $enhanced = app(AiDescriptionEnhancer::class)->enhance((string) $state);
+                                    $set('description', $enhanced);
+
+                                    \Filament\Notifications\Notification::make()
+                                        ->title('Description améliorée ✨')
+                                        ->success()
+                                        ->send();
+                                })
+                        ),
                 ])
                 ->columns(2)
                 ->columnSpanFull(),

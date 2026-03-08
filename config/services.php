@@ -28,13 +28,6 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
-    'fedapay' => [
-        'public_key' => env('FEDAPAY_PUBLIC_KEY'),
-        'secret_key' => env('FEDAPAY_SECRET_KEY'),
-        'environment' => env('FEDAPAY_ENVIRONMENT', 'sandbox'),
-        'webhook_secret' => env('FEDAPAY_WEBHOOK_SECRET'),
-    ],
-
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
@@ -64,6 +57,26 @@ return [
         'client_id' => env('APPLE_CLIENT_ID'),
         'client_secret' => env('APPLE_CLIENT_SECRET'),
         'redirect' => env('APPLE_REDIRECT_URI', '/api/v1/auth/oauth/apple/callback'),
+    ],
+
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),
+    ],
+
+    'groq' => [
+        'api_key' => env('GROQ_API_KEY'),
+        'model' => env('GROQ_MODEL', 'llama-3.3-70b-versatile'),
+    ],
+
+    'gemini' => [
+        'api_key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.0-flash'),
+    ],
+
+    'ai' => [
+        // Which provider to use: openai | groq | gemini
+        'provider' => env('AI_PROVIDER', 'openai'),
     ],
 
 ];
