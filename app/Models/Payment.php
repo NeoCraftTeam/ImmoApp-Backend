@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\PaymentGateway;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
@@ -69,6 +70,13 @@ class Payment extends Model
         'agency_id',
         'plan_id',
         'period',
+        'gateway',
+        'payment_link',
+        'gateway_response',
+        'phone_number',
+        'transaction_id',
+        'amount',
+        'status',
     ];
 
     protected $hidden = [
@@ -81,7 +89,9 @@ class Payment extends Model
         'type' => PaymentType::class,
         'payment_method' => PaymentMethod::class,
         'status' => PaymentStatus::class,
+        'gateway' => PaymentGateway::class,
         'amount' => 'integer',
+        'gateway_response' => 'array',
     ];
 
     public function user(): BelongsTo
@@ -99,9 +109,19 @@ class Payment extends Model
         return $this->belongsTo(Agency::class);
     }
 
+    public function pointPackage(): BelongsTo
+    {
+        return $this->belongsTo(PointPackage::class, 'plan_id');
+    }
+
     public function isPaid(): bool
     {
         return $this->status === PaymentStatus::SUCCESS;
+    }
+
+    public function isTerminal(): bool
+    {
+        return in_array($this->status, [PaymentStatus::SUCCESS, PaymentStatus::FAILED, PaymentStatus::CANCELLED], true);
     }
 
     /**
@@ -174,6 +194,14 @@ class Payment extends Model
     public function isBoosted(): bool
     {
         return $this->type === PaymentType::BOOST;
+    }
+
+    /**
+     * Returns true if the payment was processed via Flutterwave.
+     */
+    public function isFlutterwave(): bool
+    {
+        return $this->gateway === PaymentGateway::Flutterwave;
     }
 
     public function getActivitylogOptions(): LogOptions
