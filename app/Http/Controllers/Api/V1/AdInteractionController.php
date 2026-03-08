@@ -40,6 +40,10 @@ final class AdInteractionController
     {
         $user = $request->user();
 
+        if (!$user) {
+            return response()->json(null, 204);
+        }
+
         // Debounce: 1 view per 5 minutes per user per ad
         $recentView = AdInteraction::where('user_id', $user->id)
             ->where('ad_id', $ad->id)
@@ -80,6 +84,10 @@ final class AdInteractionController
     public function trackImpression(Request $request, Ad $ad): JsonResponse
     {
         $user = $request->user();
+
+        if (!$user) {
+            return response()->json(null, 204);
+        }
 
         $recent = AdInteraction::where('user_id', $user->id)
             ->where('ad_id', $ad->id)
