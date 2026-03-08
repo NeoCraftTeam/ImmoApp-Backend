@@ -10,12 +10,14 @@ use App\Filament\Resources\Ads\Concerns\SharedAdResource;
 use App\Mail\AdApprovedMail;
 use App\Mail\AdDeclinedMail;
 use App\Models\Ad;
+use App\Services\AiDescriptionEnhancer;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\MarkdownEditor;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Actions as SchemaActions;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
@@ -163,6 +165,35 @@ class PendingAdResource extends Resource
                             ->required()
                             ->minLength(20)
                             ->columnSpanFull(),
+                        SchemaActions::make([
+                            Action::make('enhance_reason_with_ai')
+                                ->label('Améliorer avec l\'IA')
+                                ->icon(Heroicon::Sparkles)
+                                ->color('info')
+                                ->size('sm')
+                                ->tooltip('Reformule le motif en français professionnel et clair')
+                                ->action(function ($get, $set): void {
+                                    $reason = (string) ($get('reason') ?? '');
+
+                                    if (empty(trim($reason))) {
+                                        Notification::make()
+                                            ->title('Motif vide')
+                                            ->body('Veuillez d\'abord saisir un motif avant de l\'améliorer avec l\'IA.')
+                                            ->warning()
+                                            ->send();
+
+                                        return;
+                                    }
+
+                                    $enhanced = app(AiDescriptionEnhancer::class)->enhanceRejectionReason($reason);
+                                    $set('reason', $enhanced);
+
+                                    Notification::make()
+                                        ->title('Motif amélioré ✨')
+                                        ->success()
+                                        ->send();
+                                }),
+                        ])->columnSpanFull(),
                     ])
                     ->action(function (Ad $record, array $data): void {
                         $reason = $data['reason'] ?? '';
@@ -177,13 +208,12 @@ class PendingAdResource extends Resource
                         }
 
                         $title = $record->title;
-                        $record->forceFill(['status' => \App\Enums\AdStatus::DECLINED])->save();
-                        $record->delete();
+                        $record->forceFill(['status' => AdStatus::DECLINED])->save();
 
                         Notification::make()
                             ->warning()
                             ->title('Annonce déclinée')
-                            ->body("\"{$title}\" a été supprimée. L'auteur a été notifié par email.")
+                            ->body("\"{$title}\" a été refusée. L'auteur a été notifié par email.")
                             ->send();
                     }),
             ])
