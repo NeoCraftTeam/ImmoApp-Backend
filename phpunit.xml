@@ -32,5 +32,8 @@
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="SCOUT_DRIVER" value="null"/>
+        <env name="PAYMENT_GATEWAY" value="flutterwave"/>
+        <env name="FLW_SECRET_KEY" value="FLWSECK_TEST-fake"/>
+        <env name="FLW_WEBHOOK_SECRET" value="test_webhook_secret_123"/>
     </php>
 </phpunit>

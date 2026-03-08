@@ -7,8 +7,8 @@ use App\Models\Agency;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
-use App\Services\FedaPayService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
@@ -122,16 +122,12 @@ test('user without agency cannot subscribe', function (): void {
 });
 
 test('agent can initiate subscription payment', function (): void {
-    $mock = Mockery::mock(FedaPayService::class);
-    $mock->shouldReceive('createSubscriptionPayment')
-        ->once()
-        ->withArgs(fn ($amount, $agency, $planId, $period) => $amount === 35000 && $period === 'monthly')
-        ->andReturn([
-            'success' => true,
-            'url' => 'https://fedapay.com/pay/sub-123',
-            'transaction_id' => 'sub-tx-123',
-        ]);
-    $this->app->instance(FedaPayService::class, $mock);
+    Http::fake([
+        'api.flutterwave.com/*' => Http::response([
+            'status' => 'success',
+            'data' => ['link' => 'https://checkout.flutterwave.com/pay/sub-123'],
+        ], 200),
+    ]);
 
     Sanctum::actingAs($this->agentUser);
 
@@ -152,16 +148,12 @@ test('agent can initiate subscription payment', function (): void {
 });
 
 test('agent can subscribe yearly with correct amount', function (): void {
-    $mock = Mockery::mock(FedaPayService::class);
-    $mock->shouldReceive('createSubscriptionPayment')
-        ->once()
-        ->withArgs(fn ($amount) => $amount === 350000)
-        ->andReturn([
-            'success' => true,
-            'url' => 'https://fedapay.com/pay/sub-yearly',
-            'transaction_id' => 'sub-tx-yearly',
-        ]);
-    $this->app->instance(FedaPayService::class, $mock);
+    Http::fake([
+        'api.flutterwave.com/*' => Http::response([
+            'status' => 'success',
+            'data' => ['link' => 'https://checkout.flutterwave.com/pay/sub-yearly'],
+        ], 200),
+    ]);
 
     Sanctum::actingAs($this->agentUser);
 

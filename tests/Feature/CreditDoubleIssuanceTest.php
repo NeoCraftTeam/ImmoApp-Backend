@@ -4,7 +4,7 @@
  * Regression tests for the credit double-issuance vulnerability.
  *
  * Root cause: verifyPurchase() lacked a DB transaction + lockForUpdate(), so it
- * could race with the FedaPay webhook and credit points twice for the same payment.
+ * could race with the webhook and credit points twice for the same payment.
  *
  * These tests guard all three defences:
  *   1. verifyPurchase() is idempotent when called twice concurrently (application lock).
@@ -21,23 +21,32 @@ use App\Models\PointPackage;
 use App\Models\PointTransaction;
 use App\Models\Setting;
 use App\Models\User;
-use App\Services\FedaPayService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
 /**
- * Mock FedaPayService to return an approved transaction for any retrieve call.
+ * Mock Flutterwave verify endpoint to return a successful transaction.
  */
-function mockFedaPayApproved(): void
+function mockFlutterwaveApproved(): void
 {
-    $mock = Mockery::mock(FedaPayService::class);
-    $mock->shouldReceive('retrieveTransaction')
-        ->andReturn(['success' => true, 'status' => 'approved']);
-    app()->instance(FedaPayService::class, $mock);
+    Http::fake([
+        'api.flutterwave.com/v3/transactions/verify_by_reference*' => Http::response([
+            'status' => 'success',
+            'data' => [
+                'status' => 'successful',
+                'amount' => 1000,
+                'currency' => 'XAF',
+                'tx_ref' => 'test-ref',
+                'payment_type' => 'mobilemoneycameroon',
+                'created_at' => now()->toIso8601String(),
+            ],
+        ], 200),
+    ]);
 }
 
 // ── 1. Unique constraint prevents DB-level duplicate credit ───────────────────
@@ -72,7 +81,7 @@ it('the point_transactions table rejects two rows with the same payment_id', fun
 
 it('verify-purchase does not re-credit points when the webhook already processed the payment', function (): void {
     Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
-    mockFedaPayApproved();
+    mockFlutterwaveApproved();
 
     $user = User::factory()->create(['point_balance' => 0]);
     $package = PointPackage::factory()->create(['price' => 1000, 'points_awarded' => 10]);
@@ -82,7 +91,8 @@ it('verify-purchase does not re-credit points when the webhook already processed
         'transaction_id' => 'txn-already-webhook-processed',
         'status' => PaymentStatus::SUCCESS,
         'type' => PaymentType::CREDIT,
-        'payment_method' => PaymentMethod::FEDAPAY,
+        'payment_method' => PaymentMethod::FLUTTERWAVE,
+        'gateway' => 'flutterwave',
         'amount' => $package->price,
     ]);
 
@@ -110,7 +120,7 @@ it('verify-purchase does not re-credit points when the webhook already processed
 
 it('verify-purchase credits points exactly once even when called twice for a pending payment', function (): void {
     Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
-    mockFedaPayApproved();
+    mockFlutterwaveApproved();
 
     $user = User::factory()->create(['point_balance' => 0]);
     $package = PointPackage::factory()->create(['price' => 1000, 'points_awarded' => 10]);
@@ -120,7 +130,8 @@ it('verify-purchase credits points exactly once even when called twice for a pen
         'transaction_id' => 'txn-verify-idempotent',
         'status' => PaymentStatus::PENDING,
         'type' => PaymentType::CREDIT,
-        'payment_method' => PaymentMethod::FEDAPAY,
+        'payment_method' => PaymentMethod::FLUTTERWAVE,
+        'gateway' => 'flutterwave',
         'amount' => $package->price,
     ]);
 
@@ -146,7 +157,7 @@ it('verify-purchase credits points exactly once even when called twice for a pen
 
 it('Pack Starter at 1000 FCFA awards exactly 10 credits via verify-purchase', function (): void {
     Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
-    mockFedaPayApproved();
+    mockFlutterwaveApproved();
 
     $user = User::factory()->create(['point_balance' => 0]);
     $packStarter = PointPackage::factory()->create([
@@ -161,7 +172,8 @@ it('Pack Starter at 1000 FCFA awards exactly 10 credits via verify-purchase', fu
         'transaction_id' => 'txn-pack-starter',
         'status' => PaymentStatus::PENDING,
         'type' => PaymentType::CREDIT,
-        'payment_method' => PaymentMethod::FEDAPAY,
+        'payment_method' => PaymentMethod::FLUTTERWAVE,
+        'gateway' => 'flutterwave',
         'amount' => $packStarter->price,
     ]);
 
@@ -179,34 +191,38 @@ it('Pack Starter at 1000 FCFA awards exactly 10 credits via verify-purchase', fu
 it('webhook followed by verify-purchase results in exactly one credit of 10 points', function (): void {
     Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
     $secret = 'test-webhook-secret';
-    config()->set('services.fedapay.webhook_secret', $secret);
+    config()->set('payment.gateways.flutterwave.webhook_secret', $secret);
+    config()->set('payment.gateways.flutterwave.secret_key', 'FLWSECK_TEST-fake');
 
     $user = User::factory()->create(['point_balance' => 0]);
     $package = PointPackage::factory()->create(['price' => 1000, 'points_awarded' => 10]);
 
     Payment::factory()->create([
         'user_id' => $user->id,
-        'transaction_id' => 'txn-webhook-then-verify',
+        'transaction_id' => 'KH-WHTHENVERIFY',
         'status' => PaymentStatus::PENDING,
         'type' => PaymentType::CREDIT,
-        'payment_method' => PaymentMethod::FEDAPAY,
+        'payment_method' => PaymentMethod::FLUTTERWAVE,
+        'gateway' => 'flutterwave',
         'amount' => $package->price,
+        'plan_id' => $package->id,
     ]);
 
-    // Step 1: webhook fires and credits 10 points
-    $body = json_encode([
-        'name' => 'transaction.approved',
-        'entity' => [
-            'id' => 'txn-webhook-then-verify',
-            'metadata' => ['package_id' => $package->id],
+    $payload = json_encode([
+        'event' => 'charge.completed',
+        'data' => [
+            'status' => 'successful',
+            'tx_ref' => 'KH-WHTHENVERIFY',
+            'amount' => 1000,
+            'currency' => 'XAF',
+            'meta' => ['package_id' => $package->id],
         ],
     ]);
-    $timestamp = (string) time();
-    $sig = hash_hmac('sha256', $timestamp.'.'.$body, $secret);
 
-    $this->postJson('/api/v1/payments/webhook', json_decode($body, true), [
-        'X-FedaPay-Signature' => "t={$timestamp},v1={$sig}",
-    ])->assertOk();
+    $this->call('POST', '/api/v1/webhooks/flutterwave', [], [], [], [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_VERIF_HASH' => $secret,
+    ], $payload)->assertOk();
 
     expect($user->fresh()->point_balance)->toBe(10);
 
