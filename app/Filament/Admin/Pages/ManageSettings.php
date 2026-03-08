@@ -26,9 +26,9 @@ class ManageSettings extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::CurrencyDollar;
 
-    protected static ?string $navigationLabel = 'Tarification';
+    protected static ?string $navigationLabel = 'Paramètres';
 
-    protected static ?string $title = 'Tarification & Prix';
+    protected static ?string $title = 'Paramètres de la plateforme';
 
     protected static ?int $navigationSort = 2;
 
@@ -44,7 +44,6 @@ class ManageSettings extends Page
     public function mount(): void
     {
         $this->form->fill([
-            'unlock_price' => Setting::get('unlock_price', 500),
             'unlock_cost_points' => Setting::get('unlock_cost_points', 2),
             'welcome_bonus_points' => Setting::get('welcome_bonus_points', 5),
             'ad_lifetime_days' => Setting::get('ad_lifetime_days', 30),
@@ -56,65 +55,6 @@ class ManageSettings extends Page
         return $schema
             ->statePath('data')
             ->components([
-                Section::make('Paiements')
-                    ->description('Configuration des tarifs de l\'application')
-                    ->icon(Heroicon::CurrencyDollar)
-                    ->schema([
-                        TextInput::make('unlock_price')
-                            ->label('Prix de déblocage d\'une annonce (FCFA)')
-                            ->helperText('Montant facturé pour débloquer une annonce et voir toutes les images et le contact du propriétaire.')
-                            ->numeric()
-                            ->required()
-                            ->minValue(0)
-                            ->suffix('FCFA')
-                            ->default(500),
-                    ])
-                    ->footerActions([
-                        Action::make('savePricing')
-                            ->label('Modifier le tarif')
-                            ->icon('heroicon-o-shield-check')
-                            ->color('warning')
-                            ->requiresConfirmation()
-                            ->modalIcon('heroicon-o-shield-exclamation')
-                            ->modalIconColor('warning')
-                            ->modalHeading('Modification sensible')
-                            ->modalDescription('Cette action modifie le prix de déblocage pour tous les utilisateurs. Un code de vérification sera envoyé à votre adresse email.')
-                            ->modalSubmitActionLabel('Envoyer le code de vérification')
-                            ->action(fn () => $this->sendVerificationCode('pricing'))
-                            ->visible(fn (): bool => $this->awaitingSection !== 'pricing'),
-                        Action::make('verifyPricingCode')
-                            ->label('Confirmer avec le code')
-                            ->icon('heroicon-o-check-circle')
-                            ->color('success')
-                            ->form([
-                                TextInput::make('code')
-                                    ->label('Code de vérification')
-                                    ->required()
-                                    ->length(6)
-                                    ->placeholder('000000')
-                                    ->autofocus()
-                                    ->extraInputAttributes([
-                                        'class' => 'text-center text-2xl tracking-widest font-mono',
-                                        'inputmode' => 'numeric',
-                                    ]),
-                            ])
-                            ->modalIcon('heroicon-o-envelope')
-                            ->modalIconColor('success')
-                            ->modalHeading('Vérification par email')
-                            ->modalDescription('Saisissez le code à 6 chiffres reçu par email pour confirmer la modification du tarif.')
-                            ->modalSubmitActionLabel('Confirmer la modification')
-                            ->action(function (array $data): void {
-                                $this->verificationCode = (string) $data['code'];
-                                $this->confirmWithCode('pricing');
-                            })
-                            ->visible(fn (): bool => $this->awaitingSection === 'pricing'),
-                        Action::make('cancelPricingVerification')
-                            ->label('Annuler la vérification')
-                            ->icon('heroicon-o-x-mark')
-                            ->color('gray')
-                            ->action(fn () => $this->cancelVerification())
-                            ->visible(fn (): bool => $this->awaitingSection === 'pricing'),
-                    ]),
                 Section::make('Système de crédits')
                     ->description('Configuration du système de crédits utilisé pour débloquer les annonces')
                     ->icon(Heroicon::Star)
@@ -289,7 +229,6 @@ class ManageSettings extends Page
         Cache::forget("settings_verification_{$section}_{$user->id}");
 
         match ($section) {
-            'pricing' => $this->savePricingSettings(),
             'credits' => $this->saveCreditsSettings(),
             'ads' => $this->saveAdsSettings(),
             default => null,
@@ -297,38 +236,6 @@ class ManageSettings extends Page
 
         $this->awaitingSection = '';
         $this->verificationCode = '';
-    }
-
-    /**
-     * Save the unlock_price setting.
-     */
-    public function savePricingSettings(): void
-    {
-        $data = $this->form->getState();
-        $oldValue = Setting::get('unlock_price', 500);
-
-        Setting::set(
-            'unlock_price',
-            $data['unlock_price'],
-            'Prix de déblocage d\'une annonce (FCFA)',
-            'payments'
-        );
-
-        activity('settings')
-            ->causedBy(auth()->user())
-            ->performedOn(Setting::find('unlock_price'))
-            ->withProperties([
-                'old' => ['unlock_price' => $oldValue],
-                'attributes' => ['unlock_price' => $data['unlock_price']],
-            ])
-            ->event('updated')
-            ->log('Modification du prix de déblocage');
-
-        Notification::make()
-            ->title('Tarif mis à jour')
-            ->body("Le prix de déblocage est maintenant de {$data['unlock_price']} FCFA.")
-            ->success()
-            ->send();
     }
 
     /**
