@@ -23,6 +23,8 @@ class SurveyTemplateResource extends Resource
 {
     protected static ?string $model = Survey::class;
 
+    protected static ?string $slug = 'question-templates';
+
     protected static bool $isScopedToTenant = false;
 
     protected static string|null|\UnitEnum $navigationGroup = 'Utilisateurs';

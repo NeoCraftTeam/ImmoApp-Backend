@@ -7,6 +7,7 @@ namespace App\Filament\Admin\Resources\Surveys\Pages;
 use App\Filament\Admin\Resources\Surveys\SurveyResource;
 use App\Models\AnonymousSurveyResponse;
 use App\Models\Survey;
+use App\Models\SurveyResponse;
 use App\Models\User;
 use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
@@ -27,7 +28,7 @@ class ViewSurvey extends ViewRecord
     /**
      * Build the list of unique respondents with their answers for the slide-over.
      *
-     * @return Collection<int, array{user_id: string, user: User|null, display_name: string, email: string, avatar: string|null, answers: array<int, array{question: string, type: string, answer: string, has_answer: bool}>, answer_count: int, submitted_at: string, submitted_at_raw: mixed, is_anonymous: bool}>
+     * @return Collection<int, array{user_id: string, user: User|null, display_name: string, email: string, avatar: string|null, answers: array<int, array{question: string, type: string, answer: string, has_answer: bool}>, answer_count: int, submitted_at: string, submitted_at_raw: mixed, is_anonymous: bool, is_new: bool}>
      */
     public function getRespondentsWithAnswers(): Collection
     {
@@ -45,7 +46,7 @@ class ViewSurvey extends ViewRecord
             ->sortByDesc('created_at')
             ->groupBy(fn ($r) => $r->user_id ?? ('anon_'.$r->id))
             ->map(function (Collection $responses) use ($survey): array {
-                /** @var \App\Models\SurveyResponse $first */
+                /** @var SurveyResponse $first */
                 $first = $responses->first();
                 /** @var User|null $user */
                 $user = $first->user;
@@ -62,6 +63,7 @@ class ViewSurvey extends ViewRecord
                 })->values()->all();
 
                 $latestAt = $responses->max('created_at');
+                $allViewed = $responses->every(fn (SurveyResponse $r): bool => $r->viewed_at !== null);
 
                 return [
                     'user_id' => $first->user_id ?? 'anonymous',
@@ -74,6 +76,8 @@ class ViewSurvey extends ViewRecord
                     'submitted_at' => $latestAt instanceof \Carbon\Carbon ? $latestAt->format('d/m/Y à H:i') : '—',
                     'submitted_at_raw' => $latestAt,
                     'is_anonymous' => false,
+                    'is_new' => !$allViewed,
+                    'response_ids' => $responses->pluck('id')->all(),
                 ];
             });
 
@@ -108,6 +112,8 @@ class ViewSurvey extends ViewRecord
                     'submitted_at' => $anonResponse->submitted_at->format('d/m/Y à H:i'),
                     'submitted_at_raw' => $anonResponse->submitted_at,
                     'is_anonymous' => true,
+                    'is_new' => $anonResponse->viewed_at === null,
+                    'anon_response_id' => $anonResponse->id,
                 ];
             });
 
@@ -116,6 +122,46 @@ class ViewSurvey extends ViewRecord
             ->merge($anonymous)
             ->sortByDesc('submitted_at_raw')
             ->values();
+    }
+
+    /**
+     * Mark a batch of survey responses as viewed by the admin.
+     */
+    public function markAsViewed(string $type, string $id): void
+    {
+        $now = now();
+
+        if ($type === 'authenticated') {
+            SurveyResponse::query()
+                ->whereIn('id', explode(',', $id))
+                ->whereNull('viewed_at')
+                ->update(['viewed_at' => $now]);
+        } elseif ($type === 'anonymous') {
+            AnonymousSurveyResponse::query()
+                ->where('id', $id)
+                ->whereNull('viewed_at')
+                ->update(['viewed_at' => $now]);
+        }
+    }
+
+    /**
+     * Mark ALL unviewed responses for this survey as viewed.
+     */
+    public function markAllAsViewed(): void
+    {
+        /** @var Survey $survey */
+        $survey = $this->record;
+        $now = now();
+
+        SurveyResponse::query()
+            ->where('survey_id', $survey->id)
+            ->whereNull('viewed_at')
+            ->update(['viewed_at' => $now]);
+
+        AnonymousSurveyResponse::query()
+            ->where('survey_id', $survey->id)
+            ->whereNull('viewed_at')
+            ->update(['viewed_at' => $now]);
     }
 
     private function formatAnswer(string $answer, string $type): string
