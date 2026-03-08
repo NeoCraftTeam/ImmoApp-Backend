@@ -43,7 +43,7 @@ class ManageSubscription extends Page
 
     public array $stats = [];
 
-    /** Set to true while awaiting FedaPay webhook confirmation after payment redirect. */
+    /** Set to true while awaiting webhook confirmation after payment redirect. */
     public bool $awaitingConfirmation = false;
 
     public function mount(): void
@@ -106,33 +106,23 @@ class ManageSubscription extends Page
             return;
         }
 
-        // Verify payment status with FedaPay API before activating
         try {
-            $fedaPayService = app(\App\Services\FedaPayService::class);
-            $transaction = $fedaPayService->retrieveTransaction($transactionId);
+            $paymentService = app(\App\Services\Payment\PaymentService::class);
+            $payment = $paymentService->syncPaymentStatus($payment);
 
-            if ($transaction['status'] !== 'approved') {
-                \Illuminate\Support\Facades\Log::warning('FedaPay verification failed for subscription payment', [
+            if ($payment->status !== \App\Enums\PaymentStatus::SUCCESS) {
+                \Illuminate\Support\Facades\Log::warning('Payment verification failed for subscription', [
                     'transaction_id' => $transactionId,
                     'agency_id' => $agency->id,
-                    'fedapay_status' => $transaction['status'],
+                    'status' => $payment->status->value,
                 ]);
 
                 return;
             }
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('FedaPay API verification error: '.$e->getMessage());
-
-            return;
-        }
-
-        \Illuminate\Support\Facades\DB::beginTransaction();
-        try {
-            $payment->forceFill(['status' => \App\Enums\PaymentStatus::SUCCESS])->save();
 
             $plan = \App\Models\SubscriptionPlan::find($payment->plan_id);
 
-            if ($plan) {
+            if ($plan && !$agency->hasActiveSubscription()) {
                 $subscriptionService = app(\App\Services\SubscriptionService::class);
                 $subscription = $subscriptionService->createSubscription($agency, $plan, $payment->period ?? 'monthly', $payment);
                 $subscriptionService->activateSubscription($subscription);
@@ -143,11 +133,8 @@ class ManageSubscription extends Page
                     ->success()
                     ->send();
             }
-
-            \Illuminate\Support\Facades\DB::commit();
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\DB::rollBack();
-            \Illuminate\Support\Facades\Log::error('Erreur activation manuelle: '.$e->getMessage());
+            \Illuminate\Support\Facades\Log::error('Payment verification error: '.$e->getMessage());
         }
     }
 
@@ -166,7 +153,7 @@ class ManageSubscription extends Page
 
         $transactionId = session('keyhome_pending_transaction');
 
-        // Try to verify via FedaPay API if we still have a pending transaction ID.
+        // Try to verify via payment gateway if we still have a pending transaction ID.
         if ($transactionId) {
             $this->verifyPayment($transactionId);
         }
@@ -214,50 +201,30 @@ class ManageSubscription extends Page
             return;
         }
 
-        $fedaPay = new \App\Services\FedaPayService;
+        try {
+            $paymentService = app(\App\Services\Payment\PaymentService::class);
 
-        // On génère l'URL de retour correcte pour Filament Multi-tenancy
-        $callbackUrl = \Filament\Facades\Filament::getPanel('agency')->getUrl($agency).'/abonnement';
-
-        $result = $fedaPay->createSubscriptionPayment(
-            (int) $price,
-            $agency,
-            $plan->id,
-            $this->period,
-            $callbackUrl
-        );
-
-        if ($result['success']) {
-            /** @var \App\Models\Agency $agency */
-            $agency = auth()->user()->agency;
-
-            // Créer le paiement en attente dans notre base pour le suivi
-            $payment = new \App\Models\Payment;
-            $payment->forceFill([
-                'user_id' => auth()->id(),
+            $result = $paymentService->createPayment(auth()->user(), [
+                'amount' => (float) $price,
+                'type' => \App\Enums\PaymentType::SUBSCRIPTION->value,
                 'agency_id' => $agency->id,
-                'type' => \App\Enums\PaymentType::SUBSCRIPTION,
-                'transaction_id' => $result['transaction_id'],
-                'amount' => $price,
                 'plan_id' => $plan->id,
                 'period' => $this->period,
-                'status' => \App\Enums\PaymentStatus::PENDING,
-                'payment_method' => \App\Enums\PaymentMethod::FEDAPAY,
+                'description' => 'Abonnement '.$plan->name.' ('.$this->period.')',
             ]);
-            $payment->save();
 
-            // Persist transaction ID so the polling screen can verify on return.
-            session(['keyhome_pending_transaction' => $result['transaction_id']]);
+            session(['keyhome_pending_transaction' => $result['tx_ref']]);
 
-            // Rediriger vers FedaPay
-            return redirect()->away($result['url']);
+            return redirect()->away($result['link']);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Payment initiation error: '.$e->getMessage());
+
+            \Filament\Notifications\Notification::make()
+                ->title('Erreur de paiement')
+                ->body('Impossible d\'initier le paiement. Veuillez réessayer.')
+                ->danger()
+                ->send();
         }
-
-        \Filament\Notifications\Notification::make()
-            ->title('Erreur FedaPay')
-            ->body($result['message'])
-            ->danger()
-            ->send();
     }
 
     public function cancelSubscription()

@@ -86,7 +86,7 @@ final class AdResource extends JsonResource
                     'lastname' => $owner->lastname,
                     'display_name' => $owner->fullname,
                     'avatar' => $owner->getFirstMediaUrl('avatars') ?: $this->getAvatarUrl($owner->avatar),
-                    'agency_name' => $owner->agency instanceof \App\Models\Agency ? $owner->agency->name : null,
+                    'agency_name' => $owner->relationLoaded('agency') && $owner->agency instanceof \App\Models\Agency ? $owner->agency->name : null,
                     // Show contact info only if unlocked or owner/admin
                     'phone_number' => ($isUnlocked || $isOwnerOrAdmin) ? $owner->phone_number : null,
                     'phone_is_whatsapp' => ($isUnlocked || $isOwnerOrAdmin) ? (bool) $owner->phone_is_whatsapp : null,

@@ -79,6 +79,10 @@ class AgencyPanelProvider extends PanelProvider
                 fn () => view('pwa.head-meta', ['themeColor' => '#2563eb']),
             )
             ->renderHook(
+                'panels::head.end',
+                fn () => new \Illuminate\Support\HtmlString('<style>.fi-no { z-index: 9999 !important; }</style>'),
+            )
+            ->renderHook(
                 'panels::body.end',
                 fn () => view('pwa.splash'),
             )

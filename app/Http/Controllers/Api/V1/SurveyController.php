@@ -8,6 +8,8 @@ use App\Enums\UserRole;
 use App\Http\Resources\SurveyResource;
 use App\Mail\SurveyAdminNotificationMail;
 use App\Mail\SurveySubmittedMail;
+use App\Models\AnonymousSurveyAnswer;
+use App\Models\AnonymousSurveyResponse;
 use App\Models\Survey;
 use App\Models\SurveyResponse;
 use App\Models\User;
@@ -168,9 +170,15 @@ final readonly class SurveyController
                 Rule::exists('survey_questions', 'id')->where('survey_id', $survey->id),
             ],
             'answers.*.answer' => ['required'],
+            'anonymous' => ['sometimes', 'boolean'],
         ]);
 
         $user = $request->user();
+        $submitAnonymously = (bool) ($validated['anonymous'] ?? false);
+
+        if ($submitAnonymously) {
+            return $this->submitAsAnonymous($survey, $validated['answers'], $user);
+        }
 
         foreach ($validated['answers'] as $response) {
             $answerValue = is_array($response['answer'])
@@ -232,6 +240,41 @@ final readonly class SurveyController
             ->exists();
 
         return response()->json(['has_answered' => $hasAnswered]);
+    }
+
+    /**
+     * Submit responses anonymously for an authenticated user who opts for guest mode.
+     *
+     * @param  array<int, array{question_id: string, answer: mixed}>  $answers
+     */
+    private function submitAsAnonymous(Survey $survey, array $answers, User $user): JsonResponse
+    {
+        $tokenHash = hash_hmac('sha256', $user->id.'-'.now()->timestamp, (string) config('app.key'));
+        $ipHash = hash('sha256', request()->ip() ?? 'unknown');
+
+        $response = AnonymousSurveyResponse::create([
+            'survey_id' => $survey->id,
+            'session_token_hash' => $tokenHash,
+            'ip_hash' => $ipHash,
+            'submitted_at' => now(),
+        ]);
+
+        $now = now();
+        $rows = array_map(
+            fn (array $a) => [
+                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'anonymous_response_id' => $response->id,
+                'survey_question_id' => $a['question_id'],
+                'answer' => is_array($a['answer']) ? json_encode($a['answer']) : (string) $a['answer'],
+                'created_at' => $now,
+                'updated_at' => $now,
+            ],
+            $answers,
+        );
+
+        AnonymousSurveyAnswer::insert($rows);
+
+        return response()->json(['message' => 'Merci pour votre participation anonyme !'], 201);
     }
 
     /**

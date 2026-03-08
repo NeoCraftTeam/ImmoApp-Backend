@@ -268,6 +268,26 @@ final class AuthController
                 ], 422);
             }
 
+            // Vérifier la prévention des multi-comptes par IP (hors localhost)
+            $registrationIp = $request->ip();
+            $isLocalhost = in_array($registrationIp, ['127.0.0.1', '::1'], true);
+            if (!$isLocalhost) {
+                $existingAccountsFromIp = User::where('registration_ip', $registrationIp)
+                    ->where('created_at', '>=', now()->subDays((int) config('auth.ip_block_days', 30)))
+                    ->count();
+
+                if ($existingAccountsFromIp >= (int) config('auth.max_accounts_per_ip', 3)) {
+                    Log::warning('Multi-account registration attempt blocked by IP', [
+                        'ip' => $registrationIp,
+                        'existing_accounts' => $existingAccountsFromIp,
+                    ]);
+
+                    return response()->json([
+                        'message' => 'Vous ne pouvez pas créer plus de comptes depuis cette adresse IP.',
+                    ], 422);
+                }
+            }
+
             // Transaction pour assurer la cohérence
             // P1-1 Fix: email uniqueness is also enforced by DB unique constraint;
             // catch UniqueConstraintViolationException for clean 409 response
@@ -292,6 +312,7 @@ final class AuthController
                     'is_active' => true,
                     'email_verified_at' => null,
                     'last_login_ip' => $request->ip(),
+                    'registration_ip' => $request->ip(),
                 ]);
                 $user->save();
 
@@ -1332,7 +1353,7 @@ final class AuthController
      */
     public function me(Request $request): \App\Http\Resources\UserResource
     {
-        return new UserResource($request->user());
+        return new UserResource($request->user()->load(['agency', 'city']));
     }
 
     /**

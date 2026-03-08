@@ -18,7 +18,6 @@
         "darkaonline/l5-swagger": "^9.0",
         "dotswan/filament-map-picker": "^2.1",
         "dutchcodingcompany/filament-socialite": "^3.1",
-        "fedapay/fedapay-php": "^0.4.7",
         "filament/filament": "~4.0",
         "filament/spatie-laravel-media-library-plugin": "^4.3",
         "flowframe/laravel-trend": "^0.4",

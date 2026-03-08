@@ -116,4 +116,19 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | IP-Based Multi-Account Prevention
+    |--------------------------------------------------------------------------
+    |
+    | These settings control how many accounts can be registered from the same
+    | IP address within the configured number of days. Set max_accounts_per_ip
+    | to a high number to effectively disable this feature.
+    |
+    */
+
+    'ip_block_days' => env('AUTH_IP_BLOCK_DAYS', 30),
+
+    'max_accounts_per_ip' => env('AUTH_MAX_ACCOUNTS_PER_IP', 3),
+
 ];

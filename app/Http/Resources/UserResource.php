@@ -38,9 +38,6 @@ final class UserResource extends JsonResource
     #[\Override]
     public function toArray(Request $request): array
     {
-        $isAgency = $this->type === \App\Enums\UserType::AGENCY;
-        $agencyName = $this->agency instanceof \App\Models\Agency ? $this->agency->name : null;
-
         return [
             'id' => $this->id,
             'firstname' => $this->firstname,
@@ -56,7 +53,7 @@ final class UserResource extends JsonResource
             'avatar' => $this->getFirstMediaUrl('avatars') ?: $this->getAvatarUrl(),
             'display_name' => $this->fullname,
             'name' => $this->fullname,
-            'agency_name' => ($this->agency instanceof \App\Models\Agency) ? $this->agency->name : null,
+            'agency_name' => $this->whenLoaded('agency', fn () => $this->agency->name),
 
             // Le propriétaire du compte ou un admin peut voir le role/type
             'role' => $this->when($request->user()?->id === $this->id || $request->user()?->isAdmin(), $this->role),
@@ -65,7 +62,7 @@ final class UserResource extends JsonResource
             'created_at' => $this->when($request->user()?->isAdmin(), $this->created_at),
             'updated_at' => $this->when($request->user()?->isAdmin(), $this->updated_at),
             'city_id' => $this->city_id,
-            'city_name' => $this->city?->name,
+            'city_name' => $this->whenLoaded('city', fn () => $this->city->name),
             'point_balance' => $this->when(
                 $request->user()?->id === $this->id,
                 (int) $this->point_balance

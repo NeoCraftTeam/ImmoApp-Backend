@@ -8,6 +8,7 @@ use App\Filament\Bailleur\Resources\Viewings\ViewingAvailabilityResource;
 use App\Models\Ad;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
 use Filament\Actions\Action;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -104,8 +105,24 @@ class ManageViewingAvailabilities extends ManageRecords
                                     'biweekly' => 'Toutes les 2 semaines',
                                     'monthly' => 'Chaque mois',
                                 ])
+                                ->live()
                                 ->required(fn (\Filament\Schemas\Components\Utilities\Get $get) => (bool) $get('is_recurring')),
                         ]),
+
+                    CheckboxList::make('recurrence_days')
+                        ->label('Jours de la semaine')
+                        ->helperText('Sélectionnez les jours où vous êtes disponible.')
+                        ->options([
+                            'monday' => 'Lundi',
+                            'tuesday' => 'Mardi',
+                            'wednesday' => 'Mercredi',
+                            'thursday' => 'Jeudi',
+                            'friday' => 'Vendredi',
+                            'saturday' => 'Samedi',
+                            'sunday' => 'Dimanche',
+                        ])
+                        ->columns(4)
+                        ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => in_array($get('recurrence'), ['weekly', 'biweekly'])),
 
                     Repeater::make('periods')
                         ->label('Plages horaires')

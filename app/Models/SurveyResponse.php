@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property string $survey_question_id
  * @property string $user_id
  * @property string $answer
+ * @property Carbon|null $viewed_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Survey $survey
@@ -41,7 +42,16 @@ class SurveyResponse extends Model
         'survey_question_id',
         'user_id',
         'answer',
+        'viewed_at',
     ];
+
+    #[\Override]
+    public function casts(): array
+    {
+        return [
+            'viewed_at' => 'datetime',
+        ];
+    }
 
     public function survey(): BelongsTo
     {

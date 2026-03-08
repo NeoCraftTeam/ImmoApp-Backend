@@ -154,6 +154,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'oauth_provider',
         'oauth_avatar',
         'onboarding_completed_at',
+        'registration_ip',
     ];
 
     /**

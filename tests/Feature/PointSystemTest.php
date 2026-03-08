@@ -4,12 +4,10 @@ use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
 use App\Enums\PointTransactionType;
-use App\Models\Ad;
 use App\Models\Payment;
 use App\Models\PointPackage;
 use App\Models\PointTransaction;
 use App\Models\Setting;
-use App\Models\UnlockedAd;
 use App\Models\User;
 use App\Services\PointService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -74,62 +72,6 @@ it('hasEnough returns false when balance is insufficient', function (): void {
     expect(app(PointService::class)->hasEnough($user, 2))->toBeFalse();
 });
 
-// ── PAYMENT CONTROLLER - INITIALIZE ───────────────────────────────────────────
-
-it('initialize unlocks ad instantly when user has enough points', function (): void {
-    Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
-    Setting::set('unlock_cost_points', 2, 'Cout unlock', 'points');
-
-    $user = User::factory()->create(['point_balance' => 5]);
-    $ad = Ad::factory()->create();
-
-    $this->actingAs($user, 'sanctum')
-        ->postJson("/api/v1/payments/initialize/{$ad->id}")
-        ->assertOk()
-        ->assertJsonPath('status', 'unlocked');
-
-    expect($user->fresh()->point_balance)->toBe(3);
-    expect(UnlockedAd::where('user_id', $user->id)->where('ad_id', $ad->id)->exists())->toBeTrue();
-});
-
-it('initialize returns insufficient_points with packages when balance is low', function (): void {
-    Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
-    Setting::set('unlock_cost_points', 5, 'Cout unlock', 'points');
-
-    $user = User::factory()->create(['point_balance' => 1]);
-    $ad = Ad::factory()->create();
-    PointPackage::factory()->create(['is_active' => true]);
-
-    $this->actingAs($user, 'sanctum')
-        ->postJson("/api/v1/payments/initialize/{$ad->id}")
-        ->assertStatus(402)
-        ->assertJsonPath('status', 'insufficient_points')
-        ->assertJsonStructure(['packages']);
-});
-
-it('initialize returns owner status when ad belongs to the user', function (): void {
-    Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
-    $user = User::factory()->create(['point_balance' => 0]);
-    $ad = Ad::factory()->create(['user_id' => $user->id]);
-
-    $this->actingAs($user, 'sanctum')
-        ->postJson("/api/v1/payments/initialize/{$ad->id}")
-        ->assertOk()
-        ->assertJsonPath('status', 'owner');
-});
-
-it('initialize returns already_unlocked when ad is already unlocked', function (): void {
-    Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
-    $user = User::factory()->create(['point_balance' => 10]);
-    $ad = Ad::factory()->create();
-    UnlockedAd::factory()->create(['user_id' => $user->id, 'ad_id' => $ad->id]);
-
-    $this->actingAs($user, 'sanctum')
-        ->postJson("/api/v1/payments/initialize/{$ad->id}")
-        ->assertOk()
-        ->assertJsonPath('status', 'already_unlocked');
-});
-
 // ── CREDIT CONTROLLER ──────────────────────────────────────────────────────────
 
 it('packages endpoint returns only active packages', function (): void {
@@ -162,33 +104,38 @@ it('approved webhook for CREDIT payment credits points to the user', function ()
     Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
 
     $secret = 'test-webhook-secret';
-    config()->set('services.fedapay.webhook_secret', $secret);
+    config()->set('payment.gateways.flutterwave.webhook_secret', $secret);
+    config()->set('payment.gateways.flutterwave.secret_key', 'FLWSECK_TEST-fake');
 
     $user = User::factory()->create(['point_balance' => 0]);
-    $package = PointPackage::factory()->create(['points_awarded' => 50]);
+    $package = PointPackage::factory()->create(['points_awarded' => 50, 'price' => 5000]);
 
     Payment::factory()->create([
         'user_id' => $user->id,
-        'transaction_id' => 'txn-credit-approved',
+        'transaction_id' => 'KH-CREDITAPPROVED',
         'status' => PaymentStatus::PENDING,
         'type' => PaymentType::CREDIT,
-        'payment_method' => PaymentMethod::FEDAPAY,
+        'payment_method' => PaymentMethod::FLUTTERWAVE,
+        'gateway' => 'flutterwave',
+        'amount' => 5000,
+        'plan_id' => $package->id,
     ]);
 
-    $body = json_encode([
-        'name' => 'transaction.approved',
-        'entity' => [
-            'id' => 'txn-credit-approved',
-            'metadata' => ['package_id' => $package->id],
+    $payload = json_encode([
+        'event' => 'charge.completed',
+        'data' => [
+            'status' => 'successful',
+            'tx_ref' => 'KH-CREDITAPPROVED',
+            'amount' => 5000,
+            'currency' => 'XAF',
+            'meta' => ['package_id' => $package->id],
         ],
     ]);
 
-    $timestamp = (string) time();
-    $signature = hash_hmac('sha256', $timestamp.'.'.$body, $secret);
-
-    $this->postJson('/api/v1/payments/webhook', json_decode($body, true), [
-        'X-FedaPay-Signature' => "t={$timestamp},v1={$signature}",
-    ])->assertOk();
+    $this->call('POST', '/api/v1/webhooks/flutterwave', [], [], [], [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_VERIF_HASH' => $secret,
+    ], $payload)->assertOk();
 
     expect($user->fresh()->point_balance)->toBe(50);
 
@@ -212,7 +159,8 @@ it('verify-purchase returns completed when credit payment is already successful'
         'transaction_id' => 'txn-verify-completed',
         'status' => PaymentStatus::SUCCESS,
         'type' => PaymentType::CREDIT,
-        'payment_method' => PaymentMethod::FEDAPAY,
+        'payment_method' => PaymentMethod::FLUTTERWAVE,
+        'gateway' => 'flutterwave',
     ]);
 
     $this->actingAs($user)

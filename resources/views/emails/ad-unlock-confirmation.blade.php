@@ -98,7 +98,7 @@
         </tr>
         <tr>
             <td>Mode de paiement</td>
-            <td>FedaPay</td>
+            <td>{{ ucfirst($payment->gateway?->value ?? 'Flutterwave') }}</td>
         </tr>
     </table>
 

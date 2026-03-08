@@ -176,22 +176,25 @@ Route::prefix('v1')->group(function (): void {
         'users_count' => \App\Models\User::query()->count(),
     ]))->middleware('throttle:30,1');
 
-    // --- PRIX DE DÉBLOCAGE ---
-    Route::get('/payments/unlock-price', [PaymentController::class, 'getUnlockPrice']);
-
     // --- CLERK WEBHOOKS ---
     Route::post('/clerk/webhook', [ClerkWebhookController::class, 'handle'])
         ->middleware('throttle:60,1');
 
-    // --- PAIEMENTS ---
-    Route::post('/payments/initialize/{ad}', [PaymentController::class, 'initialize'])
-        ->middleware(['auth:sanctum', 'throttle:30,1']);
-    Route::post('/payments/verify/{ad}', [PaymentController::class, 'verify'])
-        ->middleware(['auth:sanctum', 'throttle:30,1']);
-    Route::post('/payments/webhook', [PaymentController::class, 'webhook'])
+    // --- WEBHOOKS PAIEMENT (pas d'auth, signature validée dans le controller) ---
+    Route::post('/webhooks/flutterwave', [PaymentController::class, 'flutterwaveWebhook'])
         ->middleware('throttle:120,1');
-    Route::get('/payments/callback', [PaymentController::class, 'callback'])
-        ->middleware('throttle:30,1');
+
+    // --- PAIEMENTS FLUTTERWAVE ---
+    Route::middleware(['auth:sanctum'])->group(function (): void {
+        Route::post('/payments/initiate_payment', [PaymentController::class, 'flutterwaveInitiate'])
+            ->middleware('throttle:5,1');
+        Route::post('/payments/verify_payment', [PaymentController::class, 'flutterwaveVerify'])
+            ->middleware('throttle:30,1');
+        Route::post('/payments/cancel_payment', [PaymentController::class, 'flutterwaveCancel'])
+            ->middleware('throttle:10,1');
+        Route::get('/payments/history', [PaymentController::class, 'history'])
+            ->middleware('throttle:60,1');
+    });
 
     // --- ABONNEMENTS AGENCES ---
     Route::get('/subscriptions/plans', [SubscriptionController::class, 'plans']);
@@ -256,13 +259,18 @@ Route::prefix('v1')->group(function (): void {
     });
 
     // --- INTERACTIONS (vues, favoris, impressions, partages, clics) ---
-    Route::middleware('auth:sanctum')->group(function (): void {
+    // View & impression tracking: optional auth so guests can also be tracked
+    Route::middleware('optional.auth')->group(function (): void {
         Route::post('/ads/{ad}/view', [AdInteractionController::class, 'trackView'])
             ->middleware('throttle:120,1');
-        Route::post('/ads/{ad}/favorite', [AdInteractionController::class, 'toggleFavorite'])
-            ->middleware('throttle:30,1');
         Route::post('/ads/{ad}/impression', [AdInteractionController::class, 'trackImpression'])
             ->middleware('throttle:300,1');
+    });
+
+    // Actions requiring authentication
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::post('/ads/{ad}/favorite', [AdInteractionController::class, 'toggleFavorite'])
+            ->middleware('throttle:30,1');
         Route::post('/ads/{ad}/share', [AdInteractionController::class, 'trackShare'])
             ->middleware('throttle:30,1');
         Route::post('/ads/{ad}/contact-click', [AdInteractionController::class, 'trackContactClick'])

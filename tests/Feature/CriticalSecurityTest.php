@@ -62,27 +62,34 @@ test('admin can register another admin through protected endpoint', function ():
 });
 
 test('payment webhook rejects invalid signature when secret is configured', function (): void {
-    config()->set('services.fedapay.webhook_secret', 'test-secret');
+    config()->set('payment.gateways.flutterwave.webhook_secret', 'test-secret');
+    config()->set('payment.gateways.flutterwave.secret_key', 'FLWSECK_TEST-fake');
 
     $payment = Payment::factory()->create([
-        'transaction_id' => 'txn-critical-invalid',
+        'transaction_id' => 'KH-CRITICALINVALID',
         'status' => PaymentStatus::PENDING,
+        'gateway' => 'flutterwave',
     ]);
 
     $payload = json_encode([
-        'event' => 'transaction.approved',
-        'entity' => ['id' => 'txn-critical-invalid'],
+        'event' => 'charge.completed',
+        'data' => [
+            'status' => 'successful',
+            'tx_ref' => 'KH-CRITICALINVALID',
+            'amount' => 5000,
+            'currency' => 'XAF',
+        ],
     ], JSON_THROW_ON_ERROR);
 
     $response = $this->call(
         'POST',
-        '/api/v1/payments/webhook',
+        '/api/v1/webhooks/flutterwave',
         [],
         [],
         [],
         [
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_X_FEDAPAY_SIGNATURE' => 'invalid-signature',
+            'HTTP_VERIF_HASH' => 'invalid-signature',
         ],
         $payload
     );
@@ -93,31 +100,35 @@ test('payment webhook rejects invalid signature when secret is configured', func
 
 test('payment webhook accepts valid signature and updates payment', function (): void {
     $secret = 'test-secret';
-    config()->set('services.fedapay.webhook_secret', $secret);
+    config()->set('payment.gateways.flutterwave.webhook_secret', $secret);
+    config()->set('payment.gateways.flutterwave.secret_key', 'FLWSECK_TEST-fake');
 
     $payment = Payment::factory()->create([
-        'transaction_id' => 'txn-critical-valid',
+        'transaction_id' => 'KH-CRITICALVALID',
         'status' => PaymentStatus::PENDING,
+        'gateway' => 'flutterwave',
+        'amount' => 5000,
     ]);
 
     $payload = json_encode([
-        'name' => 'transaction.approved',
-        'entity' => ['id' => 'txn-critical-valid'],
+        'event' => 'charge.completed',
+        'data' => [
+            'status' => 'successful',
+            'tx_ref' => 'KH-CRITICALVALID',
+            'amount' => 5000,
+            'currency' => 'XAF',
+        ],
     ], JSON_THROW_ON_ERROR);
-
-    // Controller expects "t=<timestamp>,v1=<hmac(timestamp.'.'.payload, secret)>"
-    $timestamp = (string) time();
-    $signature = hash_hmac('sha256', $timestamp.'.'.$payload, $secret);
 
     $response = $this->call(
         'POST',
-        '/api/v1/payments/webhook',
+        '/api/v1/webhooks/flutterwave',
         [],
         [],
         [],
         [
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_X_FEDAPAY_SIGNATURE' => "t={$timestamp},v1={$signature}",
+            'HTTP_VERIF_HASH' => $secret,
         ],
         $payload
     );

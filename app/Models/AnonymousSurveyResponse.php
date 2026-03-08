@@ -18,6 +18,7 @@ use Illuminate\Support\Carbon;
  * @property string $session_token_hash
  * @property string|null $ip_hash
  * @property Carbon $submitted_at
+ * @property Carbon|null $viewed_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Survey $survey
@@ -34,6 +35,7 @@ class AnonymousSurveyResponse extends Model
         'session_token_hash',
         'ip_hash',
         'submitted_at',
+        'viewed_at',
     ];
 
     #[\Override]
@@ -41,6 +43,7 @@ class AnonymousSurveyResponse extends Model
     {
         return [
             'submitted_at' => 'datetime',
+            'viewed_at' => 'datetime',
         ];
     }
 

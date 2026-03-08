@@ -4,33 +4,29 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\PaymentMethod;
-use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
 use App\Http\Requests\Api\V1\SubscribeRequest;
 use App\Http\Resources\SubscriptionPlanResource;
 use App\Http\Resources\SubscriptionResource;
-use App\Models\Payment;
 use App\Models\SubscriptionPlan;
-use App\Services\FedaPayService;
+use App\Services\Payment\PaymentService;
 use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use OpenApi\Annotations as OA;
 
 /**
  * @OA\Tag(
  *     name="📦 Abonnements Agences",
- *     description="Gestion des abonnements pour les agences immobilières. Permet de consulter les plans disponibles, souscrire via FedaPay, consulter l'abonnement actif, l'annuler et voir l'historique. Les agences reçoivent une facture par email à chaque souscription."
+ *     description="Gestion des abonnements pour les agences immobilières. Permet de consulter les plans disponibles, souscrire via Flutterwave, consulter l'abonnement actif, l'annuler et voir l'historique. Les agences reçoivent une facture par email à chaque souscription."
  * )
  */
 final class SubscriptionController
 {
     public function __construct(
-        protected FedaPayService $fedaPay,
+        protected PaymentService $paymentService,
         protected SubscriptionService $subscriptionService,
     ) {}
 
@@ -178,7 +174,7 @@ final class SubscriptionController
      *     path="/api/v1/subscriptions/subscribe",
      *     operationId="subscribe",
      *     summary="Souscrire à un plan d'abonnement",
-     *     description="Initie le processus de souscription à un plan d'abonnement pour l'agence de l'utilisateur. Crée une transaction de paiement FedaPay et retourne l'URL de paiement. Le frontend (mobile ou web) doit **rediriger l'utilisateur** vers `payment_url` pour finaliser le paiement. Une fois le paiement confirmé par le webhook FedaPay, l'abonnement est activé automatiquement, les annonces de l'agence sont boostées, et une **facture est envoyée par email** à tous les membres de l'agence.",
+     *     description="Initie le processus de souscription à un plan d'abonnement pour l'agence de l'utilisateur. Crée une transaction de paiement et retourne l'URL de paiement. Le frontend (mobile ou web) doit **rediriger l'utilisateur** vers `payment_url` pour finaliser le paiement. Une fois le paiement confirmé par le webhook, l'abonnement est activé automatiquement, les annonces de l'agence sont boostées, et une **facture est envoyée par email** à tous les membres de l'agence.",
      *     tags={"📦 Abonnements Agences"},
      *     security={{"sanctum":{}}},
      *
@@ -201,7 +197,7 @@ final class SubscriptionController
      *
      *         @OA\JsonContent(
      *
-     *             @OA\Property(property="payment_url", type="string", description="URL FedaPay vers laquelle rediriger l'utilisateur pour payer", example="https://checkout.fedapay.com/pay/abc123"),
+     *             @OA\Property(property="payment_url", type="string", description="URL vers laquelle rediriger l'utilisateur pour payer", example="https://checkout.flutterwave.com/pay/abc123"),
      *             @OA\Property(property="message", type="string", example="Redirigez l'utilisateur vers cette URL pour payer.")
      *         )
      *     ),
@@ -225,7 +221,7 @@ final class SubscriptionController
      *         )
      *     ),
      *
-     *     @OA\Response(response=500, description="Erreur technique FedaPay ou serveur")
+     *     @OA\Response(response=500, description="Erreur technique serveur")
      * )
      */
     public function subscribe(SubscribeRequest $request): JsonResponse
@@ -258,50 +254,28 @@ final class SubscriptionController
             ], 422);
         }
 
-        $callbackUrl = $request->input(
-            'callback_url',
-            config('app.frontend_url', config('app.url')).'/subscription/callback'
-        );
-
-        $paymentData = $this->fedaPay->createSubscriptionPayment(
-            $amount,
-            $agency,
-            $plan->id,
-            $period,
-            $callbackUrl,
-        );
-
-        if (!$paymentData['success']) {
-            return response()->json([
-                'message' => 'Erreur lors de l\'initialisation du paiement.',
-                'error' => config('app.debug') ? ($paymentData['message'] ?? null) : null,
-            ], 500);
-        }
-
-        DB::beginTransaction();
         try {
-            $payment = new Payment;
-            $payment->forceFill([
-                'user_id' => $user->id,
+            $result = $this->paymentService->createPayment($user, [
+                'amount' => (float) $amount,
+                'type' => PaymentType::SUBSCRIPTION->value,
+                'payment_method' => 'flutterwave',
                 'agency_id' => $agency->id,
                 'plan_id' => $plan->id,
                 'period' => $period,
-                'amount' => $amount,
-                'transaction_id' => (string) $paymentData['transaction_id'],
-                'status' => PaymentStatus::PENDING,
-                'payment_method' => PaymentMethod::FEDAPAY,
-                'type' => PaymentType::SUBSCRIPTION,
+                'description' => "Abonnement {$plan->name} ({$period})",
+                'meta' => [
+                    'payment_type' => 'subscription',
+                    'agency_id' => $agency->id,
+                    'plan_id' => $plan->id,
+                    'period' => $period,
+                ],
             ]);
-            $payment->save();
-
-            DB::commit();
 
             return response()->json([
-                'payment_url' => $paymentData['url'],
+                'payment_url' => $result['link'],
                 'message' => 'Redirigez l\'utilisateur vers cette URL pour payer.',
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
             Log::error('Erreur création paiement abonnement: '.$e->getMessage());
 
             return response()->json([

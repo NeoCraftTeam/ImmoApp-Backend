@@ -4,19 +4,24 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
 use App\Enums\PointTransactionType;
+use App\Exceptions\PaymentGatewayException;
 use App\Http\Resources\PointPackageResource;
+use App\Mail\CreditPurchaseConfirmationMail;
+use App\Models\Ad;
 use App\Models\Payment;
 use App\Models\PointPackage;
-use App\Services\FedaPayService;
+use App\Models\UnlockedAd;
+use App\Services\Payment\PaymentService;
 use App\Services\PointService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use OpenApi\Annotations as OA;
 
 /**
@@ -25,7 +30,7 @@ use OpenApi\Annotations as OA;
 final class CreditController
 {
     public function __construct(
-        protected FedaPayService $fedaPay,
+        protected PaymentService $paymentService,
         protected PointService $pointService,
     ) {}
 
@@ -86,12 +91,12 @@ final class CreditController
     }
 
     /**
-     * Initiate a FedaPay purchase for a point package.
+     * Initiate a purchase for a point package.
      *
      * @OA\Post(
      *     path="/api/v1/credits/purchase/{package}",
      *     summary="Acheter un pack de crédits",
-     *     description="Initialise un paiement FedaPay pour acheter le pack de crédits sélectionné. Retourne une URL de paiement.",
+     *     description="Initialise un paiement pour acheter le pack de crédits sélectionné. Retourne une URL de paiement.",
      *     tags={"🎯 Crédits / Points"},
      *     security={{"sanctum":{}}},
      *
@@ -118,7 +123,7 @@ final class CreditController
      *
      *     @OA\Response(response=401, description="Non authentifié"),
      *     @OA\Response(response=422, description="Pack non disponible"),
-     *     @OA\Response(response=500, description="Erreur FedaPay")
+     *     @OA\Response(response=500, description="Erreur paiement")
      * )
      */
     public function purchase(Request $request, PointPackage $package): JsonResponse
@@ -131,47 +136,28 @@ final class CreditController
 
         $user = $request->user();
 
-        $callbackUrl = $request->input(
-            'callback_url',
-            config('app.frontend_url', config('app.url')).'/credits/callback'
-        );
+        try {
+            $result = $this->paymentService->createPayment($user, [
+                'amount' => (float) $package->price,
+                'type' => PaymentType::CREDIT->value,
+                'payment_method' => 'flutterwave',
+                'plan_id' => $package->id,
+                'description' => "Achat pack: {$package->name}",
+                'meta' => [
+                    'package_id' => $package->id,
+                ],
+            ]);
+        } catch (PaymentGatewayException $e) {
+            Log::error('Erreur initiation paiement crédits: '.$e->getMessage());
 
-        $paymentData = $this->fedaPay->createCreditPayment(
-            $package->price,
-            $user,
-            $package->id,
-            $callbackUrl,
-        );
-
-        if (!$paymentData['success']) {
             return response()->json([
                 'message' => 'Erreur lors de l\'initialisation du paiement.',
-                'error' => config('app.debug') ? ($paymentData['message'] ?? null) : null,
-            ], 500);
-        }
-
-        try {
-            $payment = new Payment;
-            $payment->forceFill([
-                'user_id' => $user->id,
-                'amount' => $package->price,
-                'transaction_id' => (string) $paymentData['transaction_id'],
-                'status' => PaymentStatus::PENDING,
-                'payment_method' => PaymentMethod::FEDAPAY,
-                'type' => PaymentType::CREDIT,
-            ]);
-            $payment->save();
-        } catch (\Exception $e) {
-            Log::error('Erreur création paiement crédits: '.$e->getMessage());
-
-            return response()->json([
-                'message' => 'Erreur technique lors de l\'initialisation.',
                 'error' => config('app.debug') ? $e->getMessage() : null,
             ], 500);
         }
 
         return response()->json([
-            'payment_url' => $paymentData['url'],
+            'payment_url' => $result['link'],
             'message' => 'Redirigez l\'utilisateur vers cette URL pour payer.',
         ]);
     }
@@ -179,12 +165,12 @@ final class CreditController
     /**
      * Verify and optionally force-process a credit purchase.
      *
-     * If the webhook hasn't arrived yet, checks with FedaPay and credits the points.
+     * If the webhook hasn't arrived yet, checks with the payment gateway and credits the points.
      *
      * @OA\Post(
      *     path="/api/v1/credits/verify-purchase",
      *     summary="Vérifier un achat de crédits",
-     *     description="Vérifie le dernier achat de crédits de l'utilisateur auprès de FedaPay. Si le paiement est approuvé, crédite les points.",
+     *     description="Vérifie le dernier achat de crédits de l'utilisateur. Si le paiement est approuvé, crédite les points.",
      *     tags={"🎯 Crédits / Points"},
      *     security={{"sanctum":{}}},
      *
@@ -238,28 +224,15 @@ final class CreditController
             ], 422);
         }
 
-        // Payment is still PENDING — check with FedaPay, then apply the same
-        // lock+transaction guard used by the webhook handler to prevent double-crediting
-        // when both paths run concurrently.
-        $result = $this->fedaPay->retrieveTransaction((int) $payment->transaction_id);
+        // Payment is still PENDING — verify via Flutterwave gateway
+        $synced = $this->paymentService->syncPaymentStatus($payment);
 
-        if ($result['success'] && $result['status'] === 'approved') {
-            return \Illuminate\Support\Facades\DB::transaction(function () use ($user, $payment): JsonResponse {
+        if ($synced->status === PaymentStatus::SUCCESS) {
+            return \Illuminate\Support\Facades\DB::transaction(function () use ($user, $synced): JsonResponse {
                 /** @var Payment $lockedPayment */
-                $lockedPayment = Payment::where('id', $payment->id)
+                $lockedPayment = Payment::where('id', $synced->id)
                     ->lockForUpdate()
                     ->first();
-
-                // Re-check inside the lock: webhook may have already committed
-                if ($lockedPayment->status === PaymentStatus::SUCCESS) {
-                    return response()->json([
-                        'status' => 'completed',
-                        'message' => 'Achat de crédits confirmé.',
-                        'point_balance' => (int) $user->fresh()->point_balance,
-                    ]);
-                }
-
-                $lockedPayment->forceFill(['status' => PaymentStatus::SUCCESS])->save();
 
                 // Idempotency check — safe inside the lock
                 $alreadyCredited = $user->pointTransactions()
@@ -267,16 +240,9 @@ final class CreditController
                     ->exists();
 
                 if (!$alreadyCredited) {
-                    $metadata = [];
-                    try {
-                        $transaction = \FedaPay\Transaction::retrieve((int) $lockedPayment->transaction_id);
-                        /** @var array<string, mixed> $metadata */
-                        $metadata = (array) ($transaction->metadata ?? []); // @phpstan-ignore class.notFound
-                    } catch (\Exception) {
-                        // fall back to amount-based lookup
-                    }
-
-                    $packageId = $metadata['package_id'] ?? null;
+                    $raw = (array) ($lockedPayment->gateway_response ?? []);
+                    $meta = (array) ($raw['meta'] ?? []);
+                    $packageId = $meta['package_id'] ?? null;
                     $package = $packageId ? PointPackage::find($packageId) : null;
 
                     if (!$package) {
@@ -293,6 +259,17 @@ final class CreditController
                             "Achat pack: {$package->name}",
                             $lockedPayment->id,
                         );
+
+                        try {
+                            Mail::to($user->email)->send(new CreditPurchaseConfirmationMail(
+                                $user,
+                                $package,
+                                $lockedPayment,
+                                (int) $user->fresh()->point_balance,
+                            ));
+                        } catch (\Exception $e) {
+                            Log::error('Erreur email achat crédits: '.$e->getMessage());
+                        }
                     }
                 }
 
@@ -304,9 +281,7 @@ final class CreditController
             });
         }
 
-        if ($result['success'] && in_array($result['status'], ['canceled', 'declined', 'refunded'])) {
-            $payment->forceFill(['status' => PaymentStatus::FAILED])->save();
-
+        if ($synced->status === PaymentStatus::FAILED) {
             return response()->json([
                 'status' => 'failed',
                 'message' => 'Le paiement n\'a pas abouti.',
@@ -318,6 +293,66 @@ final class CreditController
             'status' => 'pending',
             'message' => 'Le paiement est en cours de confirmation.',
             'point_balance' => (int) $user->point_balance,
+        ]);
+    }
+
+    /**
+     * Unlock an ad using the user's credit balance.
+     *
+     * @OA\Post(
+     *     path="/api/v1/payments/initialize/{ad}",
+     *     summary="Débloquer une annonce avec des crédits",
+     *     description="Vérifie le solde de crédits et débloque l'annonce si suffisant.",
+     *     tags={"🎯 Crédits / Points"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, description="UUID de l'annonce", @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=200, description="Annonce débloquée ou déjà accessible"),
+     *     @OA\Response(response=401, description="Non authentifié"),
+     *     @OA\Response(response=402, description="Crédits insuffisants")
+     * )
+     */
+    public function unlock(Request $request, Ad $ad): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($ad->user_id === $user->id) {
+            return response()->json(['status' => 'owner']);
+        }
+
+        if (UnlockedAd::where('user_id', $user->id)->where('ad_id', $ad->id)->exists()) {
+            return response()->json(['status' => 'already_unlocked']);
+        }
+
+        $cost = (int) \App\Models\Setting::get('unlock_cost_points', 2);
+
+        if ($user->point_balance < $cost) {
+            return response()->json([
+                'status' => 'insufficient_points',
+                'current_balance' => (int) $user->point_balance,
+                'required_points' => $cost,
+                'packages' => PointPackageResource::collection(PointPackage::active()->get()),
+            ], 402);
+        }
+
+        DB::transaction(function () use ($user, $ad, $cost): void {
+            $this->pointService->deduct(
+                $user,
+                $cost,
+                "Déblocage annonce: {$ad->title}",
+                $ad->id,
+            );
+
+            UnlockedAd::firstOrCreate(
+                ['user_id' => $user->id, 'ad_id' => $ad->id],
+                ['unlocked_at' => now()],
+            );
+        });
+
+        return response()->json([
+            'status' => 'unlocked',
+            'points_balance' => (int) $user->fresh()->point_balance,
         ]);
     }
 }
