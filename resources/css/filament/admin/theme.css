@@ -3,3 +3,8 @@
 @source '../../../../app/Filament/Admin/**/*';
 @source '../../../../resources/views/filament/admin/**/*';
 @source '../../../../resources/views/filament/surveys/**/*';
+
+/* Ensure toast notifications always render above modals and slide-overs */
+.fi-no {
+    z-index: 9999 !important;
+}

@@ -466,7 +466,12 @@ body {
     font-size: 0.8125rem !important;
 }
 
-/* === Modals — no custom styles, let Filament handle z-index === */
+/* Modals — no custom styles, let Filament handle z-index */
+
+/* Ensure toast notifications always render above modals and slide-overs */
+.fi-no {
+    z-index: 9999 !important;
+}
 .fi-modal-window {
     border-radius: var(--kh-radius-lg) !important;
 }
