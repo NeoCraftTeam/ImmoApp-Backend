@@ -633,7 +633,7 @@ final class UserController
 
             return response()->json([
                 'message' => 'Utilisateur mis à jour avec succès.',
-                'user' => new UserResource($user),
+                'user' => new UserResource($user->load('city')),
             ], 200);
 
         } catch (Throwable $e) {
