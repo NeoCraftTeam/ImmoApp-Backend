@@ -53,7 +53,7 @@ final class UserResource extends JsonResource
             'avatar' => $this->getFirstMediaUrl('avatars') ?: $this->getAvatarUrl(),
             'display_name' => $this->fullname,
             'name' => $this->fullname,
-            'agency_name' => $this->whenLoaded('agency', fn () => $this->agency->name),
+            'agency_name' => $this->whenLoaded('agency', fn () => $this->agency instanceof \App\Models\Agency ? $this->agency->name : null),
 
             // Le propriétaire du compte ou un admin peut voir le role/type
             'role' => $this->when($request->user()?->id === $this->id || $request->user()?->isAdmin(), $this->role),

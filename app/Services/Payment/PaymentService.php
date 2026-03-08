@@ -156,8 +156,8 @@ final readonly class PaymentService
             }
 
             if ($result['status'] === 'success') {
-                $paidAmount = (float) ($result['amount'] ?? 0);
-                $paidCurrency = (string) ($result['currency'] ?? '');
+                $paidAmount = (float) $result['amount'];
+                $paidCurrency = (string) $result['currency'];
 
                 if (abs($paidAmount - (float) $locked->amount) > 0.01 || strcasecmp($paidCurrency, (string) $expectedCurrency) !== 0) {
                     Log::critical('Payment amount/currency mismatch', [
@@ -220,7 +220,7 @@ final readonly class PaymentService
         $gateway = $this->resolveGateway($gatewayName);
         $data = $gateway->handleWebhook($payload, $headers);
 
-        $txRef = $data['tx_ref'] ?? '';
+        $txRef = $data['tx_ref'];
         $payment = Payment::where('transaction_id', $txRef)
             ->where('gateway', $gatewayName)
             ->lockForUpdate()
@@ -241,8 +241,8 @@ final readonly class PaymentService
         $expectedCurrency = config('payment.default_currency', 'XAF');
 
         if ($data['status'] === 'success') {
-            $paidAmount = (float) ($data['amount'] ?? 0);
-            $paidCurrency = (string) ($data['currency'] ?? '');
+            $paidAmount = (float) $data['amount'];
+            $paidCurrency = (string) $data['currency'];
 
             if (abs($paidAmount - (float) $payment->amount) > 0.01 || strcasecmp($paidCurrency, (string) $expectedCurrency) !== 0) {
                 Log::critical('Webhook: amount/currency mismatch', [

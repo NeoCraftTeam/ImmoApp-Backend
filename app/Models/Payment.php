@@ -25,13 +25,15 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property PaymentType $type
  * @property string $amount
  * @property string $transaction_id
- * @property PaymentMethod $payment_method
+ * @property PaymentGateway|null $gateway
+ * @property PaymentMethod|null $payment_method
  * @property string $user_id
  * @property PaymentStatus $status
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  * @property-read User $user
+ * @property-read \App\Models\PointPackage|null $pointPackage
  *
  * @method static PaymentFactory factory($count = null, $state = [])
  * @method static Builder<static>|Payment newModelQuery()

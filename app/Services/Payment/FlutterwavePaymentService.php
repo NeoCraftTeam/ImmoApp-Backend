@@ -54,7 +54,7 @@ final readonly class FlutterwavePaymentService implements PaymentGatewayInterfac
             'redirect_url' => $payload['redirect_url'],
             'customer' => [
                 'email' => $payload['email'],
-                'phonenumber' => $payload['phone'] ?? '',
+                'phonenumber' => $payload['phone'],
                 'name' => $payload['name'],
             ],
             'customizations' => [
@@ -154,9 +154,11 @@ final readonly class FlutterwavePaymentService implements PaymentGatewayInterfac
         if ($event !== 'charge.completed') {
             return [
                 'event' => $event,
-                'tx_ref' => null,
-                'action' => 'ignored',
+                'tx_ref' => '',
                 'status' => 'ignored',
+                'amount' => 0.0,
+                'currency' => '',
+                'payment_method' => null,
                 'raw' => $data,
             ];
         }

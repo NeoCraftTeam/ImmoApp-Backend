@@ -17,6 +17,7 @@ interface PaymentGatewayInterface
      *     name: string,
      *     tx_ref: string,
      *     redirect_url: string,
+     *     payment_method?: string,
      *     payment_options?: string,
      *     description?: string,
      *     meta?: array<string, mixed>

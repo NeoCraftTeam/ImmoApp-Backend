@@ -187,6 +187,7 @@ class ManageSubscription extends Page
     public function subscribe(string $planId)
     {
         $plan = \App\Models\SubscriptionPlan::findOrFail($planId);
+        /** @var \App\Models\Agency $agency */
         $agency = auth()->user()->agency;
 
         $price = $this->period === 'yearly' ? $plan->price_yearly : $plan->price;
