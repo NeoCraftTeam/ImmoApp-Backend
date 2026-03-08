@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace App\Filament\Bailleur\Resources\Ads;
 
+use App\Enums\AdStatus;
 use App\Filament\Bailleur\Resources\Ads\Pages\ManageAds;
 use App\Filament\Resources\Ads\Concerns\SharedAdResource;
 use App\Models\Ad;
 use App\Models\Scopes\LandlordScope;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
@@ -88,6 +91,24 @@ class AdResource extends Resource
                     ->modalWidth(Width::FourExtraLarge)
                     ->successNotificationTitle('Annonce mise à jour')
                     ->mutateFormDataUsing(fn (array $data): array => static::mutateLocationMapData($data)),
+                Action::make('resubmit')
+                    ->label('Soumettre à nouveau')
+                    ->icon(Heroicon::ArrowPath)
+                    ->color('warning')
+                    ->tooltip('Corriger et resoumettre cette annonce pour validation')
+                    ->visible(fn (Ad $record): bool => $record->status === AdStatus::DECLINED)
+                    ->requiresConfirmation()
+                    ->modalHeading('Soumettre à nouveau')
+                    ->modalDescription('Votre annonce sera envoyée à l\'administrateur pour une nouvelle vérification.')
+                    ->action(function (Ad $record): void {
+                        $record->forceFill(['status' => AdStatus::PENDING])->save();
+
+                        Notification::make()
+                            ->title('Annonce soumise à nouveau')
+                            ->body('Votre annonce est en attente de validation par notre équipe.')
+                            ->success()
+                            ->send();
+                    }),
                 DeleteAction::make()
                     ->successNotificationTitle('Annonce supprimée'),
             ])
