@@ -34,6 +34,7 @@
         "laravel/tinker": "^2.10.1",
         "laraveljutsu/zap": "^1.14",
         "laravolt/avatar": "^6.3",
+        "league/flysystem-aws-s3-v3": "^3.0",
         "livewire/livewire": "^3.0",
         "meilisearch/meilisearch-php": "^1.16",
         "owenvoke/blade-fontawesome": "^3.1",
