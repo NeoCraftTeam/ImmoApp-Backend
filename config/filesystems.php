@@ -60,6 +60,30 @@ return [
             'report' => false,
         ],
 
+        // ─── LIVEWIRE TEMPORARY UPLOADS ──────────────────────────────────
+        'tmp' => [
+            'driver' => 'local',
+            'root' => storage_path('app/tmp'),
+            'throw' => false,
+        ],
+
+        // ─── CLOUDFLARE R2 ────────────────────────────────────────────
+        'r2' => [
+            'driver' => 's3',      // R2 = compatible S3
+            'key' => env('R2_ACCESS_KEY_ID'),
+            'secret' => env('R2_SECRET_ACCESS_KEY'),
+            'region' => env('R2_REGION', 'auto'),
+            'bucket' => env('R2_BUCKET'),
+            'url' => env('R2_URL'),
+            'endpoint' => env('R2_ENDPOINT'),
+            'use_path_style_endpoint' => env('R2_USE_PATH_STYLE_ENDPOINT', false),
+            'visibility' => 'public',
+            'throw' => false,
+            // ⚠️ CRITIQUE — R2 ne supporte pas les ACLs
+            // Sans cette ligne tu auras une erreur "ACL not supported"
+            'retain_visibility' => false,
+        ],
+
     ],
 
     /*

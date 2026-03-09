@@ -47,6 +47,7 @@ class EditProfile extends BaseEditProfile
                         FileUpload::make('avatar')
                             ->label('')
                             ->disk('public')
+                            ->fetchFileInformation(false)
                             ->directory('avatars')
                             ->avatar()
                             ->image()
