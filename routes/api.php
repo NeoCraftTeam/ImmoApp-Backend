@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\SocialAuthController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\SurveyController;
+use App\Http\Controllers\Api\V1\TourController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\ViewingAvailabilityController;
 use App\Http\Controllers\Api\V1\ViewingReservationController;
@@ -184,8 +185,19 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/webhooks/flutterwave', [PaymentController::class, 'flutterwaveWebhook'])
         ->middleware('throttle:120,1');
 
+    // --- TOUR 3D (public read, protected write) ---
+    Route::get('/ads/{ad}/tour', [TourController::class, 'show']);
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::post('/ads/{ad}/tour/scenes', [TourController::class, 'uploadScenes'])
+            ->middleware('throttle:10,1');
+        Route::patch('/ads/{ad}/tour/scenes/{sceneId}/hotspots', [TourController::class, 'updateHotspots']);
+        Route::delete('/ads/{ad}/tour', [TourController::class, 'destroy']);
+    });
+
     // --- PAIEMENTS FLUTTERWAVE ---
     Route::middleware(['auth:sanctum'])->group(function (): void {
+        Route::post('/payments/initialize/{ad}', [CreditController::class, 'unlock'])
+            ->middleware('throttle:30,1');
         Route::post('/payments/initiate_payment', [PaymentController::class, 'flutterwaveInitiate'])
             ->middleware('throttle:5,1');
         Route::post('/payments/verify_payment', [PaymentController::class, 'flutterwaveVerify'])

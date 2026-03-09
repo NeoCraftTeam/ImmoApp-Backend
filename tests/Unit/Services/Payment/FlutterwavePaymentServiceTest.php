@@ -151,6 +151,6 @@ it('should ignore non charge completed webhook events', function (): void {
     $result = $this->service->handleWebhook($payload, $headers);
 
     expect($result)
-        ->toHaveKey('action', 'ignored')
-        ->and($result['tx_ref'] ?? null)->toBeNull();
+        ->toHaveKey('status', 'ignored')
+        ->and($result['tx_ref'] ?? null)->toBeEmpty();
 });

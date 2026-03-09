@@ -35,7 +35,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\URL;
 use InvalidArgumentException;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -216,15 +215,12 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             $name = 'U';
         }
 
-        $filename = 'avatars/'.$this->id.'.webp';
-        $fullPath = Storage::disk('public')->path($filename);
-
-        if (!is_dir(dirname($fullPath))) {
-            mkdir(dirname($fullPath), 0755, true);
-        }
-
-        \Laravolt\Avatar\Facade::create($name)->save($fullPath, 80);
-        $this->avatar = $filename;
+        $storagePath = 'avatars/'.$this->id.'/avatar.webp';
+        $tempFile = sys_get_temp_dir().'/avatar_'.uniqid('', true).'.png';
+        \Laravolt\Avatar\Facade::create($name)->save($tempFile, 80);
+        Storage::disk()->put($storagePath, (string) file_get_contents($tempFile));
+        @unlink($tempFile);
+        $this->avatar = $storagePath;
     }
 
     public function canPublishAds(): bool
@@ -391,9 +387,8 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             return $this->avatar;
         }
 
-        // Si le fichier existe sur le disque public, on donne son URL
-        if ($this->avatar && Storage::disk('public')->exists($this->avatar)) {
-            return Storage::disk('public')->url($this->avatar);
+        if ($this->avatar && Storage::disk()->exists($this->avatar)) {
+            return Storage::disk()->url($this->avatar);
         }
 
         // Privacy: Return null to let Filament/Frontend handle the default placeholder

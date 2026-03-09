@@ -29,4 +29,16 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         Integration::handles($exceptions);
+
+        // Livewire tmp-file metadata failures (e.g. iPhone HEIC/large uploads that
+        // leave no file on disk) must never produce a 500.  Convert them into a
+        // user-friendly validation error so FilePond can display the rejection.
+        $exceptions->renderable(function (\League\Flysystem\UnableToRetrieveMetadata $e, \Illuminate\Http\Request $request) {
+            if ($request->is('livewire/update') || $request->is('livewire/upload-file')) {
+                return response()->json([
+                    'message' => 'Le fichier téléversé est invalide ou trop volumineux.',
+                    'errors' => ['file' => ['Le fichier téléversé est invalide ou trop volumineux.']],
+                ], 422);
+            }
+        });
     })->create();

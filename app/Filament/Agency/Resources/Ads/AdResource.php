@@ -55,6 +55,7 @@ class AdResource extends Resource
             ->components([
                 ...static::getSharedFormFields(),
                 static::getStatusSelect(isAdmin: false),
+                static::getTourSection(),
                 ...static::getRelationSelects(),
             ]);
     }

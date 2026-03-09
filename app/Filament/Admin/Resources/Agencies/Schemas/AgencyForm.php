@@ -32,6 +32,7 @@ class AgencyForm
                         FileUpload::make('logo')
                             ->label('Logo')
                             ->disk('public')
+                            ->fetchFileInformation(false)
                             ->directory('agency-logos')
                             ->image()
                             ->optimize('webp', 85)
