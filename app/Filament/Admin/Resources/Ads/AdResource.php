@@ -64,6 +64,7 @@ class AdResource extends Resource
             ->components([
                 ...static::getSharedFormFields(),
                 static::getStatusSelect(isAdmin: true),
+                static::getTourSection(),
                 Select::make('user_id')
                     ->label('Propriétaire')
                     ->relationship('user', 'firstname')

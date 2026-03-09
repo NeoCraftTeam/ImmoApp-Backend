@@ -22,6 +22,7 @@
     <option name="translation">
       <LaravelTranslation>
         <option name="defaultLanguageFromConfig" value="fr" />
+        <option name="defaultPath" value="lang" />
       </LaravelTranslation>
     </option>
     <option name="userClassName" value="\App\Models\User" />

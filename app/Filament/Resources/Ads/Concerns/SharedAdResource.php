@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\Ads\Concerns;
 
 use App\Enums\AdStatus;
+use App\Jobs\ProcessTourSceneJob;
 use App\Models\Ad;
 use App\Models\PropertyAttribute;
 use App\Services\AiDescriptionEnhancer;
@@ -13,12 +14,17 @@ use Dotswan\MapPicker\Fields\Map;
 use Filament\Actions\Action;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ToggleButtons;
+use Filament\Forms\Components\ViewField;
 use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\SpatieMediaLibraryImageEntry;
 use Filament\Infolists\Components\TextEntry;
@@ -29,6 +35,11 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
+use Intervention\Image\ImageManager;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 /**
  * Shared form, infolist, and table definitions for AdResource across all panels.
@@ -103,6 +114,8 @@ trait SharedAdResource
                     SpatieMediaLibraryFileUpload::make('images')
                         ->label('')
                         ->collection('images')
+                        ->disk(config('filesystems.default'))
+                        ->fetchFileInformation(false)
                         ->multiple()
                         ->reorderable()
                         ->appendFiles()
@@ -114,6 +127,21 @@ trait SharedAdResource
                         ->imagePreviewHeight('150')
                         ->panelLayout('grid')
                         ->columnSpanFull()
+                        ->getUploadedFileUsing(function ($component, string $file, $storedFileNames): ?array {
+                            /** @var \Spatie\MediaLibrary\MediaCollections\Models\Media|null $media */
+                            $media = $component->getRecord()?->getRelationValue('media')->firstWhere('uuid', $file);
+
+                            if (!$media) {
+                                return null;
+                            }
+
+                            return [
+                                'name' => $media->file_name,
+                                'size' => 0,
+                                'type' => $media->mime_type,
+                                'url' => route('media.proxy', ['uuid' => $media->uuid]),
+                            ];
+                        })
                         ->extraAttributes([
                             'data-native-image' => 'true',
                             'data-native-image-camera' => 'true',
@@ -274,6 +302,8 @@ trait SharedAdResource
                     SpatieMediaLibraryFileUpload::make('property_condition')
                         ->collection('property_condition')
                         ->label('État des lieux (PDF)')
+                        ->disk(config('filesystems.default'))
+                        ->fetchFileInformation(false)
                         ->acceptedFileTypes(['application/pdf'])
                         ->maxSize(10240)
                         ->helperText('Document PDF de l\'état des lieux')
@@ -550,6 +580,27 @@ trait SharedAdResource
                 ->columns(2)
                 ->collapsible()
                 ->columnSpanFull(),
+            Section::make('Visite Virtuelle 3D')
+                ->icon('heroicon-o-cube-transparent')
+                ->schema([
+                    \Filament\Infolists\Components\TextEntry::make('has_3d_tour')
+                        ->label('Présence d\'un tour 3D')
+                        ->formatStateUsing(fn ($state) => $state ? 'Oui' : 'Non')
+                        ->badge()
+                        ->color(fn ($state) => $state ? 'success' : 'danger'),
+                    \Filament\Infolists\Components\TextEntry::make('tour_link')
+                        ->label('Tour 3D')
+                        ->default('Ouvrir le tour 3D')
+                        ->icon('heroicon-o-arrow-top-right-on-square')
+                        ->iconColor('info')
+                        ->color('info')
+                        ->url(fn ($record) => config('app.frontend_url')."/ads/{$record->id}")
+                        ->openUrlInNewTab()
+                        ->visible(fn ($record) => (bool) $record->has_3d_tour),
+                ])
+                ->columns(2)
+                ->collapsible()
+                ->columnSpanFull(),
         ];
 
         if ($showMeta) {
@@ -693,5 +744,449 @@ trait SharedAdResource
         }
 
         return $data;
+    }
+
+    /**
+     * Virtual tour (3D) section — upload photos + hotspot editor.
+     */
+    protected static function getTourSection(): Section
+    {
+        return Section::make('Visite Virtuelle 3D')
+            ->description('Offrez à vos locataires une immersion complète dans votre bien.')
+            ->icon('heroicon-o-cube-transparent')
+            ->headerActions([
+                Action::make('preview_tour')
+                    ->label('Voir le tour (aperçu client)')
+                    ->icon('heroicon-o-arrow-top-right-on-square')
+                    ->color('info')
+                    ->url(fn (Ad $record) => config('app.frontend_url')."/ads/{$record->id}")
+                    ->openUrlInNewTab()
+                    ->visible(fn ($record) => $record?->has_3d_tour === true),
+            ])
+            ->collapsible()
+            ->schema([
+                Section::make('Avant de commencer — Comment prendre vos photos 360°')
+                    ->icon('heroicon-o-device-phone-mobile')
+                    ->description('Guide complet pour prendre de belles photos 360° avec votre téléphone')
+                    ->collapsible()
+                    ->collapsed(true)
+                    ->schema([
+                        Placeholder::make('guide_360')
+                            ->label('')
+                            ->content(new HtmlString('
+                                <div class="space-y-4 text-sm">
+                                    <!-- Android Guide -->
+                                    <div class="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                                        <div class="flex items-center gap-2 font-bold text-green-800 dark:text-green-400 mb-3">
+                                            <span class="text-2xl">🤖</span>
+                                            <span>Android — Google Camera (Recommandé)</span>
+                                        </div>
+                                        <ol class="list-decimal list-inside space-y-2 text-green-700 dark:text-green-300 ml-2">
+                                            <li>Téléchargez <strong>Google Camera</strong> depuis le Play Store (gratuit)</li>
+                                            <li>Ouvrez l\'app → Appuyez sur <strong>Plus</strong> → Sélectionnez <strong>Photo Sphere</strong></li>
+                                            <li>Placez-vous <strong>au centre exact de la pièce</strong></li>
+                                            <li>Suivez les cercles blancs à l\'écran en tournant <strong>lentement</strong> à 360°</li>
+                                            <li>Attendez le traitement automatique (10-30 secondes)</li>
+                                            <li>La photo 360° apparaît dans votre Galerie avec une icône 🌐</li>
+                                        </ol>
+                                    </div>
+
+                                    <!-- iPhone Guide -->
+                                    <div class="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                                        <div class="flex items-center gap-2 font-bold text-blue-800 dark:text-blue-400 mb-3">
+                                            <span class="text-2xl">🍎</span>
+                                            <span>iPhone (iOS 14+)</span>
+                                        </div>
+                                        <ol class="list-decimal list-inside space-y-2 text-blue-700 dark:text-blue-300 ml-2">
+                                            <li>Ouvrez l\'app <strong>Appareil Photo</strong> native</li>
+                                            <li>Sélectionnez le mode <strong>Panorama</strong></li>
+                                            <li>Faites un panorama <strong>complet à 360°</strong> en tournant sur vous-même</li>
+                                            <li>Gardez la flèche <strong>bien centrée</strong> sur la ligne horizontale</li>
+                                            <li>Tournez doucement et régulièrement (environ 15 secondes)</li>
+                                            <li><em>Alternative :</em> Téléchargez <strong>Panorama 360</strong> sur l\'App Store pour de meilleurs résultats</li>
+                                        </ol>
+                                    </div>
+
+                                    <!-- Samsung Guide -->
+                                    <div class="bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+                                        <div class="flex items-center gap-2 font-bold text-purple-800 dark:text-purple-400 mb-3">
+                                            <span class="text-2xl">📱</span>
+                                            <span>Samsung Galaxy</span>
+                                        </div>
+                                        <ol class="list-decimal list-inside space-y-2 text-purple-700 dark:text-purple-300 ml-2">
+                                            <li>Ouvrez l\'app <strong>Appareil Photo</strong> Samsung</li>
+                                            <li>Balayez vers <strong>Plus</strong> dans les modes de prise de vue</li>
+                                            <li>Sélectionnez <strong>Hyperlapse</strong> ou <strong>Directeur</strong></li>
+                                            <li><strong>Recommandé :</strong> Utilisez plutôt <strong>Google Camera</strong> (gratuit sur Play Store) pour de meilleurs résultats</li>
+                                        </ol>
+                                    </div>
+
+                                    <!-- Tips -->
+                                    <div class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                                        <div class="font-bold text-gray-800 dark:text-gray-200 mb-3 flex items-center gap-2">
+                                            <span class="text-xl">✅</span>
+                                            <span>Conseils pour des photos parfaites</span>
+                                        </div>
+                                        <ul class="list-disc list-inside space-y-2 text-gray-700 dark:text-gray-300 ml-2">
+                                            <li>Prenez vos photos en <strong>pleine lumière</strong> — ouvrez rideaux et volets ☀️</li>
+                                            <li>Placez-vous au <strong>centre exact</strong> de chaque pièce</li>
+                                            <li><strong>Ne bougez pas</strong> pendant la prise (restez immobile)</li>
+                                            <li>Faites <strong>une photo par pièce</strong> : salon, chambre, cuisine, salle de bain...</li>
+                                            <li>Format accepté : <strong>JPG ou WEBP</strong>, maximum <strong>30 Mo</strong> par photo</li>
+                                            <li>Nommez vos fichiers clairement : <code>salon.jpg</code>, <code>chambre.jpg</code>, etc.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            ')),
+                    ]),
+                Section::make('Étape 1 — Gestion des pièces')
+                    ->description('Uploadez vos photos 360° et donnez-leur un nom.')
+                    ->icon('heroicon-o-photo')
+                    ->schema([
+                        Hidden::make('has_3d_tour'),
+                        Hidden::make('tour_published_at'),
+                        Repeater::make('tour_scenes')
+                            ->label('')
+                            ->statePath('tour_config.scenes')
+                            ->schema([
+                                Grid::make(2)
+                                    ->schema([
+                                        TextInput::make('title')
+                                            ->label('Nom de la pièce')
+                                            ->required()
+                                            ->placeholder('Ex: Salon, Chambre parentale...'),
+                                        Select::make('type')
+                                            ->label('Type de panorama')
+                                            ->options([
+                                                'equirectangular' => '🟢 Équirectangulaire — 1 fichier, standard',
+                                                'cubemap' => '🔵 Cubemap — 6 faces, moins de déformation (converti auto.)',
+                                                'multires' => '🔴 Haute résolution — tuiles progressives, idéal 3G (converti auto.)',
+                                            ])
+                                            ->default('equirectangular')
+                                            ->required()
+                                            ->selectablePlaceholder(false)
+                                            ->live(),
+
+                                        // ── Per-type documentation (reactive) ──────────────────────
+
+                                        Placeholder::make('type_docs_equirectangular')
+                                            ->label('')
+                                            ->columnSpanFull()
+                                            ->visible(fn (callable $get) => ($get('type') ?? 'equirectangular') === 'equirectangular')
+                                            ->content(new HtmlString('
+                                                <div class="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-4 text-sm space-y-3">
+                                                    <p class="font-semibold text-green-800 dark:text-green-200">🟢 Équirectangulaire — Format standard</p>
+                                                    <p class="text-green-700 dark:text-green-300">Format panoramique universel (rapport 2:1). Une seule image, aucune conversion. Compatible avec toutes les photos 360° prises sur smartphone ou appareil photo.</p>
+                                                    <div class="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <p class="font-medium text-green-800 dark:text-green-200 mb-1">✅ Avantages</p>
+                                                            <ul class="list-disc list-inside text-green-700 dark:text-green-300 space-y-1">
+                                                                <li>Disponible <strong>immédiatement</strong> après upload</li>
+                                                                <li>Compatible avec toutes les apps 360°</li>
+                                                                <li>Aucun temps de traitement</li>
+                                                            </ul>
+                                                        </div>
+                                                        <div>
+                                                            <p class="font-medium text-green-800 dark:text-green-200 mb-1">⚠️ Limites</p>
+                                                            <ul class="list-disc list-inside text-green-700 dark:text-green-300 space-y-1">
+                                                                <li>Légère déformation aux pôles (haut/bas)</li>
+                                                                <li>Moins adapté aux très grandes images</li>
+                                                            </ul>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <p class="font-medium text-green-800 dark:text-green-200 mb-1">📋 Étapes d\'utilisation</p>
+                                                        <ol class="list-decimal list-inside text-green-700 dark:text-green-300 space-y-1">
+                                                            <li>Prenez une photo 360° avec votre app (Google Camera, app Panorama…)</li>
+                                                            <li>Exportez l\'image en JPG ou WEBP (max 30 Mo, idéalement ≥ 4000 × 2000 px)</li>
+                                                            <li>Sélectionnez ce type, uploadez → la visite est <strong>disponible immédiatement</strong></li>
+                                                        </ol>
+                                                    </div>
+                                                </div>
+                                            ')),
+
+                                        Placeholder::make('type_docs_cubemap')
+                                            ->label('')
+                                            ->columnSpanFull()
+                                            ->visible(fn (callable $get) => $get('type') === 'cubemap')
+                                            ->content(new HtmlString('
+                                                <div class="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-4 text-sm space-y-3">
+                                                    <p class="font-semibold text-blue-800 dark:text-blue-200">🔵 Cubemap — Conversion automatique en 6 faces</p>
+                                                    <p class="text-blue-700 dark:text-blue-300">Le serveur convertit automatiquement votre photo équirectangulaire en 6 faces de cube. Rendu plus naturel, moins de déformation — idéal pour les visites professionnelles.</p>
+                                                    <div class="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <p class="font-medium text-blue-800 dark:text-blue-200 mb-1">✅ Avantages</p>
+                                                            <ul class="list-disc list-inside text-blue-700 dark:text-blue-300 space-y-1">
+                                                                <li>Moins de déformation (haut, bas, coins)</li>
+                                                                <li>Qualité visuelle supérieure à l\'équirectangulaire</li>
+                                                                <li>Même fichier source (pas besoin d\'autre format)</li>
+                                                            </ul>
+                                                        </div>
+                                                        <div>
+                                                            <p class="font-medium text-blue-800 dark:text-blue-200 mb-1">⏱️ Traitement serveur</p>
+                                                            <ul class="list-disc list-inside text-blue-700 dark:text-blue-300 space-y-1">
+                                                                <li>Conversion automatique : <strong>1–3 min</strong></li>
+                                                                <li>Indicateur « en cours » affiché pendant ce temps</li>
+                                                                <li>Visite disponible automatiquement après conversion</li>
+                                                            </ul>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <p class="font-medium text-blue-800 dark:text-blue-200 mb-1">📋 Étapes d\'utilisation</p>
+                                                        <ol class="list-decimal list-inside text-blue-700 dark:text-blue-300 space-y-1">
+                                                            <li>Préparez votre photo équirectangulaire (JPG/WEBP, max 30 Mo, ratio 2:1)</li>
+                                                            <li>Sélectionnez <strong>Cubemap</strong>, puis uploadez l\'image</li>
+                                                            <li>La conversion des 6 faces démarre automatiquement en arrière-plan (~1–3 min)</li>
+                                                            <li>Pendant la conversion, les visiteurs voient l\'image équirectangulaire en attendant</li>
+                                                            <li>La visite passe en mode Cubemap dès que la conversion est terminée</li>
+                                                        </ol>
+                                                    </div>
+                                                    <p class="text-xs text-blue-500 dark:text-blue-400 italic">💡 Recommandé pour les images inférieures à 8 000 × 4 000 px ou si vous souhaitez une qualité professionnelle sans long temps d\'attente.</p>
+                                                </div>
+                                            ')),
+
+                                        Placeholder::make('type_docs_multires')
+                                            ->label('')
+                                            ->columnSpanFull()
+                                            ->visible(fn (callable $get) => $get('type') === 'multires')
+                                            ->content(new HtmlString('
+                                                <div class="rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30 p-4 text-sm space-y-3">
+                                                    <p class="font-semibold text-orange-800 dark:text-orange-200">🔴 Haute résolution (Multirés) — Tuiles progressives</p>
+                                                    <p class="text-orange-700 dark:text-orange-300">Le serveur génère une pyramide de tuiles (comme Google Maps) : la visite charge en basse résolution immédiatement, puis affine progressivement la qualité. Parfait pour les grandes images et les connexions mobiles lentes.</p>
+                                                    <div class="grid grid-cols-2 gap-3">
+                                                        <div>
+                                                            <p class="font-medium text-orange-800 dark:text-orange-200 mb-1">✅ Avantages</p>
+                                                            <ul class="list-disc list-inside text-orange-700 dark:text-orange-300 space-y-1">
+                                                                <li>Chargement <strong>instantané</strong> même sur 3G/4G</li>
+                                                                <li>Qualité maximale pour les grandes images</li>
+                                                                <li>Zoom sans pixellisation</li>
+                                                                <li>Expérience fluide sur tous les appareils</li>
+                                                            </ul>
+                                                        </div>
+                                                        <div>
+                                                            <p class="font-medium text-orange-800 dark:text-orange-200 mb-1">⏱️ Traitement serveur</p>
+                                                            <ul class="list-disc list-inside text-orange-700 dark:text-orange-300 space-y-1">
+                                                                <li>Génération des tuiles : <strong>5–15 min</strong></li>
+                                                                <li>Durée variable selon la taille de l\'image</li>
+                                                                <li>Visite disponible automatiquement après traitement</li>
+                                                            </ul>
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <p class="font-medium text-orange-800 dark:text-orange-200 mb-1">📋 Étapes d\'utilisation</p>
+                                                        <ol class="list-decimal list-inside text-orange-700 dark:text-orange-300 space-y-1">
+                                                            <li>Préparez une image haute résolution (≥ 8 000 × 4 000 px recommandé, max 30 Mo)</li>
+                                                            <li>Sélectionnez <strong>Haute résolution</strong>, puis uploadez l\'image</li>
+                                                            <li>Le serveur génère la pyramide de tuiles automatiquement (5–15 min)</li>
+                                                            <li>Pendant le traitement, les visiteurs voient l\'image équirectangulaire en attendant</li>
+                                                            <li>La visite passe en mode haute résolution dès que le traitement est terminé</li>
+                                                        </ol>
+                                                    </div>
+                                                    <div class="rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700 p-3 space-y-1">
+                                                        <p class="font-medium text-orange-800 dark:text-orange-200">📐 Résolution recommandée de l\'image source</p>
+                                                        <ul class="list-disc list-inside text-orange-700 dark:text-orange-300 space-y-1 text-xs">
+                                                            <li><strong>Minimum :</strong> 4 000 × 2 000 px</li>
+                                                            <li><strong>Recommandé :</strong> 8 000 × 4 000 px</li>
+                                                            <li><strong>Optimal :</strong> 12 000 × 6 000 px+ (Insta360, GoPro MAX, Ricoh Theta Z1…)</li>
+                                                        </ul>
+                                                    </div>
+                                                </div>
+                                            ')),
+
+                                        // ── End per-type documentation ──────────────────────────────
+
+                                        FileUpload::make('image_path')
+                                            ->label('Photo 360°')
+                                            ->image()
+                                            ->disk(config('filesystems.default'))
+                                            ->fetchFileInformation(false)
+                                            ->directory(fn (?Ad $record) => $record ? "ads/{$record->id}/tours" : 'ads/temp/tours')
+                                            ->required()
+                                            ->maxSize(30720)
+                                            ->imagePreviewHeight('120')
+                                            ->columnSpanFull()
+                                            ->hint('Format panoramique 2:1 recommandé')
+                                            ->getUploadedFileUsing(function ($component, string $file, $storedFileNames): array {
+                                                // Build a proxy URL so existing R2 uploads render a live preview.
+                                                // Supports both new path (ads/{adId}/tours/...) and legacy (tours/{adId}/...).
+                                                $parts = explode('/', $file);
+                                                if (count($parts) >= 4 && $parts[0] === 'ads') {
+                                                    $adId = $parts[1];
+                                                    $path = implode('/', array_slice($parts, 3)); // strip 'ads/{adId}/tours/'
+                                                    $url = route('tour.image.proxy', ['adId' => $adId, 'path' => $path]);
+                                                } elseif (count($parts) >= 3 && $parts[0] === 'tours') {
+                                                    // Legacy: tours/{adId}/{filename}
+                                                    $adId = $parts[1];
+                                                    $path = implode('/', array_slice($parts, 2));
+                                                    $url = route('tour.image.proxy', ['adId' => $adId, 'path' => $path]);
+                                                } else {
+                                                    $url = Storage::disk()->url($file);
+                                                }
+
+                                                return ['name' => basename($file), 'size' => 0, 'type' => 'image/webp', 'url' => $url];
+                                            })
+                                            ->deleteUploadedFileUsing(fn () => null)
+                                            ->saveUploadedFileUsing(function (TemporaryUploadedFile $file, ?Ad $record): string {
+                                                $directory = $record ? "ads/{$record->id}/tours" : 'ads/temp/tours';
+                                                $filename = Str::ulid().'.webp';
+                                                $path = "{$directory}/{$filename}";
+
+                                                $webp = ImageManager::gd()
+                                                    ->read($file->getRealPath())
+                                                    ->toWebp(quality: 82)
+                                                    ->toString();
+
+                                                Storage::disk()->put($path, $webp);
+
+                                                return $path;
+                                            }),
+                                        Hidden::make('id')
+                                            ->default(fn () => 'scene_'.Str::random(8)),
+                                        Hidden::make('image_url'),
+                                        Hidden::make('hotspots')
+                                            ->default([]),
+                                        Hidden::make('initial_view')
+                                            ->default(['pitch' => 0, 'yaw' => 0, 'hfov' => 110]),
+                                        Hidden::make('processing')->default(false),
+                                        Hidden::make('processing_failed')->default(false),
+                                        Hidden::make('cube_map')->default(null),
+                                        Hidden::make('tiles_base_url')->default(null),
+                                        Hidden::make('fallback_base_url')->default(null),
+                                        Hidden::make('tiles_max_level')->default(null),
+                                        Hidden::make('cube_resolution')->default(null),
+                                    ]),
+                            ])
+                            ->itemLabel(fn (array $state): ?string => $state['title'] ?? null)
+                            ->addActionLabel('Ajouter une pièce')
+                            ->reorderable()
+                            ->cloneable()
+                            ->collapsible()
+                            ->grid(2)
+                            ->minItems(1)
+                            ->columnSpanFull()
+                            ->afterStateHydrated(function ($component, $record): void {
+                                if ($record && $record->tour_config && isset($record->tour_config['scenes'])) {
+                                    $scenes = collect($record->tour_config['scenes'])->map(function ($scene) {
+                                        if (isset($scene['image_path']) && is_string($scene['image_path'])) {
+                                            $scene['image_path'] = [$scene['image_path']];
+                                        }
+
+                                        return $scene;
+                                    })->toArray();
+                                    $component->state($scenes);
+                                }
+                            })
+                            ->dehydrateStateUsing(function ($state, $record) {
+                                // Index the persisted scenes by ID so hotspots saved via the
+                                // hotspot editor (PATCH) are not overwritten by the stale
+                                // Hidden-field state when the main form is re-saved.
+                                $persistedScenes = collect($record?->tour_config['scenes'] ?? [])->keyBy('id');
+
+                                return collect($state)->map(function ($scene) use ($persistedScenes, $record) {
+                                    if (isset($scene['image_path']) && !empty($scene['image_path'])) {
+                                        // FileUpload state is an array of file keys; unwrap to a single path.
+                                        $first = is_array($scene['image_path'])
+                                            ? (array_values($scene['image_path'])[0] ?? null)
+                                            : $scene['image_path'];
+
+                                        if (!$first) {
+                                            // User cleared the widget without uploading a replacement —
+                                            // preserve the previously persisted image data.
+                                            $persisted = $persistedScenes->get($scene['id']) ?? [];
+                                            $scene['image_path'] = $persisted['image_path'] ?? null;
+                                            $scene['image_url'] = $persisted['image_url'] ?? null;
+                                            $scene['type'] ??= 'equirectangular';
+                                            $scene['hotspots'] = $persisted['hotspots'] ?? $scene['hotspots'] ?? [];
+                                            $scene['initial_view'] ??= ['pitch' => 0, 'yaw' => 0, 'hfov' => 110];
+
+                                            return $scene;
+                                        }
+
+                                        $path = $first;
+                                        // Support both new path (ads/{adId}/tours/{filename})
+                                        // and legacy path (tours/{adId}/{filename})
+                                        $parts = explode('/', (string) $path);
+                                        if (count($parts) >= 4 && $parts[0] === 'ads') {
+                                            $adId = $parts[1];
+                                            $filename = $parts[3];
+                                        } elseif (count($parts) >= 3 && $parts[0] === 'tours') {
+                                            $adId = $parts[1];
+                                            $filename = $parts[2];
+                                        } else {
+                                            $adId = $record->id ?? '';
+                                            $filename = basename((string) $path);
+                                        }
+
+                                        // When uploaded during ad creation ($record was null), the file
+                                        // landed in ads/temp/tours/. Now that the record exists, move it to
+                                        // the correct location and fix the adId reference.
+                                        if ($adId === 'temp' && $record?->id) {
+                                            $correctPath = "ads/{$record->id}/tours/{$filename}";
+                                            if (!Storage::disk()->exists($correctPath)) {
+                                                Storage::disk()->copy($path, $correctPath);
+                                            }
+                                            $adId = $record->id;
+                                            $path = $correctPath;
+                                        }
+
+                                        $scene['image_url'] = route('tour.image.proxy', [
+                                            'adId' => $adId,
+                                            'path' => $filename,
+                                        ]);
+                                        $scene['image_path'] = $path;
+
+                                        // Dispatch background conversion for cubemap / multires
+                                        // unless processing has already been done or is in progress.
+                                        $sceneType = $scene['type'] ?? 'equirectangular';
+                                        $needsProcessing = in_array($sceneType, ['cubemap', 'multires'])
+                                            && empty($scene['cube_map'])
+                                            && empty($scene['tiles_base_url'])
+                                            && !($scene['processing'] ?? false)
+                                            && $record?->id;
+
+                                        if ($needsProcessing) {
+                                            $scene['processing'] = true;
+                                            $scene['processing_failed'] = false;
+                                            ProcessTourSceneJob::dispatch(
+                                                $record->id,
+                                                $scene['id'],
+                                                $sceneType,
+                                                $path,
+                                            );
+                                        }
+                                    }
+                                    $scene['type'] ??= 'equirectangular';
+                                    $scene['hotspots'] = $persistedScenes->get($scene['id'])['hotspots']
+                                        ?? $scene['hotspots']
+                                        ?? [];
+                                    $scene['initial_view'] ??= ['pitch' => 0, 'yaw' => 0, 'hfov' => 110];
+
+                                    return $scene;
+                                })->values()->toArray();
+                            })
+                            ->afterStateUpdated(function ($state, $set, $record): void {
+                                if (empty($state)) {
+                                    $set('has_3d_tour', false);
+                                    $set('tour_published_at', null);
+
+                                    return;
+                                }
+                                $set('has_3d_tour', true);
+                                $set('tour_published_at', now());
+                                $set('tour_config.default_scene', $state[0]['id'] ?? null);
+                            }),
+                    ]),
+
+                Section::make('Étape 2 — Liens entre les pièces')
+                    ->description('Utilisez l\'éditeur ci-dessous pour relier vos pièces entre elles.')
+                    ->icon('heroicon-o-link')
+                    ->visible(fn (callable $get, $record) => (bool) $get('has_3d_tour') || $record?->has_3d_tour === true)
+                    ->schema([
+                        ViewField::make('tour_hotspot_editor')
+                            ->label('')
+                            ->view('filament.components.tour-hotspot-editor'),
+                    ]),
+            ])
+            ->columnSpanFull();
     }
 }

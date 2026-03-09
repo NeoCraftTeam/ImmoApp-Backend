@@ -122,6 +122,9 @@ class Ad extends Model implements HasMedia
         'deposit_amount',
         'minimum_lease_duration',
         'detailed_charges',
+        'has_3d_tour',
+        'tour_config',
+        'tour_published_at',
     ];
 
     protected $hidden = [
@@ -131,6 +134,9 @@ class Ad extends Model implements HasMedia
         'deleted_at',
         'agency_id',
     ];
+
+    /** @var list<string> */
+    protected $appends = ['tour_scenes_count'];
 
     protected $casts = [
         'location' => Point::class, // Assuming 'point' is a custom cast for PostGIS
@@ -145,6 +151,9 @@ class Ad extends Model implements HasMedia
         'is_boosted' => 'boolean',
         'boost_expires_at' => 'datetime',
         'boosted_at' => 'datetime',
+        'has_3d_tour' => 'boolean',
+        'tour_config' => 'array',
+        'tour_published_at' => 'datetime',
     ];
 
     #[\Override]
@@ -191,6 +200,28 @@ class Ad extends Model implements HasMedia
 
         $this->status = $newStatus;
         $this->save();
+    }
+
+    /** Return the number of 360\u00b0 scenes in the tour config. */
+    public function getTourScenesCountAttribute(): int
+    {
+        if (!$this->tour_config) {
+            return 0;
+        }
+
+        return count($this->tour_config['scenes'] ?? []);
+    }
+
+    /**
+     * Scope \u2014 ads that have a published 3D tour.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<static>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<static>
+     */
+    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    protected function withTour(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    {
+        return $query->where('has_3d_tour', true)->whereNotNull('tour_config');
     }
 
     public static function generateUniqueSlug(string $title, ?string $ignoreId = null): string
@@ -360,13 +391,11 @@ class Ad extends Model implements HasMedia
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('images')
-            ->onlyKeepLatest(10)
-            ->useDisk('public');
+            ->onlyKeepLatest(10);
 
         $this->addMediaCollection('property_condition')
             ->singleFile()
-            ->acceptsMimeTypes(['application/pdf'])
-            ->useDisk('public');
+            ->acceptsMimeTypes(['application/pdf']);
     }
 
     public function registerMediaConversions(?Media $media = null): void

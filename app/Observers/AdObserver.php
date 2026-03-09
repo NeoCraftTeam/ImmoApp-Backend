@@ -18,6 +18,18 @@ use Illuminate\Support\Facades\Notification;
 class AdObserver
 {
     /**
+     * Ensure tour_config always has a default_scene set before saving.
+     */
+    public function saving(Ad $ad): void
+    {
+        if (!empty($ad->tour_config['scenes']) && empty($ad->tour_config['default_scene'])) {
+            $config = $ad->tour_config;
+            $config['default_scene'] = $config['scenes'][0]['id'];
+            $ad->tour_config = $config;
+        }
+    }
+
+    /**
      * Handle the Ad "created" event.
      */
     public function created(Ad $ad): void
