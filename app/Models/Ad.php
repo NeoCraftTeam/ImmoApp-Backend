@@ -76,6 +76,7 @@ use Spatie\Activitylog\LogOptions;
  * @mixin Eloquent
  */
 use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -400,26 +401,26 @@ class Ad extends Model implements HasMedia
 
     public function registerMediaConversions(?Media $media = null): void
     {
+        // Tiny blur placeholder — sync, ~20px, used as blurDataURL before the real image loads.
+        $this->addMediaConversion('placeholder')
+            ->nonQueued()
+            ->fit(Fit::Max, 20, 20)
+            ->format('webp')
+            ->quality(30);
+
+        // Listing card thumbnail — landscape-safe, no upscaling, queued.
         $this->addMediaConversion('thumb')
-            ->nonQueued()
-            ->width(300)
-            ->height(300)
+            ->queued()
+            ->fit(Fit::Max, 480, 320)
             ->format('webp')
-            ->quality(80);
+            ->quality(78);
 
-        $this->addMediaConversion('medium')
-            ->nonQueued()
-            ->width(800)
-            ->height(600)
-            ->format('webp')
-            ->quality(80);
-
+        // Detail view & lightbox — high quality, landscape-safe, queued.
         $this->addMediaConversion('large')
             ->queued()
-            ->width(1200)
-            ->height(900)
+            ->fit(Fit::Max, 1280, 854)
             ->format('webp')
-            ->quality(85);
+            ->quality(82);
     }
 
     /**
