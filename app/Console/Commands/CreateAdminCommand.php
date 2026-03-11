@@ -86,11 +86,11 @@ class CreateAdminCommand extends Command
         $user->forceFill(['role' => UserRole::ADMIN]);
         $user->save();
 
-        // Trigger email verification — VerifyEmailMail is queued via sendEmailVerificationNotification()
-        $user->sendEmailVerificationNotification();
+        // Send a signed verification link (not OTP) — admins use the web link, not the mobile OTP flow.
+        $user->notify(new \Illuminate\Auth\Notifications\VerifyEmail);
 
         $this->info("✅ Admin created: {$user->email} (ID: {$user->id})");
-        $this->info("📧 A verification email has been sent to {$user->email}.");
+        $this->info(" A verification email has been sent to {$user->email}.");
         $this->line('   The admin will receive a welcome email automatically after verifying their address.');
 
         return self::SUCCESS;

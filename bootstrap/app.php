@@ -13,7 +13,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->trustProxies(at: env('TRUSTED_PROXIES', '127.0.0.1'));
+        $middleware->trustProxies(at: env('TRUSTED_PROXIES', '*'));
         $middleware->validateCsrfTokens(except: [
             'api/*',
             'api/v1/payments/webhook',
