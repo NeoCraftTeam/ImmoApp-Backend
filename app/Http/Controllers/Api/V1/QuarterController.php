@@ -104,7 +104,7 @@ final class QuarterController
      */
     public function index()
     {
-        $quarter = Quarter::paginate(config('pagination.default', 10));
+        $quarter = Quarter::query()->with('city')->paginate(config('pagination.default', 10));
 
         return QuarterResource::collection($quarter);
     }
