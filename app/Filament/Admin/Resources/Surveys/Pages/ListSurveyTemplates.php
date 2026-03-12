@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources\Surveys\Pages;
 
 use App\Filament\Admin\Resources\Surveys\SurveyTemplateResource;
+use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListSurveyTemplates extends ListRecords
@@ -14,6 +15,9 @@ class ListSurveyTemplates extends ListRecords
     #[\Override]
     protected function getHeaderActions(): array
     {
-        return [];
+        return [
+            CreateAction::make()
+                ->label('Nouveau modèle'),
+        ];
     }
 }

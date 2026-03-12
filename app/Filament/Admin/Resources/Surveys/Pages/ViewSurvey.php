@@ -118,8 +118,8 @@ class ViewSurvey extends ViewRecord
             });
 
         /** @phpstan-ignore return.type */
-        return $authenticated->values()
-            ->merge($anonymous)
+        return collect($authenticated->values()->all())
+            ->merge($anonymous->values())
             ->sortByDesc('submitted_at_raw')
             ->values();
     }

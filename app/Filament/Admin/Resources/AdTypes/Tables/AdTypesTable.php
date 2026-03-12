@@ -24,7 +24,7 @@ class AdTypesTable
             ->striped()
             ->columns([
                 TextColumn::make('name')->label('Nom')
-                    ->description(fn (AdType $record): string => $record->desc)
+                    ->description(fn (AdType $record): string => $record->desc ?? '')
                     ->searchable()
                     ->sortable(),
                 TextColumn::make('created_at')

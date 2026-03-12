@@ -8,20 +8,20 @@
  * - Background sync for failed POST/PUT/DELETE requests
  */
 
-const CACHE_VERSION = 'keyhome-v3';
+const CACHE_VERSION = "keyhome-v3";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 const API_CACHE = `${CACHE_VERSION}-api`;
-const OFFLINE_URL = '/pwa/offline.html';
+const OFFLINE_URL = "/pwa/offline.html";
 
 /**
  * Static assets to precache during install.
  */
 const PRECACHE_ASSETS = [
     OFFLINE_URL,
-    '/pwa/icons/icon-192x192.png',
-    '/pwa/icons/icon-512x512.png',
-    '/manifest.json',
+    "/pwa/icons/icon-192x192.png",
+    "/pwa/icons/icon-512x512.png",
+    "/manifest.json",
 ];
 
 /**
@@ -60,38 +60,58 @@ const NO_CACHE_PATTERNS = [
 /**
  * Background sync queue name.
  */
-const SYNC_QUEUE = 'keyhome-bg-sync';
+const SYNC_QUEUE = "keyhome-bg-sync";
 
 // ─── Install ──────────────────────────────────────────────
-self.addEventListener('install', (event) => {
+self.addEventListener("install", (event) => {
     event.waitUntil(
-        caches.open(STATIC_CACHE)
+        caches
+            .open(STATIC_CACHE)
             .then((cache) => cache.addAll(PRECACHE_ASSETS))
-            .then(() => self.skipWaiting())
+            .then(() => self.skipWaiting()),
     );
 });
 
 // ─── Activate ─────────────────────────────────────────────
-self.addEventListener('activate', (event) => {
+self.addEventListener("activate", (event) => {
     event.waitUntil(
-        caches.keys()
-            .then((keys) => Promise.all(
-                keys
-                    .filter((key) => key.startsWith('keyhome-') && key !== STATIC_CACHE && key !== DYNAMIC_CACHE && key !== API_CACHE)
-                    .map((key) => caches.delete(key))
-            ))
+        caches
+            .keys()
+            .then((keys) =>
+                Promise.all(
+                    keys
+                        .filter(
+                            (key) =>
+                                key.startsWith("keyhome-") &&
+                                key !== STATIC_CACHE &&
+                                key !== DYNAMIC_CACHE &&
+                                key !== API_CACHE,
+                        )
+                        .map((key) => caches.delete(key)),
+                ),
+            )
             .then(() => caches.open(DYNAMIC_CACHE))
-            .then((cache) => cache.keys().then((requests) => Promise.all(
-                requests
-                    .filter((req) => /\/(login|logout|register|password|forgot-password|reset-password)/.test(new URL(req.url).pathname))
-                    .map((req) => cache.delete(req))
-            )))
-            .then(() => self.clients.claim())
+            .then((cache) =>
+                cache
+                    .keys()
+                    .then((requests) =>
+                        Promise.all(
+                            requests
+                                .filter((req) =>
+                                    /\/(login|logout|register|password|forgot-password|reset-password)/.test(
+                                        new URL(req.url).pathname,
+                                    ),
+                                )
+                                .map((req) => cache.delete(req)),
+                        ),
+                    ),
+            )
+            .then(() => self.clients.claim()),
     );
 });
 
 // ─── Fetch ────────────────────────────────────────────────
-self.addEventListener('fetch', (event) => {
+self.addEventListener("fetch", (event) => {
     const { request } = event;
     const url = new URL(request.url);
 
@@ -106,12 +126,16 @@ self.addEventListener('fetch', (event) => {
     }
 
     // Skip non-GET for caching (but queue for background sync)
-    if (request.method !== 'GET') {
-        if (request.method === 'POST' || request.method === 'PUT' || request.method === 'DELETE') {
+    if (request.method !== "GET") {
+        if (
+            request.method === "POST" ||
+            request.method === "PUT" ||
+            request.method === "DELETE"
+        ) {
             event.respondWith(
                 fetch(request.clone()).catch(() => {
                     return enqueueSync(request);
-                })
+                }),
             );
         }
         return;
@@ -124,13 +148,16 @@ self.addEventListener('fetch', (event) => {
     }
 
     // Strategy: Stale-while-revalidate for API GETs
-    if (url.pathname.startsWith('/api/')) {
+    if (url.pathname.startsWith("/api/")) {
         event.respondWith(staleWhileRevalidate(request, API_CACHE));
         return;
     }
 
     // Strategy: Network-first for navigation/HTML
-    if (request.mode === 'navigate' || request.headers.get('accept')?.includes('text/html')) {
+    if (
+        request.mode === "navigate" ||
+        request.headers.get("accept")?.includes("text/html")
+    ) {
         event.respondWith(networkFirst(request, DYNAMIC_CACHE));
         return;
     }
@@ -146,14 +173,14 @@ self.addEventListener('fetch', (event) => {
 });
 
 // ─── Push Notifications ───────────────────────────────────
-self.addEventListener('push', (event) => {
+self.addEventListener("push", (event) => {
     let data = {
-        title: 'KeyHome',
-        body: 'Vous avez une nouvelle notification.',
-        icon: '/pwa/icons/icon-192x192.png',
-        badge: '/pwa/icons/icon-72x72.png',
-        tag: 'keyhome-notification',
-        data: { url: '/admin' },
+        title: "KeyHome",
+        body: "Vous avez une nouvelle notification.",
+        icon: "/pwa/icons/icon-192x192.png",
+        badge: "/pwa/icons/icon-72x72.png",
+        tag: "keyhome-notification",
+        data: { url: "/admin" },
     };
 
     if (event.data) {
@@ -175,25 +202,26 @@ self.addEventListener('push', (event) => {
             requireInteraction: false,
             actions: data.actions || [],
             data: data.data || {},
-        })
+        }),
     );
 });
 
 // ─── Notification Click ───────────────────────────────────
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener("notificationclick", (event) => {
     event.notification.close();
 
-    const targetPath = event.notification.data?.url || '/admin';
+    const targetPath = event.notification.data?.url || "/admin";
     const targetUrl = new URL(targetPath, self.location.origin).href;
 
     event.waitUntil(
-        self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+        self.clients
+            .matchAll({ type: "window", includeUncontrolled: true })
             .then((clients) => {
                 // Focus any existing app window and navigate it
                 for (const client of clients) {
-                    if ('focus' in client) {
+                    if ("focus" in client) {
                         return client.focus().then((focused) => {
-                            if ('navigate' in focused) {
+                            if ("navigate" in focused) {
                                 return focused.navigate(targetUrl);
                             }
                             return focused;
@@ -202,12 +230,12 @@ self.addEventListener('notificationclick', (event) => {
                 }
                 // No existing window — open a new one
                 return self.clients.openWindow(targetUrl);
-            })
+            }),
     );
 });
 
 // ─── Background Sync ──────────────────────────────────────
-self.addEventListener('sync', (event) => {
+self.addEventListener("sync", (event) => {
     if (event.tag === SYNC_QUEUE) {
         event.waitUntil(replayQueuedRequests());
     }
@@ -233,7 +261,10 @@ async function cacheFirst(request, cacheName) {
         }
         return response;
     } catch {
-        return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+        return new Response("Offline", {
+            status: 503,
+            statusText: "Service Unavailable",
+        });
     }
 }
 
@@ -246,7 +277,10 @@ async function networkFirst(request, cacheName) {
         const response = await fetch(request);
         if (response.ok) {
             const url = new URL(request.url);
-            const isAuthPage = /\/(login|logout|register|password|forgot-password|reset-password)/.test(url.pathname);
+            const isAuthPage =
+                /\/(login|logout|register|password|forgot-password|reset-password)/.test(
+                    url.pathname,
+                );
             if (!isAuthPage) {
                 const cache = await caches.open(cacheName);
                 cache.put(request, response.clone());
@@ -260,14 +294,17 @@ async function networkFirst(request, cacheName) {
         }
 
         // Return offline page for navigation requests
-        if (request.mode === 'navigate') {
+        if (request.mode === "navigate") {
             const offlinePage = await caches.match(OFFLINE_URL);
             if (offlinePage) {
                 return offlinePage;
             }
         }
 
-        return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+        return new Response("Offline", {
+            status: 503,
+            statusText: "Service Unavailable",
+        });
     }
 }
 
@@ -288,7 +325,11 @@ async function staleWhileRevalidate(request, cacheName) {
         })
         .catch(() => null);
 
-    return cached || await fetchPromise || new Response('Offline', { status: 503 });
+    return (
+        cached ||
+        (await fetchPromise) ||
+        new Response("Offline", { status: 503 })
+    );
 }
 
 // ─── Background Sync Helpers ──────────────────────────────
@@ -309,8 +350,8 @@ async function enqueueSync(request) {
 
         // Store in IndexedDB
         const db = await openSyncDB();
-        const tx = db.transaction('requests', 'readwrite');
-        tx.objectStore('requests').add(queueData);
+        const tx = db.transaction("requests", "readwrite");
+        tx.objectStore("requests").add(queueData);
         await tx.complete;
 
         // Register sync
@@ -318,12 +359,19 @@ async function enqueueSync(request) {
             await self.registration.sync.register(SYNC_QUEUE);
         }
 
-        return new Response(JSON.stringify({ queued: true, message: 'Requête mise en file — sera envoyée quand la connexion sera rétablie.' }), {
-            status: 202,
-            headers: { 'Content-Type': 'application/json' },
-        });
+        return new Response(
+            JSON.stringify({
+                queued: true,
+                message:
+                    "Requête mise en file — sera envoyée quand la connexion sera rétablie.",
+            }),
+            {
+                status: 202,
+                headers: { "Content-Type": "application/json" },
+            },
+        );
     } catch {
-        return new Response('Offline', { status: 503 });
+        return new Response("Offline", { status: 503 });
     }
 }
 
@@ -332,15 +380,15 @@ async function enqueueSync(request) {
  */
 async function replayQueuedRequests() {
     const db = await openSyncDB();
-    const tx = db.transaction('requests', 'readonly');
-    const store = tx.objectStore('requests');
+    const tx = db.transaction("requests", "readonly");
+    const store = tx.objectStore("requests");
 
     return new Promise((resolve, reject) => {
         const getAll = store.getAll();
         getAll.onsuccess = async () => {
             const requests = getAll.result;
-            const deleteTx = db.transaction('requests', 'readwrite');
-            const deleteStore = deleteTx.objectStore('requests');
+            const deleteTx = db.transaction("requests", "readwrite");
+            const deleteStore = deleteTx.objectStore("requests");
 
             for (const item of requests) {
                 try {
@@ -365,11 +413,14 @@ async function replayQueuedRequests() {
  */
 function openSyncDB() {
     return new Promise((resolve, reject) => {
-        const req = indexedDB.open('keyhome-sync', 1);
+        const req = indexedDB.open("keyhome-sync", 1);
         req.onupgradeneeded = () => {
             const db = req.result;
-            if (!db.objectStoreNames.contains('requests')) {
-                db.createObjectStore('requests', { keyPath: 'id', autoIncrement: true });
+            if (!db.objectStoreNames.contains("requests")) {
+                db.createObjectStore("requests", {
+                    keyPath: "id",
+                    autoIncrement: true,
+                });
             }
         };
         req.onsuccess = () => resolve(req.result);

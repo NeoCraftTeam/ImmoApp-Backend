@@ -39,6 +39,7 @@ class AgencyPanelProvider extends PanelProvider
             ->registration(\App\Filament\Pages\Auth\CustomRegister::class)
             ->profile(\App\Filament\Pages\Auth\EditProfile::class)
             ->emailVerification()
+            ->databaseTransactions()
             ->colors([
                 'primary' => \Filament\Support\Colors\Color::hex('#2563eb'), // Bleu Agence
             ])

@@ -9,6 +9,7 @@ use App\Filament\Admin\Resources\Surveys\Pages\ViewSurvey;
 use App\Models\Survey;
 use App\Models\SurveyResponse;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -49,7 +50,7 @@ class SurveyResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->withCount(['questions', 'responses'])
+            ->withCount(['questions', 'responses', 'anonymousResponses'])
             ->selectSub(
                 SurveyResponse::query()
                     ->selectRaw('COUNT(DISTINCT user_id)')
@@ -188,9 +189,9 @@ class SurveyResource extends Resource
                     ->sortable(),
                 TextColumn::make('respondents_count')
                     ->label('Répondants')
+                    ->state(fn (Survey $record): int => (int) ($record->respondents_count ?? 0) + (int) ($record->anonymous_responses_count ?? 0))
                     ->badge()
-                    ->color('success')
-                    ->sortable(),
+                    ->color('success'),
                 TextColumn::make('created_at')
                     ->label('Créé le')
                     ->dateTime('d/m/Y')
@@ -199,10 +200,12 @@ class SurveyResource extends Resource
             ])
             ->recordActions([
                 ViewAction::make(),
+                Action::make('questions')
+                    ->label('Questions')
+                    ->icon(Heroicon::QuestionMarkCircle)
+                    ->color('gray')
+                    ->url(fn (Survey $record): string => SurveyTemplateResource::getUrl('edit', ['record' => $record])),
                 \Filament\Actions\EditAction::make(),
-            ])
-            ->toolbarActions([
-                \Filament\Actions\CreateAction::make(),
             ]);
     }
 
@@ -213,7 +216,6 @@ class SurveyResource extends Resource
             'index' => ListSurveys::route('/'),
             'view' => ViewSurvey::route('/{record}'),
             'edit' => Pages\EditSurvey::route('/{record}/edit'),
-            'create' => Pages\CreateSurvey::route('/create'),
         ];
     }
 

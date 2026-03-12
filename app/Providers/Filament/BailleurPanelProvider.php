@@ -40,6 +40,7 @@ class BailleurPanelProvider extends PanelProvider
             ->passwordReset()
             ->globalSearch(false)
             ->spa()
+            ->databaseTransactions()
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')
             ->registration(\App\Filament\Pages\Auth\CustomRegister::class)

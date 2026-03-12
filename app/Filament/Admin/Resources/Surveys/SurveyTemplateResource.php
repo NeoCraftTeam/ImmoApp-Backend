@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources\Surveys;
 
 use App\Models\Survey;
+use App\Models\User;
 use BackedEnum;
+use Filament\Actions\CreateAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -42,6 +46,30 @@ class SurveyTemplateResource extends Resource
     protected static ?int $navigationSort = 6;
 
     #[\Override]
+    public static function canViewAny(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->isAdmin();
+    }
+
+    #[\Override]
+    public static function canCreate(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->isAdmin();
+    }
+
+    #[\Override]
+    public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->isAdmin();
+    }
+
+    #[\Override]
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()->withCount('questions');
@@ -52,6 +80,26 @@ class SurveyTemplateResource extends Resource
     {
         return $schema
             ->components([
+                Section::make('Informations du modèle')
+                    ->icon(Heroicon::ClipboardDocumentList)
+                    ->columns(2)
+                    ->schema([
+                        TextInput::make('title')
+                            ->label('Titre')
+                            ->required()
+                            ->maxLength(255)
+                            ->columnSpanFull(),
+                        Textarea::make('description')
+                            ->label('Description')
+                            ->rows(3)
+                            ->columnSpanFull(),
+                        Toggle::make('is_active')
+                            ->label('Actif')
+                            ->default(true),
+                        Toggle::make('is_public')
+                            ->label('Visible publiquement')
+                            ->default(false),
+                    ]),
                 Section::make('Questions du sondage')
                     ->icon(Heroicon::QuestionMarkCircle)
                     ->description('Ajoutez, modifiez ou réordonnez les questions de ce sondage.')
@@ -118,7 +166,10 @@ class SurveyTemplateResource extends Resource
                     ->label('Gérer les questions')
                     ->icon(Heroicon::PencilSquare),
             ])
-            ->toolbarActions([]);
+            ->toolbarActions([
+                CreateAction::make()
+                    ->label('Nouveau modèle'),
+            ]);
     }
 
     #[\Override]
@@ -126,6 +177,7 @@ class SurveyTemplateResource extends Resource
     {
         return [
             'index' => Pages\ListSurveyTemplates::route('/'),
+            'create' => Pages\CreateSurveyTemplate::route('/create'),
             'edit' => Pages\EditSurveyTemplate::route('/{record}/edit'),
         ];
     }

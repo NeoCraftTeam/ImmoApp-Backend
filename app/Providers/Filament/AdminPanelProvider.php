@@ -79,9 +79,10 @@ class AdminPanelProvider extends PanelProvider
                 '),
             )
             ->renderHook(
-                'panels::scripts.after',
-                fn () => view('pwa.register-sw'),
+                'panels::head.end',
+                fn () => view('pwa.unregister-sw'),
             )
+            ->databaseTransactions()
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')
             ->unsavedChangesAlerts()
