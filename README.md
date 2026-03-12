@@ -98,6 +98,21 @@ php artisan migrate:fresh --seed
 php artisan media-library:regenerate --force
 ```
 
+### Import des catégories et attributs de biens
+
+```bash
+# Import standard (ajoute/met à jour le catalogue)
+php artisan make:upload-attributes
+
+# Réinitialiser puis réimporter entièrement le catalogue
+php artisan make:upload-attributes --fresh
+```
+
+**En production (Docker) :**
+```bash
+docker compose exec app php artisan make:upload-attributes
+```
+
 ### Meilisearch
 
 ```bash
