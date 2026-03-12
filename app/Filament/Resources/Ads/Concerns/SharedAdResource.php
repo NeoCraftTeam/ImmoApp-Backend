@@ -12,7 +12,6 @@ use App\Services\AiDescriptionEnhancer;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Dotswan\MapPicker\Fields\Map;
 use Filament\Actions\Action;
-use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
@@ -205,13 +204,13 @@ trait SharedAdResource
                 ->icon('heroicon-o-check-circle')
                 ->description('Sélectionnez les équipements disponibles dans ce bien')
                 ->schema([
-                    CheckboxList::make('attributes')
-                        ->label('')
-                        ->options(PropertyAttribute::toSelectArray())
-                        ->columns(3)
-                        ->gridDirection('row')
-                        ->bulkToggleable()
+                    Select::make('attributes')
+                        ->label('Équipements')
+                        ->options(PropertyAttribute::toGroupedSelectArray())
+                        ->placeholder('Sélectionnez les équipements')
+                        ->multiple()
                         ->searchable()
+                        ->preload()
                         ->afterStateHydrated(function ($component, $state): void {
                             if (!is_array($state)) {
                                 $component->state([]);
@@ -228,7 +227,8 @@ trait SharedAdResource
                             $validSlugs = array_keys(PropertyAttribute::toSelectArray());
 
                             return array_values(array_intersect($state, $validSlugs));
-                        }),
+                        })
+                        ->columnSpanFull(),
                 ])
                 ->collapsed(false)
                 ->collapsible()
@@ -511,23 +511,19 @@ trait SharedAdResource
                         ->label('')
                         ->badge()
                         ->formatStateUsing(function ($state) {
+                            $labelsBySlug = PropertyAttribute::query()->pluck('name', 'slug')->all();
+
                             if (empty($state)) {
                                 return 'Aucun équipement spécifié';
                             }
 
                             if (is_array($state)) {
                                 return collect($state)
-                                    ->map(function ($attr) {
-                                        $property = PropertyAttribute::query()->where('slug', $attr)->first();
-
-                                        return $property ? $property->name : $attr;
-                                    })
+                                    ->map(fn ($attr) => $labelsBySlug[$attr] ?? $attr)
                                     ->join(', ');
                             }
 
-                            $property = PropertyAttribute::query()->where('slug', $state)->first();
-
-                            return $property ? $property->name : $state;
+                            return $labelsBySlug[$state] ?? $state;
                         })
                         ->columnSpanFull(),
                 ])

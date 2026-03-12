@@ -99,6 +99,13 @@ final class AdRequest extends FormRequest
                 'images.7' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
                 'images.8' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
                 'images.9' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'attributes' => ['sometimes', 'array'],
+                'attributes.*' => [
+                    'string',
+                    Rule::exists('property_attributes', 'slug')->where(
+                        fn ($query) => $query->where('is_active', true)
+                    ),
+                ],
             ];
         }
         if ($this->isMethod('put') || $this->isMethod('patch')) {
@@ -124,7 +131,12 @@ final class AdRequest extends FormRequest
                 'available_to' => ['nullable', 'date', 'after_or_equal:available_from'],
                 // Task 6: Property attributes
                 'attributes' => ['sometimes', 'array'],
-                'attributes.*' => ['string', Rule::in(array_column(\App\Enums\PropertyAttribute::cases(), 'value'))],
+                'attributes.*' => [
+                    'string',
+                    Rule::exists('property_attributes', 'slug')->where(
+                        fn ($query) => $query->where('is_active', true)
+                    ),
+                ],
                 // user_id cannot be changed via API — ownership is immutable
                 'quarter_id' => ['sometimes', 'exists:quarter,id'],
                 'type_id' => ['sometimes', 'exists:ad_type,id'],

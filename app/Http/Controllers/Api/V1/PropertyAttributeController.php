@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\PropertyAttribute;
+use App\Models\PropertyAttribute;
 use Illuminate\Http\JsonResponse;
 use OpenApi\Attributes as OA;
 
@@ -26,7 +26,8 @@ final class PropertyAttributeController
     {
         return response()->json([
             'success' => true,
-            'data' => PropertyAttribute::toSelectArray(),
+            'data' => PropertyAttribute::toApiArray(),
+            'grouped' => PropertyAttribute::toApiGroupedArray(),
         ]);
     }
 }
