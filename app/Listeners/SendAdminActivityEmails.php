@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Listeners;
 
+use App\Enums\AdStatus;
 use App\Enums\UserRole;
 use App\Mail\AdminActionPerformedMail;
 use App\Models\User;
@@ -36,6 +37,7 @@ class SendAdminActivityEmails
         \App\Models\Subscription::class => 'Abonnement',
         \App\Models\SubscriptionPlan::class => "Plan d'abonnement",
         \App\Models\PointPackage::class => 'Pack de crédits',
+        \App\Models\AdReport::class => 'Signalement annonce',
         \App\Models\UnlockedAd::class => 'Déblocage',
         \App\Models\PropertyAttribute::class => 'Attribut',
         \App\Models\Setting::class => 'Paramètre',
@@ -58,8 +60,23 @@ class SendAdminActivityEmails
         $subject = $activity->subject;
         $entityName = $this->resolveEntityName($subject, $activity);
 
+        // Detect ad approval / rejection to use a more descriptive event label
+        $newStatus = $activity->properties['attributes']['status'] ?? null;
+        $isAdApproval = $activity->subject_type === \App\Models\Ad::class
+            && $activity->event === 'updated'
+            && $newStatus === AdStatus::AVAILABLE->value;
+        $isAdRejection = $activity->subject_type === \App\Models\Ad::class
+            && $activity->event === 'updated'
+            && $newStatus === AdStatus::DECLINED->value;
+
+        $event = match (true) {
+            $isAdApproval => 'approved',
+            $isAdRejection => 'rejected',
+            default => $activity->event ?? 'updated',
+        };
+
         $details = [
-            'event' => $activity->event ?? 'updated',
+            'event' => $event,
             'entity' => $entityLabel,
             'entity_name' => $entityName,
             'description' => $activity->description ?? "{$entityLabel} modifié(e)",
@@ -68,10 +85,13 @@ class SendAdminActivityEmails
         ];
 
         // 1. Confirmation email to the acting admin
-        try {
-            Mail::to($causer->email)->send(new AdminActionPerformedMail($causer, $details));
-        } catch (\Throwable $e) {
-            Log::error('Failed to send admin action confirmation email: '.$e->getMessage());
+        // Skip for ad approval/rejection — the action speaks for itself
+        if (!$isAdApproval && !$isAdRejection) {
+            try {
+                Mail::to($causer->email)->send(new AdminActionPerformedMail($causer, $details));
+            } catch (\Throwable $e) {
+                Log::error('Failed to send admin action confirmation email: '.$e->getMessage());
+            }
         }
 
         // 2. Notify other admins (mail + Filament DB notification + WebPush)

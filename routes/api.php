@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\V1\AdAnalyticsController;
 use App\Http\Controllers\Api\V1\AdController;
 use App\Http\Controllers\Api\V1\AdInteractionController;
+use App\Http\Controllers\Api\V1\AdReportController;
 use App\Http\Controllers\Api\V1\AdTypeController;
 use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\AuthController;
@@ -288,6 +289,8 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/ads/{ad}/contact-click', [AdInteractionController::class, 'trackContactClick'])
             ->middleware('throttle:30,1');
         Route::post('/ads/{ad}/phone-click', [AdInteractionController::class, 'trackPhoneClick'])
+            ->middleware('throttle:30,1');
+        Route::post('/ads/{ad}/reports', [AdReportController::class, 'store'])
             ->middleware('throttle:30,1');
     });
 

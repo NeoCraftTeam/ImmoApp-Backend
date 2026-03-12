@@ -28,10 +28,12 @@ use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -144,6 +146,12 @@ class UserResource extends Resource
                     ->icon(Heroicon::LockClosed)
                     ->columns(2)
                     ->schema([
+                        Toggle::make('is_active')
+                            ->label('Compte actif')
+                            ->helperText('Désactivez pour bloquer l’accès de cet utilisateur à la plateforme.')
+                            ->default(true)
+                            ->onColor('success')
+                            ->columnSpanFull(),
                         TextInput::make('password')
                             ->label('Mot de passe')
                             ->password()
@@ -219,6 +227,10 @@ class UserResource extends Resource
                 ->badge()
                 ->searchable()
                 ->toggleable(isToggledHiddenByDefault: true),
+            IconColumn::make('is_active')
+                ->label('Actif')
+                ->boolean()
+                ->sortable(),
             TextColumn::make('city.name')
                 ->label('Ville')
                 ->searchable(),

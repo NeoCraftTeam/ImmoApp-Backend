@@ -86,8 +86,8 @@ class CreateAdminCommand extends Command
         $user->forceFill(['role' => UserRole::ADMIN]);
         $user->save();
 
-        // Send a signed verification link (not OTP) — admins use the web link, not the mobile OTP flow.
-        $user->notify(new \Illuminate\Auth\Notifications\VerifyEmail);
+        // Align with app-wide OTP verification flow.
+        $user->sendEmailVerificationNotification();
 
         $this->info("✅ Admin created: {$user->email} (ID: {$user->id})");
         $this->info(" A verification email has been sent to {$user->email}.");

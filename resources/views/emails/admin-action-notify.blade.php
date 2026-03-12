@@ -44,16 +44,20 @@
             <td align="center">
                 @php
                     $badgeColors = match($event) {
-                        'created' => ['bg' => '#f0fdf4', 'color' => '#15803d', 'border' => '#86efac'],
-                        'updated' => ['bg' => '#fffbeb', 'color' => '#b45309', 'border' => '#fcd34d'],
-                        'deleted' => ['bg' => '#fef2f2', 'color' => '#dc2626', 'border' => '#fca5a5'],
-                        default   => ['bg' => '#f8fafc', 'color' => '#64748b', 'border' => '#cbd5e1'],
+                        'created'  => ['bg' => '#f0fdf4', 'color' => '#15803d', 'border' => '#86efac'],
+                        'updated'  => ['bg' => '#fffbeb', 'color' => '#b45309', 'border' => '#fcd34d'],
+                        'deleted'  => ['bg' => '#fef2f2', 'color' => '#dc2626', 'border' => '#fca5a5'],
+                        'approved' => ['bg' => '#f0fdf4', 'color' => '#15803d', 'border' => '#86efac'],
+                        'rejected' => ['bg' => '#fef2f2', 'color' => '#dc2626', 'border' => '#fca5a5'],
+                        default    => ['bg' => '#f8fafc', 'color' => '#64748b', 'border' => '#cbd5e1'],
                     };
                     $eventLabel = match($event) {
-                        'created' => 'Création',
-                        'updated' => 'Modification',
-                        'deleted' => 'Suppression',
-                        default   => ucfirst($event),
+                        'created'  => 'Création',
+                        'updated'  => 'Modification',
+                        'deleted'  => 'Suppression',
+                        'approved' => 'Approuvé',
+                        'rejected' => 'Rejeté',
+                        default    => ucfirst($event),
                     };
                 @endphp
                 <span style="

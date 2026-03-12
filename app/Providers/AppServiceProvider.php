@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Enums\UserRole;
+use App\Enums\UserType;
 use App\Models\PersonalAccessToken;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
 use App\Services\ReservationService;
 use App\Services\ViewingScheduleService;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
@@ -66,6 +69,29 @@ class AppServiceProvider extends ServiceProvider
             }
 
             return $link;
+        });
+
+        VerifyEmail::createUrlUsing(function (object $notifiable) {
+            $domain = match (true) {
+                $notifiable->role === UserRole::ADMIN => config('filament.domains.admin_domain'),
+                $notifiable->type === UserType::AGENCY => config('filament.domains.agency_domain'),
+                $notifiable->type === UserType::INDIVIDUAL => config('filament.domains.owner_domain'),
+                default => config('filament.domains.admin_domain'),
+            };
+
+            $rootUrl = $domain ? "https://{$domain}" : config('app.url');
+
+            URL::forceRootUrl($rootUrl);
+
+            $verificationUrl = URL::temporarySignedRoute(
+                'verification.verify',
+                now()->addMinutes(config('auth.verification.expire', 60)),
+                ['id' => $notifiable->getKey(), 'hash' => sha1($notifiable->getEmailForVerification())],
+            );
+
+            URL::forceRootUrl(config('app.url'));
+
+            return $verificationUrl;
         });
 
         Gate::define('viewPulse', fn (?\App\Models\User $user = null) => $user?->isAdmin() ?? false);

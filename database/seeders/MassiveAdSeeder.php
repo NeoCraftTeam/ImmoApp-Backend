@@ -108,7 +108,7 @@ class MassiveAdSeeder extends Seeder
         $cities = City::all();
 
         User::factory()->admin()->recycle($cities)->create([
-            'email' => 'admin@keyhome.cm',
+            'email' => 'admin@test.com',
             'password' => $password,
         ]);
 

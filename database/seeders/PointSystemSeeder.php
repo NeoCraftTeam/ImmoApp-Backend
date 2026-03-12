@@ -16,14 +16,14 @@ class PointSystemSeeder extends Seeder
         $packages = [
             [
                 'name' => 'Pack Starter',
-                'description' => 'Idéal pour découvrir la plateforme',
+                'description' => 'Parfait pour débloquer vos premiers contacts propriétaires',
                 'badge' => null,
                 'price' => 1000,   // 1 000 FCFA
                 'points_awarded' => 10,
                 'features' => [
-                    '10 crédits de déblocage',
-                    'Accès aux contacts propriétaires',
-                    'Support par email',
+                    '10 déverrouillages de contacts',
+                    'Accès direct aux numéros et WhatsApp',
+                    'Historique des annonces déverrouillées',
                 ],
                 'is_active' => true,
                 'is_popular' => false,
@@ -31,15 +31,15 @@ class PointSystemSeeder extends Seeder
             ],
             [
                 'name' => 'Pack Pro',
-                'description' => 'Le choix préféré de nos utilisateurs',
+                'description' => 'Le meilleur ratio pour accélérer votre recherche immobilière',
                 'badge' => 'Le + populaire',
                 'price' => 4000,   // 4 000 FCFA
                 'points_awarded' => 50,
                 'features' => [
-                    '50 crédits de déblocage',
-                    'Accès aux contacts propriétaires',
+                    '50 déverrouillages de contacts',
+                    'Accès direct aux numéros et WhatsApp',
                     'Support prioritaire',
-                    'Économisez 20%',
+                    'Meilleur coût par contact',
                 ],
                 'is_active' => true,
                 'is_popular' => true,
@@ -47,15 +47,15 @@ class PointSystemSeeder extends Seeder
             ],
             [
                 'name' => 'Pack Premium',
-                'description' => 'Pour les professionnels de l\'immobilier',
+                'description' => 'Conçu pour les pros et les recherches à fort volume',
                 'badge' => 'Meilleur rapport',
                 'price' => 7000,   // 7 000 FCFA
                 'points_awarded' => 120,
                 'features' => [
-                    '120 crédits de déblocage',
-                    'Accès aux contacts propriétaires',
+                    '120 déverrouillages de contacts',
+                    'Accès direct aux numéros et WhatsApp',
                     'Support prioritaire 24h/7j',
-                    'Économisez 40%',
+                    'Volume optimisé pour équipes',
                 ],
                 'is_active' => true,
                 'is_popular' => false,

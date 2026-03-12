@@ -56,12 +56,16 @@ class AdminCrudAction extends Notification implements ShouldQueue
             'created' => 'heroicon-o-plus-circle',
             'updated' => 'heroicon-o-pencil-square',
             'deleted' => 'heroicon-o-trash',
+            'approved' => 'heroicon-o-check-circle',
+            'rejected' => 'heroicon-o-x-circle',
         ];
 
         $eventColors = [
             'created' => 'success',
             'updated' => 'info',
             'deleted' => 'danger',
+            'approved' => 'success',
+            'rejected' => 'danger',
         ];
 
         $event = $this->details['event'];
