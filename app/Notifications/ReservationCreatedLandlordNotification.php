@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
+use App\Filament\Bailleur\Resources\Viewings\ViewingReservationResource;
 use App\Models\TentativeReservation;
+use App\Support\PanelUrl;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -14,6 +16,15 @@ use NotificationChannels\WebPush\WebPushMessage;
 
 class ReservationCreatedLandlordNotification extends Notification implements ShouldQueue
 {
+    private function resolveOwnerReservationsUrl(): string
+    {
+        try {
+            return ViewingReservationResource::getUrl(panel: 'bailleur');
+        } catch (\Throwable) {
+            return PanelUrl::for('bailleur', 'viewings/viewing-reservations');
+        }
+    }
+
     use Queueable;
 
     public function __construct(
@@ -55,7 +66,7 @@ class ReservationCreatedLandlordNotification extends Notification implements Sho
             ->badge('/pwa/icons/icon-72x72.png')
             ->body("{$clientName} veut visiter « {$this->reservation->ad->title} » le {$date}")
             ->tag('viewing-request-'.$this->reservation->id)
-            ->data(['url' => config('app.url').'/owner/viewings/viewing-reservations']);
+            ->data(['url' => $this->resolveOwnerReservationsUrl()]);
     }
 
     /** @return array<string, mixed> */

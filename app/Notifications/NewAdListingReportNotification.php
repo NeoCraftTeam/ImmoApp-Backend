@@ -7,6 +7,7 @@ namespace App\Notifications;
 use App\Filament\Admin\Resources\AdReports\AdReportResource;
 use App\Mail\NewAdReportMail;
 use App\Models\AdReport;
+use App\Support\PanelUrl;
 use Filament\Actions\Action as FilamentAction;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Bus\Queueable;
@@ -86,7 +87,7 @@ class NewAdListingReportNotification extends Notification implements ShouldQueue
 
     private function resolveReviewUrl(): string
     {
-        $fallback = rtrim((string) config('app.url'), '/')."/admin/ad-reports/{$this->report->id}/edit";
+        $fallback = PanelUrl::for('admin', "ad-reports/{$this->report->id}/edit");
 
         try {
             return AdReportResource::getUrl('edit', ['record' => $this->report->id], panel: 'admin');

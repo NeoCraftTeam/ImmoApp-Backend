@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
+use App\Filament\Admin\Resources\Surveys\SurveyResource;
 use App\Models\AnonymousSurveyResponse;
 use App\Models\Survey;
+use App\Support\PanelUrl;
 use Filament\Actions\Action as FilamentAction;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Bus\Queueable;
@@ -17,6 +19,15 @@ use NotificationChannels\WebPush\WebPushMessage;
 
 class NewAnonymousSurveyResponse extends Notification implements ShouldQueue
 {
+    private function resolveAdminSurveyUrl(): string
+    {
+        try {
+            return SurveyResource::getUrl('view', ['record' => $this->survey->id], panel: 'admin');
+        } catch (\Throwable) {
+            return PanelUrl::for('admin', "surveys/{$this->survey->id}");
+        }
+    }
+
     use Queueable;
 
     public function __construct(
@@ -71,7 +82,7 @@ class NewAnonymousSurveyResponse extends Notification implements ShouldQueue
             ];
         })->all();
 
-        $adminUrl = config('app.url').'/admin/surveys/'.$this->survey->id;
+        $adminUrl = $this->resolveAdminSurveyUrl();
 
         return (new MailMessage)
             ->subject('KeyHome — Nouvelle réponse anonyme : «'.$this->survey->title.'»')
@@ -99,7 +110,8 @@ class NewAnonymousSurveyResponse extends Notification implements ShouldQueue
             ->actions([
                 FilamentAction::make('view')
                     ->label('Voir les réponses')
-                    ->url(config('app.url').'/admin/surveys/'.$this->survey->id),
+                    ->url($this->resolveAdminSurveyUrl())
+                    ->markAsRead(),
             ])
             ->getDatabaseMessage();
     }
@@ -112,6 +124,6 @@ class NewAnonymousSurveyResponse extends Notification implements ShouldQueue
             ->badge('/pwa/icons/icon-72x72.png')
             ->body('Nouvelle réponse anonyme reçue pour «'.$this->survey->title.'»')
             ->tag('survey-response-'.$this->survey->id)
-            ->data(['url' => config('app.url').'/admin/surveys/'.$this->survey->id]);
+            ->data(['url' => $this->resolveAdminSurveyUrl()]);
     }
 }

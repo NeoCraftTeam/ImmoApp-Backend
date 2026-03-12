@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
+use App\Filament\Admin\Resources\PendingAds\PendingAdResource;
 use App\Mail\NewAdSubmissionMail;
 use App\Models\Ad;
+use App\Support\PanelUrl;
 use Filament\Actions\Action as FilamentAction;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Bus\Queueable;
@@ -17,6 +19,15 @@ use NotificationChannels\WebPush\WebPushMessage;
 
 class NewAdPending extends Notification implements ShouldQueue
 {
+    private function resolveAdminPendingAdsUrl(): string
+    {
+        try {
+            return PendingAdResource::getUrl(panel: 'admin');
+        } catch (\Throwable) {
+            return PanelUrl::for('admin', 'pending-ads');
+        }
+    }
+
     use Queueable;
 
     public function __construct(
@@ -49,13 +60,7 @@ class NewAdPending extends Notification implements ShouldQueue
      */
     public function toDatabase(object $notifiable): array
     {
-        $url = '/admin/pending-ads';
-
-        try {
-            $url = \App\Filament\Admin\Resources\PendingAds\PendingAdResource::getUrl();
-        } catch (\Exception) {
-            // Fallback if route generation fails (e.g. testing)
-        }
+        $url = $this->resolveAdminPendingAdsUrl();
 
         return FilamentNotification::make()
             ->title('Nouvelle annonce en attente')
@@ -83,6 +88,6 @@ class NewAdPending extends Notification implements ShouldQueue
             ->badge('/pwa/icons/icon-72x72.png')
             ->body("L'annonce \"{$this->ad->title}\" (par {$authorName}) nécessite votre validation.")
             ->tag('ad-pending-'.$this->ad->id)
-            ->data(['url' => config('app.url').'/admin/pending-ads']);
+            ->data(['url' => $this->resolveAdminPendingAdsUrl()]);
     }
 }
