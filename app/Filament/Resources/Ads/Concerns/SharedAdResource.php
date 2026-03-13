@@ -12,7 +12,6 @@ use App\Services\AiDescriptionEnhancer;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Dotswan\MapPicker\Fields\Map;
 use Filament\Actions\Action;
-use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
@@ -149,6 +148,27 @@ trait SharedAdResource
                 ->collapsed(false)
                 ->columnSpanFull(),
 
+            // ── Section 2b: Quartier & Catégorie ──────────────────
+            Section::make('Quartier & Catégorie')
+                ->icon('heroicon-o-map')
+                ->description('Localisation et type de bien')
+                ->schema([
+                    Select::make('quarter_id')
+                        ->label('Quartier')
+                        ->relationship('quarter', 'name')
+                        ->searchable()
+                        ->preload()
+                        ->required(),
+                    Select::make('type_id')
+                        ->label('Catégorie d\'annonce')
+                        ->relationship('ad_type', 'name')
+                        ->required()
+                        ->searchable()
+                        ->preload(),
+                ])
+                ->columns(2)
+                ->columnSpanFull(),
+
             // ── Section 3: Caractéristiques du bien ──────────────
             Section::make('Caractéristiques')
                 ->icon('heroicon-o-squares-2x2')
@@ -234,39 +254,10 @@ trait SharedAdResource
                 ->collapsible()
                 ->columnSpanFull(),
 
-            // ── Section 5: Visibilité & Disponibilité ────────────
-            Section::make('Visibilité & Disponibilité')
-                ->icon('heroicon-o-eye')
-                ->description('Contrôlez quand votre annonce est visible')
-                ->schema([
-                    Toggle::make('is_visible')
-                        ->label('Annonce visible')
-                        ->helperText('Désactivez pour masquer temporairement votre annonce')
-                        ->default(true)
-                        ->onIcon('heroicon-o-eye')
-                        ->offIcon('heroicon-o-eye-slash')
-                        ->onColor('success'),
-                    DatePicker::make('available_from')
-                        ->label('Disponible à partir de')
-                        ->native(false)
-                        ->displayFormat('d/m/Y')
-                        ->helperText('Laissez vide pour "Immédiatement"'),
-                    DatePicker::make('available_to')
-                        ->label('Disponible jusqu\'au')
-                        ->native(false)
-                        ->displayFormat('d/m/Y')
-                        ->afterOrEqual('available_from')
-                        ->helperText('Laissez vide pour "Indéfiniment"'),
-                ])
-                ->columns(3)
-                ->collapsible()
-                ->collapsed(false)
-                ->columnSpanFull(),
-
-            // ── Section 6: Informations Premium ──────────────────
-            Section::make('Informations Premium')
+            // ── Section 5: Informations Premium ──────────────────
+            Section::make('Informations Supplémentaires')
                 ->icon('heroicon-o-lock-closed')
-                ->description('Ces informations seront visibles uniquement après paiement par les utilisateurs')
+                ->description('Ce sont les informations supplémentaires qui seront comporteent les detailles de votre bien')
                 ->schema([
                     Fieldset::make('Conditions du bail')
                         ->schema([
@@ -293,12 +284,47 @@ trait SharedAdResource
                                 ->native(false),
                         ])
                         ->columns(2),
-                    Textarea::make('detailed_charges')
-                        ->label('Charges détaillées')
-                        ->placeholder('Ex: Eau/électricité: 15 000 FCFA/mois, Gardiennage: 5 000 FCFA/mois')
-                        ->helperText('Détail des charges mensuelles')
-                        ->rows(3)
-                        ->columnSpanFull(),
+                    Fieldset::make('Charges détaillées')
+                        ->schema([
+                            Toggle::make('charges_forfaitaires')
+                                ->label('Charges au forfait')
+                                ->helperText('Activez si les charges sont un montant fixe mensuel (eau, électricité incluses)')
+                                ->onIcon('heroicon-o-check')
+                                ->offIcon('heroicon-o-x-mark')
+                                ->onColor('success')
+                                ->live()
+                                ->columnSpanFull(),
+                            TextInput::make('charges_montant_forfait')
+                                ->label('Montant forfaitaire mensuel')
+                                ->numeric()
+                                ->minValue(0)
+                                ->prefix('FCFA')
+                                ->placeholder('Ex: 25 000')
+                                ->extraInputAttributes(['inputmode' => 'numeric'])
+                                ->visible(fn (callable $get): bool => (bool) $get('charges_forfaitaires')),
+                            TextInput::make('charges_eau')
+                                ->label('Frais d\'eau (mensuel)')
+                                ->numeric()
+                                ->minValue(0)
+                                ->prefix('FCFA')
+                                ->placeholder('Ex: 10 000')
+                                ->extraInputAttributes(['inputmode' => 'numeric'])
+                                ->visible(fn (callable $get): bool => !(bool) $get('charges_forfaitaires')),
+                            TextInput::make('charges_electricite')
+                                ->label('Frais d\'électricité (mensuel)')
+                                ->numeric()
+                                ->minValue(0)
+                                ->prefix('FCFA')
+                                ->placeholder('Ex: 15 000')
+                                ->extraInputAttributes(['inputmode' => 'numeric'])
+                                ->visible(fn (callable $get): bool => !(bool) $get('charges_forfaitaires')),
+                            Textarea::make('charges_autres')
+                                ->label('Autres charges')
+                                ->placeholder('Ex: Gardiennage: 5 000 FCFA/mois, Ordures: 2 000 FCFA/mois')
+                                ->rows(2)
+                                ->columnSpanFull(),
+                        ])
+                        ->columns(2),
                     SpatieMediaLibraryFileUpload::make('property_condition')
                         ->collection('property_condition')
                         ->label('État des lieux (PDF)')
@@ -449,22 +475,13 @@ trait SharedAdResource
      *
      * @return array<int, Select>
      */
+    /**
+     * @return array<int, \Filament\Schemas\Components\Component>
+     */
+    #[\Deprecated(message: 'Quartier & Catégorie are now inline in getSharedFormFields().')]
     protected static function getRelationSelects(): array
     {
-        return [
-            Select::make('quarter_id')
-                ->label('Quartier')
-                ->relationship('quarter', 'name')
-                ->searchable()
-                ->preload()
-                ->required(),
-            Select::make('type_id')
-                ->label('Catégorie d\'annonce')
-                ->relationship('ad_type', 'name')
-                ->required()
-                ->searchable()
-                ->preload(),
-        ];
+        return [];
     }
 
     // ──────────────────────────────────────────────
@@ -845,151 +862,14 @@ trait SharedAdResource
                             ->label('')
                             ->statePath('tour_config.scenes')
                             ->schema([
-                                Grid::make(2)
+                                Grid::make(1)
                                     ->schema([
                                         TextInput::make('title')
                                             ->label('Nom de la pièce')
                                             ->required()
                                             ->placeholder('Ex: Salon, Chambre parentale...'),
-                                        Select::make('type')
-                                            ->label('Type de panorama')
-                                            ->options([
-                                                'equirectangular' => '🟢 Équirectangulaire — 1 fichier, standard',
-                                                'cubemap' => '🔵 Cubemap — 6 faces, moins de déformation (converti auto.)',
-                                                'multires' => '🔴 Haute résolution — tuiles progressives, idéal 3G (converti auto.)',
-                                            ])
-                                            ->default('equirectangular')
-                                            ->required()
-                                            ->selectablePlaceholder(false)
-                                            ->live(),
-
-                                        // ── Per-type documentation (reactive) ──────────────────────
-
-                                        Placeholder::make('type_docs_equirectangular')
-                                            ->label('')
-                                            ->columnSpanFull()
-                                            ->visible(fn (callable $get) => ($get('type') ?? 'equirectangular') === 'equirectangular')
-                                            ->content(new HtmlString('
-                                                <div class="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-4 text-sm space-y-3">
-                                                    <p class="font-semibold text-green-800 dark:text-green-200">🟢 Équirectangulaire — Format standard</p>
-                                                    <p class="text-green-700 dark:text-green-300">Format panoramique universel (rapport 2:1). Une seule image, aucune conversion. Compatible avec toutes les photos 360° prises sur smartphone ou appareil photo.</p>
-                                                    <div class="grid grid-cols-2 gap-3">
-                                                        <div>
-                                                            <p class="font-medium text-green-800 dark:text-green-200 mb-1">✅ Avantages</p>
-                                                            <ul class="list-disc list-inside text-green-700 dark:text-green-300 space-y-1">
-                                                                <li>Disponible <strong>immédiatement</strong> après upload</li>
-                                                                <li>Compatible avec toutes les apps 360°</li>
-                                                                <li>Aucun temps de traitement</li>
-                                                            </ul>
-                                                        </div>
-                                                        <div>
-                                                            <p class="font-medium text-green-800 dark:text-green-200 mb-1">⚠️ Limites</p>
-                                                            <ul class="list-disc list-inside text-green-700 dark:text-green-300 space-y-1">
-                                                                <li>Légère déformation aux pôles (haut/bas)</li>
-                                                                <li>Moins adapté aux très grandes images</li>
-                                                            </ul>
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <p class="font-medium text-green-800 dark:text-green-200 mb-1">📋 Étapes d\'utilisation</p>
-                                                        <ol class="list-decimal list-inside text-green-700 dark:text-green-300 space-y-1">
-                                                            <li>Prenez une photo 360° avec votre app (Google Camera, app Panorama…)</li>
-                                                            <li>Exportez l\'image en JPG ou WEBP (max 30 Mo, idéalement ≥ 4000 × 2000 px)</li>
-                                                            <li>Sélectionnez ce type, uploadez → la visite est <strong>disponible immédiatement</strong></li>
-                                                        </ol>
-                                                    </div>
-                                                </div>
-                                            ')),
-
-                                        Placeholder::make('type_docs_cubemap')
-                                            ->label('')
-                                            ->columnSpanFull()
-                                            ->visible(fn (callable $get) => $get('type') === 'cubemap')
-                                            ->content(new HtmlString('
-                                                <div class="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-4 text-sm space-y-3">
-                                                    <p class="font-semibold text-blue-800 dark:text-blue-200">🔵 Cubemap — Conversion automatique en 6 faces</p>
-                                                    <p class="text-blue-700 dark:text-blue-300">Le serveur convertit automatiquement votre photo équirectangulaire en 6 faces de cube. Rendu plus naturel, moins de déformation — idéal pour les visites professionnelles.</p>
-                                                    <div class="grid grid-cols-2 gap-3">
-                                                        <div>
-                                                            <p class="font-medium text-blue-800 dark:text-blue-200 mb-1">✅ Avantages</p>
-                                                            <ul class="list-disc list-inside text-blue-700 dark:text-blue-300 space-y-1">
-                                                                <li>Moins de déformation (haut, bas, coins)</li>
-                                                                <li>Qualité visuelle supérieure à l\'équirectangulaire</li>
-                                                                <li>Même fichier source (pas besoin d\'autre format)</li>
-                                                            </ul>
-                                                        </div>
-                                                        <div>
-                                                            <p class="font-medium text-blue-800 dark:text-blue-200 mb-1">⏱️ Traitement serveur</p>
-                                                            <ul class="list-disc list-inside text-blue-700 dark:text-blue-300 space-y-1">
-                                                                <li>Conversion automatique : <strong>1–3 min</strong></li>
-                                                                <li>Indicateur « en cours » affiché pendant ce temps</li>
-                                                                <li>Visite disponible automatiquement après conversion</li>
-                                                            </ul>
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <p class="font-medium text-blue-800 dark:text-blue-200 mb-1">📋 Étapes d\'utilisation</p>
-                                                        <ol class="list-decimal list-inside text-blue-700 dark:text-blue-300 space-y-1">
-                                                            <li>Préparez votre photo équirectangulaire (JPG/WEBP, max 30 Mo, ratio 2:1)</li>
-                                                            <li>Sélectionnez <strong>Cubemap</strong>, puis uploadez l\'image</li>
-                                                            <li>La conversion des 6 faces démarre automatiquement en arrière-plan (~1–3 min)</li>
-                                                            <li>Pendant la conversion, les visiteurs voient l\'image équirectangulaire en attendant</li>
-                                                            <li>La visite passe en mode Cubemap dès que la conversion est terminée</li>
-                                                        </ol>
-                                                    </div>
-                                                    <p class="text-xs text-blue-500 dark:text-blue-400 italic">💡 Recommandé pour les images inférieures à 8 000 × 4 000 px ou si vous souhaitez une qualité professionnelle sans long temps d\'attente.</p>
-                                                </div>
-                                            ')),
-
-                                        Placeholder::make('type_docs_multires')
-                                            ->label('')
-                                            ->columnSpanFull()
-                                            ->visible(fn (callable $get) => $get('type') === 'multires')
-                                            ->content(new HtmlString('
-                                                <div class="rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30 p-4 text-sm space-y-3">
-                                                    <p class="font-semibold text-orange-800 dark:text-orange-200">🔴 Haute résolution (Multirés) — Tuiles progressives</p>
-                                                    <p class="text-orange-700 dark:text-orange-300">Le serveur génère une pyramide de tuiles (comme Google Maps) : la visite charge en basse résolution immédiatement, puis affine progressivement la qualité. Parfait pour les grandes images et les connexions mobiles lentes.</p>
-                                                    <div class="grid grid-cols-2 gap-3">
-                                                        <div>
-                                                            <p class="font-medium text-orange-800 dark:text-orange-200 mb-1">✅ Avantages</p>
-                                                            <ul class="list-disc list-inside text-orange-700 dark:text-orange-300 space-y-1">
-                                                                <li>Chargement <strong>instantané</strong> même sur 3G/4G</li>
-                                                                <li>Qualité maximale pour les grandes images</li>
-                                                                <li>Zoom sans pixellisation</li>
-                                                                <li>Expérience fluide sur tous les appareils</li>
-                                                            </ul>
-                                                        </div>
-                                                        <div>
-                                                            <p class="font-medium text-orange-800 dark:text-orange-200 mb-1">⏱️ Traitement serveur</p>
-                                                            <ul class="list-disc list-inside text-orange-700 dark:text-orange-300 space-y-1">
-                                                                <li>Génération des tuiles : <strong>5–15 min</strong></li>
-                                                                <li>Durée variable selon la taille de l\'image</li>
-                                                                <li>Visite disponible automatiquement après traitement</li>
-                                                            </ul>
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <p class="font-medium text-orange-800 dark:text-orange-200 mb-1">📋 Étapes d\'utilisation</p>
-                                                        <ol class="list-decimal list-inside text-orange-700 dark:text-orange-300 space-y-1">
-                                                            <li>Préparez une image haute résolution (≥ 8 000 × 4 000 px recommandé, max 30 Mo)</li>
-                                                            <li>Sélectionnez <strong>Haute résolution</strong>, puis uploadez l\'image</li>
-                                                            <li>Le serveur génère la pyramide de tuiles automatiquement (5–15 min)</li>
-                                                            <li>Pendant le traitement, les visiteurs voient l\'image équirectangulaire en attendant</li>
-                                                            <li>La visite passe en mode haute résolution dès que le traitement est terminé</li>
-                                                        </ol>
-                                                    </div>
-                                                    <div class="rounded bg-orange-100 dark:bg-orange-900/40 border border-orange-300 dark:border-orange-700 p-3 space-y-1">
-                                                        <p class="font-medium text-orange-800 dark:text-orange-200">📐 Résolution recommandée de l\'image source</p>
-                                                        <ul class="list-disc list-inside text-orange-700 dark:text-orange-300 space-y-1 text-xs">
-                                                            <li><strong>Minimum :</strong> 4 000 × 2 000 px</li>
-                                                            <li><strong>Recommandé :</strong> 8 000 × 4 000 px</li>
-                                                            <li><strong>Optimal :</strong> 12 000 × 6 000 px+ (Insta360, GoPro MAX, Ricoh Theta Z1…)</li>
-                                                        </ul>
-                                                    </div>
-                                                </div>
-                                            ')),
-
-                                        // ── End per-type documentation ──────────────────────────────
+                                        Hidden::make('type')
+                                            ->default('equirectangular'),
 
                                         FileUpload::make('image_path')
                                             ->label('Photo 360°')
