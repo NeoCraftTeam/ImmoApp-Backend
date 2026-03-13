@@ -197,6 +197,7 @@ describe('PATCH /panel-api/v1/ads/{ad}/tour/scenes/{sceneId}/hotspots', function
         $owner = User::factory()->agents()->create();
         $config = ['default_scene' => 'salon', 'scenes' => [
             ['id' => 'salon', 'title' => 'Salon', 'image_url' => 'https://s3.example.com/salon.jpg', 'hotspots' => []],
+            ['id' => 'chambre', 'title' => 'Chambre', 'image_url' => 'https://s3.example.com/chambre.jpg', 'hotspots' => []],
         ]];
         $ad = null;
         Ad::withoutSyncingToSearch(function () use (&$ad, $owner, $config): void {
@@ -207,7 +208,7 @@ describe('PATCH /panel-api/v1/ads/{ad}/tour/scenes/{sceneId}/hotspots', function
 
         $this->patchJson("/panel-api/v1/ads/{$ad->id}/tour/scenes/salon/hotspots", [
             'hotspots' => [
-                ['pitch' => 5.0, 'yaw' => -30.0, 'target_scene' => 'salon', 'label' => 'Retour salon'],
+                ['pitch' => 5.0, 'yaw' => -30.0, 'target_scene' => 'chambre', 'label' => 'Vers la chambre'],
             ],
         ])->assertOk()->assertJsonPath('message', 'Hotspots mis à jour.');
 
@@ -232,6 +233,24 @@ describe('PATCH /panel-api/v1/ads/{ad}/tour/scenes/{sceneId}/hotspots', function
         ])->assertUnprocessable();
     });
 
+    it('rejects hotspot that targets its own scene', function (): void {
+        $owner = User::factory()->agents()->create();
+        $config = ['default_scene' => 'salon', 'scenes' => [
+            ['id' => 'salon', 'title' => 'Salon', 'hotspots' => []],
+            ['id' => 'chambre', 'title' => 'Chambre', 'hotspots' => []],
+        ]];
+        $ad = null;
+        Ad::withoutSyncingToSearch(function () use (&$ad, $owner, $config): void {
+            $ad = Ad::factory()->create(['user_id' => $owner->id, 'has_3d_tour' => true, 'tour_config' => $config]);
+        });
+
+        $this->actingAs($owner);
+
+        $this->patchJson("/panel-api/v1/ads/{$ad->id}/tour/scenes/salon/hotspots", [
+            'hotspots' => [['pitch' => 10, 'yaw' => 5, 'target_scene' => 'salon', 'label' => 'Self-ref']],
+        ])->assertUnprocessable();
+    });
+
     it('rejects hotspot target scene that does not exist', function (): void {
         $owner = User::factory()->agents()->create();
         $config = ['default_scene' => 'salon', 'scenes' => [
@@ -247,6 +266,31 @@ describe('PATCH /panel-api/v1/ads/{ad}/tour/scenes/{sceneId}/hotspots', function
 
         $this->patchJson("/panel-api/v1/ads/{$ad->id}/tour/scenes/salon/hotspots", [
             'hotspots' => [['pitch' => 10, 'yaw' => 5, 'target_scene' => 'invalide', 'label' => 'Mauvais lien']],
+        ])->assertUnprocessable();
+    });
+
+    it('rejects more than 50 hotspots per scene', function (): void {
+        $owner = User::factory()->agents()->create();
+        $config = ['default_scene' => 'salon', 'scenes' => [
+            ['id' => 'salon', 'title' => 'Salon', 'hotspots' => []],
+            ['id' => 'chambre', 'title' => 'Chambre', 'hotspots' => []],
+        ]];
+        $ad = null;
+        Ad::withoutSyncingToSearch(function () use (&$ad, $owner, $config): void {
+            $ad = Ad::factory()->create(['user_id' => $owner->id, 'has_3d_tour' => true, 'tour_config' => $config]);
+        });
+
+        $this->actingAs($owner);
+
+        $hotspots = array_map(fn (int $i) => [
+            'pitch' => $i % 90,
+            'yaw' => $i % 180,
+            'target_scene' => 'chambre',
+            'label' => "Hotspot {$i}",
+        ], range(1, 51));
+
+        $this->patchJson("/panel-api/v1/ads/{$ad->id}/tour/scenes/salon/hotspots", [
+            'hotspots' => $hotspots,
         ])->assertUnprocessable();
     });
 });

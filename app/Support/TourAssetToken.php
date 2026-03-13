@@ -6,6 +6,9 @@ namespace App\Support;
 
 final class TourAssetToken
 {
+    /**
+     * @return array{exp: int, sig: string}
+     */
     public static function issue(string $adId, int $ttlSeconds = 1800): array
     {
         $exp = time() + max(60, $ttlSeconds);
@@ -34,6 +37,48 @@ final class TourAssetToken
         $replacement = "/tour-image/{$adId}/__t/{$exp}/{$sig}/";
 
         return str_replace($needle, $replacement, $url);
+    }
+
+    /**
+     * Sign all asset URLs inside a tour config so the image proxy accepts them.
+     *
+     * @param  array<string, mixed>  $tourConfig
+     * @return array<string, mixed>
+     */
+    public static function signTourConfig(string $adId, array $tourConfig, int $ttlSeconds = 1800): array
+    {
+        if (!isset($tourConfig['scenes']) || !is_array($tourConfig['scenes'])) {
+            return $tourConfig;
+        }
+
+        $token = self::issue($adId, $ttlSeconds);
+        $exp = (int) $token['exp'];
+        $sig = (string) $token['sig'];
+
+        $tourConfig['scenes'] = collect($tourConfig['scenes'])
+            ->map(function (array $scene) use ($adId, $exp, $sig): array {
+                foreach (['image_url', 'tiles_base_url', 'fallback_base_url'] as $key) {
+                    if (isset($scene[$key]) && is_string($scene[$key])) {
+                        $scene[$key] = self::injectIntoProxyPath($scene[$key], $adId, $exp, $sig);
+                    }
+                }
+
+                if (isset($scene['cube_map']) && is_array($scene['cube_map'])) {
+                    $scene['cube_map'] = collect($scene['cube_map'])
+                        ->map(fn (mixed $url): mixed => is_string($url)
+                            ? self::injectIntoProxyPath($url, $adId, $exp, $sig)
+                            : $url
+                        )
+                        ->values()
+                        ->all();
+                }
+
+                return $scene;
+            })
+            ->values()
+            ->all();
+
+        return $tourConfig;
     }
 
     private static function signature(string $adId, int $exp): string

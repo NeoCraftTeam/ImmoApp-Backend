@@ -361,7 +361,7 @@
             viewerContainer.innerHTML = '';
 
             try {
-                state.viewer = window.pannellum.viewer(viewerContainer, {
+                const viewerConfig = {
                     type: 'equirectangular',
                     panorama: scene.image_url,
                     autoLoad: true,
@@ -375,7 +375,28 @@
                         cssClass: 'kh-hotspot',
                         id: `hs_${index}`,
                     })),
-                });
+                };
+
+                if (scene.haov && scene.haov > 0 && scene.haov <= 360) {
+                    viewerConfig.haov = scene.haov;
+                }
+                if (scene.vaov && scene.vaov > 0 && scene.vaov <= 180) {
+                    viewerConfig.vaov = scene.vaov;
+                    const offset = scene.vOffset || 0;
+                    const halfVaov = scene.vaov / 2;
+                    viewerConfig.minPitch = -(halfVaov + offset);
+                    viewerConfig.maxPitch = halfVaov - offset;
+                    if (scene.vaov < 179) {
+                        viewerConfig.hfov = Math.min(110, scene.vaov * 0.9);
+                        viewerConfig.maxHfov = scene.vaov;
+                        viewerConfig.pitch = 0;
+                    }
+                }
+                if (scene.vOffset != null) {
+                    viewerConfig.vOffset = scene.vOffset;
+                }
+
+                state.viewer = window.pannellum.viewer(viewerContainer, viewerConfig);
             } catch (_) {
                 renderFallbackScene(scene);
                 return;

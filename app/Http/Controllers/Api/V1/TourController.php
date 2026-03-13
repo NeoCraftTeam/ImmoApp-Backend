@@ -99,15 +99,18 @@ final readonly class TourController
             ->all();
 
         $request->validate([
-            'hotspots' => ['present', 'array'],
+            'hotspots' => ['present', 'array', 'max:50'],
             'hotspots.*.pitch' => ['required', 'numeric', 'between:-90,90'],
             'hotspots.*.yaw' => ['required', 'numeric', 'between:-180,180'],
             'hotspots.*.target_scene' => [
                 'required',
                 'string',
-                function (string $attribute, mixed $value, \Closure $fail) use ($sceneIds): void {
+                function (string $attribute, mixed $value, \Closure $fail) use ($sceneIds, $sceneId): void {
                     if (!is_string($value) || !in_array($value, $sceneIds, true)) {
                         $fail('La scène de destination est invalide.');
+                    }
+                    if ($value === $sceneId) {
+                        $fail('Un hotspot ne peut pas pointer vers sa propre scène.');
                     }
                 },
             ],
@@ -149,39 +152,6 @@ final readonly class TourController
      */
     private function signTourConfigUrls(string $adId, array $tourConfig): array
     {
-        $token = TourAssetToken::issue($adId, 1800);
-        $exp = (int) $token['exp'];
-        $sig = (string) $token['sig'];
-
-        $tourConfig['scenes'] = collect($tourConfig['scenes'] ?? [])
-            ->map(function (array $scene) use ($adId, $exp, $sig): array {
-                if (isset($scene['image_url']) && is_string($scene['image_url'])) {
-                    $scene['image_url'] = TourAssetToken::injectIntoProxyPath($scene['image_url'], $adId, $exp, $sig);
-                }
-
-                if (isset($scene['cube_map']) && is_array($scene['cube_map'])) {
-                    $scene['cube_map'] = collect($scene['cube_map'])
-                        ->map(fn (mixed $url): mixed => is_string($url)
-                            ? TourAssetToken::injectIntoProxyPath($url, $adId, $exp, $sig)
-                            : $url
-                        )
-                        ->values()
-                        ->all();
-                }
-
-                if (isset($scene['tiles_base_url']) && is_string($scene['tiles_base_url'])) {
-                    $scene['tiles_base_url'] = TourAssetToken::injectIntoProxyPath($scene['tiles_base_url'], $adId, $exp, $sig);
-                }
-
-                if (isset($scene['fallback_base_url']) && is_string($scene['fallback_base_url'])) {
-                    $scene['fallback_base_url'] = TourAssetToken::injectIntoProxyPath($scene['fallback_base_url'], $adId, $exp, $sig);
-                }
-
-                return $scene;
-            })
-            ->values()
-            ->all();
-
-        return $tourConfig;
+        return TourAssetToken::signTourConfig($adId, $tourConfig);
     }
 }
