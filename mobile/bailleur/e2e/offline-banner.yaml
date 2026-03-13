@@ -1,0 +1,12 @@
+# Maestro E2E Test — Offline banner appears when network is lost
+appId: cm.neocraft.keyhome.bailleur
+---
+- launchApp
+- waitForAnimationToEnd
+- toggleAirplaneMode
+- extendedWaitUntil:
+    visible: "Hors ligne"
+    timeout: 5000
+- assertVisible: "Hors ligne — données en cache"
+- takeScreenshot: offline-banner
+- toggleAirplaneMode

@@ -6,26 +6,34 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "lint": "npx tsc --noEmit",
+    "prebuild": "expo prebuild",
+    "build:dev": "eas build --profile development",
+    "build:preview": "eas build --profile preview",
+    "build:prod": "eas build --profile production"
   },
   "dependencies": {
     "@react-native-community/netinfo": "11.4.1",
+    "@types/react": "~19.1.10",
     "expo": "~54.0.33",
     "expo-auth-session": "~7.0.10",
     "expo-constants": "~18.0.13",
     "expo-device": "~8.0.10",
     "expo-haptics": "~15.0.8",
     "expo-image-picker": "~17.0.10",
+    "expo-local-authentication": "~17.0.8",
     "expo-location": "~19.0.8",
     "expo-notifications": "~0.32.16",
     "expo-secure-store": "~15.0.8",
+    "expo-splash-screen": "~31.0.13",
     "expo-status-bar": "~3.0.9",
     "expo-web-browser": "~15.0.10",
     "react": "19.1.0",
     "react-native": "0.81.5",
-    "react-native-maps": "1.20.1",
     "react-native-safe-area-context": "~5.6.0",
-    "react-native-webview": "13.15.0"
+    "react-native-webview": "13.15.0",
+    "typescript": "~5.9.2"
   },
   "private": true
 }

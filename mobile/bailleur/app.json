@@ -14,13 +14,20 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
+      "bundleIdentifier": "cm.neocraft.keyhome.owner",
       "supportsTablet": true,
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false,
-          "NSAllowsArbitraryLoadsInWebContent": true,
+          "NSAllowsArbitraryLoadsInWebContent": false,
           "NSExceptionDomains": {
-            "keyhomeback.neocraft.dev": {
+            "keyhome.neocraft.dev": {
+              "NSIncludesSubdomains": true,
+              "NSExceptionAllowsInsecureHTTPLoads": false,
+              "NSExceptionRequiresForwardSecrecy": true
+            },
+            "neocraft.dev": {
+              "NSIncludesSubdomains": true,
               "NSExceptionAllowsInsecureHTTPLoads": false,
               "NSExceptionRequiresForwardSecrecy": true
             },
@@ -31,9 +38,10 @@
             }
           }
         },
-        "NSCameraUsageDescription": "Cette application utilise la caméra pour ajouter des photos aux annonces.",
-        "NSPhotoLibraryUsageDescription": "Cette application accède à vos photos pour les ajouter aux annonces.",
-        "NSLocationWhenInUseUsageDescription": "Cette application utilise votre position pour localiser les biens immobiliers."
+        "NSCameraUsageDescription": "KeyHome utilise la caméra pour ajouter des photos à vos annonces immobilières.",
+        "NSPhotoLibraryUsageDescription": "KeyHome accède à vos photos pour les ajouter à vos annonces immobilières.",
+        "NSLocationWhenInUseUsageDescription": "KeyHome utilise votre position pour localiser vos biens immobiliers sur la carte.",
+        "NSFaceIDUsageDescription": "KeyHome utilise Face ID pour sécuriser l'accès à votre espace propriétaire."
       }
     },
     "android": {
@@ -46,7 +54,13 @@
       "permissions": [
         "CAMERA",
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE",
+        "POST_NOTIFICATIONS",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "VIBRATE"
       ],
       "intentFilters": [
         {
@@ -66,7 +80,34 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "KeyHome accède à vos photos pour les ajouter à vos annonces.",
+          "cameraPermission": "KeyHome utilise la caméra pour photographier vos biens."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "KeyHome utilise votre position pour localiser vos biens."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#10b981"
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "KeyHome utilise Face ID pour sécuriser votre espace propriétaire."
+        }
+      ],
+      "expo-splash-screen"
     ]
   }
 }
