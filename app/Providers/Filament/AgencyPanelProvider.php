@@ -91,10 +91,6 @@ class AgencyPanelProvider extends PanelProvider
                 'panels::body.end',
                 fn () => view('filament.mobile-bridge'),
             )
-            ->renderHook(
-                'panels::scripts.after',
-                fn () => view('pwa.register-sw'),
-            )
             ->assets([
                 // Bridge natif minimal
                 \Filament\Support\Assets\Js::make('filament-native-bridge', resource_path('js/filament-native-bridge.js')),

@@ -30,7 +30,7 @@ it('service worker exists in public directory', function (): void {
     expect(file_exists(public_path('sw.js')))->toBeTrue();
 
     $content = file_get_contents(public_path('sw.js'));
-    expect($content)->toContain('keyhome-v3');
+    expect($content)->toContain('const CACHE_VERSION = "keyhome-v');
 });
 
 it('PWA icons exist for all required sizes', function (): void {

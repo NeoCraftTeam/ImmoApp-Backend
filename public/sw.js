@@ -8,7 +8,7 @@
  * - Background sync for failed POST/PUT/DELETE requests
  */
 
-const CACHE_VERSION = "keyhome-v3";
+const CACHE_VERSION = "keyhome-v4";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const DYNAMIC_CACHE = `${CACHE_VERSION}-dynamic`;
 const API_CACHE = `${CACHE_VERSION}-api`;
@@ -114,9 +114,23 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
     const { request } = event;
     const url = new URL(request.url);
+    const panelPathPrefixes = ["/admin", "/owner", "/agency"];
+    const panelHostPrefixes = ["admin.", "owner.", "agency."];
+    const isPanelHost = panelHostPrefixes.some((prefix) =>
+        self.location.hostname.startsWith(prefix),
+    );
+    const isPanelPath = panelPathPrefixes.some((prefix) =>
+        url.pathname === prefix || url.pathname.startsWith(`${prefix}/`),
+    );
 
     // Skip cross-origin requests
     if (url.origin !== self.location.origin) {
+        return;
+    }
+
+    // Never intercept Filament panel requests (admin/owner/agency).
+    // This avoids stale-cache glitches in SPA/live forms (e.g. hotspot editor).
+    if (isPanelHost || isPanelPath) {
         return;
     }
 

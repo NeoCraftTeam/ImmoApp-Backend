@@ -8,10 +8,13 @@
         return;
     }
 
-    const marker = 'kh_admin_sw_unregistered_v1';
-    const isAdminHost = window.location.hostname.startsWith('admin.');
+    const marker = 'kh_panel_sw_unregistered_v2';
+    const host = window.location.hostname;
+    const path = window.location.pathname;
+    const isPanelHost = host.startsWith('admin.') || host.startsWith('owner.') || host.startsWith('agency.');
+    const isPanelPath = path.startsWith('/admin') || path.startsWith('/owner') || path.startsWith('/agency');
 
-    if (!isAdminHost) {
+    if (!isPanelHost && !isPanelPath) {
         return;
     }
 
@@ -30,7 +33,7 @@
                 window.location.reload();
             }
         } catch (error) {
-            console.warn('[PWA] Unable to unregister service workers on admin panel:', error);
+            console.warn('[PWA] Unable to unregister service workers on panel:', error);
         }
     })();
 })();
