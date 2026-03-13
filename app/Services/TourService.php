@@ -6,8 +6,10 @@ namespace App\Services;
 
 use App\Models\Ad;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class TourService
 {
@@ -66,22 +68,8 @@ class TourService
             return;
         }
 
-        foreach ($ad->tour_config['scenes'] ?? [] as $scene) {
-            $path = $scene['image_path'] ?? null;
-
-            if (!$path && isset($scene['image_url'])) {
-                // Fallback for legacy configs: extract and correct path from proxy URL
-                // /tour-image/uuid/filename.jpg -> tours/uuid/filename.jpg
-                $urlPath = parse_url((string) $scene['image_url'], PHP_URL_PATH);
-                if ($urlPath) {
-                    $path = str_replace('tour-image/', 'tours/', ltrim($urlPath, '/'));
-                }
-            }
-
-            if ($path) {
-                Storage::disk()->delete($path);
-            }
-        }
+        Storage::disk()->deleteDirectory("ads/{$ad->id}/tours");
+        Storage::disk()->deleteDirectory("tours/{$ad->id}");
 
         $ad->update([
             'has_3d_tour' => false,
@@ -97,16 +85,60 @@ class TourService
      */
     public function updateHotspots(Ad $ad, string $sceneId, array $hotspots): void
     {
-        $config = $ad->tour_config;
+        DB::transaction(function () use ($ad, $sceneId, $hotspots): void {
+            /** @var Ad|null $lockedAd */
+            $lockedAd = Ad::query()
+                ->whereKey($ad->getKey())
+                ->lockForUpdate()
+                ->first();
 
-        $config['scenes'] = array_map(function (array $scene) use ($sceneId, $hotspots): array {
-            if ($scene['id'] === $sceneId) {
-                $scene['hotspots'] = $hotspots;
+            if (!$lockedAd) {
+                throw ValidationException::withMessages([
+                    'ad' => 'Annonce introuvable.',
+                ]);
             }
 
-            return $scene;
-        }, $config['scenes']);
+            $config = $lockedAd->tour_config ?? [];
+            $scenes = array_values($config['scenes'] ?? []);
 
-        $ad->update(['tour_config' => $config]);
+            $sceneIds = collect($scenes)
+                ->pluck('id')
+                ->filter(fn (mixed $id): bool => is_string($id) && $id !== '')
+                ->values()
+                ->all();
+
+            if (!in_array($sceneId, $sceneIds, true)) {
+                throw ValidationException::withMessages([
+                    'scene_id' => 'La scène à modifier est introuvable dans ce tour.',
+                ]);
+            }
+
+            foreach ($hotspots as $index => $hotspot) {
+                $targetScene = (string) ($hotspot['target_scene'] ?? '');
+                if (!in_array($targetScene, $sceneIds, true)) {
+                    throw ValidationException::withMessages([
+                        "hotspots.{$index}.target_scene" => 'La scène de destination est invalide.',
+                    ]);
+                }
+            }
+
+            $hasBeenUpdated = false;
+            $config['scenes'] = array_map(function (array $scene) use ($sceneId, $hotspots, &$hasBeenUpdated): array {
+                if (($scene['id'] ?? null) === $sceneId) {
+                    $scene['hotspots'] = $hotspots;
+                    $hasBeenUpdated = true;
+                }
+
+                return $scene;
+            }, $scenes);
+
+            if (!$hasBeenUpdated) {
+                throw ValidationException::withMessages([
+                    'scene_id' => 'Impossible de mettre à jour les hotspots de cette scène.',
+                ]);
+            }
+
+            $lockedAd->update(['tour_config' => $config]);
+        }, attempts: 3);
     }
 }

@@ -1073,10 +1073,27 @@ trait SharedAdResource
                                 }
                             })
                             ->dehydrateStateUsing(function ($state, $record) {
+                                $state = array_values((array) $state);
+                                $seenSceneIds = [];
+                                foreach ($state as $index => $scene) {
+                                    $candidateId = (string) ($scene['id'] ?? '');
+                                    if ($candidateId === '' || in_array($candidateId, $seenSceneIds, true)) {
+                                        $candidateId = 'scene_'.Str::lower(Str::random(10));
+                                        $state[$index]['id'] = $candidateId;
+                                    }
+                                    $seenSceneIds[] = $candidateId;
+                                }
+
                                 // Index the persisted scenes by ID so hotspots saved via the
                                 // hotspot editor (PATCH) are not overwritten by the stale
                                 // Hidden-field state when the main form is re-saved.
-                                $persistedScenes = collect($record?->tour_config['scenes'] ?? [])->keyBy('id');
+                                $persistedTourConfig = $record?->id
+                                    ? Ad::query()
+                                        ->whereKey($record->id)
+                                        ->first()?->tour_config
+                                    : null;
+
+                                $persistedScenes = collect(($persistedTourConfig['scenes'] ?? []))->keyBy('id');
 
                                 return collect($state)->map(function ($scene) use ($persistedScenes, $record) {
                                     if (isset($scene['image_path']) && !empty($scene['image_path'])) {

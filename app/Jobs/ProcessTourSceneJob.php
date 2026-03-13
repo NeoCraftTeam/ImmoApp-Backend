@@ -8,7 +8,9 @@ use App\Models\Ad;
 use App\Services\PanoramaProcessor;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class ProcessTourSceneJob implements ShouldQueue
 {
@@ -84,6 +86,8 @@ class ProcessTourSceneJob implements ShouldQueue
         if ($ad) {
             $this->patchScene($ad, ['processing' => false, 'processing_failed' => true]);
         }
+
+        Storage::disk()->deleteDirectory("ads/{$this->adId}/tours/scenes/{$this->sceneId}");
     }
 
     /**
@@ -103,18 +107,29 @@ class ProcessTourSceneJob implements ShouldQueue
      */
     private function patchScene(Ad $ad, array $updates): void
     {
-        $ad->refresh();
+        DB::transaction(function () use ($ad, $updates): void {
+            /** @var Ad|null $lockedAd */
+            $lockedAd = Ad::query()
+                ->whereKey($ad->getKey())
+                ->lockForUpdate()
+                ->first();
 
-        $scenes = collect($ad->tour_config['scenes'] ?? [])
-            ->map(fn (array $scene) => $scene['id'] === $this->sceneId
-                ? array_merge($scene, $updates)
-                : $scene
-            )
-            ->values()
-            ->toArray();
+            if (!$lockedAd) {
+                return;
+            }
 
-        $ad->update([
-            'tour_config' => array_merge($ad->tour_config ?? [], ['scenes' => $scenes]),
-        ]);
+            $config = $lockedAd->tour_config ?? [];
+            $scenes = collect($config['scenes'] ?? [])
+                ->map(fn (array $scene) => ($scene['id'] ?? null) === $this->sceneId
+                    ? array_merge($scene, $updates)
+                    : $scene
+                )
+                ->values()
+                ->toArray();
+
+            $lockedAd->update([
+                'tour_config' => array_merge($config, ['scenes' => $scenes]),
+            ]);
+        }, attempts: 3);
     }
 }

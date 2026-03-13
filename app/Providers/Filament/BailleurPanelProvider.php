@@ -117,13 +117,10 @@ class BailleurPanelProvider extends PanelProvider
                 'panels::body.end',
                 fn () => view('filament.mobile-bridge'),
             )
-            ->renderHook(
-                'panels::scripts.after',
-                fn () => view('pwa.register-sw'),
-            )
             ->assets([
                 // Bridge natif minimal — CSS et JS uniquement pour l'app mobile
                 \Filament\Support\Assets\Js::make('filament-native-bridge', resource_path('js/filament-native-bridge.js')),
+                \Filament\Support\Assets\Js::make('tour-hotspot-editor', resource_path('js/filament/tour-hotspot-editor.js')),
             ])
             ->renderHook(
                 'panels::body.end',

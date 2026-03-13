@@ -191,7 +191,7 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/ads/{ad}/tour/scenes', [TourController::class, 'uploadScenes'])
             ->middleware('throttle:10,1');
-        Route::patch('/ads/{ad}/tour/scenes/{sceneId}/hotspots', [TourController::class, 'updateHotspots']);
+        Route::match(['patch', 'post'], '/ads/{ad}/tour/scenes/{sceneId}/hotspots', [TourController::class, 'updateHotspots']);
         Route::delete('/ads/{ad}/tour', [TourController::class, 'destroy']);
     });
 

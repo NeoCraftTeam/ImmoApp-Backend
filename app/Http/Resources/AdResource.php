@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use App\Models\Ad;
+use App\Models\User;
+use App\Support\TourAssetToken;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Storage;
@@ -24,6 +26,10 @@ final class AdResource extends JsonResource
     public function toArray(Request $request): array
     {
         $user = $request->user();
+        $canAccessTour = $this->canAccessTour($user);
+        $signedTourConfig = $canAccessTour && $this->has_3d_tour
+            ? $this->signTourConfigUrls($this->tour_config)
+            : null;
 
         // Compute rating from eager-loaded aggregate or fallback
         $avgRating = $this->reviews_avg_rating
@@ -58,7 +64,7 @@ final class AdResource extends JsonResource
             'is_unlocked' => $this->isUnlockedFor($user),
             'unlock_cost' => (int) \App\Models\Setting::get('unlock_cost_points', 2),
             'has_3d_tour' => (bool) $this->has_3d_tour,
-            'tour_config' => $this->when($this->has_3d_tour && $this->isUnlockedFor($user), $this->tour_config),
+            'tour_config' => $this->when($this->has_3d_tour && $canAccessTour, $signedTourConfig),
             'tour_scenes_count' => $this->when($this->has_3d_tour, $this->tour_scenes_count),
             'tour_published_at' => $this->when($this->has_3d_tour, $this->tour_published_at),
             'total_images' => $this->getMedia('images')->count(),
@@ -130,5 +136,79 @@ final class AdResource extends JsonResource
         }
 
         return null;
+    }
+
+    private function canAccessTour(?User $user): bool
+    {
+        if (!$this->has_3d_tour) {
+            return false;
+        }
+
+        if ($this->isUnlockedFor($user)) {
+            return true;
+        }
+
+        return $user instanceof User && $user->isAdmin();
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $tourConfig
+     * @return array<string, mixed>|null
+     */
+    private function signTourConfigUrls(?array $tourConfig): ?array
+    {
+        if (!$tourConfig || !isset($tourConfig['scenes']) || !is_array($tourConfig['scenes'])) {
+            return $tourConfig;
+        }
+
+        $token = TourAssetToken::issue((string) $this->id, 1800);
+        $exp = (int) $token['exp'];
+        $sig = (string) $token['sig'];
+
+        $tourConfig['scenes'] = collect($tourConfig['scenes'])
+            ->map(function (array $scene) use ($exp, $sig): array {
+                if (isset($scene['image_url']) && is_string($scene['image_url'])) {
+                    $scene['image_url'] = TourAssetToken::injectIntoProxyPath(
+                        $scene['image_url'],
+                        (string) $this->id,
+                        $exp,
+                        $sig
+                    );
+                }
+
+                if (isset($scene['cube_map']) && is_array($scene['cube_map'])) {
+                    $scene['cube_map'] = collect($scene['cube_map'])
+                        ->map(fn (mixed $url): mixed => is_string($url)
+                            ? TourAssetToken::injectIntoProxyPath($url, (string) $this->id, $exp, $sig)
+                            : $url
+                        )
+                        ->values()
+                        ->all();
+                }
+
+                if (isset($scene['tiles_base_url']) && is_string($scene['tiles_base_url'])) {
+                    $scene['tiles_base_url'] = TourAssetToken::injectIntoProxyPath(
+                        $scene['tiles_base_url'],
+                        (string) $this->id,
+                        $exp,
+                        $sig
+                    );
+                }
+
+                if (isset($scene['fallback_base_url']) && is_string($scene['fallback_base_url'])) {
+                    $scene['fallback_base_url'] = TourAssetToken::injectIntoProxyPath(
+                        $scene['fallback_base_url'],
+                        (string) $this->id,
+                        $exp,
+                        $sig
+                    );
+                }
+
+                return $scene;
+            })
+            ->values()
+            ->all();
+
+        return $tourConfig;
     }
 }

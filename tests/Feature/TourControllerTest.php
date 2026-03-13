@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\AdStatus;
 use App\Models\Ad;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,7 +15,11 @@ describe('GET /api/v1/ads/{ad}/tour', function (): void {
     it('returns 404 when ad has no tour', function (): void {
         $ad = null;
         Ad::withoutSyncingToSearch(function () use (&$ad): void {
-            $ad = Ad::factory()->create(['has_3d_tour' => false, 'tour_config' => null]);
+            $ad = Ad::factory()->create([
+                'status' => AdStatus::AVAILABLE,
+                'has_3d_tour' => false,
+                'tour_config' => null,
+            ]);
         });
 
         $this->getJson("/api/v1/ads/{$ad->id}/tour")
@@ -22,6 +27,7 @@ describe('GET /api/v1/ads/{ad}/tour', function (): void {
     });
 
     it('returns tour config when tour exists', function (): void {
+        $owner = User::factory()->agents()->create();
         $config = [
             'default_scene' => 'salon',
             'scenes' => [
@@ -29,8 +35,37 @@ describe('GET /api/v1/ads/{ad}/tour', function (): void {
             ],
         ];
         $ad = null;
-        Ad::withoutSyncingToSearch(function () use (&$ad, $config): void {
+        Ad::withoutSyncingToSearch(function () use (&$ad, $config, $owner): void {
             $ad = Ad::factory()->create([
+                'status' => AdStatus::AVAILABLE,
+                'user_id' => $owner->id,
+                'has_3d_tour' => true,
+                'tour_config' => $config,
+                'tour_published_at' => now(),
+            ]);
+        });
+
+        $this->actingAs($owner, 'sanctum');
+
+        $this->getJson("/api/v1/ads/{$ad->id}/tour")
+            ->assertOk()
+            ->assertJsonPath('has_tour', true)
+            ->assertJsonStructure(['has_tour', 'scenes_count', 'tour_published_at', 'config']);
+    });
+
+    it('returns 403 for guest when tour exists but is locked', function (): void {
+        $owner = User::factory()->agents()->create();
+        $config = [
+            'default_scene' => 'salon',
+            'scenes' => [
+                ['id' => 'salon', 'title' => 'Salon', 'image_url' => 'https://example.com/salon.jpg', 'hotspots' => []],
+            ],
+        ];
+        $ad = null;
+        Ad::withoutSyncingToSearch(function () use (&$ad, $owner, $config): void {
+            $ad = Ad::factory()->create([
+                'status' => AdStatus::AVAILABLE,
+                'user_id' => $owner->id,
                 'has_3d_tour' => true,
                 'tour_config' => $config,
                 'tour_published_at' => now(),
@@ -38,9 +73,7 @@ describe('GET /api/v1/ads/{ad}/tour', function (): void {
         });
 
         $this->getJson("/api/v1/ads/{$ad->id}/tour")
-            ->assertOk()
-            ->assertJsonPath('has_tour', true)
-            ->assertJsonStructure(['has_tour', 'scenes_count', 'tour_published_at', 'config']);
+            ->assertForbidden();
     });
 });
 
@@ -196,6 +229,24 @@ describe('PATCH /panel-api/v1/ads/{ad}/tour/scenes/{sceneId}/hotspots', function
 
         $this->patchJson("/panel-api/v1/ads/{$ad->id}/tour/scenes/salon/hotspots", [
             'hotspots' => [['pitch' => 999, 'yaw' => 0, 'target_scene' => 'salon', 'label' => 'Bad']],
+        ])->assertUnprocessable();
+    });
+
+    it('rejects hotspot target scene that does not exist', function (): void {
+        $owner = User::factory()->agents()->create();
+        $config = ['default_scene' => 'salon', 'scenes' => [
+            ['id' => 'salon', 'title' => 'Salon', 'hotspots' => []],
+            ['id' => 'chambre', 'title' => 'Chambre', 'hotspots' => []],
+        ]];
+        $ad = null;
+        Ad::withoutSyncingToSearch(function () use (&$ad, $owner, $config): void {
+            $ad = Ad::factory()->create(['user_id' => $owner->id, 'has_3d_tour' => true, 'tour_config' => $config]);
+        });
+
+        $this->actingAs($owner);
+
+        $this->patchJson("/panel-api/v1/ads/{$ad->id}/tour/scenes/salon/hotspots", [
+            'hotspots' => [['pitch' => 10, 'yaw' => 5, 'target_scene' => 'invalide', 'label' => 'Mauvais lien']],
         ])->assertUnprocessable();
     });
 });
