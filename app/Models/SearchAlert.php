@@ -77,7 +77,7 @@ final class SearchAlert extends Model
             return false;
         }
 
-        if ($this->type_id && $ad->type?->id !== $this->type_id) {
+        if ($this->type_id && $ad->ad_type?->id !== $this->type_id) {
             return false;
         }
 

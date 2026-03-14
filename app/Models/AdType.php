@@ -17,7 +17,7 @@ use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
- * @property int $id
+ * @property string $id
  * @property string $name
  * @property string|null $desc
  * @property Carbon|null $created_at

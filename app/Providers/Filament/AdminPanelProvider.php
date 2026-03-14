@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\Enums\AdStatus;
 use App\Filament\Admin\Pages\Dashboard;
 use App\Filament\Admin\Widgets\StatsOverview;
 use App\Filament\Admin\Widgets\UserChart;
 use App\Filament\Admin\Widgets\UserStatusChart;
+use App\Models\Ad;
 use DutchCodingCompany\FilamentSocialite\FilamentSocialitePlugin;
 use DutchCodingCompany\FilamentSocialite\Provider;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
@@ -142,7 +144,7 @@ class AdminPanelProvider extends PanelProvider
                         MobileBottomNavItem::make('À valider')
                             ->icon('heroicon-o-clipboard-document-check')
                             ->url(fn () => \App\Filament\Admin\Resources\PendingAds\PendingAdResource::getUrl())
-                            ->badge((string) (\App\Models\Ad::where('status', \App\Enums\AdStatus::PENDING)->count() ?: null))
+                            ->badge($this->getPendingAdsBadge())
                             ->badgeColor('danger')
                             ->isActive(fn () => request()->routeIs('filament.admin.resources.pending-ads.*')),
 
@@ -181,5 +183,19 @@ class AdminPanelProvider extends PanelProvider
                     ->rememberLogin(true)
                     ->showDivider(true),
             ]);
+    }
+
+    /**
+     * Get pending ads count for nav badge. Returns null when tables don't exist (e.g. during migrate).
+     */
+    private function getPendingAdsBadge(): ?string
+    {
+        try {
+            $count = Ad::where('status', AdStatus::PENDING)->count();
+
+            return $count > 0 ? (string) $count : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }

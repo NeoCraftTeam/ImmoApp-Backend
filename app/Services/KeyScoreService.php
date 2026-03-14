@@ -113,7 +113,7 @@ final class KeyScoreService
 
     private function scoreAttributes(Ad $ad): array
     {
-        $count = count($ad->attributes ?? []);
+        $count = count($ad->getAttribute('attributes') ?? []);
         $score = match (true) {
             $count >= 6 => 15,
             $count >= 4 => 12,
