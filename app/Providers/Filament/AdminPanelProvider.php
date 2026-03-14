@@ -19,6 +19,7 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Hammadzafar05\MobileBottomNav\MobileBottomNav;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -135,6 +136,10 @@ class AdminPanelProvider extends PanelProvider
                 Authenticate::class,
             ])
             ->plugins([
+                MobileBottomNav::make()
+                    ->fromNavigation(5)
+                    ->moreButton(true)
+                    ->moreButtonLabel('Menu'),
                 FilamentSocialitePlugin::make()
                     ->providers([
                         Provider::make('google')
