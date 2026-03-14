@@ -53,7 +53,7 @@ final class KeyScoreService
             default => 0,
         };
 
-        return ['score' => $score, 'max' => 20, 'label' => 'Photos', 'value' => $count.' photo(s)'];
+        return ['score' => $score, 'max' => 20, 'label' => 'Photos', 'value' => $count.' photo'.($count > 1 ? 's' : '')];
     }
 
     private function scoreDescription(Ad $ad): array
@@ -66,7 +66,7 @@ final class KeyScoreService
             default => 0,
         };
 
-        return ['score' => $score, 'max' => 15, 'label' => 'Description', 'value' => $len.' caractères'];
+        return ['score' => $score, 'max' => 15, 'label' => 'Description', 'value' => $len.' caractère'.($len > 1 ? 's' : '')];
     }
 
     private function scorePrice(Ad $ad): array
@@ -76,15 +76,13 @@ final class KeyScoreService
         }
 
         $cacheKey = 'median_price_'.$ad->quarter_id.'_'.($ad->type_id ?? 'all');
-        $median = Cache::remember($cacheKey, 3600, function () use ($ad): ?float {
-            return Ad::query()
-                ->where('quarter_id', $ad->quarter_id)
-                ->when($ad->type_id, fn ($q) => $q->where('type_id', $ad->type_id))
-                ->whereNotNull('price')
-                ->where('price', '>', 0)
-                ->selectRaw('PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) as median')
-                ->value('median');
-        });
+        $median = Cache::remember($cacheKey, 3600, fn (): ?float => Ad::query()
+            ->where('quarter_id', $ad->quarter_id)
+            ->when($ad->type_id, fn ($q) => $q->where('type_id', $ad->type_id))
+            ->whereNotNull('price')
+            ->where('price', '>', 0)
+            ->selectRaw('PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price) as median')
+            ->value('median'));
 
         if (!$median) {
             return ['score' => 10, 'max' => 20, 'label' => 'Prix', 'value' => 'Non évalué'];
@@ -124,7 +122,7 @@ final class KeyScoreService
             default => 0,
         };
 
-        return ['score' => $score, 'max' => 15, 'label' => 'Équipements', 'value' => $count.' équipement(s)'];
+        return ['score' => $score, 'max' => 15, 'label' => 'Équipements', 'value' => $count.' équipement'.($count > 1 ? 's' : '')];
     }
 
     private function scoreResponsiveness(Ad $ad): array
@@ -140,12 +138,12 @@ final class KeyScoreService
             default => 2,
         };
 
-        return ['score' => $score, 'max' => 10, 'label' => 'Popularité', 'value' => $views.' vues'];
+        return ['score' => $score, 'max' => 10, 'label' => 'Popularité', 'value' => $views.' vue'.($views > 1 ? 's' : '')];
     }
 
     private function scoreFreshness(Ad $ad): array
     {
-        $days = $ad->created_at->diffInDays(now());
+        $days = (int) round($ad->created_at->diffInHours(now()) / 24);
         $score = match (true) {
             $days <= 7 => 10,
             $days <= 30 => 7,
@@ -153,7 +151,7 @@ final class KeyScoreService
             default => 1,
         };
 
-        return ['score' => $score, 'max' => 10, 'label' => 'Fraîcheur', 'value' => $days.' jour(s)'];
+        return ['score' => $score, 'max' => 10, 'label' => 'Fraîcheur', 'value' => $days.' jour'.($days > 1 ? 's' : '')];
     }
 
     private function getLabel(float $score): string

@@ -43,8 +43,8 @@ final class RentEstimatorController
                 ->filter()
                 ->values();
 
-            if ($pricePerSqm->count() < 3) {
-                // Fallback: ignore bedrooms filter
+            // Fallback 1: ignore bedrooms filter
+            if ($pricePerSqm->count() < 3 && isset($data['bedrooms'])) {
                 $pricePerSqm = Ad::query()
                     ->whereHas('quarter', fn ($q) => $q->where('city_id', $data['city_id']))
                     ->where('type_id', $data['type_id'])
@@ -58,16 +58,31 @@ final class RentEstimatorController
                     ->values();
             }
 
+            // Fallback 2: ignore type filter
             if ($pricePerSqm->isEmpty()) {
-                return ['error' => 'Pas assez de données pour cette combinaison.'];
+                $pricePerSqm = Ad::query()
+                    ->whereHas('quarter', fn ($q) => $q->where('city_id', $data['city_id']))
+                    ->where('status', AdStatus::AVAILABLE)
+                    ->whereNotNull('price')
+                    ->where('price', '>', 0)
+                    ->where('surface_area', '>', 0)
+                    ->selectRaw('price / NULLIF(surface_area, 0) as ppsm')
+                    ->pluck('ppsm')
+                    ->filter()
+                    ->values();
+            }
+
+            if ($pricePerSqm->isEmpty()) {
+                return ['error' => 'Pas assez de données pour cette ville.'];
             }
 
             $sorted = $pricePerSqm->sort()->values();
             $count = $sorted->count();
-            $p25 = $sorted[(int) floor($count * 0.25)];
-            $p50 = $sorted[(int) floor($count * 0.50)];
-            $p75 = $sorted[(int) floor($count * 0.75)];
-
+            // With few samples, use median for all three estimates with ±15% spread
+            $midIdx = max(0, (int) floor($count * 0.50));
+            $p25 = $sorted[max(0, (int) floor($count * 0.25))];
+            $p50 = $sorted[$midIdx];
+            $p75 = $sorted[min($count - 1, (int) floor($count * 0.75))];
             $estimatedMin = (int) round($p25 * $data['surface']);
             $estimatedMedian = (int) round($p50 * $data['surface']);
             $estimatedMax = (int) round($p75 * $data['surface']);

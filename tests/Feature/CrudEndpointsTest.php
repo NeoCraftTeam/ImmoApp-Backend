@@ -64,10 +64,10 @@ it('authenticated user can list ad types', function (): void {
     $response->assertOk();
 });
 
-it('unauthenticated user cannot list ad types', function (): void {
+it('unauthenticated user can list ad types (public read)', function (): void {
     $response = $this->getJson('/api/v1/ad-types');
 
-    $response->assertUnauthorized();
+    $response->assertOk();
 });
 
 it('authenticated user can list users', function (): void {

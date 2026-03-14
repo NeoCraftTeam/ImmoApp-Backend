@@ -41,7 +41,6 @@ final class AdTypeController
      */
     public function index()
     {
-        $this->authorize('viewAny', AdType::class);
         $adTypes = AdType::all();
 
         return AdTypeResource::collection($adTypes);
@@ -133,8 +132,6 @@ final class AdTypeController
      */
     public function show(AdType $adType)
     {
-        $this->authorize('view', $adType);
-
         return new AdTypeResource($adType);
     }
 

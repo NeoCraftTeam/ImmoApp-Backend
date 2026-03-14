@@ -24,7 +24,7 @@ final class NaturalSearchController
             'q' => ['required', 'string', 'max:300'],
         ]);
 
-        $query = mb_strtolower(trim($data['q']));
+        $query = mb_strtolower(trim((string) $data['q']));
         $result = $this->parseQuery($query);
 
         return response()->json($result);
@@ -136,10 +136,10 @@ final class NaturalSearchController
     private function parseAmount(string $raw): int
     {
         $clean = preg_replace('/\s+/', '', $raw);
-        if (str_ends_with($clean, 'k')) {
-            return (int) rtrim($clean, 'k') * 1000;
+        if (str_ends_with((string) $clean, 'k')) {
+            return (int) rtrim((string) $clean, 'k') * 1000;
         }
 
-        return (int) preg_replace('/\D/', '', $clean);
+        return (int) preg_replace('/\D/', '', (string) $clean);
     }
 }

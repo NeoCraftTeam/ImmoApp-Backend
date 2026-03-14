@@ -11,11 +11,9 @@ use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\ClerkWebhookController;
-use App\Http\Controllers\Api\V1\ConversationController;
 use App\Http\Controllers\Api\V1\CreditController;
 use App\Http\Controllers\Api\V1\InvoiceController;
 use App\Http\Controllers\Api\V1\KeyScoreController;
-use App\Http\Controllers\Api\V1\MessageController;
 use App\Http\Controllers\Api\V1\NaturalSearchController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PaymentController;
@@ -112,10 +110,12 @@ Route::prefix('v1')->group(function (): void {
         });
     });
 
-    // adType
-    Route::middleware('auth:sanctum')->controller(AdTypeController::class)->group(function (): void {
+    // adType — read routes are public, write routes require auth
+    Route::controller(AdTypeController::class)->group(function (): void {
         Route::get('/ad-types', 'index');
         Route::get('/ad-types/{adType}', 'show');
+    });
+    Route::middleware('auth:sanctum')->controller(AdTypeController::class)->group(function (): void {
         Route::post('/ad-types', 'store');
         Route::put('/ad-types/{adType}', 'update');
         Route::delete('/ad-types/{adType}', 'destroy');
@@ -369,16 +369,6 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/', [SearchAlertController::class, 'store'])->middleware('throttle:20,1');
         Route::put('/{searchAlert}', [SearchAlertController::class, 'update']);
         Route::delete('/{searchAlert}', [SearchAlertController::class, 'destroy']);
-    });
-
-    // --- CONVERSATIONS & MESSAGES ---
-    Route::middleware('auth:sanctum')->group(function (): void {
-        Route::get('/conversations', [ConversationController::class, 'index']);
-        Route::post('/ads/{ad}/conversation', [ConversationController::class, 'findOrCreate'])
-            ->middleware('throttle:20,1');
-        Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
-        Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store'])
-            ->middleware('throttle:60,1');
     });
 
     // --- RENT ESTIMATOR (public) ---

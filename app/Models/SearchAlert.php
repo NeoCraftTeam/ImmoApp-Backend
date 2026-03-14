@@ -51,6 +51,7 @@ final class SearchAlert extends Model
         'last_notified_at',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [
