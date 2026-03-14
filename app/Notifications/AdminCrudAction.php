@@ -44,7 +44,7 @@ class AdminCrudAction extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): Mailable
     {
-        return new AdminActionNotifyMail($this->actor, $notifiable, $this->details);
+        return (new AdminActionNotifyMail($this->actor, $notifiable, $this->details))->to($notifiable->email);
     }
 
     /**
