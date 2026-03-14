@@ -276,6 +276,24 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return $this->hasMany(AdInteraction::class);
     }
 
+    /** @return HasMany<SearchAlert, $this> */
+    public function searchAlerts(): HasMany
+    {
+        return $this->hasMany(SearchAlert::class);
+    }
+
+    /** @return HasMany<Conversation, $this> */
+    public function tenantConversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class, 'tenant_id');
+    }
+
+    /** @return HasMany<Conversation, $this> */
+    public function landlordConversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class, 'landlord_id');
+    }
+
     /**
      * returns true if the user is an agent.
      */

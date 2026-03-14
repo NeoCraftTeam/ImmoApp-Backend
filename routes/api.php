@@ -11,16 +11,23 @@ use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\ClerkWebhookController;
+use App\Http\Controllers\Api\V1\ConversationController;
 use App\Http\Controllers\Api\V1\CreditController;
 use App\Http\Controllers\Api\V1\InvoiceController;
+use App\Http\Controllers\Api\V1\KeyScoreController;
+use App\Http\Controllers\Api\V1\MessageController;
+use App\Http\Controllers\Api\V1\NaturalSearchController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PaymentController;
+use App\Http\Controllers\Api\V1\PriceHeatmapController;
 use App\Http\Controllers\Api\V1\PropertyAttributeController;
 use App\Http\Controllers\Api\V1\PublicSurveyController;
 use App\Http\Controllers\Api\V1\PwaController;
 use App\Http\Controllers\Api\V1\QuarterController;
 use App\Http\Controllers\Api\V1\RecommendationController;
+use App\Http\Controllers\Api\V1\RentEstimatorController;
 use App\Http\Controllers\Api\V1\ReviewController;
+use App\Http\Controllers\Api\V1\SearchAlertController;
 use App\Http\Controllers\Api\V1\SocialAuthController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
 use App\Http\Controllers\Api\V1\SurveyController;
@@ -355,4 +362,38 @@ Route::prefix('v1')->group(function (): void {
         });
         Route::get('/session/validate', [PwaController::class, 'validateSession']);
     });
+
+    // --- SEARCH ALERTS ---
+    Route::middleware('auth:sanctum')->prefix('search-alerts')->group(function (): void {
+        Route::get('/', [SearchAlertController::class, 'index']);
+        Route::post('/', [SearchAlertController::class, 'store'])->middleware('throttle:20,1');
+        Route::put('/{searchAlert}', [SearchAlertController::class, 'update']);
+        Route::delete('/{searchAlert}', [SearchAlertController::class, 'destroy']);
+    });
+
+    // --- CONVERSATIONS & MESSAGES ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/conversations', [ConversationController::class, 'index']);
+        Route::post('/ads/{ad}/conversation', [ConversationController::class, 'findOrCreate'])
+            ->middleware('throttle:20,1');
+        Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
+        Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store'])
+            ->middleware('throttle:60,1');
+    });
+
+    // --- RENT ESTIMATOR (public) ---
+    Route::get('/rent-estimate', [RentEstimatorController::class, 'estimate'])
+        ->middleware('throttle:30,1');
+
+    // --- PRICE HEATMAP (public) ---
+    Route::get('/price-heatmap', [PriceHeatmapController::class, 'index'])
+        ->middleware('throttle:30,1');
+
+    // --- KEYSCORE ---
+    Route::get('/ads/{ad}/keyscore', [KeyScoreController::class, 'show'])
+        ->middleware('throttle:60,1');
+
+    // --- NATURAL LANGUAGE SEARCH ---
+    Route::post('/search/parse', [NaturalSearchController::class, 'parse'])
+        ->middleware('throttle:30,1');
 });
