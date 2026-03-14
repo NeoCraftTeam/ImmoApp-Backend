@@ -49,7 +49,7 @@ phpstan:
   stage: quality
   needs: [prepare_ci_image]
   script:
-    - docker run --rm $CI_IMAGE ./vendor/bin/phpstan analyse --memory-limit=512M
+    - docker run --rm -e APP_KEY="base64:$(openssl rand -base64 32)" $CI_IMAGE ./vendor/bin/phpstan analyse --memory-limit=512M
   rules:
     - if: $CI_COMMIT_BRANCH
       changes:
