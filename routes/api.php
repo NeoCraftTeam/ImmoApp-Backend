@@ -171,6 +171,10 @@ Route::prefix('v1')->group(function (): void {
     // --- PROPERTY ATTRIBUTES (public) ---
     Route::get('/property-attributes', [PropertyAttributeController::class, 'index']);
 
+    // --- VISIT TRACKING (anonymous) ---
+    Route::post('/track/visit', [\App\Http\Controllers\Api\V1\VisitTrackingController::class, 'store'])
+        ->middleware('throttle:60,1');
+
     // --- PUBLIC LANDING STATS ---
     Route::get('/stats/landing', fn () => response()->json([
         'ads_count' => \App\Models\Ad::query()->publiclyListed()->where('is_visible', true)->count(),

@@ -40,7 +40,7 @@ class AdResource extends Resource
 
     protected static string|null|UnitEnum $navigationGroup = 'Annonces';
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::Home;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::Megaphone;
 
     protected static ?string $recordTitleAttribute = 'title';
 

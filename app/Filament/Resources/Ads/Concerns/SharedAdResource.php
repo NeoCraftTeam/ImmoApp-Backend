@@ -24,7 +24,6 @@ use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Forms\Components\ViewField;
 use Filament\Infolists\Components\IconEntry;
-use Filament\Infolists\Components\SpatieMediaLibraryImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Grid;
@@ -496,11 +495,11 @@ trait SharedAdResource
     protected static function getSharedInfolistSchema(bool $showMeta = false): array
     {
         $sections = [
-            Section::make('Aperçu')
+            Section::make('Galerie Photos')
                 ->schema([
-                    SpatieMediaLibraryImageEntry::make('images')
-                        ->collection('images')
-                        ->label('Galerie Photos')
+                    \Filament\Infolists\Components\ViewEntry::make('images')
+                        ->label('')
+                        ->view('filament.components.image-lightbox-gallery')
                         ->columnSpanFull(),
                 ])
                 ->columnSpanFull(),
