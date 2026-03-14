@@ -131,6 +131,11 @@ class Ad extends Model implements HasMedia
         'has_3d_tour',
         'tour_config',
         'tour_published_at',
+        'is_verified',
+        'verified_at',
+        'verification_status',
+        'verification_notes',
+        'verification_requested_at',
     ];
 
     protected $hidden = [
@@ -164,6 +169,10 @@ class Ad extends Model implements HasMedia
         'has_3d_tour' => 'boolean',
         'tour_config' => 'array',
         'tour_published_at' => 'datetime',
+        'is_verified' => 'boolean',
+        'verified_at' => 'datetime',
+        'verification_status' => \App\Enums\VerificationStatus::class,
+        'verification_requested_at' => 'datetime',
     ];
 
     #[\Override]
@@ -348,6 +357,12 @@ class Ad extends Model implements HasMedia
     public function reports(): HasMany
     {
         return $this->hasMany(AdReport::class);
+    }
+
+    /** @return HasMany<UnlockedAd, $this> */
+    public function unlockedAds(): HasMany
+    {
+        return $this->hasMany(UnlockedAd::class);
     }
 
     /** @return HasMany<AdInteraction, $this> */

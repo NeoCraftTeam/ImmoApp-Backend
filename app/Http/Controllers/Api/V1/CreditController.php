@@ -11,6 +11,7 @@ use App\Exceptions\PaymentGatewayException;
 use App\Http\Resources\PointPackageResource;
 use App\Mail\CreditPurchaseConfirmationMail;
 use App\Models\Ad;
+use App\Models\AdInteraction;
 use App\Models\Payment;
 use App\Models\PointPackage;
 use App\Models\UnlockedAd;
@@ -348,6 +349,12 @@ final class CreditController
                 ['user_id' => $user->id, 'ad_id' => $ad->id],
                 ['unlocked_at' => now()],
             );
+
+            AdInteraction::create([
+                'user_id' => $user->id,
+                'ad_id' => $ad->id,
+                'type' => AdInteraction::TYPE_UNLOCK,
+            ]);
         });
 
         return response()->json([

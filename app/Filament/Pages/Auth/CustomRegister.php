@@ -6,10 +6,12 @@ namespace App\Filament\Pages\Auth;
 
 use App\Enums\UserRole;
 use App\Filament\Forms\Components\NativePhoneInput;
+use App\Models\City;
 use App\Models\User;
 use App\Services\AgencyService;
 use Filament\Auth\Pages\Register as BaseRegister;
 use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Fieldset;
@@ -28,6 +30,7 @@ class CustomRegister extends BaseRegister
                 $this->getLastnameFormComponent(),
                 $this->getEmailFormComponent(),
                 $this->getPhoneFormComponent(),
+                $this->getCityFormComponent(),
                 $this->getAgencyNameFormComponent(),
                 $this->getPasswordFormComponent(),
                 $this->getPasswordConfirmationFormComponent(),
@@ -67,6 +70,17 @@ class CustomRegister extends BaseRegister
             ->columns(1);
     }
 
+    protected function getCityFormComponent(): Component
+    {
+        return Select::make('city_id')
+            ->label('Ville')
+            ->searchable()
+            ->preload()
+            ->options(City::query()->orderBy('name')->pluck('name', 'id'))
+            ->required()
+            ->prefixIcon('heroicon-o-map-pin');
+    }
+
     protected function getAgencyNameFormComponent(): Component
     {
         $panelId = \Filament\Facades\Filament::getCurrentPanel()->getId();
@@ -92,6 +106,7 @@ class CustomRegister extends BaseRegister
                 'email' => $data['email'],
                 'password' => $data['password'],
                 'phone_number' => $data['phone_number'] ?? null,
+                'city_id' => $data['city_id'] ?? null,
             ]);
             $user->forceFill([
                 'role' => UserRole::CUSTOMER,

@@ -36,6 +36,12 @@ class SubscriptionResource extends Resource
     protected static ?int $navigationSort = 3;
 
     #[\Override]
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
+    #[\Override]
     public static function getEloquentQuery(): Builder
     {
         $user = auth()->user();

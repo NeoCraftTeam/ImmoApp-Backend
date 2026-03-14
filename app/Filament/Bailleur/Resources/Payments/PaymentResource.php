@@ -37,6 +37,12 @@ class PaymentResource extends Resource
     protected static ?int $navigationSort = 1;
 
     #[\Override]
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
+    #[\Override]
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()

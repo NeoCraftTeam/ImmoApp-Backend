@@ -76,7 +76,7 @@ class StatsOverview extends BaseWidget
                 ->chart($favoritesTrend),
 
             Stat::make('Engagement', $engagementRate.'%')
-                ->description($engagementRate > 5 ? 'Bon engagement 📈' : 'Engagement faible 📉')
+                ->description($engagementRate > 5 ? 'Bon engagement' : 'Engagement faible')
                 ->descriptionIcon('heroicon-m-chart-bar')
                 ->color($engagementRate > 5 ? 'success' : 'gray')
                 ->chart($viewsTrend),

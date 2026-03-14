@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Spatie\Activitylog\LogOptions;
@@ -50,6 +51,10 @@ class Quarter extends Model
     protected $fillable = [
         'name',
         'city_id',
+        'avg_price',
+        'avg_price_per_sqm',
+        'active_ads_count',
+        'pricing_updated_at',
     ];
 
     protected $hidden = [
@@ -64,6 +69,22 @@ class Quarter extends Model
     public function city(): BelongsTo
     {
         return $this->belongsTo(City::class);
+    }
+
+    /** @return HasMany<Ad, $this> */
+    public function ads(): HasMany
+    {
+        return $this->hasMany(Ad::class);
+    }
+
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'avg_price' => 'decimal:2',
+            'avg_price_per_sqm' => 'decimal:2',
+            'pricing_updated_at' => 'datetime',
+        ];
     }
 
     public function getActivitylogOptions(): LogOptions
