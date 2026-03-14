@@ -6,8 +6,11 @@ use App\Http\Controllers\Api\V1\Auth\EmailVerificationController;
 use App\Http\Controllers\Api\V1\TourController;
 use App\Http\Controllers\MediaProxyController;
 use App\Http\Controllers\PanelSsoController;
+use App\Http\Controllers\PwaManifestController;
 use App\Http\Controllers\TourImageProxyController;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/manifest.json', PwaManifestController::class)->name('pwa.manifest');
 
 Route::get('/', function () {
     $host = request()->getHost();

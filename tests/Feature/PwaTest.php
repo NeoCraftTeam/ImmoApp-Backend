@@ -9,14 +9,21 @@ uses(RefreshDatabase::class);
 
 // ─── Manifest & Static Assets ─────────────────────────────
 
-it('manifest file exists in public directory', function (): void {
-    expect(file_exists(public_path('manifest.json')))->toBeTrue();
+it('manifest route returns valid JSON manifest', function (): void {
+    $response = $this->get('/manifest.json');
 
-    $manifest = json_decode(file_get_contents(public_path('manifest.json')), true);
+    $response->assertOk()
+        ->assertHeader('Content-Type', 'application/manifest+json')
+        ->assertJsonPath('display', 'standalone')
+        ->assertJsonPath('lang', 'fr');
+
+    $manifest = $response->json();
     expect($manifest)
-        ->toHaveKey('short_name', 'KeyHome')
-        ->toHaveKey('display', 'standalone')
-        ->toHaveKey('lang', 'fr');
+        ->toHaveKey('start_url')
+        ->toHaveKey('scope')
+        ->toHaveKey('icons');
+
+    expect($manifest['start_url'])->toContain('http');
 });
 
 it('offline page exists in public directory', function (): void {

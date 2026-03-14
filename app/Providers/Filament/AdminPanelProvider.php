@@ -20,6 +20,7 @@ use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Hammadzafar05\MobileBottomNav\MobileBottomNav;
+use Hammadzafar05\MobileBottomNav\MobileBottomNavItem;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -137,7 +138,34 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->plugins([
                 MobileBottomNav::make()
-                    ->fromNavigation(5)
+                    ->items([
+                        MobileBottomNavItem::make('À valider')
+                            ->icon('heroicon-o-clipboard-document-check')
+                            ->url(fn () => \App\Filament\Admin\Resources\PendingAds\PendingAdResource::getUrl())
+                            ->badge((string) (\App\Models\Ad::where('status', \App\Enums\AdStatus::PENDING)->count() ?: null))
+                            ->badgeColor('danger')
+                            ->isActive(fn () => request()->routeIs('filament.admin.resources.pending-ads.*')),
+
+                        MobileBottomNavItem::make('Annonces')
+                            ->icon('heroicon-o-megaphone')
+                            ->url(fn () => \App\Filament\Admin\Resources\Ads\AdResource::getUrl())
+                            ->isActive(fn () => request()->routeIs('filament.admin.resources.ads.*')),
+
+                        MobileBottomNavItem::make('Tableau de bord')
+                            ->icon('heroicon-o-home')
+                            ->url(fn () => \App\Filament\Admin\Pages\Dashboard::getUrl())
+                            ->isActive(fn () => request()->routeIs('filament.admin.pages.dashboard')),
+
+                        MobileBottomNavItem::make('Utilisateurs')
+                            ->icon('heroicon-o-users')
+                            ->url(fn () => \App\Filament\Admin\Resources\Users\UserResource::getUrl())
+                            ->isActive(fn () => request()->routeIs('filament.admin.resources.users.*')),
+
+                        MobileBottomNavItem::make('Transactions')
+                            ->icon('heroicon-o-banknotes')
+                            ->url(fn () => \App\Filament\Admin\Resources\Payments\PaymentResource::getUrl())
+                            ->isActive(fn () => request()->routeIs('filament.admin.resources.payments.*')),
+                    ])
                     ->moreButton(true)
                     ->moreButtonLabel('Menu'),
                 FilamentSocialitePlugin::make()

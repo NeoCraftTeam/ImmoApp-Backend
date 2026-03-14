@@ -50,7 +50,7 @@ class NewAdPending extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): Mailable
     {
-        return (new NewAdSubmissionMail($this->ad))->to($notifiable->email);
+        return new NewAdSubmissionMail($this->ad)->to($notifiable->email);
     }
 
     /**

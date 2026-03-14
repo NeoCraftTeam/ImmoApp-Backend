@@ -89,6 +89,10 @@ class AgencyPanelProvider extends PanelProvider
             )
             ->renderHook(
                 'panels::body.end',
+                fn () => view('pwa.register-sw'),
+            )
+            ->renderHook(
+                'panels::body.end',
                 fn () => view('filament.mobile-bridge'),
             )
             ->assets([
