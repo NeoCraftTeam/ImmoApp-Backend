@@ -299,93 +299,161 @@ body {
     letter-spacing: 0.01em;
 }
 
-/* === Simple Pages (Login / Register) — Premium Design === */
-.fi-simple-page {
-    min-height: 100vh;
-    background: linear-gradient(160deg, #F0FDFA 0%, #F7F7F7 40%, #F0FDFA 100%) !important;
-}
-.dark .fi-simple-page {
-    background: linear-gradient(160deg, #1a2e2b 0%, #222222 40%, #1a2e2b 100%) !important;
+/* === Simple Pages (Login / Register) — Desktop Premium Design === */
+@media (min-width: 641px) {
+    .fi-simple-page {
+        min-height: 100vh;
+        background: linear-gradient(160deg, #F0FDFA 0%, #F7F7F7 40%, #F0FDFA 100%) !important;
+    }
+    .dark .fi-simple-page {
+        background: linear-gradient(160deg, #1a2e2b 0%, #222222 40%, #1a2e2b 100%) !important;
+    }
+    .fi-simple-page::before {
+        content: '';
+        position: fixed;
+        top: -20%;
+        right: -10%;
+        width: 500px;
+        height: 500px;
+        background: radial-gradient(circle, rgba(13, 148, 136, 0.08) 0%, transparent 70%);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 0;
+    }
+    .fi-simple-page::after {
+        content: '';
+        position: fixed;
+        bottom: -15%;
+        left: -10%;
+        width: 400px;
+        height: 400px;
+        background: radial-gradient(circle, rgba(15, 118, 110, 0.06) 0%, transparent 70%);
+        border-radius: 50%;
+        pointer-events: none;
+        z-index: 0;
+    }
+    .fi-simple-main,
+    .fi-simple-page .fi-simple-main {
+        position: relative;
+        z-index: 1;
+        border-radius: 20px !important;
+        box-shadow:
+            0 0 0 1px rgba(13, 148, 136, 0.06),
+            0 4px 6px rgba(0, 0, 0, 0.02),
+            0 20px 50px rgba(0, 0, 0, 0.06) !important;
+        border: none !important;
+        background: rgba(255, 255, 255, 0.88) !important;
+        backdrop-filter: blur(20px) !important;
+        -webkit-backdrop-filter: blur(20px) !important;
+        max-width: 380px !important;
+        width: 380px !important;
+        padding: 1.5rem 1.75rem !important;
+    }
+    .dark .fi-simple-main,
+    .dark .fi-simple-page .fi-simple-main {
+        background: rgba(42, 42, 42, 0.92) !important;
+        box-shadow:
+            0 0 0 1px rgba(13, 148, 136, 0.1),
+            0 4px 6px rgba(0, 0, 0, 0.1),
+            0 20px 50px rgba(0, 0, 0, 0.3) !important;
+    }
+    .fi-simple-main-ctn {
+        max-width: 380px !important;
+    }
+    .fi-simple-main::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 60%;
+        height: 3px;
+        background: var(--kh-gradient-primary);
+        border-radius: 0 0 3px 3px;
+    }
 }
 
-/* Subtle decorative gradient orbs */
-.fi-simple-page::before {
-    content: '';
-    position: fixed;
-    top: -20%;
-    right: -10%;
-    width: 500px;
-    height: 500px;
-    background: radial-gradient(circle, rgba(13, 148, 136, 0.08) 0%, transparent 70%);
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 0;
-}
-.fi-simple-page::after {
-    content: '';
-    position: fixed;
-    bottom: -15%;
-    left: -10%;
-    width: 400px;
-    height: 400px;
-    background: radial-gradient(circle, rgba(15, 118, 110, 0.06) 0%, transparent 70%);
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 0;
-}
-
-/* Main card — floating glass-like card */
-.fi-simple-main,
-.fi-simple-page .fi-simple-main {
-    position: relative;
-    z-index: 1;
-    border-radius: 20px !important;
-    box-shadow:
-        0 0 0 1px rgba(13, 148, 136, 0.06),
-        0 4px 6px rgba(0, 0, 0, 0.02),
-        0 20px 50px rgba(0, 0, 0, 0.06) !important;
-    border: none !important;
-    background: rgba(255, 255, 255, 0.88) !important;
-    backdrop-filter: blur(20px) !important;
-    -webkit-backdrop-filter: blur(20px) !important;
-    max-width: 380px !important;
-    width: 380px !important;
-    padding: 1.5rem 1.75rem !important;
-}
-.dark .fi-simple-main,
-.dark .fi-simple-page .fi-simple-main {
-    background: rgba(42, 42, 42, 0.92) !important;
-    box-shadow:
-        0 0 0 1px rgba(13, 148, 136, 0.1),
-        0 4px 6px rgba(0, 0, 0, 0.1),
-        0 20px 50px rgba(0, 0, 0, 0.3) !important;
-}
-
-/* Override Filament's max-w utility on the container */
-.fi-simple-main-ctn {
-    max-width: 380px !important;
-}
-@media (max-width: 480px) {
+/* === Mobile Login — clean full-screen, no card === */
+@media (max-width: 640px) {
+    .fi-simple-page {
+        min-height: 100vh;
+        background: #ffffff !important;
+        padding-top: env(safe-area-inset-top) !important;
+    }
+    .dark .fi-simple-page {
+        background: var(--kh-bg-dark) !important;
+    }
+    .fi-simple-page::before,
+    .fi-simple-page::after {
+        display: none !important;
+    }
     .fi-simple-main,
     .fi-simple-page .fi-simple-main {
         max-width: 100% !important;
         width: 100% !important;
-        border-radius: 16px !important;
-        padding: 1.25rem !important;
+        border-radius: 0 !important;
+        padding: 1.5rem 1.5rem !important;
+        box-shadow: none !important;
+        border: none !important;
+        background: transparent !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
     }
-}
-
-/* Teal accent line at the top of the card */
-.fi-simple-main::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 60%;
-    height: 3px;
-    background: var(--kh-gradient-primary);
-    border-radius: 0 0 3px 3px;
+    .fi-simple-main::before {
+        display: none !important;
+    }
+    .fi-simple-main-ctn {
+        max-width: 100% !important;
+        padding: 0 !important;
+    }
+    .fi-simple-page .fi-simple-header {
+        padding-top: 0.5rem;
+        padding-bottom: 1rem;
+    }
+    .fi-simple-page .fi-btn-primary {
+        width: 100% !important;
+        padding: 0.75rem 1rem !important;
+        font-size: 0.9375rem !important;
+        border-radius: 14px !important;
+    }
+    .fi-simple-page .filament-socialite-buttons button,
+    .fi-simple-page .filament-socialite-buttons a {
+        width: 100% !important;
+        padding: 0.7rem 1rem !important;
+        font-size: 0.9375rem !important;
+        border-radius: 14px !important;
+        justify-content: center !important;
+    }
+    .fi-simple-page .fi-input-wrp {
+        border-radius: 14px !important;
+        border: 1.5px solid rgba(0, 0, 0, 0.12) !important;
+        background: #F9FAFB !important;
+    }
+    .dark .fi-simple-page .fi-input-wrp {
+        border-color: rgba(255, 255, 255, 0.1) !important;
+        background: rgba(255, 255, 255, 0.04) !important;
+    }
+    .fi-simple-page .fi-input-wrp:focus-within {
+        border-color: var(--kh-primary) !important;
+        background: white !important;
+    }
+    .fi-simple-page .fi-input-wrp input,
+    .fi-simple-page .fi-input-wrp select {
+        font-size: 1rem !important;
+        padding: 0.75rem 1rem !important;
+    }
+    .fi-simple-page .fi-fo-field-wrp label {
+        font-size: 0.875rem !important;
+    }
+    .fi-simple-page .fi-checkbox label span {
+        font-size: 0.875rem !important;
+    }
+    .fi-simple-page .fi-link {
+        font-size: 0.875rem !important;
+    }
+    .fi-simple-page .fi-form > .grid {
+        gap: 1rem !important;
+    }
 }
 
 .fi-simple-header {

@@ -16,6 +16,11 @@
     "ios": {
       "bundleIdentifier": "cm.neocraft.keyhome.owner",
       "supportsTablet": true,
+      "icon": {
+        "light": "./assets/icon.png",
+        "dark": "./assets/icon-dark.png",
+        "tinted": "./assets/icon-tinted.png"
+      },
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false,
@@ -30,11 +35,6 @@
               "NSIncludesSubdomains": true,
               "NSExceptionAllowsInsecureHTTPLoads": false,
               "NSExceptionRequiresForwardSecrecy": true
-            },
-            "keyhome.test": {
-              "NSExceptionAllowsInsecureHTTPLoads": true,
-              "NSTemporaryExceptionAllowsInsecureHTTPLoads": true,
-              "NSExceptionRequiresForwardSecrecy": false
             }
           }
         },
@@ -65,10 +65,18 @@
       "intentFilters": [
         {
           "action": "VIEW",
-          "data": [{ "scheme": "keyhome-owner" }],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "data": [
+            {
+              "scheme": "keyhome-owner"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
-      ]
+      ],
+      "versionCode": 3
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -107,7 +115,22 @@
           "faceIDPermission": "KeyHome utilise Face ID pour sécuriser votre espace propriétaire."
         }
       ],
-      "expo-splash-screen"
+      "expo-splash-screen",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": {
+            "ios": [
+              "fr",
+              "en"
+            ],
+            "android": [
+              "fr",
+              "en"
+            ]
+          }
+        }
+      ]
     ]
   }
 }

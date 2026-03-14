@@ -67,6 +67,12 @@ function buildInjectedJs(sanctumToken: string | null): string {
     window.appMode       = 'native';
     window.platform      = '${Platform.OS}';
     ${tokenInjection}
+    // Force white background on login/simple pages (bypass CSS cache)
+    var _mobileCSS = document.createElement('style');
+    _mobileCSS.id = '__kh_native_css_early';
+    _mobileCSS.textContent = '.fi-simple-page{background:#fff!important}.fi-simple-page::before,.fi-simple-page::after{display:none!important}.fi-simple-main,.fi-simple-page .fi-simple-main{max-width:100%!important;width:100%!important;border-radius:0!important;box-shadow:none!important;border:none!important;background:transparent!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;padding:1.5rem 1.5rem!important}.fi-simple-main::before{display:none!important}.fi-simple-main-ctn{max-width:100%!important;padding:0!important}::-webkit-scrollbar{display:none}body{-ms-overflow-style:none;scrollbar-width:none}html{-webkit-overflow-scrolling:touch}';
+    (document.head || document.documentElement).appendChild(_mobileCSS);
+
     window.KeyHomeBridge = {
       pickImage:    function(opts) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'PICK_IMAGE',       data: opts || {} })); },
       takePhoto:    function(opts) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'TAKE_PHOTO',       data: opts || {} })); },
@@ -75,7 +81,19 @@ function buildInjectedJs(sanctumToken: string | null): string {
       signInGoogle: function(p)    { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'OAUTH_SIGN_IN',    data: { provider: 'google', panelType: p || 'bailleur' } })); },
       haptic:       function(s)    { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'HAPTIC',           data: { style: s || 'light' } })); },
       setStatusBar: function(s)    { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SET_STATUS_BAR',   data: { style: s } })); },
+      getBiometricStatus: function() { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'GET_BIOMETRIC_STATUS', data: {} })); },
+      setBiometric: function(on)   { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'SET_BIOMETRIC',    data: { enabled: !!on } })); },
+      logout:       function()     { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'LOGOUT',            data: {} })); },
     };
+
+    // Intercept Filament logout to clear native token
+    document.addEventListener('submit', function(e) {
+      var form = e.target;
+      if (form && form.action && form.action.indexOf('logout') !== -1) {
+        window.KeyHomeBridge.logout();
+      }
+    }, true);
+
     true;
   })();
 `;
@@ -198,26 +216,156 @@ function AppContent() {
       splashTimer.current = setTimeout(hideSplash, 600);
     }
 
-    if (insets.top > 0 && webViewRef.current) {
+    if (webViewRef.current) {
       const top = insets.top;
       const bottom = insets.bottom;
       webViewRef.current.injectJavaScript(`
         (function() {
           document.documentElement.style.setProperty('--rn-safe-top',    '${top}px');
           document.documentElement.style.setProperty('--rn-safe-bottom', '${bottom}px');
-          var topbar = document.querySelector('.fi-topbar');
-          if (topbar) topbar.style.paddingTop = '${top}px';
-          var sidebarHeader = document.querySelector('.fi-sidebar-header');
-          if (sidebarHeader) sidebarHeader.style.paddingTop = '${top + 16}px';
+
+          if (!document.getElementById('__kh_native_css')) {
+            var s = document.createElement('style');
+            s.id = '__kh_native_css';
+            s.textContent = [
+              ':root { --kh-safe-top: ${top}px; --kh-safe-bottom: ${bottom}px; }',
+
+              /* Login / register — full-screen white */
+              '.fi-simple-page { background: #ffffff !important; }',
+              '.fi-simple-page::before, .fi-simple-page::after { display: none !important; }',
+              '.fi-simple-main, .fi-simple-page .fi-simple-main {',
+              '  max-width: 100% !important; width: 100% !important;',
+              '  border-radius: 0 !important; box-shadow: none !important;',
+              '  border: none !important; background: transparent !important;',
+              '  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;',
+              '  padding: 1.5rem 1.5rem !important;',
+              '}',
+              '.fi-simple-main::before { display: none !important; }',
+              '.fi-simple-main-ctn { max-width: 100% !important; padding: 0 !important; }',
+              '.fi-simple-page .fi-btn-primary { width: 100% !important; border-radius: 14px !important; padding: 0.75rem 1rem !important; }',
+              '.fi-simple-page .filament-socialite-buttons button,',
+              '.fi-simple-page .filament-socialite-buttons a {',
+              '  width: 100% !important; border-radius: 14px !important;',
+              '  padding: 0.7rem 1rem !important; justify-content: center !important;',
+              '}',
+              '.fi-simple-page .fi-input-wrp { border-radius: 14px !important; background: #F9FAFB !important; border: 1.5px solid rgba(0,0,0,0.12) !important; }',
+              '.fi-simple-page .fi-input-wrp:focus-within { border-color: #0d9488 !important; background: #fff !important; }',
+              '.fi-simple-page .fi-input-wrp input, .fi-simple-page .fi-input-wrp select { font-size: 1rem !important; padding: 0.75rem 1rem !important; }',
+
+              /* Dashboard — native feel */
+              '.fi-topbar { padding-top: ${top}px !important; background: #ffffff !important; border-bottom: 1px solid rgba(0,0,0,0.06) !important; position: sticky !important; top: 0 !important; z-index: 100 !important; }',
+              '.fi-sidebar-header { padding-top: ${top + 16}px !important; }',
+              '.fi-body { background-color: #f8f9fa !important; }',
+
+              /* Sidebar / drawer — must stay above everything */
+              '.fi-sidebar-close-overlay { z-index: 200 !important; }',
+              '.fi-sidebar { z-index: 300 !important; }',
+              'aside.fi-sidebar { z-index: 300 !important; }',
+
+              /* Bottom nav — thick bar covering bottom safe area */
+              '.fi-bottom-nav, [class*="bottom-navigation"], nav.fixed.bottom-0, .fi-main-ctn > nav:last-child, .fi-layout > nav {',
+              '  padding-bottom: calc(${bottom}px + 8px) !important;',
+              '  padding-top: 8px !important;',
+              '  z-index: 90 !important;',
+              '  background: #ffffff !important;',
+              '  border-top: 1px solid rgba(0,0,0,0.08) !important;',
+              '  box-shadow: 0 -2px 10px rgba(0,0,0,0.04) !important;',
+              '}',
+              '.fi-bottom-nav a, .fi-bottom-nav button, nav.fixed.bottom-0 a, nav.fixed.bottom-0 button {',
+              '  padding: 4px 0 !important;',
+              '  min-height: 44px !important;',
+              '  display: flex !important;',
+              '  flex-direction: column !important;',
+              '  align-items: center !important;',
+              '  justify-content: center !important;',
+              '}',
+
+              /* Cards — cleaner on mobile */
+              '.fi-section { border-radius: 16px !important; overflow: hidden; }',
+              '.fi-wi-stats-overview-stat { border-radius: 14px !important; }',
+              '.fi-wi-chart { border-radius: 16px !important; }',
+
+              /* Main content — must not overlap topbar or drawer */
+              '.fi-main-ctn { position: relative; z-index: 1; }',
+
+              /* Smoother scrolling */
+              'html { -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }',
+
+              /* Hide scrollbars for native feel */
+              '::-webkit-scrollbar { display: none; }',
+              'body { -ms-overflow-style: none; scrollbar-width: none; }',
+            ].join('\\n');
+            document.head.appendChild(s);
+          }
+
+          function applyNativeSafeAreas() {
+            var topbar = document.querySelector('.fi-topbar');
+            if (topbar) topbar.style.paddingTop = '${top}px';
+            var sidebarHeader = document.querySelector('.fi-sidebar-header');
+            if (sidebarHeader) sidebarHeader.style.paddingTop = '${top + 16}px';
+          }
+          applyNativeSafeAreas();
+
           if (!window.__rnSafeAreaObserver) {
             window.__rnSafeAreaObserver = true;
             document.addEventListener('livewire:navigated', function() {
-              var tb = document.querySelector('.fi-topbar');
-              if (tb) tb.style.paddingTop = '${top}px';
-              var sh = document.querySelector('.fi-sidebar-header');
-              if (sh) sh.style.paddingTop = '${top + 16}px';
+              applyNativeSafeAreas();
+              injectBiometricSettings();
             });
           }
+
+          function injectBiometricSettings() {
+            if (!window.isNativeApp) return;
+            if (document.getElementById('__kh_biometric_section')) return;
+            var profileForm = document.querySelector('.fi-page-edit-profile-page form, [class*="profile"] form');
+            var menuPage = document.querySelector('.fi-page');
+            var target = profileForm || menuPage;
+            if (!target) return;
+            var logoutBtn = document.querySelector('form[action*="logout"] button, a[href*="logout"]');
+            if (!logoutBtn) return;
+
+            var section = document.createElement('div');
+            section.id = '__kh_biometric_section';
+            section.style.cssText = 'margin: 1rem 1rem 0; padding: 1rem; background: white; border-radius: 16px; border: 1px solid rgba(0,0,0,0.06);';
+            section.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between">'
+              + '<div><div style="font-weight:600;font-size:0.875rem;color:#1e293b">Verrouillage biométrique</div>'
+              + '<div id="__kh_bio_label" style="font-size:0.75rem;color:#64748b;margin-top:2px">Chargement...</div></div>'
+              + '<label style="position:relative;display:inline-block;width:48px;height:28px">'
+              + '<input type="checkbox" id="__kh_bio_toggle" style="opacity:0;width:0;height:0" />'
+              + '<span id="__kh_bio_slider" style="position:absolute;cursor:pointer;inset:0;background:#cbd5e1;border-radius:28px;transition:.3s"></span>'
+              + '<span id="__kh_bio_dot" style="position:absolute;height:22px;width:22px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,0.2)"></span>'
+              + '</label></div>';
+
+            var parent = logoutBtn.closest('.fi-page') || logoutBtn.parentElement?.parentElement;
+            if (parent) parent.insertBefore(section, logoutBtn.closest('form') || logoutBtn);
+            else document.body.appendChild(section);
+
+            window.KeyHomeBridge.getBiometricStatus();
+
+            var toggle = document.getElementById('__kh_bio_toggle');
+            toggle.addEventListener('change', function() {
+              window.KeyHomeBridge.setBiometric(toggle.checked);
+            });
+          }
+
+          window.addEventListener('message', function(e) {
+            try {
+              var msg = JSON.parse(e.data);
+              if (msg.type === 'BIOMETRIC_STATUS' || msg.type === 'BIOMETRIC_SET_RESULT') {
+                var d = msg.data || msg;
+                var label = document.getElementById('__kh_bio_label');
+                var toggle = document.getElementById('__kh_bio_toggle');
+                var slider = document.getElementById('__kh_bio_slider');
+                var dot = document.getElementById('__kh_bio_dot');
+                if (label && d.label) label.textContent = d.available ? d.label : 'Non disponible sur cet appareil';
+                if (toggle) { toggle.checked = !!d.enabled; toggle.disabled = !d.available; }
+                if (slider) slider.style.background = d.enabled ? '#10b981' : '#cbd5e1';
+                if (dot) dot.style.transform = d.enabled ? 'translateX(20px)' : 'translateX(0)';
+              }
+            } catch(ex) {}
+          });
+
+          injectBiometricSettings();
           true;
         })();
       `);
@@ -281,6 +429,9 @@ function AppContent() {
 
   const handleNavigationStateChange = useCallback((s: WebViewNavigation) => {
     setCanGoBack(s.canGoBack);
+    if (s.url && (s.url.includes('/logout') || s.url.endsWith('/login'))) {
+      OAuthService.clearAuthToken();
+    }
   }, []);
 
   const handleBiometricRetry = useCallback(async () => {
@@ -297,7 +448,7 @@ function AppContent() {
       <View style={[styles.biometricContainer, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <ExpoStatusBar style="dark" />
         <View style={styles.biometricContent}>
-          <Image source={require('./assets/icon.png')} style={styles.biometricLogo} tintColor={APP_CONFIG.primaryColor} />
+          <Image source={require('./assets/splash-icon.png')} style={styles.biometricLogo} />
           <Text style={styles.biometricTitle}>KeyHome Owner</Text>
           <Text style={styles.biometricSubtitle}>Authentification requise</Text>
           <Pressable
@@ -315,7 +466,7 @@ function AppContent() {
 
   return (
     <View style={styles.container}>
-      <ExpoStatusBar style={statusBarStyle} backgroundColor={APP_CONFIG.splashBg} translucent={false} />
+      <ExpoStatusBar style={statusBarStyle} translucent />
 
       {isOffline && (
         <View style={[styles.offlineBanner, { marginTop: insets.top }]}>
@@ -342,13 +493,15 @@ function AppContent() {
           domStorageEnabled
           cacheEnabled
           cacheMode="LOAD_DEFAULT"
+          sharedCookiesEnabled
+          thirdPartyCookiesEnabled
           allowFileAccess={false}
           allowsBackForwardNavigationGestures
-          pullToRefreshEnabled={false}
+          pullToRefreshEnabled
           scrollEnabled
           bounces={Platform.OS === 'ios'}
-          overScrollMode={Platform.OS === 'android' ? 'always' : undefined}
-          {...(Platform.OS === 'ios' && { dataDetectorTypes: ['phoneNumber', 'link'] })}
+          hideKeyboardAccessoryView
+          allowsInlineMediaPlayback
           injectedJavaScriptBeforeContentLoaded={injectedJs}
           originWhitelist={['https://*', 'http://localhost:*']}
           userAgent={USER_AGENT}
@@ -377,7 +530,7 @@ function AppContent() {
 
       {isLoading && !showSplash && !error && (
         <View style={styles.loaderContainer}>
-          <Image source={require('./assets/icon.png')} style={styles.loaderLogo} tintColor={APP_CONFIG.primaryColor} />
+          <Image source={require('./assets/splash-icon.png')} style={styles.loaderLogo} />
           <ActivityIndicator size="large" color={APP_CONFIG.primaryColor} />
         </View>
       )}
@@ -386,9 +539,8 @@ function AppContent() {
         <Animated.View style={[styles.splashContainer, { opacity: fadeAnim }]}>
           <View style={styles.splashContent}>
             <Animated.Image
-              source={require('./assets/icon.png')}
+              source={require('./assets/splash-icon.png')}
               style={[styles.splashLogo, { transform: [{ scale: scaleAnim }] }]}
-              tintColor={APP_CONFIG.primaryColor}
             />
             <Text style={styles.splashTitle}>KeyHome Owner</Text>
             <Text style={styles.splashSubtitle}>Gérez vos biens en toute sérénité</Text>

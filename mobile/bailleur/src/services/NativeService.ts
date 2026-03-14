@@ -6,6 +6,7 @@ import * as Notifications from 'expo-notifications';
 
 import { ALLOWED_ORIGINS } from '../config';
 import type { BridgeMessage, HapticStyle, WebViewRef } from '../types';
+import BiometricService from './BiometricService';
 import OAuthService from './OAuthService';
 
 Notifications.setNotificationHandler({
@@ -90,6 +91,15 @@ class NativeService {
           break;
         case 'HAPTIC':
           this.triggerHaptic((data?.style as HapticStyle) ?? 'light');
+          break;
+        case 'GET_BIOMETRIC_STATUS':
+          await this.sendBiometricStatus();
+          break;
+        case 'SET_BIOMETRIC':
+          await this.setBiometric(!!data?.enabled);
+          break;
+        case 'LOGOUT':
+          await this.handleLogout();
           break;
         case 'PAGE_LOADED':
         case 'PERFORMANCE_METRICS':
@@ -243,6 +253,31 @@ class NativeService {
         this.navigateWebViewTo(data.url);
       }
     });
+  }
+
+  private async sendBiometricStatus(): Promise<void> {
+    const available = await BiometricService.isAvailable();
+    const enabled = await BiometricService.isEnabled();
+    const label = await BiometricService.getBiometricLabel();
+    this.sendToWebView('BIOMETRIC_STATUS', { available, enabled, label });
+  }
+
+  private async setBiometric(enabled: boolean): Promise<void> {
+    if (enabled) {
+      const passed = await BiometricService.authenticate('Confirmez pour activer la biométrie');
+      if (!passed) {
+        this.sendToWebView('BIOMETRIC_SET_RESULT', { success: false, enabled: false, message: 'Authentification échouée' });
+        return;
+      }
+    }
+    await BiometricService.setEnabled(enabled);
+    const label = await BiometricService.getBiometricLabel();
+    this.sendToWebView('BIOMETRIC_SET_RESULT', { success: true, enabled, label });
+  }
+
+  private async handleLogout(): Promise<void> {
+    await OAuthService.clearAuthToken();
+    this.sendToWebView('LOGOUT_COMPLETE', {});
   }
 
   /**

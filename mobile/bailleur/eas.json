@@ -10,29 +10,24 @@
         "simulator": true
       },
       "env": {
-        "EXPO_PUBLIC_BASE_URL": "http://192.168.1.64:8000/owner"
+        "EXPO_PUBLIC_BASE_URL": "http://owner.keyhome.test"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_BASE_URL": "https://api.keyhome.neocraft.dev/owner"
+        "EXPO_PUBLIC_BASE_URL": "https://owner.keyhome.neocraft.dev"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_BASE_URL": "https://api.keyhome.neocraft.dev/owner"
+        "EXPO_PUBLIC_BASE_URL": "https://owner.keyhome.neocraft.dev"
       }
     }
   },
   "submit": {
     "production": {
-      "ios": {
-        "appleId": "",
-        "ascAppId": "",
-        "appleTeamId": ""
-      },
       "android": {
         "track": "internal"
       }
