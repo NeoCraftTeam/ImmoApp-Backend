@@ -66,7 +66,8 @@ RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framewor
     && cp .env.example .env 2>/dev/null || true
 
 # Installation des dépendances (SANS les tests/dev)
-RUN composer install --no-dev --optimize-autoloader --no-interaction
+# --no-scripts évite package:discover qui boot Laravel et tente une connexion DB (PostgreSQL absent au build)
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
 
 # Build des assets Vite (Filament theme CSS + JS)
 RUN npm ci && npm run build && npm cache clean --force
