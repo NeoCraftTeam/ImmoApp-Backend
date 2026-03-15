@@ -36,6 +36,7 @@ services:
       - keyhome-network
     environment:
       - DB_HOST=db
+      - DB_SSLMODE=prefer
       - REDIS_HOST=redis
       - APP_ENV=${APP_ENV:-production}
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
@@ -80,6 +81,7 @@ services:
     networks:
       - keyhome-network
     environment:
+      - DB_SSLMODE=prefer
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
 
@@ -112,6 +114,7 @@ services:
     networks:
       - keyhome-network
     environment:
+      - DB_SSLMODE=prefer
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
 

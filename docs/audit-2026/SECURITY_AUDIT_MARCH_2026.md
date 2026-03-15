@@ -504,7 +504,7 @@ The **high-priority items** around token expiration, race conditions in point cr
 |-----|-----------|----------|--------|-------|
 | G-1 | C, I | High | ✅ Done | `TRUSTED_PROXIES` restricted to IP/CIDR list; default `127.0.0.1` |
 | G-2 | A | Critical | ✅ Done | `spatie/laravel-backup` — daily DB + files at 02:00; `BACKUP_DISKS` for offsite |
-| G-3 | C | High | ✅ Doc | `DB_SSLMODE=require` documented in `.env.example` for production |
+| G-3 | C | High | ✅ Doc | `DB_SSLMODE=require` for external DB only; use `prefer` for Docker (DB on same network) |
 | G-4 | C | Medium | ✅ Done | `ProxyCorsHeaders` restricts CORS on tour/media proxies to `PROXY_CORS_ORIGINS` |
 | G-5 | C, I, A | Medium | 📋 Infra | Add Cloudflare WAF or ModSecurity in front of Traefik |
 | G-6 | A | High | 📋 Infra | Plan multi-node (Docker Swarm/K8s); at minimum separate DB server |

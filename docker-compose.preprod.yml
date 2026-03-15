@@ -38,6 +38,7 @@ services:
       - keyhome-prod-network
     environment:
       - APP_ENV=${APP_ENV:-staging}
+      - DB_SSLMODE=prefer
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
     # FIX: healthcheck manquant — web et worker ne peuvent pas dépendre de app proprement sans ça
@@ -75,6 +76,7 @@ services:
       - preprod-network
       - keyhome-prod-network
     environment:
+      - DB_SSLMODE=prefer
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
 
