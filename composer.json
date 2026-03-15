@@ -40,6 +40,7 @@
         "sentry/sentry-laravel": "^4.20",
         "socialiteproviders/apple": "^5.9",
         "spatie/laravel-activitylog": "^4.11",
+        "spatie/laravel-backup": "^10.0",
         "spatie/laravel-medialibrary": "^11.14"
     },
     "require-dev": {
