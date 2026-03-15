@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Providers;
 
 // use App\Listeners\SendEmailVerificationNotification;
+use App\Listeners\SendBackupByEmailListener;
 use App\Listeners\SendWelcomeNotification;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use SocialiteProviders\Apple\AppleExtendSocialite;
 use SocialiteProviders\Manager\SocialiteWasCalled;
+use Spatie\Backup\Events\BackupZipWasCreated;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -33,6 +35,11 @@ class EventServiceProvider extends ServiceProvider
         // Socialite Apple Provider
         SocialiteWasCalled::class => [
             AppleExtendSocialite::class.'@handle',
+        ],
+
+        // Backup: send zip by email when enabled
+        BackupZipWasCreated::class => [
+            SendBackupByEmailListener::class,
         ],
     ];
 
