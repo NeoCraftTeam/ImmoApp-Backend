@@ -113,6 +113,36 @@ php artisan make:upload-attributes --fresh
 docker compose exec app php artisan make:upload-attributes
 ```
 
+### Backups (spatie/laravel-backup)
+
+Les backups (base de données + fichiers) sont planifiés quotidiennement à 02:00. Configuration via `BACKUP_DISKS`, `BACKUP_NOTIFICATION_MAIL` et `BACKUP_SEND_BY_MAIL` dans `.env`.
+
+Pour recevoir le fichier de backup par email : `BACKUP_SEND_BY_MAIL=true`. La pièce jointe est ignorée si le fichier dépasse `BACKUP_MAIL_MAX_SIZE_MB` (défaut 20 MB, limite courante des fournisseurs email).
+
+```bash
+# Backup complet (DB + fichiers)
+php artisan backup:run
+
+# Backup base de données uniquement
+php artisan backup:run --only-db
+
+# Backup fichiers uniquement
+php artisan backup:run --only-files
+
+# Lister les backups existants
+php artisan backup:list
+
+# Nettoyer les anciens backups (selon la rétention configurée)
+php artisan backup:clean
+```
+
+**En production (Docker) :**
+```bash
+docker compose exec app php artisan backup:run
+```
+
+> Les backups planifiés nécessitent que le scheduler Laravel soit exécuté par cron : `* * * * * cd /path/to/project && php artisan schedule:run >> /dev/null 2>&1`
+
 ### Meilisearch
 
 ```bash
