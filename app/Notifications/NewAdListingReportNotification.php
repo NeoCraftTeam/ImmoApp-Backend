@@ -10,17 +10,13 @@ use App\Models\AdReport;
 use App\Support\PanelUrl;
 use Filament\Actions\Action as FilamentAction;
 use Filament\Notifications\Notification as FilamentNotification;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Notifications\Notification;
 use NotificationChannels\WebPush\WebPushChannel;
 use NotificationChannels\WebPush\WebPushMessage;
 
-class NewAdListingReportNotification extends Notification implements ShouldQueue
+class NewAdListingReportNotification extends Notification
 {
-    use Queueable;
-
     public function __construct(
         public AdReport $report,
     ) {}
@@ -48,10 +44,14 @@ class NewAdListingReportNotification extends Notification implements ShouldQueue
     public function toDatabase(object $notifiable): array
     {
         $url = $this->resolveReviewUrl();
+        $body = "Annonce \"{$this->report->ad->title}\" signalee par {$this->report->reporter->fullname}.";
+        if (filled($this->report->description)) {
+            $body .= "\n\nMessage du client: {$this->report->description}";
+        }
 
         return FilamentNotification::make()
             ->title('Nouveau signalement annonce')
-            ->body("Annonce \"{$this->report->ad->title}\" signalee par {$this->report->reporter->fullname}.")
+            ->body($body)
             ->warning()
             ->icon('heroicon-o-flag')
             ->actions([

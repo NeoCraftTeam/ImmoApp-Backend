@@ -115,13 +115,22 @@ it('forgotPassword always returns 200 for unknown email', function (): void {
 
 // ── Welcome email déclenché par Verified event ─────────────────────────────────────────
 
-it('queues WelcomeEmail when the Verified event fires', function (): void {
+it('queues WelcomeEmail when the Verified event fires for customer', function (): void {
     Mail::fake();
-    $user = User::factory()->unverified()->create();
+    $user = User::factory()->unverified()->customers()->create();
 
     event(new Verified($user));
 
     Mail::assertQueued(WelcomeEmail::class, fn ($m) => $m->hasTo($user->email));
+});
+
+it('queues AdminWelcomeEmail when the Verified event fires for admin', function (): void {
+    Mail::fake();
+    $user = User::factory()->unverified()->admin()->create();
+
+    event(new Verified($user));
+
+    Mail::assertQueued(\App\Mail\AdminWelcomeEmail::class, fn ($m) => $m->hasTo($user->email));
 });
 
 // ── sendEmailVerificationNotification utilise VerifyEmailMail ─────────────────────────
@@ -138,7 +147,7 @@ it('sendEmailVerificationNotification queues VerificationCodeMail with OTP', fun
 
 // ── CreateAdminCommand ────────────────────────────────────────────────────────────────
 
-it('create-admin command creates an unverified admin and sends VerificationCodeMail', function (): void {
+it('create-admin command creates an unverified admin and sends VerifyEmailMail', function (): void {
     Mail::fake();
 
     $this->artisan('app:create-admin', [
@@ -152,9 +161,10 @@ it('create-admin command creates an unverified admin and sends VerificationCodeM
 
     expect($user)->not->toBeNull()
         ->and($user->email_verified_at)->toBeNull()
-        ->and($user->role->value)->toBe('admin');
+        ->and($user->role->value)->toBe('admin')
+        ->and($user->must_change_password_at)->not->toBeNull();
 
-    Mail::assertQueued(VerificationCodeMail::class, fn ($m) => $m->hasTo('newadmin@keyhome.test'));
+    Mail::assertQueued(\App\Mail\VerifyEmailMail::class, fn ($m) => $m->hasTo('newadmin@keyhome.test'));
 });
 
 it('create-admin command promotes existing user without sending verification', function (): void {

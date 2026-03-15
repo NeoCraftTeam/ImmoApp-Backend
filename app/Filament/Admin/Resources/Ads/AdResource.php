@@ -139,20 +139,4 @@ class AdResource extends Resource
                 SoftDeletingScope::class,
             ]);
     }
-
-    public static function getNavigationBadge(): ?string
-    {
-        return (string) static::getModel()::count();
-    }
-
-    public static function getNavigationBadgeColor(): ?string
-    {
-        return 'gray';
-    }
-
-    #[\Override]
-    public static function getNavigationBadgeTooltip(): ?string
-    {
-        return 'Nombre total d\'annonces';
-    }
 }

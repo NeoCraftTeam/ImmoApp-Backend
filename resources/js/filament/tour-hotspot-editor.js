@@ -486,43 +486,44 @@
         });
 
         saveHotspotsBtn?.addEventListener('click', async () => {
-            const scene = activeScene();
-            if (!scene || !propertyId) return;
-            normalizeHotspotsForScene(scene);
+            if (!propertyId) return;
+            state.scenes.forEach((s) => normalizeHotspotsForScene(s));
             saveHotspotsBtn.disabled = true;
             setFeedback('Sauvegarde en cours...');
             try {
-                const payloadHotspots = scene.hotspots.map((hotspot) => ({
-                    pitch: Number(hotspot.pitch),
-                    yaw: Number(hotspot.yaw),
-                    target_scene: String(hotspot.target_scene || ''),
-                    label: String(hotspot.label || '').trim(),
-                }));
-
-                const response = await fetch(`/panel-api/v1/ads/${propertyId}/tour/scenes/${scene.id}/hotspots`, {
-                    method: 'PATCH',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        Accept: 'application/json',
-                        'X-CSRF-TOKEN': csrfToken,
-                    },
-                    credentials: 'same-origin',
-                    body: JSON.stringify({ hotspots: payloadHotspots }),
-                });
-                if (!response.ok) {
-                    let details = '';
-                    try {
-                        const json = await response.json();
-                        const firstError = Object.values(json?.errors || {})?.[0];
-                        if (Array.isArray(firstError) && firstError[0]) {
-                            details = `: ${firstError[0]}`;
-                        }
-                    } catch (_) {
-                        // noop
+                const results = await Promise.allSettled(
+                    state.scenes.map((scene) => {
+                        const payloadHotspots = (scene.hotspots ?? []).map((hotspot) => ({
+                            pitch: Number(hotspot.pitch),
+                            yaw: Number(hotspot.yaw),
+                            target_scene: String(hotspot.target_scene || ''),
+                            label: String(hotspot.label || '').trim(),
+                        }));
+                        return fetch(`/panel-api/v1/ads/${propertyId}/tour/scenes/${scene.id}/hotspots`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                Accept: 'application/json',
+                                'X-CSRF-TOKEN': csrfToken,
+                            },
+                            credentials: 'same-origin',
+                            body: JSON.stringify({ hotspots: payloadHotspots }),
+                        });
+                    }),
+                );
+                const failed = results.filter((r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.ok));
+                if (failed.length > 0) {
+                    const firstRejection = results.find((r) => r.status === 'rejected');
+                    const firstBadResponse = results.find((r) => r.status === 'fulfilled' && r.value && !r.value.ok);
+                    let msg = `Erreur: ${failed.length} scène(s) non sauvegardée(s).`;
+                    if (firstRejection?.reason) {
+                        msg = firstRejection.reason?.message ?? String(firstRejection.reason);
+                    } else if (firstBadResponse?.value) {
+                        msg = `HTTP ${firstBadResponse.value.status}`;
                     }
-                    throw new Error(`HTTP ${response.status}${details}`);
+                    throw new Error(msg);
                 }
-                setFeedback(' Liens sauvegardés avec succès.', 'success');
+                setFeedback('Tous les liens ont été sauvegardés avec succès.', 'success');
             } catch (error) {
                 setFeedback(`Erreur lors de la sauvegarde: ${error?.message || 'inconnue'}`, 'error');
             } finally {

@@ -36,17 +36,43 @@ final class VerifyEmailController
 
     protected function showSuccessPage(User $user)
     {
-        // Déterminer l'URL de redirection en fonction du type d'utilisateur
-        $loginUrl = url('/admin/login');
-
-        if ($user->type === UserType::AGENCY) {
-            $loginUrl = url('/agency/login');
-        } elseif ($user->type === UserType::INDIVIDUAL) {
-            $loginUrl = url('/owner/login');
-        }
+        $loginUrl = $this->buildLoginUrl($user);
 
         return view('auth.verified', [
             'loginUrl' => $loginUrl,
+            'isAdmin' => $user->role === \App\Enums\UserRole::ADMIN,
         ]);
+    }
+
+    protected function buildLoginUrl(User $user): string
+    {
+        if ($user->role === \App\Enums\UserRole::ADMIN) {
+            $domain = config('filament.panels.admin_domain');
+            if ($domain) {
+                return 'https://'.$domain.'/login';
+            }
+
+            return url('/admin/login');
+        }
+
+        if ($user->type === UserType::AGENCY) {
+            $domain = config('filament.panels.agency_domain');
+            if ($domain) {
+                return 'https://'.$domain.'/login';
+            }
+
+            return url('/agency/login');
+        }
+
+        if ($user->type === UserType::INDIVIDUAL) {
+            $domain = config('filament.panels.owner_domain');
+            if ($domain) {
+                return 'https://'.$domain.'/login';
+            }
+
+            return url('/owner/login');
+        }
+
+        return url('/admin/login');
     }
 }

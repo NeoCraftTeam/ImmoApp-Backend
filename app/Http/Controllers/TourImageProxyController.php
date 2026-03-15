@@ -118,22 +118,26 @@ class TourImageProxyController
         }
 
         // Resolve the storage path — new structure first, legacy path as fallback.
+        $disk = Storage::disk(config('filesystems.tour_disk', config('filesystems.default')));
         $newPath = 'ads/'.$adId.'/tours/'.$normalizedPath;
         $legacyPath = 'tours/'.$adId.'/'.$normalizedPath;
-        $r2path = Storage::disk()->exists($newPath) ? $newPath : $legacyPath;
+        $r2path = $disk->exists($newPath) ? $newPath : $legacyPath;
 
-        if (!Storage::disk()->exists($r2path)) {
+        if (!$disk->exists($r2path)) {
             return response('Not Found', 404, [
                 'Access-Control-Allow-Origin' => '*',
                 'Access-Control-Allow-Methods' => 'GET, HEAD',
             ]);
         }
 
-        $mime = Storage::disk()->mimeType($r2path) ?: 'image/webp';
-        $size = Storage::disk()->size($r2path);
+        // Always stream instead of redirecting to R2. Pannellum loads images via XHR;
+        // a redirect to R2 would return a response without CORS headers, causing
+        // "The file could not be accessed" in the hotspot editor.
+        $mime = $disk->mimeType($r2path) ?: 'image/webp';
+        $size = $disk->size($r2path);
 
-        return response()->stream(function () use ($r2path): void {
-            $stream = Storage::disk()->readStream($r2path);
+        return response()->stream(function () use ($disk, $r2path): void {
+            $stream = $disk->readStream($r2path);
             if ($stream) {
                 fpassthru($stream);
                 fclose($stream);

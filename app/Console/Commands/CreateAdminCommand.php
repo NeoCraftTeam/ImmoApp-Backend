@@ -83,15 +83,17 @@ class CreateAdminCommand extends Command
             'email' => $email,
             'password' => $password,
         ]);
-        $user->forceFill(['role' => UserRole::ADMIN]);
+        $user->forceFill([
+            'role' => UserRole::ADMIN,
+            'must_change_password_at' => now(),
+        ]);
         $user->save();
 
-        // Align with app-wide OTP verification flow.
-        $user->sendEmailVerificationNotification();
+        $user->sendAdminVerificationEmail();
 
         $this->info("✅ Admin created: {$user->email} (ID: {$user->id})");
-        $this->info(" A verification email has been sent to {$user->email}.");
-        $this->line('   The admin will receive a welcome email automatically after verifying their address.');
+        $this->info(" A verification link has been sent to {$user->email}.");
+        $this->line('   After verification, the admin must change their password and configure 2FA.');
 
         return self::SUCCESS;
     }

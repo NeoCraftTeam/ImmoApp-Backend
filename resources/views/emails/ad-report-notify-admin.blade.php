@@ -31,10 +31,11 @@
                 <p style="margin:6px 0 0 0; font-size:14px; color:#0f172a;">
                     Motif: <strong>{{ $report->reason->getLabel() }}</strong>
                 </p>
-                @if($report->description)
-                    <p style="margin:10px 0 0 0; font-size:13px; color:#475569;">
-                        Note: {{ $report->description }}
+                @if(filled($report->description))
+                    <p style="margin:10px 0 0 0; font-size:13px; font-weight:600; color:#0f172a;">
+                        Message du client:
                     </p>
+                    <p style="margin:4px 0 0 0; font-size:13px; color:#475569; white-space:pre-wrap;">{{ $report->description }}</p>
                 @endif
             </td>
         </tr>

@@ -26,7 +26,9 @@ class ProcessTourSceneJob implements ShouldQueue
         public readonly string $sceneId,
         public readonly string $panoramaType,
         public readonly string $sourceR2Path,
-    ) {}
+    ) {
+        $this->onQueue('tours');
+    }
 
     public function handle(PanoramaProcessor $processor): void
     {

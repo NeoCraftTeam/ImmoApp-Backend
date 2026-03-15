@@ -71,6 +71,20 @@ class AdReportService
             ->where('email', '!=', '')
             ->get();
 
+        if (config('mail.default') === 'log') {
+            Log::warning('Ad report admin emails: MAIL_MAILER=log — emails are written to storage/logs, not sent. Configure SMTP (MAIL_MAILER=smtp) to deliver emails.', [
+                'report_id' => $report->id,
+            ]);
+        }
+
+        if ($admins->isEmpty()) {
+            Log::warning('Ad report admin emails: no active admins with valid email found.', [
+                'report_id' => $report->id,
+            ]);
+
+            return;
+        }
+
         foreach ($admins as $admin) {
             if (!$this->isDeliverableEmail($admin->email)) {
                 Log::warning('Skipping ad report admin email due to undeliverable address.', [

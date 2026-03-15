@@ -37,6 +37,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->ensureLivewireTmpDirectoryExists();
+
         // Prevent N+1 queries in dev/testing — throws exception on lazy loading
         Model::preventLazyLoading(!app()->isProduction());
 
@@ -73,10 +75,10 @@ class AppServiceProvider extends ServiceProvider
 
         VerifyEmail::createUrlUsing(function (object $notifiable) {
             $domain = match (true) {
-                $notifiable->role === UserRole::ADMIN => config('filament.domains.admin_domain'),
-                $notifiable->type === UserType::AGENCY => config('filament.domains.agency_domain'),
-                $notifiable->type === UserType::INDIVIDUAL => config('filament.domains.owner_domain'),
-                default => config('filament.domains.admin_domain'),
+                $notifiable->role === UserRole::ADMIN => config('filament.panels.admin_domain'),
+                $notifiable->type === UserType::AGENCY => config('filament.panels.agency_domain'),
+                $notifiable->type === UserType::INDIVIDUAL => config('filament.panels.owner_domain'),
+                default => config('filament.panels.admin_domain'),
             };
 
             $rootUrl = $domain ? "https://{$domain}" : config('app.url');
@@ -95,5 +97,18 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Gate::define('viewPulse', fn (?\App\Models\User $user = null) => $user?->isAdmin() ?? false);
+    }
+
+    private function ensureLivewireTmpDirectoryExists(): void
+    {
+        $tmpDisk = config('livewire.temporary_file_upload.disk', 'tmp');
+        if ($tmpDisk !== 'tmp') {
+            return;
+        }
+
+        $dir = storage_path('app/tmp/livewire-tmp');
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
     }
 }

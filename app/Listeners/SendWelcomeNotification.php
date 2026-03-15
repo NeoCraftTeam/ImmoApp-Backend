@@ -7,11 +7,13 @@ declare(strict_types=1);
 namespace App\Listeners;
 
 use App\Enums\UserRole;
+use App\Mail\AdminWelcomeEmail;
 use App\Mail\WelcomeEmail;
 use Exception;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
@@ -27,6 +29,14 @@ class SendWelcomeNotification implements ShouldQueue
         /** @var \App\Models\User $user */
         $user = $event->user;
 
+        $cacheKey = 'welcome_email_sent_'.$user->id;
+        if (Cache::has($cacheKey)) {
+            Log::info('Welcome email already sent recently, skipping duplicate', ['user_id' => $user->id]);
+
+            return;
+        }
+        Cache::put($cacheKey, true, now()->addMinutes(5));
+
         try {
             // 1. Logger la vérification
             Log::info('User email verified - triggering welcome actions', [
@@ -36,9 +46,13 @@ class SendWelcomeNotification implements ShouldQueue
                 'role' => $user->role ?? 'unknown',
             ]);
 
-            // 2. Envoyer email de bienvenue
-            Mail::to($user->email, $user->firstname)->queue(new WelcomeEmail($user));
-            Log::info('Welcome email queued', ['user_id' => $user->id]);
+            // 2. Envoyer email de bienvenue (adapté au rôle)
+            if ($user->role === UserRole::ADMIN) {
+                Mail::to($user->email, $user->firstname)->queue(new AdminWelcomeEmail($user));
+            } else {
+                Mail::to($user->email, $user->firstname)->queue(new WelcomeEmail($user));
+            }
+            Log::info('Welcome email queued', ['user_id' => $user->id, 'role' => $user->role->value]);
 
             // 3. Autres actions automatiques que tu peux ajouter :
 

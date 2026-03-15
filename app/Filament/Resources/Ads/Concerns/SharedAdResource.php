@@ -139,6 +139,7 @@ trait SharedAdResource
                                 'url' => route('media.proxy', ['uuid' => $media->uuid]),
                             ];
                         })
+                        ->hint('Sur iPhone : Réglages > Appareil photo > Formats > « Photos plus compatibles »')
                         ->extraAttributes([
                             'data-native-image' => 'true',
                             'data-native-image-camera' => 'true',
@@ -873,14 +874,20 @@ trait SharedAdResource
                                         FileUpload::make('image_path')
                                             ->label('Photo 360°')
                                             ->image()
+                                            ->acceptedFileTypes(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
+                                            ->mimeTypeMap([
+                                                'jpeg' => 'image/jpeg',
+                                                'jpg' => 'image/jpeg',
+                                                'png' => 'image/png',
+                                                'webp' => 'image/webp',
+                                            ])
                                             ->disk(config('filesystems.default'))
                                             ->fetchFileInformation(false)
                                             ->directory(fn (?Ad $record) => $record ? "ads/{$record->id}/tours" : 'ads/temp/tours')
                                             ->required()
-                                            ->maxSize(30720)
                                             ->imagePreviewHeight('120')
                                             ->columnSpanFull()
-                                            ->hint('Format panoramique 2:1 recommandé')
+                                            ->hint('Format panoramique 2:1 recommandé. Max 30 Mo (limité par Livewire à 120 Mo).')
                                             ->getUploadedFileUsing(function ($component, string $file, $storedFileNames): array {
                                                 // Build a proxy URL so existing R2 uploads render a live preview.
                                                 // Supports both new path (ads/{adId}/tours/...) and legacy (tours/{adId}/...).
@@ -906,10 +913,11 @@ trait SharedAdResource
                                                 $filename = Str::ulid().'.webp';
                                                 $path = "{$directory}/{$filename}";
 
-                                                $webp = ImageManager::gd()
-                                                    ->read($file->getRealPath())
-                                                    ->toWebp(quality: 82)
-                                                    ->toString();
+                                                $image = ImageManager::gd()->read($file->getRealPath());
+                                                if ($image->width() > 4096) {
+                                                    $image->scale(width: 4096);
+                                                }
+                                                $webp = $image->toWebp(quality: 80)->toString();
 
                                                 Storage::disk()->put($path, $webp);
 

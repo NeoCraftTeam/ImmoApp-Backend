@@ -87,7 +87,7 @@
         </div>
 
         <button type="button" data-save-hotspots style="width:50%; margin:0 auto; padding:.75rem; background:#16a34a; color:#fff; font-weight:700; border:none; border-radius:.75rem; cursor:pointer;">
-            Sauvegarder
+            Sauvegarder tous les liens
         </button>
 
         <p data-feedback style="text-align:center; font-size:.875rem; color:#4b5563;"></p>

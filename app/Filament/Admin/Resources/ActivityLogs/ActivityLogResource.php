@@ -247,24 +247,6 @@ class ActivityLogResource extends Resource
         ];
     }
 
-    public static function getNavigationBadge(): ?string
-    {
-        $count = static::getEloquentQuery()->whereDate('created_at', today())->count();
-
-        return $count > 0 ? (string) $count : null;
-    }
-
-    public static function getNavigationBadgeColor(): ?string
-    {
-        return 'warning';
-    }
-
-    #[\Override]
-    public static function getNavigationBadgeTooltip(): ?string
-    {
-        return 'Activités admin aujourd\'hui';
-    }
-
     /**
      * Render a combined diff table showing old → new values side by side.
      *

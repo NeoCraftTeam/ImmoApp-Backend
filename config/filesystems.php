@@ -17,6 +17,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Tour Storage Disk
+    |--------------------------------------------------------------------------
+    |
+    | Disk used for 3D tour assets (R2 in production). When S3-compatible,
+    | the proxy redirects to signed URLs instead of streaming through PHP.
+    |
+    */
+    'tour_disk' => env('TOUR_STORAGE_DISK', env('FILESYSTEM_DISK', 'local')),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

@@ -59,15 +59,4 @@ class PointPackageResource extends Resource
             'edit' => EditPointPackage::route('/{record}/edit'),
         ];
     }
-
-    public static function getNavigationBadge(): ?string
-    {
-        return (string) static::getModel()::count();
-    }
-
-    #[\Override]
-    public static function getNavigationBadgeTooltip(): ?string
-    {
-        return 'Nombre de packs';
-    }
 }

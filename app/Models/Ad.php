@@ -99,6 +99,9 @@ class Ad extends Model implements HasMedia
 
     protected $table = 'ad';
 
+    /**
+     * SEC-006: status excluded — use transitionTo() or forceFill() only.
+     */
     protected $fillable = [
         'title',
         'slug',
@@ -110,7 +113,6 @@ class Ad extends Model implements HasMedia
         'bathrooms',
         'has_parking',
         'location',
-        'status',
         'is_visible',
         'available_from',
         'available_to',
@@ -192,6 +194,11 @@ class Ad extends Model implements HasMedia
             // Automatiquement lier l'agence de l'utilisateur créateur
             if (empty($ad->agency_id)) {
                 $ad->agency_id = auth()->user()?->agency_id;
+            }
+
+            // Default status when not set (status is not fillable for security)
+            if (empty($ad->status)) {
+                $ad->status = AdStatus::PENDING;
             }
         });
 

@@ -55,11 +55,14 @@ class PaymentImporter extends Importer
         return $body;
     }
 
+    /**
+     * SEC-002: Admin import sets status/amount/transaction_id — use unguarded for this trusted context.
+     */
     #[\Override]
     public function resolveRecord(): Payment
     {
-        return Payment::firstOrNew([
-            'transaction_id' => $this->data['transaction_id'],
-        ]);
+        return Payment::unguarded(fn () => Payment::firstOrNew([
+            'transaction_id' => $this->data['transaction_id'] ?? null,
+        ]));
     }
 }

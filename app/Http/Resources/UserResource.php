@@ -62,7 +62,12 @@ final class UserResource extends JsonResource
             'created_at' => $this->when($request->user()?->isAdmin(), $this->created_at),
             'updated_at' => $this->when($request->user()?->isAdmin(), $this->updated_at),
             'city_id' => $this->city_id,
-            'city_name' => $this->whenLoaded('city', fn () => $this->city->name),
+            'city_name' => $this->when(
+                !empty($this->city_id),
+                fn () => $this->relationLoaded('city')
+                    ? $this->city->name
+                    : \App\Models\City::find($this->city_id)?->name
+            ),
             'point_balance' => $this->when(
                 $request->user()?->id === $this->id,
                 (int) $this->point_balance

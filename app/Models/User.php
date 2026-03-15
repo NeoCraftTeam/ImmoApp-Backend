@@ -10,6 +10,7 @@ use App\Enums\PointTransactionType;
 use App\Enums\UserRole;
 use App\Enums\UserType;
 use App\Mail\VerificationCodeMail;
+use App\Mail\VerifyEmailMail;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\UserFactory;
 use Eloquent;
@@ -35,6 +36,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use InvalidArgumentException;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -107,6 +109,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property string|null $last_login_city
  * @property bool $is_active
  * @property Carbon|null $onboarding_completed_at
+ * @property Carbon|null $must_change_password_at
  * @property-read City|null $city
  * @property-read MediaCollection<int, Media> $media
  * @property-read Collection<int, Review> $reviews
@@ -154,6 +157,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'oauth_avatar',
         'onboarding_completed_at',
         'registration_ip',
+        'must_change_password_at',
     ];
 
     /**
@@ -487,6 +491,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'app_authentication_recovery_codes' => 'encrypted:array',
             'has_email_authentication' => 'boolean',
             'onboarding_completed_at' => 'datetime',
+            'must_change_password_at' => 'datetime',
         ];
     }
 
@@ -531,5 +536,35 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
         Mail::to($this->email, $this->firstname)
             ->queue(new VerificationCodeMail($otp, $requestedFrom, $requestedAt));
+    }
+
+    /**
+     * Send a verification link by email for admin users (instead of OTP).
+     * Used when creating an admin via app:create-admin.
+     */
+    public function sendAdminVerificationEmail(): void
+    {
+        $ttlMinutes = (int) config('auth.verification.expire', 60);
+
+        URL::forceRootUrl(config('app.url'));
+
+        $verificationUrl = URL::temporarySignedRoute(
+            'verification.verify',
+            now()->addMinutes($ttlMinutes),
+            ['id' => $this->getKey(), 'hash' => sha1((string) $this->getEmailForVerification())],
+        );
+
+        URL::forceRootUrl(config('app.url'));
+
+        $requestedFrom = request()->ip() ?? 'inconnu';
+        $requestedAt = now()->translatedFormat('d F Y à H:i');
+
+        Mail::to($this->email, $this->firstname)
+            ->queue(new VerifyEmailMail($verificationUrl, $ttlMinutes, $requestedFrom, $requestedAt));
+    }
+
+    public function hasMustChangePassword(): bool
+    {
+        return $this->must_change_password_at !== null;
     }
 }

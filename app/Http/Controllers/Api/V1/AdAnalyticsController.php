@@ -362,35 +362,36 @@ final class AdAnalyticsController
      */
     private function computeTopAds($adIds, $since, int $limit): array
     {
-        // Get view counts per ad
-        $viewCounts = AdInteraction::whereIn('ad_id', $adIds)
+        // Single batched query: views, favorites, unlocks per ad
+        $rows = AdInteraction::whereIn('ad_id', $adIds)
             ->where('created_at', '>=', $since)
-            ->where('type', AdInteraction::TYPE_VIEW)
-            ->selectRaw('ad_id, COUNT(*) as views')
+            ->whereIn('type', [
+                AdInteraction::TYPE_VIEW,
+                AdInteraction::TYPE_FAVORITE,
+                AdInteraction::TYPE_UNLOCK,
+            ])
+            ->selectRaw('
+                ad_id,
+                SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as views,
+                SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as favs,
+                SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as unlocks
+            ', [
+                AdInteraction::TYPE_VIEW,
+                AdInteraction::TYPE_FAVORITE,
+                AdInteraction::TYPE_UNLOCK,
+            ])
             ->groupBy('ad_id')
             ->orderByDesc('views')
             ->limit($limit)
-            ->pluck('views', 'ad_id');
+            ->get();
 
-        if ($viewCounts->isEmpty()) {
+        if ($rows->isEmpty()) {
             return [];
         }
 
-        // Get favorite counts
-        $favCounts = AdInteraction::whereIn('ad_id', $viewCounts->keys())
-            ->where('created_at', '>=', $since)
-            ->where('type', AdInteraction::TYPE_FAVORITE)
-            ->selectRaw('ad_id, COUNT(*) as favs')
-            ->groupBy('ad_id')
-            ->pluck('favs', 'ad_id');
-
-        // Get unlock counts
-        $unlockCounts = AdInteraction::whereIn('ad_id', $viewCounts->keys())
-            ->where('created_at', '>=', $since)
-            ->where('type', AdInteraction::TYPE_UNLOCK)
-            ->selectRaw('ad_id, COUNT(*) as unlocks')
-            ->groupBy('ad_id')
-            ->pluck('unlocks', 'ad_id');
+        $viewCounts = $rows->pluck('views', 'ad_id');
+        $favCounts = $rows->pluck('favs', 'ad_id');
+        $unlockCounts = $rows->pluck('unlocks', 'ad_id');
 
         // Load ads
         $ads = Ad::whereIn('id', $viewCounts->keys())->get()->keyBy('id');

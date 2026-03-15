@@ -64,6 +64,10 @@ class Payment extends Model
 {
     use HasFactory, HasUuids, LogsActivity, SoftDeletes;
 
+    /**
+     * SEC-002: status, amount, transaction_id excluded — set only via PaymentService
+     * or forceFill() to prevent mass-assignment fraud.
+     */
     protected $fillable = [
         'type',
         'payment_method',
@@ -76,9 +80,6 @@ class Payment extends Model
         'payment_link',
         'gateway_response',
         'phone_number',
-        'transaction_id',
-        'amount',
-        'status',
     ];
 
     protected $hidden = [

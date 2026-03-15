@@ -93,7 +93,7 @@ class AdminPanelProvider extends PanelProvider
             ->collapsibleNavigationGroups(true)
             ->navigationGroups([
                 \Filament\Navigation\NavigationGroup::make('Annonces')
-                    ->icon('heroicon-o-home'),
+                    ->icon('heroicon-o-megaphone'),
                 \Filament\Navigation\NavigationGroup::make('Villes & Quartiers')
                     ->icon('heroicon-o-map-pin'),
                 \Filament\Navigation\NavigationGroup::make('Utilisateurs')
@@ -117,6 +117,7 @@ class AdminPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Admin/Pages'), for: 'App\Filament\Admin\Pages')
             ->pages([
                 Dashboard::class,
+                \App\Filament\Admin\Pages\ForcePasswordChange::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Admin/Widgets'), for: 'App\Filament\Admin\Widgets')
             ->widgets([
@@ -137,6 +138,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                \App\Http\Middleware\RequirePasswordChange::class,
             ])
             ->plugins([
                 MobileBottomNav::make()

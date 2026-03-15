@@ -83,6 +83,38 @@ services:
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
 
+  worker-tours:
+    image: ${APP_IMAGE:-keyhome-backend}
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-worker-tours
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan queue:work --queue=tours --tries=2 --timeout=900 --memory=512
+    depends_on:
+      code-sync:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      app:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - keyhome-app-code:/var/www
+      - keyhome-storage-data:/var/www/storage
+      - ./.env:/var/www/.env
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'queue:work' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - keyhome-network
+    environment:
+      - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
+      - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+
   # Laravel Nightwatch Agent (monitoring)
   nightwatch-agent:
     image: laravelphp/nightwatch-agent:latest
@@ -153,11 +185,12 @@ services:
       retries: 5
       start_period: 20s
 
-  # Cache (Redis)
+  # Cache (Redis) — enable AOF for persistence when used for cache/queue/session
   redis:
     image: redis:alpine
     container_name: ${COMPOSE_PREFIX:-keyhome-prod}-redis
     restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory-policy allkeys-lru
     networks:
       - keyhome-network
     # FIX: healthcheck manquant — app et worker ne peuvent pas savoir si Redis est prêt

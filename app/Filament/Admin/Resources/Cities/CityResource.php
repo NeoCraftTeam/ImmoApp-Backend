@@ -142,15 +142,4 @@ class CityResource extends Resource
                 SoftDeletingScope::class,
             ]);
     }
-
-    public static function getNavigationBadge(): ?string
-    {
-        return (string) static::getModel()::count();
-    }
-
-    #[\Override]
-    public static function getNavigationBadgeTooltip(): ?string
-    {
-        return 'Nombre de villes';
-    }
 }

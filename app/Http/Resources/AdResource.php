@@ -157,6 +157,44 @@ final class AdResource extends JsonResource
             return null;
         }
 
-        return TourAssetToken::signTourConfig((string) $this->id, $tourConfig);
+        $signed = TourAssetToken::signTourConfig((string) $this->id, $tourConfig);
+
+        return $this->ensureAbsoluteTourUrls($signed);
+    }
+
+    /**
+     * Ensure tour asset URLs are absolute for cross-origin frontend (e.g. Next.js on different domain).
+     *
+     * @param  array<string, mixed>  $tourConfig
+     * @return array<string, mixed>
+     */
+    private function ensureAbsoluteTourUrls(array $tourConfig): array
+    {
+        $base = rtrim((string) config('app.url'), '/');
+
+        if (!isset($tourConfig['scenes']) || !is_array($tourConfig['scenes'])) {
+            return $tourConfig;
+        }
+
+        $tourConfig['scenes'] = array_map(function (array $scene) use ($base): array {
+            foreach (['image_url', 'tiles_base_url', 'fallback_base_url'] as $key) {
+                if (isset($scene[$key]) && is_string($scene[$key]) && !str_starts_with($scene[$key], 'http')) {
+                    $scene[$key] = $base.($scene[$key][0] === '/' ? '' : '/').$scene[$key];
+                }
+            }
+            if (isset($scene['cube_map']) && is_array($scene['cube_map'])) {
+                $scene['cube_map'] = array_map(function (mixed $url) use ($base): mixed {
+                    if (is_string($url) && !str_starts_with($url, 'http')) {
+                        return $base.($url[0] === '/' ? '' : '/').$url;
+                    }
+
+                    return $url;
+                }, $scene['cube_map']);
+            }
+
+            return $scene;
+        }, $tourConfig['scenes']);
+
+        return $tourConfig;
     }
 }

@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Services\Payment;
 
 use App\Contracts\PaymentGatewayInterface;
+use App\Enums\PaymentGateway;
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Enums\PaymentType;
 use App\Events\PaymentFailed;
 use App\Events\PaymentInitiated;
 use App\Events\PaymentSucceeded;
@@ -79,21 +82,21 @@ final readonly class PaymentService
         ]);
 
         $payment = DB::transaction(function () use ($data, $txRef, $result, $user): Payment {
-            $payment = Payment::create([
-                'type' => $data['type'],
-                'amount' => $data['amount'],
-                'transaction_id' => $txRef,
-                'payment_method' => $data['payment_method'] ?? 'flutterwave',
-                'user_id' => $user->id,
-                'status' => PaymentStatus::PENDING,
-                'gateway' => $this->gateway->getName(),
-                'payment_link' => $result['link'],
-                'phone_number' => $data['phone_number'] ?? null,
-                'ad_id' => $data['ad_id'] ?? null,
-                'agency_id' => $data['agency_id'] ?? null,
-                'plan_id' => $data['plan_id'] ?? null,
-                'period' => $data['period'] ?? null,
-            ]);
+            $payment = new Payment;
+            $payment->type = PaymentType::from((string) $data['type']);
+            $payment->amount = (int) round((float) $data['amount']);
+            $payment->transaction_id = $txRef;
+            $payment->payment_method = PaymentMethod::from((string) ($data['payment_method'] ?? 'flutterwave'));
+            $payment->user_id = $user->id;
+            $payment->status = PaymentStatus::PENDING;
+            $payment->gateway = PaymentGateway::from($this->gateway->getName());
+            $payment->payment_link = $result['link'];
+            $payment->phone_number = $data['phone_number'] ?? null;
+            $payment->ad_id = $data['ad_id'] ?? null;
+            $payment->agency_id = $data['agency_id'] ?? null;
+            $payment->plan_id = $data['plan_id'] ?? null;
+            $payment->period = $data['period'] ?? null;
+            $payment->save();
 
             PaymentInitiated::dispatch($payment);
 

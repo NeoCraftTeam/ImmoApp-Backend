@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'active' => \App\Http\Middleware\EnsureUserIsActive::class,
             'optional.auth' => \App\Http\Middleware\OptionalAuth::class,
         ]);
+        $middleware->prependToGroup('web', \App\Http\Middleware\LivewireLongRunningRequest::class);
         // Append is_active check to all sanctum-authenticated API routes
         $middleware->appendToGroup('api', [
             \App\Http\Middleware\EnsureUserIsActive::class,
@@ -30,15 +31,28 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions): void {
         Integration::handles($exceptions);
 
-        // Livewire tmp-file metadata failures (e.g. iPhone HEIC/large uploads that
-        // leave no file on disk) must never produce a 500.  Convert them into a
-        // user-friendly validation error so FilePond can display the rejection.
-        $exceptions->renderable(function (\League\Flysystem\UnableToRetrieveMetadata $e, \Illuminate\Http\Request $request) {
-            if ($request->is('livewire/update') || $request->is('livewire/upload-file')) {
-                return response()->json([
-                    'message' => 'Le fichier téléversé est invalide ou trop volumineux.',
-                    'errors' => ['file' => ['Le fichier téléversé est invalide ou trop volumineux.']],
-                ], 422);
+        // Livewire file upload failures must never produce a 500.
+        // UnableToRetrieveMetadata: temp file missing (expired, wrong disk, or upload failed)
+        $fileExpiredMessage = 'Le fichier a peut-être expiré. Téléchargez-le à nouveau puis soumettez le formulaire rapidement.';
+        $fileUploadErrorResponse = fn (string $msg) => response()->json([
+            'message' => $msg,
+            'errors' => ['file' => [$msg]],
+        ], 422);
+
+        $exceptions->renderable(function (\League\Flysystem\UnableToRetrieveMetadata $e, \Illuminate\Http\Request $request) use ($fileUploadErrorResponse, $fileExpiredMessage) {
+            if ($request->is('livewire/*')) {
+                report($e);
+
+                return $fileUploadErrorResponse($fileExpiredMessage);
+            }
+        });
+
+        // Catch any exception on the upload endpoint (disk, Flysystem, etc.)
+        $exceptions->renderable(function (\Throwable $e, \Illuminate\Http\Request $request) use ($fileUploadErrorResponse) {
+            if ($request->is('livewire/upload-file') && !$e instanceof \Illuminate\Validation\ValidationException) {
+                report($e);
+
+                return $fileUploadErrorResponse('Le fichier téléversé est invalide ou trop volumineux.');
             }
         });
     })->create();

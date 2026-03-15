@@ -14,3 +14,7 @@ parameters:
         # danihidayatx/image-optimizer extends FileUpload via macros — PHPStan can't see them
         - '#Call to an undefined method Filament\\Forms\\Components\\FileUpload::(optimize|resize|maxImageWidth|maxImageHeight)\(\)#'
         - '#Call to an undefined method Filament\\Forms\\Components\\SpatieMediaLibraryFileUpload::(optimize|resize|maxImageWidth|maxImageHeight)\(\)#'
+        # Filament Page with form() — $form property comes from trait
+        - '#Access to an undefined property App\\Filament\\Admin\\Pages\\ForcePasswordChange::\$form#'
+        # Payment amount: model casts to integer (cents), @property says string
+        - '#Property App\\Models\\Payment::\$amount \(string\) does not accept int#'

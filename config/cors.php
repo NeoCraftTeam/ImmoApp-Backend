@@ -22,11 +22,18 @@ return [
     'allowed_origins' => [
         'http://localhost:3000',
         'https://keyhome.test',
-        'https://*.keyhome.neocraft.dev',
         'https://api.keyhome.neocraft.dev',
+        'https://keyhome.fr',
+        'https://www.keyhome.fr',
+        'https://keyhome.app',
+        'https://www.keyhome.app',
+        'https://neocraft.dev',
+        'https://www.neocraft.dev',
     ],
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [
+        '/^https:\/\/[a-z0-9-]+\.keyhome\.neocraft\.dev$/',
+    ],
 
     'allowed_headers' => ['*'],
 

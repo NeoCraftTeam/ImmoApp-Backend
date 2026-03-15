@@ -30,7 +30,6 @@
         "laravel/sanctum": "^4.0",
         "laravel/scout": "^10.21",
         "laravel/socialite": "^5.24",
-        "laravel/telescope": "^5.15",
         "laravel/tinker": "^2.10.1",
         "laraveljutsu/zap": "^1.14",
         "laravolt/avatar": "^6.3",
@@ -45,6 +44,7 @@
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^3.6",
+        "laravel/telescope": "^5.15",
         "driftingly/rector-laravel": "^2.1",
         "fakerphp/faker": "^1.24",
         "larastan/larastan": "^3.0",

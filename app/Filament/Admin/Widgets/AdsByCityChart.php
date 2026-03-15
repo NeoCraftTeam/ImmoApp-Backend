@@ -17,7 +17,7 @@ class AdsByCityChart extends ChartWidget
 
     protected ?string $pollingInterval = '60s';
 
-    protected int|string|array $columnSpan = 1;
+    protected int|string|array $columnSpan = 'full';
 
     #[\Override]
     protected function getData(): array
@@ -27,7 +27,7 @@ class AdsByCityChart extends ChartWidget
             ->select(DB::raw('city.name as city_name'), DB::raw('count(*) as total'))
             ->groupBy('city.name')
             ->orderByDesc('total')
-            ->limit(10)
+            ->limit(20)
             ->pluck('total', 'city_name'));
 
         return [

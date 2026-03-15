@@ -206,6 +206,9 @@
 
         <h1>Compte activé avec succès !</h1>
         <p>Merci d'avoir vérifié votre adresse email.<br>Votre compte est maintenant pleinement opérationnel.</p>
+        @if($isAdmin ?? false)
+        <p style="margin-top: -16px; margin-bottom: 24px; font-size: 14px;">Connectez-vous puis <strong>changez votre mot de passe</strong> et <strong>configurez l'authentification à deux facteurs (2FA)</strong>.</p>
+        @endif
 
         <a href="{{ $loginUrl }}" class="btn">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
