@@ -14,7 +14,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $trustedProxies = env('TRUSTED_PROXIES', '127.0.0.1');
-        $middleware->trustProxies(at: $trustedProxies === '*' ? '*' : array_map('trim', explode(',', (string) $trustedProxies)));
+        $middleware->trustProxies(at: $trustedProxies === '*' ? '*' : array_map(trim(...), explode(',', (string) $trustedProxies)));
         $middleware->validateCsrfTokens(except: [
             'api/*',
             'api/v1/payments/webhook',

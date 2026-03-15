@@ -19,7 +19,7 @@ return [
     'allowed_origins' => env('PROXY_CORS_ORIGINS') === '*'
         ? ['*']
         : (env('PROXY_CORS_ORIGINS')
-            ? array_map('trim', explode(',', (string) env('PROXY_CORS_ORIGINS')))
+            ? array_map(trim(...), explode(',', (string) env('PROXY_CORS_ORIGINS')))
             : config('cors.allowed_origins', [])),
 
 ];

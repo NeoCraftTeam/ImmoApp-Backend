@@ -161,7 +161,7 @@ return [
              * The disk names on which the backups will be stored.
              * Production: add 'backups' (S3/R2) via BACKUP_DISKS for offsite storage.
              */
-            'disks' => array_values(array_filter(array_map('trim', explode(',', env('BACKUP_DISKS', 'local'))))) ?: ['local'],
+            'disks' => array_values(array_filter(array_map(trim(...), explode(',', (string) env('BACKUP_DISKS', 'local'))))) ?: ['local'],
 
             /*
              * Determines whether to allow backups to continue when some targets fail instead of failing completely.
@@ -284,7 +284,7 @@ return [
     'monitor_backups' => [
         [
             'name' => env('APP_NAME', 'laravel-backup'),
-            'disks' => array_values(array_filter(array_map('trim', explode(',', env('BACKUP_DISKS', 'local'))))) ?: ['local'],
+            'disks' => array_values(array_filter(array_map(trim(...), explode(',', (string) env('BACKUP_DISKS', 'local'))))) ?: ['local'],
             'health_checks' => [
                 \Spatie\Backup\Tasks\Monitor\HealthChecks\MaximumAgeInDays::class => 1,
                 \Spatie\Backup\Tasks\Monitor\HealthChecks\MaximumStorageInMegabytes::class => 5000,

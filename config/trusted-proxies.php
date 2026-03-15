@@ -19,6 +19,6 @@ return [
 
     'at' => env('TRUSTED_PROXIES', '127.0.0.1') === '*'
         ? '*'
-        : array_map('trim', explode(',', (string) env('TRUSTED_PROXIES', '127.0.0.1'))),
+        : array_map(trim(...), explode(',', (string) env('TRUSTED_PROXIES', '127.0.0.1'))),
 
 ];
