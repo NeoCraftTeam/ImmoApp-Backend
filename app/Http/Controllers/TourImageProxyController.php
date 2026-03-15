@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Ad;
 use App\Models\User;
+use App\Support\ProxyCorsHeaders;
 use App\Support\TourAssetToken;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -30,24 +31,16 @@ class TourImageProxyController
             /** @var User|null $user */
             $user = $request->user();
             if (!$user instanceof User) {
-                return response('Forbidden', 403, [
-                    'Access-Control-Allow-Origin' => '*',
-                    'Access-Control-Allow-Methods' => 'GET, HEAD',
-                ]);
+                return response('Forbidden', 403, ProxyCorsHeaders::for($request));
             }
 
             if (!preg_match('#^[a-zA-Z0-9\-_.\/]+$#', $path)) {
-                return response('Bad Request', 400, [
-                    'Access-Control-Allow-Origin' => '*',
-                ]);
+                return response('Bad Request', 400, ProxyCorsHeaders::for($request));
             }
 
             $tempPath = 'ads/temp/tours/'.$path;
             if (!Storage::disk()->exists($tempPath)) {
-                return response('Not Found', 404, [
-                    'Access-Control-Allow-Origin' => '*',
-                    'Access-Control-Allow-Methods' => 'GET, HEAD',
-                ]);
+                return response('Not Found', 404, ProxyCorsHeaders::for($request));
             }
 
             $mime = Storage::disk()->mimeType($tempPath) ?: 'image/webp';
@@ -59,28 +52,20 @@ class TourImageProxyController
                     fpassthru($stream);
                     fclose($stream);
                 }
-            }, 200, [
+            }, 200, array_merge([
                 'Content-Type' => $mime,
                 'Content-Length' => $size,
                 'Cache-Control' => 'public, max-age=3600',
-                'Access-Control-Allow-Origin' => '*',
-                'Access-Control-Allow-Methods' => 'GET, HEAD',
-            ]);
+            ], ProxyCorsHeaders::for($request)));
         }
 
         if (!Str::isUuid($adId)) {
-            return response('Not Found', 404, [
-                'Access-Control-Allow-Origin' => '*',
-                'Access-Control-Allow-Methods' => 'GET, HEAD',
-            ]);
+            return response('Not Found', 404, ProxyCorsHeaders::for($request));
         }
 
         $ad = Ad::query()->find($adId);
         if (!$ad || !$ad->has_3d_tour) {
-            return response('Not Found', 404, [
-                'Access-Control-Allow-Origin' => '*',
-                'Access-Control-Allow-Methods' => 'GET, HEAD',
-            ]);
+            return response('Not Found', 404, ProxyCorsHeaders::for($request));
         }
 
         $tokenExp = null;
@@ -104,17 +89,12 @@ class TourImageProxyController
         $hasTokenAccess = TourAssetToken::validate($adId, $tokenExp, $tokenSig);
 
         if (!$hasSessionAccess && !$hasTokenAccess) {
-            return response('Forbidden', 403, [
-                'Access-Control-Allow-Origin' => '*',
-                'Access-Control-Allow-Methods' => 'GET, HEAD',
-            ]);
+            return response('Forbidden', 403, ProxyCorsHeaders::for($request));
         }
 
         // Prevent path traversal — only allow safe path characters and forward slashes.
         if (!preg_match('#^[a-zA-Z0-9\-_.\/]+$#', $normalizedPath)) {
-            return response('Bad Request', 400, [
-                'Access-Control-Allow-Origin' => '*',
-            ]);
+            return response('Bad Request', 400, ProxyCorsHeaders::for($request));
         }
 
         // Resolve the storage path — new structure first, legacy path as fallback.
@@ -124,10 +104,7 @@ class TourImageProxyController
         $r2path = $disk->exists($newPath) ? $newPath : $legacyPath;
 
         if (!$disk->exists($r2path)) {
-            return response('Not Found', 404, [
-                'Access-Control-Allow-Origin' => '*',
-                'Access-Control-Allow-Methods' => 'GET, HEAD',
-            ]);
+            return response('Not Found', 404, ProxyCorsHeaders::for($request));
         }
 
         // Always stream instead of redirecting to R2. Pannellum loads images via XHR;
@@ -142,12 +119,10 @@ class TourImageProxyController
                 fpassthru($stream);
                 fclose($stream);
             }
-        }, 200, [
+        }, 200, array_merge([
             'Content-Type' => $mime,
             'Content-Length' => $size,
             'Cache-Control' => 'public, max-age=31536000, immutable',
-            'Access-Control-Allow-Origin' => '*',
-            'Access-Control-Allow-Methods' => 'GET, HEAD',
-        ]);
+        ], ProxyCorsHeaders::for($request)));
     }
 }

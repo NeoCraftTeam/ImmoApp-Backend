@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Support\ProxyCorsHeaders;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
@@ -47,12 +48,10 @@ class MediaProxyController
                 fpassthru($stream);
                 fclose($stream);
             }
-        }, 200, [
+        }, 200, array_merge([
             'Content-Type' => $mime,
             'Content-Length' => $size,
             'Cache-Control' => 'private, max-age=3600',
-            'Access-Control-Allow-Origin' => '*',
-            'Access-Control-Allow-Methods' => 'GET, HEAD',
-        ]);
+        ], ProxyCorsHeaders::for($request)));
     }
 }
