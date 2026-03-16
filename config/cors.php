@@ -21,6 +21,8 @@ return [
 
     'allowed_origins' => [
         'http://localhost:3000',
+        'http://192.168.1.186:3000',
+        'http://192.168.1.130:3000',
         'https://keyhome.test',
         'https://api.keyhome.neocraft.dev',
         'https://keyhome.fr',
