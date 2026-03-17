@@ -28,6 +28,20 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | App Media Disk (logos, avatars, contracts)
+    |--------------------------------------------------------------------------
+    |
+    | Disk for app media: agency logos, user avatars, lease contract PDFs.
+    | When FILESYSTEM_DISK=r2, these are stored on R2 with this structure:
+    |   avatars/{userId}/avatar.webp
+    |   agency-logos/{agencyId}/{filename}
+    |   lease-contracts/{adSlug}-{date}.pdf
+    |
+    */
+    'app_media_disk' => env('APP_MEDIA_DISK', env('FILESYSTEM_DISK', 'public')),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |
