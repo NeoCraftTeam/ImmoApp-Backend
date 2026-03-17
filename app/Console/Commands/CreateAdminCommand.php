@@ -5,112 +5,111 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Enums\UserRole;
+use App\Mail\AdminWelcomeEmail;
 use App\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+
+use function Laravel\Prompts\password;
+use function Laravel\Prompts\text;
 
 class CreateAdminCommand extends Command
 {
     protected $signature = 'app:create-admin
-                            {--email= : Admin email address}
-                            {--firstname= : Admin first name}
-                            {--lastname= : Admin last name}
-                            {--password= : Admin password}';
+                            {--email= : Email address of the admin}
+                            {--firstname= : First name}
+                            {--lastname= : Last name}
+                            {--password= : Password (min 8 chars)}';
 
-    protected $description = 'Create a new admin user or promote an existing user to admin';
+    protected $description = 'Create a new administrator account interactively or via options';
 
     public function handle(): int
     {
-        $this->info('🔑 Creating admin user...');
+        $this->info('Creating a new admin account...');
+        $this->newLine();
 
-        $email = $this->sanitize($this->option('email') ?? $this->ask('Email address'));
-        $existing = User::where('email', $email)->first();
+        $email = $this->option('email') ?? text(
+            label: 'Email address',
+            placeholder: 'admin@example.com',
+            required: true,
+            validate: fn (string $value) => match (true) {
+                !filter_var($value, FILTER_VALIDATE_EMAIL) => 'Please enter a valid email address.',
+                User::withTrashed()->where('email', $value)->exists() => 'This email is already taken.',
+                default => null,
+            },
+        );
 
-        if ($existing) {
-            if ($existing->role === UserRole::ADMIN) {
-                $this->warn("User {$email} is already an admin.");
-
-                return self::SUCCESS;
-            }
-
-            if ($this->confirm("User {$email} exists as {$existing->role->value}. Promote to admin?", true)) {
-                $existing->forceFill(['role' => UserRole::ADMIN])->save();
-                $this->info("✅ User {$email} promoted to admin.");
-
-                return self::SUCCESS;
-            }
+        if (User::withTrashed()->where('email', $email)->exists()) {
+            $this->error("A user with email [{$email}] already exists.");
 
             return self::FAILURE;
         }
 
-        $firstname = $this->sanitize($this->option('firstname') ?? $this->ask('First name'));
-        $lastname = $this->sanitize($this->option('lastname') ?? $this->ask('Last name'));
-        $password = $this->option('password');
-        while (empty($password) || strlen((string) $password) < 8) {
-            $password = $this->sanitize($this->ask('Password (min 8 characters)'));
-            if (empty($password)) {
-                $this->error('Le mot de passe ne peut pas être vide.');
-            } elseif (strlen($password) < 8) {
-                $this->error('Le mot de passe doit contenir au moins 8 caractères.');
-                $password = null;
-            }
-        }
+        $firstname = $this->option('firstname') ?? text(
+            label: 'First name',
+            placeholder: 'John',
+            required: true,
+        );
 
-        $validator = Validator::make([
-            'email' => $email,
-            'firstname' => $firstname,
-            'lastname' => $lastname,
-            'password' => $password,
-        ], [
-            'email' => ['required', 'email', 'unique:users,email'],
-            'firstname' => ['required', 'string', 'min:2'],
-            'lastname' => ['required', 'string', 'min:2'],
-            'password' => ['required', 'string', 'min:8'],
-        ]);
+        $lastname = $this->option('lastname') ?? text(
+            label: 'Last name',
+            placeholder: 'Doe',
+            required: true,
+        );
+
+        $plainPassword = $this->option('password') ?? password(
+            label: 'Password',
+            placeholder: 'min. 8 characters',
+            required: true,
+            validate: fn (string $value) => strlen($value) < 8
+                ? 'Password must be at least 8 characters.'
+                : null,
+        );
+
+        $validator = Validator::make(
+            ['password' => $plainPassword],
+            ['password' => ['required', 'string', 'min:8']],
+        );
 
         if ($validator->fails()) {
-            foreach ($validator->errors()->all() as $error) {
-                $this->error($error);
-            }
+            $this->error($validator->errors()->first('password'));
 
             return self::FAILURE;
         }
 
-        $user = new User;
-        $user->fill([
-            'firstname' => $firstname,
-            'lastname' => $lastname,
-            'email' => $email,
-            'password' => $password,
-        ]);
-        $user->forceFill([
-            'role' => UserRole::ADMIN,
-            'must_change_password_at' => now(),
-        ]);
-        $user->save();
+        try {
+            $user = new User;
+            $user->fill([
+                'firstname' => $firstname,
+                'lastname' => $lastname,
+                'email' => $email,
+                'password' => $plainPassword,
+            ]);
+            $user->forceFill([
+                'role' => UserRole::ADMIN,
+                'type' => null,
+                'email_verified_at' => now(),
+                'is_active' => true,
+                'must_change_password_at' => now(),
+            ]);
+            $user->save();
 
-        $user->sendAdminVerificationEmail();
+            Mail::to($user->email, $user->firstname)->queue(new AdminWelcomeEmail($user));
 
-        $this->info("✅ Admin created: {$user->email} (ID: {$user->id})");
-        $this->info(" A verification link has been sent to {$user->email}.");
-        $this->line('   After verification, the admin must change their password and configure 2FA.');
+            $this->newLine();
+            $this->info('  Admin account created successfully.');
+            $this->line("  ID    : {$user->id}");
+            $this->line("  Email : {$user->email}");
+            $this->line("  Name  : {$user->firstname} {$user->lastname}");
+            $this->newLine();
+            $this->comment('A welcome email has been queued.');
+        } catch (\Throwable $e) {
+            $this->error("Failed to create admin: {$e->getMessage()}");
 
-        return self::SUCCESS;
-    }
-
-    /**
-     * Strip invalid UTF-8 bytes and trim whitespace from input.
-     * Docker exec -T can inject garbage bytes into interactive prompts.
-     */
-    private function sanitize(?string $value): string
-    {
-        if ($value === null) {
-            return '';
+            return self::FAILURE;
         }
 
-        // Remove any non-UTF-8 bytes
-        $clean = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
-
-        return trim($clean);
+        return self::SUCCESS;
     }
 }
