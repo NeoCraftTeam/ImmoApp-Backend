@@ -12,6 +12,7 @@ use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Routing\Exceptions\UrlGenerationException;
 use Symfony\Component\Routing\Exception\RouteNotFoundException;
 
 class NewAdSubmissionMail extends Mailable implements ShouldQueue
@@ -75,7 +76,7 @@ class NewAdSubmissionMail extends Mailable implements ShouldQueue
     {
         try {
             return AdResource::getUrl('edit', ['record' => $ad]);
-        } catch (RouteNotFoundException|\Illuminate\Routing\Exceptions\UrlGenerationException) {
+        } catch (RouteNotFoundException|UrlGenerationException) {
             return '#';
         }
     }
