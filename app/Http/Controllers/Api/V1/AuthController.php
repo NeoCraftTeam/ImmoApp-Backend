@@ -351,6 +351,10 @@ final class AuthController
                 'user_agent' => $request->userAgent(),
             ]);
 
+            // Ensure UserResource includes point_balance & onboarding_completed_at (requires $request->user())
+            $user->refresh();
+            auth()->setUser($user);
+
             return response()->json([
                 'message' => 'Inscription réussie.',
                 'user' => new UserResource($user),
@@ -849,6 +853,9 @@ final class AuthController
             ['*'],
             now()->addDays(7)
         );
+
+        // Ensure UserResource includes point_balance & onboarding_completed_at (requires $request->user())
+        auth()->setUser($user);
 
         return response()->json([
             'message' => 'Email vérifié avec succès.',
@@ -1373,6 +1380,43 @@ final class AuthController
         }
 
         return response()->json(['message' => 'Onboarding complété.']);
+    }
+
+    /**
+     * Track home page visit for greeting ("Bon retour parmi nous").
+     */
+    public function trackHomeVisit(Request $request): JsonResponse
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+        $user->last_home_visit_at = now();
+        $user->save();
+
+        return response()->json(['last_home_visit_at' => $user->last_home_visit_at->toIso8601String()]);
+    }
+
+    /**
+     * Update user preferences (e.g. survey_postponed_ids).
+     */
+    public function updatePreferences(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'survey_postponed_ids' => 'sometimes|array',
+            'survey_postponed_ids.*' => 'string',
+        ]);
+
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+        $prefs = $user->preferences ?? [];
+
+        if (array_key_exists('survey_postponed_ids', $validated)) {
+            $prefs['survey_postponed_ids'] = array_values(array_unique($validated['survey_postponed_ids']));
+        }
+
+        $user->preferences = $prefs;
+        $user->save();
+
+        return response()->json(['preferences' => $user->preferences]);
     }
 
     /**

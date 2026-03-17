@@ -156,6 +156,8 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'oauth_provider',
         'oauth_avatar',
         'onboarding_completed_at',
+        'last_home_visit_at',
+        'preferences',
         'registration_ip',
         'must_change_password_at',
     ];
@@ -492,6 +494,8 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'app_authentication_recovery_codes' => 'encrypted:array',
             'has_email_authentication' => 'boolean',
             'onboarding_completed_at' => 'datetime',
+            'last_home_visit_at' => 'datetime',
+            'preferences' => 'array',
             'must_change_password_at' => 'datetime',
         ];
     }

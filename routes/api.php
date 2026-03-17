@@ -107,6 +107,8 @@ Route::prefix('v1')->group(function (): void {
             Route::post('email/resend', [AuthController::class, 'resendVerificationEmail'])->middleware('auth:sanctum');
             Route::post('update-password', [AuthController::class, 'updatePassword'])->middleware('throttle:5,10');
             Route::post('onboarding-complete', [AuthController::class, 'completeOnboarding']);
+            Route::post('track-home-visit', [AuthController::class, 'trackHomeVisit']);
+            Route::patch('preferences', [AuthController::class, 'updatePreferences']);
         });
     });
 

@@ -8,6 +8,7 @@ use App\Enums\AdStatus;
 use App\Http\Requests\AdRequest;
 use App\Http\Resources\AdResource as AdApiResource;
 use App\Models\Ad;
+use App\Models\AdInteraction;
 use App\Models\AdType;
 use App\Models\City;
 use App\Models\Quarter;
@@ -428,7 +429,14 @@ final class AdController
     {
         $ad = Ad::with(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency', 'reviews.user'])
             ->withAvg('reviews', 'rating')
-            ->withCount('reviews')
+            ->withCount([
+                'reviews',
+                'interactions as views_count' => fn ($q) => $q->where('type', AdInteraction::TYPE_VIEW),
+                'interactions as views_count_today' => fn ($q) => $q->where('type', AdInteraction::TYPE_VIEW)
+                    ->where('created_at', '>=', now()->startOfDay()),
+                'interactions as views_count_week' => fn ($q) => $q->where('type', AdInteraction::TYPE_VIEW)
+                    ->where('created_at', '>=', now()->subDays(7)),
+            ])
             ->findOrFail($id);
 
         $this->authorize('view', $ad);

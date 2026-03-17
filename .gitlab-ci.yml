@@ -195,6 +195,9 @@ production_deploy:
     - echo "🧹 Clearing cache before migrations..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize:clear
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan config:cache
+    # Composer install (dépendances fraîches)
+    - echo "📦 Running composer install..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app composer install --no-dev --optimize-autoloader --no-interaction
     # Run migrations — rollback container on failure
     - |
       echo "🗄️ Running migrations..."
@@ -210,7 +213,8 @@ production_deploy:
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app chmod +x resetFilamentLivewire.sh
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app bash resetFilamentLivewire.sh
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan storage:link || true
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate || true
+    - echo "📄 Generating Swagger docs..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate
     # Disable maintenance mode
     - echo "✅ Deployment complete, bringing app back up..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan up
@@ -280,6 +284,9 @@ preprod_deploy:
     - echo "🧹 Clearing cache before migrations..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize:clear
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan config:cache
+    # Composer install (dépendances fraîches)
+    - echo "📦 Running composer install..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app composer install --no-dev --optimize-autoloader --no-interaction
     # Run migrations — rollback container on failure
     - |
       echo "🗄️ Running migrations..."
@@ -295,7 +302,8 @@ preprod_deploy:
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app chmod +x resetFilamentLivewire.sh
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app bash resetFilamentLivewire.sh
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan storage:link || true
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate || true
+    - echo "📄 Generating Swagger docs..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate
     # Disable maintenance mode
     - echo "✅ Deployment complete, bringing app back up..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan up

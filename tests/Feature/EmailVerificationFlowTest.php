@@ -206,3 +206,20 @@ it('returns access_token after successful OTP verification for auto-login', func
     expect($response->json('access_token'))->not->toBeEmpty();
     expect($response->json('user'))->not->toBeEmpty();
 });
+
+it('returns user with onboarding_completed_at and point_balance for WelcomeModal', function (): void {
+    \App\Models\Setting::set('welcome_bonus_points', 5, 'Bonus bienvenue', 'credits');
+    $user = User::factory()->unverified()->create();
+    Cache::put('email_otp_'.$user->id, '123456', now()->addMinutes(10));
+
+    $response = $this->postJson('/api/v1/auth/verify-email-otp', [
+        'email' => $user->email,
+        'otp' => '123456',
+    ])->assertOk();
+
+    $userData = $response->json('user');
+    expect($userData)->toHaveKey('onboarding_completed_at');
+    expect($userData['onboarding_completed_at'])->toBeNull();
+    expect($userData)->toHaveKey('point_balance');
+    expect($userData['point_balance'])->toBeGreaterThanOrEqual(5);
+});

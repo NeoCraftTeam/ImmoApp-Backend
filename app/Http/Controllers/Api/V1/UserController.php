@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\PaymentStatus;
-use App\Enums\PaymentType;
 use App\Http\Requests\UserRequest;
 use App\Http\Resources\AdResource;
 use App\Http\Resources\UserResource;
 use App\Mail\EmailUpdatedMail;
 use App\Models\Ad;
-use App\Models\Payment;
+use App\Models\AdInteraction;
+use App\Models\UnlockedAd;
 use App\Models\User;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -797,12 +796,14 @@ final class UserController
     {
         $user = request()->user();
 
-        $adIds = Payment::where('user_id', $user->id)
-            ->where('type', PaymentType::UNLOCK)
-            ->where('status', PaymentStatus::SUCCESS)
-            ->pluck('ad_id');
+        $adIds = UnlockedAd::where('user_id', $user->id)->pluck('ad_id');
 
-        $ads = Ad::with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')
+        $ads = Ad::with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency', 'reviews.user'])
+            ->withAvg('reviews', 'rating')
+            ->withCount([
+                'reviews',
+                'interactions as views_count' => fn ($q) => $q->where('type', AdInteraction::TYPE_VIEW),
+            ])
             ->whereIn('id', $adIds)
             ->latest()
             ->get();

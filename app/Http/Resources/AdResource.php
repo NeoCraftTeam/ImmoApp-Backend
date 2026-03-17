@@ -72,6 +72,9 @@ final class AdResource extends JsonResource
             'reviews_count' => (int) $reviewsCount,
             'is_favorited' => $this->isFavoritedBy($user),
             'view_count' => $this->views_count ?? 0,
+            'views_count_today' => $this->views_count_today ?? 0,
+            'views_count_week' => $this->views_count_week ?? 0,
+            'is_verified' => (bool) ($this->is_verified ?? false),
 
             // Premium info - only visible when unlocked
             'deposit_amount' => $this->when($this->isUnlockedFor($user), $this->deposit_amount),

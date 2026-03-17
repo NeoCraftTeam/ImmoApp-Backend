@@ -76,6 +76,14 @@ final class UserResource extends JsonResource
                 $request->user()?->id === $this->id,
                 $this->onboarding_completed_at,
             ),
+            'last_home_visit_at' => $this->when(
+                $request->user()?->id === $this->id,
+                $this->last_home_visit_at,
+            ),
+            'preferences' => $this->when(
+                $request->user()?->id === $this->id,
+                $this->preferences ?? [],
+            ),
         ];
     }
 
