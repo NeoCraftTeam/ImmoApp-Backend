@@ -17,7 +17,7 @@ use Illuminate\Http\Request;
  * Example: "appartement meublé 2 chambres à Douala pas cher avec parking"
  * Returns: { type_name: "Appartement", city_name: "Douala", bedrooms: 2, price_max: 100000, has_parking: true }
  */
-final class NaturalSearchController
+final readonly class NaturalSearchController
 {
     public function __construct(
         private AiSearchService $aiSearchService

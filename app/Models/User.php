@@ -109,6 +109,8 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property string|null $last_login_city
  * @property bool $is_active
  * @property Carbon|null $onboarding_completed_at
+ * @property Carbon|null $last_home_visit_at
+ * @property array<string, mixed>|null $preferences
  * @property Carbon|null $must_change_password_at
  * @property-read City|null $city
  * @property-read MediaCollection<int, Media> $media

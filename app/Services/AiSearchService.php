@@ -18,9 +18,9 @@ use Illuminate\Support\Facades\Log;
  */
 class AiSearchService
 {
-    private const CACHE_TTL_SECONDS = 86400; // 24 hours
+    private const int CACHE_TTL_SECONDS = 86400; // 24 hours
 
-    private const CACHE_PREFIX = 'ai_search:';
+    private const string CACHE_PREFIX = 'ai_search:';
 
     /**
      * Parse a natural language query into structured search parameters.
@@ -91,7 +91,7 @@ class AiSearchService
             }
 
             $decoded = $this->extractJson($content);
-            if ($decoded === null || !is_array($decoded)) {
+            if ($decoded === null) {
                 Log::warning('AiSearchService: Invalid JSON from Groq', ['content' => substr($content, 0, 200)]);
 
                 return null;
@@ -206,7 +206,7 @@ PROMPT;
 
                 if (!empty($parsed['quarter_name'])) {
                     $quarter = $city->quarters()->where('name', 'ilike', $parsed['quarter_name'])->first();
-                    if ($quarter) {
+                    if ($quarter instanceof \App\Models\Quarter) {
                         $result['quarter_name'] = $quarter->name;
                     }
                 }

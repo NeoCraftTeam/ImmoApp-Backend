@@ -1392,7 +1392,7 @@ final class AuthController
         $user->last_home_visit_at = now();
         $user->save();
 
-        return response()->json(['last_home_visit_at' => $user->last_home_visit_at->toIso8601String()]);
+        return response()->json(['last_home_visit_at' => now()->toIso8601String()]);
     }
 
     /**
