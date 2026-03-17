@@ -11,6 +11,9 @@ class DatabaseSeeder extends Seeder
 
     /**
      * Seed the application's database.
+     *
+     * Optional seeders (not called by default): UserSeeder, AgencySeeder,
+     * PaymentSeeder, SurveySeeder, CitySeeder. Call them explicitly if needed.
      */
     public function run(): void
     {
@@ -19,6 +22,7 @@ class DatabaseSeeder extends Seeder
             SubscriptionPlanSeeder::class,
             PointSystemSeeder::class,
             CameroonCitiesSeeder::class,
+            PropertyAttributeSeeder::class,
             MassiveAdSeeder::class,
         ]);
     }
