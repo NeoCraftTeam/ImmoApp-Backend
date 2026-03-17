@@ -41,11 +41,11 @@
         "socialiteproviders/apple": "^5.9",
         "spatie/laravel-activitylog": "^4.11",
         "spatie/laravel-backup": "^10.0",
-        "spatie/laravel-medialibrary": "^11.14"
+        "spatie/laravel-medialibrary": "^11.14",
+        "laravel/telescope": "^5.15"
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^3.6",
-        "laravel/telescope": "^5.15",
         "driftingly/rector-laravel": "^2.1",
         "fakerphp/faker": "^1.24",
         "larastan/larastan": "^3.0",
