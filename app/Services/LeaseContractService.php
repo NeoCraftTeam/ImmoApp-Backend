@@ -72,8 +72,8 @@ class LeaseContractService
 
         $pdf = Pdf::loadView('pdf.lease-contract', $data)->setPaper('a4');
 
-        $filename = 'contracts/'.str($ad->title)->slug().'-'.now()->format('Ymd-His').'.pdf';
-        Storage::disk('public')->put($filename, $pdf->output());
+        $filename = 'lease-contracts/'.str($ad->title)->slug().'-'.now()->format('Ymd-His').'.pdf';
+        Storage::disk(config('filesystems.app_media_disk'))->put($filename, $pdf->output());
 
         return LeaseContract::create([
             'user_id' => $landlord->id,

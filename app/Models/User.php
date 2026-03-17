@@ -222,7 +222,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         $storagePath = 'avatars/'.$this->id.'/avatar.webp';
         $tempFile = sys_get_temp_dir().'/avatar_'.uniqid('', true).'.png';
         \Laravolt\Avatar\Facade::create($name)->save($tempFile, 80);
-        Storage::disk()->put($storagePath, (string) file_get_contents($tempFile));
+        Storage::disk(config('filesystems.app_media_disk'))->put($storagePath, (string) file_get_contents($tempFile));
         @unlink($tempFile);
         $this->avatar = $storagePath;
     }
@@ -403,8 +403,9 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             return $this->avatar;
         }
 
-        if ($this->avatar && Storage::disk()->exists($this->avatar)) {
-            return Storage::disk()->url($this->avatar);
+        $disk = config('filesystems.app_media_disk');
+        if ($this->avatar && Storage::disk($disk)->exists($this->avatar)) {
+            return Storage::disk($disk)->url($this->avatar);
         }
 
         // Privacy: Return null to let Filament/Frontend handle the default placeholder
@@ -540,7 +541,6 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
     /**
      * Send a verification link by email for admin users (instead of OTP).
-     * Used when creating an admin via app:create-admin.
      */
     public function sendAdminVerificationEmail(): void
     {

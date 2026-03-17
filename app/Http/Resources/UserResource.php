@@ -89,8 +89,9 @@ final class UserResource extends JsonResource
             return $this->avatar;
         }
 
-        if (Storage::disk('public')->exists($this->avatar)) {
-            return Storage::disk('public')->url($this->avatar);
+        $disk = config('filesystems.app_media_disk');
+        if (Storage::disk($disk)->exists($this->avatar)) {
+            return Storage::disk($disk)->url($this->avatar);
         }
 
         return null;

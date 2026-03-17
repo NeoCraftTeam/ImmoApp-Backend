@@ -131,8 +131,9 @@ final class AdResource extends JsonResource
             return $avatar;
         }
 
-        if (Storage::disk('public')->exists($avatar)) {
-            return Storage::disk('public')->url($avatar);
+        $disk = config('filesystems.app_media_disk');
+        if (Storage::disk($disk)->exists($avatar)) {
+            return Storage::disk($disk)->url($avatar);
         }
 
         return null;

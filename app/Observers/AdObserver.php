@@ -6,6 +6,7 @@ namespace App\Observers;
 
 use App\Enums\AdStatus;
 use App\Enums\UserRole;
+use App\Jobs\MatchSearchAlertsForAdJob;
 use App\Mail\AdSubmissionConfirmationMail;
 use App\Models\Ad;
 use App\Models\User;
@@ -37,7 +38,10 @@ class AdObserver
         // Auto-boost if agency has active subscription
         app(\App\Services\AdBoostService::class)->autoBoostIfEligible($ad);
 
-        // Notify admins if status is PENDING
+        if ($ad->status === AdStatus::AVAILABLE) {
+            MatchSearchAlertsForAdJob::dispatch($ad);
+        }
+
         if ($ad->status === AdStatus::PENDING) {
             // 1. Send confirmation to the author
             if ($ad->user) {
@@ -99,6 +103,10 @@ class AdObserver
             } catch (\Throwable $e) {
                 Log::error('Failed to send admin resubmission notifications for ad: '.$e->getMessage());
             }
+        }
+
+        if ($newStatus === AdStatus::AVAILABLE) {
+            MatchSearchAlertsForAdJob::dispatch($ad);
         }
     }
 

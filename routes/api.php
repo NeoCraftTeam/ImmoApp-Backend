@@ -363,6 +363,12 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/session/validate', [PwaController::class, 'validateSession']);
     });
 
+    // --- Push (SPA / Bearer token — for Next.js frontend) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::post('/push/subscribe', [PwaController::class, 'subscribe']);
+        Route::post('/push/unsubscribe', [PwaController::class, 'unsubscribe']);
+    });
+
     // --- SEARCH ALERTS ---
     Route::middleware('auth:sanctum')->prefix('search-alerts')->group(function (): void {
         Route::get('/', [SearchAlertController::class, 'index']);
