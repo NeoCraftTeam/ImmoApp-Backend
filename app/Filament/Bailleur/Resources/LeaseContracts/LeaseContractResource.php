@@ -156,7 +156,7 @@ class LeaseContractResource extends Resource
                     ->icon(Heroicon::ArrowDownTray)
                     ->color('info')
                     ->action(fn (LeaseContract $record): \Symfony\Component\HttpFoundation\StreamedResponse => response()->streamDownload(
-                        fn () => print (Storage::disk('public')->get($record->pdf_path)),
+                        fn () => print (Storage::disk(config('filesystems.app_media_disk'))->get($record->pdf_path)),
                         "contrat-{$record->contract_number}.pdf",
                         ['Content-Type' => 'application/pdf'],
                     )),

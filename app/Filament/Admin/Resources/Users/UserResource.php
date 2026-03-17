@@ -71,7 +71,7 @@ class UserResource extends Resource
                     ->schema([
                         FileUpload::make('avatar')
                             ->label('Avatar')
-                            ->disk('public')
+                            ->disk(config('filesystems.app_media_disk'))
                             ->fetchFileInformation(false)
                             ->directory('avatars')
                             ->avatar()
@@ -195,7 +195,7 @@ class UserResource extends Resource
                 ->label('Avatar')
                 ->circular()
                 ->size(40)
-                ->disk('public')
+                ->disk(config('filesystems.app_media_disk'))
                 ->defaultImageUrl(fn ($record) => 'https://ui-avatars.com/api/?name='.urlencode($record->firstname.' '.$record->lastname).'&background=F6475F&color=fff'),
             TextColumn::make('full_name')
                 ->label('Nom complet')

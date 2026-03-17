@@ -46,7 +46,7 @@ class EditProfile extends BaseEditProfile
                     ->schema([
                         FileUpload::make('avatar')
                             ->label('')
-                            ->disk('public')
+                            ->disk(config('filesystems.app_media_disk'))
                             ->fetchFileInformation(false)
                             ->directory('avatars')
                             ->avatar()

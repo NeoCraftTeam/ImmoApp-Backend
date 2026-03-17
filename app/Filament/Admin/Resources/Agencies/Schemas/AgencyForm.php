@@ -31,7 +31,7 @@ class AgencyForm
                             ->helperText('Identifiant URL unique'),
                         FileUpload::make('logo')
                             ->label('Logo')
-                            ->disk('public')
+                            ->disk(config('filesystems.app_media_disk'))
                             ->fetchFileInformation(false)
                             ->directory('agency-logos')
                             ->image()

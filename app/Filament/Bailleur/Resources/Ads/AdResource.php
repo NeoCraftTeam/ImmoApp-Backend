@@ -159,7 +159,7 @@ class AdResource extends Resource
                             ->send();
 
                         return response()->streamDownload(
-                            fn () => print (Storage::disk('public')->get($contract->pdf_path)),
+                            fn () => print (Storage::disk(config('filesystems.app_media_disk'))->get($contract->pdf_path)),
                             'contrat-bail-'.str($record->title)->slug().'-'.now()->format('Ymd').'.pdf',
                             ['Content-Type' => 'application/pdf'],
                         );
