@@ -2361,6 +2361,97 @@
                 ]
             }
         },
+        "/api/v1/ads/{ad}/reports": {
+            "post": {
+                "tags": [
+                    "🚩 Signalements"
+                ],
+                "summary": "Signaler une annonce",
+                "description": "Permet à un client authentifié de signaler une annonce avec un motif principal et, si nécessaire, des détails complémentaires. La création est bloquée si l'utilisateur signale sa propre annonce ou s'il a déjà un signalement ouvert pour cette annonce.",
+                "operationId": "9a1e0f95bce2e458a43a3e345d47bafe",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "description": "UUID de l'annonce",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AdReportStoreRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Signalement enregistré",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdReportStoreSuccessResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Unauthenticated."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Annonce introuvable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "No query results for model [App\\\\Models\\\\Ad]."
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Erreur de validation (champs invalides, auto-signalement, signalement déjà ouvert)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdReportValidationErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/ad-types": {
             "get": {
                 "tags": [
@@ -4681,7 +4772,7 @@
                     "🎯 Crédits / Points"
                 ],
                 "summary": "Acheter un pack de crédits",
-                "description": "Initialise un paiement FedaPay pour acheter le pack de crédits sélectionné. Retourne une URL de paiement.",
+                "description": "Initialise un paiement pour acheter le pack de crédits sélectionné. Retourne une URL de paiement.",
                 "operationId": "ef3e1d1ea064d546e32a29ad07d366fb",
                 "parameters": [
                     {
@@ -4736,7 +4827,7 @@
                         "description": "Pack non disponible"
                     },
                     "500": {
-                        "description": "Erreur FedaPay"
+                        "description": "Erreur paiement"
                     }
                 },
                 "security": [
@@ -4752,7 +4843,7 @@
                     "🎯 Crédits / Points"
                 ],
                 "summary": "Vérifier un achat de crédits",
-                "description": "Vérifie le dernier achat de crédits de l'utilisateur auprès de FedaPay. Si le paiement est approuvé, crédite les points.",
+                "description": "Vérifie le dernier achat de crédits de l'utilisateur. Si le paiement est approuvé, crédite les points.",
                 "operationId": "235014727746381b2fdabd0a491edd20",
                 "responses": {
                     "200": {
@@ -4790,6 +4881,44 @@
                     },
                     "422": {
                         "description": "Paiement échoué"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/payments/initialize/{ad}": {
+            "post": {
+                "tags": [
+                    "🎯 Crédits / Points"
+                ],
+                "summary": "Débloquer une annonce avec des crédits",
+                "description": "Vérifie le solde de crédits et débloque l'annonce si suffisant.",
+                "operationId": "7b0ccc6d7275b1431bcc89b5ffeb1d81",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "description": "UUID de l'annonce",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Annonce débloquée ou déjà accessible"
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "402": {
+                        "description": "Crédits insuffisants"
                     }
                 },
                 "security": [
@@ -5093,113 +5222,35 @@
                 ]
             }
         },
-        "/api/v1/payments/unlock-price": {
-            "get": {
-                "tags": [
-                    "💰 Paiements"
-                ],
-                "summary": "Obtenir le prix de déblocage",
-                "description": "Retourne le prix de déblocage en FCFA et le coût en crédits/points.",
-                "operationId": "cf0b294c676fef0aeaccd05920066fb3",
-                "responses": {
-                    "200": {
-                        "description": "Prix de déblocage",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "unlock_price": {
-                                            "type": "integer",
-                                            "example": 500
-                                        },
-                                        "unlock_cost_points": {
-                                            "type": "integer",
-                                            "example": 2
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/payments/initialize/{ad}": {
+        "/api/v1/payments/flutterwave/initiate": {
             "post": {
                 "tags": [
                     "💰 Paiements"
                 ],
-                "summary": "1. Initialiser une demande de paiement",
-                "description": "Génère un lien de paiement sécurisé via FedaPay. Le frontend doit rediriger l'utilisateur vers 'payment_url'.",
-                "operationId": "2668ecddf3c0a8a298c0f5a00e1ed8b2",
-                "parameters": [
-                    {
-                        "name": "ad",
-                        "in": "path",
-                        "description": "UUID de l'annonce à débloquer",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "format": "uuid"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Succès : Lien généré",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "payment_url": {
-                                            "description": "URL vers l'interface FedaPay",
-                                            "type": "string"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Redirigez l'utilisateur vers cette URL pour payer."
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Non authentifié"
-                    },
-                    "404": {
-                        "description": "L'annonce demandée n'existe pas"
-                    }
-                },
-                "security": [
-                    {
-                        "sanctum": []
-                    }
-                ]
-            }
-        },
-        "/api/v1/payments/webhook": {
-            "post": {
-                "tags": [
-                    "💰 Paiements"
-                ],
-                "summary": "2. Webhook de validation (Usage interne FedaPay)",
-                "description": "Cet endpoint est appelé automatiquement par FedaPay dès qu'une transaction change de statut. Ne pas appeler manuellement par le frontend.",
-                "operationId": "4ce4817727fef48fb4e50d0d0555595d",
+                "summary": "Initier un paiement Flutterwave",
+                "description": "Initiate a Flutterwave payment.\n\nIntended for: subscription, credit purchases.\nReturns a hosted checkout link to redirect the user.",
+                "operationId": "639de8174dd955635d797846b7cca2cb",
                 "requestBody": {
-                    "description": "Payload envoyé par FedaPay",
+                    "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "properties": {
-                                    "event": {
-                                        "type": "string",
-                                        "example": "transaction.approved"
+                                    "amount": {
+                                        "type": "number",
+                                        "example": 150000
                                     },
-                                    "entity": {
-                                        "type": "object"
+                                    "type": {
+                                        "type": "string",
+                                        "example": "credit"
+                                    },
+                                    "payment_method": {
+                                        "type": "string",
+                                        "example": "mobile_money"
+                                    },
+                                    "phone_number": {
+                                        "type": "string",
+                                        "example": "+237699000000"
                                     }
                                 },
                                 "type": "object"
@@ -5209,109 +5260,132 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Webhook traité avec succès",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "ok"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/payments/callback": {
-            "get": {
-                "tags": [
-                    "💰 Paiements"
-                ],
-                "summary": "3. Retour utilisateur après paiement",
-                "description": "Page vers laquelle l'utilisateur est redirigé après avoir quitté l'interface de paiement. Le frontend peut intercepter cette URL pour fermer la WebView.",
-                "operationId": "8fd83614f4eaa636fde8efd984a3c0c9",
-                "parameters": [
-                    {
-                        "name": "ad_id",
-                        "in": "query",
-                        "description": "ID de l'annonce d'origine",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Succès",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string"
-                                        },
-                                        "status": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/payments/verify/{ad}": {
-            "post": {
-                "tags": [
-                    "💰 Paiements"
-                ],
-                "summary": "Vérifier le statut d'un paiement",
-                "description": "Vérifie le paiement le plus récent pour une annonce auprès de FedaPay. Débloque l'annonce si le paiement est approuvé.",
-                "operationId": "b53480b176f0c3dd0ddeee5c8bd82602",
-                "parameters": [
-                    {
-                        "name": "ad",
-                        "in": "path",
-                        "description": "UUID de l'annonce",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "format": "uuid"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Statut du paiement",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string"
-                                        },
-                                        "is_unlocked": {
-                                            "type": "boolean"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                        "description": "Lien de paiement retourné"
                     },
                     "401": {
                         "description": "Non authentifié"
                     },
+                    "422": {
+                        "description": "Validation échouée"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/payments/flutterwave/verify": {
+            "post": {
+                "tags": [
+                    "💰 Paiements"
+                ],
+                "summary": "Vérifier un paiement Flutterwave",
+                "description": "Verify a Flutterwave payment after the user returns from checkout.",
+                "operationId": "7ec9b30743d67037bae533b80de04e48",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "tx_ref": {
+                                        "type": "string",
+                                        "example": "KH-ABCDEF123456"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Statut du paiement"
+                    },
                     "404": {
-                        "description": "Aucun paiement trouvé"
+                        "description": "Paiement introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/payments/flutterwave/cancel": {
+            "post": {
+                "tags": [
+                    "💰 Paiements"
+                ],
+                "summary": "Annuler un paiement Flutterwave en attente",
+                "description": "Cancel a pending Flutterwave payment on user request.",
+                "operationId": "08cf07ba8ab3814c943f01908cec4ca1",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "tx_ref": {
+                                        "type": "string",
+                                        "example": "KH-ABCDEF123456"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Paiement annulé"
+                    },
+                    "404": {
+                        "description": "Paiement introuvable"
+                    },
+                    "409": {
+                        "description": "Paiement déjà traité"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/webhooks/flutterwave": {
+            "post": {
+                "tags": [
+                    "💰 Paiements"
+                ],
+                "summary": "Webhook Flutterwave",
+                "description": "Handle Flutterwave webhook (charge.completed event).\n\nValidates the verif-hash header and processes the payment update.",
+                "operationId": "13c20cc108976d358d3343c68254ba03",
+                "responses": {
+                    "200": {
+                        "description": "Webhook traité"
+                    },
+                    "401": {
+                        "description": "Signature invalide"
+                    }
+                }
+            }
+        },
+        "/api/v1/payments/history": {
+            "get": {
+                "tags": [
+                    "💰 Paiements"
+                ],
+                "summary": "Historique des paiements",
+                "description": "Return the authenticated user's payment history.",
+                "operationId": "45ec5d008409ff2609b75e9c5480c8d4",
+                "responses": {
+                    "200": {
+                        "description": "Liste paginée des transactions"
                     }
                 },
                 "security": [
@@ -7086,7 +7160,7 @@
                     "📦 Abonnements Agences"
                 ],
                 "summary": "Souscrire à un plan d'abonnement",
-                "description": "Initie le processus de souscription à un plan d'abonnement pour l'agence de l'utilisateur. Crée une transaction de paiement FedaPay et retourne l'URL de paiement. Le frontend (mobile ou web) doit **rediriger l'utilisateur** vers `payment_url` pour finaliser le paiement. Une fois le paiement confirmé par le webhook FedaPay, l'abonnement est activé automatiquement, les annonces de l'agence sont boostées, et une **facture est envoyée par email** à tous les membres de l'agence.",
+                "description": "Initie le processus de souscription à un plan d'abonnement pour l'agence de l'utilisateur. Crée une transaction de paiement et retourne l'URL de paiement. Le frontend (mobile ou web) doit **rediriger l'utilisateur** vers `payment_url` pour finaliser le paiement. Une fois le paiement confirmé par le webhook, l'abonnement est activé automatiquement, les annonces de l'agence sont boostées, et une **facture est envoyée par email** à tous les membres de l'agence.",
                 "operationId": "subscribe",
                 "requestBody": {
                     "description": "Données de souscription",
@@ -7133,9 +7207,9 @@
                                 "schema": {
                                     "properties": {
                                         "payment_url": {
-                                            "description": "URL FedaPay vers laquelle rediriger l'utilisateur pour payer",
+                                            "description": "URL vers laquelle rediriger l'utilisateur pour payer",
                                             "type": "string",
-                                            "example": "https://checkout.fedapay.com/pay/abc123"
+                                            "example": "https://checkout.flutterwave.com/pay/abc123"
                                         },
                                         "message": {
                                             "type": "string",
@@ -7187,7 +7261,7 @@
                         }
                     },
                     "500": {
-                        "description": "Erreur technique FedaPay ou serveur"
+                        "description": "Erreur technique serveur"
                     }
                 },
                 "security": [
@@ -9449,6 +9523,132 @@
                 },
                 "type": "object"
             },
+            "AdReportStoreRequest": {
+                "description": "Payload de signalement d'annonce. Les champs `scam_reason`, `payment_methods` et `description` sont conditionnels.",
+                "required": [
+                    "reason"
+                ],
+                "properties": {
+                    "reason": {
+                        "description": "Motif principal du signalement.",
+                        "type": "string",
+                        "enum": [
+                            "inaccurate",
+                            "not_real_property",
+                            "scam",
+                            "shocking_content",
+                            "other"
+                        ],
+                        "example": "scam"
+                    },
+                    "scam_reason": {
+                        "description": "Obligatoire uniquement si `reason=scam`.",
+                        "type": "string",
+                        "enum": [
+                            "asked_off_platform_payment",
+                            "shared_contacts",
+                            "promoting_external_services",
+                            "duplicate_listing",
+                            "misleading_listing"
+                        ],
+                        "example": "asked_off_platform_payment",
+                        "nullable": true
+                    },
+                    "payment_methods": {
+                        "description": "Obligatoire uniquement si `reason=scam` et `scam_reason=asked_off_platform_payment`.",
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "bank_transfer",
+                                "card",
+                                "cash",
+                                "paypal",
+                                "moneygram",
+                                "western_union",
+                                "other"
+                            ]
+                        },
+                        "maxItems": 7,
+                        "minItems": 1,
+                        "nullable": true
+                    },
+                    "description": {
+                        "description": "Obligatoire uniquement si `reason=other`.",
+                        "type": "string",
+                        "maxLength": 2000,
+                        "minLength": 10,
+                        "example": "Le propriétaire m'a demandé de payer en dehors de la plateforme.",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "AdReportStoreSuccessResponse": {
+                "required": [
+                    "message",
+                    "data"
+                ],
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "Signalement envoye. Merci de nous aider a proteger la communaute."
+                    },
+                    "data": {
+                        "required": [
+                            "id",
+                            "status"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            "status": {
+                                "type": "string",
+                                "enum": [
+                                    "pending",
+                                    "reviewing",
+                                    "resolved",
+                                    "dismissed"
+                                ],
+                                "example": "pending"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "type": "object"
+            },
+            "AdReportValidationErrorResponse": {
+                "required": [
+                    "message",
+                    "errors"
+                ],
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "The given data was invalid."
+                    },
+                    "errors": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "schema": "AdReportSchemas",
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "type": "object"
+            },
+            "AdReportSchemas": {
+                "type": "array",
+                "items": {
+                    "type": "string"
+                }
+            },
             "AdResource": {
                 "title": "Ad Resource",
                 "description": "Ressource complète d'une annonce avec relations",
@@ -9982,6 +10182,10 @@
     },
     "tags": [
         {
+            "name": "🚩 Signalements",
+            "description": "Signalement des annonces par les clients"
+        },
+        {
             "name": "🔗 Webhooks",
             "description": "Points d'entrée pour les webhooks externes"
         },
@@ -10047,7 +10251,7 @@
         },
         {
             "name": "📦 Abonnements Agences",
-            "description": "Gestion des abonnements pour les agences immobilières. Permet de consulter les plans disponibles, souscrire via FedaPay, consulter l'abonnement actif, l'annuler et voir l'historique. Les agences reçoivent une facture par email à chaque souscription."
+            "description": "Gestion des abonnements pour les agences immobilières. Permet de consulter les plans disponibles, souscrire via Flutterwave, consulter l'abonnement actif, l'annuler et voir l'historique. Les agences reçoivent une facture par email à chaque souscription."
         },
         {
             "name": "📋 Sondages",
