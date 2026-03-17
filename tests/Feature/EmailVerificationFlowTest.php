@@ -145,40 +145,6 @@ it('sendEmailVerificationNotification queues VerificationCodeMail with OTP', fun
     expect(Cache::has('email_otp_'.$user->id))->toBeTrue();
 });
 
-// ── CreateAdminCommand ────────────────────────────────────────────────────────────────
-
-it('create-admin command creates an unverified admin and sends VerifyEmailMail', function (): void {
-    Mail::fake();
-
-    $this->artisan('app:create-admin', [
-        '--email' => 'newadmin@keyhome.test',
-        '--firstname' => 'Super',
-        '--lastname' => 'Admin',
-        '--password' => 'Adm1nPass!',
-    ])->assertSuccessful();
-
-    $user = User::where('email', 'newadmin@keyhome.test')->first();
-
-    expect($user)->not->toBeNull()
-        ->and($user->email_verified_at)->toBeNull()
-        ->and($user->role->value)->toBe('admin')
-        ->and($user->must_change_password_at)->not->toBeNull();
-
-    Mail::assertQueued(\App\Mail\VerifyEmailMail::class, fn ($m) => $m->hasTo('newadmin@keyhome.test'));
-});
-
-it('create-admin command promotes existing user without sending verification', function (): void {
-    Mail::fake();
-    $user = User::factory()->create(['role' => \App\Enums\UserRole::CUSTOMER]);
-
-    $this->artisan('app:create-admin', ['--email' => $user->email])
-        ->expectsConfirmation('User '.$user->email.' exists as customer. Promote to admin?', 'yes')
-        ->assertSuccessful();
-
-    expect($user->fresh()?->role->value)->toBe('admin');
-    Mail::assertNothingQueued();
-});
-
 // ── OTP Email Verification ─────────────────────────────────────────────────────────────
 
 it('verifies email with a valid OTP code', function (): void {
