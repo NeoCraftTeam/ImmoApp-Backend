@@ -107,7 +107,7 @@ class SubscriptionResource extends Resource
                             ->iconColor(fn (bool $state): string => $state ? 'success' : 'gray'),
                     ]),
 
-                \Filament\Schemas\Components\Section::make('Informations complémentaires')
+                Section::make('Informations complémentaires')
                     ->icon('heroicon-o-information-circle')
                     ->columns(2)
                     ->collapsible()

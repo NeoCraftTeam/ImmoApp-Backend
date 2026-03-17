@@ -6,9 +6,16 @@ namespace App\Providers\Filament;
 
 use App\Enums\AdStatus;
 use App\Filament\Admin\Pages\Dashboard;
+use App\Filament\Admin\Pages\ForcePasswordChange;
+use App\Filament\Admin\Resources\Ads\AdResource;
+use App\Filament\Admin\Resources\Payments\PaymentResource;
+use App\Filament\Admin\Resources\PendingAds\PendingAdResource;
+use App\Filament\Admin\Resources\Users\UserResource;
 use App\Filament\Admin\Widgets\StatsOverview;
 use App\Filament\Admin\Widgets\UserChart;
 use App\Filament\Admin\Widgets\UserStatusChart;
+use App\Filament\Pages\Auth\EditProfile;
+use App\Http\Middleware\RequirePasswordChange;
 use App\Models\Ad;
 use DutchCodingCompany\FilamentSocialite\FilamentSocialitePlugin;
 use DutchCodingCompany\FilamentSocialite\Provider;
@@ -18,6 +25,7 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
@@ -28,6 +36,7 @@ use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\HtmlString;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AdminPanelProvider extends PanelProvider
@@ -55,7 +64,7 @@ class AdminPanelProvider extends PanelProvider
             ->emailVerification()
             ->emailChangeVerification()
             ->globalSearch(true)
-            ->profile(\App\Filament\Pages\Auth\EditProfile::class)
+            ->profile(EditProfile::class)
             ->sidebarCollapsibleOnDesktop()
             ->font('poppins')
             ->brandLogo(fn () => view('filament.admin.brand'))
@@ -72,7 +81,7 @@ class AdminPanelProvider extends PanelProvider
             )
             ->renderHook(
                 'panels::scripts.after',
-                fn () => new \Illuminate\Support\HtmlString('
+                fn () => new HtmlString('
                     <script>
                         window.addEventListener("error", function(e) {
                             if (e.message && e.message.includes("this.getChart().destroy")) {
@@ -92,20 +101,20 @@ class AdminPanelProvider extends PanelProvider
             ->unsavedChangesAlerts()
             ->collapsibleNavigationGroups(true)
             ->navigationGroups([
-                \Filament\Navigation\NavigationGroup::make('Annonces')
+                NavigationGroup::make('Annonces')
                     ->icon('heroicon-o-megaphone'),
-                \Filament\Navigation\NavigationGroup::make('Villes & Quartiers')
+                NavigationGroup::make('Villes & Quartiers')
                     ->icon('heroicon-o-map-pin'),
-                \Filament\Navigation\NavigationGroup::make('Utilisateurs')
+                NavigationGroup::make('Utilisateurs')
                     ->icon('heroicon-o-users'),
-                \Filament\Navigation\NavigationGroup::make('Abonnements')
+                NavigationGroup::make('Abonnements')
                     ->icon('heroicon-o-credit-card'),
-                \Filament\Navigation\NavigationGroup::make('Système de Crédits')
+                NavigationGroup::make('Système de Crédits')
                     ->icon('heroicon-o-star'),
-                \Filament\Navigation\NavigationGroup::make('Configuration')
+                NavigationGroup::make('Configuration')
                     ->icon('heroicon-o-cog-6-tooth')
                     ->collapsed(),
-                \Filament\Navigation\NavigationGroup::make('Administration')
+                NavigationGroup::make('Administration')
                     ->icon('heroicon-o-shield-check')
                     ->collapsed(),
             ])
@@ -117,7 +126,7 @@ class AdminPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Admin/Pages'), for: 'App\Filament\Admin\Pages')
             ->pages([
                 Dashboard::class,
-                \App\Filament\Admin\Pages\ForcePasswordChange::class,
+                ForcePasswordChange::class,
             ])
             ->discoverWidgets(in: app_path('Filament/Admin/Widgets'), for: 'App\Filament\Admin\Widgets')
             ->widgets([
@@ -138,36 +147,36 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
-                \App\Http\Middleware\RequirePasswordChange::class,
+                RequirePasswordChange::class,
             ])
             ->plugins([
                 MobileBottomNav::make()
                     ->items([
                         MobileBottomNavItem::make('À valider')
                             ->icon('heroicon-o-clipboard-document-check')
-                            ->url(fn () => \App\Filament\Admin\Resources\PendingAds\PendingAdResource::getUrl())
+                            ->url(fn () => PendingAdResource::getUrl())
                             ->badge($this->getPendingAdsBadge())
                             ->badgeColor('danger')
                             ->isActive(fn () => request()->routeIs('filament.admin.resources.pending-ads.*')),
 
                         MobileBottomNavItem::make('Annonces')
                             ->icon('heroicon-o-megaphone')
-                            ->url(fn () => \App\Filament\Admin\Resources\Ads\AdResource::getUrl())
+                            ->url(fn () => AdResource::getUrl())
                             ->isActive(fn () => request()->routeIs('filament.admin.resources.ads.*')),
 
                         MobileBottomNavItem::make('Tableau de bord')
                             ->icon('heroicon-o-home')
-                            ->url(fn () => \App\Filament\Admin\Pages\Dashboard::getUrl())
+                            ->url(fn () => Dashboard::getUrl())
                             ->isActive(fn () => request()->routeIs('filament.admin.pages.dashboard')),
 
                         MobileBottomNavItem::make('Utilisateurs')
                             ->icon('heroicon-o-users')
-                            ->url(fn () => \App\Filament\Admin\Resources\Users\UserResource::getUrl())
+                            ->url(fn () => UserResource::getUrl())
                             ->isActive(fn () => request()->routeIs('filament.admin.resources.users.*')),
 
                         MobileBottomNavItem::make('Transactions')
                             ->icon('heroicon-o-banknotes')
-                            ->url(fn () => \App\Filament\Admin\Resources\Payments\PaymentResource::getUrl())
+                            ->url(fn () => PaymentResource::getUrl())
                             ->isActive(fn () => request()->routeIs('filament.admin.resources.payments.*')),
                     ])
                     ->moreButton(true)

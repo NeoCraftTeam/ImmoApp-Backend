@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Database\Factories\AnonymousSurveyResponseFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -22,7 +23,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Survey $survey
- * @property-read \Illuminate\Database\Eloquent\Collection<int, AnonymousSurveyAnswer> $answers
+ * @property-read Collection<int, AnonymousSurveyAnswer> $answers
  *
  * @method static AnonymousSurveyResponseFactory factory($count = null, $state = [])
  */

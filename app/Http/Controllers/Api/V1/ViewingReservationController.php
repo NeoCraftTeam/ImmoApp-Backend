@@ -12,6 +12,7 @@ use App\Models\TentativeReservation;
 use App\Policies\TentativeReservationPolicy;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -57,19 +58,19 @@ final readonly class ViewingReservationController
             $slotsRaw = $this->scheduleService->getBookableSlotsForRange($ad, $from, $to);
 
             // Fetch active reservations in range to overlay status.
-            $activeReservations = \App\Models\TentativeReservation::query()
+            $activeReservations = TentativeReservation::query()
                 ->where('ad_id', $ad->id)
                 ->active()
                 ->whereDate('slot_date', '>=', $from)
                 ->whereDate('slot_date', '<=', $to)
                 ->get()
-                ->groupBy(fn (\App\Models\TentativeReservation $r): string => $r->slot_date->toDateString());
+                ->groupBy(fn (TentativeReservation $r): string => $r->slot_date->toDateString());
 
             $slotsByDate = [];
             foreach ($slotsRaw as $date => $daySlots) {
                 $slotsByDate[$date] = collect($daySlots)->map(function (array $slot) use ($date, $activeReservations): array {
                     $isReserved = $activeReservations->get($date)?->contains(
-                        fn (\App\Models\TentativeReservation $r): bool => \Carbon\Carbon::parse($r->slot_starts_at)->format('H:i') === $slot['start_time']
+                        fn (TentativeReservation $r): bool => Carbon::parse($r->slot_starts_at)->format('H:i') === $slot['start_time']
                     ) ?? false;
 
                     return [

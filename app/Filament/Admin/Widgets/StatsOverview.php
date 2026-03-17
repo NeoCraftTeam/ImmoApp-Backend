@@ -12,6 +12,7 @@ use App\Models\Review;
 use App\Models\User;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Database\Eloquent\Model;
 
 class StatsOverview extends StatsOverviewWidget
 {
@@ -94,7 +95,7 @@ class StatsOverview extends StatsOverviewWidget
     /**
      * Get monthly creation trend for a model over the last 7 months.
      *
-     * @param  class-string<\Illuminate\Database\Eloquent\Model>  $model
+     * @param  class-string<Model>  $model
      * @return array<int, int>
      */
     private function getMonthlyTrend(string $model): array

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 use NotificationChannels\WebPush\PushSubscription as BasePushSubscription;
 
 /**
@@ -15,10 +17,10 @@ use NotificationChannels\WebPush\PushSubscription as BasePushSubscription;
  * @property string|null $public_key
  * @property string|null $auth_token
  * @property string|null $content_encoding
- * @property \Illuminate\Support\Carbon|null $last_used_at
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read \Illuminate\Database\Eloquent\Model $subscribable
+ * @property Carbon|null $last_used_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property-read Model $subscribable
  */
 class PushSubscription extends BasePushSubscription
 {

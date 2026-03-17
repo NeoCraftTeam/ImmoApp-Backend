@@ -18,6 +18,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use UnitEnum;
 
 class LeaseContractResource extends Resource
@@ -155,7 +156,7 @@ class LeaseContractResource extends Resource
                     ->label('Télécharger')
                     ->icon(Heroicon::ArrowDownTray)
                     ->color('info')
-                    ->action(fn (LeaseContract $record): \Symfony\Component\HttpFoundation\StreamedResponse => response()->streamDownload(
+                    ->action(fn (LeaseContract $record): StreamedResponse => response()->streamDownload(
                         fn () => print (Storage::disk(config('filesystems.app_media_disk'))->get($record->pdf_path)),
                         "contrat-{$record->contract_number}.pdf",
                         ['Content-Type' => 'application/pdf'],

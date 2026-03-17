@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Enums\UserRole;
 use App\Models\User;
 use App\Services\AgencyService;
+use Filament\Facades\Filament;
 use Illuminate\Console\Command;
 
 class TestMultiTenancyFlow extends Command
@@ -30,7 +32,7 @@ class TestMultiTenancyFlow extends Command
                 'password' => 'password',
             ]);
             $user->forceFill([
-                'role' => \App\Enums\UserRole::CUSTOMER,
+                'role' => UserRole::CUSTOMER,
                 'email_verified_at' => now(),
             ])->save();
         }
@@ -56,7 +58,7 @@ class TestMultiTenancyFlow extends Command
                 ['Role', $user->role->value],
                 ['Type', $user->type->value],
                 ['Agency ID', $user->agency_id],
-                ['Panel Access', $user->canAccessPanel(\Filament\Facades\Filament::getPanel($type)) ? '✅ ALLOWED' : '❌ DENIED'],
+                ['Panel Access', $user->canAccessPanel(Filament::getPanel($type)) ? '✅ ALLOWED' : '❌ DENIED'],
             ]
         );
     }

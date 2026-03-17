@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Models\Subscription;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -15,7 +16,7 @@ class SubscriptionSuccessEmail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public \App\Models\Subscription $subscription)
+    public function __construct(public Subscription $subscription)
     {
         $this->onQueue('emails');
     }

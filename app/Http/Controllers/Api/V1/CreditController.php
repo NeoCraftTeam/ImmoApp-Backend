@@ -14,6 +14,7 @@ use App\Models\Ad;
 use App\Models\AdInteraction;
 use App\Models\Payment;
 use App\Models\PointPackage;
+use App\Models\Setting;
 use App\Models\UnlockedAd;
 use App\Services\Payment\PaymentService;
 use App\Services\PointService;
@@ -229,7 +230,7 @@ final class CreditController
         $synced = $this->paymentService->syncPaymentStatus($payment);
 
         if ($synced->status === PaymentStatus::SUCCESS) {
-            return \Illuminate\Support\Facades\DB::transaction(function () use ($user, $synced): JsonResponse {
+            return DB::transaction(function () use ($user, $synced): JsonResponse {
                 /** @var Payment $lockedPayment */
                 $lockedPayment = Payment::where('id', $synced->id)
                     ->lockForUpdate()
@@ -326,7 +327,7 @@ final class CreditController
             return response()->json(['status' => 'already_unlocked']);
         }
 
-        $cost = (int) \App\Models\Setting::get('unlock_cost_points', 2);
+        $cost = (int) Setting::get('unlock_cost_points', 2);
 
         if ($user->point_balance < $cost) {
             return response()->json([

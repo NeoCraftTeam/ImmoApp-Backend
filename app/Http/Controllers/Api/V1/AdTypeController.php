@@ -91,7 +91,7 @@ final class AdTypeController
 
             return response()->json([
                 'message' => 'Crée avec succès',
-                'data' => new adTypeResource($type),
+                'data' => new AdTypeResource($type),
             ], 201); // 201 = Created
 
         } catch (Exception $e) {

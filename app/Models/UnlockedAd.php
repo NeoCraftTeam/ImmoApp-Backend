@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Spatie\Activitylog\LogOptions;
 
 /**
  * @property-read Ad|null $ad
@@ -78,9 +79,9 @@ class UnlockedAd extends Model
         return ['unlocked_at' => 'datetime', 'updated_at' => 'datetime'];
     }
 
-    public function getActivitylogOptions(): \Spatie\Activitylog\LogOptions
+    public function getActivitylogOptions(): LogOptions
     {
-        return \Spatie\Activitylog\LogOptions::defaults()
+        return LogOptions::defaults()
             ->logAll()
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()

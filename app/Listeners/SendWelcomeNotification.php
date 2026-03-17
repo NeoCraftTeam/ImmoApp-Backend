@@ -9,6 +9,7 @@ namespace App\Listeners;
 use App\Enums\UserRole;
 use App\Mail\AdminWelcomeEmail;
 use App\Mail\WelcomeEmail;
+use App\Models\User;
 use Exception;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -26,7 +27,7 @@ class SendWelcomeNotification implements ShouldQueue
      */
     public function handle(Verified $event): void
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $event->user;
 
         $cacheKey = 'welcome_email_sent_'.$user->id;
@@ -132,7 +133,7 @@ class SendWelcomeNotification implements ShouldQueue
      */
     public function failed(Verified $event, Exception $exception): void
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $event->user;
 
         Log::error('SendWelcomeNotification job failed', [

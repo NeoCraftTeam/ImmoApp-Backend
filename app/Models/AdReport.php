@@ -7,10 +7,13 @@ namespace App\Models;
 use App\Enums\AdReportReason;
 use App\Enums\AdReportScamReason;
 use App\Enums\AdReportStatus;
+use Database\Factories\AdReportFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -25,14 +28,14 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property string|null $description
  * @property AdReportStatus $status
  * @property string|null $admin_notes
- * @property \Illuminate\Support\Carbon|null $resolved_at
+ * @property Carbon|null $resolved_at
  * @property string|null $resolved_by
  * @property string|null $ip_address
  * @property string|null $user_agent
  */
 class AdReport extends Model
 {
-    /** @use HasFactory<\Database\Factories\AdReportFactory> */
+    /** @use HasFactory<AdReportFactory> */
     use HasFactory, HasUuids, LogsActivity;
 
     protected $fillable = [
@@ -83,7 +86,7 @@ class AdReport extends Model
         return $this->belongsTo(User::class, 'resolved_by');
     }
 
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function open($query): void
     {
         $query->whereIn('status', [AdReportStatus::PENDING, AdReportStatus::REVIEWING]);

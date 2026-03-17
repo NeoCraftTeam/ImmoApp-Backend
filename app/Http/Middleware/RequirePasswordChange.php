@@ -13,7 +13,7 @@ class RequirePasswordChange
      * Handle an incoming request.
      * Redirects admin users who must change their password to the force-password-change page.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {

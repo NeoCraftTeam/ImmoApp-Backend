@@ -6,7 +6,15 @@ namespace App\Providers;
 
 use App\Enums\UserRole;
 use App\Enums\UserType;
+use App\Models\Ad;
+use App\Models\Payment;
 use App\Models\PersonalAccessToken;
+use App\Models\TentativeReservation;
+use App\Models\User;
+use App\Observers\ActivityObserver;
+use App\Observers\AdObserver;
+use App\Observers\PaymentObserver;
+use App\Observers\TentativeReservationObserver;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
 use App\Services\ReservationService;
@@ -15,10 +23,12 @@ use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Activitylog\Models\Activity;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -46,10 +56,10 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
-        \App\Models\Payment::observe(\App\Observers\PaymentObserver::class);
-        \App\Models\Ad::observe(\App\Observers\AdObserver::class);
-        \App\Models\TentativeReservation::observe(\App\Observers\TentativeReservationObserver::class);
-        \Spatie\Activitylog\Models\Activity::observe(\App\Observers\ActivityObserver::class);
+        Payment::observe(PaymentObserver::class);
+        Ad::observe(AdObserver::class);
+        TentativeReservation::observe(TentativeReservationObserver::class);
+        Activity::observe(ActivityObserver::class);
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
@@ -67,7 +77,7 @@ class AppServiceProvider extends ServiceProvider
             $link = "{$frontendUrl}/reset-password?token={$token}&email={$notifiable->getEmailForVerification()}";
 
             if (app()->isLocal()) {
-                \Illuminate\Support\Facades\Log::debug('PASSWORD RESET LINK: '.$link);
+                Log::debug('PASSWORD RESET LINK: '.$link);
             }
 
             return $link;
@@ -96,7 +106,7 @@ class AppServiceProvider extends ServiceProvider
             return $verificationUrl;
         });
 
-        Gate::define('viewPulse', fn (?\App\Models\User $user = null) => $user?->isAdmin() ?? false);
+        Gate::define('viewPulse', fn (?User $user = null) => $user?->isAdmin() ?? false);
     }
 
     private function ensureLivewireTmpDirectoryExists(): void

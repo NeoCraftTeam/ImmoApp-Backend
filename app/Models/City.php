@@ -7,6 +7,7 @@ namespace App\Models;
 use Database\Factories\CityFactory;
 use Eloquent;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -36,9 +37,9 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @method static Builder<static>|City withTrashed(bool $withTrashed = true)
  * @method static Builder<static>|City withoutTrashed()
  *
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Quarter> $quarters
+ * @property-read Collection<int, Quarter> $quarters
  * @property-read int|null $quarters_count
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\User> $users
+ * @property-read Collection<int, User> $users
  * @property-read int|null $users_count
  *
  * @mixin Eloquent

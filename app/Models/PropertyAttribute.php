@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Carbon\Carbon;
+use Database\Factories\PropertyAttributeFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -23,12 +26,12 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property string $admin_icon
  * @property bool $is_active
  * @property int $sort_order
- * @property \Carbon\Carbon $created_at
- * @property \Carbon\Carbon $updated_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 class PropertyAttribute extends Model
 {
-    /** @use HasFactory<\Database\Factories\PropertyAttributeFactory> */
+    /** @use HasFactory<PropertyAttributeFactory> */
     use HasFactory, LogsActivity;
 
     protected $fillable = [
@@ -74,7 +77,7 @@ class PropertyAttribute extends Model
             ->setDescriptionForEvent(fn (string $eventName): string => "Attribut « {$this->name} » {$eventName}");
     }
 
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function active(Builder $query): Builder
     {
         return $query->where('is_active', true);
@@ -83,7 +86,7 @@ class PropertyAttribute extends Model
     /**
      * Scope: ordered by sort_order then name.
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function ordered(Builder $query): Builder
     {
         return $query->orderBy('sort_order')->orderBy('name');

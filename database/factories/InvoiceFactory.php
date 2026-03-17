@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\SubscriptionStatus;
 use App\Models\Agency;
 use App\Models\Invoice;
 use App\Models\Subscription;
@@ -39,7 +40,7 @@ class InvoiceFactory extends Factory
             'agency_id' => $agency->id,
             'subscription_plan_id' => $plan->id,
             'billing_period' => 'monthly',
-            'status' => \App\Enums\SubscriptionStatus::ACTIVE,
+            'status' => SubscriptionStatus::ACTIVE,
             'amount_paid' => 35000,
             'auto_renew' => false,
             'starts_at' => now(),

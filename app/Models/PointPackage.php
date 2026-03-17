@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Database\Factories\PointPackageFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -20,7 +22,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  */
 class PointPackage extends Model
 {
-    /** @use HasFactory<\Database\Factories\PointPackageFactory> */
+    /** @use HasFactory<PointPackageFactory> */
     use HasFactory, \Illuminate\Database\Eloquent\Concerns\HasUuids, LogsActivity;
 
     protected $fillable = [
@@ -50,7 +52,7 @@ class PointPackage extends Model
         return $this->hasMany(PointTransaction::class, 'payment_id');
     }
 
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function active($query): void
     {
         $query->where('is_active', true)->orderBy('sort_order');

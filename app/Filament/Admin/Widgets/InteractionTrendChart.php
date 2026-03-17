@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Widgets;
 
 use App\Models\AdInteraction;
+use Carbon\Carbon;
 use Filament\Widgets\ChartWidget;
 
 class InteractionTrendChart extends ChartWidget
@@ -71,7 +72,7 @@ class InteractionTrendChart extends ChartWidget
                     'tension' => 0.4,
                 ],
             ],
-            'labels' => $dates->map(fn (string $date) => \Carbon\Carbon::parse($date)->format('d/m')),
+            'labels' => $dates->map(fn (string $date) => Carbon::parse($date)->format('d/m')),
         ];
     }
 

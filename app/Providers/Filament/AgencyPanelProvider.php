@@ -4,14 +4,20 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\CustomRegister;
+use App\Filament\Pages\Auth\EditProfile;
+use App\Models\Agency;
 use DutchCodingCompany\FilamentSocialite\FilamentSocialitePlugin;
 use DutchCodingCompany\FilamentSocialite\Provider;
+use Filament\Auth\MultiFactor\App\AppAuthentication;
+use Filament\Auth\MultiFactor\Email\EmailAuthentication;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
+use Filament\Support\Assets\Js;
 use Filament\Support\Colors\Color;
 use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -19,6 +25,7 @@ use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\HtmlString;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class AgencyPanelProvider extends PanelProvider
@@ -36,22 +43,22 @@ class AgencyPanelProvider extends PanelProvider
             ->brandLogoHeight('3.5rem')
             ->login()
             ->passwordReset()
-            ->registration(\App\Filament\Pages\Auth\CustomRegister::class)
-            ->profile(\App\Filament\Pages\Auth\EditProfile::class)
+            ->registration(CustomRegister::class)
+            ->profile(EditProfile::class)
             ->emailVerification()
             ->databaseTransactions()
             ->colors([
-                'primary' => \Filament\Support\Colors\Color::hex('#2563eb'), // Bleu Agence
+                'primary' => Color::hex('#2563eb'), // Bleu Agence
             ])
             ->multiFactorAuthentication([
-                \Filament\Auth\MultiFactor\App\AppAuthentication::make()
+                AppAuthentication::make()
                     ->recoverable()
                     ->recoveryCodeCount(10)
                     ->regenerableRecoveryCodes(false)
                     ->brandName('KeyHome Agency App'),
-                \Filament\Auth\MultiFactor\Email\EmailAuthentication::make(),
+                EmailAuthentication::make(),
             ], isRequired: false)
-            ->tenant(\App\Models\Agency::class)
+            ->tenant(Agency::class)
             ->discoverResources(in: app_path('Filament/Agency/Resources'), for: 'App\Filament\Agency\Resources')
             ->discoverPages(in: app_path('Filament/Agency/Pages'), for: 'App\Filament\Agency\Pages')
             ->pages([
@@ -81,7 +88,7 @@ class AgencyPanelProvider extends PanelProvider
             )
             ->renderHook(
                 'panels::head.end',
-                fn () => new \Illuminate\Support\HtmlString('<style>.fi-no { z-index: 9999 !important; }</style>'),
+                fn () => new HtmlString('<style>.fi-no { z-index: 9999 !important; }</style>'),
             )
             ->renderHook(
                 'panels::body.end',
@@ -97,7 +104,7 @@ class AgencyPanelProvider extends PanelProvider
             )
             ->assets([
                 // Bridge natif minimal
-                \Filament\Support\Assets\Js::make('filament-native-bridge', resource_path('js/filament-native-bridge.js')),
+                Js::make('filament-native-bridge', resource_path('js/filament-native-bridge.js')),
             ])
             ->plugins([
                 FilamentSocialitePlugin::make()

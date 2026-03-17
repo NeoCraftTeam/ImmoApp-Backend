@@ -3,7 +3,10 @@
 declare(strict_types=1);
 
 use NunoMaduro\PhpInsights\Domain\Insights\ForbiddenFinalClasses;
+use NunoMaduro\PhpInsights\Domain\Insights\ForbiddenNormalClasses;
+use NunoMaduro\PhpInsights\Domain\Insights\ForbiddenTraits;
 use NunoMaduro\PhpInsights\Domain\Metrics\Architecture\Classes;
+use PHP_CodeSniffer\Standards\Generic\Sniffs\Formatting\SpaceAfterNotSniff;
 
 return [
     'preset' => 'laravel',
@@ -17,9 +20,9 @@ return [
         ],
     ],
     'remove' => [
-        \PHP_CodeSniffer\Standards\Generic\Sniffs\Formatting\SpaceAfterNotSniff::class,
-        \NunoMaduro\PhpInsights\Domain\Insights\ForbiddenNormalClasses::class,
-        \NunoMaduro\PhpInsights\Domain\Insights\ForbiddenTraits::class,
+        SpaceAfterNotSniff::class,
+        ForbiddenNormalClasses::class,
+        ForbiddenTraits::class,
     ],
     'config' => [
         //  ...

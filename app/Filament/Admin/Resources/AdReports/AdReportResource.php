@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\AdReports;
 
+use App\Enums\AdReportStatus;
 use App\Filament\Admin\Resources\AdReports\Pages\EditAdReport;
 use App\Filament\Admin\Resources\AdReports\Pages\ListAdReports;
 use App\Filament\Admin\Resources\AdReports\Schemas\AdReportForm;
@@ -60,7 +61,7 @@ class AdReportResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        $pending = AdReport::query()->where('status', \App\Enums\AdReportStatus::PENDING)->count();
+        $pending = AdReport::query()->where('status', AdReportStatus::PENDING)->count();
 
         return $pending > 0 ? (string) $pending : null;
     }

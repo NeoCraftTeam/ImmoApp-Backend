@@ -6,6 +6,7 @@ namespace App\Filament\Agency\Widgets;
 
 use App\Models\Ad;
 use App\Models\AdInteraction;
+use Carbon\Carbon;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\Auth;
 
@@ -64,7 +65,7 @@ class AdViewsChart extends ChartWidget
                     'tension' => 0.4,
                 ],
             ],
-            'labels' => $dates->map(fn (string $date) => \Carbon\Carbon::parse($date)->format('d/m')),
+            'labels' => $dates->map(fn (string $date) => Carbon::parse($date)->format('d/m')),
         ];
     }
 

@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\PushSubscription;
+
 return [
 
     /*
@@ -25,7 +27,7 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'model' => \App\Models\PushSubscription::class,
+    'model' => PushSubscription::class,
 
     /*
     |--------------------------------------------------------------------------

@@ -1,11 +1,19 @@
 <?php
 
+use App\Providers\AppServiceProvider;
+use App\Providers\AuthServiceProvider;
+use App\Providers\EventServiceProvider;
+use App\Providers\Filament\AdminPanelProvider;
+use App\Providers\Filament\AgencyPanelProvider;
+use App\Providers\Filament\BailleurPanelProvider;
+use App\Providers\TelescopeServiceProvider;
+
 return array_filter([
-    App\Providers\AppServiceProvider::class,
-    App\Providers\AuthServiceProvider::class,
-    App\Providers\EventServiceProvider::class,
-    App\Providers\Filament\AdminPanelProvider::class,
-    App\Providers\Filament\AgencyPanelProvider::class,
-    App\Providers\Filament\BailleurPanelProvider::class,
-    App\Providers\TelescopeServiceProvider::class,
+    AppServiceProvider::class,
+    AuthServiceProvider::class,
+    EventServiceProvider::class,
+    AdminPanelProvider::class,
+    AgencyPanelProvider::class,
+    BailleurPanelProvider::class,
+    TelescopeServiceProvider::class,
 ]);

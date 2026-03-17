@@ -24,7 +24,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
- * @property-read \App\Models\City $city
+ * @property-read City $city
  *
  * @method static QuarterFactory factory($count = null, $state = [])
  * @method static Builder<static>|Quarter newModelQuery()

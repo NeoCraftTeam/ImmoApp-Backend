@@ -8,6 +8,7 @@ use App\Filament\Admin\Resources\Ads\AdResource;
 use App\Models\Ad;
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ManageRecords;
+use Illuminate\Support\Facades\DB;
 
 class ManageAds extends ManageRecords
 {
@@ -20,7 +21,7 @@ class ManageAds extends ManageRecords
             CreateAction::make()
                 ->successNotificationTitle('Annonce créée avec succès')
                 ->mutateFormDataUsing(fn (array $data): array => AdResource::mutateLocationMapData($data))
-                ->using(fn (array $data, string $model): Ad => \Illuminate\Support\Facades\DB::transaction(fn () => $model::create($data))),
+                ->using(fn (array $data, string $model): Ad => DB::transaction(fn () => $model::create($data))),
         ];
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Models\Agency;
 use App\Models\Invoice;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -38,7 +39,7 @@ class InvoiceResource extends JsonResource
                 ? $this->period_start->format('d/m/Y').' — '.$this->period_end->format('d/m/Y')
                 : null,
             'agency' => $this->whenLoaded('agency', function () {
-                /** @var \App\Models\Agency $agency */
+                /** @var Agency $agency */
                 $agency = $this->agency;
 
                 return [

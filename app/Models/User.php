@@ -9,8 +9,10 @@ namespace App\Models;
 use App\Enums\PointTransactionType;
 use App\Enums\UserRole;
 use App\Enums\UserType;
+use App\Mail\ForgotPasswordMail;
 use App\Mail\VerificationCodeMail;
 use App\Mail\VerifyEmailMail;
+use App\Services\PointService;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\UserFactory;
 use Eloquent;
@@ -26,10 +28,13 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Notifications\DatabaseNotificationCollection;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -40,6 +45,7 @@ use Illuminate\Support\Facades\URL;
 use InvalidArgumentException;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\PersonalAccessToken;
+use Laravolt\Avatar\Facade;
 use NotificationChannels\WebPush\HasPushSubscriptions;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -66,7 +72,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property Carbon|null $deleted_at
  * @property-read Collection<int, Ad> $ads
  * @property-read int|null $ads_count
- * @property-read \Illuminate\Notifications\DatabaseNotificationCollection<int, \Illuminate\Notifications\DatabaseNotification> $notifications
+ * @property-read DatabaseNotificationCollection<int, DatabaseNotification> $notifications
  * @property-read int|null $notifications_count
  * @property-read Collection<int, Payment> $payments
  * @property-read int|null $payments_count
@@ -199,7 +205,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         static::created(function (User $user): void {
             $bonus = (int) Setting::get('welcome_bonus_points', 5);
             if ($bonus > 0) {
-                app(\App\Services\PointService::class)->credit(
+                app(PointService::class)->credit(
                     $user,
                     $bonus,
                     PointTransactionType::BONUS,
@@ -225,7 +231,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
         $storagePath = 'avatars/'.$this->id.'/avatar.webp';
         $tempFile = sys_get_temp_dir().'/avatar_'.uniqid('', true).'.png';
-        \Laravolt\Avatar\Facade::create($name)->save($tempFile, 80);
+        Facade::create($name)->save($tempFile, 80);
         Storage::disk(config('filesystems.app_media_disk'))->put($storagePath, (string) file_get_contents($tempFile));
         @unlink($tempFile);
         $this->avatar = $storagePath;
@@ -379,7 +385,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return collect([$this->agency])->filter();
     }
 
-    public function canAccessTenant(\Illuminate\Database\Eloquent\Model $tenant): bool
+    public function canAccessTenant(Model $tenant): bool
     {
         if ($this->isAdmin()) {
             return true;
@@ -522,8 +528,8 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         $requestedFrom = request()->ip() ?? 'inconnu';
         $requestedAt = now()->translatedFormat('d F Y à H:i');
 
-        \Illuminate\Support\Facades\Mail::to($this->email, $this->firstname)
-            ->queue(new \App\Mail\ForgotPasswordMail($resetUrl, $requestedFrom, $requestedAt));
+        Mail::to($this->email, $this->firstname)
+            ->queue(new ForgotPasswordMail($resetUrl, $requestedFrom, $requestedAt));
     }
 
     /**

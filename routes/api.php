@@ -33,6 +33,10 @@ use App\Http\Controllers\Api\V1\TourController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\ViewingAvailabilityController;
 use App\Http\Controllers\Api\V1\ViewingReservationController;
+use App\Http\Controllers\Api\V1\VisitTrackingController;
+use App\Models\Ad;
+use App\Models\City;
+use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
 // Health check endpoint (used by CI/CD smoke tests)
@@ -181,14 +185,14 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/property-attributes', [PropertyAttributeController::class, 'index']);
 
     // --- VISIT TRACKING (anonymous) ---
-    Route::post('/track/visit', [\App\Http\Controllers\Api\V1\VisitTrackingController::class, 'store'])
+    Route::post('/track/visit', [VisitTrackingController::class, 'store'])
         ->middleware('throttle:60,1');
 
     // --- PUBLIC LANDING STATS ---
     Route::get('/stats/landing', fn () => response()->json([
-        'ads_count' => \App\Models\Ad::query()->publiclyListed()->where('is_visible', true)->count(),
-        'cities_count' => \App\Models\City::query()->count(),
-        'users_count' => \App\Models\User::query()->count(),
+        'ads_count' => Ad::query()->publiclyListed()->where('is_visible', true)->count(),
+        'cities_count' => City::query()->count(),
+        'users_count' => User::query()->count(),
     ]))->middleware('throttle:30,1');
 
     // --- CLERK WEBHOOKS ---

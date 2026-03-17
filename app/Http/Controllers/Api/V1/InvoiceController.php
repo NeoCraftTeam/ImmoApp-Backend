@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Resources\InvoiceResource;
 use App\Models\Agency;
 use App\Models\Invoice;
+use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -53,7 +54,7 @@ final class InvoiceController
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         $agency = $user->agency;
 
@@ -90,9 +91,9 @@ final class InvoiceController
      */
     public function show(Request $request, Invoice $invoice): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
-        /** @var \App\Models\Agency|null $agency */
+        /** @var Agency|null $agency */
         $agency = $user->agency;
 
         if (!$agency || $invoice->agency_id !== $agency->id) {
@@ -128,9 +129,9 @@ final class InvoiceController
      */
     public function download(Request $request, Invoice $invoice): Response
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
-        /** @var \App\Models\Agency|null $agency */
+        /** @var Agency|null $agency */
         $agency = $user->agency;
 
         if (!$agency || $invoice->agency_id !== $agency->id) {

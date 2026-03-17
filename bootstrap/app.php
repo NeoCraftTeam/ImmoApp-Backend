@@ -1,8 +1,14 @@
 <?php
 
+use App\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\LivewireLongRunningRequest;
+use App\Http\Middleware\OptionalAuth;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
+use League\Flysystem\UnableToRetrieveMetadata;
 use Sentry\Laravel\Integration;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -20,13 +26,13 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/v1/payments/webhook',
         ]);
         $middleware->alias([
-            'active' => \App\Http\Middleware\EnsureUserIsActive::class,
-            'optional.auth' => \App\Http\Middleware\OptionalAuth::class,
+            'active' => EnsureUserIsActive::class,
+            'optional.auth' => OptionalAuth::class,
         ]);
-        $middleware->prependToGroup('web', \App\Http\Middleware\LivewireLongRunningRequest::class);
+        $middleware->prependToGroup('web', LivewireLongRunningRequest::class);
         // Append is_active check to all sanctum-authenticated API routes
         $middleware->appendToGroup('api', [
-            \App\Http\Middleware\EnsureUserIsActive::class,
+            EnsureUserIsActive::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
@@ -40,7 +46,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'errors' => ['file' => [$msg]],
         ], 422);
 
-        $exceptions->renderable(function (\League\Flysystem\UnableToRetrieveMetadata $e, \Illuminate\Http\Request $request) use ($fileUploadErrorResponse, $fileExpiredMessage) {
+        $exceptions->renderable(function (UnableToRetrieveMetadata $e, Request $request) use ($fileUploadErrorResponse, $fileExpiredMessage) {
             if ($request->is('livewire/*')) {
                 report($e);
 
@@ -49,8 +55,8 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         // Catch any exception on the upload endpoint (disk, Flysystem, etc.)
-        $exceptions->renderable(function (\Throwable $e, \Illuminate\Http\Request $request) use ($fileUploadErrorResponse) {
-            if ($request->is('livewire/upload-file') && !$e instanceof \Illuminate\Validation\ValidationException) {
+        $exceptions->renderable(function (Throwable $e, Request $request) use ($fileUploadErrorResponse) {
+            if ($request->is('livewire/upload-file') && !$e instanceof ValidationException) {
                 report($e);
 
                 return $fileUploadErrorResponse('Le fichier téléversé est invalide ou trop volumineux.');

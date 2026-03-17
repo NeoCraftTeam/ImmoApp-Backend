@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * Tracks user interactions with ads (views, favorites, searches, unlocks).
@@ -18,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $ad_id
  * @property string $type
  * @property array|null $metadata
- * @property \Illuminate\Support\Carbon $created_at
+ * @property Carbon $created_at
  * @property-read User $user
  * @property-read Ad|null $ad
  */

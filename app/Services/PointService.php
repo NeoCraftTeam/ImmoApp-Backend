@@ -42,8 +42,8 @@ class PointService
         ?string $adId = null
     ): PointTransaction {
         return DB::transaction(function () use ($user, $cost, $description, $adId): PointTransaction {
-            /** @var \App\Models\User $freshUser */
-            $freshUser = \App\Models\User::query()
+            /** @var User $freshUser */
+            $freshUser = User::query()
                 ->lockForUpdate()
                 ->findOrFail($user->id);
 
@@ -75,7 +75,7 @@ class PointService
         ?string $paymentId = null
     ): PointTransaction {
         return DB::transaction(function () use ($user, $points, $type, $description, $paymentId): PointTransaction {
-            /** @var \App\Models\User $freshUser */
+            /** @var User $freshUser */
             $freshUser = User::query()
                 ->lockForUpdate()
                 ->findOrFail($user->id);

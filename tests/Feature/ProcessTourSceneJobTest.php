@@ -157,7 +157,7 @@ it('marks scene as failed when an exception occurs', function (): void {
         sourceR2Path: "ads/{$ad->id}/tours/salon.jpg",
     );
 
-    $job->failed(new \RuntimeException('GD memory exhausted'));
+    $job->failed(new RuntimeException('GD memory exhausted'));
 
     $updated = $ad->fresh();
     $scene = collect($updated->tour_config['scenes'])->firstWhere('id', 's1');

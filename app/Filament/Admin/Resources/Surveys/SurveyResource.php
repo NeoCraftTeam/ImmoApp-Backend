@@ -10,6 +10,7 @@ use App\Models\Survey;
 use App\Models\SurveyResponse;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -149,7 +150,7 @@ class SurveyResource extends Resource
                     ->icon(Heroicon::Users)
                     ->columnSpanFull()
                     ->schema([
-                        \Filament\Infolists\Components\ViewEntry::make('respondents_view')
+                        ViewEntry::make('respondents_view')
                             ->label('')
                             ->columnSpanFull()
                             ->view('filament.surveys.respondents-infolist'),
@@ -205,7 +206,7 @@ class SurveyResource extends Resource
                     ->icon(Heroicon::QuestionMarkCircle)
                     ->color('gray')
                     ->url(fn (Survey $record): string => SurveyTemplateResource::getUrl('edit', ['record' => $record])),
-                \Filament\Actions\EditAction::make(),
+                EditAction::make(),
             ]);
     }
 

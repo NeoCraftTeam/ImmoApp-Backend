@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\Surveys\Pages;
 
+use App\Filament\Admin\Resources\Surveys\SurveyResource;
 use App\Filament\Admin\Resources\Surveys\SurveyTemplateResource;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\EditRecord;
@@ -21,7 +22,7 @@ class EditSurveyTemplate extends EditRecord
                 ->label('Voir le sondage')
                 ->icon(Heroicon::ClipboardDocumentList)
                 ->color('gray')
-                ->url(fn () => \App\Filament\Admin\Resources\Surveys\SurveyResource::getUrl('view', ['record' => $this->record]))
+                ->url(fn () => SurveyResource::getUrl('view', ['record' => $this->record]))
                 ->openUrlInNewTab(false),
         ];
     }

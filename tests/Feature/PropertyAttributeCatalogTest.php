@@ -2,6 +2,7 @@
 
 use App\Models\Ad;
 use App\Models\PropertyAttribute;
+use App\Models\PropertyAttributeCategory;
 use App\Models\User;
 use App\Support\PropertyAttributeCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -17,7 +18,7 @@ it('imports grouped property attributes with command', function (): void {
     $this->artisan('make:upload-attributes')
         ->assertSuccessful();
 
-    expect(\App\Models\PropertyAttributeCategory::query()->count())->toBe($categoryCount);
+    expect(PropertyAttributeCategory::query()->count())->toBe($categoryCount);
     expect(PropertyAttribute::query()->count())->toBe($attributeCount);
 });
 

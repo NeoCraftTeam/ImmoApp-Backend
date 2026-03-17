@@ -10,6 +10,7 @@ use App\Models\Zap\Schedule;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
@@ -31,7 +32,7 @@ function availAd(User $owner): Ad
 function insertSchedule(Ad $ad, array $extra = []): Schedule
 {
     $id = fake()->uuid();
-    \Illuminate\Support\Facades\DB::table('schedules')->insert(array_merge([
+    DB::table('schedules')->insert(array_merge([
         'id' => $id,
         'schedulable_type' => Ad::class,
         'schedulable_id' => $ad->id,

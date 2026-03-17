@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
-/** @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Payment> */
+/** @extends Factory<Payment> */
 class PaymentFactory extends Factory
 {
     protected $model = Payment::class;

@@ -9,7 +9,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
 
-/** @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\UnlockedAd> */
+/** @extends Factory<UnlockedAd> */
 class UnlockedAdFactory extends Factory
 {
     protected $model = UnlockedAd::class;

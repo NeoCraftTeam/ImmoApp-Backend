@@ -7,15 +7,20 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
 use App\Enums\PointTransactionType;
+use App\Exceptions\InvalidWebhookSignatureException;
+use App\Exceptions\PaymentGatewayException;
 use App\Http\Requests\Api\V1\FlutterwaveInitiateRequest;
 use App\Http\Requests\Api\V1\FlutterwaveVerifyRequest;
 use App\Http\Resources\PaymentResource;
 use App\Mail\CreditPurchaseConfirmationMail;
+use App\Models\Agency;
 use App\Models\Payment;
 use App\Models\PointPackage;
+use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\Payment\PaymentService;
 use App\Services\PointService;
+use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -139,7 +144,7 @@ final class PaymentController
             return null;
         }
 
-        $plan = \App\Models\SubscriptionPlan::where('id', $planId)->where('is_active', true)->first();
+        $plan = SubscriptionPlan::where('id', $planId)->where('is_active', true)->first();
 
         if (!$plan) {
             return null;
@@ -315,9 +320,9 @@ final class PaymentController
 
                 $this->handlePostPaymentActions($payment, $payload['data'] ?? []);
             });
-        } catch (\App\Exceptions\InvalidWebhookSignatureException) {
+        } catch (InvalidWebhookSignatureException) {
             return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
-        } catch (\App\Exceptions\PaymentGatewayException|\Exception $e) {
+        } catch (PaymentGatewayException|\Exception $e) {
             Log::error('Flutterwave webhook error: '.$e->getMessage());
 
             return response()->json(['status' => 'error'], 500);
@@ -384,10 +389,10 @@ final class PaymentController
             $period = $payment->period ?? ($metadata['period'] ?? 'monthly');
 
             if ($agencyId && $planId) {
-                $agency = \App\Models\Agency::find($agencyId);
-                $plan = \App\Models\SubscriptionPlan::find($planId);
+                $agency = Agency::find($agencyId);
+                $plan = SubscriptionPlan::find($planId);
                 if ($agency && $plan) {
-                    $subscriptionService = new \App\Services\SubscriptionService;
+                    $subscriptionService = new SubscriptionService;
                     $subscription = $subscriptionService->createSubscription($agency, $plan, $period, $payment);
                     $subscriptionService->activateSubscription($subscription);
                     Log::info("Abonnement activé (flutterwave): agence {$agency->id} - plan {$plan->id}");
@@ -397,10 +402,10 @@ final class PaymentController
 
         if ($payment->type === PaymentType::CREDIT) {
             $packageId = $payment->plan_id ?? ($metadata['package_id'] ?? null);
-            $package = $packageId ? \App\Models\PointPackage::find($packageId) : null;
+            $package = $packageId ? PointPackage::find($packageId) : null;
 
             if (!$package) {
-                $package = \App\Models\PointPackage::where('price', $payment->amount)
+                $package = PointPackage::where('price', $payment->amount)
                     ->where('is_active', true)
                     ->first();
             }

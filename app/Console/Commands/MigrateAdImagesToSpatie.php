@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Models\Ad;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class MigrateAdImagesToSpatie extends Command
 {
@@ -30,7 +33,7 @@ class MigrateAdImagesToSpatie extends Command
         $this->info('Starting migration of AdImages to Spatie Media Library...');
 
         // Query directly the table since Models might be missing relations
-        $oldImages = \Illuminate\Support\Facades\DB::table('ad_images')
+        $oldImages = DB::table('ad_images')
             ->orderBy('ad_id')
             ->orderBy('is_primary', 'desc')
             ->get();
@@ -47,7 +50,7 @@ class MigrateAdImagesToSpatie extends Command
         $bar->start();
 
         foreach ($oldImages as $oldImage) {
-            $ad = \App\Models\Ad::find($oldImage->ad_id);
+            $ad = Ad::find($oldImage->ad_id);
 
             // Skip if ad deleted
             if (!$ad) {
@@ -58,7 +61,7 @@ class MigrateAdImagesToSpatie extends Command
 
             $relativePath = $oldImage->image_path;
 
-            if (\Illuminate\Support\Facades\Storage::disk('public')->exists($relativePath)) {
+            if (Storage::disk('public')->exists($relativePath)) {
                 try {
                     // Check if already migrated
                     $alreadyMigrated = $ad->getMedia('images')->contains(fn ($media) => $media->getCustomProperty('old_id') === $oldImage->id);

@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\AdStatus;
+use App\Enums\UserType;
+use App\Enums\VerificationStatus;
 use App\Exceptions\InvalidStatusTransitionException;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\AdFactory;
 use Eloquent;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,14 +19,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Str;
-use Laravel\Scout\Searchable;
-use Spatie\Activitylog\LogOptions;
 /**
- * @property-read \App\Models\Quarter|null $quarter
- * @property-read \App\Models\User|null $user
- * @property-read \App\Models\Agency|null $agency
- * @property-read \App\Models\AdType|null $ad_type
+ * @property-read Quarter|null $quarter
+ * @property-read User|null $user
+ * @property-read Agency|null $agency
+ * @property-read AdType|null $ad_type
  *
  * @method static AdFactory factory($count = null, $state = [])
  * @method static Builder<static>|Ad newModelQuery()
@@ -49,9 +49,9 @@ use Spatie\Activitylog\LogOptions;
  * @property string $user_id
  * @property string $quarter_id
  * @property string $type_id
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
  *
  * @method static Builder<static>|Ad whereAdresse($value)
  * @method static Builder<static>|Ad whereBathrooms($value)
@@ -75,6 +75,11 @@ use Spatie\Activitylog\LogOptions;
  *
  * @mixin Eloquent
  */
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
+use Laravel\Scout\Searchable;
+use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
@@ -153,7 +158,7 @@ class Ad extends Model implements HasMedia
 
     protected $casts = [
         'location' => Point::class, // Assuming 'point' is a custom cast for PostGIS
-        'status' => \App\Enums\AdStatus::class,
+        'status' => AdStatus::class,
         'has_parking' => 'boolean',
         'is_visible' => 'boolean',
         'available_from' => 'date',
@@ -173,7 +178,7 @@ class Ad extends Model implements HasMedia
         'tour_published_at' => 'datetime',
         'is_verified' => 'boolean',
         'verified_at' => 'datetime',
-        'verification_status' => \App\Enums\VerificationStatus::class,
+        'verification_status' => VerificationStatus::class,
         'verification_requested_at' => 'datetime',
     ];
 
@@ -241,11 +246,11 @@ class Ad extends Model implements HasMedia
     /**
      * Scope \u2014 ads that have a published 3D tour.
      *
-     * @param  \Illuminate\Database\Eloquent\Builder<static>  $query
-     * @return \Illuminate\Database\Eloquent\Builder<static>
+     * @param  Builder<static>  $query
+     * @return Builder<static>
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
-    protected function withTour(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    #[Scope]
+    protected function withTour(Builder $query): Builder
     {
         return $query->where('has_3d_tour', true)->whereNotNull('tour_config');
     }
@@ -318,14 +323,14 @@ class Ad extends Model implements HasMedia
         $user = $this->user;
 
         // Si l'utilisateur est de type AGENCY, on essaie de retourner le nom de son agence
-        if ($user && $user->type === \App\Enums\UserType::AGENCY) {
+        if ($user && $user->type === UserType::AGENCY) {
             $agency = $this->agency;
-            if ($agency instanceof \App\Models\Agency) {
+            if ($agency instanceof Agency) {
                 return $agency->name;
             }
 
             $userAgency = $user->agency;
-            if ($userAgency instanceof \App\Models\Agency) {
+            if ($userAgency instanceof Agency) {
                 return $userAgency->name;
             }
         }
@@ -483,7 +488,7 @@ class Ad extends Model implements HasMedia
         $key = $user->id.':'.$this->id;
 
         if (!array_key_exists($key, $cache)) {
-            $cache[$key] = \App\Models\UnlockedAd::where('user_id', $user->id)
+            $cache[$key] = UnlockedAd::where('user_id', $user->id)
                 ->where('ad_id', $this->id)
                 ->exists();
         }
@@ -494,7 +499,7 @@ class Ad extends Model implements HasMedia
     /**
      * Get all images for the ad (images are always visible).
      */
-    public function getAccessibleImages(?User $user): \Illuminate\Support\Collection
+    public function getAccessibleImages(?User $user): Collection
     {
         $media = $this->getMedia('images');
 
@@ -543,7 +548,7 @@ class Ad extends Model implements HasMedia
     /**
      * Scope to get only boosted ads
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function boosted($query)
     {
         return $query->where('is_boosted', true)
@@ -553,7 +558,7 @@ class Ad extends Model implements HasMedia
     /**
      * Scope to order by boost score then created_at
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function orderByBoost($query)
     {
         return $query->orderByDesc('boost_score')
@@ -563,7 +568,7 @@ class Ad extends Model implements HasMedia
     /**
      * Scope to get only visible ads
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function visible($query)
     {
         return $query->where('is_visible', true);
@@ -572,7 +577,7 @@ class Ad extends Model implements HasMedia
     /**
      * Scope to get only publicly listed ads (available + reserved).
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function publiclyListed($query)
     {
         return $query->whereIn('status', array_map(fn (AdStatus $s) => $s->value, self::PUBLIC_STATUSES));
@@ -581,7 +586,7 @@ class Ad extends Model implements HasMedia
     /**
      * Scope to get only currently available ads based on date range
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function currentlyAvailable($query)
     {
         $today = now()->toDateString();
@@ -600,7 +605,7 @@ class Ad extends Model implements HasMedia
     /**
      * Scope to filter by property attributes
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function withAttributes($query, array $attributes)
     {
         foreach ($attributes as $attribute) {

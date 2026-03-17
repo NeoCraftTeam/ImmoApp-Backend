@@ -40,8 +40,8 @@ final class UserRequest extends FormRequest
                 'location' => ['sometimes', new GeometryGeojsonRule([Point::class])],
                 'latitude' => 'nullable|numeric|between:-90,90',
                 'longitude' => 'nullable|numeric|between:-180,180',
-                'role' => ['required', 'string', \Illuminate\Validation\Rule::in(['customer', 'agent', 'admin'])],
-                'type' => ['nullable', 'string', \Illuminate\Validation\Rule::in(['individual', 'agency'])],
+                'role' => ['required', 'string', Rule::in(['customer', 'agent', 'admin'])],
+                'type' => ['nullable', 'string', Rule::in(['individual', 'agency'])],
                 'city_id' => ['sometimes', 'uuid', 'exists:city,id'],
             ];
         }

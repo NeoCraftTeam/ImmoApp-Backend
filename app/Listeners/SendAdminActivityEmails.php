@@ -7,6 +7,20 @@ namespace App\Listeners;
 use App\Enums\AdStatus;
 use App\Enums\UserRole;
 use App\Mail\AdminActionPerformedMail;
+use App\Models\Ad;
+use App\Models\AdReport;
+use App\Models\AdType;
+use App\Models\Agency;
+use App\Models\City;
+use App\Models\Payment;
+use App\Models\PointPackage;
+use App\Models\PropertyAttribute;
+use App\Models\Quarter;
+use App\Models\Review;
+use App\Models\Setting;
+use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
+use App\Models\UnlockedAd;
 use App\Models\User;
 use App\Notifications\AdminCrudAction;
 use Illuminate\Support\Facades\Log;
@@ -26,21 +40,21 @@ class SendAdminActivityEmails
      * @var array<string, string>
      */
     private const array ENTITY_LABELS = [
-        \App\Models\Ad::class => 'Annonce',
-        \App\Models\User::class => 'Utilisateur',
-        \App\Models\Agency::class => 'Agence',
-        \App\Models\City::class => 'Ville',
-        \App\Models\Quarter::class => 'Quartier',
-        \App\Models\AdType::class => "Type d'annonce",
-        \App\Models\Review::class => 'Avis',
-        \App\Models\Payment::class => 'Paiement',
-        \App\Models\Subscription::class => 'Abonnement',
-        \App\Models\SubscriptionPlan::class => "Plan d'abonnement",
-        \App\Models\PointPackage::class => 'Pack de crédits',
-        \App\Models\AdReport::class => 'Signalement annonce',
-        \App\Models\UnlockedAd::class => 'Déblocage',
-        \App\Models\PropertyAttribute::class => 'Attribut',
-        \App\Models\Setting::class => 'Paramètre',
+        Ad::class => 'Annonce',
+        User::class => 'Utilisateur',
+        Agency::class => 'Agence',
+        City::class => 'Ville',
+        Quarter::class => 'Quartier',
+        AdType::class => "Type d'annonce",
+        Review::class => 'Avis',
+        Payment::class => 'Paiement',
+        Subscription::class => 'Abonnement',
+        SubscriptionPlan::class => "Plan d'abonnement",
+        PointPackage::class => 'Pack de crédits',
+        AdReport::class => 'Signalement annonce',
+        UnlockedAd::class => 'Déblocage',
+        PropertyAttribute::class => 'Attribut',
+        Setting::class => 'Paramètre',
     ];
 
     public function handle(Activity $activity): void
@@ -62,10 +76,10 @@ class SendAdminActivityEmails
 
         // Detect ad approval / rejection to use a more descriptive event label
         $newStatus = $activity->properties['attributes']['status'] ?? null;
-        $isAdApproval = $activity->subject_type === \App\Models\Ad::class
+        $isAdApproval = $activity->subject_type === Ad::class
             && $activity->event === 'updated'
             && $newStatus === AdStatus::AVAILABLE->value;
-        $isAdRejection = $activity->subject_type === \App\Models\Ad::class
+        $isAdRejection = $activity->subject_type === Ad::class
             && $activity->event === 'updated'
             && $newStatus === AdStatus::DECLINED->value;
 

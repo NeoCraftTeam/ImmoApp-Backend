@@ -33,7 +33,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  * @property-read User $user
- * @property-read \App\Models\PointPackage|null $pointPackage
+ * @property-read PointPackage|null $pointPackage
  *
  * @method static PaymentFactory factory($count = null, $state = [])
  * @method static Builder<static>|Payment newModelQuery()
@@ -54,7 +54,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @method static Builder<static>|Payment withoutTrashed()
  *
  * @property string $ad_id
- * @property-read \App\Models\Ad $ad
+ * @property-read Ad $ad
  *
  * @method static Builder<static>|Payment whereAdId($value)
  *

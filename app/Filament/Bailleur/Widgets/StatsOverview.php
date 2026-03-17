@@ -8,6 +8,7 @@ use App\Models\Ad;
 use App\Models\AdInteraction;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 
 class StatsOverview extends BaseWidget
@@ -86,11 +87,11 @@ class StatsOverview extends BaseWidget
     /**
      * Trend journalier d'interactions sur les 7 dernières semaines (par semaine).
      *
-     * @param  \Illuminate\Support\Collection<int, string>  $adIds
+     * @param  Collection<int, string>  $adIds
      * @param  string|array<int, string>  $type
      * @return array<int, int>
      */
-    private function getDailyTrend(\Illuminate\Support\Collection $adIds, string|array $type): array
+    private function getDailyTrend(Collection $adIds, string|array $type): array
     {
         $types = is_array($type) ? $type : [$type];
 

@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\AdType;
 use App\Models\City;
+use App\Models\Quarter;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -206,7 +207,7 @@ PROMPT;
 
                 if (!empty($parsed['quarter_name'])) {
                     $quarter = $city->quarters()->where('name', 'ilike', $parsed['quarter_name'])->first();
-                    if ($quarter instanceof \App\Models\Quarter) {
+                    if ($quarter instanceof Quarter) {
                         $result['quarter_name'] = $quarter->name;
                     }
                 }

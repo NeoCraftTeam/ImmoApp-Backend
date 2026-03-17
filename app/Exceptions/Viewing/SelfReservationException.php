@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions\Viewing;
 
+use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class SelfReservationException extends \RuntimeException
@@ -13,7 +14,7 @@ class SelfReservationException extends \RuntimeException
         parent::__construct('Vous ne pouvez pas réserver votre propre bien.');
     }
 
-    public function render(): \Illuminate\Http\JsonResponse
+    public function render(): JsonResponse
     {
         return response()->json([
             'error' => [

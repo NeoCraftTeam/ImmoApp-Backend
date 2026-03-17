@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Enums\AdStatus;
+use App\Http\Controllers\Api\V1\RecommendationController;
 use App\Models\Ad;
 use App\Models\AdInteraction;
 use App\Models\User;
@@ -27,7 +28,7 @@ use Illuminate\Support\Facades\Cache;
  *   - Boosted ads
  *   - Latest ads
  *
- * @see \App\Http\Controllers\Api\V1\RecommendationController
+ * @see RecommendationController
  */
 final class RecommendationEngine
 {

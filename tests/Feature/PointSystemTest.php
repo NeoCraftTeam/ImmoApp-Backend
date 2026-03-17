@@ -55,7 +55,7 @@ it('throws when deducting more than the available balance', function (): void {
     $user = User::factory()->create(['point_balance' => 1]);
     $service = app(PointService::class);
 
-    expect(fn () => $service->deduct($user, 5, 'Too expensive'))->toThrow(\RuntimeException::class);
+    expect(fn () => $service->deduct($user, 5, 'Too expensive'))->toThrow(RuntimeException::class);
 
     expect($user->fresh()->point_balance)->toBe(1);
 });

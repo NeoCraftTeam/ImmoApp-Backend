@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Models\Agency;
+use App\Models\Subscription;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
@@ -18,7 +21,7 @@ class SubscriptionExpiringEmail extends Mailable implements ShouldQueue
     /**
      * Create a new message instance.
      */
-    public function __construct(public \App\Models\Subscription $subscription, public int $daysLeft)
+    public function __construct(public Subscription $subscription, public int $daysLeft)
     {
         $this->onQueue('emails');
     }
@@ -38,7 +41,7 @@ class SubscriptionExpiringEmail extends Mailable implements ShouldQueue
      */
     public function content(): Content
     {
-        /** @var \App\Models\Agency|null $agency */
+        /** @var Agency|null $agency */
         $agency = $this->subscription->agency;
 
         return new Content(
@@ -57,7 +60,7 @@ class SubscriptionExpiringEmail extends Mailable implements ShouldQueue
     /**
      * Get the attachments for the message.
      *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
+     * @return array<int, Attachment>
      */
     public function attachments(): array
     {

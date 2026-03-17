@@ -1,6 +1,8 @@
 <?php
 
-$ads = App\Models\Ad::query()->whereNotNull('tour_config')->get();
+use App\Models\Ad;
+
+$ads = Ad::query()->whereNotNull('tour_config')->get();
 
 foreach ($ads as $ad) {
     $config = $ad->tour_config;

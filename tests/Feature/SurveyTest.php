@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Mail\SurveySubmittedMail;
 use App\Models\Survey;
 use App\Models\SurveyQuestion;
 use App\Models\SurveyResponse;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
@@ -262,7 +264,7 @@ it('returns true when the user has already answered the survey', function (): vo
 // ── Email dispatch after submit ────────────────────────────────────────────
 
 it('dispatches emails after a successful survey submission', function (): void {
-    \Illuminate\Support\Facades\Mail::fake();
+    Mail::fake();
 
     $user = User::factory()->create();
     Sanctum::actingAs($user);
@@ -274,5 +276,5 @@ it('dispatches emails after a successful survey submission', function (): void {
         'answers' => [['question_id' => $question->id, 'answer' => '5']],
     ])->assertCreated();
 
-    \Illuminate\Support\Facades\Mail::assertQueued(\App\Mail\SurveySubmittedMail::class, fn ($mail) => $mail->hasTo($user->email));
+    Mail::assertQueued(SurveySubmittedMail::class, fn ($mail) => $mail->hasTo($user->email));
 });

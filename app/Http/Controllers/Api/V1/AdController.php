@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\AdStatus;
+use App\Exceptions\InvalidStatusTransitionException;
 use App\Http\Requests\AdRequest;
 use App\Http\Resources\AdResource as AdApiResource;
 use App\Models\Ad;
@@ -20,6 +21,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
+use Meilisearch\Endpoints\Indexes;
+use Meilisearch\Exceptions\ApiException;
 use Throwable;
 
 final class AdController
@@ -1889,7 +1893,7 @@ final class AdController
             $allowedSorts = ['price', 'surface_area', 'created_at', 'boost_score'];
 
             // Construire la requête Scout
-            $builder = Ad::search($q, function (\Meilisearch\Endpoints\Indexes $index, string $query, array $options) use ($filters, $sortBy, $sortOrder, $allowedSorts) {
+            $builder = Ad::search($q, function (Indexes $index, string $query, array $options) use ($filters, $sortBy, $sortOrder, $allowedSorts) {
                 // AND logic : tous les filtres doivent matcher
                 $options['filter'] = implode(' AND ', $filters);
 
@@ -1925,7 +1929,7 @@ final class AdController
                     'next' => $results->nextPageUrl(),
                 ],
             ], 200);
-        } catch (\Meilisearch\Exceptions\ApiException|\Exception $e) {
+        } catch (ApiException|\Exception $e) {
             Log::warning('Search fallback to Eloquent: '.$e->getMessage());
 
             return $this->searchFallback($validated);
@@ -2096,7 +2100,7 @@ final class AdController
         $this->authorize('update', $ad);
 
         $validated = request()->validate([
-            'status' => ['required', \Illuminate\Validation\Rule::enum(AdStatus::class)],
+            'status' => ['required', Rule::enum(AdStatus::class)],
         ]);
 
         try {
@@ -2115,7 +2119,7 @@ final class AdController
                     'new_status' => $newStatus->value,
                 ],
             ]);
-        } catch (\App\Exceptions\InvalidStatusTransitionException $e) {
+        } catch (InvalidStatusTransitionException $e) {
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),

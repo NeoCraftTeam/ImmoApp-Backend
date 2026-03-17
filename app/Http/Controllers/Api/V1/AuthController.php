@@ -18,12 +18,16 @@ use App\Models\User;
 use App\Services\ClerkJwtService;
 use App\Services\UserAgentParser;
 use Clickbar\Magellan\Data\Geometries\Point;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -34,6 +38,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 use Spatie\MediaLibrary\MediaCollections\Exceptions\FileDoesNotExist;
 use Spatie\MediaLibrary\MediaCollections\Exceptions\FileIsTooBig;
 use Throwable;
@@ -663,7 +668,7 @@ final class AuthController
      *     )
      * )
      */
-    public function verifyEmail(string $id, string $hash, Request $request): JsonResponse|\Illuminate\Http\Response|\Illuminate\Contracts\View\View
+    public function verifyEmail(string $id, string $hash, Request $request): JsonResponse|Response|View
     {
         Log::info('VerifyEmail called with ID: '.$id);
 
@@ -706,7 +711,7 @@ final class AuthController
                 return $request->wantsJson()
                     ? response()->json(['message' => 'Email déjà vérifié.', 'verified' => true])
                     : view('auth.verified', [
-                        'loginUrl' => $user->role === \App\Enums\UserRole::ADMIN
+                        'loginUrl' => $user->role === UserRole::ADMIN
                             ? config('app.url').'/admin'
                             : config('app.frontend_url').'/login',
                     ]);
@@ -725,7 +730,7 @@ final class AuthController
             return $request->wantsJson()
                 ? response()->json(['message' => 'Email vérifié avec succès.', 'verified' => true])
                 : view('auth.verified', [
-                    'loginUrl' => $user->role === \App\Enums\UserRole::ADMIN
+                    'loginUrl' => $user->role === UserRole::ADMIN
                         ? config('app.url').'/admin'
                         : config('app.frontend_url').'/login',
                 ]);
@@ -1108,7 +1113,7 @@ final class AuthController
             if ($request->hasSession()) {
                 $request->session()->regenerate();
                 // Use the web guard to authenticate the session
-                \Illuminate\Support\Facades\Auth::guard('web')->login($user);
+                Auth::guard('web')->login($user);
             }
 
             // Créer le token avec expiration
@@ -1294,7 +1299,7 @@ final class AuthController
                     'user_id' => $user->id,
                 ]);
 
-                \Illuminate\Support\Facades\Auth::guard('web')->logout();
+                Auth::guard('web')->logout();
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
             }
@@ -1358,7 +1363,7 @@ final class AuthController
      *     )
      * )
      */
-    public function me(Request $request): \App\Http\Resources\UserResource
+    public function me(Request $request): UserResource
     {
         return new UserResource($request->user()->load(['agency', 'city']));
     }
@@ -1369,9 +1374,9 @@ final class AuthController
      * Called by the frontend after the WelcomeModal is dismissed.
      * Idempotent — subsequent calls are no-ops.
      */
-    public function completeOnboarding(Request $request): \Illuminate\Http\JsonResponse
+    public function completeOnboarding(Request $request): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
 
         if (!$user->onboarding_completed_at) {
@@ -1387,7 +1392,7 @@ final class AuthController
      */
     public function trackHomeVisit(Request $request): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         $user->last_home_visit_at = now();
         $user->save();
@@ -1405,7 +1410,7 @@ final class AuthController
             'survey_postponed_ids.*' => 'string',
         ]);
 
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         $prefs = $user->preferences ?? [];
 
@@ -1609,7 +1614,7 @@ final class AuthController
                 Mail::to($user->email, $user->firstname)
                     ->queue(new PasswordChangedMail($user->email, $user->firstname));
 
-                event(new \Illuminate\Auth\Events\PasswordReset($user));
+                event(new PasswordReset($user));
             }
         );
 
@@ -1673,7 +1678,7 @@ final class AuthController
 
         // Revoke all existing tokens except the current one
         $currentToken = $user->currentAccessToken();
-        if ($currentToken instanceof \Laravel\Sanctum\PersonalAccessToken) { // @phpstan-ignore instanceof.alwaysTrue (TransientToken possible at runtime)
+        if ($currentToken instanceof PersonalAccessToken) { // @phpstan-ignore instanceof.alwaysTrue (TransientToken possible at runtime)
             $user->tokens()->where('id', '!=', $currentToken->getKey())->delete();
         } else {
             $user->tokens()->delete();

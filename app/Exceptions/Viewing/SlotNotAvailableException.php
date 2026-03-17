@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions\Viewing;
 
+use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class SlotNotAvailableException extends \RuntimeException
@@ -13,7 +14,7 @@ class SlotNotAvailableException extends \RuntimeException
         parent::__construct('Ce créneau n\'est pas disponible pour la date demandée.');
     }
 
-    public function render(): \Illuminate\Http\JsonResponse
+    public function render(): JsonResponse
     {
         return response()->json([
             'error' => [

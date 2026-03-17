@@ -31,6 +31,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use UnitEnum;
 
 class AdResource extends Resource
@@ -143,7 +144,7 @@ class AdResource extends Resource
                     ->modalDescription('Les informations de votre annonce seront automatiquement pré-remplies.')
                     ->modalSubmitActionLabel('Générer le PDF')
                     ->modalWidth(Width::TwoExtraLarge)
-                    ->action(function (Ad $record, array $data): \Symfony\Component\HttpFoundation\StreamedResponse {
+                    ->action(function (Ad $record, array $data): StreamedResponse {
                         $record->load(['ad_type', 'quarter.city']);
 
                         $contract = app(LeaseContractService::class)->generate(

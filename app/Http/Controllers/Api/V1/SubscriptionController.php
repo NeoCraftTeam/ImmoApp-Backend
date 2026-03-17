@@ -8,7 +8,9 @@ use App\Enums\PaymentType;
 use App\Http\Requests\Api\V1\SubscribeRequest;
 use App\Http\Resources\SubscriptionPlanResource;
 use App\Http\Resources\SubscriptionResource;
+use App\Models\Agency;
 use App\Models\SubscriptionPlan;
+use App\Models\User;
 use App\Services\Payment\PaymentService;
 use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
@@ -140,9 +142,9 @@ final class SubscriptionController
      */
     public function current(Request $request): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
-        /** @var \App\Models\Agency|null $agency */
+        /** @var Agency|null $agency */
         $agency = $user->agency;
 
         if (!$agency) {
@@ -226,9 +228,9 @@ final class SubscriptionController
      */
     public function subscribe(SubscribeRequest $request): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
-        /** @var \App\Models\Agency|null $agency */
+        /** @var Agency|null $agency */
         $agency = $user->agency;
 
         if (!$agency) {
@@ -333,9 +335,9 @@ final class SubscriptionController
      */
     public function cancel(Request $request): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
-        /** @var \App\Models\Agency|null $agency */
+        /** @var Agency|null $agency */
         $agency = $user->agency;
 
         if (!$agency) {
@@ -440,9 +442,9 @@ final class SubscriptionController
      */
     public function history(Request $request): AnonymousResourceCollection
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
-        /** @var \App\Models\Agency|null $agency */
+        /** @var Agency|null $agency */
         $agency = $user->agency;
 
         if (!$agency) {

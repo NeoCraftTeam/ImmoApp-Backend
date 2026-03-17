@@ -16,6 +16,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /**
@@ -262,7 +263,7 @@ final readonly class SurveyController
         $now = now();
         $rows = array_map(
             fn (array $a) => [
-                'id' => (string) \Illuminate\Support\Str::uuid(),
+                'id' => (string) Str::uuid(),
                 'anonymous_response_id' => $response->id,
                 'survey_question_id' => $a['question_id'],
                 'answer' => is_array($a['answer']) ? json_encode($a['answer']) : (string) $a['answer'],

@@ -12,6 +12,7 @@ use App\Models\Ad;
 use App\Models\User;
 use App\Notifications\AdStatusChanged;
 use App\Notifications\NewAdPending;
+use App\Services\AdBoostService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
@@ -36,7 +37,7 @@ class AdObserver
     public function created(Ad $ad): void
     {
         // Auto-boost if agency has active subscription
-        app(\App\Services\AdBoostService::class)->autoBoostIfEligible($ad);
+        app(AdBoostService::class)->autoBoostIfEligible($ad);
 
         if ($ad->status === AdStatus::AVAILABLE) {
             MatchSearchAlertsForAdJob::dispatch($ad);
@@ -48,7 +49,7 @@ class AdObserver
                 try {
                     Mail::to($ad->user)->send(new AdSubmissionConfirmationMail($ad));
                 } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::error("Failed to send ad confirmation email to {$ad->user->email}: ".$e->getMessage());
+                    Log::error("Failed to send ad confirmation email to {$ad->user->email}: ".$e->getMessage());
                 }
             }
 
@@ -57,7 +58,7 @@ class AdObserver
                 $admins = User::where('role', UserRole::ADMIN)->get();
                 Notification::send($admins, new NewAdPending($ad));
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::error('Failed to send admin notifications for new ad: '.$e->getMessage());
+                Log::error('Failed to send admin notifications for new ad: '.$e->getMessage());
             }
         }
     }

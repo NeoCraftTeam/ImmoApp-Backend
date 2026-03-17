@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions\Viewing;
 
+use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class SlotAlreadyReservedException extends \RuntimeException
@@ -13,7 +14,7 @@ class SlotAlreadyReservedException extends \RuntimeException
         parent::__construct('Ce créneau vient d\'être réservé par un autre utilisateur.');
     }
 
-    public function render(): \Illuminate\Http\JsonResponse
+    public function render(): JsonResponse
     {
         return response()->json([
             'error' => [

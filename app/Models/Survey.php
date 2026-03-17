@@ -7,6 +7,7 @@ namespace App\Models;
 use Database\Factories\SurveyFactory;
 use Eloquent;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -23,9 +24,9 @@ use Illuminate\Support\Str;
  * @property bool $is_public
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
- * @property-read \Illuminate\Database\Eloquent\Collection<int, SurveyQuestion> $questions
- * @property-read \Illuminate\Database\Eloquent\Collection<int, SurveyResponse> $responses
- * @property-read \Illuminate\Database\Eloquent\Collection<int, AnonymousSurveyResponse> $anonymousResponses
+ * @property-read Collection<int, SurveyQuestion> $questions
+ * @property-read Collection<int, SurveyResponse> $responses
+ * @property-read Collection<int, AnonymousSurveyResponse> $anonymousResponses
  *
  * @method static SurveyFactory factory($count = null, $state = [])
  * @method static Builder<static>|Survey active()

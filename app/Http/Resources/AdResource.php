@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use App\Models\Ad;
+use App\Models\Agency;
+use App\Models\Setting;
 use App\Models\User;
 use App\Support\TourAssetToken;
 use Illuminate\Http\Request;
@@ -62,7 +64,7 @@ final class AdResource extends JsonResource
             'attributes' => $this->resource->getAttribute('attributes') ?? [],
             'is_currently_available' => $this->isCurrentlyAvailable(),
             'is_unlocked' => $this->isUnlockedFor($user),
-            'unlock_cost' => (int) \App\Models\Setting::get('unlock_cost_points', 2),
+            'unlock_cost' => (int) Setting::get('unlock_cost_points', 2),
             'has_3d_tour' => (bool) $this->has_3d_tour,
             'tour_config' => $this->when($this->has_3d_tour && $canAccessTour, $signedTourConfig),
             'tour_scenes_count' => $this->when($this->has_3d_tour, $this->tour_scenes_count),
@@ -100,7 +102,7 @@ final class AdResource extends JsonResource
                     'lastname' => $owner->lastname,
                     'display_name' => $owner->fullname,
                     'avatar' => $owner->getFirstMediaUrl('avatars') ?: $this->getAvatarUrl($owner->avatar),
-                    'agency_name' => $owner->relationLoaded('agency') && $owner->agency instanceof \App\Models\Agency ? $owner->agency->name : null,
+                    'agency_name' => $owner->relationLoaded('agency') && $owner->agency instanceof Agency ? $owner->agency->name : null,
                     // Show contact info only if unlocked or owner/admin
                     'phone_number' => ($isUnlocked || $isOwnerOrAdmin) ? $owner->phone_number : null,
                     'phone_is_whatsapp' => ($isUnlocked || $isOwnerOrAdmin) ? (bool) $owner->phone_is_whatsapp : null,

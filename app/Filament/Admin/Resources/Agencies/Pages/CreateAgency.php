@@ -8,6 +8,8 @@ use App\Filament\Admin\Resources\Agencies\AgencyResource;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class CreateAgency extends CreateRecord
 {
@@ -33,8 +35,8 @@ class CreateAgency extends CreateRecord
     }
 
     #[\Override]
-    protected function handleRecordCreation(array $data): \Illuminate\Database\Eloquent\Model
+    protected function handleRecordCreation(array $data): Model
     {
-        return \Illuminate\Support\Facades\DB::transaction(fn () => static::getModel()::create($data));
+        return DB::transaction(fn () => static::getModel()::create($data));
     }
 }

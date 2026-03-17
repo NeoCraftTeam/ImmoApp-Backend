@@ -4,7 +4,13 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Enums\SubscriptionStatus;
+use App\Mail\SubscriptionExpiringEmail;
+use App\Models\Subscription;
+use App\Services\SubscriptionService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 class CheckSubscriptionExpirations extends Command
 {
@@ -30,7 +36,7 @@ class CheckSubscriptionExpirations extends Command
 
         foreach ($daysToNotify as $days) {
 
-            $subscriptions = \App\Models\Subscription::where('status', \App\Enums\SubscriptionStatus::ACTIVE)
+            $subscriptions = Subscription::where('status', SubscriptionStatus::ACTIVE)
                 ->whereDate('ends_at', '=', now()->addDays($days)->toDateString())
                 ->with('agency.users')
                 ->get();
@@ -38,10 +44,10 @@ class CheckSubscriptionExpirations extends Command
             foreach ($subscriptions as $subscription) {
                 foreach ($subscription->agency->users as $user) {
                     try {
-                        \Illuminate\Support\Facades\Mail::to($user->email)
-                            ->send(new \App\Mail\SubscriptionExpiringEmail($subscription, $days));
+                        Mail::to($user->email)
+                            ->send(new SubscriptionExpiringEmail($subscription, $days));
                     } catch (\Throwable $e) {
-                        \Illuminate\Support\Facades\Log::error("Failed to send expiry email to {$user->email}: ".$e->getMessage());
+                        Log::error("Failed to send expiry email to {$user->email}: ".$e->getMessage());
                     }
                 }
                 $this->line("Rappel de {$days} jours envoyé pour l'agence: {$subscription->agency->name}");
@@ -49,7 +55,7 @@ class CheckSubscriptionExpirations extends Command
         }
 
         // Marquer comme expirés ceux qui sont passés
-        $expiredCount = app(\App\Services\SubscriptionService::class)->expireSubscriptions();
+        $expiredCount = app(SubscriptionService::class)->expireSubscriptions();
         $this->info("{$expiredCount} abonnements marqués comme expirés.");
 
         $this->info('Vérification terminée.');

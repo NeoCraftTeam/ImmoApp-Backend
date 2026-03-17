@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Models\Agency;
+use App\Models\City;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -53,7 +55,7 @@ final class UserResource extends JsonResource
             'avatar' => $this->getFirstMediaUrl('avatars') ?: $this->getAvatarUrl(),
             'display_name' => $this->fullname,
             'name' => $this->fullname,
-            'agency_name' => $this->whenLoaded('agency', fn () => $this->agency instanceof \App\Models\Agency ? $this->agency->name : null),
+            'agency_name' => $this->whenLoaded('agency', fn () => $this->agency instanceof Agency ? $this->agency->name : null),
 
             // Le propriétaire du compte ou un admin peut voir le role/type
             'role' => $this->when($request->user()?->id === $this->id || $request->user()?->isAdmin(), $this->role),
@@ -66,7 +68,7 @@ final class UserResource extends JsonResource
                 !empty($this->city_id),
                 fn () => $this->relationLoaded('city')
                     ? $this->city->name
-                    : \App\Models\City::find($this->city_id)?->name
+                    : City::find($this->city_id)?->name
             ),
             'point_balance' => $this->when(
                 $request->user()?->id === $this->id,

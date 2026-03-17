@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\Auth\EmailVerificationController;
 use App\Http\Controllers\Api\V1\TourController;
+use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\MediaProxyController;
 use App\Http\Controllers\PanelSsoController;
 use App\Http\Controllers\PwaManifestController;
 use App\Http\Controllers\TourImageProxyController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/manifest.json', PwaManifestController::class)->name('pwa.manifest');
@@ -41,12 +43,12 @@ Route::get('email/verify/{id}/{hash}', [
 ])->name('web.verification.verify');
 
 Route::get('auth/verify-email/{id}/{hash}', [
-    \App\Http\Controllers\Auth\VerifyEmailController::class,
+    VerifyEmailController::class,
     '__invoke',
 ])->name('verification.verify');
 
 // Route de "Callback" pour redirection sécurisée
-Route::get('/verify-email', function (\Illuminate\Http\Request $request) {
+Route::get('/verify-email', function (Request $request) {
     if (!$request->has('verify_url')) {
         abort(400, 'Missing verify_url');
     }

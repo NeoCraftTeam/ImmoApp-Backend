@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Database\Factories\PropertyAttributeCategoryFactory;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -18,7 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class PropertyAttributeCategory extends Model
 {
-    /** @use HasFactory<\Database\Factories\PropertyAttributeCategoryFactory> */
+    /** @use HasFactory<PropertyAttributeCategoryFactory> */
     use HasFactory;
 
     protected $fillable = [
@@ -48,13 +50,13 @@ class PropertyAttributeCategory extends Model
         return $this->hasMany(PropertyAttribute::class, 'property_attribute_category_id');
     }
 
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function active(Builder $query): Builder
     {
         return $query->where('is_active', true);
     }
 
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function ordered(Builder $query): Builder
     {
         return $query->orderBy('sort_order')->orderBy('name');

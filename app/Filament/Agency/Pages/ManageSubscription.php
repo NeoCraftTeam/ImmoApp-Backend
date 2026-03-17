@@ -4,7 +4,18 @@ declare(strict_types=1);
 
 namespace App\Filament\Agency\Pages;
 
+use App\Enums\PaymentStatus;
+use App\Enums\PaymentType;
+use App\Models\Agency;
+use App\Models\Payment;
+use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
+use App\Services\Payment\PaymentService;
+use App\Services\SubscriptionService;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\Computed;
 
 class ManageSubscription extends Page
 {
@@ -21,7 +32,7 @@ class ManageSubscription extends Page
     public static function getNavigationBadge(): ?string
     {
         try {
-            /** @var \App\Models\Agency|null $agency */
+            /** @var Agency|null $agency */
             $agency = auth()->user()?->agency;
 
             return $agency && $agency->hasActiveSubscription() ? 'Actif' : null;
@@ -35,7 +46,7 @@ class ManageSubscription extends Page
         return 'success';
     }
 
-    public ?\App\Models\Subscription $subscription = null;
+    public ?Subscription $subscription = null;
 
     public $plans;
 
@@ -48,7 +59,7 @@ class ManageSubscription extends Page
 
     public function mount(): void
     {
-        /** @var \App\Models\Agency|null $agency */
+        /** @var Agency|null $agency */
         $agency = auth()->user()->agency;
 
         if (!$agency) {
@@ -61,8 +72,8 @@ class ManageSubscription extends Page
         }
 
         $this->subscription = $agency->getCurrentSubscription();
-        $this->plans = \App\Models\SubscriptionPlan::active()->orderBy('sort_order')->get();
-        $this->stats = app(\App\Services\SubscriptionService::class)->getAgencyStats($agency);
+        $this->plans = SubscriptionPlan::active()->orderBy('sort_order')->get();
+        $this->stats = app(SubscriptionService::class)->getAgencyStats($agency);
 
         // If there's a pending payment in session and no active subscription, start polling.
         if (!$this->subscription?->isActive() && session()->has('keyhome_pending_transaction')) {
@@ -75,7 +86,7 @@ class ManageSubscription extends Page
     /**
      * Progress percentage for the active subscription (0-100).
      */
-    #[\Livewire\Attributes\Computed]
+    #[Computed]
     public function progress(): int
     {
         if (!$this->subscription || !$this->subscription->starts_at || !$this->subscription->ends_at) {
@@ -90,16 +101,16 @@ class ManageSubscription extends Page
 
     protected function verifyPayment(string $transactionId): void
     {
-        /** @var \App\Models\Agency|null $agency */
+        /** @var Agency|null $agency */
         $agency = auth()->user()->agency;
 
         if (!$agency) {
             return;
         }
 
-        $payment = \App\Models\Payment::where('transaction_id', $transactionId)
+        $payment = Payment::where('transaction_id', $transactionId)
             ->where('agency_id', $agency->id)
-            ->where('status', \App\Enums\PaymentStatus::PENDING)
+            ->where('status', PaymentStatus::PENDING)
             ->first();
 
         if (!$payment) {
@@ -107,11 +118,11 @@ class ManageSubscription extends Page
         }
 
         try {
-            $paymentService = app(\App\Services\Payment\PaymentService::class);
+            $paymentService = app(PaymentService::class);
             $payment = $paymentService->syncPaymentStatus($payment);
 
-            if ($payment->status !== \App\Enums\PaymentStatus::SUCCESS) {
-                \Illuminate\Support\Facades\Log::warning('Payment verification failed for subscription', [
+            if ($payment->status !== PaymentStatus::SUCCESS) {
+                Log::warning('Payment verification failed for subscription', [
                     'transaction_id' => $transactionId,
                     'agency_id' => $agency->id,
                     'status' => $payment->status->value,
@@ -120,21 +131,21 @@ class ManageSubscription extends Page
                 return;
             }
 
-            $plan = \App\Models\SubscriptionPlan::find($payment->plan_id);
+            $plan = SubscriptionPlan::find($payment->plan_id);
 
             if ($plan && !$agency->hasActiveSubscription()) {
-                $subscriptionService = app(\App\Services\SubscriptionService::class);
+                $subscriptionService = app(SubscriptionService::class);
                 $subscription = $subscriptionService->createSubscription($agency, $plan, $payment->period ?? 'monthly', $payment);
                 $subscriptionService->activateSubscription($subscription);
 
-                \Filament\Notifications\Notification::make()
+                Notification::make()
                     ->title('Paiement réussi !')
                     ->body('Votre abonnement a été activé avec succès. Bienvenue !')
                     ->success()
                     ->send();
             }
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Payment verification error: '.$e->getMessage());
+            Log::error('Payment verification error: '.$e->getMessage());
         }
     }
 
@@ -144,7 +155,7 @@ class ManageSubscription extends Page
      */
     public function refreshSubscriptionStatus(): void
     {
-        /** @var \App\Models\Agency|null $agency */
+        /** @var Agency|null $agency */
         $agency = auth()->user()->agency;
 
         if (!$agency) {
@@ -159,13 +170,13 @@ class ManageSubscription extends Page
         }
 
         $this->subscription = $agency->getCurrentSubscription();
-        $this->stats = app(\App\Services\SubscriptionService::class)->getAgencyStats($agency);
+        $this->stats = app(SubscriptionService::class)->getAgencyStats($agency);
 
         if ($this->subscription?->isActive()) {
             $this->awaitingConfirmation = false;
             session()->forget('keyhome_pending_transaction');
 
-            \Filament\Notifications\Notification::make()
+            Notification::make()
                 ->title('Abonnement activé !')
                 ->body('Votre abonnement '.($this->subscription->plan->name ?? '').' est maintenant actif. Vos annonces vont être boostées.')
                 ->success()
@@ -186,14 +197,14 @@ class ManageSubscription extends Page
 
     public function subscribe(string $planId)
     {
-        $plan = \App\Models\SubscriptionPlan::findOrFail($planId);
-        /** @var \App\Models\Agency $agency */
+        $plan = SubscriptionPlan::findOrFail($planId);
+        /** @var Agency $agency */
         $agency = auth()->user()->agency;
 
         $price = $this->period === 'yearly' ? $plan->price_yearly : $plan->price;
 
         if (!$price) {
-            \Filament\Notifications\Notification::make()
+            Notification::make()
                 ->title('Option non disponible')
                 ->body('Ce plan ne propose pas cette fréquence de paiement.')
                 ->danger()
@@ -203,11 +214,11 @@ class ManageSubscription extends Page
         }
 
         try {
-            $paymentService = app(\App\Services\Payment\PaymentService::class);
+            $paymentService = app(PaymentService::class);
 
             $result = $paymentService->createPayment(auth()->user(), [
                 'amount' => (float) $price,
-                'type' => \App\Enums\PaymentType::SUBSCRIPTION->value,
+                'type' => PaymentType::SUBSCRIPTION->value,
                 'agency_id' => $agency->id,
                 'plan_id' => $plan->id,
                 'period' => $this->period,
@@ -218,9 +229,9 @@ class ManageSubscription extends Page
 
             return redirect()->away($result['link']);
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Payment initiation error: '.$e->getMessage());
+            Log::error('Payment initiation error: '.$e->getMessage());
 
-            \Filament\Notifications\Notification::make()
+            Notification::make()
                 ->title('Erreur de paiement')
                 ->body('Impossible d\'initier le paiement. Veuillez réessayer.')
                 ->danger()
@@ -234,14 +245,14 @@ class ManageSubscription extends Page
             return;
         }
 
-        $service = app(\App\Services\SubscriptionService::class);
-        /** @var \App\Models\Agency $agency */
+        $service = app(SubscriptionService::class);
+        /** @var Agency $agency */
         $agency = auth()->user()->agency;
         $service->cancelActiveSubscriptions($agency, 'Annulation par l\'utilisateur');
 
         $this->subscription = null;
 
-        \Filament\Notifications\Notification::make()
+        Notification::make()
             ->title('Abonnement annulé')
             ->body('Votre abonnement a été annulé.')
             ->success()

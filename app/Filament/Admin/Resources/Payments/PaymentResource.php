@@ -12,6 +12,7 @@ use BackedEnum;
 use Filament\Actions\ExportAction;
 use Filament\Actions\ImportAction;
 use Filament\Actions\ViewAction;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -53,26 +54,26 @@ class PaymentResource extends Resource
     {
         return $schema
             ->components([
-                \Filament\Infolists\Components\TextEntry::make('type')
+                TextEntry::make('type')
                     ->label('Type')
                     ->badge(),
-                \Filament\Infolists\Components\TextEntry::make('amount')
+                TextEntry::make('amount')
                     ->label('Montant')
                     ->money('XAF'),
-                \Filament\Infolists\Components\TextEntry::make('transaction_id')
+                TextEntry::make('transaction_id')
                     ->label('ID Transaction')
                     ->copyable(),
-                \Filament\Infolists\Components\TextEntry::make('payment_method')
+                TextEntry::make('payment_method')
                     ->label('Moyen de paiement')
                     ->badge(),
-                \Filament\Infolists\Components\TextEntry::make('ad.title')
+                TextEntry::make('ad.title')
                     ->label('Annonce'),
-                \Filament\Infolists\Components\TextEntry::make('user.fullname')
+                TextEntry::make('user.fullname')
                     ->label('Utilisateur'),
-                \Filament\Infolists\Components\TextEntry::make('status')
+                TextEntry::make('status')
                     ->label('Statut')
                     ->badge(),
-                \Filament\Infolists\Components\TextEntry::make('created_at')
+                TextEntry::make('created_at')
                     ->label('Créé le')
                     ->dateTime('d/m/Y à H:i'),
             ]);

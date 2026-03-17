@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Mail\AdminWelcomeEmail;
 use App\Mail\VerificationCodeMail;
 use App\Mail\WelcomeEmail;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -130,7 +132,7 @@ it('queues AdminWelcomeEmail when the Verified event fires for admin', function 
 
     event(new Verified($user));
 
-    Mail::assertQueued(\App\Mail\AdminWelcomeEmail::class, fn ($m) => $m->hasTo($user->email));
+    Mail::assertQueued(AdminWelcomeEmail::class, fn ($m) => $m->hasTo($user->email));
 });
 
 // ── sendEmailVerificationNotification utilise VerifyEmailMail ─────────────────────────
@@ -208,7 +210,7 @@ it('returns access_token after successful OTP verification for auto-login', func
 });
 
 it('returns user with onboarding_completed_at and point_balance for WelcomeModal', function (): void {
-    \App\Models\Setting::set('welcome_bonus_points', 5, 'Bonus bienvenue', 'credits');
+    Setting::set('welcome_bonus_points', 5, 'Bonus bienvenue', 'credits');
     $user = User::factory()->unverified()->create();
     Cache::put('email_otp_'.$user->id, '123456', now()->addMinutes(10));
 

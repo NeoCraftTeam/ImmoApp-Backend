@@ -9,6 +9,7 @@ use App\Models\AnonymousSurveyResponse;
 use App\Models\Survey;
 use App\Models\SurveyResponse;
 use App\Models\User;
+use Carbon\Carbon;
 use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Collection;
@@ -73,7 +74,7 @@ class ViewSurvey extends ViewRecord
                     'avatar' => $user?->avatar,
                     'answers' => $answers,
                     'answer_count' => $responses->count(),
-                    'submitted_at' => $latestAt instanceof \Carbon\Carbon ? $latestAt->format('d/m/Y à H:i') : '—',
+                    'submitted_at' => $latestAt instanceof Carbon ? $latestAt->format('d/m/Y à H:i') : '—',
                     'submitted_at_raw' => $latestAt,
                     'is_anonymous' => false,
                     'is_new' => !$allViewed,

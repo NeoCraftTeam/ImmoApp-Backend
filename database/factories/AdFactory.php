@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\PropertyAttribute;
 use App\Models\Ad;
 use App\Models\AdType;
 use App\Models\Quarter;
@@ -10,7 +11,7 @@ use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
 
-/** @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Ad> */
+/** @extends Factory<Ad> */
 class AdFactory extends Factory
 {
     protected static $citiesData = null;
@@ -45,7 +46,7 @@ class AdFactory extends Factory
             'available_from' => fake()->optional(0.3)->dateTimeBetween('now', '+1 week'),
             'available_to' => fake()->optional(0.2)->dateTimeBetween('+1 month', '+1 year'),
             'attributes' => fake()->optional(0.7)->randomElements(
-                array_column(\App\Enums\PropertyAttribute::cases(), 'value'),
+                array_column(PropertyAttribute::cases(), 'value'),
                 fake()->numberBetween(1, 5)
             ),
             'created_at' => Carbon::now(),

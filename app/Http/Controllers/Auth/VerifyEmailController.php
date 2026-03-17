@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Auth;
 
+use App\Enums\UserRole;
 use App\Enums\UserType;
 use App\Models\User;
 use Illuminate\Auth\Events\Verified;
@@ -40,13 +41,13 @@ final class VerifyEmailController
 
         return view('auth.verified', [
             'loginUrl' => $loginUrl,
-            'isAdmin' => $user->role === \App\Enums\UserRole::ADMIN,
+            'isAdmin' => $user->role === UserRole::ADMIN,
         ]);
     }
 
     protected function buildLoginUrl(User $user): string
     {
-        if ($user->role === \App\Enums\UserRole::ADMIN) {
+        if ($user->role === UserRole::ADMIN) {
             $domain = config('filament.panels.admin_domain');
             if ($domain) {
                 return 'https://'.$domain.'/login';

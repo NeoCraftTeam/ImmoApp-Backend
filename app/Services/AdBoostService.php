@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\AdStatus;
 use App\Models\Ad;
 use App\Models\Agency;
+use App\Models\User;
 
 class AdBoostService
 {
@@ -76,12 +78,12 @@ class AdBoostService
         $count = 0;
 
         $agency->users()->get()->each(function ($user) use ($subscription, &$count): void {
-            /** @var \App\Models\User $user */
+            /** @var User $user */
             $user->ads()
-                ->where('status', \App\Enums\AdStatus::AVAILABLE)
+                ->where('status', AdStatus::AVAILABLE)
                 ->get()
                 ->each(function ($ad) use ($subscription, &$count): void {
-                    /** @var \App\Models\Ad $ad */
+                    /** @var Ad $ad */
                     $ad->boost(
                         $subscription->plan->boost_score,
                         $subscription->plan->boost_duration_days
@@ -101,12 +103,12 @@ class AdBoostService
         $count = 0;
 
         $agency->users()->get()->each(function ($user) use (&$count): void {
-            /** @var \App\Models\User $user */
+            /** @var User $user */
             $user->ads()
                 ->where('is_boosted', true)
                 ->get()
                 ->each(function ($ad) use (&$count): void {
-                    /** @var \App\Models\Ad $ad */
+                    /** @var Ad $ad */
                     $ad->unboost();
                     $count++;
                 });

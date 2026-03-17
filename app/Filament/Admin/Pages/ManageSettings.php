@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Mail;
 use UnitEnum;
 
 /**
- * @property-read \Filament\Schemas\Schema $form
+ * @property-read Schema $form
  */
 class ManageSettings extends Page
 {

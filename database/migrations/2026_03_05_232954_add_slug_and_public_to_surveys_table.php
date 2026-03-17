@@ -15,8 +15,8 @@ return new class extends Migration
         });
 
         // Back-fill slugs for existing surveys.
-        foreach (\DB::table('surveys')->whereNull('slug')->cursor() as $survey) {
-            \DB::table('surveys')->where('id', $survey->id)->update([
+        foreach (DB::table('surveys')->whereNull('slug')->cursor() as $survey) {
+            DB::table('surveys')->where('id', $survey->id)->update([
                 'slug' => Str::slug($survey->title).'-'.Str::lower(Str::random(5)),
             ]);
         }

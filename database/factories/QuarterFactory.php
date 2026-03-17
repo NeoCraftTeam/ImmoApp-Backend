@@ -7,7 +7,7 @@ use App\Models\Quarter;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
 
-/** @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Quarter> */
+/** @extends Factory<Quarter> */
 class QuarterFactory extends Factory
 {
     protected $model = Quarter::class;

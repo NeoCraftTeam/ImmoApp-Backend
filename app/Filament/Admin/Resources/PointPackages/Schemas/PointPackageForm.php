@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\PointPackages\Schemas;
 
+use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
@@ -50,7 +51,7 @@ class PointPackageForm
                             ->minValue(1)
                             ->helperText('Nombre de crédits accordés à l\'achat'),
 
-                        \Filament\Forms\Components\TagsInput::make('features')
+                        TagsInput::make('features')
                             ->label('Fonctionnalités')
                             ->placeholder('Ajouter une fonctionnalité')
                             ->helperText('Liste des avantages affichés sur la carte du pack'),

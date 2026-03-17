@@ -4,7 +4,22 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\ActivityLogs;
 
+use App\Enums\UserRole;
 use App\Filament\Admin\Resources\ActivityLogs\Pages\ManageActivityLogs;
+use App\Models\Ad;
+use App\Models\AdType;
+use App\Models\Agency;
+use App\Models\City;
+use App\Models\Payment;
+use App\Models\PointPackage;
+use App\Models\PropertyAttribute;
+use App\Models\Quarter;
+use App\Models\Review;
+use App\Models\Setting;
+use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
+use App\Models\UnlockedAd;
+use App\Models\User;
 use BackedEnum;
 use Filament\Actions\ViewAction;
 use Filament\Infolists\Components\TextEntry;
@@ -14,6 +29,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Spatie\Activitylog\Models\Activity;
 use UnitEnum;
 
@@ -37,20 +53,20 @@ class ActivityLogResource extends Resource
      * @var array<string, string>
      */
     private const array ENTITY_LABELS = [
-        \App\Models\Ad::class => 'Annonce',
-        \App\Models\User::class => 'Utilisateur',
-        \App\Models\Agency::class => 'Agence',
-        \App\Models\City::class => 'Ville',
-        \App\Models\Quarter::class => 'Quartier',
-        \App\Models\AdType::class => "Type d'annonce",
-        \App\Models\Review::class => 'Avis',
-        \App\Models\Payment::class => 'Paiement',
-        \App\Models\Subscription::class => 'Abonnement',
-        \App\Models\SubscriptionPlan::class => "Plan d'abonnement",
-        \App\Models\PointPackage::class => 'Pack de crédits',
-        \App\Models\UnlockedAd::class => 'Déblocage',
-        \App\Models\PropertyAttribute::class => 'Attribut',
-        \App\Models\Setting::class => 'Paramètre',
+        Ad::class => 'Annonce',
+        User::class => 'Utilisateur',
+        Agency::class => 'Agence',
+        City::class => 'Ville',
+        Quarter::class => 'Quartier',
+        AdType::class => "Type d'annonce",
+        Review::class => 'Avis',
+        Payment::class => 'Paiement',
+        Subscription::class => 'Abonnement',
+        SubscriptionPlan::class => "Plan d'abonnement",
+        PointPackage::class => 'Pack de crédits',
+        UnlockedAd::class => 'Déblocage',
+        PropertyAttribute::class => 'Attribut',
+        Setting::class => 'Paramètre',
     ];
 
     #[\Override]
@@ -63,15 +79,15 @@ class ActivityLogResource extends Resource
      * Scope activity log to admin-only actions.
      */
     #[\Override]
-    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->where('causer_type', \App\Models\User::class)
+            ->where('causer_type', User::class)
             ->whereExists(function ($query): void {
                 $query->selectRaw('1')
                     ->from('users')
                     ->whereColumn('users.id', 'activity_log.causer_id')
-                    ->where('users.role', \App\Enums\UserRole::ADMIN);
+                    ->where('users.role', UserRole::ADMIN);
             })
             ->with('causer');
     }

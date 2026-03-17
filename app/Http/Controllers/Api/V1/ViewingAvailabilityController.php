@@ -14,6 +14,7 @@ use App\Models\Zap\Schedule;
 use App\Policies\ViewingAvailabilityPolicy;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -197,7 +198,7 @@ final readonly class ViewingAvailabilityController
                 'slots' => collect($daySlots)->map(function (array $slot) use ($date, $activeReservations): array {
                     /** @var TentativeReservation|null $reservation */
                     $reservation = $activeReservations->get($date)?->first(
-                        fn (TentativeReservation $r): bool => \Carbon\Carbon::parse($r->slot_starts_at)->format('H:i') === $slot['start_time']
+                        fn (TentativeReservation $r): bool => Carbon::parse($r->slot_starts_at)->format('H:i') === $slot['start_time']
                     );
 
                     $entry = [

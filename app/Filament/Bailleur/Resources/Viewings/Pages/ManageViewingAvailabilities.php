@@ -18,6 +18,7 @@ use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ManageRecords;
 use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Utilities\Get;
 
 class ManageViewingAvailabilities extends ManageRecords
 {
@@ -95,7 +96,7 @@ class ManageViewingAvailabilities extends ManageRecords
                         ->helperText('Activez si ces créneaux se répètent régulièrement.'),
 
                     Grid::make(2)
-                        ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => (bool) $get('is_recurring'))
+                        ->visible(fn (Get $get) => (bool) $get('is_recurring'))
                         ->schema([
                             Select::make('recurrence')
                                 ->label('Fréquence')
@@ -106,7 +107,7 @@ class ManageViewingAvailabilities extends ManageRecords
                                     'monthly' => 'Chaque mois',
                                 ])
                                 ->live()
-                                ->required(fn (\Filament\Schemas\Components\Utilities\Get $get) => (bool) $get('is_recurring')),
+                                ->required(fn (Get $get) => (bool) $get('is_recurring')),
                         ]),
 
                     CheckboxList::make('recurrence_days')
@@ -122,7 +123,7 @@ class ManageViewingAvailabilities extends ManageRecords
                             'sunday' => 'Dimanche',
                         ])
                         ->columns(4)
-                        ->visible(fn (\Filament\Schemas\Components\Utilities\Get $get) => in_array($get('recurrence'), ['weekly', 'biweekly'])),
+                        ->visible(fn (Get $get) => in_array($get('recurrence'), ['weekly', 'biweekly'])),
 
                     Repeater::make('periods')
                         ->label('Plages horaires')

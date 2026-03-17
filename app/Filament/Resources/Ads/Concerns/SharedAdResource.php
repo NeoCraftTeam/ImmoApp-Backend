@@ -9,6 +9,7 @@ use App\Jobs\ProcessTourSceneJob;
 use App\Models\Ad;
 use App\Models\PropertyAttribute;
 use App\Services\AiDescriptionEnhancer;
+use Carbon\Carbon;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Dotswan\MapPicker\Fields\Map;
 use Filament\Actions\Action;
@@ -25,11 +26,16 @@ use Filament\Forms\Components\ToggleButtons;
 use Filament\Forms\Components\ViewField;
 use Filament\Infolists\Components\IconEntry;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\ViewEntry;
+use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Storage;
@@ -37,6 +43,7 @@ use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Intervention\Image\ImageManager;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 /**
  * Shared form, infolist, and table definitions for AdResource across all panels.
@@ -52,7 +59,7 @@ trait SharedAdResource
     /**
      * Common form fields shared by all panels.
      *
-     * @return array<int, \Filament\Schemas\Components\Component>
+     * @return array<int, Component>
      */
     protected static function getSharedFormFields(): array
     {
@@ -81,7 +88,7 @@ trait SharedAdResource
                                 ->tooltip('Utilisez l\'IA pour améliorer votre description en français professionnel')
                                 ->action(function ($state, $set): void {
                                     if (empty(trim((string) $state))) {
-                                        \Filament\Notifications\Notification::make()
+                                        Notification::make()
                                             ->title('Description vide')
                                             ->body('Veuillez d\'abord saisir une description avant de l\'améliorer avec l\'IA.')
                                             ->warning()
@@ -93,7 +100,7 @@ trait SharedAdResource
                                     $enhanced = app(AiDescriptionEnhancer::class)->enhance((string) $state);
                                     $set('description', $enhanced);
 
-                                    \Filament\Notifications\Notification::make()
+                                    Notification::make()
                                         ->title('Description améliorée ✨')
                                         ->success()
                                         ->send();
@@ -125,7 +132,7 @@ trait SharedAdResource
                         ->panelLayout('grid')
                         ->columnSpanFull()
                         ->getUploadedFileUsing(function ($component, string $file, $storedFileNames): ?array {
-                            /** @var \Spatie\MediaLibrary\MediaCollections\Models\Media|null $media */
+                            /** @var Media|null $media */
                             $media = $component->getRecord()?->getRelationValue('media')->firstWhere('uuid', $file);
 
                             if (!$media) {
@@ -476,7 +483,7 @@ trait SharedAdResource
      * @return array<int, Select>
      */
     /**
-     * @return array<int, \Filament\Schemas\Components\Component>
+     * @return array<int, Component>
      */
     #[\Deprecated(message: 'Quartier & Catégorie are now inline in getSharedFormFields().')]
     protected static function getRelationSelects(): array
@@ -498,7 +505,7 @@ trait SharedAdResource
         $sections = [
             Section::make('Galerie Photos')
                 ->schema([
-                    \Filament\Infolists\Components\ViewEntry::make('images')
+                    ViewEntry::make('images')
                         ->label('')
                         ->view('filament.components.image-lightbox-gallery')
                         ->columnSpanFull(),
@@ -551,10 +558,10 @@ trait SharedAdResource
                     IconEntry::make('is_visible')->label('Visible')->boolean(),
                     TextEntry::make('available_from')
                         ->label('Disponible à partir de')
-                        ->formatStateUsing(fn ($state) => $state ? \Carbon\Carbon::parse($state)->format('d/m/Y') : 'Immédiatement'),
+                        ->formatStateUsing(fn ($state) => $state ? Carbon::parse($state)->format('d/m/Y') : 'Immédiatement'),
                     TextEntry::make('available_to')
                         ->label('Disponible jusqu\'au')
-                        ->formatStateUsing(fn ($state) => $state ? \Carbon\Carbon::parse($state)->format('d/m/Y') : 'Indéfiniment'),
+                        ->formatStateUsing(fn ($state) => $state ? Carbon::parse($state)->format('d/m/Y') : 'Indéfiniment'),
                 ])
                 ->columns(3)
                 ->columnSpanFull(),
@@ -596,12 +603,12 @@ trait SharedAdResource
             Section::make('Visite Virtuelle 3D')
                 ->icon('heroicon-o-cube-transparent')
                 ->schema([
-                    \Filament\Infolists\Components\TextEntry::make('has_3d_tour')
+                    TextEntry::make('has_3d_tour')
                         ->label('Présence d\'un tour 3D')
                         ->formatStateUsing(fn ($state) => $state ? 'Oui' : 'Non')
                         ->badge()
                         ->color(fn ($state) => $state ? 'success' : 'danger'),
-                    \Filament\Infolists\Components\TextEntry::make('tour_link')
+                    TextEntry::make('tour_link')
                         ->label('Tour 3D')
                         ->default('Ouvrir le tour 3D')
                         ->icon('heroicon-o-arrow-top-right-on-square')
@@ -636,12 +643,12 @@ trait SharedAdResource
     /**
      * Common table columns.
      *
-     * @return array<int, \Filament\Tables\Columns\Column>
+     * @return array<int, Column>
      */
     protected static function getSharedTableColumns(bool $isAdmin = false): array
     {
         $columns = [
-            \Filament\Tables\Columns\SpatieMediaLibraryImageColumn::make('images')
+            SpatieMediaLibraryImageColumn::make('images')
                 ->collection('images')
                 ->conversion('thumb')
                 ->circular()

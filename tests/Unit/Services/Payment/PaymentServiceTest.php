@@ -3,6 +3,7 @@
 use App\Enums\PaymentStatus;
 use App\Events\PaymentInitiated;
 use App\Events\PaymentSucceeded;
+use App\Exceptions\PaymentGatewayException;
 use App\Models\Payment;
 use App\Models\User;
 use App\Services\Payment\PaymentService;
@@ -107,7 +108,7 @@ it('should mark payment as failed when gateway throws exception', function (): v
             'amount' => 150000,
             'type' => 'unlock',
         ]);
-    } catch (\App\Exceptions\PaymentGatewayException) {
+    } catch (PaymentGatewayException) {
         // Expected
     }
 

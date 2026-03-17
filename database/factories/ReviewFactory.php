@@ -8,7 +8,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
 
-/** @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\Review> */
+/** @extends Factory<Review> */
 class ReviewFactory extends Factory
 {
     protected $model = Review::class;

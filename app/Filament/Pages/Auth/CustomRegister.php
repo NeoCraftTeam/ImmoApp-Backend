@@ -10,6 +10,7 @@ use App\Models\City;
 use App\Models\User;
 use App\Services\AgencyService;
 use Filament\Auth\Pages\Register as BaseRegister;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -18,6 +19,7 @@ use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class CustomRegister extends BaseRegister
 {
@@ -83,7 +85,7 @@ class CustomRegister extends BaseRegister
 
     protected function getAgencyNameFormComponent(): Component
     {
-        $panelId = \Filament\Facades\Filament::getCurrentPanel()->getId();
+        $panelId = Filament::getCurrentPanel()->getId();
 
         return TextInput::make('agency_name')
             ->label('Nom de votre agence')
@@ -95,7 +97,7 @@ class CustomRegister extends BaseRegister
     #[\Override]
     protected function handleRegistration(array $data): Model
     {
-        $panelId = \Filament\Facades\Filament::getCurrentPanel()->getId();
+        $panelId = Filament::getCurrentPanel()->getId();
 
         return DB::transaction(function () use ($data, $panelId) {
             // 1. On crée d'abord l'utilisateur de base
@@ -125,7 +127,7 @@ class CustomRegister extends BaseRegister
                     $agencyService->promoteToBailleur($user);
                 }
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::error('Registration promotion failed', [
+                Log::error('Registration promotion failed', [
                     'user_id' => $user->id,
                     'panel' => $panelId,
                     'error' => $e->getMessage(),

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
+use App\Mail\SearchAlertMatchMail;
 use App\Models\Ad;
 use App\Models\SearchAlert;
 use Illuminate\Bus\Queueable;
@@ -35,9 +36,9 @@ class SearchAlertMatchNotification extends Notification implements ShouldQueue
         return $channels;
     }
 
-    public function toMail(object $notifiable): \App\Mail\SearchAlertMatchMail
+    public function toMail(object $notifiable): SearchAlertMatchMail
     {
-        return new \App\Mail\SearchAlertMatchMail($this->ad, $this->alert, $notifiable)
+        return new SearchAlertMatchMail($this->ad, $this->alert, $notifiable)
             ->to($notifiable->email, $notifiable->firstname);
     }
 

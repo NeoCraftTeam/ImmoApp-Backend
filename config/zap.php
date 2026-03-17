@@ -1,6 +1,9 @@
 <?php
 
+use App\Models\Zap\Schedule;
+use App\Models\Zap\SchedulePeriod;
 use Carbon\CarbonInterface;
+use Zap\Enums\ScheduleTypes;
 
 return [
     /*
@@ -29,8 +32,8 @@ return [
             'enabled' => true,
             'applies_to' => [
                 // Which schedule types get this rule automatically
-                \Zap\Enums\ScheduleTypes::APPOINTMENT,
-                \Zap\Enums\ScheduleTypes::BLOCKED,
+                ScheduleTypes::APPOINTMENT,
+                ScheduleTypes::BLOCKED,
             ],
         ],
         'working_hours' => [
@@ -99,7 +102,7 @@ return [
     |
     */
     'models' => [
-        'schedule' => \App\Models\Zap\Schedule::class,
-        'schedule_period' => \App\Models\Zap\SchedulePeriod::class,
+        'schedule' => Schedule::class,
+        'schedule_period' => SchedulePeriod::class,
     ],
 ];

@@ -9,6 +9,7 @@ use App\Enums\ReservationStatus;
 use App\Models\Zap\Schedule;
 use Database\Factories\TentativeReservationFactory;
 use Eloquent;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,7 +23,7 @@ use Illuminate\Support\Carbon;
  * @property string $ad_id
  * @property string $client_id
  * @property string $appointment_schedule_id
- * @property \Illuminate\Support\Carbon $slot_date
+ * @property Carbon $slot_date
  * @property string $slot_starts_at
  * @property string $slot_ends_at
  * @property ReservationStatus $status
@@ -120,7 +121,7 @@ class TentativeReservation extends Model
         return $query->whereIn('status', [ReservationStatus::Pending, ReservationStatus::Confirmed]);
     }
 
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function expiredAndPending(Builder $query): Builder
     {
         return $query->where('status', ReservationStatus::Pending)

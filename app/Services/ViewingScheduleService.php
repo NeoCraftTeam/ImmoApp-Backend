@@ -79,8 +79,8 @@ final class ViewingScheduleService implements ViewingScheduleServiceInterface
             'starts_on' => $schedule->start_date->toDateString(),
             'ends_on' => $schedule->end_date?->toDateString(),
             'periods' => $schedule->periods->map(fn ($p): array => [
-                'starts_at' => \Carbon\Carbon::parse($p->start_time)->format('H:i'),
-                'ends_at' => \Carbon\Carbon::parse($p->end_time)->format('H:i'),
+                'starts_at' => Carbon::parse($p->start_time)->format('H:i'),
+                'ends_at' => Carbon::parse($p->end_time)->format('H:i'),
             ])->toArray(),
             'recurrence' => null,
             'slot_duration' => $schedule->metadata['slot_duration'] ?? 30,

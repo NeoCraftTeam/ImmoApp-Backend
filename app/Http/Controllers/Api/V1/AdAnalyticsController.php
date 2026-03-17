@@ -8,6 +8,7 @@ use App\Models\Ad;
 use App\Models\AdInteraction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use OpenApi\Annotations as OA;
 
 /**
@@ -218,7 +219,7 @@ final class AdAnalyticsController
     /**
      * Compute total counts per interaction type for a set of ad IDs.
      *
-     * @param  \Illuminate\Support\Collection<int, mixed>  $adIds
+     * @param  Collection<int, mixed>  $adIds
      * @return array<string, int|float>
      */
     private function computeTotals($adIds, $since): array
@@ -275,7 +276,7 @@ final class AdAnalyticsController
     /**
      * Compute daily trends per metric type for overview.
      *
-     * @param  \Illuminate\Support\Collection<int, int|string>  $adIds
+     * @param  Collection<int, int|string>  $adIds
      * @return array<string, array<int, array{date: string, count: int}>>
      */
     private function computeTrends($adIds, $since): array
@@ -357,7 +358,7 @@ final class AdAnalyticsController
     /**
      * Compute top performing ads by total views.
      *
-     * @param  \Illuminate\Support\Collection<int, int|string>  $adIds
+     * @param  Collection<int, int|string>  $adIds
      * @return array<int, array<string, mixed>>
      */
     private function computeTopAds($adIds, $since, int $limit): array

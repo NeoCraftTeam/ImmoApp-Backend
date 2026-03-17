@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\PointTransactionType;
+use Database\Factories\PointTransactionFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class PointTransaction extends Model
 {
-    /** @use HasFactory<\Database\Factories\PointTransactionFactory> */
+    /** @use HasFactory<PointTransactionFactory> */
     use HasFactory, \Illuminate\Database\Eloquent\Concerns\HasUuids;
 
     protected $fillable = [

@@ -22,6 +22,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class SurveyTemplateResource extends Resource
 {
@@ -62,7 +63,7 @@ class SurveyTemplateResource extends Resource
     }
 
     #[\Override]
-    public static function canEdit(\Illuminate\Database\Eloquent\Model $record): bool
+    public static function canEdit(Model $record): bool
     {
         $user = auth()->user();
 

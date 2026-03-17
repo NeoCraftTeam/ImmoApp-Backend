@@ -26,6 +26,7 @@ use Filament\Forms\Components\Select;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -90,7 +91,7 @@ class AdResource extends Resource
             ->columns(static::getSharedTableColumns(isAdmin: true))
             ->filters([
                 TrashedFilter::make(),
-                \Filament\Tables\Filters\SelectFilter::make('status')
+                SelectFilter::make('status')
                     ->options(AdStatus::class)
                     ->label('Statut'),
             ])

@@ -21,6 +21,7 @@ use App\Models\PointPackage;
 use App\Models\PointTransaction;
 use App\Models\Setting;
 use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -74,7 +75,7 @@ it('the point_transactions table rejects two rows with the same payment_id', fun
         'points' => 10,
         'description' => 'Duplicate credit — must be rejected',
         'payment_id' => $payment->id,
-    ]))->toThrow(\Illuminate\Database\QueryException::class);
+    ]))->toThrow(QueryException::class);
 });
 
 // ── 2. verifyPurchase does not re-credit when webhook already succeeded ────────

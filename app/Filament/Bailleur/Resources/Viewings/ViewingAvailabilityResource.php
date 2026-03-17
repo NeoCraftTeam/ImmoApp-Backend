@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Bailleur\Resources\Viewings;
 
 use App\Enums\ReservationStatus;
+use App\Exceptions\Viewing\ScheduleHasActiveReservationsException;
 use App\Filament\Bailleur\Resources\Viewings\Pages\ManageViewingAvailabilities;
 use App\Models\Ad;
 use App\Models\TentativeReservation;
@@ -12,6 +13,7 @@ use App\Models\Zap\Schedule;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
 use BackedEnum;
+use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Forms\Components\DatePicker;
@@ -29,6 +31,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Livewire\Component;
 use UnitEnum;
 
 class ViewingAvailabilityResource extends Resource
@@ -215,14 +218,14 @@ class ViewingAvailabilityResource extends Resource
                         'starts_on' => $record->start_date->toDateString(),
                         'ends_on' => $record->end_date?->toDateString(),
                         'periods' => $record->periods->map(fn ($p): array => [
-                            'starts_at' => \Carbon\Carbon::parse($p->start_time)->format('H:i'),
-                            'ends_at' => \Carbon\Carbon::parse($p->end_time)->format('H:i'),
+                            'starts_at' => Carbon::parse($p->start_time)->format('H:i'),
+                            'ends_at' => Carbon::parse($p->end_time)->format('H:i'),
                         ])->toArray(),
                     ])
-                    ->action(function (Schedule $record, array $data, \Livewire\Component $livewire): void {
+                    ->action(function (Schedule $record, array $data, Component $livewire): void {
                         try {
                             app(ReservationServiceInterface::class)->assertNoActiveReservationsForSchedule($record);
-                        } catch (\App\Exceptions\Viewing\ScheduleHasActiveReservationsException) {
+                        } catch (ScheduleHasActiveReservationsException) {
                             Notification::make()
                                 ->title('Modification impossible')
                                 ->body('Cette disponibilité a des réservations actives. Annulez-les d\'abord.')

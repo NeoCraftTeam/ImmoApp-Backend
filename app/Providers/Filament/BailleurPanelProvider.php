@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Auth\CustomRegister;
+use App\Filament\Pages\Auth\EditProfile;
 use DutchCodingCompany\FilamentSocialite\FilamentSocialitePlugin;
 use DutchCodingCompany\FilamentSocialite\Provider;
+use Filament\Auth\MultiFactor\App\AppAuthentication;
+use Filament\Auth\MultiFactor\Email\EmailAuthentication;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
+use Filament\Support\Assets\Js;
 use Filament\Support\Colors\Color;
 use Hammadzafar05\MobileBottomNav\MobileBottomNav;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -19,6 +24,7 @@ use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\HtmlString;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
 class BailleurPanelProvider extends PanelProvider
@@ -43,8 +49,8 @@ class BailleurPanelProvider extends PanelProvider
             ->databaseTransactions()
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')
-            ->registration(\App\Filament\Pages\Auth\CustomRegister::class)
-            ->profile(\App\Filament\Pages\Auth\EditProfile::class)
+            ->registration(CustomRegister::class)
+            ->profile(EditProfile::class)
             ->emailVerification()
             ->colors([
                 'primary' => Color::hex('#0D9488'),
@@ -55,12 +61,12 @@ class BailleurPanelProvider extends PanelProvider
                 'warning' => Color::hex('#F59E0B'),
             ])
             ->multiFactorAuthentication([
-                \Filament\Auth\MultiFactor\App\AppAuthentication::make()
+                AppAuthentication::make()
                     ->recoverable()
                     ->recoveryCodeCount(10)
                     ->regenerableRecoveryCodes(false)
                     ->brandName('KeyHome Owner App'),
-                \Filament\Auth\MultiFactor\Email\EmailAuthentication::make(),
+                EmailAuthentication::make(),
             ], isRequired: false)
             ->discoverResources(in: app_path('Filament/Bailleur/Resources'), for: 'App\Filament\Bailleur\Resources')
             ->discoverPages(in: app_path('Filament/Bailleur/Pages'), for: 'App\Filament\Bailleur\Pages')
@@ -90,7 +96,7 @@ class BailleurPanelProvider extends PanelProvider
             )
             ->renderHook(
                 'panels::head.end',
-                fn () => new \Illuminate\Support\HtmlString('
+                fn () => new HtmlString('
                     <!-- Dynamic Island / Notch — viewport-fit=cover requis pour env(safe-area-inset-top) -->
                     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
                     <style>
@@ -123,8 +129,8 @@ class BailleurPanelProvider extends PanelProvider
             )
             ->assets([
                 // Bridge natif minimal — CSS et JS uniquement pour l'app mobile
-                \Filament\Support\Assets\Js::make('filament-native-bridge', resource_path('js/filament-native-bridge.js')),
-                \Filament\Support\Assets\Js::make('tour-hotspot-editor', resource_path('js/filament/tour-hotspot-editor.js')),
+                Js::make('filament-native-bridge', resource_path('js/filament-native-bridge.js')),
+                Js::make('tour-hotspot-editor', resource_path('js/filament/tour-hotspot-editor.js')),
             ])
             ->renderHook(
                 'panels::body.end',

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Pages;
 
+use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -67,7 +68,7 @@ class ForcePasswordChange extends Page
                     ])
                     ->columns(1)
                     ->footerActions([
-                        \Filament\Actions\Action::make('submit')
+                        Action::make('submit')
                             ->label('Changer le mot de passe')
                             ->action('submit'),
                     ]),

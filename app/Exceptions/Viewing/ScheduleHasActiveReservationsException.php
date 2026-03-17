@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Exceptions\Viewing;
 
 use App\Models\TentativeReservation;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -16,7 +17,7 @@ class ScheduleHasActiveReservationsException extends \RuntimeException
         parent::__construct('Ce planning a des réservations provisoires actives.');
     }
 
-    public function render(): \Illuminate\Http\JsonResponse
+    public function render(): JsonResponse
     {
         return response()->json([
             'error' => [

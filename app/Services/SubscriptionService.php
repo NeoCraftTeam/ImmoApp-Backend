@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\AdStatus;
 use App\Enums\SubscriptionStatus;
 use App\Mail\SubscriptionInvoiceMail;
 use App\Mail\SubscriptionSuccessEmail;
+use App\Models\Ad;
 use App\Models\Agency;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -134,7 +137,7 @@ class SubscriptionService
                 $subscription->expire();
 
                 $subscription->agency->users->each(function (User $user): void {
-                    $user->ads->each(fn (\App\Models\Ad $ad) => $ad->unboost());
+                    $user->ads->each(fn (Ad $ad) => $ad->unboost());
                 });
             });
         }
@@ -150,10 +153,10 @@ class SubscriptionService
         $agency->users()->get()->each(function ($user) use ($plan): void {
             /** @var User $user */
             $user->ads()
-                ->where('status', \App\Enums\AdStatus::AVAILABLE)
+                ->where('status', AdStatus::AVAILABLE)
                 ->get()
                 ->each(function ($ad) use ($plan): void {
-                    /** @var \App\Models\Ad $ad */
+                    /** @var Ad $ad */
                     $ad->boost($plan->boost_score, $plan->boost_duration_days);
                 });
         });
@@ -162,7 +165,7 @@ class SubscriptionService
     /**
      * Get subscription statistics for an agency.
      *
-     * @return array{has_active_subscription: bool, current_plan: string|null, days_remaining: int, expires_at: \Illuminate\Support\Carbon|null, total_boosted_ads: int}
+     * @return array{has_active_subscription: bool, current_plan: string|null, days_remaining: int, expires_at: Carbon|null, total_boosted_ads: int}
      */
     public function getAgencyStats(Agency $agency): array
     {
