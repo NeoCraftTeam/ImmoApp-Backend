@@ -35,7 +35,7 @@ class MassiveAdSeeder extends Seeder
     private const SEED_FAST_MODE_DEFAULT = true;
 
     /**
-     * Maps normalized ad type to folder name in storage/app/seeder-images/
+     * Maps normalized ad type to folder name in resources/seeder-images/
      * Download 10-20 images from Unsplash per category and place in these folders.
      */
     private const TYPE_TO_FOLDER = [
@@ -50,8 +50,6 @@ class MassiveAdSeeder extends Seeder
         'commercial' => 'commercial',
         'commerces' => 'commercial',
     ];
-
-    private const SEEDER_IMAGES_BASE = 'seeder-images';
 
     private string $imageBaseDir;
 
@@ -106,18 +104,17 @@ class MassiveAdSeeder extends Seeder
 
     public function run(): void
     {
-        $this->imageBaseDir = storage_path('app/'.self::SEEDER_IMAGES_BASE);
+        $this->imageBaseDir = resource_path('seeder-images');
         $fastMode = config('seeding.massive_ad_fast_mode', self::SEED_FAST_MODE_DEFAULT);
         $totalAds = $fastMode ? 200 : self::TOTAL_ADS;
         $this->command->info('Seeding '.$totalAds.' realistic ads with images...'.($fastMode ? ' (fast mode)' : ''));
 
         $this->ensureImageFoldersExist();
-        if (empty($this->getImagesForType('maison'))) {
-            $this->command->error('No seeder images found. Download 10-20 images from Unsplash per category and place them in:');
+        $hasImages = !empty($this->getImagesForType('maison'));
+        if (!$hasImages) {
+            $this->command->warn('No seeder images found. Seeding ads without images.');
+            $this->command->line('  To add images: place 10-20 jpg/png/webp per category in:');
             $this->command->line('  '.$this->imageBaseDir.'/{maison,terrain,chambre,studio,appartement,commercial}/');
-            $this->command->line('  Supported formats: jpg, jpeg, png, webp');
-
-            return;
         }
 
         $this->createUsers();

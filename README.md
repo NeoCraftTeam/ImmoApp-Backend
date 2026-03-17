@@ -105,7 +105,7 @@ docker compose exec app php artisan app:create-test-users
 Avant de lancer le seed, placez 10–20 images par catégorie (téléchargeables sur Unsplash) dans :
 
 ```
-storage/app/seeder-images/
+resources/seeder-images/
 ├── maison/
 ├── terrain/
 ├── chambre/
