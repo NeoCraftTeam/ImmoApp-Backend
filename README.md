@@ -70,17 +70,16 @@ php artisan storage:link
 
 ## Commandes utiles
 
-### Créer un admin
+### Créer un administrateur
+
+Crée un compte administrateur de manière interactive (prompts) ou via des options en ligne de commande. Le compte est directement vérifié et un email de bienvenue est envoyé.
 
 ```bash
-# Interactif
+# Mode interactif (prompts)
 php artisan app:create-admin
 
-# Non-interactif
-php artisan app:create-admin --email=admin@example.com --firstname=John --lastname=Doe --password=secret123
-
-# Promouvoir un utilisateur existant en admin
-php artisan app:create-admin --email=user@example.com
+# Mode non-interactif (CI / scripts)
+php artisan app:create-admin --email=admin@example.com --firstname=John --lastname=Doe --password=Secret123
 ```
 
 **En production (Docker) :**
@@ -88,11 +87,41 @@ php artisan app:create-admin --email=user@example.com
 docker compose exec app php artisan app:create-admin
 ```
 
+### Créer les utilisateurs de test
+
+Crée 4 utilisateurs (admin, agence, bailleur, client) avec des identifiants prédéfinis, vérifie leurs comptes et envoie un email de bienvenue adapté à chaque rôle.
+
+```bash
+php artisan app:create-test-users
+```
+
+**En production (Docker) :**
+```bash
+docker compose exec app php artisan app:create-test-users
+```
+
 ### Seeding de la base de données
+
+Avant de lancer le seed, placez 10–20 images par catégorie (téléchargeables sur Unsplash) dans :
+
+```
+storage/app/seeder-images/
+├── maison/
+├── terrain/
+├── chambre/
+├── studio/
+├── appartement/
+└── commercial/
+```
+
+Formats acceptés : jpg, jpeg, png, webp.
 
 ```bash
 # Purge et re-seed complet (villes, quartiers, 2000 annonces)
 php artisan migrate:fresh --seed
+
+# Ou simplement
+php artisan db:seed
 
 # Régénérer les conversions d'images (thumb, medium, large en WebP)
 php artisan media-library:regenerate --force
@@ -166,11 +195,14 @@ php artisan test --filter=NomDuTest
 vendor/bin/pint
 ```
 
-## Comptes par défaut (seed)
+## Comptes de test (`app:create-test-users`)
 
-| Rôle     | Email              | Mot de passe |
-|----------|--------------------|--------------|
-| Admin    | admin@keyhome.cm   | password     |
+| Rôle     | Email                        | Mot de passe |
+|----------|------------------------------|--------------|
+| Admin    | test-admin-nc@proton.me      | Password123! |
+| Agence   | test-prof-nc@proton.me       | Password123! |
+| Bailleur | test-student-nc@proton.me    | Password123! |
+| Client   | test-client-nc@proton.me     | Password123! |
 
 ## Déploiement
 
