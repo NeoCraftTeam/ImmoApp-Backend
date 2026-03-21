@@ -19,11 +19,13 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => [
-        'http://localhost:3000',
-        'http://192.168.1.186:3000',
-        'http://192.168.1.130:3000',
-        'https://keyhome.test',
+    'allowed_origins' => array_filter([
+        ...((string) env('APP_ENV') !== 'production' ? [
+            'http://localhost:3000',
+            'http://192.168.1.186:3000',
+            'http://192.168.1.130:3000',
+            'https://keyhome.test',
+        ] : []),
         'https://api.keyhome.neocraft.dev',
         'https://keyhome.fr',
         'https://www.keyhome.fr',
@@ -31,7 +33,7 @@ return [
         'https://www.keyhome.app',
         'https://neocraft.dev',
         'https://www.neocraft.dev',
-    ],
+    ]),
 
     'allowed_origins_patterns' => [
         '/^https:\/\/[a-z0-9-]+\.keyhome\.neocraft\.dev$/',
