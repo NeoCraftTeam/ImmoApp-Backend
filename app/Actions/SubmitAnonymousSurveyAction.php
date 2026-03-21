@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
+use App\Enums\SurveyAnonymousAudience;
 use App\Models\AnonymousSurveyAnswer;
 use App\Models\AnonymousSurveyResponse;
 use App\Models\Survey;
@@ -32,6 +33,7 @@ final class SubmitAnonymousSurveyAction
             'survey_id' => $survey->id,
             'session_token_hash' => $sessionToken,
             'ip_hash' => $ipHash,
+            'respondent_audience' => SurveyAnonymousAudience::PublicGuest,
             'submitted_at' => now(),
         ]);
 

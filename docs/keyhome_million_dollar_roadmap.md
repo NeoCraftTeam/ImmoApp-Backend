@@ -39,7 +39,7 @@ KeyHome is already a **technically exceptional** platform for the African real-e
 | **Tech Stack** | Next.js 16 + React 19 + Laravel 12 + PostGIS + MeiliSearch | Best-in-class for African PropTech — competitors use WordPress or basic PHP |
 | **Recommendation Engine** | Weighted scoring v2 with diversity injection, temporal decay, cold-start handling | No African competitor has personalized recommendations |
 | **Payment Evolution** | Migrated from FedaPay to Flutterwave with credit-based model + Mobile Money support | Addresses the 70%+ unbanked population |
-| **3D Tours** | Pannellum-based virtual tours with hotspots, cubemap, and multires support | Matterport-level functionality at zero per-tour cost |
+| **3D Tours** | Photo Sphere Viewer (v5) virtual tours with hotspots, cubemap, and multires support | Matterport-level functionality at zero per-tour cost |
 | **SEO Infrastructure** | Dynamic sitemap, programmatic city/type pages, blog, comparison pages, structured data (7 schemas) | Massive improvement from previous client-rendered state |
 | **Viewing Reservations** | Full booking flow with slots, confirmations, cancellations | Unique feature in the African market |
 | **Ad Quality Tools** | Ad reporting (5 reasons + scam sub-reasons), KeyScore quality badge, rent estimator | Trust-building features that competitors lack entirely |

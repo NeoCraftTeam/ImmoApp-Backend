@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\SurveyAnonymousAudience;
 use App\Models\AnonymousSurveyResponse;
 use App\Models\Survey;
 use App\Models\SurveyQuestion;
@@ -98,6 +99,9 @@ it('stores anonymous responses successfully', function (): void {
 
     expect(AnonymousSurveyResponse::where('survey_id', $survey->id)->count())->toBe(1);
     expect($survey->anonymousResponses->first()->answers->count())->toBe(2);
+    expect(AnonymousSurveyResponse::where('survey_id', $survey->id)->first()->respondent_audience)->toBe(
+        SurveyAnonymousAudience::PublicGuest,
+    );
 });
 
 it('validates that question_id belongs to the survey', function (): void {

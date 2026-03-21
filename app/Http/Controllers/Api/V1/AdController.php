@@ -197,7 +197,7 @@ final class AdController
      *                 @OA\Property(
      *                     property="images",
      *                     type="array",
-     *                     description="Images du bien (maximum 10 images, 5MB chacune). Formats: JPEG, PNG, GIF, WebP. Note: Utiliser le nom de champ 'images[]' pour l'envoi multiple.",
+     *                     description="Images du bien (maximum 10 images, 20 Mo chacune). Formats: JPEG, PNG, GIF, WebP. Note: Utiliser le nom de champ 'images[]' pour l'envoi multiple.",
      *
      *                     @OA\Items(type="string", format="binary"),
      *                     maxItems=10
@@ -299,11 +299,12 @@ final class AdController
                 'bedrooms' => $data['bedrooms'],
                 'bathrooms' => $data['bathrooms'],
                 'has_parking' => $data['has_parking'] ?? false,
-                'location' => Point::makeGeodetic($data['latitude'], $data['longitude']),
-                'expires_at' => $data['expires_at'],
+                'location' => Point::makeGeodetic((float) $data['latitude'], (float) $data['longitude']),
+                'expires_at' => $data['expires_at'] ?? null,
                 'user_id' => auth()->id(),
                 'quarter_id' => $data['quarter_id'],
                 'type_id' => $data['type_id'],
+                'attributes' => $data['attributes'] ?? [],
             ]);
             $ad->forceFill(['status' => AdStatus::PENDING]);
             $ad->save();
@@ -498,7 +499,7 @@ final class AdController
      *                 @OA\Property(
      *                     property="images",
      *                     type="array",
-     *                     description="Nouvelles images à ajouter (max 10 total). Note: Utiliser le nom de champ 'images[]'.",
+     *                     description="Nouvelles images à ajouter (max 10 total, 20 Mo chacune). Note: Utiliser le nom de champ 'images[]'.",
      *
      *                     @OA\Items(type="string", format="binary")
      *                 ),
@@ -599,7 +600,7 @@ final class AdController
 
             // Mise à jour des coordonnées GPS si fournies
             if (isset($data['latitude']) && isset($data['longitude'])) {
-                $data['location'] = Point::makeGeodetic($data['latitude'], $data['longitude']);
+                $data['location'] = Point::makeGeodetic((float) $data['latitude'], (float) $data['longitude']);
             }
 
             // Strip status from non-admin users to prevent privilege escalation

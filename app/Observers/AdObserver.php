@@ -15,7 +15,6 @@ use App\Notifications\NewAdPending;
 use App\Services\AdBoostService;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Notification;
 
 class AdObserver
 {
@@ -54,11 +53,13 @@ class AdObserver
             }
 
             // 2. Notify all admins (mail + Filament DB notification + WebPush)
-            try {
-                $admins = User::where('role', UserRole::ADMIN)->get();
-                Notification::send($admins, new NewAdPending($ad));
-            } catch (\Throwable $e) {
-                Log::error('Failed to send admin notifications for new ad: '.$e->getMessage());
+            $admins = User::where('role', UserRole::ADMIN)->get();
+            foreach ($admins as $admin) {
+                try {
+                    $admin->notify(new NewAdPending($ad));
+                } catch (\Throwable $e) {
+                    Log::error("Failed to send admin notification to {$admin->email} for new ad: ".$e->getMessage());
+                }
             }
         }
     }
@@ -98,11 +99,13 @@ class AdObserver
 
         // Re-notify admins when a declined ad is resubmitted for review
         if ($newStatus === AdStatus::PENDING) {
-            try {
-                $admins = User::where('role', UserRole::ADMIN)->get();
-                Notification::send($admins, new NewAdPending($ad));
-            } catch (\Throwable $e) {
-                Log::error('Failed to send admin resubmission notifications for ad: '.$e->getMessage());
+            $admins = User::where('role', UserRole::ADMIN)->get();
+            foreach ($admins as $admin) {
+                try {
+                    $admin->notify(new NewAdPending($ad));
+                } catch (\Throwable $e) {
+                    Log::error("Failed to send admin resubmission notification to {$admin->email}: ".$e->getMessage());
+                }
             }
         }
 

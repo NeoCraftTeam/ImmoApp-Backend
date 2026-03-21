@@ -4,19 +4,21 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\ReservationStatus;
 use App\Http\Requests\Viewing\CancelReservationRequest;
 use App\Http\Requests\Viewing\StoreTentativeReservationRequest;
 use App\Http\Resources\TentativeReservationResource;
 use App\Models\Ad;
 use App\Models\TentativeReservation;
+use App\Notifications\ReservationConfirmedClientNotification;
 use App\Policies\TentativeReservationPolicy;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
+use App\Support\ViewingSlotsResponseCache;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\Cache;
 use OpenApi\Annotations as OA;
 
 /**
@@ -52,9 +54,7 @@ final readonly class ViewingReservationController
         $from = $singleDate ?? $request->input('from', now()->toDateString());
         $to = $singleDate ?? $request->input('to', now()->addDays(14)->toDateString());
 
-        $cacheKey = "slots:{$ad->id}:{$from}:{$to}";
-
-        $data = Cache::remember($cacheKey, 60, function () use ($ad, $from, $to): array {
+        $data = ViewingSlotsResponseCache::remember($ad, $from, $to, function () use ($ad, $from, $to): array {
             $slotsRaw = $this->scheduleService->getBookableSlotsForRange($ad, $from, $to);
 
             // Fetch active reservations in range to overlay status.
@@ -134,10 +134,78 @@ final readonly class ViewingReservationController
 
         $reservation = $this->reservationService->reserve($ad, $request->user(), $request->validated());
 
+        ViewingSlotsResponseCache::bumpGeneration($ad);
+
         return response()->json([
             'data' => new TentativeReservationResource($reservation->load('ad')),
             'message' => 'Votre réservation provisoire a bien été enregistrée.',
         ], 201);
+    }
+
+    /**
+     * List all viewing reservations for the landlord's ads.
+     */
+    public function myReservationsAsLandlord(Request $request): AnonymousResourceCollection
+    {
+        $paginator = TentativeReservation::query()
+            ->whereHas('ad', fn ($q) => $q->where('user_id', $request->user()->id))
+            ->with(['ad.quarter', 'ad.media', 'client'])
+            ->orderByDesc('slot_date')
+            ->orderBy('slot_starts_at')
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->input('status')))
+            ->paginate(max(1, min(50, (int) $request->input('per_page', 15))));
+
+        return TentativeReservationResource::collection($paginator);
+    }
+
+    /**
+     * Confirm a pending reservation (landlord only).
+     */
+    public function confirm(Request $request, TentativeReservation $reservation): JsonResponse
+    {
+        abort_unless(
+            $reservation->isOwnedByLandlord($request->user()),
+            403,
+            'Seul le propriétaire peut confirmer cette réservation.'
+        );
+
+        abort_unless(
+            $reservation->status === ReservationStatus::Pending,
+            422,
+            'Seule une réservation en attente peut être confirmée.'
+        );
+
+        $reservation->update(['status' => ReservationStatus::Confirmed]);
+        $reservation->loadMissing('client');
+        $reservation->client->notify(new ReservationConfirmedClientNotification($reservation));
+
+        return response()->json([
+            'data' => new TentativeReservationResource($reservation->load('ad')),
+            'message' => 'Visite confirmée. Le locataire a été notifié.',
+        ]);
+    }
+
+    /**
+     * Update landlord notes on a reservation.
+     */
+    public function updateNotes(Request $request, TentativeReservation $reservation): JsonResponse
+    {
+        abort_unless(
+            $reservation->isOwnedByLandlord($request->user()),
+            403,
+            'Seul le propriétaire peut modifier les notes.'
+        );
+
+        $request->validate([
+            'landlord_notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $reservation->update(['landlord_notes' => $request->input('landlord_notes')]);
+
+        return response()->json([
+            'data' => new TentativeReservationResource($reservation->load('ad')),
+            'message' => 'Notes enregistrées.',
+        ]);
     }
 
     /**
@@ -189,6 +257,8 @@ final readonly class ViewingReservationController
             $request->user(),
             $request->input('cancellation_reason')
         );
+
+        ViewingSlotsResponseCache::bumpGenerationForAdId($reservation->ad_id);
 
         return response()->json([
             'data' => new TentativeReservationResource($cancelled->load('ad')),

@@ -179,21 +179,23 @@
 
 | File(s) | Detail |
 |---|---|
-| `components/ads/TourViewer.tsx` | Full Pannellum integration (533 lines) |
-| `types/pannellum.d.ts` | TypeScript declarations |
+| `components/ads/TourViewerPSV.tsx` | Public tour: **Photo Sphere Viewer v5** (core, markers, virtual-tour, cubemap-adapter); loaded via `dynamic()` from `AdDetailClient.tsx` |
+| `components/owner/PanoramaViewer.tsx` | Owner/agency preview for hotspot editing (PSV core + markers) |
+| `components/owner/AdTourHotspotEditor.tsx` | Hotspot editor UI wrapping `PanoramaViewer` |
+| `types/photo-sphere-viewer.d.ts` | CSS module declarations for bundler |
 
 **Sub-features:**
-- **Pannellum.js integration** — Loads from JSDelivr CDN with Unpkg fallback
-- **Equirectangular panoramas** — Standard 360° photo support with auto-detected FOV
-- **Cubemap support** — 6-face cubemap rendering
-- **Multi-resolution tiling** — Progressive tile loading (`multires`) for high-res tours
-- **Hotspot navigation** — Clickable hotspots to navigate between scenes with custom tooltips
-- **Scene navigation pills** — Bottom bar with named scene chips for quick jumping
-- **Auto-FOV detection** — Probes image dimensions to auto-calculate HAOV/VAOV for partial panoramas
-- **Cross-origin asset resolution** — Prepends backend origin to relative tour URLs
-- **Fullscreen modal** — Fixed overlay with loading spinner, error retry, ESC-key close
-- **Safety timeout** — 60-second fallback if panorama never loads
-- **Scene fade transitions** — 1-second crossfade between scenes
+- **Photo Sphere Viewer v5** — npm packages (`@photo-sphere-viewer/*`, `three`); PSV styles from JSDelivr; dynamic `import()` for SSR safety
+- **Equirectangular panoramas** — Standard 360° with optional GPano-derived `haov` / `vaov` / `vOffset` from the API
+- **Cubemap & multires** — `CubemapAdapter` and tiled pyramid loading compatible with backend-generated assets (legacy Pannellum-era layout on disk)
+- **Virtual tour plugin** — Scene-to-scene navigation via tour hotspots
+- **Markers plugin** — Hotspots and tooltips
+- **Same-origin tour assets** — Rewrites `/tour-image/...` to Next **`/tour-proxy/...`** so the viewer loads tiles without CORS issues
+- **Scene navigation pills** — Bottom chips when multiple scenes exist
+- **Auto-FOV probing** — Image dimension probe for partial panoramas when metadata is missing
+- **Fullscreen modal** — Overlay with loading state, error + retry, ESC to close
+- **Safety timeout** — Fallback if the panorama never becomes ready
+- **Filament (Laravel)** — `resources/js/filament/tour-hotspot-editor.js` also uses PSV from CDN for admin/agency hotspot editing
 
 ---
 

@@ -148,13 +148,6 @@ class MassiveAdSeeder extends Seeder
         $password = Hash::make('password');
         $cities = City::all();
 
-        if (!User::where('email', 'admin@test.com')->exists()) {
-            User::factory()->admin()->recycle($cities)->create([
-                'email' => 'admin@test.com',
-                'password' => $password,
-            ]);
-        }
-
         $agencyAgents = User::factory()
             ->count(20)->agents()->state(['type' => UserType::AGENCY])
             ->recycle($cities)->create(['password' => $password]);
@@ -170,7 +163,7 @@ class MassiveAdSeeder extends Seeder
 
         $customers = User::factory()->count(50)->customers()->recycle($cities)->create(['password' => $password]);
         $this->customerIds = $customers->pluck('id')->toArray();
-        $this->command->info('  1 admin, 40 agents (20 agences), 50 clients');
+        $this->command->info('  40 agents (20 agences), 50 clients');
     }
 
     private function loadReferenceData(): void

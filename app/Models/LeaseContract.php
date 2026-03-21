@@ -7,7 +7,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
+/**
+ * @property Carbon|null $lease_start
+ * @property Carbon|null $lease_end
+ */
 class LeaseContract extends Model
 {
     use HasUuids;

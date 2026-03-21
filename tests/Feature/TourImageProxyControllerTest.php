@@ -2,6 +2,7 @@
 
 use App\Enums\AdStatus;
 use App\Models\Ad;
+use App\Models\UnlockedAd;
 use App\Models\User;
 use App\Support\TourAssetToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -51,6 +52,34 @@ describe('GET /tour-image/{adId}/{path}', function (): void {
         Storage::disk($this->tourDisk)->put("ads/{$ad->id}/tours/salon.webp", 'fake-image-content');
 
         $this->actingAs($owner)
+            ->get("/tour-image/{$ad->id}/salon.webp")
+            ->assertOk();
+    });
+
+    it('allows unlocked customer via sanctum bearer without signed path token', function (): void {
+        $owner = User::factory()->agents()->create();
+        $customer = User::factory()->customers()->create();
+        $ad = null;
+        Ad::withoutSyncingToSearch(function () use (&$ad, $owner): void {
+            $ad = Ad::factory()->create([
+                'status' => AdStatus::AVAILABLE,
+                'user_id' => $owner->id,
+                'has_3d_tour' => true,
+            ]);
+        });
+
+        Storage::disk($this->tourDisk)->put("ads/{$ad->id}/tours/salon.webp", 'fake-image-content');
+
+        UnlockedAd::query()->create([
+            'ad_id' => $ad->id,
+            'user_id' => $customer->id,
+            'payment_id' => null,
+            'unlocked_at' => now(),
+        ]);
+
+        $plain = $customer->createToken('test')->plainTextToken;
+
+        $this->withToken($plain)
             ->get("/tour-image/{$ad->id}/salon.webp")
             ->assertOk();
     });

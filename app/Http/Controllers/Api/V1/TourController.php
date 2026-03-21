@@ -34,7 +34,7 @@ final readonly class TourController
             return response()->json(['message' => 'Accès au tour 3D refusé.'], 403);
         }
 
-        $signedConfig = $this->signTourConfigUrls((string) $ad->id, $ad->tour_config);
+        $signedConfig = $this->signTourConfigUrls((string) $ad->id, TourAssetToken::normalizeHotspotsLists($ad->tour_config));
 
         return response()->json([
             'has_tour' => true,

@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Requests\QuarterRequest;
 use App\Http\Resources\QuarterResource;
 use App\Models\Quarter;
+use Illuminate\Database\Connection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -104,7 +105,22 @@ final class QuarterController
      */
     public function index()
     {
-        $quarter = Quarter::query()->with('city')->paginate(config('pagination.default', 10));
+        $query = Quarter::query()->with('city');
+
+        if ($cityId = request('city_id')) {
+            $query->where('city_id', $cityId);
+        }
+
+        $q = request('q');
+        if (is_string($q) && strlen($q) >= 2) {
+            /** @var Connection $connection */
+            $connection = $query->getConnection();
+            $likeOp = $connection->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+            $query->where('name', $likeOp, '%'.$q.'%');
+        }
+
+        $perPage = min((int) request('per_page', 50), 100);
+        $quarter = $query->orderBy('name')->paginate($perPage);
 
         return QuarterResource::collection($quarter);
     }

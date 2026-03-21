@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\Surveys\Pages;
 
+use App\Enums\SurveyAnonymousAudience;
+use App\Enums\UserRole;
 use App\Filament\Admin\Resources\Surveys\SurveyResource;
 use App\Models\AnonymousSurveyResponse;
 use App\Models\Survey;
@@ -29,7 +31,7 @@ class ViewSurvey extends ViewRecord
     /**
      * Build the list of unique respondents with their answers for the slide-over.
      *
-     * @return Collection<int, array{user_id: string, user: User|null, display_name: string, email: string, avatar: string|null, answers: array<int, array{question: string, type: string, answer: string, has_answer: bool}>, answer_count: int, submitted_at: string, submitted_at_raw: mixed, is_anonymous: bool, is_new: bool}>
+     * @return Collection<int, array{user_id: string, user: User|null, display_name: string, email: string, avatar: string|null, respondent_kind_label: string, answers: array<int, array{question: string, type: string, answer: string, has_answer: bool}>, answer_count: int, submitted_at: string, submitted_at_raw: mixed, is_anonymous: bool, is_new: bool, response_ids?: array<int, string>, anon_response_id?: string}>
      */
     public function getRespondentsWithAnswers(): Collection
     {
@@ -72,6 +74,7 @@ class ViewSurvey extends ViewRecord
                     'display_name' => $user ? trim($user->firstname.' '.$user->lastname) : 'Anonyme',
                     'email' => $user !== null ? $user->email : '—',
                     'avatar' => $user?->avatar,
+                    'respondent_kind_label' => $this->authenticatedRespondentKindLabel($user),
                     'answers' => $answers,
                     'answer_count' => $responses->count(),
                     'submitted_at' => $latestAt instanceof Carbon ? $latestAt->format('d/m/Y à H:i') : '—',
@@ -102,12 +105,15 @@ class ViewSurvey extends ViewRecord
                     ];
                 })->values()->all();
 
+                $audience = $anonResponse->respondent_audience ?? SurveyAnonymousAudience::PublicGuest;
+
                 return [
                     'user_id' => 'anon_public_'.$anonResponse->id,
                     'user' => null,
                     'display_name' => 'Anonyme #'.($index + 1),
                     'email' => '— (lien public)',
                     'avatar' => null,
+                    'respondent_kind_label' => $audience->adminLabel(),
                     'answers' => $answers,
                     'answer_count' => $anonResponse->answers->count(),
                     'submitted_at' => $anonResponse->submitted_at->format('d/m/Y à H:i'),
@@ -163,6 +169,19 @@ class ViewSurvey extends ViewRecord
             ->where('survey_id', $survey->id)
             ->whereNull('viewed_at')
             ->update(['viewed_at' => $now]);
+    }
+
+    private function authenticatedRespondentKindLabel(?User $user): string
+    {
+        if ($user === null) {
+            return '—';
+        }
+
+        return match ($user->role) {
+            UserRole::AGENT => 'Bailleur',
+            UserRole::CUSTOMER => 'Client',
+            UserRole::ADMIN => 'Administrateur',
+        };
     }
 
     private function formatAnswer(string $answer, string $type): string

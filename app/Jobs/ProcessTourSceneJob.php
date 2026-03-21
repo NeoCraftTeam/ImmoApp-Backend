@@ -50,7 +50,7 @@ class ProcessTourSceneJob implements ShouldQueue
         $updates = ['processing' => false];
 
         if ($this->panoramaType === 'cubemap') {
-            // Build proxy URLs for each face in Pannellum's expected order: f, r, b, l, u, d
+            // Build proxy URLs for each face in standard cubemap order: f, r, b, l, u, d
             $updates['cube_map'] = array_map(
                 $this->proxyUrl(...),
                 array_values($facePaths),

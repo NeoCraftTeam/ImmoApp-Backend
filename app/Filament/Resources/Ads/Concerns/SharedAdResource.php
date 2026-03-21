@@ -113,7 +113,7 @@ trait SharedAdResource
             // ── Section 2: Photos du bien ────────────────────────
             Section::make('Photos du bien')
                 ->icon('heroicon-o-camera')
-                ->description('Ajoutez jusqu\'à 10 photos (JPEG, PNG, WebP — max 5 Mo chacune). Glissez pour réordonner.')
+                ->description('Ajoutez jusqu\'à 10 photos (JPEG, PNG, WebP — max 20 Mo chacune). Glissez pour réordonner.')
                 ->schema([
                     SpatieMediaLibraryFileUpload::make('images')
                         ->label('')
@@ -126,7 +126,7 @@ trait SharedAdResource
                         ->optimize('webp', 85)
                         ->resize(50)
                         ->maxFiles(10)
-                        ->maxSize(5120)
+                        ->maxSize(20480)
                         ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
                         ->imagePreviewHeight('150')
                         ->panelLayout('grid')

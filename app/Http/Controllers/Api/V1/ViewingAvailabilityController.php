@@ -14,11 +14,12 @@ use App\Models\Zap\Schedule;
 use App\Policies\ViewingAvailabilityPolicy;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
+use App\Support\ViewingSlotsResponseCache;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use OpenApi\Annotations as OA;
 
 /**
@@ -78,14 +79,17 @@ final readonly class ViewingAvailabilityController
     {
         $this->authorize($request, $ad);
 
-        $schedule = $this->scheduleService->createAvailability($ad, $request->validated());
+        return DB::transaction(function () use ($request, $ad): JsonResponse {
+            $schedule = $this->scheduleService->createAvailability($ad, $request->validated());
+            $payload = new AvailabilitySlotResource($schedule->fresh(['periods']))->resolve($request);
 
-        Cache::tags(['slots', "ad:{$ad->id}"])->flush();
+            ViewingSlotsResponseCache::bumpGeneration($ad);
 
-        return response()->json([
-            'data' => new AvailabilitySlotResource($schedule->load('periods')),
-            'message' => 'Planning de disponibilité créé avec succès.',
-        ], 201);
+            return response()->json([
+                'data' => $payload,
+                'message' => 'Planning de disponibilité créé avec succès.',
+            ], 201);
+        });
     }
 
     /**
@@ -115,14 +119,17 @@ final readonly class ViewingAvailabilityController
             $this->reservationService->assertNoActiveReservationsForSchedule($schedule);
         }
 
-        $updated = $this->scheduleService->updateAvailability($ad, $schedule, $request->validated());
+        return DB::transaction(function () use ($request, $ad, $schedule): JsonResponse {
+            $updated = $this->scheduleService->updateAvailability($ad, $schedule, $request->validated());
+            $payload = new AvailabilitySlotResource($updated->fresh(['periods']))->resolve($request);
 
-        Cache::tags(['slots', "ad:{$ad->id}"])->flush();
+            ViewingSlotsResponseCache::bumpGeneration($ad);
 
-        return response()->json([
-            'data' => new AvailabilitySlotResource($updated->load('periods')),
-            'message' => 'Planning de disponibilité mis à jour.',
-        ]);
+            return response()->json([
+                'data' => $payload,
+                'message' => 'Planning de disponibilité mis à jour.',
+            ]);
+        });
     }
 
     /**
@@ -145,17 +152,18 @@ final readonly class ViewingAvailabilityController
     {
         $this->authorize($request, $ad);
 
-        // Cancel all pending reservations for this schedule.
-        TentativeReservation::query()
-            ->where('appointment_schedule_id', $schedule->id)
-            ->active()
-            ->each(fn (TentativeReservation $r) => $this->reservationService->cancel($r, $request->user(), 'Planning supprimé par le propriétaire.'));
+        return DB::transaction(function () use ($request, $ad, $schedule): JsonResponse {
+            TentativeReservation::query()
+                ->where('appointment_schedule_id', $schedule->id)
+                ->active()
+                ->each(fn (TentativeReservation $r) => $this->reservationService->cancel($r, $request->user(), 'Planning supprimé par le propriétaire.'));
 
-        $schedule->delete();
+            $schedule->delete();
 
-        Cache::tags(['slots', "ad:{$ad->id}"])->flush();
+            ViewingSlotsResponseCache::bumpGeneration($ad);
 
-        return response()->json(null, 204);
+            return response()->json(null, 204);
+        });
     }
 
     /**

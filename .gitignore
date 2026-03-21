@@ -48,3 +48,5 @@ _ide_helper*.php
 
 # Accidental shell redirect artifact
 /count
+
+.pnpm-store/

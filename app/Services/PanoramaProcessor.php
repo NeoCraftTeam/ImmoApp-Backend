@@ -9,7 +9,7 @@ use RuntimeException;
 
 /**
  * Converts equirectangular 360° panoramas to cubemap face images and
- * Pannellum-compatible multires tile pyramids.
+ * multires tile pyramids for Photo Sphere Viewer (same layout as legacy Pannellum tours).
  *
  * This class performs pixel-by-pixel coordinate projection using GD.
  * It must only be called from a queued job — never from a HTTP request.
@@ -17,8 +17,7 @@ use RuntimeException;
 class PanoramaProcessor
 {
     /**
-     * Face identifiers in the order Pannellum's cubeMap array expects:
-     * front, right, back, left, up, down.
+     * Face identifiers in cubemap order (front, right, back, left, up, down).
      */
     private const array FACES = ['f', 'r', 'b', 'l', 'u', 'd'];
 
@@ -93,7 +92,7 @@ class PanoramaProcessor
     }
 
     /**
-     * Generate a Pannellum multires tile pyramid from pre-generated cube face images stored on R2.
+     * Generate a multires tile pyramid from pre-generated cube face images stored on R2.
      * Tiles are stored at {tilesR2Prefix}/{level}/{face}{row}_{col}.webp
      *
      * @param  array<string, string>  $facePaths  R2 paths keyed by face letter
@@ -149,8 +148,7 @@ class PanoramaProcessor
     }
 
     /**
-     * Generate small (256 px) fallback cube face images used by Pannellum
-     * while multires tiles are still loading.
+     * Generate small (256 px) fallback cube face images shown while multires tiles load.
      *
      * @param  array<string, string>  $facePaths  R2 paths keyed by face letter
      * @return array<string, string> Fallback R2 paths keyed by face letter

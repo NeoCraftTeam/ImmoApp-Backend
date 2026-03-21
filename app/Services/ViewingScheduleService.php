@@ -8,6 +8,7 @@ use App\Models\Ad;
 use App\Models\Zap\Schedule;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
 use Carbon\Carbon;
+use Zap\Data\WeeklyFrequencyConfig\AbstractWeeklyFrequencyConfig;
 use Zap\Facades\Zap;
 
 final class ViewingScheduleService implements ViewingScheduleServiceInterface
@@ -29,6 +30,8 @@ final class ViewingScheduleService implements ViewingScheduleServiceInterface
      */
     public function createAvailability(Ad $ad, array $data): Schedule
     {
+        $data = $this->applyRecurrenceDayDefaults($data);
+
         $builder = Zap::for($ad)
             ->named($data['name'])
             ->availability()
@@ -82,10 +85,12 @@ final class ViewingScheduleService implements ViewingScheduleServiceInterface
                 'starts_at' => Carbon::parse($p->start_time)->format('H:i'),
                 'ends_at' => Carbon::parse($p->end_time)->format('H:i'),
             ])->toArray(),
-            'recurrence' => null,
+            'recurrence' => 'once',
+            'recurrence_days' => null,
+            'days_of_month' => null,
             'slot_duration' => $schedule->metadata['slot_duration'] ?? 30,
             'buffer_minutes' => $schedule->metadata['buffer_minutes'] ?? 0,
-        ], $data);
+        ], $this->extractRecurrencePayloadFromSchedule($schedule), $data);
 
         return $this->createAvailability($ad, $merged);
     }
@@ -188,6 +193,130 @@ final class ViewingScheduleService implements ViewingScheduleServiceInterface
             'monthly' => $builder->monthly(['days_of_month' => $data['days_of_month'] ?? []]),
             default => null,
         };
+    }
+
+    /**
+     * Zap filtre les plannings hebdo avec whereJsonContains('frequency_config->days', $weekday).
+     * Si aucun jour n’est envoyé, on utilise le jour calendaire de starts_on (ex. samedi 21 → "saturday").
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function applyRecurrenceDayDefaults(array $data): array
+    {
+        $recurrence = $data['recurrence'] ?? 'once';
+        if (!in_array($recurrence, ['weekly', 'biweekly'], true)) {
+            return $data;
+        }
+
+        $days = $data['recurrence_days'] ?? null;
+        if (!is_array($days)) {
+            $days = [];
+        }
+
+        $allowed = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+        $normalized = array_values(array_filter(
+            array_map(static fn (mixed $d): string => is_string($d) ? strtolower($d) : '', $days),
+            static fn (string $d): bool => in_array($d, $allowed, true),
+        ));
+
+        if ($normalized === []) {
+            $data['recurrence_days'] = [self::weekdayKeyFromDateString((string) $data['starts_on'])];
+        } else {
+            $data['recurrence_days'] = $normalized;
+        }
+
+        return $data;
+    }
+
+    private static function weekdayKeyFromDateString(string $startsOn): string
+    {
+        $d = Carbon::parse($startsOn)->startOfDay();
+
+        return match ($d->dayOfWeek) {
+            Carbon::MONDAY => 'monday',
+            Carbon::TUESDAY => 'tuesday',
+            Carbon::WEDNESDAY => 'wednesday',
+            Carbon::THURSDAY => 'thursday',
+            Carbon::FRIDAY => 'friday',
+            Carbon::SATURDAY => 'saturday',
+            Carbon::SUNDAY => 'sunday',
+            default => 'monday',
+        };
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function extractRecurrencePayloadFromSchedule(Schedule $schedule): array
+    {
+        if (!$schedule->is_recurring) {
+            return [];
+        }
+
+        $frequency = $schedule->frequency;
+        $value = $frequency instanceof \BackedEnum
+            ? (string) $frequency->value
+            : (string) $frequency;
+
+        $days = $this->weekDaysFromFrequencyConfig($schedule->frequency_config);
+        $fallbackDay = self::weekdayKeyFromDateString($schedule->start_date->toDateString());
+
+        return match ($value) {
+            'daily' => ['recurrence' => 'daily'],
+            'weekly', 'weekly_odd', 'weekly_even' => [
+                'recurrence' => 'weekly',
+                'recurrence_days' => $days !== [] ? $days : [$fallbackDay],
+            ],
+            'biweekly' => [
+                'recurrence' => 'biweekly',
+                'recurrence_days' => $days !== [] ? $days : [$fallbackDay],
+            ],
+            'monthly', 'bimonthly', 'quarterly', 'semiannually', 'annually' => [
+                'recurrence' => 'monthly',
+                'days_of_month' => $this->daysOfMonthFromFrequencyConfig($schedule->frequency_config) ?? [Carbon::parse($schedule->start_date)->day],
+            ],
+            default => [],
+        };
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function weekDaysFromFrequencyConfig(mixed $config): array
+    {
+        $allowed = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+        if ($config instanceof AbstractWeeklyFrequencyConfig) {
+            return array_values(array_filter(array_map(
+                static fn (mixed $d): string => is_string($d) ? strtolower($d) : '',
+                $config->days,
+            ), static fn (string $d): bool => in_array($d, $allowed, true)));
+        }
+
+        if (is_array($config) && isset($config['days']) && is_array($config['days'])) {
+            return array_values(array_filter(array_map(
+                static fn (mixed $d): string => is_string($d) ? strtolower($d) : '',
+                $config['days'],
+            ), static fn (string $d): bool => in_array($d, $allowed, true)));
+        }
+
+        return [];
+    }
+
+    /**
+     * @return list<int>|null
+     */
+    private function daysOfMonthFromFrequencyConfig(mixed $config): ?array
+    {
+        if (is_array($config) && isset($config['days_of_month']) && is_array($config['days_of_month'])) {
+            /** @var list<int> $out */
+            $out = array_map(static fn (mixed $v): int => (int) $v, $config['days_of_month']);
+
+            return $out;
+        }
+
+        return null;
     }
 
     /** @return array{slot_duration: int, buffer_minutes: int} */

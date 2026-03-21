@@ -20,6 +20,7 @@ class ClerkExchangeRequest extends FormRequest
         return [
             'phone_number' => ['sometimes', 'nullable', 'string', 'regex:/^[+]?[0-9\s\-\(\)]{8,15}$/'],
             'city_id' => ['sometimes', 'nullable', 'string', 'exists:city,id'],
+            'registration_intent' => ['sometimes', 'nullable', 'string', 'in:customer,agent'],
         ];
     }
 

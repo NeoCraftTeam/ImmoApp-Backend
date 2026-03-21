@@ -142,10 +142,13 @@
                             @endif
 
                             <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-2 flex-wrap">
                                     <span class="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{{ $respondent['display_name'] }}</span>
+                                    @if (!empty($respondent['respondent_kind_label']))
+                                        <span class="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 border border-violet-200/60 dark:border-violet-500/25">{{ $respondent['respondent_kind_label'] }}</span>
+                                    @endif
                                     @if ($respondent['is_anonymous'])
-                                        <span class="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-gray-200/60 dark:bg-gray-700/60 text-gray-500 dark:text-gray-400">Anonyme</span>
+                                        <span class="text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-gray-200/60 dark:bg-gray-700/60 text-gray-500 dark:text-gray-400">Sans identité</span>
                                     @endif
                                 </div>
                                 <p class="text-[10px] text-gray-400 dark:text-gray-600 truncate">{{ $respondent['email'] }}</p>
@@ -210,6 +213,9 @@
                                 @endif
                                 <div class="flex-1 min-w-0">
                                     <span class="text-xs font-bold text-gray-800 dark:text-gray-100 truncate block">{{ $respondent['display_name'] }}</span>
+                                    @if (!empty($respondent['respondent_kind_label']))
+                                        <span class="inline-block mt-0.5 text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-500/25">{{ $respondent['respondent_kind_label'] }}</span>
+                                    @endif
                                     <p class="text-[10px] text-gray-400 dark:text-gray-500 truncate">{{ $respondent['email'] }}</p>
                                 </div>
                                 @if ($respondent['is_new'])
@@ -265,6 +271,9 @@
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <span class="text-xs font-bold text-gray-800 dark:text-gray-100 truncate block">{{ $respondent['display_name'] }}</span>
+                                    @if (!empty($respondent['respondent_kind_label']))
+                                        <span class="inline-block mt-0.5 text-[8px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-gray-200/80 dark:bg-gray-700/80 text-gray-700 dark:text-gray-300 border border-gray-300/60 dark:border-gray-600/60">{{ $respondent['respondent_kind_label'] }}</span>
+                                    @endif
                                     <p class="text-[10px] text-gray-400 dark:text-gray-500 truncate">{{ $respondent['email'] }}</p>
                                 </div>
                                 @if ($respondent['is_new'])

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use App\Models\Zap\Schedule;
+use Carbon\Carbon;
+use DateTimeInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -28,11 +30,27 @@ final class AvailabilitySlotResource extends JsonResource
             'buffer_minutes' => $this->metadata['buffer_minutes'] ?? 0,
             'periods' => $this->whenLoaded('periods', fn () => $this->periods->map(fn ($p): array => [
                 'id' => $p->id,
-                'starts_at' => $p->start_time?->format('H:i'),
-                'ends_at' => $p->end_time?->format('H:i'),
+                'starts_at' => self::formatPeriodTime($p->start_time),
+                'ends_at' => self::formatPeriodTime($p->end_time),
             ])->toArray()),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
+    }
+
+    /**
+     * Zap stores schedule period times as strings; older paths may expose DateTimeInterface.
+     */
+    private static function formatPeriodTime(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof DateTimeInterface) {
+            return Carbon::instance($value)->format('H:i');
+        }
+
+        return Carbon::parse((string) $value)->format('H:i');
     }
 }

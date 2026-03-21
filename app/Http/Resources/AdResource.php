@@ -163,7 +163,8 @@ final class AdResource extends JsonResource
             return null;
         }
 
-        $signed = TourAssetToken::signTourConfig((string) $this->id, $tourConfig);
+        $normalized = TourAssetToken::normalizeHotspotsLists($tourConfig);
+        $signed = TourAssetToken::signTourConfig((string) $this->id, $normalized);
 
         return $this->ensureAbsoluteTourUrls($signed);
     }

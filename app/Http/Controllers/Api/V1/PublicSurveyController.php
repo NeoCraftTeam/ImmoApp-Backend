@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\SurveyAnonymousAudience;
 use App\Enums\UserRole;
 use App\Http\Resources\SurveyResource;
 use App\Models\AnonymousSurveyAnswer;
@@ -230,6 +231,7 @@ final class PublicSurveyController
             'survey_id' => $survey->id,
             'session_token_hash' => $tokenHash,
             'ip_hash' => $ipHash,
+            'respondent_audience' => SurveyAnonymousAudience::PublicGuest,
             'submitted_at' => now(),
         ]);
 

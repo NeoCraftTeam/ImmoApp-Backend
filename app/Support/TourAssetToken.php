@@ -45,6 +45,42 @@ final class TourAssetToken
      * @param  array<string, mixed>  $tourConfig
      * @return array<string, mixed>
      */
+    /**
+     * Ensure each scene's hotspots are a zero-indexed list (not a JSON object) for API consumers.
+     *
+     * @param  array<string, mixed>  $tourConfig
+     * @return array<string, mixed>
+     */
+    public static function normalizeHotspotsLists(array $tourConfig): array
+    {
+        if (!isset($tourConfig['scenes']) || !is_array($tourConfig['scenes'])) {
+            return $tourConfig;
+        }
+
+        $tourConfig['scenes'] = array_map(function (mixed $scene): mixed {
+            if (!is_array($scene)) {
+                return $scene;
+            }
+
+            $raw = $scene['hotspots'] ?? [];
+            if (!is_array($raw)) {
+                $scene['hotspots'] = [];
+
+                return $scene;
+            }
+
+            $list = array_is_list($raw) ? $raw : array_values($raw);
+            $scene['hotspots'] = array_values(array_filter(
+                $list,
+                is_array(...),
+            ));
+
+            return $scene;
+        }, $tourConfig['scenes']);
+
+        return $tourConfig;
+    }
+
     public static function signTourConfig(string $adId, array $tourConfig, int $ttlSeconds = 1800): array
     {
         if (!isset($tourConfig['scenes']) || !is_array($tourConfig['scenes'])) {

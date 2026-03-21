@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\LivewireLongRunningRequest;
 use App\Http\Middleware\OptionalAuth;
+use App\Http\Middleware\ResolveSanctumBearerUser;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -28,6 +29,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'active' => EnsureUserIsActive::class,
             'optional.auth' => OptionalAuth::class,
+            'resolve.sanctum.bearer' => ResolveSanctumBearerUser::class,
         ]);
         $middleware->prependToGroup('web', LivewireLongRunningRequest::class);
         // Append is_active check to all sanctum-authenticated API routes

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\SurveyAnonymousAudience;
 use App\Enums\UserRole;
 use App\Http\Resources\SurveyResource;
 use App\Mail\SurveyAdminNotificationMail;
@@ -20,7 +21,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 /**
- * @OA\Tag(name="📋 Sondages", description="Sondages de satisfaction (clients)")
+ * @OA\Tag(name="📋 Sondages", description="Sondages de satisfaction (utilisateurs authentifiés)")
  */
 final readonly class SurveyController
 {
@@ -257,6 +258,7 @@ final readonly class SurveyController
             'survey_id' => $survey->id,
             'session_token_hash' => $tokenHash,
             'ip_hash' => $ipHash,
+            'respondent_audience' => SurveyAnonymousAudience::fromUserRole($user->role),
             'submitted_at' => now(),
         ]);
 

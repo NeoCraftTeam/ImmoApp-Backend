@@ -80,3 +80,25 @@ it('returns config unchanged when scenes key is missing', function (): void {
 
     expect($result)->toBe($config);
 });
+
+it('normalizes hotspots map to a zero-indexed list', function (): void {
+    $config = [
+        'default_scene' => 'a',
+        'scenes' => [
+            [
+                'id' => 'a',
+                'hotspots' => [
+                    '0' => ['pitch' => 0, 'yaw' => 10, 'target_scene' => 'b', 'label' => 'Salon'],
+                    '1' => ['pitch' => 1, 'yaw' => 20, 'target_scene' => 'b', 'label' => 'Cuisine'],
+                ],
+            ],
+        ],
+    ];
+
+    $out = TourAssetToken::normalizeHotspotsLists($config);
+
+    expect($out['scenes'][0]['hotspots'])->toBeArray()->toHaveCount(2);
+    expect(array_keys($out['scenes'][0]['hotspots']))->toBe([0, 1]);
+    expect($out['scenes'][0]['hotspots'][0]['yaw'])->toBe(10);
+    expect($out['scenes'][0]['hotspots'][1]['yaw'])->toBe(20);
+});

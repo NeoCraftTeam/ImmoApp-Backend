@@ -137,7 +137,7 @@ echo ""
 
 # ─── 5. PHP Insights ──────────────────────────────────────
 echo -e "${YELLOW}▸ [5/5] PHP Insights${NC}"
-./vendor/bin/phpinsights --no-interaction --summary 2>&1
+./vendor/bin/phpinsights analyse --no-interaction --summary -c config/phpinsights.php 2>&1
 if [[ $? -eq 0 ]]; then
     echo -e "${GREEN}  ✅ PHP Insights — complet${NC}"; PASS=$((PASS + 1))
 else

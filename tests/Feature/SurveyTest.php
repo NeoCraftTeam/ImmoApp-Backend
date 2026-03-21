@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Enums\SurveyAnonymousAudience;
 use App\Mail\SurveySubmittedMail;
+use App\Models\AnonymousSurveyResponse;
 use App\Models\Survey;
 use App\Models\SurveyQuestion;
 use App\Models\SurveyResponse;
@@ -277,4 +279,36 @@ it('dispatches emails after a successful survey submission', function (): void {
     ])->assertCreated();
 
     Mail::assertQueued(SurveySubmittedMail::class, fn ($mail) => $mail->hasTo($user->email));
+});
+
+it('allows an agent to submit identified survey responses', function (): void {
+    $user = User::factory()->agents()->create();
+    Sanctum::actingAs($user);
+
+    $survey = makeSurveyWithQuestions([['text' => 'Note ?', 'type' => 'rating']]);
+    $question = $survey->questions->first();
+
+    $this->postJson("/api/v1/surveys/{$survey->id}/responses", [
+        'answers' => [['question_id' => $question->id, 'answer' => '4']],
+    ])->assertCreated();
+
+    expect(SurveyResponse::where('user_id', $user->id)->count())->toBe(1);
+});
+
+it('stores incognito bailleur audience when an agent submits anonymously', function (): void {
+    $user = User::factory()->agents()->create();
+    Sanctum::actingAs($user);
+
+    $survey = makeSurveyWithQuestions([['text' => 'Note ?', 'type' => 'rating']]);
+    $question = $survey->questions->first();
+
+    $this->postJson("/api/v1/surveys/{$survey->id}/responses", [
+        'anonymous' => true,
+        'answers' => [['question_id' => $question->id, 'answer' => '5']],
+    ])->assertCreated();
+
+    $anon = AnonymousSurveyResponse::where('survey_id', $survey->id)->first();
+
+    expect($anon)->not->toBeNull();
+    expect($anon->respondent_audience)->toBe(SurveyAnonymousAudience::IncognitoBailleur);
 });

@@ -15,12 +15,6 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
-        if (!User::where('email', 'admin@test.com')->exists()) {
-            User::factory()
-                ->admin()
-                ->create(['email' => 'admin@test.com']);
-        }
-
         User::factory()->customers()->count(50)->create();
 
         // Create 5 agents of type 'agency'
@@ -36,13 +30,13 @@ class UserSeeder extends Seeder
 
             $ads = Ad::factory()->count(5)->for($agent)->create();
             $ads->each(function ($ad) {
-                // On utilise une image distante pour éviter l'erreur de fichier manquant sur le VPS
-                try {
-                    $ad->addMediaFromUrl('https://picsum.photos/seed/'.$ad->id.'/800/600')
-                        ->toMediaCollection('images');
-                } catch (\Exception $e) {
-                    // Si pas d'internet ou erreur, on continue sans image au lieu de faire planter le seeder
-                    \Log::warning("Impossible de charger l'image pour l'annonce {$ad->id}: ".$e->getMessage());
+                for ($i = 0; $i < 5; $i++) {
+                    try {
+                        $ad->addMediaFromUrl('https://picsum.photos/seed/'.$ad->id.'-'.$i.'/800/600')
+                            ->toMediaCollection('images');
+                    } catch (\Exception $e) {
+                        \Log::warning("Impossible de charger l'image pour l'annonce {$ad->id}: ".$e->getMessage());
+                    }
                 }
 
                 $customers = User::where('role', 'customer')->get();

@@ -25,7 +25,8 @@ class StoreAvailabilityRequest extends FormRequest
             'periods.*.starts_at' => ['required', 'date_format:H:i'],
             'periods.*.ends_at' => ['required', 'date_format:H:i', 'after:periods.*.starts_at'],
             'recurrence' => ['nullable', Rule::in(['once', 'daily', 'weekly', 'biweekly', 'monthly'])],
-            'recurrence_days' => ['required_if:recurrence,weekly,biweekly', 'nullable', 'array'],
+            /** Optionnel : si vide pour hebdo / bihebdo, le jour de starts_on est appliqué côté serveur (Zap exige des jours pour le scope SQL). */
+            'recurrence_days' => ['nullable', 'array'],
             'recurrence_days.*' => [Rule::in(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'])],
             'days_of_month' => ['required_if:recurrence,monthly', 'nullable', 'array'],
             'days_of_month.*' => ['integer', 'min:1', 'max:31'],

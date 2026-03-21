@@ -79,7 +79,7 @@
             placing: false,
             pendingCoords: null,
             viewer: null,
-            viewerMouseHandler: null,
+            markersPlugin: null,
             fallbackMode: false,
             repositioningIndex: null,
         };
@@ -118,6 +118,14 @@
                 } else {
                     togglePlacingBtn.textContent = state.placing ? '❌ Annuler' : '➕ Ajouter un lien';
                 }
+            }
+            // Apply cursor to viewer container AND PSV canvas elements
+            const cursorValue = state.placing ? 'crosshair' : '';
+            if (viewerContainer) {
+                viewerContainer.style.cursor = cursorValue;
+                viewerContainer.querySelectorAll('canvas').forEach((c) => {
+                    c.style.cursor = cursorValue;
+                });
             }
             const image = viewerContainer?.querySelector('img');
             if (image) {
@@ -238,52 +246,76 @@
             });
         };
 
-        const ensurePannellumLoaded = () => {
-            const pannellumCss = 'https://cdn.jsdelivr.net/npm/pannellum@2.5.7/build/pannellum.css';
-            const pannellumJsPrimary = 'https://cdn.jsdelivr.net/npm/pannellum@2.5.7/build/pannellum.js';
-            const pannellumJsFallback = 'https://unpkg.com/pannellum@2.5.7/build/pannellum.js';
-
-            if (!document.querySelector(`link[href="${pannellumCss}"]`)) {
-                const styleTag = document.createElement('link');
-                styleTag.rel = 'stylesheet';
-                styleTag.href = pannellumCss;
-                document.head.appendChild(styleTag);
-            }
-
-            if (window.pannellum) {
+        /**
+         * Load Photo Sphere Viewer + Markers plugin from CDN via dynamic import.
+         */
+        const loadPhotoSphereViewer = () => {
+            if (window.__psvModules) {
                 return Promise.resolve();
             }
+            if (window.__psvLoading) {
+                return window.__psvLoading;
+            }
 
-            const loadScript = (src) => new Promise((resolve, reject) => {
-                let scriptTag = document.querySelector(`script[src="${src}"]`);
-                if (!scriptTag) {
-                    scriptTag = document.createElement('script');
-                    scriptTag.src = src;
-                    document.head.appendChild(scriptTag);
-                }
-                if (window.pannellum) {
-                    resolve();
-                    return;
-                }
-                scriptTag.addEventListener('load', () => resolve(), { once: true });
-                scriptTag.addEventListener('error', () => reject(new Error(src)), { once: true });
+            window.__psvLoading = new Promise((resolve, reject) => {
+                // Inject CSS
+                const cssUrls = [
+                    'https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/core/index.min.css',
+                    'https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/markers-plugin/index.min.css',
+                ];
+                cssUrls.forEach((href) => {
+                    if (!document.querySelector(`link[href="${href}"]`)) {
+                        const link = document.createElement('link');
+                        link.rel = 'stylesheet';
+                        link.href = href;
+                        document.head.appendChild(link);
+                    }
+                });
+
+                // Use a module script with inline imports from CDN
+                const loader = document.createElement('script');
+                loader.type = 'module';
+                loader.textContent = `
+                    import { Viewer } from 'https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/core/index.module.js';
+                    import { MarkersPlugin } from 'https://cdn.jsdelivr.net/npm/@photo-sphere-viewer/markers-plugin/index.module.js';
+                    window.__psvModules = { Viewer, MarkersPlugin };
+                    window.dispatchEvent(new Event('psv-loaded'));
+                `;
+
+                const onLoad = () => {
+                    window.removeEventListener('psv-loaded', onLoad);
+                    if (window.__psvModules) {
+                        resolve();
+                    } else {
+                        reject(new Error('Photo Sphere Viewer modules failed to load'));
+                    }
+                };
+                window.addEventListener('psv-loaded', onLoad);
+
+                setTimeout(() => {
+                    window.removeEventListener('psv-loaded', onLoad);
+                    if (window.__psvModules) {
+                        resolve();
+                    } else {
+                        reject(new Error('Photo Sphere Viewer CDN load timeout'));
+                    }
+                }, 15000);
+
+                document.head.appendChild(loader);
             });
 
-            return loadScript(pannellumJsPrimary).catch(() => loadScript(pannellumJsFallback));
+            return window.__psvLoading;
         };
 
         const destroyViewer = () => {
             if (!state.viewer) return;
             try {
-                if (state.viewerMouseHandler && state.viewer.getContainer) {
-                    state.viewer.getContainer().removeEventListener('mousedown', state.viewerMouseHandler);
-                }
                 state.viewer.destroy();
             } catch (_) {
                 // noop
             }
             state.viewer = null;
-            state.viewerMouseHandler = null;
+            state.markersPlugin = null;
         };
 
         const renderFallbackScene = () => {
@@ -351,7 +383,7 @@
 
             normalizeHotspotsForScene(scene);
 
-            if (!window.pannellum) {
+            if (!window.__psvModules) {
                 renderFallbackScene(scene);
                 return;
             }
@@ -361,82 +393,126 @@
             viewerContainer.innerHTML = '';
 
             try {
-                const viewerConfig = {
-                    type: 'equirectangular',
+                const { Viewer, MarkersPlugin } = window.__psvModules;
+
+                // Build panoData for partial panoramas
+                let panoData = undefined;
+                if ((scene.haov && scene.haov > 0 && scene.haov < 360) ||
+                    (scene.vaov && scene.vaov > 0 && scene.vaov < 180) ||
+                    scene.vOffset) {
+                    const effHaov = scene.haov || 360;
+                    const effVaov = scene.vaov || 180;
+                    const vOff = scene.vOffset || 0;
+                    const fullWidth = 4000;
+                    const fullHeight = fullWidth / 2;
+                    const croppedWidth = Math.round(fullWidth * (effHaov / 360));
+                    const croppedHeight = Math.round(fullHeight * (effVaov / 180));
+                    const croppedX = Math.round((fullWidth - croppedWidth) / 2);
+                    const croppedY = Math.round((fullHeight - croppedHeight) / 2 - (vOff / 180) * fullHeight);
+                    panoData = { fullWidth, fullHeight, croppedWidth, croppedHeight, croppedX, croppedY };
+                }
+
+                // Build markers from hotspots
+                const markers = scene.hotspots.map((hotspot, index) => ({
+                    id: `hs_${index}`,
+                    position: { yaw: `${hotspot.yaw}deg`, pitch: `${hotspot.pitch}deg` },
+                    html: '<div class="kh-hotspot"></div>',
+                    size: { width: 24, height: 24 },
+                    anchor: 'center center',
+                    tooltip: hotspot.label || `Hotspot ${index + 1}`,
+                    data: { index },
+                }));
+
+                const viewer = new Viewer({
+                    container: viewerContainer,
                     panorama: scene.image_url,
-                    autoLoad: true,
-                    hfov: 110,
-                    showControls: true,
-                    hotSpots: scene.hotspots.map((hotspot, index) => ({
-                        pitch: hotspot.pitch,
-                        yaw: hotspot.yaw,
-                        type: 'custom',
-                        text: hotspot.label,
-                        cssClass: 'kh-hotspot',
-                        id: `hs_${index}`,
-                    })),
+                    defaultZoomLvl: 50,
+                    navbar: false,
+                    panoData,
+                    plugins: [
+                        MarkersPlugin.withConfig({
+                            markers,
+                        }),
+                    ],
+                });
+
+                state.viewer = viewer;
+                state.markersPlugin = viewer.getPlugin(MarkersPlugin);
+
+                // ── Click handling for hotspot placement ──
+                let lastClickTime = 0;
+                const handlePlacementClick = (yawDeg, pitchDeg) => {
+                    if (!state.placing) return;
+                    const now = Date.now();
+                    if (now - lastClickTime < 300) return;
+                    lastClickTime = now;
+
+                    if (state.repositioningIndex !== null && scene.hotspots[state.repositioningIndex]) {
+                        scene.hotspots[state.repositioningIndex].pitch = pitchDeg;
+                        scene.hotspots[state.repositioningIndex].yaw = yawDeg;
+                        state.repositioningIndex = null;
+                        state.placing = false;
+                        updatePlacingUi();
+                        renderScene();
+                        setFeedback('✅ Hotspot repositionné. Cliquez sur "Sauvegarder les liens".', 'success');
+                        return;
+                    }
+
+                    state.pendingCoords = { pitch: pitchDeg, yaw: yawDeg };
+
+                    if (!dialog || !targetSceneSelect || !hotspotLabelInput) return;
+                    targetSceneSelect.innerHTML = '';
+                    state.scenes.filter((s) => s.id !== scene.id).forEach((s) => {
+                        const option = document.createElement('option');
+                        option.value = s.id;
+                        option.textContent = s.title;
+                        targetSceneSelect.appendChild(option);
+                    });
+                    hotspotLabelInput.value = '';
+                    dialog.style.display = 'flex';
                 };
 
-                if (scene.haov && scene.haov > 0 && scene.haov <= 360) {
-                    viewerConfig.haov = scene.haov;
-                }
-                if (scene.vaov && scene.vaov > 0 && scene.vaov <= 180) {
-                    viewerConfig.vaov = scene.vaov;
-                    const offset = scene.vOffset || 0;
-                    const halfVaov = scene.vaov / 2;
-                    viewerConfig.minPitch = -(halfVaov + offset);
-                    viewerConfig.maxPitch = halfVaov - offset;
-                    if (scene.vaov < 179) {
-                        viewerConfig.hfov = Math.min(110, scene.vaov * 0.9);
-                        viewerConfig.maxHfov = scene.vaov;
-                        viewerConfig.pitch = 0;
-                    }
-                }
-                if (scene.vOffset != null) {
-                    viewerConfig.vOffset = scene.vOffset;
-                }
+                // Primary: PSV's own click event
+                viewer.addEventListener('click', (e) => {
+                    if (!e.data || typeof e.data.yaw !== 'number') return;
+                    handlePlacementClick(
+                        (e.data.yaw * 180) / Math.PI,
+                        (e.data.pitch * 180) / Math.PI,
+                    );
+                });
 
-                state.viewer = window.pannellum.viewer(viewerContainer, viewerConfig);
+                // Fallback: DOM mousedown/mouseup for cases where PSV click doesn't fire
+                let downPos = null;
+                viewerContainer.addEventListener('mousedown', (ev) => {
+                    downPos = { x: ev.clientX, y: ev.clientY };
+                });
+                viewerContainer.addEventListener('mouseup', (ev) => {
+                    if (!downPos || !state.placing) { downPos = null; return; }
+                    const dx = ev.clientX - downPos.x;
+                    const dy = ev.clientY - downPos.y;
+                    downPos = null;
+                    if (Math.sqrt(dx * dx + dy * dy) > 6) return;
+                    try {
+                        const rect = viewerContainer.getBoundingClientRect();
+                        const coords = state.viewer.dataHelper.viewerCoordsToSphericalCoords({
+                            x: ev.clientX - rect.left,
+                            y: ev.clientY - rect.top,
+                        });
+                        if (coords) {
+                            handlePlacementClick(
+                                (coords.yaw * 180) / Math.PI,
+                                (coords.pitch * 180) / Math.PI,
+                            );
+                        }
+                    } catch (_) {
+                        // raycasting failed
+                    }
+                });
             } catch (_) {
                 renderFallbackScene(scene);
                 return;
             }
 
-            state.viewerMouseHandler = (event) => {
-                if (!state.placing || !state.viewer) return;
-                if (event instanceof MouseEvent && event.button !== 0) return;
-                const coords = state.viewer.mouseEventToCoords(event);
-                if (!Array.isArray(coords)) return;
-                const nextCoords = {
-                    pitch: Number(coords[0]),
-                    yaw: Number(coords[1]),
-                };
-                if (state.repositioningIndex !== null && scene.hotspots[state.repositioningIndex]) {
-                    scene.hotspots[state.repositioningIndex].pitch = nextCoords.pitch;
-                    scene.hotspots[state.repositioningIndex].yaw = nextCoords.yaw;
-                    state.repositioningIndex = null;
-                    state.placing = false;
-                    updatePlacingUi();
-                    renderScene();
-                    setFeedback('✅ Hotspot repositionné. Cliquez sur "Sauvegarder les liens".', 'success');
-                    return;
-                }
-
-                state.pendingCoords = nextCoords;
-
-                if (!dialog || !targetSceneSelect || !hotspotLabelInput) return;
-                targetSceneSelect.innerHTML = '';
-                state.scenes.filter((s) => s.id !== scene.id).forEach((s) => {
-                    const option = document.createElement('option');
-                    option.value = s.id;
-                    option.textContent = s.title;
-                    targetSceneSelect.appendChild(option);
-                });
-                hotspotLabelInput.value = '';
-                dialog.style.display = 'flex';
-            };
-
-            state.viewer.getContainer().addEventListener('mousedown', state.viewerMouseHandler);
             renderHotspotList();
             setFeedback(
                 scene.hotspots.length > 0
@@ -533,7 +609,7 @@
 
         renderTabs();
         updatePlacingUi();
-        ensurePannellumLoaded()
+        loadPhotoSphereViewer()
             .then(() => renderScene())
             .catch(() => renderFallbackScene());
     }

@@ -1,0 +1,88 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Api\V1;
+
+use App\Enums\AdStatus;
+use App\Http\Resources\AdResource as AdApiResource;
+use App\Models\Ad;
+use Illuminate\Database\Connection;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Str;
+
+final class MyAdsController
+{
+    /**
+     * List all ads owned by the authenticated user (landlord/agent).
+     * Uses LandlordScope (same as Filament Bailleur panel) to ensure only the owner's ads.
+     * Supports search, filters (status, type, city, quarter), and sort.
+     */
+    public function index(): AnonymousResourceCollection
+    {
+        $userId = auth()->id();
+        if (!$userId) {
+            abort(401, 'Non authentifié');
+        }
+
+        $query = Ad::query()
+            ->where('user_id', $userId)
+            ->with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])
+            ->withAvg('reviews', 'rating')
+            ->withCount('reviews')
+            ->withTrashed();
+
+        $q = Str::of(request('q', ''))->trim()->toString();
+        if (Str::length($q) >= 2) {
+            $pattern = '%'.$q.'%';
+            /** @var Connection $connection */
+            $connection = $query->getConnection();
+            $driver = $connection->getDriverName();
+            $likeOp = $driver === 'pgsql' ? 'ilike' : 'like';
+            $query->where(function ($builder) use ($pattern, $likeOp): void {
+                $builder->where('title', $likeOp, $pattern)
+                    ->orWhere('adresse', $likeOp, $pattern)
+                    ->orWhere('description', $likeOp, $pattern);
+            });
+        }
+
+        if ($status = request('status')) {
+            $valid = AdStatus::tryFrom($status);
+            if ($valid) {
+                $query->where('status', $valid);
+            }
+        }
+
+        if ($typeId = request('type_id')) {
+            $query->where('type_id', $typeId);
+        }
+
+        if ($cityId = request('city_id')) {
+            $query->whereHas('quarter', fn ($q) => $q->where('city_id', $cityId));
+        }
+
+        if ($quarterId = request('quarter_id')) {
+            $query->where('quarter_id', $quarterId);
+        }
+
+        if ($minPrice = request('price_min')) {
+            $query->where('price', '>=', (float) $minPrice);
+        }
+        if ($maxPrice = request('price_max')) {
+            $query->where('price', '<=', (float) $maxPrice);
+        }
+
+        $sort = request('sort', 'created_at');
+        $order = strtolower((string) request('order', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $allowedSort = ['created_at', 'price', 'surface_area', 'title'];
+        if (in_array($sort, $allowedSort, true)) {
+            $query->orderBy($sort, $order);
+        } else {
+            $query->latest();
+        }
+
+        $ads = $query->paginate(max(1, min(100, (int) request('per_page', 15))));
+
+        return AdApiResource::collection($ads);
+    }
+}

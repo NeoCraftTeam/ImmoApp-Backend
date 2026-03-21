@@ -82,12 +82,12 @@ Route::get('/verify-email', function (Request $request) {
 // ── Fallback login route — required by the web `auth` middleware redirect ──
 Route::get('/login', fn () => redirect('/owner/login'))->name('login');
 
-// ── Tour image proxy — streams R2 images with CORS headers for Pannellum (XHR-based) ──
+// ── Tour image proxy — streams R2 images with CORS headers for Photo Sphere Viewer (XHR-based) ──
 // The {path} parameter uses `.+` to match nested tile paths like scenes/{id}/tiles/1/f0_0.webp
 Route::get('/tour-image/{adId}/{path}', [TourImageProxyController::class, 'show'])
     ->where('adId', 'temp|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')
     ->where('path', '.+')
-    ->middleware('throttle:120,1')
+    ->middleware(['throttle:120,1', 'resolve.sanctum.bearer'])
     ->name('tour.image.proxy');
 
 // ── Media proxy — serves Spatie Media Library files from R2 for Filament FilePond previews ──

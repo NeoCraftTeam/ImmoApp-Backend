@@ -1,0 +1,451 @@
+# KeyHome — Enterprise-Level Gap Analysis & Roadmap
+
+> **Audit date:** March 21, 2026 (updated)
+> **Stack:** Laravel 12 · Next.js 16 · React Native (Expo) · PostgreSQL/PostGIS · Redis · Meilisearch · Docker
+> **Score:** 72/100 — Strong foundation, critical security & compliance gaps
+
+---
+
+## Current State Summary
+
+### What you have (solid foundation)
+
+| Area | Details |
+|------|---------|
+| **Stack** | Laravel 12 + Next.js 16 + React Native (Expo) — modern stack |
+| **Data Layer** | 30+ models with UUIDs, SoftDeletes, ActivityLog, SpatialData |
+| **Authorization** | 16 policies, 23 Form Requests, 19 API Resources — good pattern adoption |
+| **Auth & Security** | 57 rate-limit rules, Sanctum + Clerk dual auth, OAuth (Google/Facebook/Apple) |
+| **Observability** | Sentry, Laravel Pulse, Nightwatch, Laravel Telescope |
+| **Infrastructure** | Spatie Backup, Docker + nginx, CI/CD (GitHub Actions) |
+| **SEO** | Sitemap, `robots.ts`, OpenGraph images, JsonLd, blog, comparison pages |
+| **Testing** | 47+ Feature tests, 8 Unit tests (Pest), 12 frontend unit tests (Vitest) |
+| **Admin** | 3 Filament panels (Admin, Agency, Bailleur), rich dashboard widgets |
+| **Search & AI** | Meilisearch, AI description enhancer, natural language search, KeyScore |
+| **Payments** | Flutterwave payments, credit/point system, subscriptions |
+| **Features** | 3D tours (Photo Sphere Viewer), viewing reservations, lease contracts, surveys |
+
+---
+
+## TIER 1 — CRITICAL (Security, Data Integrity, Legal)
+
+### 1. 🚨 Unprotected Admin Registration Endpoint
+
+> **Gap:** `POST /registerAdmin` uses `can:admin-access` gate but NO `auth:sanctum` middleware — unauthenticated users reach the endpoint.
+
+- [ ] Add `->middleware('auth:sanctum')` **BEFORE** `->middleware('can:admin-access')` on the registerAdmin route
+- [ ] Add test: unauthenticated POST to `/registerAdmin` → 401
+
+### 2. 🚨 Missing Security Headers Middleware
+
+> **Gap:** No `X-Frame-Options`, `X-Content-Type-Options`, `Strict-Transport-Security`, or server-side CSP headers in `bootstrap/app.php`.
+
+- [ ] Add security headers middleware in `bootstrap/app.php`
+- [ ] HSTS with `max-age=31536000; includeSubDomains`
+- [ ] `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`
+
+### 3. 🚨 User API Authorization Not Enforced
+
+> **Gap:** `UserPolicy` requires `isAdmin()` for `viewAny()`, but the route (`GET /users`) only checks `auth:sanctum` — any authenticated user can list ALL users.
+
+- [ ] Enforce `->middleware('can:viewAny,App\\Models\\User')` on user routes or use `$this->authorize()` in controllers
+- [ ] Same gap exists for `PUT /users/{user}`, `DELETE /users/{user}`
+- [ ] Write regression tests: _"Regular user cannot list all users"_
+
+### 4. Multi-Tenancy Data Isolation Hardening
+
+> **Gap:** You have `LandlordScope` but no systematic tenant isolation enforcement.
+
+- [ ] Add **global scopes** on all tenant-sensitive models (`Ad`, `LeaseContract`, `Payment`, `ViewingReservation`) — not just Bailleur panel
+- [ ] Add middleware-level `X-Tenant-ID` header validation for API requests
+- [ ] Write **tenant leakage regression tests**: _"Agent A cannot see Agent B's data"_
+
+### 5. GDPR / Data Privacy Compliance
+
+> **Gap:** Zero consent management, no data export/deletion endpoints.
+
+- [ ] **Cookie consent:** `CookieBanner.tsx` exists but there's no backend record of consent
+- [ ] Add `GET /my/data-export` — user can download all their personal data (JSON/ZIP)
+- [ ] Add `DELETE /my/account` — right to erasure (cascading soft-delete + anonymization after 30 days)
+- [ ] Add a **privacy preferences** model: marketing emails opt-in/out, analytics opt-in/out
+- [ ] **Data retention policy:** Auto-purge soft-deleted records older than N months
+
+---
+
+### 6. CORS Configuration Hardening
+
+> **Gap:** `config/cors.php` allows `*` for methods and headers + wildcard subdomain pattern. This is exploitable in production.
+
+- [ ] Restrict `allowed_methods` to `['GET', 'POST', 'PUT', 'DELETE', 'PATCH']`
+- [ ] Restrict `allowed_headers` to `['Accept', 'Content-Type', 'Authorization', 'X-Requested-With']`
+- [ ] Replace wildcard `allowed_origins_patterns` with explicit origins list
+
+---
+
+### 7. API Rate Limiting — Per-User Tier
+
+> **Gap:** Your 57 throttle rules are IP-based. Enterprise needs user-tier throttling + global fallback.
+
+- [ ] Free users: **60 req/min**, Subscribed agents: **300 req/min**, Admin: **unlimited**
+- [ ] Use Laravel's `RateLimiter::for()` in `bootstrap/app.php` with user-aware resolvers
+- [ ] Add **global API throttle fallback** via `$middleware->throttleApi()` for unprotected endpoints
+- [ ] Login endpoint: increase throttle from `5,1` to `3,15` (3 per 15 min — industry standard)
+
+---
+
+### 8. Input Sanitization & XSS
+
+> **Gap:** You have `sanitize.ts` on frontend but no systematic backend HTML sanitization.
+
+- [ ] Add `htmlpurifier` or Sterilize middleware for all text inputs that accept rich content (ad descriptions, reviews, survey responses)
+- [ ] `NaturalSearchRegexParser` needs extra care — regex injection potential
+- [ ] Add explicit file upload validation in Form Requests: `'avatar' => 'nullable|image|mimes:jpeg,png,gif,webp|max:2048'`
+
+---
+
+### 9. No 2FA/MFA Enforcement
+
+> **Gap:** `app_authentication_secret` and `app_authentication_recovery_codes` exist on `User`, but 2FA is optional and not enforced anywhere.
+
+- [ ] Enforce 2FA for admin/agency panel logins (Filament 2FA middleware)
+- [ ] Offer 2FA option for regular users via API settings endpoint
+- [ ] Add 2FA enrollment test: _"Admin without 2FA is redirected to setup page"_
+
+---
+
+### 10. Webhook Signature Verification Tests
+
+> **Gap:** `FlutterwaveWebhookTest` exists but no systematic webhook replay/tamper tests. Signature validation happens AFTER some DB operations.
+
+- [ ] Add tests for: **signature mismatch → 403**, **replayed webhook** (duplicate `tx_ref`) → idempotent, **expired timestamp → reject**
+- [ ] Move signature validation **before** any database operations in `FlutterwavePaymentService`
+
+---
+
+## TIER 2 — PRODUCT MATURITY (Revenue, Retention, Trust)
+
+### 6. Messaging / In-App Chat System
+
+> **Gap:** You dropped conversations (migration: `drop_conversations_and_messages_tables`). For a real estate platform, buyer↔agent messaging is table stakes.
+
+- [ ] Add a **real-time messaging system** (Laravel Reverb/Pusher + Next.js WebSocket)
+- [ ] Minimum: text messages, image sharing, "is typing" indicator, read receipts
+- [ ] Link conversations to specific ads: _"Message about Ad #X"_
+- [ ] Unread badge on BottomNav
+
+---
+
+### 7. Identity Verification (KYC)
+
+> **Gap:** `VerificationStatus` enum exists, `is_verified` field on ads, but no actual verification flow.
+
+- [ ] Frontend has `/my/verify-identity` endpoint that **404s**
+- [ ] Integrate a KYC provider (**Smile Identity** for Africa, or Jumio/Onfido)
+- [ ] Document upload (ID card/passport) + selfie matching
+- [ ] Verified badge prominently displayed on agent profiles and ads
+
+---
+
+### 8. Ad Boost / Promotion System
+
+> **Gap:** `AdBoostService` exists, `is_boosted` on ads exists, but routes are missing.
+
+- [ ] `POST /my/ads/{id}/boost` — **doesn't exist**
+- [ ] `GET /my/boost-plans` — **doesn't exist**
+- [ ] Implement boost tiers: **Featured** (homepage), **Highlighted** (search results), **Urgent** badge
+- [ ] Connect to payment flow — this is a **direct revenue stream**
+
+---
+
+### 9. Multi-Language (i18n)
+
+> **Gap:** Zero internationalization. Backend has `lang/` folder but frontend has no i18n setup.
+
+- [ ] You target Cameroon (French), but also list cities in Ghana (Accra), Senegal (Dakar), Togo (Lomé)
+- [ ] Add `next-intl` or `react-i18next` for **FR/EN minimum**
+- [ ] Backend already has `APP_LOCALE=fr` — add translatable columns for Ad titles/descriptions
+- [ ] SEO: `hreflang` tags, `/fr/` and `/en/` URL prefixes
+
+---
+
+### 10. Notification Center (Real-Time)
+
+> **Gap:** You have push notifications (WebPush) and email notifications (30+ mail templates!) but no real-time in-app notification bell.
+
+- [ ] Add **WebSocket/SSE** for instant notification delivery
+- [ ] Notification preferences page: per-channel control (push, email, SMS, WhatsApp)
+- [ ] `WhatsAppChannel.php` exists — integrate **WhatsApp Business API** for transactional messages
+---
+
+### 16b. Filament Admin Enhancement
+
+> **Gap:** 3 panels exist (Admin 17 resources, Agency 3, Bailleur 6) but missing enterprise-grade admin features.
+
+- [ ] **Relation Managers** — zero nested CRUD: add `AdsRelationManager` on `UserResource`, `ScenesRelationManager` on `TourResource`, `PaymentsRelationManager` on `AdResource`
+- [ ] **Permission Management UI** — policies are defined but no way for admins to manage roles/permissions in the panel
+- [ ] **Bulk status actions** — approve/reject/archive multiple ads at once
+- [ ] **Advanced filters** — saved filter presets, date range pickers on all list pages
+- [ ] **Notification center** — Filament's built-in notification system for admin alerts
+- [ ] **Media Manager** — centralized media browser (Spatie MediaLibrary integration)
+- [ ] **Webhook management** — admin UI to configure & test webhook endpoints
+- [ ] **Scheduled reports** — downloadable CSV/PDF reports on demand + scheduled email delivery
+---
+
+### 11. Reviews Trust System
+
+> **Gap:** Reviews exist but no fraud prevention.
+
+- [ ] Only allow reviews from users who actually contacted/visited the property
+- [ ] Add **review response** from property owner
+- [ ] Flag suspicious patterns: 5-star reviews from new accounts, review bombing
+
+---
+
+## TIER 3 — TECHNICAL EXCELLENCE (Scalability, DX, Ops)
+
+### 17. Production Infrastructure Hardening
+
+> **Gap:** Docker setup is solid but several production defaults are wrong.
+
+- [ ] **Change `CACHE_STORE` to `redis`** (currently `database` — causes contention under load)
+- [ ] **Change `QUEUE_CONNECTION` to `redis`** (currently `database` — slow job processing)
+- [ ] **Change `SESSION_DRIVER` to `redis`** (currently `cookie` — limited size, no server-side invalidation)
+- [ ] **Offsite backups**: `config/backup.php` stores only to local disk — add R2/S3 backup disk
+- [ ] **HTTPS enforcement**: No middleware forces HTTPS or sets HSTS headers
+- [ ] **Set `SENTRY_DSN`** in production (currently empty — no error tracking)
+- [ ] **Enable Prometheus/Grafana monitoring** (exists as Docker profile but not auto-enabled)
+
+### 18. Test Coverage
+
+> **Gap:** 45 Feature tests, 7 Unit tests, 0 Browser tests. 23 controllers completely untested. 7 models missing factories.
+
+- [ ] **Current pain points:** No Playwright E2E tests (folder empty), no visual regression tests
+- [ ] Target: **80%+ line coverage** on Services, Controllers, and Policies
+- [ ] **Missing factories**: Create factories for `LeaseContract`, `Invoice`, `AdReport`, `PushSubscription`, `SiteVisit`, `Property`, `PropertyAttribute`
+- [ ] **Untested controllers** (top priority): `AdController`, `SearchAlertController`, `LeaseContractController`, `InvoiceController`, `AdReportController`
+- [ ] Add **contract tests**: if frontend calls `GET /api/v1/ads`, test that the response schema matches `AdResource` exactly
+- [ ] Add **browser tests** (Pest v4): login flow, ad creation, payment flow, 360° tour hotspot placement
+- [ ] Add **coverage configuration** in `phpunit.xml` with minimum threshold
+
+---
+
+### 13. API Documentation
+
+> **Gap:** L5-Swagger is installed but the Swagger annotations are only on a few controllers.
+
+- [ ] Annotate **ALL 40+ controllers** with OpenAPI specs
+- [ ] Add response examples for error states (`401`, `403`, `404`, `422`, `429`, `500`)
+- [ ] Add API changelog / versioning headers (`X-API-Version`, `Deprecation` header for old endpoints)
+- [ ] Generate and publish interactive docs at `/api/documentation`
+
+---
+
+### 14. Caching Strategy
+
+> **Gap:** 54 cache calls exist but no systematic caching layer.
+
+- [ ] Add **HTTP cache headers** (`Cache-Control`, `ETag`) for public endpoints (ads list, cities, property attributes)
+- [ ] Add **response caching middleware** for expensive queries (price heatmap, rent estimator, recommendations)
+- [ ] **Cache invalidation strategy:** when Ad is updated, invalidate related caches (search, recommendations, heatmap)
+- [ ] Add **Redis-based session store** for production (currently `SESSION_DRIVER=cookie`)
+
+---
+
+### 15. Database Performance
+
+> **Gap:** PostGIS spatial indexes exist, but no query monitoring.
+
+- [ ] Add **database indexes** on commonly filtered columns: `ads.status`, `ads.city_id`, `ads.user_id`, `ads.price`
+- [ ] Enable **slow query logging** in production
+- [ ] Add **read replicas** config in `config/database.php` for read-heavy endpoints
+- [ ] Consider **materialized views** for dashboard analytics (`AdminMetricsService` queries)
+
+---
+
+### 16. CI/CD Pipeline Completeness
+
+> **Gap:** 114-line pipeline runs Pest tests but misses critical checks.
+
+- [ ] Add: `vendor/bin/pint --test` (formatting), `vendor/bin/phpstan analyse` (static analysis — larastan already installed!), frontend `npm run lint && npm run test`
+- [ ] Add: **Playwright E2E** in CI
+- [ ] Add: Database migration rollback test (`php artisan migrate:fresh` in CI)
+- [ ] Add: Docker image build + push step for staging/production
+- [ ] Add: Deployment smoke test after deploy (`curl /api/health`)
+
+---
+
+### 17. Feature Flags
+
+> **Gap:** No feature flag system.
+
+- [ ] Use **Laravel Pennant** (first-party) for gradual rollouts
+- [ ] Flags for: new search algorithm, boost system, messaging, KYC requirement
+- [ ] Essential for enterprise: deploy code without enabling features, A/B testing
+
+---
+
+### 18. Queues & Background Processing
+
+> **Gap:** Only 3 queue jobs. Many operations should be async.
+
+- [ ] Move to async: email sending (already queued?), PDF generation (lease contracts), image optimization, AI description enhancement
+- [ ] Add **failed job monitoring** dashboard in Filament admin
+- [ ] Add **Horizon** for Redis queue monitoring and auto-scaling workers
+- [ ] Current queue: `--queue=emails,default` — add priority queues: `critical,payments,emails,default`
+
+---
+
+## TIER 4 — SEO & GROWTH (Organic Traffic, Conversion)
+
+### 19. Structured Data (Schema.org)
+
+> **Gap:** You have `JsonLd.tsx` component but limited implementation.
+
+- [ ] Add `RealEstateListing` schema on every ad detail page
+- [ ] Add `Organization` schema on landing page
+- [ ] Add `BreadcrumbList` schema on all pages
+- [ ] Add `FAQPage` schema on FAQ section
+- [ ] Add `BlogPosting` schema on blog posts
+- [ ] Add `AggregateRating` schema on reviewed properties
+
+---
+
+### 20. SEO Content Strategy
+
+> **Gap:** Blog exists with 3 posts, comparison pages with 3 entries — thin content.
+
+- [ ] **City landing pages** (`/immobilier/douala`): need unique, rich content — not just ad listings
+- [ ] Each city page needs: average rent table, best neighborhoods, market trends chart, Q&A section
+- [ ] **Property type pages** (`/type-bien/appartement`): same — rich contextual content
+- [ ] Blog: publish **2–4 articles/month** — _"Guide location Douala 2026"_, _"Comment choisir son quartier"_, _"Arnaques immobilières"_
+- [ ] Add **internal linking** between blog posts, city pages, and ad listings
+
+---
+
+### 21. Performance & Core Web Vitals
+
+> **Gap:** `WebVitals.tsx` and `@vercel/analytics` exist but no Performance Budget.
+
+- [ ] Add **Lighthouse CI** to CI pipeline — fail build if performance score < 85
+- [ ] Ensure all ad images use `next/image` with proper `sizes` attribute
+- [ ] Add `loading="lazy"` on below-fold images
+- [ ] Preload critical fonts and hero images
+- [ ] Implement **ISR (Incremental Static Regeneration)** for ad detail pages — massive performance + SEO win
+
+---
+
+### 22. Conversion Rate Optimization (CRO)
+
+> **Gap:** No conversion tracking, no funnel analytics.
+
+- [ ] Instrument funnel: **Landing → Search → View Ad → Contact/Call → Reserve Viewing**
+- [ ] Add **UTM parameter tracking** and store acquisition source on `User` model
+- [ ] Add A/B testing framework (Pennant + analytics events)
+- [ ] Add **social proof** widgets: _"15 people viewed this today"_, _"2 visits scheduled"_
+- [ ] Add **urgency indicators**: _"Listed 2 hours ago"_, _"Price reduced 10%"_
+- [ ] Add **saved search notifications**: _"3 new apartments match your search"_
+
+---
+
+### 23. Progressive Web App (PWA) Polish
+
+> **Gap:** PWA manifest exists, service worker registered, but install rate likely low.
+
+- [ ] Add **custom install prompt** that triggers at high-engagement moments (after 3rd ad view, after favoriting)
+- [ ] Offline page exists but **caching strategy is basic** — cache recent ad listings, images, map tiles for offline browsing
+- [ ] Add **background sync**: queue favorite/contact actions when offline, replay when online
+
+---
+
+## TIER 5 — OPERATIONAL EXCELLENCE (Monitoring, Disaster Recovery)
+
+### 24. Health Monitoring & Alerting
+
+> **Gap:** You have Pulse + Sentry + Nightwatch but no SLA-grade alerting.
+
+- [ ] Add **uptime monitoring** with alerts: PagerDuty/OpsGenie integration
+- [ ] Add **business metric alerts**: payment failure rate > 5%, new user signups = 0 for 24h, API error rate spike
+- [ ] Add **database backup verification**: monthly restore test
+- [ ] Add **runbook** for common incidents: DB full, queue backed up, payment gateway down
+
+---
+
+### 25. Logging & Audit Trail
+
+> **Gap:** ActivityLog exists on key models but no centralized log aggregation.
+
+- [ ] Ship logs to a **log aggregator** (ELK / Loki / Datadog)
+- [ ] Add **security audit log**: all auth events (login, logout, password change, failed attempts, role changes)
+- [ ] Add **admin action audit**: who approved/rejected which ad, who modified which user
+- [ ] Make audit logs **immutable** and retained for minimum 1 year
+
+---
+
+### 26. Environment Parity
+
+> **Gap:** `docker-compose.yml` (production) exists but no staging environment config.
+
+- [ ] `docker-compose.preprod.yml` exists — ensure it **mirrors production exactly**
+- [ ] Add **database seeding for staging**: realistic data volumes (10K ads, 5K users) for performance testing
+- [ ] Add **staging URL protection** (HTTP basic auth or VPN-only access)
+
+---
+
+## Priority Implementation Order
+
+| Priority | Item | Impact | Effort |
+|:--------:|------|--------|:------:|
+| **P0** | Fix admin registration endpoint (add `auth:sanctum`) | Privilege escalation risk | **15 min** |
+| **P0** | Add security headers middleware | Clickjacking/MITM risk | **1 hour** |
+| **P0** | Enforce User API authorization (policies in routes) | Data breach risk | **2 hours** |
+| **P0** | GDPR data export/deletion | Legal risk | Medium |
+| **P0** | Multi-tenancy leakage tests | Data breach risk | Low |
+| **P0** | CORS hardening (remove wildcards) | Cross-origin attack risk | **30 min** |
+| **P0** | Backend input sanitization | XSS risk | Low |
+| **P0** | 2FA enforcement for admin panels | Account takeover risk | Medium |
+| **P1** | Production infra: Redis cache/queue/session | Performance under load | Low |
+| **P1** | Offsite backups (R2/S3) | Data loss risk | Low |
+| **P1** | In-app messaging | #1 user-requested feature for real estate | High |
+| **P1** | Identity verification (KYC) | Trust & fraud prevention | High |
+| **P1** | Ad boost/promotion routes | Direct revenue | Medium |
+| **P1** | Multi-language (FR/EN) | Market expansion | High |
+| **P2** | Test coverage to 80% + missing factories | Regression prevention | Medium |
+| **P2** | Full OpenAPI documentation | Developer experience | Medium |
+| **P2** | CI pipeline: Pint + PHPStan + Playwright | Quality gate | Low |
+| **P2** | Feature flags (Laravel Pennant) | Safe deployments | Low |
+| **P2** | Filament: Relation Managers + permissions UI | Admin productivity | Medium |
+| **P3** | `RealEstateListing` schema on ad pages | SEO ranking boost | Low |
+| **P3** | City/type page rich content + internal linking | Organic traffic | Medium |
+| **P3** | Lighthouse CI + ISR optimization | Core Web Vitals | Medium |
+| **P3** | Real-time notifications (WebSocket) | User engagement | Medium |
+| **P3** | Filament Notification Center + bulk actions | Admin UX | Low |
+| **P4** | Log aggregation (ELK/Loki) | Ops maturity | Medium |
+| **P4** | Horizon queue monitoring | Reliability | Low |
+| **P4** | A/B testing framework | Growth optimization | Medium |
+| **P4** | Prometheus/Grafana auto-enable | Observability | Low |
+
+---
+
+## Bottom Line
+
+> Your app has a genuinely strong foundation — better than most startups at this stage. After the deep-dive audit across **6 dimensions** (backend architecture, test coverage, Filament admin, security posture, frontend/SEO, infrastructure/DevOps), the scoring is:
+>
+> | Dimension | Score | Verdict |
+> |-----------|:-----:|---------|
+> | **Backend Architecture** | 7/10 | Good patterns, missing 14 policies + event-driven arch |
+> | **Security** | 5/10 | Auth exists but critical authorization gaps + no 2FA |
+> | **Test Coverage** | 5/10 | 52 tests but 23 controllers untested, 0 browser tests |
+> | **Filament Admin** | 7/10 | Feature-rich but no relation managers or permission UI |
+> | **Frontend & SEO** | 8/10 | Excellent structured data, PWA, ISR — best dimension |
+> | **Infrastructure** | 7/10 | Docker+CI solid, but wrong cache/queue defaults for prod |
+>
+> ### The 5 enterprise blockers (fix these first):
+>
+> 1. **Security hardening** — admin endpoint unprotected, user API leaks data, no security headers, CORS wide open
+> 2. **Missing in-app messaging** — deal-breaker for a real estate marketplace
+> 3. **No identity verification** — trust is everything in African real estate where scams are rampant
+> 4. **GDPR compliance** — legal requirement if you operate with French/EU-aligned data laws
+> 5. **Production infra defaults** — Redis for cache/queue/session, offsite backups, HTTPS enforcement
+>
+> Fix the 8 P0 items (most are under 2 hours each) and you immediately jump from **72/100 to ~85/100**. Then tackle P1 product features (messaging, KYC, ad boost) for the money-making enterprise leap.
+

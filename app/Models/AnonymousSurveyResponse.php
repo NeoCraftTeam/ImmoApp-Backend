@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\SurveyAnonymousAudience;
 use Database\Factories\AnonymousSurveyResponseFactory;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
@@ -20,6 +21,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $ip_hash
  * @property Carbon $submitted_at
  * @property Carbon|null $viewed_at
+ * @property SurveyAnonymousAudience $respondent_audience
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read Survey $survey
@@ -45,6 +47,7 @@ class AnonymousSurveyResponse extends Model
         return [
             'submitted_at' => 'datetime',
             'viewed_at' => 'datetime',
+            'respondent_audience' => SurveyAnonymousAudience::class,
         ];
     }
 

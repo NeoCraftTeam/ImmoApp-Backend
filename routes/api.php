@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\V1\AdAiController;
 use App\Http\Controllers\Api\V1\AdAnalyticsController;
 use App\Http\Controllers\Api\V1\AdController;
 use App\Http\Controllers\Api\V1\AdInteractionController;
@@ -14,6 +15,9 @@ use App\Http\Controllers\Api\V1\ClerkWebhookController;
 use App\Http\Controllers\Api\V1\CreditController;
 use App\Http\Controllers\Api\V1\InvoiceController;
 use App\Http\Controllers\Api\V1\KeyScoreController;
+use App\Http\Controllers\Api\V1\LeaseContractController;
+use App\Http\Controllers\Api\V1\MyAdsController;
+use App\Http\Controllers\Api\V1\MyReviewsController;
 use App\Http\Controllers\Api\V1\NaturalSearchController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PaymentController;
@@ -204,7 +208,7 @@ Route::prefix('v1')->group(function (): void {
         ->middleware('throttle:120,1');
 
     // --- TOUR 3D (public read, protected write) ---
-    Route::get('/ads/{ad}/tour', [TourController::class, 'show']);
+    Route::get('/ads/{ad}/tour', [TourController::class, 'show'])->middleware('optional.auth');
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/ads/{ad}/tour/scenes', [TourController::class, 'uploadScenes'])
             ->middleware('throttle:10,1');
@@ -271,6 +275,9 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/facets', 'facets')->name('ads.facets')->middleware('throttle:60,1');
 
         Route::middleware('auth:sanctum')->group(function (): void {
+            Route::post('/ai/enhance-description', AdAiController::class)
+                ->middleware('throttle:10,1');
+
             // Routes spécifiques AVANT les routes avec paramètres génériques
             Route::get('/{user}/nearby', 'ads_nearby_user');
 
@@ -313,8 +320,32 @@ Route::prefix('v1')->group(function (): void {
 
     // --- ANALYTICS (dashboard bailleur/agence) ---
     Route::middleware('auth:sanctum')->prefix('my/ads')->group(function (): void {
+        Route::get('/', [MyAdsController::class, 'index']);
         Route::get('/analytics', [AdAnalyticsController::class, 'overview']);
         Route::get('/{ad}/analytics', [AdAnalyticsController::class, 'show']);
+    });
+
+    // --- LEASE CONTRACTS (bailleur) ---
+    Route::middleware('auth:sanctum')->prefix('my/lease-contracts')->controller(LeaseContractController::class)->group(function (): void {
+        Route::get('/', 'index');
+        Route::post('/ai/enhance-conditions', 'enhanceConditions')
+            ->middleware('throttle:10,1');
+        Route::get('/{leaseContract}', 'show')->name('lease-contracts.show');
+        Route::put('/{leaseContract}', 'update')->name('lease-contracts.update');
+        Route::post('/{ad}/generate', 'store')->name('lease-contracts.generate');
+        Route::get('/{leaseContract}/download', 'download')->name('lease-contracts.download');
+    });
+
+    // --- MY REVIEWS (bailleur — avis sur mes annonces) ---
+    Route::middleware('auth:sanctum')->get('/my/reviews', [MyReviewsController::class, 'index']);
+
+    // --- MY VIEWING RESERVATIONS (bailleur — toutes les demandes de visite) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/viewing-reservations', [ViewingReservationController::class, 'myReservationsAsLandlord']);
+        Route::post('/reservations/{reservation}/confirm', [ViewingReservationController::class, 'confirm'])
+            ->middleware('throttle:20,1');
+        Route::patch('/reservations/{reservation}/notes', [ViewingReservationController::class, 'updateNotes'])
+            ->middleware('throttle:30,1');
     });
 
     // --- VIEWING AVAILABILITY (landlord) ---

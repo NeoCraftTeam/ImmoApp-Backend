@@ -207,6 +207,11 @@ production_deploy:
         APP_IMAGE=$FULL_IMAGE docker compose down --remove-orphans || true
         exit 1
       fi
+    # Meilisearch / Laravel Scout (nécessite MEILISEARCH_* dans .env et conteneur Meilisearch joignable)
+    - echo "🔍 Sync Meilisearch index settings..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan scout:sync-index-settings
+    - echo "🔍 Reindex ads (Scout import)..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan scout:import "App\Models\Ad"
     - echo "⚡ Optimizing..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan filament:assets
@@ -296,6 +301,11 @@ preprod_deploy:
         APP_IMAGE=$FULL_IMAGE docker compose down --remove-orphans || true
         exit 1
       fi
+    # Meilisearch / Laravel Scout (nécessite MEILISEARCH_* dans .env et conteneur Meilisearch joignable)
+    - echo "🔍 Sync Meilisearch index settings..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan scout:sync-index-settings
+    - echo "🔍 Reindex ads (Scout import)..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan scout:import "App\Models\Ad"
     - echo "⚡ Optimizing..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan filament:assets

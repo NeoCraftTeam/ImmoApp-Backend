@@ -17,8 +17,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class TourImageProxyController
 {
     /**
-     * Stream a tour image from R2 with CORS headers so Pannellum
-     * (which fetches images via XHR) can load them from any origin.
+     * Stream a tour image from R2 with CORS headers so Photo Sphere Viewer
+     * and other XHR-based clients can load them from any origin.
      *
      * Route: GET /tour-image/{adId}/{path}
      * The {path} parameter may contain slashes (e.g. tile paths: scenes/x/tiles/1/f0_0.webp)
@@ -107,7 +107,7 @@ class TourImageProxyController
             return response('Not Found', 404, ProxyCorsHeaders::for($request));
         }
 
-        // Always stream instead of redirecting to R2. Pannellum loads images via XHR;
+        // Always stream instead of redirecting to R2. The viewer loads images via XHR;
         // a redirect to R2 would return a response without CORS headers, causing
         // "The file could not be accessed" in the hotspot editor.
         $mime = $disk->mimeType($r2path) ?: 'image/webp';

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Ad;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -18,10 +19,18 @@ class TourService
     private const int EXIFTOOL_TIMEOUT_SECONDS = 10;
 
     /**
+     * Get the configured tour storage disk.
+     */
+    private function disk(): Filesystem
+    {
+        return Storage::disk(config('filesystems.tour_disk', config('filesystems.default')));
+    }
+
+    /**
      * Extract GPano XMP metadata from a panoramic image file.
      *
      * Uses exiftool to read the standard Google Photo Sphere (GPano) metadata
-     * and computes haov / vaov / vOffset for Pannellum.
+     * and computes haov / vaov / vOffset for the tour JSON consumed by Photo Sphere Viewer.
      *
      * @return array{haov: float, vaov: float, vOffset: float, is_partial: bool}
      */
@@ -166,7 +175,7 @@ class TourService
         $filename = "{$slug}-".time().'.'.$file->getClientOriginalExtension();
         $path = "ads/{$ad->id}/tours/{$filename}";
 
-        Storage::disk()->put($path, file_get_contents($file->getRealPath()));
+        $this->disk()->put($path, file_get_contents($file->getRealPath()));
 
         return [
             'id' => 'scene_'.Str::slug($sceneTitle).'_'.Str::random(4),
@@ -209,8 +218,8 @@ class TourService
             return;
         }
 
-        Storage::disk()->deleteDirectory("ads/{$ad->id}/tours");
-        Storage::disk()->deleteDirectory("tours/{$ad->id}");
+        $this->disk()->deleteDirectory("ads/{$ad->id}/tours");
+        $this->disk()->deleteDirectory("tours/{$ad->id}");
 
         $ad->update([
             'has_3d_tour' => false,

@@ -93,6 +93,12 @@ print_step "Migration de la base de données"
 php artisan migrate --force
 print_success "Migrations exécutées"
 
+# 4b. Meilisearch / Scout (nécessite Meilisearch joignable et SCOUT_DRIVER=meilisearch)
+print_step "Synchronisation des index Meilisearch (Scout)"
+php artisan scout:sync-index-settings
+php artisan scout:import "App\Models\Ad"
+print_success "Index Scout synchronisés"
+
 # 5. Génération de L5 Swagger
 print_step "Génération de la documentation L5 Swagger"
 php artisan l5-swagger:generate

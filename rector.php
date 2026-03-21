@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Rector\Config\RectorConfig;
-use RectorLaravel\Set\LaravelSetProvider;
 
 return RectorConfig::configure()
     ->withPaths([
@@ -22,6 +21,4 @@ return RectorConfig::configure()
     ->withPhpSets(php84: true)
     ->withTypeCoverageLevel(0)
     ->withDeadCodeLevel(10)
-    ->withCodeQualityLevel(10)
-    ->withSetProviders(LaravelSetProvider::class)
-    ->withComposerBased(laravel: true);
+    ->withCodeQualityLevel(10);

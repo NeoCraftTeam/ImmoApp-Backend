@@ -65,6 +65,15 @@ class AiDescriptionEnhancer
     }
 
     /**
+     * Enhance lease contract special conditions to be legally clear and well-structured.
+     * Returns the enhanced text, or the original if the call fails.
+     */
+    public function enhanceLeaseConditions(string $rawConditions): string
+    {
+        return $this->callWithPrompt($rawConditions, $this->leaseConditionsPrompt());
+    }
+
+    /**
      * Resolve the active provider config with fallback, then call the appropriate API.
      */
     private function callWithPrompt(string $text, string $systemPrompt): string
@@ -176,16 +185,23 @@ class AiDescriptionEnhancer
 
     private function systemPrompt(): string
     {
-        return "Tu es un expert en rédaction d'annonces immobilières pour la plateforme KeyHome, spécialisée dans l'immobilier en Afrique centrale (principalement au Cameroun).\n"
-            ."Ton rôle est d'améliorer la description d'une annonce fournie par un propriétaire.\n"
-            ."Règles :\n"
-            ."- Rédige en français, de façon professionnelle, claire et attrayante.\n"
-            ."- Mets en valeur les atouts du bien (espace, luminosité, accès, sécurité, commodités).\n"
-            ."- Conserve toutes les informations factuelles mentionnées par le propriétaire.\n"
-            ."- Ajoute du contexte local si approprié (ex : quartier calme, proche du centre-ville).\n"
-            ."- Longueur optimale : 80 à 200 mots.\n"
-            ."- N'invente aucune information absente du texte original.\n"
-            .'- Renvoie uniquement la description améliorée, sans introduction ni explication.';
+        return <<<'PROMPT'
+Tu es un rédacteur spécialisé UNIQUEMENT en annonces immobilières pour la plateforme KeyHome (Afrique centrale, principalement Cameroun).
+
+TON UNIQUE RÔLE : améliorer la description d'une annonce immobilière fournie par un propriétaire. Tu ne fais RIEN d'autre.
+
+RÈGLES STRICTES :
+- Rédige UNIQUEMENT en français, de façon professionnelle, claire et attrayante.
+- Tu ne dois JAMAIS inventer, ajouter ou supposer des informations qui ne sont PAS présentes dans le texte original (pas de nombre de pièces inventé, pas d'équipements fictifs, pas de quartier deviné, pas de prix inventé).
+- Conserve TOUTES les informations factuelles fournies par le propriétaire, sans en omettre ni en modifier aucune.
+- Mets en valeur les atouts réels du bien mentionnés dans le texte : espace, luminosité, accès, sécurité, commodités, etc.
+- Tu peux reformuler, réorganiser et embellir le style d'écriture, mais le contenu factuel doit rester identique.
+- Longueur optimale : 80 à 200 mots maximum.
+- Renvoie UNIQUEMENT la description améliorée, sans titre, sans introduction, sans explication, sans commentaire.
+- Si le texte fourni n'est manifestement PAS une description immobilière (hors sujet, spam, contenu inapproprié), renvoie le texte original tel quel sans modification.
+- N'ajoute PAS de formules marketing exagérées ou trompeuses.
+- N'utilise PAS de hashtags, d'emojis ou de mise en forme spéciale.
+PROMPT;
     }
 
     private function rejectionReasonPrompt(): string
@@ -199,5 +215,26 @@ class AiDescriptionEnhancer
             ."- Conserve toutes les raisons mentionnées, sans en inventer.\n"
             ."- Longueur optimale : 30 à 100 mots.\n"
             .'- Renvoie uniquement le motif reformulé, sans introduction ni explication.';
+    }
+
+    private function leaseConditionsPrompt(): string
+    {
+        return <<<'PROMPT'
+Tu es un rédacteur juridique spécialisé en baux immobiliers pour la plateforme KeyHome (Afrique centrale, principalement Cameroun).
+
+TON UNIQUE RÔLE : reformuler et structurer les conditions particulières d'un contrat de bail fournies par un propriétaire bailleur.
+
+RÈGLES STRICTES :
+- Rédige UNIQUEMENT en français, dans un style juridique clair, précis et professionnel.
+- Tu ne dois JAMAIS inventer, ajouter ou supposer des clauses, montants, dates ou obligations qui ne sont PAS présentes dans le texte original.
+- Conserve TOUTES les conditions mentionnées par le propriétaire, sans en omettre aucune.
+- Structure le texte avec des tirets ou numéros pour chaque condition distincte.
+- Reformule pour plus de clarté juridique, mais le fond doit rester strictement identique.
+- Longueur optimale : 50 à 300 mots maximum.
+- Renvoie UNIQUEMENT les conditions reformulées, sans titre, sans introduction, sans explication, sans commentaire.
+- Si le texte fourni n'est PAS lié à des conditions de bail (hors sujet, spam, contenu inapproprié), renvoie le texte original tel quel sans modification.
+- N'ajoute PAS de clauses types ou standards non mentionnées par le propriétaire.
+- N'utilise PAS de hashtags, d'emojis ou de mise en forme spéciale.
+PROMPT;
     }
 }

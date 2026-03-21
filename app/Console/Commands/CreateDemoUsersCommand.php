@@ -64,14 +64,21 @@ class CreateDemoUsersCommand extends Command
         $agencyService = app(AgencyService::class);
         $created = 0;
         $skipped = 0;
+        $synced = 0;
 
         foreach (self::USERS as $data) {
             $email = $data['email'];
             $existing = User::withTrashed()->where('email', $email)->first();
 
             if ($existing) {
-                $this->warn(" {$email} already exists (ID: {$existing->id}). Skipping.");
-                $skipped++;
+                $syncedUser = $this->syncExistingUser($existing, $data, $agencyService);
+                if ($syncedUser) {
+                    $this->info("  🔄 {$email} role/agency synced.");
+                    $synced++;
+                } else {
+                    $this->warn("  {$email} already exists (ID: {$existing->id}). Skipping.");
+                    $skipped++;
+                }
 
                 continue;
             }
@@ -91,9 +98,53 @@ class CreateDemoUsersCommand extends Command
         }
 
         $this->newLine();
-        $this->info("Done. Created: {$created}, Skipped: {$skipped}.");
+        $this->info("Done. Created: {$created}, Synced: {$synced}, Skipped: {$skipped}.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Sync existing user to ensure correct role and agency. Returns true if changes were made.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function syncExistingUser(User $user, array $data, AgencyService $agencyService): bool
+    {
+        $expectedRole = $data['role'];
+        $isBailleur = !empty($data['is_bailleur'] ?? false);
+        $hasAgencyName = !empty($data['agency_name'] ?? null);
+
+        $needsSync = false;
+
+        if ($isBailleur) {
+            if ($user->role !== UserRole::AGENT
+                || $user->type !== UserType::INDIVIDUAL
+                || $user->agency_id === null) {
+                $needsSync = true;
+            }
+        } elseif ($hasAgencyName) {
+            if ($user->role !== UserRole::AGENT || $user->type !== UserType::AGENCY || $user->agency_id === null) {
+                $needsSync = true;
+            }
+        } elseif ($user->role !== $expectedRole) {
+            $needsSync = true;
+        }
+
+        if (!$needsSync) {
+            return false;
+        }
+
+        DB::transaction(function () use ($user, $data, $agencyService, $isBailleur, $hasAgencyName): void {
+            if ($isBailleur) {
+                $agencyService->promoteToBailleur($user);
+            } elseif ($hasAgencyName) {
+                $agencyService->promoteToAgency($user, $data['agency_name']);
+            } else {
+                $user->forceFill(['role' => $data['role']])->save();
+            }
+        });
+
+        return true;
     }
 
     /**

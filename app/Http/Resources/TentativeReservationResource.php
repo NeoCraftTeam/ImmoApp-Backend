@@ -31,7 +31,7 @@ final class TentativeReservationResource extends JsonResource
 
             'ad' => new AdResource($this->whenLoaded('ad')),
             'client' => $this->when(
-                $request->user()?->id === $this->ad->user_id,
+                $this->relationLoaded('ad') && $request->user()?->id === $this->ad->user_id,
                 fn () => new UserResource($this->whenLoaded('client'))
             ),
 

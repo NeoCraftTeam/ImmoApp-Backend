@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\UserRole;
+use App\Enums\UserType;
 use App\Http\Requests\Api\V1\ClerkExchangeRequest;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
+use App\Mail\BailleurWelcomeEmail;
 use App\Mail\NewDeviceSignInMail;
 use App\Mail\NewLocationSignInMail;
 use App\Mail\PasswordChangedMail;
@@ -1772,12 +1774,20 @@ final class AuthController
         $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         Cache::put('clerk_otp_'.$clerkId, $otp, now()->addMinutes(10));
-        Cache::put('clerk_pending_'.$clerkId, [
+
+        $existingPending = Cache::get('clerk_pending_'.$clerkId, []);
+        $requestedIntent = $request->input('registration_intent');
+        $registrationIntent = in_array($requestedIntent, ['customer', 'agent'], true)
+            ? $requestedIntent
+            : ($existingPending['registration_intent'] ?? 'customer');
+
+        Cache::put('clerk_pending_'.$clerkId, array_merge($existingPending, [
             'firstname' => $firstName,
             'lastname' => $lastName,
             'email' => $email,
             'avatar' => $avatar,
-        ], now()->addMinutes(15));
+            'registration_intent' => $registrationIntent,
+        ]), now()->addMinutes(15));
 
         if ($email !== null) {
             $requestedFrom = request()->ip() ?? 'inconnu';
@@ -1959,7 +1969,7 @@ final class AuthController
             return response()->json(['message' => 'Le numéro de téléphone est obligatoire.'], 422);
         }
 
-        /** @var array{firstname?: string, lastname?: string, email?: string|null, avatar?: string|null} $pending */
+        /** @var array{firstname?: string, lastname?: string, email?: string|null, avatar?: string|null, registration_intent?: string} $pending */
         $pending = Cache::get('clerk_pending_'.$clerkId, []);
         $firstName = (string) ($pending['firstname'] ?? $clerkUser['first_name'] ?? 'Utilisateur');
         $lastName = (string) ($pending['lastname'] ?? $clerkUser['last_name'] ?? '');
@@ -1990,6 +2000,10 @@ final class AuthController
         $isNew = false;
 
         if ($user === null) {
+            $registrationIntent = ($pending['registration_intent'] ?? 'customer') === 'agent' ? 'agent' : 'customer';
+            $role = $registrationIntent === 'agent' ? UserRole::AGENT : UserRole::CUSTOMER;
+            $type = UserType::INDIVIDUAL;
+
             $user = new User;
             $user->fill([
                 'clerk_id' => $clerkId,
@@ -2001,7 +2015,8 @@ final class AuthController
                 'avatar' => $avatar,
             ]);
             $user->forceFill([
-                'role' => UserRole::CUSTOMER,
+                'role' => $role,
+                'type' => $type,
                 'is_active' => true,
                 'email_verified_at' => now(),
             ]);
@@ -2010,7 +2025,11 @@ final class AuthController
             $isNew = true;
 
             if ($email !== null && !str_ends_with((string) $email, '@clerk.local')) {
-                Mail::to($email, $firstName)->queue(new WelcomeEmail($user));
+                if ($role === UserRole::AGENT) {
+                    Mail::to($email, $firstName)->queue(new BailleurWelcomeEmail($user));
+                } else {
+                    Mail::to($email, $firstName)->queue(new WelcomeEmail($user));
+                }
             }
         } else {
             if ($user->clerk_id === null) {

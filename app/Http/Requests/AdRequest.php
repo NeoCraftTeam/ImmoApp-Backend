@@ -18,6 +18,19 @@ final class AdRequest extends FormRequest
 {
     use TransformsGeojsonGeometry;
 
+    /**
+     * Laravel `max` rule for uploaded files is in kilobytes (binary KiB).
+     * 20 MiB = 20 * 1024 = 20480.
+     */
+    private const int MAX_IMAGE_KILOBYTES = 20480;
+
+    private function imageFileRule(bool $sometimes = false): string
+    {
+        $core = 'image|mimes:jpeg,jpg,png,gif,webp|max:'.self::MAX_IMAGE_KILOBYTES;
+
+        return $sometimes ? 'sometimes|'.$core : $core;
+    }
+
     public function rules(): array
     {
 
@@ -81,24 +94,24 @@ final class AdRequest extends FormRequest
 
                 // Images,   plusieurs formats possibles
                 'images' => 'sometimes|array|max:10',
-                'images.*' => 'image|mimes:jpeg,jpg,png,gif,webp|max:5120', // 5MB max
+                'images.*' => $this->imageFileRule(false),
 
                 // Alias populaires (acceptation de variations courantes)
-                'image' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'image' => $this->imageFileRule(true),
                 'photos' => 'sometimes|array|max:10',
-                'photos.*' => 'image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'photos.*' => $this->imageFileRule(false),
 
                 // Support pour images[0], images[1], etc.
-                'images.0' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.1' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.2' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.3' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.4' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.5' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.6' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.7' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.8' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.9' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.0' => $this->imageFileRule(true),
+                'images.1' => $this->imageFileRule(true),
+                'images.2' => $this->imageFileRule(true),
+                'images.3' => $this->imageFileRule(true),
+                'images.4' => $this->imageFileRule(true),
+                'images.5' => $this->imageFileRule(true),
+                'images.6' => $this->imageFileRule(true),
+                'images.7' => $this->imageFileRule(true),
+                'images.8' => $this->imageFileRule(true),
+                'images.9' => $this->imageFileRule(true),
                 'attributes' => ['sometimes', 'array'],
                 'attributes.*' => [
                     'string',
@@ -143,27 +156,27 @@ final class AdRequest extends FormRequest
 
                 // Images, plusieurs formats possibles
                 'images' => 'sometimes|array|max:10',
-                'images.*' => 'image|mimes:jpeg,jpg,png,gif,webp|max:5120', // 5MB max
+                'images.*' => $this->imageFileRule(false),
 
                 'images_to_delete' => 'sometimes|array',
                 'images_to_delete.*' => 'exists:media,id',
 
                 // Alias populaires (acceptation de variations courantes)
-                'image' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'image' => $this->imageFileRule(true),
                 'photos' => 'sometimes|array|max:10',
-                'photos.*' => 'image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'photos.*' => $this->imageFileRule(false),
 
                 // Support pour images[0], images[1], etc.
-                'images.0' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.1' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.2' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.3' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.4' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.5' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.6' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.7' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.8' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.9' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.0' => $this->imageFileRule(true),
+                'images.1' => $this->imageFileRule(true),
+                'images.2' => $this->imageFileRule(true),
+                'images.3' => $this->imageFileRule(true),
+                'images.4' => $this->imageFileRule(true),
+                'images.5' => $this->imageFileRule(true),
+                'images.6' => $this->imageFileRule(true),
+                'images.7' => $this->imageFileRule(true),
+                'images.8' => $this->imageFileRule(true),
+                'images.9' => $this->imageFileRule(true),
             ];
         }
 
@@ -178,6 +191,12 @@ final class AdRequest extends FormRequest
     #[\Override]
     public function messages(): array
     {
+        $imageMaxMessage = 'Chaque image ne doit pas dépasser 20 Mo.';
+        $indexedImageMaxMessages = [];
+        foreach (range(0, 9) as $i) {
+            $indexedImageMaxMessages["images.{$i}.max"] = $imageMaxMessage;
+        }
+
         return [
             'title.required' => 'Le titre est obligatoire.',
             'description.required' => 'La description est obligatoire.',
@@ -197,10 +216,17 @@ final class AdRequest extends FormRequest
             'available_to.after_or_equal' => 'La date de fin de disponibilité doit être après ou égale à la date de début.',
             'attributes.*.in' => 'Un ou plusieurs attributs sélectionnés ne sont pas valides.',
 
-            'images.max' => 'You can upload a maximum of 10 images.',
-            'images.*.image' => 'Each file must be an image.',
-            'images.*.mimes' => 'Images must be in JPEG, PNG, GIF, or WebP format.',
-            'images.*.max' => 'Each image must not exceed 5MB.',
+            'images.max' => 'Vous pouvez téléverser au maximum 10 images.',
+            'images.*.image' => 'Chaque fichier doit être une image.',
+            'images.*.mimes' => 'Les images doivent être au format JPEG, PNG, GIF ou WebP.',
+            'images.*.max' => $imageMaxMessage,
+            'photos.*.image' => 'Chaque fichier doit être une image.',
+            'photos.*.mimes' => 'Les images doivent être au format JPEG, PNG, GIF ou WebP.',
+            'photos.*.max' => $imageMaxMessage,
+            'image.image' => 'Le fichier doit être une image.',
+            'image.mimes' => 'L’image doit être au format JPEG, PNG, GIF ou WebP.',
+            'image.max' => $imageMaxMessage,
+            ...$indexedImageMaxMessages,
 
         ];
     }
