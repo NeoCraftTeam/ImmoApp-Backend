@@ -21,9 +21,12 @@ use App\Services\ReservationService;
 use App\Services\ViewingScheduleService;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -47,6 +50,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->configureRateLimiting();
         $this->ensureLivewireTmpDirectoryExists();
 
         // Prevent N+1 queries in dev/testing — throws exception on lazy loading
@@ -107,6 +111,23 @@ class AppServiceProvider extends ServiceProvider
         });
 
         Gate::define('viewPulse', fn (?User $user = null) => $user?->isAdmin() ?? false);
+    }
+
+    private function configureRateLimiting(): void
+    {
+        RateLimiter::for('api', function (Request $request) {
+            $user = $request->user();
+
+            if (!$user) {
+                return Limit::perMinute(60)->by($request->ip());
+            }
+
+            return match ($user->role) {
+                UserRole::ADMIN => Limit::none(),
+                UserRole::AGENT => Limit::perMinute(300)->by($user->id),
+                default => Limit::perMinute(120)->by($user->id),
+            };
+        });
     }
 
     private function ensureLivewireTmpDirectoryExists(): void
