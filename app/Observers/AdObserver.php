@@ -5,16 +5,9 @@ declare(strict_types=1);
 namespace App\Observers;
 
 use App\Enums\AdStatus;
-use App\Enums\UserRole;
-use App\Jobs\MatchSearchAlertsForAdJob;
-use App\Mail\AdSubmissionConfirmationMail;
+use App\Events\AdCreated;
+use App\Events\AdStatusTransitioned;
 use App\Models\Ad;
-use App\Models\User;
-use App\Notifications\AdStatusChanged;
-use App\Notifications\NewAdPending;
-use App\Services\AdBoostService;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 
 class AdObserver
 {
@@ -35,40 +28,13 @@ class AdObserver
      */
     public function created(Ad $ad): void
     {
-        // Auto-boost if agency has active subscription
-        app(AdBoostService::class)->autoBoostIfEligible($ad);
-
-        if ($ad->status === AdStatus::AVAILABLE) {
-            MatchSearchAlertsForAdJob::dispatch($ad);
-        }
-
-        if ($ad->status === AdStatus::PENDING) {
-            // 1. Send confirmation to the author
-            if ($ad->user) {
-                try {
-                    Mail::to($ad->user)->send(new AdSubmissionConfirmationMail($ad));
-                } catch (\Throwable $e) {
-                    Log::error("Failed to send ad confirmation email to {$ad->user->email}: ".$e->getMessage());
-                }
-            }
-
-            // 2. Notify all admins (mail + Filament DB notification + WebPush)
-            $admins = User::where('role', UserRole::ADMIN)->get();
-            foreach ($admins as $admin) {
-                try {
-                    $admin->notify(new NewAdPending($ad));
-                } catch (\Throwable $e) {
-                    Log::error("Failed to send admin notification to {$admin->email} for new ad: ".$e->getMessage());
-                }
-            }
-        }
+        AdCreated::dispatch($ad);
     }
 
     /**
      * Handle the Ad "updated" event.
      *
-     * Notify the ad owner when their ad status changes (e.g. approved / rejected by admin).
-     * Also re-notify admins when a declined ad is resubmitted (status → PENDING).
+     * Dispatches AdStatusTransitioned when the status column changes.
      */
     public function updated(Ad $ad): void
     {
@@ -84,57 +50,6 @@ class AdObserver
             return;
         }
 
-        // Notify the owner of any status change —
-        // except DECLINED (owner already receives AdDeclinedMail with the reason)
-        // and PENDING (owner resubmitted themselves — no need to notify them of their own action).
-        $notifyOwner = !in_array($newStatus, [AdStatus::DECLINED, AdStatus::PENDING], true);
-
-        if ($notifyOwner && $ad->user) {
-            try {
-                $ad->user->notify(new AdStatusChanged($ad, $oldStatus, $newStatus));
-            } catch (\Throwable $e) {
-                Log::error("Failed to send AdStatusChanged notification for ad {$ad->id}: ".$e->getMessage());
-            }
-        }
-
-        // Re-notify admins when a declined ad is resubmitted for review
-        if ($newStatus === AdStatus::PENDING) {
-            $admins = User::where('role', UserRole::ADMIN)->get();
-            foreach ($admins as $admin) {
-                try {
-                    $admin->notify(new NewAdPending($ad));
-                } catch (\Throwable $e) {
-                    Log::error("Failed to send admin resubmission notification to {$admin->email}: ".$e->getMessage());
-                }
-            }
-        }
-
-        if ($newStatus === AdStatus::AVAILABLE) {
-            MatchSearchAlertsForAdJob::dispatch($ad);
-        }
-    }
-
-    /**
-     * Handle the Ad "deleted" event.
-     */
-    public function deleted(Ad $ad): void
-    {
-        //
-    }
-
-    /**
-     * Handle the Ad "restored" event.
-     */
-    public function restored(Ad $ad): void
-    {
-        //
-    }
-
-    /**
-     * Handle the Ad "force deleted" event.
-     */
-    public function forceDeleted(Ad $ad): void
-    {
-        //
+        AdStatusTransitioned::dispatch($ad, $oldStatus, $newStatus);
     }
 }

@@ -8,6 +8,8 @@ use App\Enums\AdStatus;
 use App\Enums\UserType;
 use App\Enums\VerificationStatus;
 use App\Exceptions\InvalidStatusTransitionException;
+use App\Models\Concerns\HasPropertyAttributes;
+use App\Models\Concerns\HasVisibility;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\AdFactory;
 use Eloquent;
@@ -17,8 +19,6 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
 /**
  * @property-read Quarter|null $quarter
  * @property-read User|null $user
@@ -75,6 +75,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  *
  * @mixin Eloquent
  */
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -90,7 +92,7 @@ use Zap\Models\Concerns\HasSchedules;
 class Ad extends Model implements HasMedia
 {
     use HasFactory, HasSchedules, HasUuids, LogsActivity, SoftDeletes;
-    use InteractsWithMedia, Searchable;
+    use HasPropertyAttributes, HasVisibility, InteractsWithMedia, Searchable;
 
     /**
      * Statuses that are visible on the public frontend.
@@ -616,30 +618,6 @@ class Ad extends Model implements HasMedia
     }
 
     /**
-     * Toggle ad visibility
-     */
-    public function toggleVisibility(): void
-    {
-        $this->update(['is_visible' => !$this->is_visible]);
-    }
-
-    /**
-     * Hide the ad
-     */
-    public function hide(): void
-    {
-        $this->update(['is_visible' => false]);
-    }
-
-    /**
-     * Show the ad
-     */
-    public function show(): void
-    {
-        $this->update(['is_visible' => true]);
-    }
-
-    /**
      * Set availability period
      */
     public function setAvailability(?\DateTimeInterface $from = null, ?\DateTimeInterface $to = null): void
@@ -647,42 +625,6 @@ class Ad extends Model implements HasMedia
         $this->update([
             'available_from' => $from,
             'available_to' => $to,
-        ]);
-    }
-
-    /**
-     * Check if ad has a specific property attribute
-     */
-    public function hasPropertyAttribute(string $attribute): bool
-    {
-        $attributes = $this->getAttribute('attributes') ?? [];
-
-        return in_array($attribute, $attributes, true);
-    }
-
-    /**
-     * Add attributes to the ad
-     *
-     * @param  array<string>  $newAttributes
-     */
-    public function addPropertyAttributes(array $newAttributes): void
-    {
-        $currentAttributes = $this->getAttribute('attributes') ?? [];
-        $this->update([
-            'attributes' => array_unique(array_merge($currentAttributes, $newAttributes)),
-        ]);
-    }
-
-    /**
-     * Remove attributes from the ad
-     *
-     * @param  array<string>  $attributesToRemove
-     */
-    public function removePropertyAttributes(array $attributesToRemove): void
-    {
-        $currentAttributes = $this->getAttribute('attributes') ?? [];
-        $this->update([
-            'attributes' => array_values(array_diff($currentAttributes, $attributesToRemove)),
         ]);
     }
 

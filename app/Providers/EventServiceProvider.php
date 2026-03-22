@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-// use App\Listeners\SendEmailVerificationNotification;
+use App\Events\AdCreated;
+use App\Events\AdStatusTransitioned;
+use App\Listeners\AutoBoostNewAd;
+use App\Listeners\MatchSearchAlertsOnAdAvailable;
+use App\Listeners\NotifyAdminsOfPendingAd;
+use App\Listeners\NotifyOwnerOfStatusChange;
 use App\Listeners\SendBackupByEmailListener;
 use App\Listeners\SendWelcomeNotification;
-use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use SocialiteProviders\Apple\AppleExtendSocialite;
@@ -22,11 +26,6 @@ class EventServiceProvider extends ServiceProvider
      * @var array<class-string, array<int, class-string|string>>
      */
     protected $listen = [
-        // Événement déclenché après l'inscription
-        // Registered::class => [
-        //     SendEmailVerificationNotification::class,
-        // ],
-
         // Événement déclenché après vérification email
         Verified::class => [
             SendWelcomeNotification::class,
@@ -40,6 +39,19 @@ class EventServiceProvider extends ServiceProvider
         // Backup: send zip by email when enabled
         BackupZipWasCreated::class => [
             SendBackupByEmailListener::class,
+        ],
+
+        // Ad lifecycle events
+        AdCreated::class => [
+            AutoBoostNewAd::class,
+            NotifyAdminsOfPendingAd::class,
+            MatchSearchAlertsOnAdAvailable::class,
+        ],
+
+        AdStatusTransitioned::class => [
+            NotifyOwnerOfStatusChange::class,
+            NotifyAdminsOfPendingAd::class,
+            MatchSearchAlertsOnAdAvailable::class,
         ],
     ];
 
