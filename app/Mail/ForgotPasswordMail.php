@@ -26,7 +26,7 @@ class ForgotPasswordMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Réinitialisation de votre mot de passe '.config('app.name'),
+            subject: __('emails.forgot_password.subject', ['app' => config('app.name')]),
         );
     }
 

@@ -25,7 +25,7 @@ class VerificationCodeMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: $this->otpCode.' est votre code de vérification '.config('app.name'),
+            subject: __('emails.verification_code.subject', ['code' => $this->otpCode, 'app' => config('app.name')]),
         );
     }
 

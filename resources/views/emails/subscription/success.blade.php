@@ -1,6 +1,6 @@
 @extends('emails.layout')
 
-@section('title', 'Abonnement activé — ' . config('app.name'))
+@section('title', __('emails.subscription_success.title', ['app' => config('app.name')]))
 
 @section('content')
     <style>
@@ -74,45 +74,45 @@
         }
     </style>
 
-    <h1>Abonnement activé 🎉</h1>
+    <h1>{{ __('emails.subscription_success.heading') }}</h1>
 
     <div style="text-align: center; margin-top: 20px;">
-        <span class="status-badge">✓ Paiement confirmé</span>
+        <span class="status-badge">{{ __('emails.subscription_success.badge') }}</span>
     </div>
 
-    <p class="text">Bonjour l'équipe <strong>{{ $agencyName }}</strong>,</p>
-    <p class="text">Nous avons le plaisir de vous confirmer l'activation de votre abonnement. Merci pour votre confiance !</p>
+    <p class="text">{{ __('emails.subscription_success.greeting', ['agency' => $agencyName]) }}</p>
+    <p class="text">{{ __('emails.subscription_success.intro') }}</p>
 
     <div style="text-align: center; margin-top: 24px;">
-        <div class="amount-label">Montant payé</div>
+        <div class="amount-label">{{ __('emails.subscription_success.amount_label') }}</div>
         <div class="amount-display">{{ $amount }} FCFA</div>
     </div>
 
     <div class="detail-card">
-        <h3>📋 Détails de l'abonnement</h3>
+        <h3>📋 {{ __('emails.subscription_success.details_heading') }}</h3>
         <table>
             <tr>
-                <td>Plan</td>
+                <td>{{ __('emails.subscription_success.plan') }}</td>
                 <td>{{ $planName }}</td>
             </tr>
             <tr>
-                <td>Période</td>
+                <td>{{ __('emails.subscription_success.period') }}</td>
                 <td>{{ $period }}</td>
             </tr>
             <tr>
-                <td>Valide jusqu'au</td>
+                <td>{{ __('emails.subscription_success.valid_until') }}</td>
                 <td>{{ $endsAt }}</td>
             </tr>
             <tr>
-                <td>Avantages</td>
-                <td>Boost + limites augmentées</td>
+                <td>{{ __('emails.subscription_success.benefits') }}</td>
+                <td>{{ __('emails.subscription_success.benefits_value') }}</td>
             </tr>
         </table>
     </div>
 
     <div class="btn-wrapper">
-        <a href="{{ config('app.url') . '/agency' }}" class="btn">Accéder à mon tableau de bord</a>
+        <a href="{{ config('app.url') . '/agency' }}" class="btn">{{ __('emails.subscription_success.dashboard_cta') }}</a>
     </div>
 
-    <p class="text">Merci d'avoir choisi {{ config('app.name') }} pour développer votre activité !</p>
+    <p class="text">{{ __('emails.subscription_success.closing', ['app' => config('app.name')]) }}</p>
 @endsection

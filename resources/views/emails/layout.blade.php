@@ -1,10 +1,12 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="{{ app()->getLocale() }}">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="color-scheme" content="light dark">
+    <meta name="supported-color-schemes" content="light dark">
     <title>@yield('title', config('app.name'))</title>
     <style>
         * {
@@ -172,6 +174,61 @@
                 letter-spacing: 6px;
             }
         }
+
+        /* Dark mode — Apple Mail, Outlook iOS/Mac, Yahoo Mail */
+        @media (prefers-color-scheme: dark) {
+            body, .wrapper {
+                background-color: #1a1a2e !important;
+                color: #e2e8f0 !important;
+            }
+            .container {
+                background-color: #16213e !important;
+                border-color: #2d3748 !important;
+            }
+            .header {
+                background-color: #16213e !important;
+                border-bottom-color: #2d3748 !important;
+            }
+            .block {
+                background-color: #16213e !important;
+            }
+            h1 {
+                color: #f1f5f9 !important;
+            }
+            .text, p {
+                color: #cbd5e1 !important;
+            }
+            .otp-box {
+                background-color: #1a1a2e !important;
+                border-color: #F6475F !important;
+            }
+            .otp-label {
+                color: #94a3b8 !important;
+            }
+            .footer {
+                background-color: #0f172a !important;
+                border-top-color: #2d3748 !important;
+                color: #64748b !important;
+            }
+            .footer a {
+                color: #94a3b8 !important;
+            }
+            .link {
+                color: #ff6b6b !important;
+            }
+            .fallback {
+                color: #64748b !important;
+            }
+        }
+
+        /* Gmail dark mode — uses [data-ogsc] or u + .body selectors */
+        [data-ogsc] .wrapper,
+        [data-ogsc] body {
+            background-color: #1a1a2e !important;
+        }
+        [data-ogsc] .container {
+            background-color: #16213e !important;
+        }
     </style>
 </head>
 
@@ -198,11 +255,19 @@
             </div>
 
             <div class="footer">
-                <p>© {{ date('Y') }} {{ config('app.name') }}. Tous droits réservés.</p>
+                <p>&copy; {{ date('Y') }} {{ config('app.name') }}. {{ __('emails.layout.rights') }}</p>
                 <p style="margin-top: 6px;">
-                    Vous recevez cet email car vous êtes inscrit sur
-                    <a href="{{ config('app.url') }}">{{ config('app.name') }}</a>.
+                    {{ __('emails.layout.receiving_reason', ['app' => config('app.name')]) }}
                 </p>
+                @isset($unsubscribeUrl)
+                    <p style="margin-top: 8px;">
+                        <a href="{{ $unsubscribeUrl }}">{{ __('emails.layout.unsubscribe') }}</a>
+                        @isset($preferencesUrl)
+                            &nbsp;|&nbsp;
+                            <a href="{{ $preferencesUrl }}">{{ __('emails.layout.manage_preferences') }}</a>
+                        @endisset
+                    </p>
+                @endisset
             </div>
 
         </div>
