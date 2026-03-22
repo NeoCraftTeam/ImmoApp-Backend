@@ -28,6 +28,7 @@ class FlutterwaveInitiateRequest extends FormRequest
                 'uuid',
             ],
             'period' => ['required_if:type,subscription', 'nullable', 'string', 'in:monthly,yearly'],
+            'promo_code' => ['nullable', 'string', 'max:50'],
         ];
     }
 

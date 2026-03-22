@@ -16,6 +16,8 @@ use App\Mail\CreditPurchaseConfirmationMail;
 use App\Models\Agency;
 use App\Models\Payment;
 use App\Models\PointPackage;
+use App\Models\PromoCode;
+use App\Models\PromoCodeUsage;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\Payment\PaymentService;
@@ -83,6 +85,17 @@ final class PaymentController
             ], 422);
         }
 
+        $appliedPromoCode = null;
+
+        if (!empty($validated['promo_code'])) {
+            $promoCode = PromoCode::where('code', strtoupper((string) $validated['promo_code']))->first();
+
+            if ($promoCode && $promoCode->isValidForUser($user, $type)) {
+                $amount = max(0.0, $amount - $promoCode->calculateDiscount($amount));
+                $appliedPromoCode = $promoCode;
+            }
+        }
+
         $description = match ($type) {
             'subscription' => 'Abonnement agence',
             'credit' => 'Achat de crédits',
@@ -103,6 +116,15 @@ final class PaymentController
                 'package_id' => ($type === 'credit') ? ($validated['plan_id'] ?? null) : null,
             ],
         ]);
+
+        if ($appliedPromoCode !== null) {
+            PromoCodeUsage::create([
+                'promo_code_id' => $appliedPromoCode->id,
+                'user_id' => $user->id,
+                'payment_id' => $result['payment']->id,
+            ]);
+            $appliedPromoCode->increment('used_count');
+        }
 
         return response()->json([
             'reference' => $result['payment']->id,
@@ -324,6 +346,61 @@ final class PaymentController
             return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
         } catch (PaymentGatewayException|\Exception $e) {
             Log::error('Flutterwave webhook error: '.$e->getMessage());
+
+            return response()->json(['status' => 'error'], 500);
+        }
+
+        return response()->json(['status' => 'ok']);
+    }
+
+    /**
+     * Handle FedaPay webhook (transaction.approved event).
+     *
+     * Validates the X-FEDAPAY-SIGNATURE header and processes the payment update.
+     *
+     * @OA\Post(
+     *     path="/api/v1/webhooks/fedapay",
+     *     summary="Webhook FedaPay",
+     *     tags={"💰 Paiements"},
+     *
+     *     @OA\Response(response=200, description="Webhook traité"),
+     *     @OA\Response(response=401, description="Signature invalide")
+     * )
+     */
+    public function fedapayWebhook(Request $request): JsonResponse
+    {
+        Log::info('--- WEBHOOK FEDAPAY START ---');
+
+        $payload = $request->all();
+        $headers = [
+            'x-fedapay-signature' => (string) $request->header('x-fedapay-signature', ''),
+        ];
+
+        try {
+            DB::transaction(function () use ($payload, $headers): void {
+                $this->paymentService->processWebhook($payload, $headers, 'fedapay');
+
+                $txRef = (string) ($payload['transaction']['custom_metadata']['tx_ref'] ?? '');
+                $status = (string) ($payload['event'] ?? '');
+
+                if ($txRef === '' || $status !== 'transaction.approved') {
+                    return;
+                }
+
+                $payment = Payment::where('transaction_id', $txRef)
+                    ->where('gateway', 'fedapay')
+                    ->first();
+
+                if (!$payment || !$payment->isPaid()) {
+                    return;
+                }
+
+                $this->handlePostPaymentActions($payment, $payload['transaction'] ?? []);
+            });
+        } catch (InvalidWebhookSignatureException) {
+            return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
+        } catch (PaymentGatewayException|\Exception $e) {
+            Log::error('FedaPay webhook error: '.$e->getMessage());
 
             return response()->json(['status' => 'error'], 500);
         }
