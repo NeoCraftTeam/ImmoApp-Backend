@@ -20,6 +20,7 @@ use Filament\PanelProvider;
 use Filament\Support\Assets\Js;
 use Filament\Support\Colors\Color;
 use Filament\Widgets\AccountWidget;
+use Hammadzafar05\MobileBottomNav\MobileBottomNav;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -88,6 +89,24 @@ class AgencyPanelProvider extends PanelProvider
             )
             ->renderHook(
                 'panels::head.end',
+                fn () => new HtmlString('
+                    <!-- Dynamic Island / Notch — viewport-fit=cover requis pour env(safe-area-inset-top) -->
+                    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+                    <style>
+                        .fi-topbar {
+                            padding-top: env(safe-area-inset-top) !important;
+                        }
+                        .fi-sidebar-header {
+                            padding-top: calc(env(safe-area-inset-top) + 1rem) !important;
+                        }
+                        body {
+                            padding-bottom: env(safe-area-inset-bottom);
+                        }
+                    </style>
+                '),
+            )
+            ->renderHook(
+                'panels::head.end',
                 fn () => new HtmlString('<style>.fi-no { z-index: 9999 !important; }</style>'),
             )
             ->renderHook(
@@ -107,6 +126,10 @@ class AgencyPanelProvider extends PanelProvider
                 Js::make('filament-native-bridge', resource_path('js/filament-native-bridge.js')),
             ])
             ->plugins([
+                MobileBottomNav::make()
+                    ->fromNavigation(5)
+                    ->moreButton(true)
+                    ->moreButtonLabel('Menu'),
                 FilamentSocialitePlugin::make()
                     ->providers([
                         Provider::make('google')

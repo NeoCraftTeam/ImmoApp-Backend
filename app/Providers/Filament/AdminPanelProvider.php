@@ -76,6 +76,23 @@ class AdminPanelProvider extends PanelProvider
                 fn () => view('pwa.head-meta', ['themeColor' => '#F6475F']),
             )
             ->renderHook(
+                'panels::head.end',
+                fn () => new HtmlString('
+                    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+                    <style>
+                        .fi-topbar {
+                            padding-top: env(safe-area-inset-top) !important;
+                        }
+                        .fi-sidebar-header {
+                            padding-top: calc(env(safe-area-inset-top) + 1rem) !important;
+                        }
+                        body {
+                            padding-bottom: env(safe-area-inset-bottom);
+                        }
+                    </style>
+                '),
+            )
+            ->renderHook(
                 'panels::body.end',
                 fn () => view('pwa.splash'),
             )
