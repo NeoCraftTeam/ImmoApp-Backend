@@ -19,14 +19,17 @@ use App\Http\Controllers\Api\V1\LeaseContractController;
 use App\Http\Controllers\Api\V1\MyAdsController;
 use App\Http\Controllers\Api\V1\MyReviewsController;
 use App\Http\Controllers\Api\V1\NaturalSearchController;
+use App\Http\Controllers\Api\V1\NewsletterController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\PriceHeatmapController;
+use App\Http\Controllers\Api\V1\PromoCodeController;
 use App\Http\Controllers\Api\V1\PropertyAttributeController;
 use App\Http\Controllers\Api\V1\PublicSurveyController;
 use App\Http\Controllers\Api\V1\PwaController;
 use App\Http\Controllers\Api\V1\QuarterController;
 use App\Http\Controllers\Api\V1\RecommendationController;
+use App\Http\Controllers\Api\V1\RefundController;
 use App\Http\Controllers\Api\V1\RentEstimatorController;
 use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\SearchAlertController;
@@ -38,8 +41,11 @@ use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\ViewingAvailabilityController;
 use App\Http\Controllers\Api\V1\ViewingReservationController;
 use App\Http\Controllers\Api\V1\VisitTrackingController;
+use App\Http\Controllers\EmailPreferenceController;
+use App\Http\Resources\TestimonialResource;
 use App\Models\Ad;
 use App\Models\City;
+use App\Models\Review;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
@@ -103,6 +109,10 @@ Route::prefix('v1')->group(function (): void {
                 Route::delete('{provider}/unlink', 'unlink')
                     ->where('provider', 'google|facebook|apple');
             });
+
+            // Confirm pending cross-provider link (unauthenticated — user has a token)
+            Route::post('confirm-link', 'confirmOAuthLink')
+                ->middleware('throttle:5,10');
         });
 
         // Routes protégées
@@ -110,6 +120,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('registerAdmin', [AuthController::class, 'registerAdmin'])
                 ->middleware('can:admin-access');
             Route::post('logout', [AuthController::class, 'logout']);
+            Route::post('logout-all', [AuthController::class, 'logoutAll']);
             Route::post('refresh', [AuthController::class, 'refresh']);
             Route::get('me', [AuthController::class, 'me']);
             Route::post('email/resend', [AuthController::class, 'resendVerificationEmail'])->middleware('auth:sanctum');
@@ -117,6 +128,9 @@ Route::prefix('v1')->group(function (): void {
             Route::post('onboarding-complete', [AuthController::class, 'completeOnboarding']);
             Route::post('track-home-visit', [AuthController::class, 'trackHomeVisit']);
             Route::patch('preferences', [AuthController::class, 'updatePreferences']);
+            Route::patch('locale', [AuthController::class, 'updateLocale']);
+            Route::get('email-preferences', [EmailPreferenceController::class, 'show']);
+            Route::patch('email-preferences', [EmailPreferenceController::class, 'apiUpdate']);
         });
     });
 
@@ -199,12 +213,39 @@ Route::prefix('v1')->group(function (): void {
         'users_count' => User::query()->count(),
     ]))->middleware('throttle:30,1');
 
+    // --- PUBLIC LANDING TESTIMONIALS ---
+    Route::get('/stats/testimonials', function () {
+        $reviews = Review::query()
+            ->whereNotNull('comment')
+            ->where('rating', '>=', 4)
+            ->with(['user.city'])
+            ->latest()
+            ->limit(8)
+            ->get();
+
+        $averageRating = round(
+            (float) (Review::query()->avg('rating') ?? 4.6),
+            1
+        );
+        $totalCount = Review::query()->count();
+
+        return response()->json([
+            'data' => TestimonialResource::collection($reviews),
+            'meta' => [
+                'average_rating' => $averageRating,
+                'total_count' => $totalCount,
+            ],
+        ]);
+    })->middleware('throttle:30,1');
+
     // --- CLERK WEBHOOKS ---
     Route::post('/clerk/webhook', [ClerkWebhookController::class, 'handle'])
         ->middleware('throttle:60,1');
 
     // --- WEBHOOKS PAIEMENT (pas d'auth, signature validée dans le controller) ---
     Route::post('/webhooks/flutterwave', [PaymentController::class, 'flutterwaveWebhook'])
+        ->middleware('throttle:120,1');
+    Route::post('/webhooks/fedapay', [PaymentController::class, 'fedapayWebhook'])
         ->middleware('throttle:120,1');
 
     // --- TOUR 3D (public read, protected write) ---
@@ -230,6 +271,14 @@ Route::prefix('v1')->group(function (): void {
             ->middleware('throttle:60,1');
     });
 
+    // --- REMBOURSEMENTS (ADMIN) ---
+    Route::middleware(['auth:sanctum', 'can:admin-access'])->prefix('admin/payments/{payment}')->group(function (): void {
+        Route::post('/refund', [RefundController::class, 'store'])
+            ->middleware('throttle:10,1');
+        Route::get('/refunds', [RefundController::class, 'index'])
+            ->middleware('throttle:30,1');
+    });
+
     // --- ABONNEMENTS AGENCES ---
     Route::get('/subscriptions/plans', [SubscriptionController::class, 'plans']);
     Route::middleware('auth:sanctum')->prefix('subscriptions')->group(function (): void {
@@ -238,6 +287,8 @@ Route::prefix('v1')->group(function (): void {
             ->middleware('throttle:5,1');
         Route::post('/cancel', [SubscriptionController::class, 'cancel'])
             ->middleware('throttle:5,1');
+        Route::patch('/auto-renew', [SubscriptionController::class, 'toggleAutoRenew'])
+            ->middleware('throttle:10,1');
         Route::get('/history', [SubscriptionController::class, 'history']);
     });
 
@@ -429,4 +480,13 @@ Route::prefix('v1')->group(function (): void {
     // --- NATURAL LANGUAGE SEARCH ---
     Route::post('/search/parse', [NaturalSearchController::class, 'parse'])
         ->middleware('throttle:30,1');
+
+    // --- NEWSLETTER ---
+    Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])
+        ->middleware('throttle:5,10');
+    Route::get('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'unsubscribe']);
+
+    // --- PROMO CODES ---
+    Route::middleware('auth:sanctum')->post('/promo-codes/validate', [PromoCodeController::class, 'validate'])
+        ->middleware('throttle:20,1');
 });
