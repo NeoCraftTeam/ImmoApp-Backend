@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\V1\Auth\EmailVerificationController;
 use App\Http\Controllers\Api\V1\TourController;
 use App\Http\Controllers\Auth\VerifyEmailController;
+use App\Http\Controllers\EmailPreferenceController;
 use App\Http\Controllers\MediaProxyController;
 use App\Http\Controllers\PanelSsoController;
 use App\Http\Controllers\PwaManifestController;
@@ -94,6 +95,19 @@ Route::get('/tour-image/{adId}/{path}', [TourImageProxyController::class, 'show'
 Route::get('/media-proxy/{uuid}', [MediaProxyController::class, 'show'])
     ->where('uuid', '[0-9a-f\-]+')
     ->name('media.proxy');
+
+// ── Email Preferences (public — accessed via token link in emails, no auth) ──
+Route::prefix('email')->group(function (): void {
+    Route::get('/unsubscribe/{token}', [EmailPreferenceController::class, 'unsubscribe'])
+        ->middleware('throttle:30,1')
+        ->name('email.unsubscribe');
+    Route::get('/preferences/{token}', [EmailPreferenceController::class, 'manage'])
+        ->middleware('throttle:30,1')
+        ->name('email.preferences');
+    Route::post('/preferences/{token}', [EmailPreferenceController::class, 'update'])
+        ->middleware('throttle:10,1')
+        ->name('email.preferences.update');
+});
 
 // ── Panel Tour Routes (web session auth — called from Filament Blade components) ──
 Route::middleware(['auth'])->prefix('panel-api/v1')->group(function (): void {

@@ -31,6 +31,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\DatabaseNotification;
@@ -166,8 +167,15 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'onboarding_completed_at',
         'last_home_visit_at',
         'preferences',
+        'locale',
         'registration_ip',
         'must_change_password_at',
+        // Pending OAuth link confirmation
+        'pending_oauth_provider',
+        'pending_oauth_id',
+        'pending_oauth_avatar',
+        'pending_oauth_token',
+        'pending_oauth_expires_at',
     ];
 
     /**
@@ -245,6 +253,11 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function ads(): HasMany
     {
         return $this->hasMany(Ad::class);
+    }
+
+    public function emailPreference(): HasOne
+    {
+        return $this->hasOne(EmailPreference::class);
     }
 
     public function agency(): BelongsTo
