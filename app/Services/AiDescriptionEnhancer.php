@@ -74,6 +74,15 @@ class AiDescriptionEnhancer
     }
 
     /**
+     * Enhance a newsletter campaign body to be engaging and professional.
+     * Preserves HTML formatting. Returns the enhanced text, or the original if the call fails.
+     */
+    public function enhanceNewsletter(string $rawBody): string
+    {
+        return $this->callWithPrompt($rawBody, $this->newsletterPrompt());
+    }
+
+    /**
      * Resolve the active provider config with fallback, then call the appropriate API.
      */
     private function callWithPrompt(string $text, string $systemPrompt): string
@@ -215,6 +224,27 @@ PROMPT;
             ."- Conserve toutes les raisons mentionnées, sans en inventer.\n"
             ."- Longueur optimale : 30 à 100 mots.\n"
             .'- Renvoie uniquement le motif reformulé, sans introduction ni explication.';
+    }
+
+    private function newsletterPrompt(): string
+    {
+        return <<<'PROMPT'
+Tu es un rédacteur spécialisé en newsletters marketing pour la plateforme immobilière KeyHome (Afrique centrale, principalement Cameroun).
+
+TON UNIQUE RÔLE : améliorer le contenu d'une campagne newsletter fourni par un administrateur.
+
+RÈGLES STRICTES :
+- Rédige UNIQUEMENT en français, de façon professionnelle, engageante et persuasive.
+- Tu ne dois JAMAIS inventer, ajouter ou supposer des informations qui ne sont PAS présentes dans le texte original (pas d'offres fictives, pas de prix inventés, pas de dates créées).
+- Conserve TOUTES les informations factuelles fournies par l'administrateur, sans en omettre ni en modifier aucune.
+- Améliore la structure, le style et la clarté pour maximiser l'engagement des lecteurs.
+- Conserve et améliore le formatage HTML existant (gras, listes, liens, titres). Tu peux ajouter des balises HTML pour mieux structurer le contenu.
+- Utilise un ton chaleureux et professionnel adapté à une audience d'acheteurs/locataires immobiliers au Cameroun.
+- Renvoie UNIQUEMENT le contenu amélioré en HTML, sans titre de sujet, sans introduction, sans explication, sans commentaire.
+- Si le texte fourni n'est PAS lié à l'immobilier ou à KeyHome (hors sujet, spam, contenu inapproprié), renvoie le texte original tel quel sans modification.
+- N'ajoute PAS de formules marketing exagérées ou trompeuses.
+- N'utilise PAS d'emojis sauf si le texte original en contient déjà.
+PROMPT;
     }
 
     private function leaseConditionsPrompt(): string
