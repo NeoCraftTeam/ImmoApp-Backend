@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Mail\Concerns\HasUnsubscribeLinks;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -14,12 +15,9 @@ use Illuminate\Queue\SerializesModels;
 
 class AdminWelcomeEmail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use HasUnsubscribeLinks, Queueable, SerializesModels;
 
-    public function __construct(public User $user)
-    {
-        //
-    }
+    public function __construct(public User $user) {}
 
     public function envelope(): Envelope
     {
@@ -32,7 +30,18 @@ class AdminWelcomeEmail extends Mailable implements ShouldQueue
     {
         return new Content(
             view: 'emails.admin-welcome',
+            with: $this->withUnsubscribe(),
         );
+    }
+
+    public function resolveRecipientUser(): ?User
+    {
+        return $this->user;
+    }
+
+    public function emailCategory(): string
+    {
+        return 'system';
     }
 
     public function attachments(): array

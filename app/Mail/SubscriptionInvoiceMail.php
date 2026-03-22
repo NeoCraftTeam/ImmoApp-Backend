@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Mail\Concerns\HasUnsubscribeLinks;
 use App\Models\Invoice;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
@@ -16,7 +17,7 @@ use Illuminate\Queue\SerializesModels;
 
 class SubscriptionInvoiceMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use HasUnsubscribeLinks, Queueable, SerializesModels;
 
     public function __construct(
         public User $user,
@@ -34,7 +35,18 @@ class SubscriptionInvoiceMail extends Mailable implements ShouldQueue
     {
         return new Content(
             view: 'emails.subscription.invoice',
+            with: $this->withUnsubscribe(),
         );
+    }
+
+    public function resolveRecipientUser(): ?User
+    {
+        return $this->user;
+    }
+
+    public function emailCategory(): string
+    {
+        return 'billing';
     }
 
     /**

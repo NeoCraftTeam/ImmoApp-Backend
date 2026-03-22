@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mail;
 
 use App\Models\Ad;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -15,6 +16,7 @@ use Illuminate\Support\Str;
 
 class AdDeclinedMail extends Mailable implements ShouldQueue
 {
+    use Concerns\HasUnsubscribeLinks;
     use Queueable, SerializesModels;
 
     /** Markdown reason rendered to safe HTML for the email template. */
@@ -46,11 +48,21 @@ class AdDeclinedMail extends Mailable implements ShouldQueue
     {
         return new Content(
             view: 'emails.ad_declined',
-            with: [
+            with: $this->withUnsubscribe([
                 'authorName' => $this->ad->user->firstname ?? 'Utilisateur',
                 'adTitle' => $this->ad->title,
                 'reasonHtml' => $this->reasonHtml,
-            ],
+            ]),
         );
+    }
+
+    protected function resolveRecipientUser(): ?User
+    {
+        return $this->ad->user;
+    }
+
+    protected function emailCategory(): string
+    {
+        return 'ad_updates';
     }
 }

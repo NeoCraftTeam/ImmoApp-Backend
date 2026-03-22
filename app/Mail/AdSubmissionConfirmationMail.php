@@ -13,6 +13,7 @@ use Illuminate\Queue\SerializesModels;
 
 class AdSubmissionConfirmationMail extends Mailable implements ShouldQueue
 {
+    use Concerns\HasUnsubscribeLinks;
     use Queueable, SerializesModels;
 
     public User $author;
@@ -48,10 +49,20 @@ class AdSubmissionConfirmationMail extends Mailable implements ShouldQueue
     {
         return new Content(
             view: 'emails.ad_submission_confirmation',
-            with: [
-                'authorName' => $this->author->firstname, // Close/personal salutation
+            with: $this->withUnsubscribe([
+                'authorName' => $this->author->firstname,
                 'adTitle' => $this->ad->title,
-            ],
+            ]),
         );
+    }
+
+    protected function resolveRecipientUser(): ?User
+    {
+        return $this->ad->user;
+    }
+
+    protected function emailCategory(): string
+    {
+        return 'ad_updates';
     }
 }

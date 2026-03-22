@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Mail\Concerns\HasUnsubscribeLinks;
 use App\Models\Ad;
 use App\Models\Payment;
 use App\Models\User;
@@ -18,7 +19,7 @@ use Illuminate\Queue\SerializesModels;
 
 class AdUnlockConfirmationMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use HasUnsubscribeLinks, Queueable, SerializesModels;
 
     public string $logoBase64 = '';
 
@@ -48,7 +49,18 @@ class AdUnlockConfirmationMail extends Mailable implements ShouldQueue
     {
         return new Content(
             view: 'emails.ad-unlock-confirmation',
+            with: $this->withUnsubscribe(),
         );
+    }
+
+    public function resolveRecipientUser(): ?User
+    {
+        return $this->user;
+    }
+
+    public function emailCategory(): string
+    {
+        return 'payments';
     }
 
     /**

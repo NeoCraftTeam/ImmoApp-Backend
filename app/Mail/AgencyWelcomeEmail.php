@@ -14,6 +14,7 @@ use Illuminate\Queue\SerializesModels;
 
 class AgencyWelcomeEmail extends Mailable implements ShouldQueue
 {
+    use Concerns\HasUnsubscribeLinks;
     use Queueable, SerializesModels;
 
     public function __construct(public User $user)
@@ -32,7 +33,18 @@ class AgencyWelcomeEmail extends Mailable implements ShouldQueue
     {
         return new Content(
             view: 'emails.agency-welcome',
+            with: $this->withUnsubscribe(),
         );
+    }
+
+    protected function resolveRecipientUser(): ?User
+    {
+        return $this->user;
+    }
+
+    protected function emailCategory(): string
+    {
+        return 'welcome_emails';
     }
 
     public function attachments(): array

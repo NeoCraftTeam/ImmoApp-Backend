@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Mail\Concerns\HasUnsubscribeLinks;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -18,7 +19,7 @@ use Illuminate\Queue\SerializesModels;
  */
 class AdminActionPerformedMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use HasUnsubscribeLinks, Queueable, SerializesModels;
 
     /**
      * @param  array{event: string, entity: string, entity_name: string, description: string, changes: array<string, mixed>, date: string}  $details
@@ -43,7 +44,7 @@ class AdminActionPerformedMail extends Mailable implements ShouldQueue
     {
         return new Content(
             view: 'emails.admin-action-performed',
-            with: [
+            with: $this->withUnsubscribe([
                 'actorName' => $this->actor->firstname.' '.$this->actor->lastname,
                 'event' => $this->details['event'],
                 'entity' => $this->details['entity'],
@@ -51,8 +52,18 @@ class AdminActionPerformedMail extends Mailable implements ShouldQueue
                 'description' => $this->details['description'],
                 'changes' => $this->details['changes'],
                 'date' => $this->details['date'],
-            ],
+            ]),
         );
+    }
+
+    public function resolveRecipientUser(): ?User
+    {
+        return $this->actor;
+    }
+
+    public function emailCategory(): string
+    {
+        return 'system';
     }
 
     /**

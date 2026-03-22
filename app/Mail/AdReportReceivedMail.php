@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mail;
 
 use App\Models\AdReport;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -14,6 +15,7 @@ use Illuminate\Queue\SerializesModels;
 
 class AdReportReceivedMail extends Mailable implements ShouldQueue
 {
+    use Concerns\HasUnsubscribeLinks;
     use Queueable, SerializesModels;
 
     public function __construct(
@@ -33,11 +35,21 @@ class AdReportReceivedMail extends Mailable implements ShouldQueue
 
         return new Content(
             view: 'emails.ad-report-received',
-            with: [
+            with: $this->withUnsubscribe([
                 'report' => $this->report,
                 'reportReference' => $reportReference,
-            ],
+            ]),
         );
+    }
+
+    protected function resolveRecipientUser(): ?User
+    {
+        return $this->report->reporter;
+    }
+
+    protected function emailCategory(): string
+    {
+        return 'ad_updates';
     }
 
     public function attachments(): array

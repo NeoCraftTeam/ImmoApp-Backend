@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Mail\Concerns\HasUnsubscribeLinks;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
@@ -14,7 +15,7 @@ use Illuminate\Queue\SerializesModels;
 
 class PricingVerificationMail extends Mailable
 {
-    use Queueable, SerializesModels;
+    use HasUnsubscribeLinks, Queueable, SerializesModels;
 
     /**
      * Create a new message instance.
@@ -41,7 +42,18 @@ class PricingVerificationMail extends Mailable
     {
         return new Content(
             view: 'emails.pricing-verification',
+            with: $this->withUnsubscribe(),
         );
+    }
+
+    public function resolveRecipientUser(): ?User
+    {
+        return $this->user;
+    }
+
+    public function emailCategory(): string
+    {
+        return 'system';
     }
 
     /**

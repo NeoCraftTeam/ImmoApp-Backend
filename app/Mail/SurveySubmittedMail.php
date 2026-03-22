@@ -13,6 +13,7 @@ use Illuminate\Queue\SerializesModels;
 
 class SurveySubmittedMail extends Mailable implements ShouldQueue
 {
+    use Concerns\HasUnsubscribeLinks;
     use Queueable, SerializesModels;
 
     public function __construct(
@@ -35,10 +36,20 @@ class SurveySubmittedMail extends Mailable implements ShouldQueue
     {
         return new Content(
             view: 'emails.survey-submitted',
-            with: [
+            with: $this->withUnsubscribe([
                 'userName' => $this->user->firstname,
                 'surveyTitle' => $this->survey->title,
-            ],
+            ]),
         );
+    }
+
+    protected function resolveRecipientUser(): ?User
+    {
+        return $this->user;
+    }
+
+    protected function emailCategory(): string
+    {
+        return 'survey_notifications';
     }
 }
