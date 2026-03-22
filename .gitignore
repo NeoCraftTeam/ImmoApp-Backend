@@ -50,3 +50,4 @@ _ide_helper*.php
 /count
 
 .pnpm-store/
+.next
