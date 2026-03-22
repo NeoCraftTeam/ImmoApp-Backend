@@ -12,6 +12,7 @@ use App\Enums\PaymentType;
 use App\Events\PaymentFailed;
 use App\Events\PaymentInitiated;
 use App\Events\PaymentSucceeded;
+use App\Exceptions\PaymentGatewayException;
 use App\Models\Payment;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -21,17 +22,23 @@ use Illuminate\Support\Str;
 /**
  * Central orchestrator for all payment operations.
  *
- * Delegates to the Flutterwave gateway implementation.
+ * Delegates to the configured gateway. Supports automatic fallback to a secondary
+ * gateway when the primary fails (e.g. Flutterwave → FedaPay).
  */
 final readonly class PaymentService
 {
     private PaymentGatewayInterface $gateway;
+
+    private ?PaymentGatewayInterface $fallbackGateway;
 
     public function __construct()
     {
         $this->gateway = $this->resolveGateway(
             (string) config('payment.default', 'flutterwave')
         );
+
+        $fallback = config('payment.fallback');
+        $this->fallbackGateway = $fallback ? $this->resolveGateway((string) $fallback) : null;
     }
 
     /**
@@ -68,7 +75,7 @@ final readonly class PaymentService
         $redirectUrl = config('payment.gateways.flutterwave.redirect_url')
             ?: config('app.frontend_url', config('app.url')).'/payment/callback';
 
-        $result = $this->gateway->initiate([
+        $gatewayPayload = [
             'amount' => $data['amount'],
             'currency' => $currency,
             'email' => $user->email,
@@ -79,9 +86,11 @@ final readonly class PaymentService
             'description' => $data['description'] ?? 'Paiement KeyHome',
             'payment_method' => $data['payment_method'] ?? 'flutterwave',
             'meta' => $meta,
-        ]);
+        ];
 
-        $payment = DB::transaction(function () use ($data, $txRef, $result, $user): Payment {
+        [$result, $usedGateway] = $this->initiateWithFallback($gatewayPayload);
+
+        $payment = DB::transaction(function () use ($data, $txRef, $result, $user, $usedGateway): Payment {
             $payment = new Payment;
             $payment->type = PaymentType::from((string) $data['type']);
             $payment->amount = (int) round((float) $data['amount']);
@@ -89,7 +98,7 @@ final readonly class PaymentService
             $payment->payment_method = PaymentMethod::from((string) ($data['payment_method'] ?? 'flutterwave'));
             $payment->user_id = $user->id;
             $payment->status = PaymentStatus::PENDING;
-            $payment->gateway = PaymentGateway::from($this->gateway->getName());
+            $payment->gateway = PaymentGateway::from($usedGateway->getName());
             $payment->payment_link = $result['link'];
             $payment->phone_number = $data['phone_number'] ?? null;
             $payment->ad_id = $data['ad_id'] ?? null;
@@ -105,7 +114,7 @@ final readonly class PaymentService
 
         Log::info('Payment created', [
             'payment_id' => $payment->id,
-            'gateway' => $this->gateway->getName(),
+            'gateway' => $usedGateway->getName(),
             'amount' => $data['amount'],
             'user_id' => $user->id,
             'tx_ref' => $txRef,
@@ -115,7 +124,7 @@ final readonly class PaymentService
             'payment' => $payment,
             'link' => $result['link'],
             'tx_ref' => $txRef,
-            'gateway' => $this->gateway->getName(),
+            'gateway' => $usedGateway->getName(),
         ];
     }
 
@@ -297,10 +306,34 @@ final readonly class PaymentService
         return $this->gateway->getName();
     }
 
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array{0: array{link: string, tx_ref: string, status: string, gateway: string}, 1: PaymentGatewayInterface}
+     */
+    private function initiateWithFallback(array $payload): array
+    {
+        try {
+            return [$this->gateway->initiate($payload), $this->gateway];
+        } catch (PaymentGatewayException $e) {
+            if ($this->fallbackGateway === null) {
+                throw $e;
+            }
+
+            Log::warning('Primary payment gateway failed, trying fallback', [
+                'primary' => $this->gateway->getName(),
+                'fallback' => $this->fallbackGateway->getName(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return [$this->fallbackGateway->initiate($payload), $this->fallbackGateway];
+        }
+    }
+
     private function resolveGateway(string $name): PaymentGatewayInterface
     {
         return match ($name) {
             'flutterwave' => app(FlutterwavePaymentService::class),
+            'fedapay' => app(FedaPayPaymentService::class),
             default => throw new \InvalidArgumentException("Gateway [{$name}] not supported."),
         };
     }

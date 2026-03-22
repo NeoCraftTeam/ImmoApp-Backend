@@ -13,7 +13,19 @@ return [
     |
     */
 
-    'default' => 'flutterwave',
+    'default' => env('PAYMENT_DEFAULT_GATEWAY', 'flutterwave'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Fallback Payment Gateway
+    |--------------------------------------------------------------------------
+    |
+    | When the primary gateway fails, this gateway is tried automatically.
+    | Set to null to disable fallback behaviour.
+    |
+    */
+
+    'fallback' => env('PAYMENT_FALLBACK_GATEWAY', null),
 
     /*
     |--------------------------------------------------------------------------
@@ -31,6 +43,12 @@ return [
             'base_url' => env('FLW_BASE_URL', 'https://api.flutterwave.com/v3'),
             'redirect_url' => env('FLW_REDIRECT_URL'),
             'logo' => env('APP_LOGO_URL'),
+        ],
+
+        'fedapay' => [
+            'secret_key' => env('FEDAPAY_SECRET_KEY', ''),
+            'base_url' => env('FEDAPAY_BASE_URL', 'https://api.fedapay.com'),
+            'webhook_secret' => env('FEDAPAY_WEBHOOK_SECRET', ''),
         ],
 
     ],
