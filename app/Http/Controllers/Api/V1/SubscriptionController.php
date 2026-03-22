@@ -458,4 +458,39 @@ final class SubscriptionController
 
         return SubscriptionResource::collection($subscriptions);
     }
+
+    /**
+     * Toggle auto-renewal for the agency's current subscription.
+     */
+    public function toggleAutoRenew(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        /** @var Agency|null $agency */
+        $agency = $user->agency;
+
+        if (!$agency) {
+            return response()->json([
+                'message' => 'Vous n\'appartenez à aucune agence.',
+            ], 403);
+        }
+
+        $subscription = $agency->getCurrentSubscription();
+
+        if (!$subscription) {
+            return response()->json([
+                'message' => 'Aucun abonnement actif.',
+            ], 404);
+        }
+
+        $subscription->update(['auto_renew' => !$subscription->auto_renew]);
+
+        return response()->json([
+            'message' => $subscription->auto_renew
+                ? 'Le renouvellement automatique est activé.'
+                : 'Le renouvellement automatique est désactivé.',
+            'auto_renew' => $subscription->auto_renew,
+            'subscription' => new SubscriptionResource($subscription->load('plan')),
+        ]);
+    }
 }
