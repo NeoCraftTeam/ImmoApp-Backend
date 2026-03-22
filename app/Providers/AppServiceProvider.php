@@ -124,7 +124,9 @@ class AppServiceProvider extends ServiceProvider
 
             return match ($user->role) {
                 UserRole::ADMIN => Limit::none(),
-                UserRole::AGENT => Limit::perMinute(300)->by($user->id),
+                UserRole::AGENT => ($user->agency?->hasActiveSubscription() ?? false)
+                    ? Limit::perMinute(500)->by($user->id)
+                    : Limit::perMinute(300)->by($user->id),
                 default => Limit::perMinute(120)->by($user->id),
             };
         });
