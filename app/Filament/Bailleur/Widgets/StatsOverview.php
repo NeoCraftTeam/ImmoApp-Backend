@@ -10,6 +10,7 @@ use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class StatsOverview extends BaseWidget
 {
@@ -17,14 +18,39 @@ class StatsOverview extends BaseWidget
     protected function getStats(): array
     {
         $user = Auth::user();
-        $adIds = Ad::where('user_id', $user->id)->pluck('id');
-        $since = now()->subDays(30);
+        $userId = $user->id;
 
-        $adCount = $adIds->count();
+        $data = Cache::remember("bailleur_stats_overview:{$userId}", 120, function () use ($userId): array {
+            $adIds = Ad::where('user_id', $userId)->pluck('id');
+            $since = now()->subDays(30);
 
-        if ($adIds->isEmpty()) {
+            if ($adIds->isEmpty()) {
+                return ['adCount' => 0, 'empty' => true, 'views' => 0, 'favorites' => 0, 'impressions' => 0, 'viewsTrend' => [0, 0, 0, 0, 0, 0, 0], 'favoritesTrend' => [0, 0, 0, 0, 0, 0, 0], 'adsTrend' => [0, 0, 0, 0, 0, 0, 0]];
+            }
+
+            /** @var object{views: int|null, favorites: int|null, impressions: int|null} $stats */
+            $stats = AdInteraction::whereIn('ad_id', $adIds)
+                ->where('created_at', '>=', $since)
+                ->selectRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as views', [AdInteraction::TYPE_VIEW])
+                ->selectRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as favorites', [AdInteraction::TYPE_FAVORITE])
+                ->selectRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as impressions', [AdInteraction::TYPE_IMPRESSION])
+                ->first();
+
             return [
-                Stat::make('Mes Biens', $adCount)
+                'adCount' => $adIds->count(),
+                'empty' => false,
+                'views' => (int) $stats->views,
+                'favorites' => (int) $stats->favorites,
+                'impressions' => (int) $stats->impressions,
+                'viewsTrend' => $this->getDailyTrend($adIds, AdInteraction::TYPE_VIEW),
+                'favoritesTrend' => $this->getDailyTrend($adIds, AdInteraction::TYPE_FAVORITE),
+                'adsTrend' => $this->getMonthlyAdsTrend($userId),
+            ];
+        });
+
+        if ($data['empty']) {
+            return [
+                Stat::make('Mes Biens', $data['adCount'])
                     ->description('Biens mis en location')
                     ->icon('heroicon-o-home')
                     ->color('primary')
@@ -37,50 +63,34 @@ class StatsOverview extends BaseWidget
             ];
         }
 
-        /** @var object{views: int|null, favorites: int|null, impressions: int|null} $stats */
-        $stats = AdInteraction::whereIn('ad_id', $adIds)
-            ->where('created_at', '>=', $since)
-            ->selectRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as views', [AdInteraction::TYPE_VIEW])
-            ->selectRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as favorites', [AdInteraction::TYPE_FAVORITE])
-            ->selectRaw('SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as impressions', [AdInteraction::TYPE_IMPRESSION])
-            ->first();
-
-        $views = (int) $stats->views;
-        $favorites = (int) $stats->favorites;
-        $impressions = (int) $stats->impressions;
-
-        $engagementRate = $impressions > 0
-            ? round($favorites / $impressions * 100, 1)
+        $engagementRate = $data['impressions'] > 0
+            ? round($data['favorites'] / $data['impressions'] * 100, 1)
             : 0;
 
-        $viewsTrend = $this->getDailyTrend($adIds, AdInteraction::TYPE_VIEW);
-        $favoritesTrend = $this->getDailyTrend($adIds, AdInteraction::TYPE_FAVORITE);
-        $adsTrend = $this->getMonthlyAdsTrend($user->id);
-
         return [
-            Stat::make('Mes Biens', $adCount)
+            Stat::make('Mes Biens', $data['adCount'])
                 ->description('Biens mis en location')
                 ->icon('heroicon-o-home')
                 ->color('primary')
-                ->chart($adsTrend),
+                ->chart($data['adsTrend']),
 
-            Stat::make('Vues', number_format($views))
+            Stat::make('Vues', number_format($data['views']))
                 ->description('30 derniers jours')
                 ->descriptionIcon('heroicon-m-eye')
                 ->color('info')
-                ->chart($viewsTrend),
+                ->chart($data['viewsTrend']),
 
-            Stat::make('Favoris', number_format($favorites))
+            Stat::make('Favoris', number_format($data['favorites']))
                 ->description('30 derniers jours')
                 ->descriptionIcon('heroicon-m-heart')
                 ->color('danger')
-                ->chart($favoritesTrend),
+                ->chart($data['favoritesTrend']),
 
             Stat::make('Engagement', $engagementRate.'%')
                 ->description($engagementRate > 5 ? 'Bon engagement' : 'Engagement faible')
                 ->descriptionIcon('heroicon-m-chart-bar')
                 ->color($engagementRate > 5 ? 'success' : 'gray')
-                ->chart($viewsTrend),
+                ->chart($data['viewsTrend']),
         ];
     }
 

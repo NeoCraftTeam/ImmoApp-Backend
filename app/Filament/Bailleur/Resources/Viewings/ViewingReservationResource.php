@@ -28,6 +28,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 use UnitEnum;
 
 class ViewingReservationResource extends Resource
@@ -56,9 +57,10 @@ class ViewingReservationResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        $count = static::getEloquentQuery()
+        $userId = auth()->id();
+        $count = Cache::remember("badge:bailleur_reservations:{$userId}", 30, fn () => static::getEloquentQuery()
             ->where('status', ReservationStatus::Pending)
-            ->count();
+            ->count());
 
         return $count > 0 ? (string) $count : null;
     }

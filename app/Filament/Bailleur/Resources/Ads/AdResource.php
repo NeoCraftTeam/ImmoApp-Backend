@@ -30,6 +30,7 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use UnitEnum;
@@ -212,9 +213,11 @@ class AdResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        return (string) static::getModel()::query()
+        $userId = auth()->id();
+
+        return Cache::remember("badge:bailleur_ads:{$userId}", 30, fn () => (string) static::getModel()::query()
             ->withGlobalScope('landlord', new LandlordScope)
-            ->count();
+            ->count());
     }
 
     #[\Override]

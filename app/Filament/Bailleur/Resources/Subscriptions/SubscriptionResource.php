@@ -17,6 +17,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 use UnitEnum;
 
 class SubscriptionResource extends Resource
@@ -220,11 +221,11 @@ class SubscriptionResource extends Resource
             return null;
         }
 
-        $activeCount = Subscription::query()
+        $activeCount = Cache::remember("badge:bailleur_subscriptions:{$agencyId}", 30, fn () => Subscription::query()
             ->where('agency_id', $agencyId)
             ->where('status', SubscriptionStatus::ACTIVE)
             ->where('ends_at', '>', now())
-            ->count();
+            ->count());
 
         return $activeCount > 0 ? (string) $activeCount : null;
     }

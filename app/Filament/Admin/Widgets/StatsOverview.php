@@ -13,6 +13,7 @@ use App\Models\User;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class StatsOverview extends StatsOverviewWidget
 {
@@ -23,72 +24,107 @@ class StatsOverview extends StatsOverviewWidget
     #[\Override]
     protected function getStats(): array
     {
-        $monthUsers = User::whereMonth('created_at', now()->month)->count();
-        $avgRating = number_format((float) Review::avg('rating'), 1);
-        $reviewCount = Review::count();
-        $revenue = Payment::sum('amount');
-        $agencyCount = Agency::count();
-        $activeAds = Ad::where('status', 'available')->count();
-        $avgPrice = Ad::avg('price');
-        $pendingAds = Ad::where('status', 'pending')->count();
+        $data = Cache::remember('admin_stats_overview', 300, fn () => $this->computeRawStats());
 
         return [
-            Stat::make('Utilisateurs', $monthUsers)
+            Stat::make('Utilisateurs', $data['monthUsers'])
                 ->description('Nouveaux ce mois')
                 ->descriptionIcon('heroicon-m-user-plus')
                 ->color('info')
-                ->chart($this->getMonthlyTrend(User::class))
+                ->chart($data['userTrend'])
                 ->extraAttributes(['class' => 'ring-1 ring-gray-200 dark:ring-gray-700']),
 
-            Stat::make('Note Moyenne', $avgRating.' / 5')
+            Stat::make('Note Moyenne', $data['avgRating'].' / 5')
                 ->description('Satisfaction globale')
                 ->descriptionIcon('heroicon-m-star')
                 ->color('warning')
-                ->chart($this->getMonthlyTrend(Review::class))
+                ->chart($data['reviewTrend'])
                 ->extraAttributes(['class' => 'ring-1 ring-gray-200 dark:ring-gray-700']),
 
-            Stat::make('Avis Reçus', $reviewCount)
+            Stat::make('Avis Reçus', $data['reviewCount'])
                 ->description('Total des feedbacks')
                 ->descriptionIcon('heroicon-m-chat-bubble-left-right')
                 ->color('info')
-                ->chart($this->getMonthlyTrend(Review::class))
+                ->chart($data['reviewTrend'])
                 ->extraAttributes(['class' => 'ring-1 ring-gray-200 dark:ring-gray-700']),
 
-            Stat::make('Revenus', number_format((float) $revenue, 0, ',', ' ').' FCFA')
+            Stat::make('Revenus', number_format((float) $data['revenue'], 0, ',', ' ').' FCFA')
                 ->description('Gains totaux')
                 ->descriptionIcon('heroicon-m-banknotes')
-                ->chart($this->getMonthlyRevenueTrend())
+                ->chart($data['revenueTrend'])
                 ->color('success')
                 ->extraAttributes(['class' => 'ring-1 ring-gray-200 dark:ring-gray-700']),
 
-            Stat::make('Agences', $agencyCount)
+            Stat::make('Agences', $data['agencyCount'])
                 ->description('Partenaires actifs')
                 ->descriptionIcon('heroicon-m-building-office-2')
                 ->color('primary')
-                ->chart($this->getMonthlyTrend(Agency::class))
+                ->chart($data['agencyTrend'])
                 ->extraAttributes(['class' => 'ring-1 ring-gray-200 dark:ring-gray-700']),
 
-            Stat::make('Annonces Actives', $activeAds)
+            Stat::make('Annonces Actives', $data['activeAds'])
                 ->description('Visibles en ligne')
                 ->descriptionIcon('heroicon-m-eye')
                 ->color('success')
-                ->chart($this->getMonthlyTrend(Ad::class))
+                ->chart($data['adTrend'])
                 ->extraAttributes(['class' => 'ring-1 ring-gray-200 dark:ring-gray-700']),
 
-            Stat::make('Prix Moyen', number_format((float) $avgPrice, 0, ',', ' ').' FCFA')
+            Stat::make('Prix Moyen', number_format((float) $data['avgPrice'], 0, ',', ' ').' FCFA')
                 ->description('Tendance du marché')
                 ->descriptionIcon('heroicon-m-chart-bar')
                 ->color('gray')
-                ->chart($this->getMonthlyAvgPriceTrend())
+                ->chart($data['avgPriceTrend'])
                 ->extraAttributes(['class' => 'ring-1 ring-gray-200 dark:ring-gray-700']),
 
-            Stat::make('En Attente', $pendingAds)
+            Stat::make('En Attente', $data['pendingAds'])
                 ->description('Annonces à modérer')
                 ->descriptionIcon('heroicon-m-clock')
                 ->color('danger')
-                ->chart($this->getMonthlyPendingTrend())
+                ->chart($data['pendingTrend'])
                 ->url(PendingAdResource::getUrl())
                 ->extraAttributes(['class' => 'ring-1 ring-gray-200 dark:ring-gray-700 cursor-pointer']),
+        ];
+    }
+
+    /**
+     * Compute all raw stat values for caching. Returns only primitives.
+     *
+     * @return array{
+     *     monthUsers: int,
+     *     avgRating: string,
+     *     reviewCount: int,
+     *     revenue: int|float,
+     *     agencyCount: int,
+     *     activeAds: int,
+     *     avgPrice: int|float,
+     *     pendingAds: int,
+     *     userTrend: array<int, int>,
+     *     reviewTrend: array<int, int>,
+     *     revenueTrend: array<int, int>,
+     *     agencyTrend: array<int, int>,
+     *     adTrend: array<int, int>,
+     *     avgPriceTrend: array<int, int>,
+     *     pendingTrend: array<int, int>,
+     * }
+     */
+    private function computeRawStats(): array
+    {
+        return [
+            'monthUsers' => User::whereMonth('created_at', now()->month)->count(),
+            'avgRating' => number_format((float) Review::avg('rating'), 1),
+            'reviewCount' => Review::count(),
+            'revenue' => Payment::sum('amount'),
+            'agencyCount' => Agency::count(),
+            'activeAds' => Ad::where('status', 'available')->count(),
+            'avgPrice' => Ad::avg('price'),
+            'pendingAds' => Ad::where('status', 'pending')->count(),
+            'userTrend' => $this->getMonthlyTrend(User::class),
+            'reviewTrend' => $this->getMonthlyTrend(Review::class),
+            'revenueTrend' => $this->getMonthlyRevenueTrend(),
+            'agencyTrend' => $this->getMonthlyTrend(Agency::class),
+            'adTrend' => $this->getMonthlyTrend(Ad::class),
+            'avgPriceTrend' => $this->getMonthlyAvgPriceTrend(),
+            'pendingTrend' => $this->getMonthlyPendingTrend(),
         ];
     }
 

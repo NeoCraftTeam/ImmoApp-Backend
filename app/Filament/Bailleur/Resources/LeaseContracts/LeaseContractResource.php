@@ -17,6 +17,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use UnitEnum;
@@ -183,7 +184,8 @@ class LeaseContractResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        $count = static::getEloquentQuery()->count();
+        $userId = auth()->id();
+        $count = Cache::remember("badge:bailleur_contracts:{$userId}", 30, fn () => static::getEloquentQuery()->count());
 
         return $count > 0 ? (string) $count : null;
     }

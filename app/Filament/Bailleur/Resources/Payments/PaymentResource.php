@@ -18,6 +18,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 use UnitEnum;
 
 class PaymentResource extends Resource
@@ -187,7 +188,9 @@ class PaymentResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        return (string) static::getEloquentQuery()->count();
+        $userId = auth()->id();
+
+        return Cache::remember("badge:bailleur_payments:{$userId}", 30, fn () => (string) static::getEloquentQuery()->count());
     }
 
     #[\Override]

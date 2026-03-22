@@ -9,6 +9,7 @@ use App\Filament\Admin\Resources\PendingAds\PendingAdResource;
 use App\Models\Ad;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Support\Facades\Cache;
 
 class PendingAdsStats extends StatsOverviewWidget
 {
@@ -17,7 +18,7 @@ class PendingAdsStats extends StatsOverviewWidget
     #[\Override]
     protected function getStats(): array
     {
-        $pendingCount = Ad::where('status', AdStatus::PENDING)->count();
+        $pendingCount = Cache::remember('badge:pending_ads', 30, fn () => Ad::where('status', AdStatus::PENDING)->count());
 
         if ($pendingCount === 0) {
             return [];

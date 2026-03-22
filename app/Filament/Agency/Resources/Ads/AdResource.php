@@ -21,6 +21,7 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Cache;
 use UnitEnum;
 
 class AdResource extends Resource
@@ -111,8 +112,10 @@ class AdResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        return (string) static::getModel()::query()
-            ->where('user_id', auth()->id())
-            ->count();
+        $userId = auth()->id();
+
+        return Cache::remember("badge:agency_ads:{$userId}", 30, fn () => (string) static::getModel()::query()
+            ->where('user_id', $userId)
+            ->count());
     }
 }

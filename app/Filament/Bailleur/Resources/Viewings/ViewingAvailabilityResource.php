@@ -31,6 +31,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Component;
 use UnitEnum;
 
@@ -66,7 +67,9 @@ class ViewingAvailabilityResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        return (string) static::getEloquentQuery()->count();
+        $userId = auth()->id();
+
+        return Cache::remember("badge:bailleur_availabilities:{$userId}", 30, fn () => (string) static::getEloquentQuery()->count());
     }
 
     #[\Override]

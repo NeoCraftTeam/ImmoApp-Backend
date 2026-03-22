@@ -24,6 +24,7 @@ use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use UnitEnum;
@@ -233,7 +234,7 @@ class PendingAdResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        $count = Ad::where('status', AdStatus::PENDING)->count();
+        $count = Cache::remember('badge:pending_ads', 30, fn () => Ad::where('status', AdStatus::PENDING)->count());
 
         return $count > 0 ? (string) $count : null;
     }

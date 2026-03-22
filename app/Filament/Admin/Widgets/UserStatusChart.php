@@ -6,6 +6,7 @@ namespace App\Filament\Admin\Widgets;
 
 use App\Models\User;
 use Filament\Widgets\ChartWidget;
+use Illuminate\Support\Facades\Cache;
 
 class UserStatusChart extends ChartWidget
 {
@@ -18,8 +19,10 @@ class UserStatusChart extends ChartWidget
     #[\Override]
     protected function getData(): array
     {
-        $activeUsers = User::whereNotNull('email_verified_at')->count();
-        $inactiveUsers = User::whereNull('email_verified_at')->count();
+        [$activeUsers, $inactiveUsers] = Cache::remember('admin_user_status_chart', 300, fn () => [
+            User::whereNotNull('email_verified_at')->count(),
+            User::whereNull('email_verified_at')->count(),
+        ]);
 
         return [
             'datasets' => [
