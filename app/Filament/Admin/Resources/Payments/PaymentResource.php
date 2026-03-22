@@ -4,15 +4,21 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\Payments;
 
+use App\Enums\PaymentStatus;
 use App\Filament\Admin\Resources\Payments\Pages\ManagePayments;
 use App\Filament\Exports\PaymentExporter;
 use App\Filament\Imports\PaymentImporter;
 use App\Models\Payment;
+use App\Services\Payment\RefundService;
 use BackedEnum;
+use Filament\Actions\Action as RecordAction;
 use Filament\Actions\ExportAction;
 use Filament\Actions\ImportAction;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -141,6 +147,48 @@ class PaymentResource extends Resource
             ])
             ->recordActions([
                 ViewAction::make(),
+                RecordAction::make('refund')
+                    ->label('Rembourser')
+                    ->icon(Heroicon::ArrowUturnLeft)
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Rembourser ce paiement')
+                    ->modalDescription('Le remboursement sera envoyé au gateway de paiement et les effets du paiement seront annulés.')
+                    ->form([
+                        Textarea::make('reason')
+                            ->label('Motif du remboursement')
+                            ->required()
+                            ->minLength(5)
+                            ->maxLength(500),
+                        TextInput::make('amount')
+                            ->label('Montant (laisser vide pour remboursement intégral)')
+                            ->numeric()
+                            ->minValue(1)
+                            ->suffix('XAF'),
+                        Textarea::make('admin_note')
+                            ->label('Note interne')
+                            ->maxLength(1000),
+                    ])
+                    ->action(function (Payment $record, array $data): void {
+                        try {
+                            /** @var RefundService $service */
+                            $service = app(RefundService::class);
+                            $service->processRefund($record, auth()->user(), $data);
+
+                            Notification::make()
+                                ->title('Remboursement traité')
+                                ->body('Le remboursement a été effectué avec succès.')
+                                ->success()
+                                ->send();
+                        } catch (\Throwable $e) {
+                            Notification::make()
+                                ->title('Échec du remboursement')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    })
+                    ->visible(fn (Payment $record): bool => $record->status === PaymentStatus::SUCCESS),
             ])
             ->headerActions([
                 ImportAction::make()->label('Importer')

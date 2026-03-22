@@ -186,6 +186,44 @@ final readonly class FlutterwavePaymentService implements PaymentGatewayInterfac
         return 'flutterwave';
     }
 
+    /**
+     * Initiate a refund via Flutterwave's transaction refund API.
+     *
+     * @see https://developer.flutterwave.com/reference/create-a-refund
+     *
+     * {@inheritDoc}
+     */
+    public function refund(string $gatewayTransactionId, ?float $amount = null): array
+    {
+        $body = $amount !== null ? ['amount' => $amount] : [];
+
+        $response = $this->client()->post("/transactions/{$gatewayTransactionId}/refund", $body);
+
+        if ($response->failed() || ($response->json('status') !== 'success')) {
+            Log::error('Flutterwave refund failed', [
+                'transaction_id' => $gatewayTransactionId,
+                'amount' => $amount,
+                'response' => $response->json(),
+                'status' => $response->status(),
+            ]);
+
+            throw new PaymentGatewayException(
+                'Flutterwave: '.($response->json('message') ?? 'Échec du remboursement.'),
+                $response->status(),
+            );
+        }
+
+        /** @var array<string, mixed> $data */
+        $data = $response->json('data', []);
+
+        return [
+            'refund_id' => (string) ($data['id'] ?? ''),
+            'status' => (string) ($data['status'] ?? 'pending'),
+            'amount_refunded' => (float) ($data['amount_refunded'] ?? $amount ?? 0),
+            'raw' => $data,
+        ];
+    }
+
     private function client(): PendingRequest
     {
         return Http::withToken($this->secretKey)

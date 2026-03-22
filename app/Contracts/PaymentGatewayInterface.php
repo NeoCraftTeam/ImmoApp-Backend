@@ -47,4 +47,11 @@ interface PaymentGatewayInterface
      * Return the unique gateway identifier (e.g. 'flutterwave').
      */
     public function getName(): string;
+
+    /**
+     * Initiate a refund for a completed transaction.
+     *
+     * @return array{refund_id: string, status: string, amount_refunded: float, raw: array<string, mixed>}
+     */
+    public function refund(string $gatewayTransactionId, ?float $amount = null): array;
 }

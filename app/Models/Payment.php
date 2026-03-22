@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Spatie\Activitylog\LogOptions;
@@ -117,6 +118,19 @@ class Payment extends Model
         return $this->belongsTo(PointPackage::class, 'plan_id');
     }
 
+    /**
+     * @return HasMany<Refund, $this>
+     */
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(Refund::class);
+    }
+
+    public function isRefunded(): bool
+    {
+        return $this->status === PaymentStatus::REFUNDED;
+    }
+
     public function isPaid(): bool
     {
         return $this->status === PaymentStatus::SUCCESS;
@@ -124,7 +138,7 @@ class Payment extends Model
 
     public function isTerminal(): bool
     {
-        return in_array($this->status, [PaymentStatus::SUCCESS, PaymentStatus::FAILED, PaymentStatus::CANCELLED], true);
+        return in_array($this->status, [PaymentStatus::SUCCESS, PaymentStatus::FAILED, PaymentStatus::CANCELLED, PaymentStatus::REFUNDED], true);
     }
 
     /**
