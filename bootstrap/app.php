@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureFrontendRequestsAreStateful;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\LivewireLongRunningRequest;
 use App\Http\Middleware\OptionalAuth;
@@ -32,10 +33,15 @@ return Application::configure(basePath: dirname(__DIR__))
             'resolve.sanctum.bearer' => ResolveSanctumBearerUser::class,
         ]);
         $middleware->prependToGroup('web', LivewireLongRunningRequest::class);
+        // Enable Sanctum SPA cookie-based authentication for stateful domains
+        // Use custom middleware that respects SESSION_SAME_SITE config
+        $middleware->statefulApi();
+        $middleware->replaceInGroup('api', Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class, EnsureFrontendRequestsAreStateful::class);
         // Append is_active check to all sanctum-authenticated API routes
         $middleware->appendToGroup('api', [
             EnsureUserIsActive::class,
         ]);
+        $middleware->throttleApi();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         Integration::handles($exceptions);

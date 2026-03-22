@@ -335,7 +335,7 @@ final class AuthController
                 $token = $user->createToken(
                     'registration_token_'.now()->timestamp,
                     ['*'],
-                    now()->addDays(7)
+                    now()->addDay()
                 );
 
                 return ['user' => $user, 'token' => $token];
@@ -361,6 +361,12 @@ final class AuthController
             // Ensure UserResource includes point_balance & onboarding_completed_at (requires $request->user())
             $user->refresh();
             auth()->setUser($user);
+
+            // SPA Authentication: start httpOnly session alongside token
+            if ($request->hasSession()) {
+                $request->session()->regenerate();
+                Auth::guard('web')->login($user);
+            }
 
             return response()->json([
                 'message' => 'Inscription réussie.',
@@ -858,11 +864,17 @@ final class AuthController
         $token = $user->createToken(
             'auth_token_'.now()->timestamp,
             ['*'],
-            now()->addDays(7)
+            now()->addDay()
         );
 
         // Ensure UserResource includes point_balance & onboarding_completed_at (requires $request->user())
         auth()->setUser($user);
+
+        // SPA Authentication: start httpOnly session alongside token
+        if ($request->hasSession()) {
+            $request->session()->regenerate();
+            Auth::guard('web')->login($user);
+        }
 
         return response()->json([
             'message' => 'Email vérifié avec succès.',
@@ -1126,8 +1138,8 @@ final class AuthController
 
             $token = $user->createToken(
                 $tokenName,
-                ['*'], // abilities (permissions du token)
-                now()->addDays(7) // expiration dans 7 jours
+                ['*'],
+                now()->addDay()
             );
 
             // ── Detect new geographic location (style Binance) ──────────────────────
@@ -1323,6 +1335,54 @@ final class AuthController
     }
 
     /**
+     * @OA\Post(
+     *     path="/api/v1/auth/logout-all",
+     *     tags={"🔐 Authentification"},
+     *     summary="Sign out from all devices",
+     *     description="Revokes all personal access tokens for the authenticated user, ending all active sessions.",
+     *     security={{"sanctum": {}}},
+     *
+     *     @OA\Response(response=200, description="All sessions revoked"),
+     *     @OA\Response(response=401, description="Unauthenticated"),
+     * )
+     */
+    public function logoutAll(Request $request): JsonResponse
+    {
+        try {
+            $user = $request->user();
+
+            $count = $user->tokens()->count();
+
+            $user->tokens()->delete();
+
+            Log::info('User logout from all devices', [
+                'user_id' => $user->id,
+                'tokens_revoked' => $count,
+            ]);
+
+            if ($request->hasSession()) {
+                Auth::guard('web')->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            }
+
+            return response()->json([
+                'message' => 'Toutes les sessions ont été révoquées.',
+                'tokens_revoked' => $count,
+            ]);
+        } catch (Throwable $e) {
+            Log::error('Logout all error', [
+                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
+                'user_id' => $request->user()?->id,
+            ]);
+
+            return response()->json([
+                'message' => 'Erreur lors de la déconnexion.',
+            ], 500);
+        }
+    }
+
+    /**
      * @OA\Get(
      *     path="/api/v1/auth/me",
      *     tags={"🔐 Authentification"},
@@ -1426,6 +1486,20 @@ final class AuthController
         return response()->json(['preferences' => $user->preferences]);
     }
 
+    public function updateLocale(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'locale' => ['required', 'string', 'in:fr,en'],
+        ]);
+
+        /** @var User $user */
+        $user = $request->user();
+        $user->locale = $validated['locale'];
+        $user->save();
+
+        return response()->json(['locale' => $user->locale]);
+    }
+
     /**
      * @OA\Post(
      *     path="/api/v1/auth/refresh",
@@ -1490,7 +1564,7 @@ final class AuthController
             $newToken = $user->createToken(
                 'refreshed_token_'.now()->timestamp,
                 ['*'],
-                now()->addDays(7)
+                now()->addDay()
             );
 
             // Supprimer l'ancien token
@@ -1759,9 +1833,16 @@ final class AuthController
                 $user->update(['clerk_id' => $clerkId]);
             }
 
-            $token = $user->createToken('clerk-exchange', ['*'], now()->addDays(7));
+            $user->tokens()->where('name', 'clerk-exchange')->delete();
+            $token = $user->createToken('clerk-exchange', ['*'], now()->addDay());
 
             auth()->setUser($user);
+
+            // SPA Authentication: start httpOnly session alongside token
+            if ($request->hasSession()) {
+                $request->session()->regenerate();
+                Auth::guard('web')->login($user);
+            }
 
             return response()->json([
                 'access_token' => $token->plainTextToken,
@@ -1855,12 +1936,28 @@ final class AuthController
 
         $clerkId = (string) ($clerkUser['id'] ?? '');
         $otp = (string) ($request->input('otp', ''));
+
+        $rateLimitKey = 'otp-verify:'.$clerkId;
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
+            $seconds = RateLimiter::availableIn($rateLimitKey);
+
+            Cache::forget('clerk_otp_'.$clerkId);
+
+            return response()->json([
+                'message' => 'Trop de tentatives. Réessayez dans '.$seconds.' secondes.',
+                'retry_after' => $seconds,
+            ], 429);
+        }
+
         $cachedOtp = Cache::get('clerk_otp_'.$clerkId);
 
         if ($cachedOtp === null || !hash_equals($cachedOtp, $otp)) {
+            RateLimiter::hit($rateLimitKey, 300);
+
             return response()->json(['message' => 'Code invalide ou expiré.'], 422);
         }
 
+        RateLimiter::clear($rateLimitKey);
         Cache::forget('clerk_otp_'.$clerkId);
         Cache::put('clerk_verified_'.$clerkId, true, now()->addMinutes(15));
 
@@ -1892,8 +1989,15 @@ final class AuthController
             Cache::forget('clerk_verified_'.$clerkId);
             Cache::forget('clerk_pending_'.$clerkId);
 
-            $token = $user->createToken('clerk-exchange', ['*'], now()->addDays(7));
+            $user->tokens()->where('name', 'clerk-exchange')->delete();
+            $token = $user->createToken('clerk-exchange', ['*'], now()->addDay());
             auth()->setUser($user);
+
+            // SPA Authentication: start httpOnly session alongside token
+            if ($request->hasSession()) {
+                $request->session()->regenerate();
+                Auth::guard('web')->login($user);
+            }
 
             return response()->json([
                 'state' => 'authenticated',
@@ -2040,8 +2144,15 @@ final class AuthController
         Cache::forget('clerk_verified_'.$clerkId);
         Cache::forget('clerk_pending_'.$clerkId);
 
-        $token = $user->createToken('clerk-exchange', ['*'], now()->addDays(7));
+        $user->tokens()->where('name', 'clerk-exchange')->delete();
+        $token = $user->createToken('clerk-exchange', ['*'], now()->addDay());
         auth()->setUser($user);
+
+        // SPA Authentication: start httpOnly session alongside token
+        if ($request->hasSession()) {
+            $request->session()->regenerate();
+            Auth::guard('web')->login($user);
+        }
 
         return response()->json([
             'access_token' => $token->plainTextToken,
