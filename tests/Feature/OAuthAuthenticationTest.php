@@ -136,7 +136,7 @@ describe('Google OAuth Authentication', function (): void {
         ]);
     });
 
-    it('links Google to existing email account', function (): void {
+    it('links Google to existing email account requires confirmation', function (): void {
         $existingUser = User::factory()->create([
             'email' => 'existing@example.com',
             'google_id' => null,
@@ -158,12 +158,16 @@ describe('Google OAuth Authentication', function (): void {
             'token' => 'valid-token',
         ]);
 
+        // Security fix (P4-33): auto-linking is disabled — user must confirm in a separate step
         $response->assertOk()
-            ->assertJson(['is_new_user' => false]);
+            ->assertJsonFragment(['requires_link_confirmation' => true])
+            ->assertJsonStructure(['linking_token', 'message']);
 
+        // Google ID should NOT be linked yet — pending confirmation
         $existingUser->refresh();
-        expect($existingUser->google_id)->toBe('google-link-123');
-        expect($existingUser->oauth_provider)->toBe('google');
+        expect($existingUser->google_id)->toBeNull();
+        expect($existingUser->pending_oauth_provider)->toBe('google');
+        expect($existingUser->pending_oauth_token)->not->toBeNull();
     });
 });
 

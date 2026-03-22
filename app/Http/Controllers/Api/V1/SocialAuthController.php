@@ -111,6 +111,15 @@ final class SocialAuthController
             $user = $result['user'];
             $isNewUser = $result['is_new'];
 
+            // Cross-provider link requires explicit confirmation
+            if ($result['requires_link_confirmation'] ?? false) {
+                return response()->json([
+                    'message' => 'Un compte existe déjà avec cet email. Confirmez la liaison des comptes.',
+                    'requires_link_confirmation' => true,
+                    'linking_token' => $result['linking_token'],
+                ], 200);
+            }
+
             // Update last login info
             $user->forceFill([
                 'last_login_at' => now(),
@@ -405,6 +414,48 @@ final class SocialAuthController
     }
 
     /**
+     * Confirm pending cross-provider account link using a short-lived token.
+     */
+    public function confirmOAuthLink(Request $request): JsonResponse
+    {
+        $request->validate([
+            'linking_token' => ['required', 'string'],
+        ]);
+
+        $user = User::where('pending_oauth_token', $request->linking_token)
+            ->where('pending_oauth_expires_at', '>', now())
+            ->first();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Token de liaison invalide ou expiré.',
+            ], 422);
+        }
+
+        $providerIdField = $user->pending_oauth_provider.'_id';
+
+        $user->update([
+            $providerIdField => $user->pending_oauth_id,
+            'oauth_provider' => $user->pending_oauth_provider,
+            'oauth_avatar' => $user->pending_oauth_avatar,
+            'email_verified_at' => $user->email_verified_at ?? now(),
+            'pending_oauth_provider' => null,
+            'pending_oauth_id' => null,
+            'pending_oauth_avatar' => null,
+            'pending_oauth_token' => null,
+            'pending_oauth_expires_at' => null,
+        ]);
+
+        $token = $user->createToken('oauth-link-confirmed')->plainTextToken;
+
+        return response()->json([
+            'message' => 'Liaison de compte confirmée avec succès.',
+            'user' => $user->fresh()->load('city'),
+            'token' => $token,
+        ]);
+    }
+
+    /**
      * Get social user data from provider.
      */
     private function getSocialUser(string $provider, string $token, ?string $idToken = null): mixed
@@ -442,21 +493,25 @@ final class SocialAuthController
                 return ['user' => $user, 'is_new' => false];
             }
 
-            // Try to find by email
-            $user = User::where('email', $socialUser->getEmail())->first();
+            // Try to find by email — requires EXPLICIT confirmation before linking
+            $existingUser = User::where('email', $socialUser->getEmail())->first();
 
-            if ($user) {
-                // Link provider to existing account
-                $user->update([
-                    $providerIdField => $socialUser->getId(),
-                    'oauth_provider' => $provider,
-                    'oauth_avatar' => $socialUser->getAvatar(),
+            if ($existingUser) {
+                $linkingToken = hash('sha256', Str::random(64));
+                $existingUser->update([
+                    'pending_oauth_provider' => $provider,
+                    'pending_oauth_id' => $socialUser->getId(),
+                    'pending_oauth_avatar' => $socialUser->getAvatar(),
+                    'pending_oauth_token' => $linkingToken,
+                    'pending_oauth_expires_at' => now()->addMinutes(15),
                 ]);
-                if ($user->email_verified_at === null) {
-                    $user->forceFill(['email_verified_at' => now()])->save();
-                }
 
-                return ['user' => $user, 'is_new' => false];
+                return [
+                    'user' => $existingUser,
+                    'is_new' => false,
+                    'requires_link_confirmation' => true,
+                    'linking_token' => $linkingToken,
+                ];
             }
 
             // Create new user
