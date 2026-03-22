@@ -1,10 +1,15 @@
 # KeyHome — Exhaustive Feature & Functionality Inventory
 
-> **Generated from codebase analysis** — 130 source files across `src/app`, `src/components`, `src/services`, `src/hooks`, `src/providers`, `src/lib`, and `src/types`.
+> **Two-part inventory**
+>
+> - **Part A (§1–47)** — Next.js consumer app: `keyhome-frontend-next` paths (`src/app`, `src/components`, `src/services`, etc.). Counts are approximate and drift as the frontend changes.
+> - **Part B (§48+)** — **Laravel backend** (`ImmoApp-Backend`): REST API (`/api/v1`), `routes/web.php`, Filament panels, jobs, mail, notifications, observers, Artisan, scheduler, services, models. Generated from a full-tree scan of this repository (controllers, routes, Filament, `app/Jobs`, `app/Mail`, `app/Notifications`, `app/Observers`, `app/Console/Commands`, `app/Services`, `app/Models`).
 
 ---
 
 ## Table of Contents
+
+### Part A — Next.js frontend
 
 1. [Authentication & Identity](#1-authentication--identity)
 2. [User Profile & Account Management](#2-user-profile--account-management)
@@ -53,6 +58,22 @@
 45. [Trusted URL Redirect Guard](#45-trusted-url-redirect-guard)
 46. [XSS Sanitization](#46-xss-sanitization)
 47. [Unit Test Suite](#47-unit-test-suite)
+
+### Part B — Laravel backend (this repo)
+
+48. [Backend Scope & Conventions](#48-backend-scope--conventions)
+49. [REST API `/api` & `/api/v1`](#49-rest-api--api--api-v1)
+50. [Web Routes & Server-Side Infrastructure](#50-web-routes--server-side-infrastructure)
+51. [Filament Panels (Admin, Bailleur, Agency)](#51-filament-panels-admin-bailleur-agency)
+52. [Filament Shared — Forms, Exports, Imports](#52-filament-shared--forms-exports-imports)
+53. [Background Jobs](#53-background-jobs)
+54. [Mail (Mailables)](#54-mail-mailables)
+55. [Notifications](#55-notifications)
+56. [Eloquent Observers](#56-eloquent-observers)
+57. [Artisan Commands & Scheduler](#57-artisan-commands--scheduler)
+58. [Services Layer](#58-services-layer)
+59. [Eloquent Models](#59-eloquent-models)
+60. [Orphan / Legacy Code Notes](#60-orphan--legacy-code-notes)
 
 ---
 
@@ -904,16 +925,363 @@
 
 ---
 
+# Part B — Laravel backend (`ImmoApp-Backend`)
+
+## 48. Backend Scope & Conventions
+
+| Item | Detail |
+|------|--------|
+| **API prefix** | `bootstrap/app.php` registers `routes/api.php` → all routes below are under `/api` unless noted. |
+| **Versioned API** | Business routes live under **`/api/v1`** (`Route::prefix('v1')->group` in `routes/api.php`). |
+| **Auth** | Sanctum (`auth:sanctum`), optional guest identity (`optional.auth`), Filament session (`auth:web,sanctum`) for some PWA routes. |
+| **Docs** | OpenAPI annotations + **L5-Swagger** (`config/l5-swagger.php`, `php artisan l5-swagger:generate` in deploy); UI routes from the package, not `DocController`. |
+| **Search** | Laravel Scout + Meilisearch (`scout:import`, `meilisearch:sync-settings`). |
+
+---
+
+## 49. REST API `/api` & `/api/v1`
+
+### Global & health
+
+| Method | Path | Handler |
+|--------|------|---------|
+| GET | `/api/health` | JSON `{ status: ok }` (CI smoke tests) |
+
+### Auth & users (`/api/v1/auth/...`, `/api/v1/users/...`)
+
+| Area | Endpoints (summary) |
+|------|---------------------|
+| **Registration / login** | `registerCustomer`, `registerAgent`, `login`, `resend-verification`, `verify-email-otp`, `forgot-password`, `reset-password` (throttled) |
+| **Email verify (signed URL)** | GET `email/verify/{id}/{hash}` |
+| **Clerk** | `clerk/exchange`, `clerk/verify-otp`, `clerk/complete-profile` (throttled) |
+| **OAuth (SocialAuthController)** | `oauth/{provider}` POST, `redirect` GET, `callback` GET; authenticated: `link` POST, `unlink` DELETE |
+| **Session (sanctum)** | `registerAdmin`, `logout`, `refresh`, `me`, `email/resend`, `update-password` (throttled), `onboarding-complete`, `track-home-visit`, PATCH `preferences` |
+| **Email preferences (API)** | GET/PATCH `email-preferences` → `EmailPreferenceController` |
+| **Users CRUD** | `GET/POST/PUT/DELETE /users` (sanctum) |
+| **Unlocked ads** | `GET /my/unlocked-ads` |
+
+### Reference data (public read; writes often sanctum)
+
+| Controller | Routes |
+|------------|--------|
+| **AdTypeController** | `/ad-types`, CRUD when authenticated |
+| **CityController** | `/cities`, CRUD when authenticated |
+| **QuarterController** | `/quarters`, CRUD when authenticated |
+| **AgencyController** | `/agencies`, CRUD when authenticated |
+| **PropertyAttributeController** | GET `/property-attributes` |
+
+### Recommendations & notifications
+
+| Path | Role |
+|------|------|
+| GET `/recommendations` | Personalized ads (sanctum) |
+| `/notifications` | Index, `unread-count`, `read-all`, `{id}/read` POST, `{id}` DELETE |
+
+### Stats & tracking
+
+| Path | Role |
+|------|------|
+| POST `/track/visit` | `VisitTrackingController` (site visit analytics) |
+| GET `/stats/landing` | Counters for landing (ads, cities, users) |
+| GET `/stats/testimonials` | Curated testimonial payload |
+
+### Webhooks (no user auth)
+
+| Method | Path | Handler |
+|--------|------|---------|
+| POST | `/clerk/webhook` | `ClerkWebhookController` |
+| POST | `/webhooks/flutterwave` | `PaymentController::flutterwaveWebhook` |
+
+### 3D tours (`TourController`)
+
+| Path | Auth |
+|------|------|
+| GET `/ads/{ad}/tour` | `optional.auth` |
+| POST `/ads/{ad}/tour/scenes`, PATCH/POST hotspots, DELETE tour | `auth:sanctum` |
+
+### Payments, credits, subscriptions, invoices
+
+| Area | Routes |
+|------|--------|
+| **Unlock ad** | POST `/payments/initialize/{ad}` → `CreditController::unlock` |
+| **Flutterwave** | POST `payments/initiate_payment`, `verify_payment`, `cancel_payment`; GET `payments/history` |
+| **Admin refunds** | `auth:sanctum` + `can:admin-access` — POST `/admin/payments/{payment}/refund`, GET `/admin/payments/{payment}/refunds` (`RefundController`) |
+| **Credits** | GET `/credits/packages` (public); GET `credits/balance`, POST `credits/purchase/{package}`, `credits/verify-purchase` (sanctum) |
+| **Subscriptions** | GET `/subscriptions/plans`; GET `subscriptions/current`, `history`; POST `subscribe`, `cancel` |
+| **Invoices** | GET `invoices`, `invoices/{invoice}`, `invoices/{invoice}/download` |
+
+### Reviews
+
+| Method | Path |
+|--------|------|
+| GET | `/ads/{ad}/reviews` |
+| POST | `/reviews` (sanctum) |
+
+### Ads — public discovery & owner lifecycle (`AdController` + interactions)
+
+| Group | Routes |
+|-------|--------|
+| **Public / optional auth** | GET `/ads`, `/nearby`, `/search`, `/autocomplete`, `/facets`, `/ads/{id}` |
+| **Authenticated** | POST `/ads/ai/enhance-description` (`AdAiController`), GET `/ads/{user}/nearby`, POST/PUT/DELETE ads, POST `toggle-visibility`, `set-status`, `set-availability` |
+| **Interactions** | POST `ads/{ad}/view`, `impression` (optional.auth, throttled); POST `favorite`, `share`, `contact-click`, `phone-click`; POST `ads/{ad}/reports` |
+
+### Landlord analytics & lease contracts
+
+| Prefix | Routes |
+|--------|--------|
+| `/my/ads` | GET `/` (MyAdsController), GET `/analytics`, `/{ad}/analytics` (AdAnalyticsController) |
+| `/my/lease-contracts` | CRUD-style: index, show, update; POST `/{ad}/generate`; POST `ai/enhance-conditions`; GET `/{leaseContract}/download` |
+| `/my/reviews` | GET `/` (reviews on landlord’s ads) |
+
+### Viewings — landlord & client
+
+| Area | Routes |
+|------|--------|
+| **Landlord** | GET `/my/viewing-reservations`; POST `/reservations/{reservation}/confirm`; PATCH `/reservations/{reservation}/notes` |
+| **Availability** | Under `/ads/{ad}`: CRUD `/availability`, GET `availability/calendar`, GET `reservations` |
+| **Public slots** | GET `/ads/{ad}/slots` |
+| **Client** | POST `/ads/{ad}/reservations`; GET `/my/reservations`; DELETE `/reservations/{reservation}` |
+
+### Surveys
+
+| Area | Routes |
+|------|--------|
+| **Public API** | `/public/surveys`, `/public/surveys/{slug}`, POST `.../respond` |
+| **Authenticated** | `/surveys/active`, `/surveys/{survey}`, POST `.../responses`, GET `.../has-answered` |
+
+### PWA & push
+
+| Area | Routes |
+|------|--------|
+| **Session + web auth** | Prefix `/pwa`: POST `push/subscribe`, `push/unsubscribe`; GET `session/validate` |
+| **Bearer (Next.js)** | POST `/push/subscribe`, `/push/unsubscribe` (sanctum) |
+
+### Search alerts, estimator, heatmap, NLP
+
+| Path | Controller |
+|------|------------|
+| CRUD `/search-alerts` | `SearchAlertController` |
+| GET `/rent-estimate` | `RentEstimatorController` |
+| GET `/price-heatmap` | `PriceHeatmapController` |
+| GET `/ads/{ad}/keyscore` | `KeyScoreController` |
+| POST `/search/parse` | `NaturalSearchController` |
+
+### API controller files (`app/Http/Controllers/Api/V1/`)
+
+`AdController`, `AdAiController`, `AdAnalyticsController`, `AdInteractionController`, `AdReportController`, `AdTypeController`, `AgencyController`, `AuthController`, `CityController`, `ClerkWebhookController`, `CreditController`, `InvoiceController`, `KeyScoreController`, `LeaseContractController`, `MyAdsController`, `MyReviewsController`, `NaturalSearchController`, `NotificationController`, `PaymentController`, `PriceHeatmapController`, `PropertyAttributeController`, `PublicSurveyController`, `PwaController`, `QuarterController`, `RecommendationController`, `RentEstimatorController`, `ReviewController`, `SearchAlertController`, `SocialAuthController`, `SubscriptionController`, `SurveyController`, `TourController`, `UserController`, `ViewingAvailabilityController`, `ViewingReservationController`, `VisitTrackingController`, `RefundController`, `Auth/EmailVerificationController`, `DocController` (empty stub — see §60).
+
+---
+
+## 50. Web Routes & Server-Side Infrastructure
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/manifest.json` | `PwaManifestController` — PWA manifest |
+| GET | `/` | Redirect to Filament login / welcome |
+| GET | `/auth/panel-sso` | `PanelSsoController` — signed SSO into Filament |
+| GET | `/email/verify/{id}/{hash}` | API-oriented email verification |
+| GET | `/auth/verify-email/{id}/{hash}` | `Auth\VerifyEmailController` |
+| GET | `/verify-email` | Query-driven redirect helper |
+| GET | `/login` | Redirect to `/owner/login` |
+| GET | `/tour-image/{adId}/{path}` | `TourImageProxyController` — tour tiles, CORS-safe |
+| GET | `/media-proxy/{uuid}` | `MediaProxyController` — Spatie media preview |
+| GET/POST | `/email/unsubscribe/{token}`, `/email/preferences/{token}` | Tokenized email preference & unsubscribe |
+| POST | `/panel-api/v1/...` | Session-auth tour upload/hotspots (mirrors API for Filament Livewire) |
+
+---
+
+## 51. Filament Panels (Admin, Bailleur, Agency)
+
+| Panel | Provider | Path / domain | Tenancy |
+|-------|----------|---------------|---------|
+| **Admin** | `AdminPanelProvider` | `/admin`, optional `admin_domain` | — |
+| **Bailleur** | `BailleurPanelProvider` | `/owner` | — |
+| **Agency** | `AgencyPanelProvider` | `/agency` | Tenant: `Agency` model |
+
+Shared auth pages: `app/Filament/Pages/Auth/EditProfile.php`, `CustomRegister.php`.
+
+### Admin resources (model)
+
+`Ad`, `Ad` (pending), `UnlockedAd`, `AdReport`, `AdType`, `City`, `Quarter`, `User`, `Agency`, `Review`, `Payment`, `Subscription`, `SubscriptionPlan`, `PointPackage`, `PointTransaction`, `PropertyAttribute`, `PropertyAttributeCategory`, `Survey`, `Survey` (templates), `Activity` (Spatie activity log).
+
+**Admin pages:** `Dashboard`, `ForcePasswordChange`, `ManageSettings`, plus CRUD pages under each resource.
+
+**Admin widgets (examples):** `StatsOverview`, `UserChart`, `UserStatusChart`, `AcquisitionStatsOverview`, `ActivationStatsOverview`, `ActiveAlertsWidget`, `AdsByCityChart`, `AdsByTypeChart`, `CohortRetentionChart`, `ConversionFunnelWidget`, `ExportActionsWidget`, `GeographicHeatmapWidget`, `InteractionStatsOverview`, `InteractionTrendChart`, `PendingAdsStats`, `QualityStatsOverview`, `RetentionStatsOverview`, `RevenueAdvancedStats`, `RevenueChart`, `RevenueProjectionChart`, and others under `app/Filament/Admin/Widgets/`.
+
+### Bailleur (`owner`) resources
+
+`Ad`, `Subscription`, `Payment`, `Review`, `LeaseContract`, `TentativeReservation` (viewings), `Schedule` (availability).
+
+**Widgets:** `StatsOverview`, `AdViewsChart`, `QuarterPricingWidget`, `TopAdsTable`, etc.
+
+### Agency resources (tenant-scoped)
+
+`Ad`, `Payment`, `Review`.
+
+**Pages:** `Dashboard`, `ManageSubscription`.
+
+**Widgets:** `StatsOverview`, `AdViewsChart`, `TopAdsTable`, Filament `AccountWidget`.
+
+### Shared ad resource logic
+
+`app/Filament/Resources/Ads/Concerns/SharedAdResource.php` — common form/table behavior for Admin / Bailleur / Agency `AdResource`.
+
+**Filament front-end assets:** `resources/js/filament/tour-hotspot-editor.js` — Photo Sphere Viewer (CDN) for hotspot editing in admin/agency flows.
+
+**Note:** `app/Filament/Widgets/StatsOverview.php` exists outside panel widget trees — treat as legacy/shared unless referenced explicitly.
+
+---
+
+## 52. Filament Shared — Forms, Exports, Imports
+
+| Folder | Files / role |
+|--------|----------------|
+| `app/Filament/Forms/Components/` | `NativeImageUpload`, `NativeLocationPicker`, `NativePhoneInput` |
+| `app/Filament/Exports/` | `AdExporter`, `QuarterExporter`, `UnlockedAdExporter`, `UserExporter` |
+| `app/Filament/Imports/` | `PaymentImporter`, `QuarterImporter`, `UnlockedAdImporter`, `UserImporter` |
+
+---
+
+## 53. Background Jobs
+
+| Job | Role |
+|-----|------|
+| `MatchSearchAlertsForAdJob` | Matches a published/updated ad to active `SearchAlert` rows; notifies users (rate-limited repeat sends). |
+| `ProcessTourSceneJob` | Converts equirectangular tour scene to cubemap/multires tiles; updates ad `tour_config`; cleans storage on failure. |
+| `ExpireStaleReservationsJob` | Expires stale tentative viewing reservations via `ReservationService`. |
+
+---
+
+## 54. Mail (Mailables)
+
+All under `app/Mail/` (plus trait `Concerns/HasUnsubscribeLinks`).
+
+| Category | Classes |
+|----------|---------|
+| **Ads / moderation** | `AdApprovedMail`, `AdDeclinedMail`, `AdSubmissionConfirmationMail`, `NewAdSubmissionMail`, `NewAdReportMail`, `AdReportReceivedMail` |
+| **Unlock / payments** | `AdUnlockConfirmationMail`, `CreditPurchaseConfirmationMail`, `SubscriptionInvoiceMail`, `SubscriptionSuccessEmail`, `SubscriptionExpiringEmail`, `RefundConfirmationMail` (stub) |
+| **Search alerts** | `SearchAlertMatchMail` |
+| **Auth / security** | `ForgotPasswordMail`, `ResetPasswordMail`, `VerifyEmailMail`, `VerificationCodeMail`, `MagicLinkSignInMail`, `MagicLinkSignUpMail`, `WelcomeEmail`, `AdminWelcomeEmail`, `AgencyWelcomeEmail`, `BailleurWelcomeEmail`, `PasswordChangedMail`, `EmailUpdatedMail`, `NewDeviceSignInMail`, `NewLocationSignInMail`, `PasskeyChangedMail` |
+| **Admin ops** | `AdminActionNotifyMail`, `AdminActionPerformedMail` |
+| **Other** | `InvitationMail`, `PricingVerificationMail`, `SurveySubmittedMail`, `SurveyAdminNotificationMail` |
+
+---
+
+## 55. Notifications
+
+All under `app/Notifications/` (many implement `ShouldQueue`; channels: `mail`, `database`, `WebPush` as configured per class).
+
+| Notification | Role |
+|----------------|------|
+| `AdExpiring` | Listing about to expire |
+| `AdReportReceivedNotification` | Reporter acknowledgment |
+| `AdStatusChanged` | Owner status change |
+| `AdminCrudAction` | Peer admins notified of CRUD |
+| `ChurnAlertNotification` | Landlord churn risk |
+| `FraudAlertNotification` | Report spike alert |
+| `InactiveLandlordNotification` | 30d inactivity nudge |
+| `LowViewsAdNotification` | No views in 14 days |
+| `NewAdListingReportNotification` | New report for staff |
+| `NewAdPending` | New listing to moderate |
+| `NewAnonymousSurveyResponse` | Anonymous survey submitted |
+| `NewReview` | New review on owner’s ad |
+| `PaymentReceived` | Payment success |
+| `ReservationCancelledNotification` | Viewing cancelled |
+| `ReservationConfirmedClientNotification` | Client: confirmed |
+| `ReservationCreatedClientNotification` | Client: pending |
+| `ReservationCreatedLandlordNotification` | Landlord: new request |
+| `ReservationExpiredNotification` | Slot expired |
+| `RevenueDropNotification` | Month-over-month revenue drop |
+| `SearchAlertMatchNotification` | In-app + push for alert match |
+| `StalePaymentsDetectedNotification` | Stale pending payments cleanup |
+
+---
+
+## 56. Eloquent Observers
+
+| Observer | Models / role |
+|----------|----------------|
+| `ActivityObserver` | Spatie `Activity` — fan-out admin mails on activity |
+| `AdObserver` | `Ad` — tour defaults, boost, emails/notifications, `MatchSearchAlertsForAdJob` on relevant changes |
+| `PaymentObserver` | `Payment` — bust recommendation cache on success |
+| `TentativeReservationObserver` | `TentativeReservation` — reservation lifecycle notifications |
+
+---
+
+## 57. Artisan Commands & Scheduler
+
+### Scheduled tasks (`routes/console.php`)
+
+| Schedule | Command / job |
+|----------|----------------|
+| Daily | `app:check-subscription-expirations` |
+| Daily | `app:check-admin-alerts` |
+| Daily | `app:cleanup-stale-payments` |
+| Monthly (1st 08:00) | `app:send-monthly-report` |
+| Every 30 min | `ExpireStaleReservationsJob` |
+| Daily 01:00 / 02:00 | `backup:clean`, `backup:run` (Spatie Laravel Backup) |
+
+### Commands (`app/Console/Commands/`)
+
+| Signature (or file) | Role |
+|---------------------|------|
+| `tour:backfill-pano-metadata` | Recompute panorama metadata for tours |
+| `app:check-admin-alerts` | Fraud, churn, inactive landlords, low views, revenue |
+| `app:check-subscription-expirations` | J-7 / J-3 / J-1 subscription emails |
+| `app:cleanup-stale-payments` | Mark old PENDING payments failed + notify |
+| `app:create-admin` | Bootstrap admin user |
+| `app:create-test-users` | Demo users + welcome mails |
+| `app:migrate-ad-images-to-spatie` | Legacy image migration |
+| `quarters:recalculate-pricing` | Quarter stats from active ads |
+| `user:reset-onboarding` | Reset onboarding flag for QA |
+| `app:send-monthly-report` | PDF metrics to admins |
+| `push:test` | Test Web Push |
+| `meilisearch:sync-settings` | Scout / Meilisearch index settings |
+| `test:tenancy` | Spark / agency vs landlord promotion simulation |
+| `make:upload-attributes` | Seed property attributes catalog |
+
+---
+
+## 58. Services Layer
+
+Files under `app/Services/` (and `Payment/`): **`RecommendationEngine`**, **`AiSearchService`**, **`AiDescriptionEnhancer`**, **`NaturalSearchRegexParser`**, **`SubscriptionService`**, **`TourService`**, **`ViewingScheduleService`**, **`ReservationService`**, **`LeaseContractService`**, **`AgencyService`**, **`PointService`**, **`AdBoostService`**, **`AdReportService`**, **`KeyScoreService`**, **`AdminMetricsService`**, **`FlutterwavePaymentService`**, **`PaymentService`**, **`RefundService`**, **`ClerkJwtService`**, **`WebPushService`**, **`NativeAppService`**, **`UserAgentParser`**, **`PropertyAttributeImportService`**, **`PanoramaProcessor`**, **`Media/MediaPathGenerator`**, plus interfaces in `Contracts/`.
+
+---
+
+## 59. Eloquent Models
+
+`app/Models/` (35 PHP files): **`Ad`**, **`AdType`**, **`AdReport`**, **`AdInteraction`**, **`Agency`**, **`AnonymousSurveyAnswer`**, **`AnonymousSurveyResponse`**, **`City`**, **`Quarter`**, **`PropertyAttribute`**, **`PropertyAttributeCategory`**, **`User`**, **`PersonalAccessToken`**, **`Review`**, **`Survey`**, **`SurveyQuestion`**, **`SurveyResponse`**, **`SearchAlert`**, **`Payment`**, **`Refund`**, **`Invoice`**, **`PointPackage`**, **`PointTransaction`**, **`Subscription`**, **`SubscriptionPlan`**, **`UnlockedAd`**, **`LeaseContract`**, **`TentativeReservation`**, **`EmailPreference`**, **`PushSubscription`**, **`SiteVisit`**, **`Setting`**, **`Zap/Schedule`**, **`Zap/SchedulePeriod`**, **`Scopes/LandlordScope`**.
+
+---
+
+## 60. Orphan / Legacy Code Notes
+
+| Item | Note |
+|------|------|
+| `App\Http\Controllers\AnonymousSurveyController` | Blade-oriented survey flow; **not registered** in `routes/web.php` or `routes/api.php` in current tree — API uses `PublicSurveyController` + `SurveyController` instead. |
+| `App\Http\Controllers\Api\V1\DocController` | **Empty class**; Swagger UI is served by **darkaonline/l5-swagger** package routes. |
+| **Pulse / Nightwatch / Sentry** | Operational monitoring configured via env & Laravel ecosystem packages — not duplicated here. |
+
+---
+
 ## Summary Statistics
 
-| Category | Count |
+| Category | Count (approx.) |
 |---|---|
-| **Total source files** | 130 |
-| **Top-level features** | 47 |
-| **Service modules** | 13 |
-| **React components** | 50+ |
-| **Custom hooks** | 4 |
-| **Context providers** | 5 |
-| **Route pages** | 30+ |
-| **Unit test files** | 12 |
-| **API endpoints consumed** | 45+ |
+| **Part A — Next.js source files cited** | 130 |
+| **Part A — top-level feature sections** | 47 |
+| **Part B — top-level backend sections** | 13 (§48–60) |
+| **Part B — Filament `*Resource.php` files** | 31 (30 panel resources + 1 shared concern file named `*Resource.php`) |
+| **Part B — API v1 controller classes** | 40+ under `Api/V1/` |
+| **Part B — Artisan commands** | 15 files in `app/Console/Commands/` |
+| **Part B — Mailables** | 35+ classes in `app/Mail/` |
+| **Part B — Notification classes** | 22 in `app/Notifications/` |
+| **Part B — Eloquent models** | 35 files in `app/Models/` |
+| **Part B — Service classes** | 27 PHP files under `app/Services/` |
+| **Frontend service modules (Part A)** | 13 |
+| **React components (Part A)** | 50+ |
+| **Custom hooks (Part A)** | 4 |
+| **Context providers (Part A)** | 5 |
+| **Route pages (Part A)** | 30+ |
+| **Frontend unit test files (Part A)** | 12 |
+| **API endpoints consumed by Next (Part A)** | 45+ |
