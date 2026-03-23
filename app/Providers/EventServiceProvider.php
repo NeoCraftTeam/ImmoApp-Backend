@@ -7,11 +7,17 @@ namespace App\Providers;
 use App\Events\AdCreated;
 use App\Events\AdStatusTransitioned;
 use App\Listeners\AutoBoostNewAd;
+use App\Listeners\LogAuthenticationEvents;
 use App\Listeners\MatchSearchAlertsOnAdAvailable;
 use App\Listeners\NotifyAdminsOfPendingAd;
 use App\Listeners\NotifyOwnerOfStatusChange;
 use App\Listeners\SendBackupByEmailListener;
 use App\Listeners\SendWelcomeNotification;
+use Illuminate\Auth\Events\Failed;
+use Illuminate\Auth\Events\Lockout;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use SocialiteProviders\Apple\AppleExtendSocialite;
@@ -52,6 +58,27 @@ class EventServiceProvider extends ServiceProvider
             NotifyOwnerOfStatusChange::class,
             NotifyAdminsOfPendingAd::class,
             MatchSearchAlertsOnAdAvailable::class,
+        ],
+
+        // Security audit trail — log all auth events
+        Login::class => [
+            [LogAuthenticationEvents::class, 'handleLogin'],
+        ],
+
+        Logout::class => [
+            [LogAuthenticationEvents::class, 'handleLogout'],
+        ],
+
+        Failed::class => [
+            [LogAuthenticationEvents::class, 'handleFailed'],
+        ],
+
+        Lockout::class => [
+            [LogAuthenticationEvents::class, 'handleLockout'],
+        ],
+
+        PasswordReset::class => [
+            [LogAuthenticationEvents::class, 'handlePasswordReset'],
         ],
     ];
 
