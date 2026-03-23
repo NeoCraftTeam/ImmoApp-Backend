@@ -5,8 +5,13 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\V1\AdInteractionController;
 use App\Http\Controllers\Api\V1\AdTypeController;
 use App\Http\Controllers\Api\V1\AgencyController;
+use App\Http\Controllers\Api\V1\BoostController;
+use App\Http\Controllers\Api\V1\BulkAdController;
 use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\ClerkWebhookController;
+use App\Http\Controllers\Api\V1\DocumentController;
+use App\Http\Controllers\Api\V1\DuplicateAdController;
+use App\Http\Controllers\Api\V1\ExpenseController;
 use App\Http\Controllers\Api\V1\GdprController;
 use App\Http\Controllers\Api\V1\HealthCheckController;
 use App\Http\Controllers\Api\V1\LeaseContractController;
@@ -14,6 +19,7 @@ use App\Http\Controllers\Api\V1\MyReviewsController;
 use App\Http\Controllers\Api\V1\NaturalSearchController;
 use App\Http\Controllers\Api\V1\NewsletterController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\NotificationPreferenceController;
 use App\Http\Controllers\Api\V1\PriceHeatmapController;
 use App\Http\Controllers\Api\V1\PropertyAttributeController;
 use App\Http\Controllers\Api\V1\PwaController;
@@ -21,6 +27,7 @@ use App\Http\Controllers\Api\V1\QuarterController;
 use App\Http\Controllers\Api\V1\RecommendationController;
 use App\Http\Controllers\Api\V1\RentEstimatorController;
 use App\Http\Controllers\Api\V1\SearchAlertController;
+use App\Http\Controllers\Api\V1\TenantController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\VisitTrackingController;
 use App\Http\Resources\TestimonialResource;
@@ -215,4 +222,46 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])
         ->middleware('throttle:5,10');
     Route::get('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'unsubscribe']);
+
+    // --- BOOST (owner) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/boost-plans', [BoostController::class, 'plans']);
+        Route::get('/my/ads/{ad}/boost-status', [BoostController::class, 'status']);
+        Route::post('/my/ads/{ad}/boost', [BoostController::class, 'boost'])->middleware('throttle:10,1');
+        Route::delete('/my/ads/{ad}/boost', [BoostController::class, 'unboost']);
+        Route::post('/my/ads/{ad}/duplicate', [DuplicateAdController::class, 'store']);
+        Route::put('/my/ads/bulk-update', [BulkAdController::class, 'bulkUpdate']);
+        Route::post('/my/ads/bulk-delete', [BulkAdController::class, 'bulkDelete']);
+    });
+
+    // --- TENANTS (owner) ---
+    Route::middleware('auth:sanctum')->prefix('my/tenants')->controller(TenantController::class)->group(function (): void {
+        Route::get('/', 'index');
+        Route::post('/', 'store')->middleware('throttle:30,1');
+        Route::get('/{tenant}', 'show');
+        Route::put('/{tenant}', 'update');
+        Route::delete('/{tenant}', 'destroy');
+    });
+
+    // --- EXPENSES (owner, per property) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/ads/{ad}/expenses', [ExpenseController::class, 'index']);
+        Route::post('/my/ads/{ad}/expenses', [ExpenseController::class, 'store'])->middleware('throttle:30,1');
+        Route::get('/my/ads/{ad}/profit-loss', [ExpenseController::class, 'profitLoss']);
+        Route::delete('/my/expenses/{expense}', [ExpenseController::class, 'destroy']);
+    });
+
+    // --- DOCUMENTS (owner, per property) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/ads/{ad}/documents', [DocumentController::class, 'index']);
+        Route::post('/my/ads/{ad}/documents', [DocumentController::class, 'store'])->middleware('throttle:20,1');
+        Route::get('/my/documents/{document}/download', [DocumentController::class, 'download']);
+        Route::delete('/my/documents/{document}', [DocumentController::class, 'destroy']);
+    });
+
+    // --- NOTIFICATION PREFERENCES (owner) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/notification-preferences', [NotificationPreferenceController::class, 'show']);
+        Route::put('/my/notification-preferences', [NotificationPreferenceController::class, 'update']);
+    });
 });
