@@ -8,6 +8,8 @@ use App\Filament\Admin\Resources\Agencies\Pages\CreateAgency;
 use App\Filament\Admin\Resources\Agencies\Pages\EditAgency;
 use App\Filament\Admin\Resources\Agencies\Pages\ListAgencies;
 use App\Filament\Admin\Resources\Agencies\Pages\ViewAgency;
+use App\Filament\Admin\Resources\Agencies\RelationManagers\MembersRelationManager;
+use App\Filament\Admin\Resources\Agencies\RelationManagers\SubscriptionsRelationManager;
 use App\Filament\Admin\Resources\Agencies\Schemas\AgencyForm;
 use App\Filament\Admin\Resources\Agencies\Schemas\AgencyInfolist;
 use App\Filament\Admin\Resources\Agencies\Tables\AgenciesTable;
@@ -69,7 +71,8 @@ class AgencyResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            MembersRelationManager::class,
+            SubscriptionsRelationManager::class,
         ];
     }
 

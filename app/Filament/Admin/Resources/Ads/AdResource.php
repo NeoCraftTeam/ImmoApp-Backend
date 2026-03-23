@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources\Ads;
 
 use App\Enums\AdStatus;
-use App\Filament\Admin\Resources\Ads\Pages\ManageAds;
+use App\Filament\Admin\Resources\Ads\Pages\CreateAd;
+use App\Filament\Admin\Resources\Ads\Pages\EditAd;
+use App\Filament\Admin\Resources\Ads\Pages\ListAds;
+use App\Filament\Admin\Resources\Ads\Pages\ViewAd;
+use App\Filament\Admin\Resources\Ads\RelationManagers\PaymentsRelationManager;
 use App\Filament\Exports\AdExporter;
 use App\Filament\Imports\AdImporter;
 use App\Filament\Resources\Ads\Concerns\SharedAdResource;
 use App\Models\Ad;
 use BackedEnum;
+use Carbon\Carbon;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -22,14 +27,19 @@ use Filament\Actions\ImportAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Actions\BulkAction;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use UnitEnum;
 
@@ -94,6 +104,65 @@ class AdResource extends Resource
                 SelectFilter::make('status')
                     ->options(AdStatus::class)
                     ->label('Statut'),
+                SelectFilter::make('type_id')
+                    ->label('Type de bien')
+                    ->relationship('ad_type', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->native(false),
+                SelectFilter::make('quarter')
+                    ->label('Quartier')
+                    ->relationship('quarter', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->native(false),
+                Filter::make('price_range')
+                    ->label('Fourchette de prix')
+                    ->form([
+                        TextInput::make('price_from')
+                            ->label('Prix min')
+                            ->numeric()
+                            ->prefix('XAF'),
+                        TextInput::make('price_to')
+                            ->label('Prix max')
+                            ->numeric()
+                            ->prefix('XAF'),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when($data['price_from'], fn (Builder $q, $price) => $q->where('price', '>=', $price))
+                            ->when($data['price_to'], fn (Builder $q, $price) => $q->where('price', '<=', $price));
+                    }),
+                Filter::make('created_at')
+                    ->label('Date de publication')
+                    ->form([
+                        DatePicker::make('created_from')
+                            ->label('Du')
+                            ->native(false),
+                        DatePicker::make('created_until')
+                            ->label('Au')
+                            ->native(false),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query
+                            ->when($data['created_from'], fn (Builder $q, $date) => $q->whereDate('created_at', '>=', $date))
+                            ->when($data['created_until'], fn (Builder $q, $date) => $q->whereDate('created_at', '<=', $date));
+                    })
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+                        if ($data['created_from'] ?? null) {
+                            $indicators[] = 'Depuis le '.Carbon::parse($data['created_from'])->format('d/m/Y');
+                        }
+                        if ($data['created_until'] ?? null) {
+                            $indicators[] = 'Avant le '.Carbon::parse($data['created_until'])->format('d/m/Y');
+                        }
+
+                        return $indicators;
+                    }),
+                Filter::make('has_tour')
+                    ->label('Avec visite 3D')
+                    ->toggle()
+                    ->query(fn (Builder $query) => $query->where('has_3d_tour', true)),
             ])
             ->recordActions([
                 ViewAction::make(),
@@ -117,6 +186,33 @@ class AdResource extends Resource
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    BulkAction::make('approve')
+                        ->label('Approuver')
+                        ->icon(Heroicon::CheckCircle)
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (Collection $records): void {
+                            $records->each(fn (Ad $ad) => $ad->update(['status' => AdStatus::AVAILABLE]));
+                        }),
+                    BulkAction::make('reject')
+                        ->label('Rejeter')
+                        ->icon(Heroicon::XCircle)
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (Collection $records): void {
+                            $records->each(fn (Ad $ad) => $ad->update(['status' => AdStatus::REJECTED]));
+                        }),
+                    BulkAction::make('archive')
+                        ->label('Archiver')
+                        ->icon(Heroicon::ArchiveBox)
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (Collection $records): void {
+                            $records->each(fn (Ad $ad) => $ad->update(['status' => AdStatus::ARCHIVED]));
+                        }),
                     DeleteBulkAction::make(),
                     ForceDeleteBulkAction::make(),
                     RestoreBulkAction::make(),
@@ -125,10 +221,21 @@ class AdResource extends Resource
     }
 
     #[\Override]
+    public static function getRelations(): array
+    {
+        return [
+            PaymentsRelationManager::class,
+        ];
+    }
+
+    #[\Override]
     public static function getPages(): array
     {
         return [
-            'index' => ManageAds::route('/'),
+            'index' => ListAds::route('/'),
+            'create' => CreateAd::route('/create'),
+            'view' => ViewAd::route('/{record}'),
+            'edit' => EditAd::route('/{record}/edit'),
         ];
     }
 

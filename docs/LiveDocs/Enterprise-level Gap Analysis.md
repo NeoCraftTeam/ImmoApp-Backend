@@ -2,7 +2,7 @@
 
 > **Audit date:** March 21, 2026 (updated)
 > **Stack:** Laravel 12 · Next.js 16 · React Native (Expo) · PostgreSQL/PostGIS · Redis · Meilisearch · Docker
-> **Score:** 72/100 — Strong foundation, critical security & compliance gaps
+> **Score:** 74/100 — Strong foundation, critical security & compliance gaps, admin panel enhanced
 
 ---
 
@@ -180,11 +180,13 @@
 ### 16b. Filament Admin Enhancement
 
 > **Gap:** 3 panels exist (Admin 17 resources, Agency 3, Bailleur 6) but missing enterprise-grade admin features.
+> **Updated:** Relation managers, bulk actions, and advanced filters now implemented.
 
-- [ ] **Relation Managers** — zero nested CRUD: add `AdsRelationManager` on `UserResource`, `ScenesRelationManager` on `TourResource`, `PaymentsRelationManager` on `AdResource`
+- [x] **Relation Managers** — `AdsRelationManager` + `PaymentsRelationManager` on `UserResource`, `PaymentsRelationManager` on `AdResource`, `MembersRelationManager` + `SubscriptionsRelationManager` on `AgencyResource`
+- [x] **Full Resource Pages** — `UserResource` and `AdResource` converted from simple (ManageRecords) to full resources (List + View + Edit + Create) to support relation managers
 - [ ] **Permission Management UI** — policies are defined but no way for admins to manage roles/permissions in the panel
-- [ ] **Bulk status actions** — approve/reject/archive multiple ads at once
-- [ ] **Advanced filters** — saved filter presets, date range pickers on all list pages
+- [x] **Bulk status actions** — approve/reject/archive multiple ads at once on AdResource
+- [x] **Advanced filters** — date range pickers, city filter, email verified toggle, price range, ad type, quarter, 3D tour filter on User & Ad list pages
 - [ ] **Notification center** — Filament's built-in notification system for admin alerts
 - [ ] **Media Manager** — centralized media browser (Spatie MediaLibrary integration)
 - [ ] **Webhook management** — admin UI to configure & test webhook endpoints
@@ -413,12 +415,12 @@
 | **P2** | Full OpenAPI documentation | Developer experience | Medium |
 | **P2** | CI pipeline: Pint + PHPStan + Playwright | Quality gate | Low |
 | **P2** | Feature flags (Laravel Pennant) | Safe deployments | Low |
-| **P2** | Filament: Relation Managers + permissions UI | Admin productivity | Medium |
+| **P2** | ~~Filament: Relation Managers~~ + permissions UI | Admin productivity | ✅ Relation Managers done |
 | **P3** | `RealEstateListing` schema on ad pages | SEO ranking boost | Low |
 | **P3** | City/type page rich content + internal linking | Organic traffic | Medium |
 | **P3** | Lighthouse CI + ISR optimization | Core Web Vitals | Medium |
 | **P3** | Real-time notifications (WebSocket) | User engagement | Medium |
-| **P3** | Filament Notification Center + bulk actions | Admin UX | Low |
+| **P3** | ~~Filament Notification Center + bulk actions~~ | Admin UX | ✅ Bulk actions done |
 | **P4** | Log aggregation (ELK/Loki) | Ops maturity | Medium |
 | **P4** | Horizon queue monitoring | Reliability | Low |
 | **P4** | A/B testing framework | Growth optimization | Medium |
@@ -435,7 +437,7 @@
 > | **Backend Architecture** | 7/10 | Good patterns, missing 14 policies + event-driven arch |
 > | **Security** | 5/10 | Auth exists but critical authorization gaps + no 2FA |
 > | **Test Coverage** | 5/10 | 52 tests but 23 controllers untested, 0 browser tests |
-> | **Filament Admin** | 7/10 | Feature-rich but no relation managers or permission UI |
+> | **Filament Admin** | 8/10 | Relation managers, bulk actions, advanced filters added; permissions UI + media manager remaining |
 > | **Frontend & SEO** | 8/10 | Excellent structured data, PWA, ISR — best dimension |
 > | **Infrastructure** | 7/10 | Docker+CI solid, but wrong cache/queue defaults for prod |
 >

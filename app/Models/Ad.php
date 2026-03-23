@@ -420,6 +420,12 @@ class Ad extends Model implements HasMedia
         return $favorites > $unfavorites;
     }
 
+    /** @return HasMany<Payment, $this> */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
     /**
      * @return BelongsTo<AdType, $this>
      */

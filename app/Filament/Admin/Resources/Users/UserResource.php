@@ -6,11 +6,17 @@ namespace App\Filament\Admin\Resources\Users;
 
 use App\Enums\UserRole;
 use App\Enums\UserType;
-use App\Filament\Admin\Resources\Users\Pages\ManageUsers;
+use App\Filament\Admin\Resources\Users\Pages\CreateUser;
+use App\Filament\Admin\Resources\Users\Pages\EditUser;
+use App\Filament\Admin\Resources\Users\Pages\ListUsers;
+use App\Filament\Admin\Resources\Users\Pages\ViewUser;
+use App\Filament\Admin\Resources\Users\RelationManagers\AdsRelationManager;
+use App\Filament\Admin\Resources\Users\RelationManagers\PaymentsRelationManager;
 use App\Filament\Exports\UserExporter;
 use App\Filament\Imports\UserImporter;
 use App\Models\User;
 use BackedEnum;
+use Carbon\Carbon;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -24,11 +30,15 @@ use Filament\Actions\ImportAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\ImageEntry;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -60,6 +70,13 @@ class UserResource extends Resource
     protected static ?string $modelLabel = 'Utilisateur';
 
     protected static ?string $pluralModelLabel = 'Utilisateurs';
+
+    #[\Override]
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with(['city', 'agency']);
+    }
 
     #[\Override]
     public static function form(Schema $schema): Schema
@@ -172,6 +189,55 @@ class UserResource extends Resource
     }
 
     #[\Override]
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                \Filament\Infolists\Components\Section::make('Informations personnelles')
+                    ->icon(Heroicon::User)
+                    ->columns(2)
+                    ->schema([
+                        ImageEntry::make('avatar')
+                            ->label('Avatar')
+                            ->circular()
+                            ->disk(config('filesystems.app_media_disk'))
+                            ->defaultImageUrl(fn ($record) => 'https://ui-avatars.com/api/?name='.urlencode($record->firstname.' '.$record->lastname).'&background=F6475F&color=fff'),
+                        TextEntry::make('full_name')
+                            ->label('Nom complet')
+                            ->formatStateUsing(fn ($record) => $record->firstname.' '.$record->lastname),
+                        TextEntry::make('email')
+                            ->label('Email')
+                            ->copyable(),
+                        TextEntry::make('phone_number')
+                            ->label('Téléphone')
+                            ->copyable(),
+                        TextEntry::make('type')
+                            ->label('Type')
+                            ->badge(),
+                        TextEntry::make('role')
+                            ->label('Rôle')
+                            ->badge(),
+                        IconEntry::make('is_active')
+                            ->label('Actif')
+                            ->boolean(),
+                        TextEntry::make('city.name')
+                            ->label('Ville'),
+                        TextEntry::make('email_verified_at')
+                            ->label('Email vérifié le')
+                            ->dateTime('d/m/Y à H:i')
+                            ->placeholder('Non vérifié'),
+                        TextEntry::make('created_at')
+                            ->label('Créé le')
+                            ->dateTime('d/m/Y à H:i'),
+                        TextEntry::make('last_login_at')
+                            ->label('Dernière connexion')
+                            ->dateTime('d/m/Y à H:i')
+                            ->placeholder('Jamais connecté'),
+                    ]),
+            ]);
+    }
+
+    #[\Override]
     public static function table(Table $table): Table
     {
         return $table
@@ -275,6 +341,46 @@ class UserResource extends Resource
                     'agency' => 'Agence',
                 ])
                 ->native(false),
+            SelectFilter::make('city_id')
+                ->label('Ville')
+                ->relationship('city', 'name')
+                ->searchable()
+                ->preload()
+                ->native(false),
+            Filter::make('created_at')
+                ->label('Date d\'inscription')
+                ->form([
+                    DatePicker::make('created_from')
+                        ->label('Du')
+                        ->native(false),
+                    DatePicker::make('created_until')
+                        ->label('Au')
+                        ->native(false),
+                ])
+                ->query(function (Builder $query, array $data): Builder {
+                    return $query
+                        ->when($data['created_from'], fn (Builder $q, $date) => $q->whereDate('created_at', '>=', $date))
+                        ->when($data['created_until'], fn (Builder $q, $date) => $q->whereDate('created_at', '<=', $date));
+                })
+                ->indicateUsing(function (array $data): array {
+                    $indicators = [];
+                    if ($data['created_from'] ?? null) {
+                        $indicators[] = 'Inscrit depuis le '.Carbon::parse($data['created_from'])->format('d/m/Y');
+                    }
+                    if ($data['created_until'] ?? null) {
+                        $indicators[] = 'Inscrit avant le '.Carbon::parse($data['created_until'])->format('d/m/Y');
+                    }
+
+                    return $indicators;
+                }),
+            Filter::make('email_verified')
+                ->label('Email vérifié')
+                ->toggle()
+                ->query(fn (Builder $query) => $query->whereNotNull('email_verified_at')),
+            Filter::make('has_ads')
+                ->label('Avec annonces')
+                ->toggle()
+                ->query(fn (Builder $query) => $query->has('ads')),
         ];
     }
 
@@ -329,10 +435,22 @@ class UserResource extends Resource
     }
 
     #[\Override]
+    public static function getRelations(): array
+    {
+        return [
+            AdsRelationManager::class,
+            PaymentsRelationManager::class,
+        ];
+    }
+
+    #[\Override]
     public static function getPages(): array
     {
         return [
-            'index' => ManageUsers::route('/'),
+            'index' => ListUsers::route('/'),
+            'create' => CreateUser::route('/create'),
+            'view' => ViewUser::route('/{record}'),
+            'edit' => EditUser::route('/{record}/edit'),
         ];
     }
 
