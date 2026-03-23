@@ -31,7 +31,7 @@ use Illuminate\Support\Facades\Mail;
 use OpenApi\Annotations as OA;
 
 /**
- * @OA\Tag(name="Paiements", description="Gestion des paiements Flutterwave")
+ * @OA\Tag(name="Paiements", description="Gestion des paiements (multi-gateway)")
  */
 final class PaymentController
 {
@@ -69,7 +69,7 @@ final class PaymentController
      *     @OA\Response(response=422, description="Validation échouée")
      * )
      */
-    public function flutterwaveInitiate(FlutterwaveInitiateRequest $request): JsonResponse
+    public function initiate(FlutterwaveInitiateRequest $request): JsonResponse
     {
         $validated = $request->validated();
 
@@ -199,7 +199,7 @@ final class PaymentController
      *     @OA\Response(response=404, description="Paiement introuvable")
      * )
      */
-    public function flutterwaveVerify(FlutterwaveVerifyRequest $request): JsonResponse
+    public function verify(FlutterwaveVerifyRequest $request): JsonResponse
     {
         $validated = $request->validated();
 
@@ -208,7 +208,6 @@ final class PaymentController
 
         $payment = Payment::where('transaction_id', $validated['tx_ref'])
             ->where('user_id', $user->id)
-            ->where('gateway', 'flutterwave')
             ->first();
 
         if (!$payment) {
@@ -254,7 +253,7 @@ final class PaymentController
      *     @OA\Response(response=409, description="Paiement déjà traité")
      * )
      */
-    public function flutterwaveCancel(Request $request): JsonResponse
+    public function cancel(Request $request): JsonResponse
     {
         $request->validate([
             'tx_ref' => ['required', 'string'],
@@ -266,7 +265,6 @@ final class PaymentController
         return DB::transaction(function () use ($user, $request): JsonResponse {
             $payment = Payment::where('transaction_id', $request->input('tx_ref'))
                 ->where('user_id', $user->id)
-                ->where('gateway', 'flutterwave')
                 ->lockForUpdate()
                 ->first();
 
@@ -296,111 +294,55 @@ final class PaymentController
     }
 
     /**
-     * Handle Flutterwave webhook (charge.completed event).
-     *
-     * Validates the verif-hash header and processes the payment update.
+     * Handle a webhook from any supported payment gateway.
+     * The {gateway} route parameter is validated by the route constraint.
      *
      * @OA\Post(
-     *     path="/api/v1/webhooks/flutterwave",
-     *     summary="Webhook Flutterwave",
+     *     path="/api/v1/webhooks/{gateway}",
+     *     summary="Webhook passerelle de paiement",
      *     tags={"💰 Paiements"},
+     *
+     *     @OA\Parameter(name="gateway", in="path", required=true, @OA\Schema(type="string", enum={"flutterwave","fedapay"})),
      *
      *     @OA\Response(response=200, description="Webhook traité"),
      *     @OA\Response(response=401, description="Signature invalide")
      * )
      */
-    public function flutterwaveWebhook(Request $request): JsonResponse
+    public function handleWebhook(Request $request, string $gateway): JsonResponse
     {
-        Log::info('--- WEBHOOK FLUTTERWAVE START ---');
+        Log::info("--- WEBHOOK {$gateway} START ---");
 
         $payload = $request->all();
         $headers = [
             'verif-hash' => (string) $request->header('verif-hash', ''),
             'HTTP_VERIF_HASH' => (string) $request->header('verif-hash', ''),
             'flutterwave-signature' => (string) $request->header('flutterwave-signature', ''),
-        ];
-
-        try {
-            DB::transaction(function () use ($payload, $headers): void {
-                $this->paymentService->processWebhook($payload, $headers, 'flutterwave');
-
-                // Post-processing: handle subscriptions, credit points
-                $txRef = (string) ($payload['data']['tx_ref'] ?? '');
-                $status = (string) ($payload['data']['status'] ?? '');
-
-                if ($txRef === '' || $status !== 'successful') {
-                    return;
-                }
-
-                $payment = Payment::where('transaction_id', $txRef)
-                    ->where('gateway', 'flutterwave')
-                    ->first();
-
-                if (!$payment || !$payment->isPaid()) {
-                    return;
-                }
-
-                $this->handlePostPaymentActions($payment, $payload['data'] ?? []);
-            });
-        } catch (InvalidWebhookSignatureException) {
-            return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
-        } catch (PaymentGatewayException|\Exception $e) {
-            Log::error('Flutterwave webhook error: '.$e->getMessage());
-
-            return response()->json(['status' => 'error'], 500);
-        }
-
-        return response()->json(['status' => 'ok']);
-    }
-
-    /**
-     * Handle FedaPay webhook (transaction.approved event).
-     *
-     * Validates the X-FEDAPAY-SIGNATURE header and processes the payment update.
-     *
-     * @OA\Post(
-     *     path="/api/v1/webhooks/fedapay",
-     *     summary="Webhook FedaPay",
-     *     tags={"💰 Paiements"},
-     *
-     *     @OA\Response(response=200, description="Webhook traité"),
-     *     @OA\Response(response=401, description="Signature invalide")
-     * )
-     */
-    public function fedapayWebhook(Request $request): JsonResponse
-    {
-        Log::info('--- WEBHOOK FEDAPAY START ---');
-
-        $payload = $request->all();
-        $headers = [
             'x-fedapay-signature' => (string) $request->header('x-fedapay-signature', ''),
         ];
 
         try {
-            DB::transaction(function () use ($payload, $headers): void {
-                $this->paymentService->processWebhook($payload, $headers, 'fedapay');
+            DB::transaction(function () use ($payload, $headers, $gateway): void {
+                $data = $this->paymentService->processWebhook($payload, $headers, $gateway);
+                $txRef = (string) ($data['tx_ref'] ?? '');
 
-                $txRef = (string) ($payload['transaction']['custom_metadata']['tx_ref'] ?? '');
-                $status = (string) ($payload['event'] ?? '');
-
-                if ($txRef === '' || $status !== 'transaction.approved') {
+                if ($txRef === '') {
                     return;
                 }
 
                 $payment = Payment::where('transaction_id', $txRef)
-                    ->where('gateway', 'fedapay')
+                    ->where('gateway', $gateway)
                     ->first();
 
                 if (!$payment || !$payment->isPaid()) {
                     return;
                 }
 
-                $this->handlePostPaymentActions($payment, $payload['transaction'] ?? []);
+                $this->handlePostPaymentActions($payment, (array) ($data['raw'] ?? []));
             });
         } catch (InvalidWebhookSignatureException) {
             return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
         } catch (PaymentGatewayException|\Exception $e) {
-            Log::error('FedaPay webhook error: '.$e->getMessage());
+            Log::error("{$gateway} webhook error: ".$e->getMessage());
 
             return response()->json(['status' => 'error'], 500);
         }

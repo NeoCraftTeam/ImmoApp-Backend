@@ -226,8 +226,9 @@ final readonly class PaymentService
      *
      * @param  array<string, mixed>  $payload
      * @param  array<string, mixed>  $headers
+     * @return array<string, mixed> Normalised webhook data from the gateway's handleWebhook
      */
-    public function processWebhook(array $payload, array $headers, string $gatewayName): void
+    public function processWebhook(array $payload, array $headers, string $gatewayName): array
     {
         $gateway = $this->resolveGateway($gatewayName);
         $data = $gateway->handleWebhook($payload, $headers);
@@ -241,13 +242,13 @@ final readonly class PaymentService
         if (!$payment) {
             Log::warning('Webhook: payment not found', ['tx_ref' => $txRef, 'gateway' => $gatewayName]);
 
-            return;
+            return $data;
         }
 
         if ($payment->isTerminal()) {
             Log::info('Webhook ignoré: Paiement #'.$payment->id.' déjà traité (status: '.$payment->status->value.').');
 
-            return;
+            return $data;
         }
 
         $expectedCurrency = config('payment.default_currency', 'XAF');
@@ -272,7 +273,7 @@ final readonly class PaymentService
 
                 PaymentFailed::dispatch($payment->fresh() ?? $payment);
 
-                return;
+                return $data;
             }
 
             $payment->forceFill([
@@ -299,6 +300,8 @@ final readonly class PaymentService
             Log::info('Webhook: payment failed', ['payment_id' => $payment->id]);
             PaymentFailed::dispatch($payment->fresh() ?? $payment);
         }
+
+        return $data;
     }
 
     public function getGatewayName(): string

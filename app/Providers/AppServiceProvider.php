@@ -130,6 +130,38 @@ class AppServiceProvider extends ServiceProvider
                 default => Limit::perMinute(120)->by($user->id),
             };
         });
+
+        // Auth named limiters (values configurable via config/rate_limiting.php)
+        RateLimiter::for('auth.register', fn (Request $r) => Limit::perMinute(config('rate_limiting.auth.register', 5))->by($r->ip()));
+
+        RateLimiter::for('auth.login', fn (Request $r) => Limit::perMinute(config('rate_limiting.auth.login', 5))->by($r->ip()));
+
+        RateLimiter::for('auth.resend-verify', fn (Request $r) => Limit::perMinutes(5, config('rate_limiting.auth.resend_verify', 2))->by($r->ip()));
+
+        RateLimiter::for('auth.verify-email', fn (Request $r) => Limit::perMinutes(10, config('rate_limiting.auth.verify_email', 5))->by($r->ip()));
+
+        RateLimiter::for('auth.verify-otp', fn (Request $r) => Limit::perMinute(config('rate_limiting.auth.verify_otp', 5))->by($r->ip()));
+
+        RateLimiter::for('auth.password-reset', fn (Request $r) => Limit::perMinutes(10, config('rate_limiting.auth.password_reset', 3))->by($r->ip()));
+
+        RateLimiter::for('auth.social', fn (Request $r) => Limit::perMinute(config('rate_limiting.auth.social_auth', 10))->by($r->ip()));
+
+        RateLimiter::for('auth.clerk', fn (Request $r) => Limit::perMinute(config('rate_limiting.auth.clerk', 10))->by($r->ip()));
+
+        RateLimiter::for('auth.clerk-otp', fn (Request $r) => Limit::perMinute(config('rate_limiting.auth.clerk_otp', 5))->by($r->ip()));
+
+        RateLimiter::for('auth.update-password', fn (Request $r) => Limit::perMinutes(10, config('rate_limiting.auth.update_password', 5))->by($r->ip()));
+
+        // Payment named limiters
+        RateLimiter::for('payments.initiate', fn (Request $r) => Limit::perMinute(config('rate_limiting.payments.initiate', 5))->by(optional($r->user())->id ?? $r->ip()));
+
+        RateLimiter::for('payments.verify', fn (Request $r) => Limit::perMinute(config('rate_limiting.payments.verify', 30))->by(optional($r->user())->id ?? $r->ip()));
+
+        RateLimiter::for('payments.cancel', fn (Request $r) => Limit::perMinute(config('rate_limiting.payments.cancel', 10))->by(optional($r->user())->id ?? $r->ip()));
+
+        RateLimiter::for('payments.webhook', fn (Request $r) => Limit::perMinute(config('rate_limiting.payments.webhook', 120))->by($r->ip()));
+
+        RateLimiter::for('payments.history', fn (Request $r) => Limit::perMinute(config('rate_limiting.payments.history', 60))->by(optional($r->user())->id ?? $r->ip()));
     }
 
     private function ensureLivewireTmpDirectoryExists(): void

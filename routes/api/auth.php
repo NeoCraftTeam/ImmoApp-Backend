@@ -15,44 +15,44 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('auth')->group(function (): void {
     // Registration
     Route::post('registerCustomer', [RegistrationController::class, 'registerCustomer'])
-        ->middleware('throttle:5,1');
+        ->middleware('throttle:auth.register');
     Route::post('registerAgent', [RegistrationController::class, 'registerAgent'])
-        ->middleware('throttle:5,1');
+        ->middleware('throttle:auth.register');
 
     // Login
     Route::post('login', [AuthController::class, 'login'])
-        ->middleware('throttle:5,1');
+        ->middleware('throttle:auth.login');
 
     // Email verification
     Route::post('resend-verification', [EmailVerificationController::class, 'resendVerificationEmail'])
-        ->middleware('throttle:2,5');
+        ->middleware('throttle:auth.resend-verify');
     Route::get('email/verify/{id}/{hash}', [EmailVerificationController::class, 'verifyEmail'])
-        ->middleware('throttle:5,10')
+        ->middleware('throttle:auth.verify-email')
         ->name('api.verification.verify');
     Route::post('verify-email-otp', [EmailVerificationController::class, 'verifyEmailOtp'])
-        ->middleware('throttle:5,1');
+        ->middleware('throttle:auth.verify-otp');
 
     // Password Reset
-    Route::post('forgot-password', [PasswordController::class, 'forgotPassword'])->middleware('throttle:3,10');
-    Route::post('reset-password', [PasswordController::class, 'resetPassword'])->middleware('throttle:3,10');
+    Route::post('forgot-password', [PasswordController::class, 'forgotPassword'])->middleware('throttle:auth.password-reset');
+    Route::post('reset-password', [PasswordController::class, 'resetPassword'])->middleware('throttle:auth.password-reset');
 
     // Clerk JWT → Sanctum token exchange
-    Route::post('clerk/exchange', [ClerkAuthController::class, 'clerkExchange'])->middleware('throttle:10,1');
-    Route::post('clerk/verify-otp', [ClerkAuthController::class, 'verifyClerkOtp'])->middleware('throttle:5,1');
-    Route::post('clerk/complete-profile', [ClerkAuthController::class, 'completeClerkProfile'])->middleware('throttle:5,1');
+    Route::post('clerk/exchange', [ClerkAuthController::class, 'clerkExchange'])->middleware('throttle:auth.clerk');
+    Route::post('clerk/verify-otp', [ClerkAuthController::class, 'verifyClerkOtp'])->middleware('throttle:auth.clerk-otp');
+    Route::post('clerk/complete-profile', [ClerkAuthController::class, 'completeClerkProfile'])->middleware('throttle:auth.clerk-otp');
 
     // OAuth Social Authentication
     Route::prefix('oauth')->controller(SocialAuthController::class)->group(function (): void {
         Route::post('{provider}', 'authenticate')
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:auth.social')
             ->where('provider', 'google|facebook|apple');
 
         Route::get('{provider}/redirect', 'redirect')
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:auth.social')
             ->where('provider', 'google|facebook|apple');
 
         Route::get('{provider}/callback', 'callback')
-            ->middleware('throttle:10,1')
+            ->middleware('throttle:auth.social')
             ->where('provider', 'google|facebook|apple');
 
         Route::middleware('auth:sanctum')->group(function (): void {
@@ -64,7 +64,7 @@ Route::prefix('auth')->group(function (): void {
         });
 
         Route::post('confirm-link', 'confirmOAuthLink')
-            ->middleware('throttle:5,10');
+            ->middleware('throttle:auth.update-password');
     });
 
     // Authenticated auth routes
@@ -76,7 +76,7 @@ Route::prefix('auth')->group(function (): void {
         Route::post('refresh', [AuthController::class, 'refresh']);
         Route::get('me', [AuthController::class, 'me']);
         Route::post('email/resend', [EmailVerificationController::class, 'resendVerificationEmail']);
-        Route::post('update-password', [PasswordController::class, 'updatePassword'])->middleware('throttle:5,10');
+        Route::post('update-password', [PasswordController::class, 'updatePassword'])->middleware('throttle:auth.update-password');
         Route::post('onboarding-complete', [UserPreferenceController::class, 'completeOnboarding']);
         Route::post('track-home-visit', [UserPreferenceController::class, 'trackHomeVisit']);
         Route::patch('preferences', [UserPreferenceController::class, 'updatePreferences']);

@@ -10,23 +10,22 @@ use App\Http\Controllers\Api\V1\RefundController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
 use Illuminate\Support\Facades\Route;
 
-// --- PAYMENTS (Flutterwave / FedaPay) ---
-Route::post('/webhooks/flutterwave', [PaymentController::class, 'flutterwaveWebhook'])
-    ->middleware('throttle:120,1');
-Route::post('/webhooks/fedapay', [PaymentController::class, 'fedapayWebhook'])
-    ->middleware('throttle:120,1');
+// --- PAYMENTS (multi-gateway: Flutterwave, FedaPay) ---
+Route::post('/webhooks/{gateway}', [PaymentController::class, 'handleWebhook'])
+    ->where('gateway', 'flutterwave|fedapay')
+    ->middleware('throttle:payments.webhook');
 
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/payments/initialize/{ad}', [CreditController::class, 'unlock'])
         ->middleware('throttle:30,1');
-    Route::post('/payments/initiate_payment', [PaymentController::class, 'flutterwaveInitiate'])
-        ->middleware('throttle:5,1');
-    Route::post('/payments/verify_payment', [PaymentController::class, 'flutterwaveVerify'])
-        ->middleware('throttle:30,1');
-    Route::post('/payments/cancel_payment', [PaymentController::class, 'flutterwaveCancel'])
-        ->middleware('throttle:10,1');
+    Route::post('/payments/initiate_payment', [PaymentController::class, 'initiate'])
+        ->middleware('throttle:payments.initiate');
+    Route::post('/payments/verify_payment', [PaymentController::class, 'verify'])
+        ->middleware('throttle:payments.verify');
+    Route::post('/payments/cancel_payment', [PaymentController::class, 'cancel'])
+        ->middleware('throttle:payments.cancel');
     Route::get('/payments/history', [PaymentController::class, 'history'])
-        ->middleware('throttle:60,1');
+        ->middleware('throttle:payments.history');
 });
 
 // --- REFUNDS (admin) ---
