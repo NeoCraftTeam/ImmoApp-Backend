@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\ClerkWebhookController;
 use App\Http\Controllers\Api\V1\GdprController;
+use App\Http\Controllers\Api\V1\HealthCheckController;
 use App\Http\Controllers\Api\V1\LeaseContractController;
 use App\Http\Controllers\Api\V1\MyReviewsController;
 use App\Http\Controllers\Api\V1\NaturalSearchController;
@@ -32,8 +33,8 @@ use App\Models\Review;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
-// Health check endpoint (used by CI/CD smoke tests)
-Route::get('/health', fn () => response()->json(['status' => 'ok']));
+// Comprehensive health check endpoint (DB, Redis, Queue, Storage, Meilisearch)
+Route::get('/health', HealthCheckController::class);
 
 // Prefix routes
 Route::prefix('v1')->group(function (): void {
