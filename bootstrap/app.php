@@ -1,11 +1,13 @@
 <?php
 
 use App\Http\Middleware\AddRequestId;
+use App\Http\Middleware\CacheHeaders;
 use App\Http\Middleware\EnsureFrontendRequestsAreStateful;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\LivewireLongRunningRequest;
 use App\Http\Middleware\OptionalAuth;
 use App\Http\Middleware\ResolveSanctumBearerUser;
+use App\Http\Middleware\SanitizeInput;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -31,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->alias([
             'active' => EnsureUserIsActive::class,
+            'cache.headers' => CacheHeaders::class,
             'optional.auth' => OptionalAuth::class,
             'resolve.sanctum.bearer' => ResolveSanctumBearerUser::class,
         ]);
@@ -42,6 +45,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Append is_active check to all sanctum-authenticated API routes
         $middleware->appendToGroup('api', [
             EnsureUserIsActive::class,
+            SanitizeInput::class,
+            CacheHeaders::class,
         ]);
         $middleware->throttleApi();
     })

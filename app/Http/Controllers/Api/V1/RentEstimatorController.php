@@ -12,6 +12,29 @@ use Illuminate\Support\Facades\Cache;
 
 final class RentEstimatorController
 {
+    /**
+     * @OA\Post(
+     *     path="/api/v1/ads/rent-estimate",
+     *     summary="Estimer le loyer",
+     *     description="Estime le loyer moyen pour un type de bien dans une ville donnée, basé sur les annonces existantes.",
+     *     tags={"🏠 Annonces"},
+     *
+     *     @OA\RequestBody(required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"city_id", "type_id", "surface"},
+     *
+     *             @OA\Property(property="city_id", type="string", format="uuid"),
+     *             @OA\Property(property="type_id", type="string", format="uuid"),
+     *             @OA\Property(property="surface", type="integer", minimum=10, maximum=10000),
+     *             @OA\Property(property="bedrooms", type="integer", minimum=0, maximum=20, nullable=true)
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=200, description="Estimation calculée"),
+     *     @OA\Response(response=422, description="Validation échouée")
+     * )
+     */
     public function estimate(Request $request): JsonResponse
     {
         $data = $request->validate([

@@ -52,7 +52,7 @@ class Review extends Model
 {
     use HasFactory, HasUuids, LogsActivity, softDeletes;
 
-    protected $fillable = ['rating', 'comment', 'ad_id', 'user_id', 'agency_id'];
+    protected $fillable = ['rating', 'comment', 'ad_id', 'user_id', 'agency_id', 'is_verified', 'owner_response', 'owner_responded_at'];
 
     protected $hidden = ['created_at', 'updated_at', 'deleted_at'];
 

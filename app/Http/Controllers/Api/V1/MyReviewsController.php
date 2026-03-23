@@ -12,6 +12,17 @@ final class MyReviewsController
 {
     /**
      * List all reviews for ads owned by the authenticated user.
+     *
+     * @OA\Get(
+     *     path="/api/v1/my/reviews",
+     *     summary="Avis reçus sur mes annonces",
+     *     description="Retourne tous les avis laissés sur les annonces de l'utilisateur authentifié.",
+     *     tags={"⭐ Avis"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Response(response=200, description="Liste paginée des avis reçus"),
+     *     @OA\Response(response=401, description="Non authentifié")
+     * )
      */
     public function index(): AnonymousResourceCollection
     {

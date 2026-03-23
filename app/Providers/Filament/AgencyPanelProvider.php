@@ -58,7 +58,7 @@ class AgencyPanelProvider extends PanelProvider
                     ->regenerableRecoveryCodes(false)
                     ->brandName('KeyHome Agency App'),
                 EmailAuthentication::make(),
-            ], isRequired: false)
+            ], isRequired: true)
             ->tenant(Agency::class)
             ->discoverResources(in: app_path('Filament/Agency/Resources'), for: 'App\Filament\Agency\Resources')
             ->discoverPages(in: app_path('Filament/Agency/Pages'), for: 'App\Filament\Agency\Pages')

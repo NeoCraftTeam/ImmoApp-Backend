@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\AdTypeController;
 use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\ClerkWebhookController;
+use App\Http\Controllers\Api\V1\GdprController;
 use App\Http\Controllers\Api\V1\LeaseContractController;
 use App\Http\Controllers\Api\V1\MyReviewsController;
 use App\Http\Controllers\Api\V1\NaturalSearchController;
@@ -23,7 +24,10 @@ use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\VisitTrackingController;
 use App\Http\Resources\TestimonialResource;
 use App\Models\Ad;
+use App\Models\AdType;
+use App\Models\Agency;
 use App\Models\City;
+use App\Models\Quarter;
 use App\Models\Review;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
@@ -47,43 +51,43 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/ad-types/{adType}', 'show');
     });
     Route::middleware('auth:sanctum')->controller(AdTypeController::class)->group(function (): void {
-        Route::post('/ad-types', 'store');
-        Route::put('/ad-types/{adType}', 'update');
-        Route::delete('/ad-types/{adType}', 'destroy');
+        Route::post('/ad-types', 'store')->can('create', AdType::class);
+        Route::put('/ad-types/{adType}', 'update')->can('update', 'adType');
+        Route::delete('/ad-types/{adType}', 'destroy')->can('delete', 'adType');
     });
 
     // --- CITIES ---
     Route::controller(CityController::class)->group(function (): void {
         Route::get('/cities', 'index');
         Route::get('/cities/{id}', 'show');
-        Route::post('/cities', 'store')->middleware('auth:sanctum');
-        Route::put('/cities/{city}', 'update')->middleware('auth:sanctum');
-        Route::delete('/cities/{city}', 'destroy')->middleware('auth:sanctum');
+        Route::post('/cities', 'store')->middleware('auth:sanctum')->can('create', City::class);
+        Route::put('/cities/{city}', 'update')->middleware('auth:sanctum')->can('update', 'city');
+        Route::delete('/cities/{city}', 'destroy')->middleware('auth:sanctum')->can('delete', 'city');
     });
 
     // --- QUARTERS ---
     Route::controller(QuarterController::class)->group(function (): void {
         Route::get('/quarters', 'index');
         Route::get('/quarters/{id}', 'show');
-        Route::post('/quarters', 'store')->middleware('auth:sanctum');
-        Route::put('/quarters/{quarter}', 'update')->middleware('auth:sanctum');
-        Route::delete('/quarters/{quarter}', 'destroy')->middleware('auth:sanctum');
+        Route::post('/quarters', 'store')->middleware('auth:sanctum')->can('create', Quarter::class);
+        Route::put('/quarters/{quarter}', 'update')->middleware('auth:sanctum')->can('update', 'quarter');
+        Route::delete('/quarters/{quarter}', 'destroy')->middleware('auth:sanctum')->can('delete', 'quarter');
     });
 
     // --- AGENCIES ---
     Route::controller(AgencyController::class)->group(function (): void {
         Route::get('/agencies', 'index');
         Route::get('/agencies/{agency}', 'show');
-        Route::post('/agencies', 'store')->middleware('auth:sanctum');
-        Route::put('/agencies/{agency}', 'update')->middleware('auth:sanctum');
-        Route::delete('/agencies/{agency}', 'destroy')->middleware('auth:sanctum');
+        Route::post('/agencies', 'store')->middleware('auth:sanctum')->can('create', Agency::class);
+        Route::put('/agencies/{agency}', 'update')->middleware('auth:sanctum')->can('update', 'agency');
+        Route::delete('/agencies/{agency}', 'destroy')->middleware('auth:sanctum')->can('delete', 'agency');
     });
 
     // --- USERS ---
     Route::middleware('auth:sanctum')->controller(UserController::class)->group(function (): void {
-        Route::get('/users', 'index');
+        Route::get('/users', 'index')->can('viewAny', User::class);
         Route::get('/users/{id}', 'show');
-        Route::post('/users', 'store');
+        Route::post('/users', 'store')->can('create', User::class);
         Route::put('/users/{user}', 'update');
         Route::delete('/users/{user}', 'destroy');
     });
@@ -93,6 +97,14 @@ Route::prefix('v1')->group(function (): void {
 
     // --- MY UNLOCKED ADS ---
     Route::middleware('auth:sanctum')->get('/my/unlocked-ads', [UserController::class, 'unlockedAds']);
+
+    // --- GDPR Data Export & Account Deletion ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/data-export', [GdprController::class, 'export'])
+            ->middleware('throttle:5,1');
+        Route::delete('/my/account', [GdprController::class, 'deleteAccount'])
+            ->middleware('throttle:3,1');
+    });
 
     // --- MY FAVORITES ---
     Route::middleware('auth:sanctum')->get('/my/favorites', [AdInteractionController::class, 'favorites']);

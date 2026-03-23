@@ -20,6 +20,17 @@ final class LeaseContractController
 {
     /**
      * List all lease contracts owned by the authenticated user.
+     *
+     * @OA\Get(
+     *     path="/api/v1/lease-contracts",
+     *     summary="Lister mes contrats de bail",
+     *     description="Retourne la liste paginée des contrats de bail de l'utilisateur authentifié.",
+     *     tags={"📄 Contrats de bail"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Response(response=200, description="Liste des contrats"),
+     *     @OA\Response(response=401, description="Non authentifié")
+     * )
      */
     public function index(Request $request): AnonymousResourceCollection
     {

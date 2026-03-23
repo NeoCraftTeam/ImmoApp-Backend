@@ -12,6 +12,17 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 final class SearchAlertController
 {
+    /**
+     * @OA\Get(
+     *     path="/api/v1/my/search-alerts",
+     *     summary="Lister mes alertes de recherche",
+     *     tags={"🔔 Alertes"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Response(response=200, description="Liste des alertes"),
+     *     @OA\Response(response=401, description="Non authentifié")
+     * )
+     */
     public function index(Request $request): AnonymousResourceCollection
     {
         $alerts = $request->user()

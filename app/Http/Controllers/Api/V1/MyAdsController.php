@@ -15,8 +15,22 @@ final class MyAdsController
 {
     /**
      * List all ads owned by the authenticated user (landlord/agent).
-     * Uses LandlordScope (same as Filament Bailleur panel) to ensure only the owner's ads.
-     * Supports search, filters (status, type, city, quarter), and sort.
+     *
+     * @OA\Get(
+     *     path="/api/v1/my/ads",
+     *     summary="Mes annonces",
+     *     description="Retourne toutes les annonces (y compris supprimées) de l'utilisateur authentifié avec filtres et tri.",
+     *     tags={"🏠 Annonces"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Parameter(name="q", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="status", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="type_id", in="query", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="city_id", in="query", @OA\Schema(type="string")),
+     *
+     *     @OA\Response(response=200, description="Liste paginée des annonces"),
+     *     @OA\Response(response=401, description="Non authentifié")
+     * )
      */
     public function index(): AnonymousResourceCollection
     {

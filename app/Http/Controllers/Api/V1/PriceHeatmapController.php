@@ -12,6 +12,19 @@ use Illuminate\Support\Facades\DB;
 
 final class PriceHeatmapController
 {
+    /**
+     * @OA\Get(
+     *     path="/api/v1/ads/price-heatmap",
+     *     summary="Carte de chaleur des prix",
+     *     description="Retourne les prix moyens par quartier sous forme de GeoJSON pour affichage sur carte.",
+     *     tags={"🏠 Annonces"},
+     *
+     *     @OA\Parameter(name="city_id", in="query", @OA\Schema(type="string", format="uuid")),
+     *     @OA\Parameter(name="type_id", in="query", @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=200, description="Données heatmap GeoJSON")
+     * )
+     */
     public function index(Request $request): JsonResponse
     {
         $cityId = $request->query('city_id');

@@ -67,7 +67,7 @@ class BailleurPanelProvider extends PanelProvider
                     ->regenerableRecoveryCodes(false)
                     ->brandName('KeyHome Owner App'),
                 EmailAuthentication::make(),
-            ], isRequired: false)
+            ], isRequired: true)
             ->discoverResources(in: app_path('Filament/Bailleur/Resources'), for: 'App\Filament\Bailleur\Resources')
             ->discoverPages(in: app_path('Filament/Bailleur/Pages'), for: 'App\Filament\Bailleur\Pages')
             ->pages([

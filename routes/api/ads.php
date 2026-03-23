@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\KeyScoreController;
 use App\Http\Controllers\Api\V1\MyAdsController;
 use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\TourController;
+use App\Models\Review;
 use Illuminate\Support\Facades\Route;
 
 // Ad CRUD & public search
@@ -53,6 +54,11 @@ Route::prefix('ads')->middleware('optional.auth')->group(function (): void {
 // Reviews on ads
 Route::get('/ads/{ad}/reviews', [ReviewController::class, 'index']);
 Route::post('/reviews', [ReviewController::class, 'store'])
+    ->middleware(['auth:sanctum', 'throttle:10,1'])
+    ->can('create', Review::class);
+
+// Owner response to a review
+Route::post('/reviews/{review}/respond', [ReviewController::class, 'respond'])
     ->middleware(['auth:sanctum', 'throttle:10,1']);
 
 // Reports on ads

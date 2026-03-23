@@ -23,6 +23,26 @@ final readonly class NaturalSearchController
         private AiSearchService $aiSearchService
     ) {}
 
+    /**
+     * @OA\Post(
+     *     path="/api/v1/ads/search/natural",
+     *     summary="Recherche en langage naturel",
+     *     description="Parse une requête en langage naturel en paramètres de recherche structurés via IA.",
+     *     tags={"🔍 Filtre"},
+     *
+     *     @OA\RequestBody(required=true,
+     *
+     *         @OA\JsonContent(
+     *             required={"q"},
+     *
+     *             @OA\Property(property="q", type="string", maxLength=300, example="appartement meublé 2 chambres à Douala")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=200, description="Paramètres de recherche structurés"),
+     *     @OA\Response(response=422, description="Validation échouée")
+     * )
+     */
     public function parse(Request $request): JsonResponse
     {
         $data = $request->validate([

@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ "main", "develop" ]
+    branches: [ "main", "develop", "preprod" ]
   pull_request:
-    branches: [ "main", "develop" ]
+    branches: [ "main", "develop", "preprod" ]
 
 jobs:
   # -----------------------------------------------------------------------------
@@ -59,6 +59,13 @@ jobs:
 
     - name: Security Audit (CVE check)
       run: composer audit --format=plain
+
+    - name: Code Style (Pint)
+      run: vendor/bin/pint --test
+
+    - name: Static Analysis (PHPStan)
+      run: vendor/bin/phpstan analyse --memory-limit=512M --no-progress
+      continue-on-error: true
 
     - name: Generate Key
       run: php artisan key:generate

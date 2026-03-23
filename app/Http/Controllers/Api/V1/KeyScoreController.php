@@ -8,9 +8,23 @@ use App\Models\Ad;
 use App\Services\KeyScoreService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
+use OpenApi\Attributes as OA;
 
 final class KeyScoreController
 {
+    /**
+     * @OA\Get(
+     *     path="/api/v1/ads/{ad}/keyscore",
+     *     summary="Score de qualité d'une annonce",
+     *     description="Retourne le KeyScore (score de qualité) d'une annonce avec le détail des critères.",
+     *     tags={"🏠 Annonces"},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=200, description="KeyScore calculé"),
+     *     @OA\Response(response=404, description="Annonce introuvable")
+     * )
+     */
     public function show(Ad $ad, KeyScoreService $service): JsonResponse
     {
         $cacheKey = 'keyscore_'.$ad->id.'_'.$ad->updated_at->timestamp;
