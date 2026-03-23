@@ -152,6 +152,8 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('auth.update-password', fn (Request $r) => Limit::perMinutes(10, config('rate_limiting.auth.update_password', 5))->by($r->ip()));
 
+        RateLimiter::for('auth.general', fn (Request $r) => Limit::perMinute(config('rate_limiting.auth.general', 30))->by(optional($r->user())->id ?? $r->ip()));
+
         // Payment named limiters
         RateLimiter::for('payments.initiate', fn (Request $r) => Limit::perMinute(config('rate_limiting.payments.initiate', 5))->by(optional($r->user())->id ?? $r->ip()));
 

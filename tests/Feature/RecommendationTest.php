@@ -8,9 +8,12 @@ use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
 
-test('recommendations endpoint returns 401 for guest', function (): void {
+test('recommendations endpoint returns cold start for guest', function (): void {
+    Ad::factory(3)->create(['status' => 'available']);
+
     $response = $this->getJson('/api/v1/recommendations');
-    $response->assertStatus(401);
+    $response->assertSuccessful()
+        ->assertJsonPath('meta.source', 'cold_start');
 });
 
 test('cold start returns mixed ads for user without history', function (): void {

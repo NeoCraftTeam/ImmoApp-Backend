@@ -553,9 +553,16 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     #[\Override]
     public function sendEmailVerificationNotification(): void
     {
+        $cooldownKey = 'email_otp_sent_'.$this->id;
+
+        if (Cache::has('email_otp_'.$this->id) && Cache::has($cooldownKey)) {
+            return;
+        }
+
         $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         Cache::put('email_otp_'.$this->id, $otp, now()->addMinutes(10));
+        Cache::put($cooldownKey, true, now()->addSeconds(60));
 
         $requestedFrom = request()->ip() ?? 'inconnu';
         $requestedAt = now()->translatedFormat('d F Y à H:i');

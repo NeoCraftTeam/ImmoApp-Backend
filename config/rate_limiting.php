@@ -22,6 +22,7 @@ return [
         'clerk' => (int) env('RL_AUTH_CLERK', 10),          // per minute
         'clerk_otp' => (int) env('RL_AUTH_CLERK_OTP', 5),       // per minute
         'update_password' => (int) env('RL_AUTH_UPDATE_PASSWORD', 5), // per 10 min
+        'general' => (int) env('RL_AUTH_GENERAL', 30),        // per minute
     ],
 
     /*

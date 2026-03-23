@@ -89,7 +89,7 @@ Route::prefix('v1')->group(function (): void {
     });
 
     // --- RECOMMENDATIONS ---
-    Route::middleware('auth:sanctum')->get('/recommendations', [RecommendationController::class, 'index']);
+    Route::middleware('optional.auth')->get('/recommendations', [RecommendationController::class, 'index']);
 
     // --- MY UNLOCKED ADS ---
     Route::middleware('auth:sanctum')->get('/my/unlocked-ads', [UserController::class, 'unlockedAds']);

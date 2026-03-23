@@ -59,7 +59,7 @@ final class PasswordController
             $request->only('email', 'password', 'password_confirmation', 'token'),
             function ($user, $password): void {
                 $user->forceFill([
-                    'password' => Hash::make($password),
+                    'password' => $password,
                 ])->setRememberToken(Str::random(60));
 
                 $user->save();
@@ -104,7 +104,7 @@ final class PasswordController
         }
 
         $user->fill([
-            'password' => Hash::make($request->new_password),
+            'password' => $request->new_password,
         ])->save();
 
         $currentToken = $user->currentAccessToken();

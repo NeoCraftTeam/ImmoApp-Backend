@@ -68,19 +68,23 @@ final class RecommendationEngine
     // ══════════════════════════════════════════════════════════════════
 
     /**
-     * Get recommendations for a user.
+     * Get recommendations for a user (or cold-start for guests).
      *
      * @return array{ads: Collection<int, Ad>, meta: array<string, mixed>}
      */
-    public function recommend(User $user): array
+    public function recommend(?User $user): array
     {
-        $cacheKey = "reco_v2_user_{$user->id}";
+        $cacheKey = $user ? "reco_v2_user_{$user->id}" : 'reco_v2_guest';
 
         return Cache::remember($cacheKey, now()->addMinutes(self::CACHE_TTL_MINUTES), function () use ($user): array {
+            if (!$user) {
+                return $this->coldStart();
+            }
+
             $profile = $this->buildUserProfile($user);
 
             if ($profile === null) {
-                return $this->coldStart($user);
+                return $this->coldStart();
             }
 
             return $this->personalizedRecommendations($user, $profile);
@@ -300,7 +304,7 @@ final class RecommendationEngine
      *
      * @return array{ads: Collection<int, Ad>, meta: array<string, mixed>}
      */
-    private function coldStart(User $user): array
+    private function coldStart(): array
     {
         $limit = self::RESULT_LIMIT;
         $trendingLimit = (int) ceil($limit * 0.4);

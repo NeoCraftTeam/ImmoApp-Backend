@@ -13,6 +13,7 @@ use App\Mail\VerificationCodeMail;
 use App\Mail\WelcomeEmail;
 use App\Models\User;
 use App\Services\ClerkJwtService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -76,10 +77,6 @@ final class ClerkAuthController
             ]);
         }
 
-        $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-
-        Cache::put('clerk_otp_'.$clerkId, $otp, now()->addMinutes(10));
-
         $existingPending = Cache::get('clerk_pending_'.$clerkId, []);
         $requestedIntent = $request->input('registration_intent');
         $registrationIntent = in_array($requestedIntent, ['customer', 'agent'], true)
@@ -93,6 +90,20 @@ final class ClerkAuthController
             'avatar' => $avatar,
             'registration_intent' => $registrationIntent,
         ]), now()->addMinutes(15));
+
+        $otpCooldownKey = 'clerk_otp_sent_'.$clerkId;
+        $existingOtp = Cache::get('clerk_otp_'.$clerkId);
+
+        if ($existingOtp !== null && Cache::has($otpCooldownKey)) {
+            return response()->json([
+                'state' => 'otp_required',
+                'email_hint' => $email !== null ? $this->maskEmail($email) : null,
+            ]);
+        }
+
+        $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+        Cache::put('clerk_otp_'.$clerkId, $otp, now()->addMinutes(10));
+        Cache::put($otpCooldownKey, true, now()->addSeconds(60));
 
         if ($email !== null) {
             $requestedFrom = request()->ip() ?? 'inconnu';
@@ -190,8 +201,11 @@ final class ClerkAuthController
             ]);
         }
 
-        /** @var array{firstname: string, lastname: string, email: string|null, avatar: string|null} $pending */
+        /** @var array{firstname: string, lastname: string, email: string|null, avatar: string|null, verified?: bool} $pending */
         $pending = Cache::get('clerk_pending_'.$clerkId, []);
+
+        $pending['verified'] = true;
+        Cache::put('clerk_pending_'.$clerkId, $pending, now()->addMinutes(15));
 
         return response()->json([
             'state' => 'profile_required',
@@ -222,7 +236,10 @@ final class ClerkAuthController
 
         $clerkId = (string) ($clerkUser['id'] ?? '');
 
-        if (!Cache::get('clerk_verified_'.$clerkId)) {
+        /** @var array{verified?: bool} $pendingCheck */
+        $pendingCheck = Cache::get('clerk_pending_'.$clerkId, []);
+
+        if (!Cache::get('clerk_verified_'.$clerkId) && empty($pendingCheck['verified'])) {
             return response()->json(['message' => 'Vérification email requise.'], 403);
         }
 
@@ -247,23 +264,32 @@ final class ClerkAuthController
             $role = $registrationIntent === 'agent' ? UserRole::AGENT : UserRole::CUSTOMER;
             $type = UserType::INDIVIDUAL;
 
-            $user = new User;
-            $user->fill([
-                'clerk_id' => $clerkId,
-                'firstname' => $firstName,
-                'lastname' => $lastName,
-                'email' => $email ?? $clerkId.'@clerk.local',
-                'phone_number' => $request->input('phone_number'),
-                'city_id' => $request->input('city_id'),
-                'avatar' => $avatar,
-            ]);
-            $user->forceFill([
-                'role' => $role,
-                'type' => $type,
-                'is_active' => true,
-                'email_verified_at' => now(),
-            ]);
-            $user->save();
+            try {
+                $user = new User;
+                $user->fill([
+                    'clerk_id' => $clerkId,
+                    'firstname' => $firstName,
+                    'lastname' => $lastName,
+                    'email' => $email ?? $clerkId.'@clerk.local',
+                    'phone_number' => $request->input('phone_number'),
+                    'city_id' => $request->input('city_id'),
+                    'avatar' => $avatar,
+                ]);
+                $user->forceFill([
+                    'role' => $role,
+                    'type' => $type,
+                    'is_active' => true,
+                    'email_verified_at' => now(),
+                ]);
+                $user->save();
+            } catch (UniqueConstraintViolationException) {
+                $user = User::query()->where('clerk_id', $clerkId)->first()
+                    ?? ($email !== null ? User::query()->where('email', $email)->first() : null);
+
+                if ($user === null) {
+                    return response()->json(['message' => 'Erreur lors de la création du compte.'], 409);
+                }
+            }
 
             $isNew = true;
 

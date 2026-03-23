@@ -73,15 +73,23 @@ Route::prefix('auth')->group(function (): void {
             ->middleware('can:admin-access');
         Route::post('logout', [AuthController::class, 'logout']);
         Route::post('logout-all', [AuthController::class, 'logoutAll']);
-        Route::post('refresh', [AuthController::class, 'refresh']);
+        Route::post('refresh', [AuthController::class, 'refresh'])
+            ->middleware('throttle:auth.general');
         Route::get('me', [AuthController::class, 'me']);
-        Route::post('email/resend', [EmailVerificationController::class, 'resendVerificationEmail']);
+        Route::post('email/resend', [EmailVerificationController::class, 'resendVerificationEmail'])
+            ->middleware('throttle:auth.resend-verify');
         Route::post('update-password', [PasswordController::class, 'updatePassword'])->middleware('throttle:auth.update-password');
-        Route::post('onboarding-complete', [UserPreferenceController::class, 'completeOnboarding']);
-        Route::post('track-home-visit', [UserPreferenceController::class, 'trackHomeVisit']);
-        Route::patch('preferences', [UserPreferenceController::class, 'updatePreferences']);
-        Route::patch('locale', [UserPreferenceController::class, 'updateLocale']);
-        Route::get('email-preferences', [EmailPreferenceController::class, 'show']);
-        Route::patch('email-preferences', [EmailPreferenceController::class, 'apiUpdate']);
+        Route::post('onboarding-complete', [UserPreferenceController::class, 'completeOnboarding'])
+            ->middleware('throttle:auth.general');
+        Route::post('track-home-visit', [UserPreferenceController::class, 'trackHomeVisit'])
+            ->middleware('throttle:auth.general');
+        Route::patch('preferences', [UserPreferenceController::class, 'updatePreferences'])
+            ->middleware('throttle:auth.general');
+        Route::patch('locale', [UserPreferenceController::class, 'updateLocale'])
+            ->middleware('throttle:auth.general');
+        Route::get('email-preferences', [EmailPreferenceController::class, 'show'])
+            ->middleware('throttle:auth.general');
+        Route::patch('email-preferences', [EmailPreferenceController::class, 'apiUpdate'])
+            ->middleware('throttle:auth.general');
     });
 });

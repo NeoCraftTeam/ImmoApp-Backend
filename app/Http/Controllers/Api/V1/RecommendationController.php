@@ -60,14 +60,13 @@ final class RecommendationController
      *         )
      *     ),
      *
-     *     @OA\Response(response=401, description="Non authentifié")
+     *     @OA\Response(response=200, description="Liste des annonces recommandées (cold start si non authentifié)")
      * )
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $user = $request->user();
         $engine = new RecommendationEngine;
-        $result = $engine->recommend($user);
+        $result = $engine->recommend($request->user());
 
         return AdResource::collection($result['ads'])
             ->additional(['meta' => $result['meta']]);

@@ -51,7 +51,7 @@ final class AuthController
             $email = $credentials['email'];
             $password = $credentials['password'];
 
-            $key = 'login-attempts:'.$request->ip();
+            $key = 'login-attempts:'.$request->ip().'|'.mb_strtolower($email);
             if (RateLimiter::tooManyAttempts($key, 5)) {
                 $seconds = RateLimiter::availableIn($key);
 
