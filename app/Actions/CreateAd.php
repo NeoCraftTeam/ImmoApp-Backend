@@ -40,7 +40,7 @@ final class CreateAd
                 'has_parking' => $data['has_parking'] ?? false,
                 'location' => GeoLocation::fromArray($data)?->toPoint(),
                 'expires_at' => $data['expires_at'] ?? null,
-                'user_id' => $data['user_id'] ?? auth()->id(),
+                'user_id' => auth()->id(),
                 'quarter_id' => $data['quarter_id'],
                 'type_id' => $data['type_id'],
                 'attributes' => $data['attributes'] ?? [],

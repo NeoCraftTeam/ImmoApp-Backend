@@ -26,7 +26,7 @@ final class AdRequest extends FormRequest
 
     private function imageFileRule(bool $sometimes = false): string
     {
-        $core = 'image|mimes:jpeg,jpg,png,gif,webp|max:'.self::MAX_IMAGE_KILOBYTES;
+        $core = 'image|mimes:jpeg,jpg,png,gif,webp|max:'.self::MAX_IMAGE_KILOBYTES.'|dimensions:max_width=8000,max_height=8000';
 
         return $sometimes ? 'sometimes|'.$core : $core;
     }

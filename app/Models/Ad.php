@@ -125,7 +125,6 @@ class Ad extends Model implements HasMedia
         'available_to',
         'attributes',
         'expires_at',
-        'user_id',
         'quarter_id',
         'type_id',
         'agency_id',
@@ -424,6 +423,12 @@ class Ad extends Model implements HasMedia
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /** @return HasMany<LeaseContract, $this> */
+    public function leaseContracts(): HasMany
+    {
+        return $this->hasMany(LeaseContract::class);
     }
 
     /**

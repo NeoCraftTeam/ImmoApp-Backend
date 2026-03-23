@@ -47,6 +47,8 @@ final class UpdateAd
                 unset($data['status']);
             }
 
+            unset($data['user_id'], $data['agency_id']);
+
             $ad->update($data);
 
             if ($newStatus !== null && $ad->status !== $newStatus) {

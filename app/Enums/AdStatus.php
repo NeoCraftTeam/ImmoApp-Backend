@@ -8,6 +8,7 @@ use Filament\Support\Contracts\HasLabel;
 
 enum AdStatus: string implements HasLabel
 {
+    case DRAFT = 'draft';
     case AVAILABLE = 'available';
     case RESERVED = 'reserved';
     case RENT = 'rent';
@@ -18,6 +19,7 @@ enum AdStatus: string implements HasLabel
     public function getLabel(): string
     {
         return match ($this) {
+            self::DRAFT => 'Brouillon',
             self::AVAILABLE => 'Disponible',
             self::RESERVED => 'Réservé',
             self::RENT => 'En location',
@@ -35,6 +37,7 @@ enum AdStatus: string implements HasLabel
     public function allowedTransitions(): array
     {
         return match ($this) {
+            self::DRAFT => [self::PENDING, self::AVAILABLE],
             self::PENDING => [self::AVAILABLE, self::DECLINED],
             self::AVAILABLE => [self::RESERVED, self::RENT, self::SOLD],
             self::RESERVED => [self::AVAILABLE, self::RENT, self::SOLD],
