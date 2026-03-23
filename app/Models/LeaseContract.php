@@ -22,6 +22,7 @@ class LeaseContract extends Model
     protected $fillable = [
         'user_id',
         'ad_id',
+        'tenant_id',
         'unit_reference',
         'contract_number',
         'tenant_name',
@@ -47,6 +48,12 @@ class LeaseContract extends Model
     public function ad(): BelongsTo
     {
         return $this->belongsTo(Ad::class);
+    }
+
+    /** @return BelongsTo<Tenant, $this> */
+    public function tenant(): BelongsTo
+    {
+        return $this->belongsTo(Tenant::class);
     }
 
     #[\Override]
