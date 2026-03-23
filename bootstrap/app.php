@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\AddRequestId;
 use App\Http\Middleware\CacheHeaders;
+use App\Http\Middleware\CheckFeatureFlag;
 use App\Http\Middleware\EnsureFrontendRequestsAreStateful;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\LivewireLongRunningRequest;
@@ -34,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'active' => EnsureUserIsActive::class,
             'cache.headers' => CacheHeaders::class,
+            'feature' => CheckFeatureFlag::class,
             'optional.auth' => OptionalAuth::class,
             'resolve.sanctum.bearer' => ResolveSanctumBearerUser::class,
         ]);
