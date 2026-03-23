@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\AdStatus;
+use App\Actions\CreateAd;
+use App\Actions\UpdateAd;
+use App\Exceptions\InvalidStatusTransitionException;
 use App\Http\Requests\AdRequest;
 use App\Http\Resources\AdResource as AdApiResource;
 use App\Models\Ad;
 use App\Models\AdInteraction;
-use App\Support\GeoLocation;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Psr\Log\LoggerInterface;
 use Throwable;
@@ -29,7 +31,11 @@ final class AdController
 {
     use AuthorizesRequests;
 
-    public function __construct(private LoggerInterface $log) {}
+    public function __construct(
+        private LoggerInterface $log,
+        private CreateAd $createAdAction,
+        private UpdateAd $updateAdAction,
+    ) {}
 
     /**
      * Afficher la liste paginée des annonces.
@@ -108,50 +114,12 @@ final class AdController
         $this->authorize('create', Ad::class);
         $data = $request->validated();
 
-        DB::beginTransaction();
-
         try {
             $this->log->info('Data received for ad creation:', $data);
             $this->log->info('Files received:', $request->allFiles());
 
-            $ad = new Ad;
-            $ad->fill([
-                'title' => $data['title'],
-                'description' => $data['description'],
-                'adresse' => $data['adresse'],
-                'price' => $data['price'],
-                'surface_area' => $data['surface_area'],
-                'bedrooms' => $data['bedrooms'],
-                'bathrooms' => $data['bathrooms'],
-                'has_parking' => $data['has_parking'] ?? false,
-                'location' => GeoLocation::fromArray($data)?->toPoint(),
-                'expires_at' => $data['expires_at'] ?? null,
-                'user_id' => auth()->id(),
-                'quarter_id' => $data['quarter_id'],
-                'type_id' => $data['type_id'],
-                'attributes' => $data['attributes'] ?? [],
-            ]);
-            $ad->forceFill(['status' => AdStatus::PENDING]);
-            $ad->save();
-
-            $this->log->info('Ad created with ID: '.$ad->id);
-
-            if ($request->hasFile('images')) {
-                foreach ($request->file('images') as $image) {
-                    $ad->addMedia($image)
-                        ->toMediaCollection('images');
-                }
-            }
-            if ($request->hasFile('image')) {
-                $ad->addMediaFromRequest('image')->toMediaCollection('images');
-            }
-            if ($request->hasFile('photos')) {
-                foreach ($request->file('photos') as $photo) {
-                    $ad->addMedia($photo)->toMediaCollection('images');
-                }
-            }
-
-            DB::commit();
+            $images = $this->collectUploadedImages($request);
+            $ad = $this->createAdAction->execute($data, $images);
 
             $ad->load(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency']);
 
@@ -165,8 +133,6 @@ final class AdController
             ], 201);
 
         } catch (Throwable $e) {
-            DB::rollback();
-
             $this->log->error('Error creating ad: '.$e->getMessage(), [
                 'user_id' => auth()->id(),
                 'trace' => $e->getTraceAsString(),
@@ -248,78 +214,23 @@ final class AdController
         $this->authorize('update', $ad);
         $data = $request->validated();
 
-        try {
-            DB::beginTransaction();
+        if (isset($data['status']) && !auth()->user()?->isAdmin()) {
+            unset($data['status']);
+        }
 
+        try {
             $this->log->info('Data received for ad update:', $data);
             $this->log->info('Files received:', $request->allFiles());
 
-            $geo = GeoLocation::fromArray($data);
-            if ($geo) {
-                $data['location'] = $geo->toPoint();
-            }
+            $images = $this->collectUploadedImages($request);
+            $imagesToDelete = is_array($request->input('images_to_delete'))
+                ? $request->input('images_to_delete')
+                : [];
 
-            if (isset($data['status']) && !auth()->user()?->isAdmin()) {
-                unset($data['status']);
-            }
+            $result = $this->updateAdAction->execute($ad, $data, $images, $imagesToDelete);
+            $ad = $result['ad'];
 
-            $newStatus = null;
-            if (isset($data['status'])) {
-                $newStatus = AdStatus::from($data['status']);
-                if ($ad->status !== $newStatus) {
-                    if (!$ad->status->canTransitionTo($newStatus)) {
-                        return response()->json([
-                            'success' => false,
-                            'message' => "Transition de statut invalide : {$ad->status->getLabel()} → {$newStatus->getLabel()}.",
-                        ], 422);
-                    }
-                }
-                unset($data['status']);
-            }
-
-            $ad->update($data);
-
-            if ($newStatus !== null) {
-                $ad->forceFill(['status' => $newStatus])->save();
-            }
-
-            $this->log->info('Ad updated with ID: '.$ad->id);
-
-            if ($request->hasFile('images')) {
-                foreach ($request->file('images') as $image) {
-                    $ad->addMedia($image)->toMediaCollection('images');
-                }
-            }
-            if ($request->hasFile('image')) {
-                $ad->addMediaFromRequest('image')->toMediaCollection('images');
-            }
-            if ($request->hasFile('photos')) {
-                foreach ($request->file('photos') as $photo) {
-                    $ad->addMedia($photo)->toMediaCollection('images');
-                }
-            }
-
-            if ($request->has('images_to_delete') && is_array($request->input('images_to_delete'))) {
-                foreach ($request->input('images_to_delete') as $mediaId) {
-                    $media = $ad->media()->find($mediaId);
-                    if ($media) {
-                        $media->delete();
-                    }
-                }
-            }
-
-            $this->log->info('Media updated for ad ID: '.$ad->id);
-
-            DB::commit();
-
-            $ad->load([
-                'media',
-                'user.agency',
-                'user.city',
-                'ad_type',
-                'quarter.city',
-                'agency',
-            ]);
+            $ad->load(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency']);
 
             return response()->json([
                 'success' => true,
@@ -330,9 +241,12 @@ final class AdController
                 ],
             ]);
 
+        } catch (InvalidStatusTransitionException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
         } catch (Throwable $e) {
-            DB::rollback();
-
             $this->log->error('Error updating ad: '.$e->getMessage(), [
                 'ad_id' => $ad->id,
                 'user_id' => auth()->id(),
@@ -412,5 +326,31 @@ final class AdController
                 'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while deleting the ad.',
             ], 422);
         }
+    }
+
+    /**
+     * Collect all uploaded image files from the request (supports images, image, photos field names).
+     *
+     * @return array<int, UploadedFile>
+     */
+    private function collectUploadedImages(Request $request): array
+    {
+        $images = [];
+
+        if ($request->hasFile('images')) {
+            foreach ($request->file('images') as $image) {
+                $images[] = $image;
+            }
+        }
+        if ($request->hasFile('image')) {
+            $images[] = $request->file('image');
+        }
+        if ($request->hasFile('photos')) {
+            foreach ($request->file('photos') as $photo) {
+                $images[] = $photo;
+            }
+        }
+
+        return $images;
     }
 }

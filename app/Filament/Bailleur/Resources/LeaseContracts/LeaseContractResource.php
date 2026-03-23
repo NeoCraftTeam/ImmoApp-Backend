@@ -6,6 +6,7 @@ namespace App\Filament\Bailleur\Resources\LeaseContracts;
 
 use App\Filament\Bailleur\Resources\LeaseContracts\Pages\ManageLeaseContracts;
 use App\Models\LeaseContract;
+use App\Models\Scopes\LandlordScope;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
@@ -42,7 +43,7 @@ class LeaseContractResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->where('user_id', auth()->id())
+            ->withGlobalScope('landlord', new LandlordScope)
             ->with(['ad']);
     }
 

@@ -4,26 +4,21 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Actions\HandlePostPaymentActions;
+use App\Actions\UnlockAd;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
-use App\Enums\PointTransactionType;
 use App\Exceptions\PaymentGatewayException;
 use App\Http\Resources\PointPackageResource;
-use App\Mail\CreditPurchaseConfirmationMail;
 use App\Models\Ad;
-use App\Models\AdInteraction;
 use App\Models\Payment;
 use App\Models\PointPackage;
 use App\Models\Setting;
-use App\Models\UnlockedAd;
 use App\Services\Payment\PaymentService;
-use App\Services\PointService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use OpenApi\Annotations as OA;
 
 /**
@@ -33,7 +28,8 @@ final class CreditController
 {
     public function __construct(
         protected PaymentService $paymentService,
-        protected PointService $pointService,
+        protected HandlePostPaymentActions $postPaymentActions,
+        protected UnlockAd $unlockAdAction,
     ) {}
 
     /**
@@ -230,57 +226,13 @@ final class CreditController
         $synced = $this->paymentService->syncPaymentStatus($payment);
 
         if ($synced->status === PaymentStatus::SUCCESS) {
-            return DB::transaction(function () use ($user, $synced): JsonResponse {
-                /** @var Payment $lockedPayment */
-                $lockedPayment = Payment::where('id', $synced->id)
-                    ->lockForUpdate()
-                    ->first();
+            $this->postPaymentActions->execute($synced, (array) ($synced->gateway_response ?? []));
 
-                // Idempotency check — safe inside the lock
-                $alreadyCredited = $user->pointTransactions()
-                    ->where('payment_id', $lockedPayment->id)
-                    ->exists();
-
-                if (!$alreadyCredited) {
-                    $raw = (array) ($lockedPayment->gateway_response ?? []);
-                    $meta = (array) ($raw['meta'] ?? []);
-                    $packageId = $meta['package_id'] ?? null;
-                    $package = $packageId ? PointPackage::find($packageId) : null;
-
-                    if (!$package) {
-                        $package = PointPackage::where('price', $lockedPayment->amount)
-                            ->where('is_active', true)
-                            ->first();
-                    }
-
-                    if ($package) {
-                        $this->pointService->credit(
-                            $user,
-                            $package->points_awarded,
-                            PointTransactionType::PURCHASE,
-                            "Achat pack: {$package->name}",
-                            $lockedPayment->id,
-                        );
-
-                        try {
-                            Mail::to($user->email)->send(new CreditPurchaseConfirmationMail(
-                                $user,
-                                $package,
-                                $lockedPayment,
-                                (int) $user->fresh()->point_balance,
-                            ));
-                        } catch (\Exception $e) {
-                            Log::error('Erreur email achat crédits: '.$e->getMessage());
-                        }
-                    }
-                }
-
-                return response()->json([
-                    'status' => 'completed',
-                    'message' => 'Achat de crédits confirmé.',
-                    'point_balance' => (int) $user->fresh()->point_balance,
-                ]);
-            });
+            return response()->json([
+                'status' => 'completed',
+                'message' => 'Achat de crédits confirmé.',
+                'point_balance' => (int) $user->fresh()->point_balance,
+            ]);
         }
 
         if ($synced->status === PaymentStatus::FAILED) {
@@ -318,49 +270,17 @@ final class CreditController
     public function unlock(Request $request, Ad $ad): JsonResponse
     {
         $user = $request->user();
-
-        if ($ad->user_id === $user->id) {
-            return response()->json(['status' => 'owner']);
-        }
-
-        if (UnlockedAd::where('user_id', $user->id)->where('ad_id', $ad->id)->exists()) {
-            return response()->json(['status' => 'already_unlocked']);
-        }
-
         $cost = (int) Setting::get('unlock_cost_points', 2);
 
-        if ($user->point_balance < $cost) {
+        $result = $this->unlockAdAction->execute($user, $ad, $cost);
+
+        if ($result['status'] === 'insufficient_points') {
             return response()->json([
-                'status' => 'insufficient_points',
-                'current_balance' => (int) $user->point_balance,
-                'required_points' => $cost,
+                ...$result,
                 'packages' => PointPackageResource::collection(PointPackage::active()->get()),
             ], 402);
         }
 
-        DB::transaction(function () use ($user, $ad, $cost): void {
-            $this->pointService->deduct(
-                $user,
-                $cost,
-                "Déblocage annonce: {$ad->title}",
-                $ad->id,
-            );
-
-            UnlockedAd::firstOrCreate(
-                ['user_id' => $user->id, 'ad_id' => $ad->id],
-                ['unlocked_at' => now()],
-            );
-
-            AdInteraction::create([
-                'user_id' => $user->id,
-                'ad_id' => $ad->id,
-                'type' => AdInteraction::TYPE_UNLOCK,
-            ]);
-        });
-
-        return response()->json([
-            'status' => 'unlocked',
-            'points_balance' => (int) $user->fresh()->point_balance,
-        ]);
+        return response()->json($result);
     }
 }

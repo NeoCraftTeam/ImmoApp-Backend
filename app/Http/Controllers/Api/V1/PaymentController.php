@@ -4,16 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Actions\HandlePostPaymentActions;
 use App\Enums\PaymentStatus;
-use App\Enums\PaymentType;
-use App\Enums\PointTransactionType;
 use App\Exceptions\InvalidWebhookSignatureException;
 use App\Exceptions\PaymentGatewayException;
 use App\Http\Requests\Api\V1\FlutterwaveInitiateRequest;
 use App\Http\Requests\Api\V1\FlutterwaveVerifyRequest;
 use App\Http\Resources\PaymentResource;
-use App\Mail\CreditPurchaseConfirmationMail;
-use App\Models\Agency;
 use App\Models\Payment;
 use App\Models\PointPackage;
 use App\Models\PromoCode;
@@ -21,13 +18,10 @@ use App\Models\PromoCodeUsage;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\Payment\PaymentService;
-use App\Services\PointService;
-use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use OpenApi\Annotations as OA;
 
 /**
@@ -36,7 +30,7 @@ use OpenApi\Annotations as OA;
 final class PaymentController
 {
     public function __construct(
-        protected PointService $pointService,
+        protected HandlePostPaymentActions $postPaymentActions,
         protected PaymentService $paymentService,
     ) {}
 
@@ -217,7 +211,7 @@ final class PaymentController
         $payment = $this->paymentService->syncPaymentStatus($payment);
 
         if ($payment->isPaid()) {
-            $this->handlePostPaymentActions($payment, (array) ($payment->gateway_response ?? []));
+            $this->postPaymentActions->execute($payment, (array) ($payment->gateway_response ?? []));
         }
 
         return response()->json([
@@ -337,7 +331,7 @@ final class PaymentController
                     return;
                 }
 
-                $this->handlePostPaymentActions($payment, (array) ($data['raw'] ?? []));
+                $this->postPaymentActions->execute($payment, (array) ($data['raw'] ?? []));
             });
         } catch (InvalidWebhookSignatureException) {
             return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
@@ -381,82 +375,5 @@ final class PaymentController
                 'total' => $payments->total(),
             ],
         ]);
-    }
-
-    /**
-     * Execute post-payment business actions (activate subscriptions, credit points).
-     *
-     * @param  array<string, mixed>  $webhookData
-     */
-    private function handlePostPaymentActions(Payment $payment, array $webhookData): void
-    {
-        DB::transaction(function () use ($payment, $webhookData): void {
-            $this->executePostPaymentActions($payment, $webhookData);
-        });
-    }
-
-    /**
-     * @param  array<string, mixed>  $webhookData
-     */
-    private function executePostPaymentActions(Payment $payment, array $webhookData): void
-    {
-        $metadata = (array) ($webhookData['meta'] ?? []);
-
-        if ($payment->type === PaymentType::SUBSCRIPTION) {
-            $agencyId = $payment->agency_id ?? ($metadata['agency_id'] ?? null);
-            $planId = $payment->plan_id ?? ($metadata['plan_id'] ?? null);
-            $period = $payment->period ?? ($metadata['period'] ?? 'monthly');
-
-            if ($agencyId && $planId) {
-                $agency = Agency::find($agencyId);
-                $plan = SubscriptionPlan::find($planId);
-                if ($agency && $plan) {
-                    $subscriptionService = new SubscriptionService;
-                    $subscription = $subscriptionService->createSubscription($agency, $plan, $period, $payment);
-                    $subscriptionService->activateSubscription($subscription);
-                    Log::info("Abonnement activé (flutterwave): agence {$agency->id} - plan {$plan->id}");
-                }
-            }
-        }
-
-        if ($payment->type === PaymentType::CREDIT) {
-            $packageId = $payment->plan_id ?? ($metadata['package_id'] ?? null);
-            $package = $packageId ? PointPackage::find($packageId) : null;
-
-            if (!$package) {
-                $package = PointPackage::where('price', $payment->amount)
-                    ->where('is_active', true)
-                    ->first();
-            }
-            $buyer = User::find($payment->user_id);
-
-            if ($package && $buyer) {
-                $alreadyCredited = $buyer->pointTransactions()
-                    ->where('payment_id', $payment->id)
-                    ->exists();
-
-                if (!$alreadyCredited) {
-                    $this->pointService->credit(
-                        $buyer,
-                        $package->points_awarded,
-                        PointTransactionType::PURCHASE,
-                        "Achat pack: {$package->name}",
-                        $payment->id
-                    );
-                    Log::info("Points crédités (flutterwave): {$package->points_awarded} → user {$buyer->id}");
-
-                    try {
-                        Mail::to($buyer->email)->send(new CreditPurchaseConfirmationMail(
-                            $buyer,
-                            $package,
-                            $payment,
-                            (int) $buyer->fresh()->point_balance,
-                        ));
-                    } catch (\Exception $e) {
-                        Log::error('Erreur email achat crédits: '.$e->getMessage());
-                    }
-                }
-            }
-        }
     }
 }
