@@ -21,6 +21,7 @@ class PointTransactionsTable
             ->heading('Transactions de crédits')
             ->description('Historique des achats, déblocages et bonus')
             ->striped()
+            ->collapsedGroupsByDefault()
             ->modifyQueryUsing(fn ($query) => $query->with(['user.agency', 'ad', 'payment']))
             ->defaultGroup(
                 Group::make('user_id')

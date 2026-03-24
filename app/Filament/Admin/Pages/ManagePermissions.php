@@ -89,7 +89,7 @@ class ManagePermissions extends Page implements HasTable
                     }),
                 Action::make('toggleActive')
                     ->label(fn (User $record): string => $record->is_active ? 'Désactiver' : 'Activer')
-                    ->icon(fn (User $record): \BackedEnum => $record->is_active ? Heroicon::XCircle : Heroicon::CheckCircle)
+                    ->icon(fn (User $record): string => $record->is_active ? Heroicon::XCircle->value : Heroicon::CheckCircle->value)
                     ->color(fn (User $record): string => $record->is_active ? 'danger' : 'success')
                     ->requiresConfirmation()
                     ->action(function (User $record): void {

@@ -59,6 +59,7 @@ class RefundConfirmationMail extends Mailable implements ShouldQueue
 
     protected function resolveRecipientUser(): ?User
     {
+        /** @var User|null $user */
         $user = $this->refund->user;
 
         return $user instanceof User ? $user : null;

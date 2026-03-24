@@ -58,7 +58,7 @@ class EventServiceProvider extends ServiceProvider
             MatchSearchAlertsOnAdAvailable::class,
         ],
 
-        // Security audit trail — log all auth events (string listeners match framework $listen typing)
+        // Security audit trail — log all auth events
         Login::class => [
             LogAuthenticationEvents::class.'@handleLogin',
         ],

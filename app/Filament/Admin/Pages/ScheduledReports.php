@@ -126,7 +126,7 @@ class ScheduledReports extends Page
                     fputcsv($handle, [
                         (string) $ad->id,
                         (string) $ad->title,
-                        $ad->status->value,
+                        (string) $ad->status->value,
                         (string) $ad->price,
                         (string) ($ad->quarter?->city->name ?? ''),
                         $ad->quarter === null ? '' : (string) $ad->quarter->name,
@@ -153,9 +153,9 @@ class ScheduledReports extends Page
                     fputcsv($handle, [
                         (string) $payment->id,
                         (string) $payment->amount,
-                        $payment->status->value,
-                        $payment->gateway !== null ? $payment->gateway->value : '',
-                        $payment->user->email,
+                        (string) $payment->status->value,
+                        $payment->gateway !== null ? (string) $payment->gateway->value : '',
+                        (string) $payment->user->email,
                         $payment->created_at?->toDateString() ?? '',
                     ],
                         escape: '\\');

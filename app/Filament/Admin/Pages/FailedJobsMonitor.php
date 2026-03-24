@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Pages;
 
 use App\Models\QueueFailedJob;
-use Filament\Actions\Action;
+use Filament\Actions\Action as HeaderAction;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
@@ -13,7 +13,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use UnitEnum;
@@ -36,7 +35,7 @@ class FailedJobsMonitor extends Page implements HasTable
     protected function getHeaderActions(): array
     {
         return [
-            Action::make('retryAll')
+            HeaderAction::make('retryAll')
                 ->label('Retry All')
                 ->color('warning')
                 ->icon('heroicon-o-arrow-path')
@@ -45,7 +44,7 @@ class FailedJobsMonitor extends Page implements HasTable
                     Artisan::call('queue:retry', ['id' => ['all']]);
                     Notification::make()->title('All failed jobs queued for retry.')->success()->send();
                 }),
-            Action::make('flushAll')
+            HeaderAction::make('flushAll')
                 ->label('Flush All')
                 ->color('danger')
                 ->icon('heroicon-o-trash')
@@ -61,7 +60,7 @@ class FailedJobsMonitor extends Page implements HasTable
     {
         return $table
             ->query(
-                fn (): Builder => QueueFailedJob::query()
+                QueueFailedJob::query()
                     ->select(['id', 'uuid', 'connection', 'queue', 'payload', 'exception', 'failed_at'])
                     ->orderByDesc('failed_at')
             )
@@ -96,7 +95,7 @@ class FailedJobsMonitor extends Page implements HasTable
                     ->sortable(),
             ])
             ->actions([
-                Action::make('retry')
+                HeaderAction::make('retry')
                     ->icon('heroicon-o-arrow-path')
                     ->color('warning')
                     ->requiresConfirmation()
@@ -104,7 +103,7 @@ class FailedJobsMonitor extends Page implements HasTable
                         Artisan::call('queue:retry', ['id' => [$record->uuid]]);
                         Notification::make()->title('Job queued for retry.')->success()->send();
                     }),
-                Action::make('delete')
+                HeaderAction::make('delete')
                     ->icon('heroicon-o-trash')
                     ->color('danger')
                     ->requiresConfirmation()

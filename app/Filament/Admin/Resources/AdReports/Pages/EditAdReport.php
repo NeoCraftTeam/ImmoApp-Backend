@@ -16,7 +16,9 @@ class EditAdReport extends EditRecord
     #[\Override]
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        $nextStatus = AdReportStatus::from($data['status']);
+        $nextStatus = $data['status'] instanceof AdReportStatus
+            ? $data['status']
+            : AdReportStatus::from($data['status']);
         $isClosingStatus = in_array($nextStatus, [AdReportStatus::RESOLVED, AdReportStatus::DISMISSED], true);
 
         if ($isClosingStatus) {

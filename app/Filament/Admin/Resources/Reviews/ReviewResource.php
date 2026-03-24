@@ -10,7 +10,6 @@ use BackedEnum;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreAction;
@@ -172,8 +171,6 @@ class ReviewResource extends Resource
             ])
             ->recordActions([
                 ViewAction::make(),
-                EditAction::make()
-                    ->successNotificationTitle('Avis mis à jour'),
                 DeleteAction::make()
                     ->successNotificationTitle('Avis supprimé'),
                 ForceDeleteAction::make()
