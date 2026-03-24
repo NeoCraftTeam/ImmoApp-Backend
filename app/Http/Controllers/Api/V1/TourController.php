@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Models\Ad;
 use App\Models\User;
 use App\Services\TourService;
+use App\Support\PanoramaAngles;
 use App\Support\TourAssetToken;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -52,6 +53,8 @@ final readonly class TourController
     {
         $this->authorize('update', $ad);
 
+        $this->normalizeTourSceneHotspotYawsInRequest($request);
+
         $request->validate([
             'scenes' => ['required', 'array', 'min:1', 'max:20'],
             'scenes.*.title' => ['required', 'string', 'max:50'],
@@ -91,6 +94,8 @@ final readonly class TourController
     public function updateHotspots(Request $request, Ad $ad, string $sceneId): JsonResponse
     {
         $this->authorize('update', $ad);
+
+        $this->normalizeHotspotListYawsInRequest($request);
 
         $sceneIds = collect($ad->tour_config['scenes'] ?? [])
             ->pluck('id')
@@ -153,5 +158,57 @@ final readonly class TourController
     private function signTourConfigUrls(string $adId, array $tourConfig): array
     {
         return TourAssetToken::signTourConfig($adId, $tourConfig);
+    }
+
+    /**
+     * Merge normalized yaw for each hotspot under scenes.*.hotspots.* (multipart upload).
+     * Does not replace whole `scenes` entries so file uploads stay intact.
+     */
+    private function normalizeTourSceneHotspotYawsInRequest(Request $request): void
+    {
+        $scenes = $request->input('scenes');
+        if (!is_array($scenes)) {
+            return;
+        }
+
+        foreach (array_keys($scenes) as $i) {
+            $hotspots = $request->input("scenes.{$i}.hotspots");
+            if (!is_array($hotspots)) {
+                continue;
+            }
+
+            foreach (array_keys($hotspots) as $j) {
+                $yaw = $request->input("scenes.{$i}.hotspots.{$j}.yaw");
+                if (!is_numeric($yaw)) {
+                    continue;
+                }
+
+                $request->merge([
+                    "scenes.{$i}.hotspots.{$j}.yaw" => PanoramaAngles::normalizeYawDegrees((float) $yaw),
+                ]);
+            }
+        }
+    }
+
+    /**
+     * Merge normalized yaw for hotspots.*.yaw (JSON / form body).
+     */
+    private function normalizeHotspotListYawsInRequest(Request $request): void
+    {
+        $hotspots = $request->input('hotspots');
+        if (!is_array($hotspots)) {
+            return;
+        }
+
+        foreach (array_keys($hotspots) as $j) {
+            $yaw = $request->input("hotspots.{$j}.yaw");
+            if (!is_numeric($yaw)) {
+                continue;
+            }
+
+            $request->merge([
+                "hotspots.{$j}.yaw" => PanoramaAngles::normalizeYawDegrees((float) $yaw),
+            ]);
+        }
     }
 }

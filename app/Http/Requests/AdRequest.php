@@ -124,7 +124,12 @@ final class AdRequest extends FormRequest
         if ($this->isMethod('put') || $this->isMethod('patch')) {
             return [
                 'title' => ['sometimes', 'string', 'max:255'],
-                'slug' => ['string', 'max:255', 'unique:ad,slug'], // éviter les doublons
+                'slug' => [
+                    'sometimes',
+                    'string',
+                    'max:255',
+                    Rule::unique('ad', 'slug')->ignore($this->route('ad')),
+                ],
                 'description' => ['sometimes', 'string'],
                 'adresse' => ['sometimes', 'string', 'max:255'],
                 'price' => ['sometimes', 'numeric', 'min:0'],

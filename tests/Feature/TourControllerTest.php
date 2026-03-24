@@ -218,6 +218,32 @@ describe('PATCH /panel-api/v1/ads/{ad}/tour/scenes/{sceneId}/hotspots', function
         expect($salonHotspots)->toHaveCount(1);
     });
 
+    it('accepts yaw outside ±180 by normalizing before validation', function (): void {
+        $owner = User::factory()->agents()->create();
+        $config = ['default_scene' => 'salon', 'scenes' => [
+            ['id' => 'salon', 'title' => 'Salon', 'image_url' => 'https://s3.example.com/salon.jpg', 'hotspots' => []],
+            ['id' => 'chambre', 'title' => 'Chambre', 'image_url' => 'https://s3.example.com/chambre.jpg', 'hotspots' => []],
+        ]];
+        $ad = null;
+        Ad::withoutSyncingToSearch(function () use (&$ad, $owner, $config): void {
+            $ad = Ad::factory()->create(['user_id' => $owner->id, 'has_3d_tour' => true, 'tour_config' => $config]);
+        });
+
+        $this->actingAs($owner);
+
+        $this->patchJson("/panel-api/v1/ads/{$ad->id}/tour/scenes/salon/hotspots", [
+            'hotspots' => [
+                ['pitch' => 0.0, 'yaw' => 270.0, 'target_scene' => 'chambre', 'label' => 'A'],
+                ['pitch' => 1.0, 'yaw' => -200.0, 'target_scene' => 'chambre', 'label' => 'B'],
+            ],
+        ])->assertOk();
+
+        $scenes = collect($ad->fresh()->tour_config['scenes']);
+        $salonHotspots = $scenes->firstWhere('id', 'salon')['hotspots'] ?? [];
+        expect((float) $salonHotspots[0]['yaw'])->toEqual(-90.0);
+        expect((float) $salonHotspots[1]['yaw'])->toEqual(160.0);
+    });
+
     it('rejects invalid hotspot pitch values', function (): void {
         $owner = User::factory()->agents()->create();
         $config = ['default_scene' => 'salon', 'scenes' => [['id' => 'salon', 'title' => 'Salon', 'hotspots' => []]]];

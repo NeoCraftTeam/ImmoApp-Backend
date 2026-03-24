@@ -119,6 +119,26 @@ it('create ad validation fails with missing fields', function (): void {
         ->assertJsonValidationErrors(['title', 'description', 'adresse', 'price', 'surface_area', 'bedrooms', 'bathrooms', 'has_parking', 'latitude', 'longitude', 'quarter_id', 'type_id']);
 });
 
+it('owner can update an ad when resubmitting the same slug', function (): void {
+    $agent = User::factory()->create(['role' => 'agent', 'type' => 'individual']);
+    $ad = null;
+    Ad::withoutSyncingToSearch(function () use (&$ad, $agent): void {
+        $ad = Ad::factory()->create(['user_id' => $agent->id, 'status' => 'available']);
+    });
+
+    Sanctum::actingAs($agent);
+    $response = $this->putJson("/api/v1/ads/{$ad->id}", [
+        'slug' => $ad->slug,
+        'title' => 'Title after slug resubmit',
+        'quarter_id' => $ad->quarter_id,
+        'type_id' => $ad->type_id,
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('success', true);
+    $this->assertDatabaseHas('ad', ['id' => $ad->id, 'title' => 'Title after slug resubmit']);
+});
+
 it('admin can update an ad', function (): void {
     $owner = User::factory()->create();
     $admin = User::factory()->create(['role' => 'admin']);
