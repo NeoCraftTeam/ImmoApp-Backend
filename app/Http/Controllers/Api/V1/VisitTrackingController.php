@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 
 class VisitTrackingController
 {
-    public function __construct(private AcquisitionChannelClassifier $classifier) {}
+    public function __construct(private readonly AcquisitionChannelClassifier $classifier) {}
 
     public function store(Request $request): JsonResponse
     {

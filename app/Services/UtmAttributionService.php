@@ -134,7 +134,7 @@ final readonly class UtmAttributionService
             return;
         }
 
-        $hash = hash('sha256', $ip);
+        $hash = hash('sha256', (string) $ip);
 
         $visit = SiteVisit::query()
             ->where('ip_hash', $hash)
