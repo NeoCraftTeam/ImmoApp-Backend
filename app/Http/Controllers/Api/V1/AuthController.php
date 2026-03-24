@@ -8,6 +8,7 @@ use App\Http\Requests\LoginRequest;
 use App\Http\Resources\UserResource;
 use App\Mail\NewDeviceSignInMail;
 use App\Mail\NewLocationSignInMail;
+use App\Models\LoginHistory;
 use App\Models\User;
 use App\Services\UserAgentParser;
 use Illuminate\Http\JsonResponse;
@@ -51,7 +52,7 @@ final class AuthController
             $email = $credentials['email'];
             $password = $credentials['password'];
 
-            $key = 'login-attempts:'.$request->ip().'|'.mb_strtolower($email);
+            $key = 'login-attempts:'.$request->ip().'|'.mb_strtolower((string) $email);
             if (RateLimiter::tooManyAttempts($key, 5)) {
                 $seconds = RateLimiter::availableIn($key);
 
@@ -125,6 +126,21 @@ final class AuthController
                 'last_login_country' => strtoupper(trim($request->header('CF-IPCountry', ''))) ?: null,
                 'last_login_city' => mb_convert_case(trim($request->header('CF-IPCity', '')), MB_CASE_TITLE) ?: null,
             ])->save();
+
+            $parsed = UserAgentParser::parse($request->userAgent() ?? '');
+
+            LoginHistory::create([
+                'user_id' => $user->id,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'device_type' => $parsed['device_type'],
+                'browser' => $parsed['browser_name'],
+                'platform' => $parsed['operating_system'],
+                'country' => strtoupper(trim($request->header('CF-IPCountry', ''))) ?: null,
+                'city' => mb_convert_case(trim($request->header('CF-IPCity', '')), MB_CASE_TITLE) ?: null,
+                'guard' => 'sanctum',
+                'successful' => true,
+            ]);
 
             Log::info('Successful login', [
                 'user_id' => $user->id,
