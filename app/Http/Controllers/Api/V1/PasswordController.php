@@ -106,7 +106,12 @@ final class PasswordController
             'password' => $request->new_password,
         ])->save();
 
-        $user->tokens()->where('id', '!=', $user->currentAccessToken()->getKey())->delete();
+        $currentToken = $user->currentAccessToken();
+        if ($currentToken !== null && method_exists($currentToken, 'getKey')) {
+            $user->tokens()->where('id', '!=', $currentToken->getKey())->delete();
+        } else {
+            $user->tokens()->delete();
+        }
 
         Mail::to($user->email, $user->firstname)
             ->queue(new PasswordChangedMail($user->email, $user->firstname));
