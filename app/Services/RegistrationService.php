@@ -9,8 +9,8 @@ use App\Models\User;
 use App\Support\GeoLocation;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
@@ -20,7 +20,7 @@ use Spatie\MediaLibrary\MediaCollections\Exceptions\FileDoesNotExist;
 use Spatie\MediaLibrary\MediaCollections\Exceptions\FileIsTooBig;
 use Throwable;
 
-final class RegistrationService
+final readonly class RegistrationService
 {
     public function __construct(private LoggerInterface $log) {}
 
@@ -29,7 +29,7 @@ final class RegistrationService
      *
      * @param  array<string, mixed>  $data
      */
-    public function register(array $data, Request $request): JsonResponse
+    public function register(array $data, FormRequest $request): JsonResponse
     {
         try {
             $key = 'register-attempts:'.$request->ip();
@@ -93,8 +93,15 @@ final class RegistrationService
                     'type' => $data['type'] ?? 'individual',
                     'city_id' => $data['city_id'] ?? null,
                 ]);
+                // SEC-001: Never allow ADMIN role via public registration.
+                // Fallback to 'customer' if role is null, empty, or invalid.
+                $allowedRoles = ['customer', 'agent'];
+                $role = in_array($data['role'] ?? null, $allowedRoles, true)
+                    ? $data['role']
+                    : 'customer';
+
                 $user->forceFill([
-                    'role' => $data['role'],
+                    'role' => $role,
                     'is_active' => true,
                     'email_verified_at' => null,
                     'last_login_ip' => $request->ip(),
