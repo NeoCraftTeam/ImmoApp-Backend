@@ -190,10 +190,17 @@ final readonly class PaymentService
                     return $locked->fresh() ?? $locked;
                 }
 
-                $locked->forceFill([
+                $updateData = [
                     'status' => PaymentStatus::SUCCESS,
                     'gateway_response' => $result['raw'],
-                ])->save();
+                ];
+
+                // Update payment_method from gateway resolution (e.g. orange_money, mobile_money, card)
+                if (!empty($result['payment_method'])) {
+                    $updateData['payment_method'] = PaymentMethod::tryFrom($result['payment_method']);
+                }
+
+                $locked->forceFill($updateData)->save();
 
                 Log::info('Payment verified as success', [
                     'payment_id' => $locked->id,
@@ -276,10 +283,17 @@ final readonly class PaymentService
                 return $data;
             }
 
-            $payment->forceFill([
+            $webhookUpdate = [
                 'status' => PaymentStatus::SUCCESS,
                 'gateway_response' => $data['raw'],
-            ])->save();
+            ];
+
+            // Update payment_method from gateway resolution (e.g. orange_money, mobile_money, card)
+            if (!empty($data['payment_method'])) {
+                $webhookUpdate['payment_method'] = PaymentMethod::tryFrom($data['payment_method']);
+            }
+
+            $payment->forceFill($webhookUpdate)->save();
 
             Log::info('Webhook: payment succeeded', ['payment_id' => $payment->id]);
             PaymentSucceeded::dispatch($payment->fresh() ?? $payment);

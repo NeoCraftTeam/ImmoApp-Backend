@@ -158,11 +158,11 @@ class Payment extends Model
     }
 
     /**
-     * Returns true if the payment method is Stripe.
+     * Returns true if the payment method is a card payment.
      */
-    public function isStripe(): bool
+    public function isCard(): bool
     {
-        return $this->payment_method === PaymentMethod::STRIPE;
+        return $this->payment_method === PaymentMethod::CARD;
     }
 
     /**

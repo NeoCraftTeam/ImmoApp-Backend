@@ -221,6 +221,8 @@ final class PaymentController
             'ad_id' => $payment->ad_id,
             'tx_ref' => $payment->transaction_id,
             'gateway' => $payment->gateway?->value,
+            'payment_method' => $payment->payment_method?->value,
+            'payment_method_label' => $payment->payment_method?->label(),
         ]);
     }
 
