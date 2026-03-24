@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Database\Factories\SiteVisitFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SiteVisit extends Model
 {
-    use HasUuids;
+    /** @use HasFactory<SiteVisitFactory> */
+    use HasFactory, HasUuids;
 
     public $timestamps = false;
 
@@ -21,6 +24,8 @@ class SiteVisit extends Model
         'utm_source',
         'utm_medium',
         'utm_campaign',
+        'utm_content',
+        'utm_term',
         'user_id',
         'ip_hash',
         'device_type',

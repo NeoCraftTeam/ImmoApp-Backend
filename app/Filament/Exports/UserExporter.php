@@ -33,6 +33,14 @@ class UserExporter extends Exporter
             ExportColumn::make('deleted_at'),
             ExportColumn::make('last_login_at'),
             ExportColumn::make('last_login_ip'),
+            ExportColumn::make('acquisition_source')
+                ->label('Canal acquisition'),
+            ExportColumn::make('utm_source'),
+            ExportColumn::make('utm_medium'),
+            ExportColumn::make('utm_campaign'),
+            ExportColumn::make('utm_content'),
+            ExportColumn::make('utm_term'),
+            ExportColumn::make('referrer_domain'),
         ];
     }
 

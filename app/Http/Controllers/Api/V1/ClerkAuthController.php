@@ -13,6 +13,7 @@ use App\Mail\VerificationCodeMail;
 use App\Mail\WelcomeEmail;
 use App\Models\User;
 use App\Services\ClerkJwtService;
+use App\Services\UtmAttributionService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -83,13 +84,18 @@ final class ClerkAuthController
             ? $requestedIntent
             : ($existingPending['registration_intent'] ?? 'customer');
 
+        $utmFromRequest = array_intersect_key(
+            $request->validated(),
+            array_flip(UtmAttributionService::ATTRIBUTION_REQUEST_KEYS),
+        );
+
         Cache::put('clerk_pending_'.$clerkId, array_merge($existingPending, [
             'firstname' => $firstName,
             'lastname' => $lastName,
             'email' => $email,
             'avatar' => $avatar,
             'registration_intent' => $registrationIntent,
-        ]), now()->addMinutes(15));
+        ], $utmFromRequest), now()->addMinutes(15));
 
         $otpCooldownKey = 'clerk_otp_sent_'.$clerkId;
         $existingOtp = Cache::get('clerk_otp_'.$clerkId);
@@ -264,7 +270,17 @@ final class ClerkAuthController
             $role = $registrationIntent === 'agent' ? UserRole::AGENT : UserRole::CUSTOMER;
             $type = UserType::INDIVIDUAL;
 
+            $utmPayload = array_merge(
+                array_intersect_key($pending, array_flip(UtmAttributionService::ATTRIBUTION_REQUEST_KEYS)),
+                array_intersect_key(
+                    $request->validated(),
+                    array_flip(UtmAttributionService::ATTRIBUTION_REQUEST_KEYS),
+                ),
+            );
+
             try {
+                $utm = app(UtmAttributionService::class);
+
                 $user = new User;
                 $user->fill([
                     'clerk_id' => $clerkId,
@@ -280,8 +296,12 @@ final class ClerkAuthController
                     'type' => $type,
                     'is_active' => true,
                     'email_verified_at' => now(),
+                    'registration_ip' => $request->ip(),
+                    'last_login_ip' => $request->ip(),
                 ]);
+                $user->forceFill($utm->attributesForNewUser($request, $utmPayload));
                 $user->save();
+                $utm->linkSessionVisitsToUser($user, isset($utmPayload['session_id']) && is_string($utmPayload['session_id']) ? $utmPayload['session_id'] : null);
             } catch (UniqueConstraintViolationException) {
                 $user = User::query()->where('clerk_id', $clerkId)->first()
                     ?? ($email !== null ? User::query()->where('email', $email)->first() : null);

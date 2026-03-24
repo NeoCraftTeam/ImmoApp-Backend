@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\UserRole;
 use App\Models\User;
+use App\Services\UtmAttributionService;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -94,7 +95,15 @@ final class SocialAuthController
             'token' => 'required|string',
             'id_token' => 'nullable|string',
             'role' => 'nullable|string|in:customer,agent',
+            'session_id' => 'nullable|string|max:64',
+            'utm_source' => 'nullable|string|max:100',
+            'utm_medium' => 'nullable|string|max:100',
+            'utm_campaign' => 'nullable|string|max:255',
+            'utm_content' => 'nullable|string|max:255',
+            'utm_term' => 'nullable|string|max:255',
         ]);
+
+        $utmPayload = $request->only(UtmAttributionService::ATTRIBUTION_REQUEST_KEYS);
 
         try {
             // Get user info from OAuth provider
@@ -107,7 +116,7 @@ final class SocialAuthController
             }
 
             // Find or create user
-            $result = $this->findOrCreateUser($socialUser, $provider, $request->role);
+            $result = $this->findOrCreateUser($socialUser, $provider, $request->role, $request, $utmPayload);
             $user = $result['user'];
             $isNewUser = $result['is_new'];
 
@@ -261,7 +270,7 @@ final class SocialAuthController
             /** @phpstan-ignore method.notFound */
             $socialUser = Socialite::driver($provider)->stateless()->user();
 
-            $result = $this->findOrCreateUser($socialUser, $provider);
+            $result = $this->findOrCreateUser($socialUser, $provider, null, $request, []);
             $user = $result['user'];
 
             $user->forceFill([
@@ -484,11 +493,19 @@ final class SocialAuthController
      *     linking_token?: string
      * }
      */
-    private function findOrCreateUser(mixed $socialUser, string $provider, ?string $role = null): array
-    {
+    /**
+     * @param  array<string, mixed>  $utmPayload
+     */
+    private function findOrCreateUser(
+        mixed $socialUser,
+        string $provider,
+        ?string $role,
+        Request $request,
+        array $utmPayload,
+    ): array {
         $providerIdField = $provider.'_id';
 
-        return DB::transaction(function () use ($socialUser, $provider, $providerIdField) {
+        return DB::transaction(function () use ($socialUser, $provider, $providerIdField, $request, $utmPayload) {
             // Try to find by provider ID first
             $user = User::where($providerIdField, $socialUser->getId())->first();
 
@@ -528,6 +545,8 @@ final class SocialAuthController
             // Users can request agent upgrade through the app after completing their profile.
             $names = $this->parseNames($socialUser);
 
+            $utm = app(UtmAttributionService::class);
+
             $user = new User;
             $user->fill([
                 'firstname' => $names['firstname'],
@@ -543,8 +562,15 @@ final class SocialAuthController
                 'email_verified_at' => now(),
                 'role' => UserRole::CUSTOMER,
                 'is_active' => true,
+                'registration_ip' => $request->ip(),
+                'last_login_ip' => $request->ip(),
             ]);
+            $user->forceFill($utm->attributesForNewUser($request, $utmPayload));
             $user->save();
+            $utm->linkSessionVisitsToUser(
+                $user,
+                isset($utmPayload['session_id']) && is_string($utmPayload['session_id']) ? $utmPayload['session_id'] : null,
+            );
 
             return ['user' => $user, 'is_new' => true];
         });

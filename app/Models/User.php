@@ -119,9 +119,17 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property Carbon|null $last_home_visit_at
  * @property array<string, mixed>|null $preferences
  * @property Carbon|null $must_change_password_at
+ * @property string|null $acquisition_source
+ * @property string|null $utm_source
+ * @property string|null $utm_medium
+ * @property string|null $utm_campaign
+ * @property string|null $utm_content
+ * @property string|null $utm_term
+ * @property string|null $referrer_domain
  * @property-read City|null $city
  * @property-read MediaCollection<int, Media> $media
  * @property-read Collection<int, Review> $reviews
+ * @property-read Collection<int, SiteVisit> $siteVisits
  * @property string|null $agency_id
  * @property-read int|null $reviews_count
  *
@@ -274,6 +282,12 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function unlockedAds(): HasMany
     {
         return $this->hasMany(UnlockedAd::class);
+    }
+
+    /** @return HasMany<SiteVisit, $this> */
+    public function siteVisits(): HasMany
+    {
+        return $this->hasMany(SiteVisit::class);
     }
 
     /** @return HasMany<PointTransaction, $this> */

@@ -19,11 +19,13 @@ final class SiteVisitFactory extends Factory
     {
         return [
             'session_id' => Str::uuid()->toString(),
-            'source' => fake()->randomElement(['direct', 'google', 'facebook', 'referral']),
+            'source' => fake()->randomElement(['direct', 'organic', 'social', 'referral', 'paid', 'email']),
             'referrer_domain' => fake()->optional(0.5)->domainName(),
             'utm_source' => fake()->optional(0.3)->word(),
             'utm_medium' => fake()->optional(0.3)->randomElement(['cpc', 'organic', 'email', 'social']),
             'utm_campaign' => fake()->optional(0.3)->slug(2),
+            'utm_content' => fake()->optional(0.2)->slug(2),
+            'utm_term' => fake()->optional(0.2)->word(),
             'user_id' => fake()->optional(0.5)->passthrough(User::factory()),
             'ip_hash' => hash('sha256', fake()->ipv4()),
             'device_type' => fake()->randomElement(['desktop', 'mobile', 'tablet']),
@@ -39,7 +41,7 @@ final class SiteVisitFactory extends Factory
     public function fromGoogle(): static
     {
         return $this->state([
-            'source' => 'google',
+            'source' => 'paid',
             'utm_source' => 'google',
             'utm_medium' => 'cpc',
         ]);

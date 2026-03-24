@@ -16,6 +16,7 @@ use App\Filament\Admin\Widgets\InteractionStatsOverview;
 use App\Filament\Admin\Widgets\InteractionTrendChart;
 use App\Filament\Admin\Widgets\PendingAdsStats;
 use App\Filament\Admin\Widgets\QualityStatsOverview;
+use App\Filament\Admin\Widgets\RegistrationsByAcquisitionChart;
 use App\Filament\Admin\Widgets\RetentionStatsOverview;
 use App\Filament\Admin\Widgets\RevenueAdvancedStats;
 use App\Filament\Admin\Widgets\RevenueChart;
@@ -39,6 +40,7 @@ class Dashboard extends BaseDashboard
 
             // Acquisition & Activation
             AcquisitionStatsOverview::class,
+            RegistrationsByAcquisitionChart::class,
             ActivationStatsOverview::class,
 
             // Users & Revenue

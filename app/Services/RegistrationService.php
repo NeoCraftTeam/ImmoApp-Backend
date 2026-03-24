@@ -22,7 +22,10 @@ use Throwable;
 
 final readonly class RegistrationService
 {
-    public function __construct(private LoggerInterface $log) {}
+    public function __construct(
+        private LoggerInterface $log,
+        private UtmAttributionService $utmAttribution,
+    ) {}
 
     /**
      * Register a new user with the given data and request context.
@@ -107,7 +110,13 @@ final readonly class RegistrationService
                     'last_login_ip' => $request->ip(),
                     'registration_ip' => $request->ip(),
                 ]);
+                $user->forceFill($this->utmAttribution->attributesForNewUser($request, $data));
                 $user->save();
+
+                $this->utmAttribution->linkSessionVisitsToUser(
+                    $user,
+                    isset($data['session_id']) && is_string($data['session_id']) ? $data['session_id'] : null,
+                );
 
                 if ($request->hasFile('avatar')) {
                     $user->clearMediaCollection('avatars');

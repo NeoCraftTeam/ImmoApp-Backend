@@ -16,6 +16,7 @@ use App\Observers\ActivityObserver;
 use App\Observers\AdObserver;
 use App\Observers\PaymentObserver;
 use App\Observers\TentativeReservationObserver;
+use App\Observers\UserObserver;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
 use App\Services\ReservationService;
@@ -65,6 +66,7 @@ class AppServiceProvider extends ServiceProvider
         Ad::observe(AdObserver::class);
         TentativeReservation::observe(TentativeReservationObserver::class);
         Activity::observe(ActivityObserver::class);
+        User::observe(UserObserver::class);
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 

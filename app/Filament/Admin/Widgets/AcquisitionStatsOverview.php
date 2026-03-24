@@ -23,6 +23,23 @@ class AcquisitionStatsOverview extends StatsOverviewWidget
     {
         $metrics = app(AdminMetricsService::class)->getAcquisitionMetrics('30d');
 
+        $byAcq = $metrics['new_registrations_by_acquisition'] ?? [];
+        arsort($byAcq);
+        $topAcqKey = !empty($byAcq) ? array_key_first($byAcq) : null;
+        $acquisitionLabels = [
+            'direct' => 'Accès direct',
+            'organic' => 'Recherche organique',
+            'social' => 'Réseaux sociaux',
+            'referral' => 'Site référent',
+            'paid' => 'Publicité payante',
+            'email' => 'Email',
+            'unknown' => 'Non renseigné',
+        ];
+        $topAcqLabel = $topAcqKey !== null
+            ? ($acquisitionLabels[$topAcqKey] ?? $topAcqKey)
+            : 'Aucune donnée';
+        $topAcqCount = $topAcqKey !== null ? (int) ($byAcq[$topAcqKey] ?? 0) : 0;
+
         $sourceLabels = [
             'direct' => 'Accès direct (URL tapée)',
             'organic' => 'Recherche Google',
@@ -65,6 +82,12 @@ class AcquisitionStatsOverview extends StatsOverviewWidget
                 ->description('Nombre de comptes créés ces 30 derniers jours')
                 ->descriptionIcon('heroicon-m-user-plus')
                 ->color('success')
+                ->extraAttributes(['class' => 'ring-1 ring-gray-200 dark:ring-gray-700']),
+
+            Stat::make('Canal d’inscription le plus fréquent', $topAcqLabel)
+                ->description($topAcqCount > 0 ? $topAcqCount.' comptes attribués à ce canal (UTM / session)' : 'Les UTM apparaîtront après déploiement front + tracking')
+                ->descriptionIcon('heroicon-m-funnel')
+                ->color('gray')
                 ->extraAttributes(['class' => 'ring-1 ring-gray-200 dark:ring-gray-700']),
         ];
     }

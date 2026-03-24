@@ -11,6 +11,7 @@ use App\Filament\Admin\Resources\Ads\AdResource;
 use App\Filament\Admin\Resources\Payments\PaymentResource;
 use App\Filament\Admin\Resources\PendingAds\PendingAdResource;
 use App\Filament\Admin\Resources\Users\UserResource;
+use App\Filament\Admin\Widgets\RegistrationsByAcquisitionChart;
 use App\Filament\Admin\Widgets\StatsOverview;
 use App\Filament\Admin\Widgets\UserChart;
 use App\Filament\Admin\Widgets\UserStatusChart;
@@ -134,6 +135,8 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make('Administration')
                     ->icon('heroicon-o-shield-check')
                     ->collapsed(),
+                NavigationGroup::make('Analytique')
+                    ->icon('heroicon-o-chart-pie'),
             ])
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->colors([
@@ -150,6 +153,7 @@ class AdminPanelProvider extends PanelProvider
                 StatsOverview::class,
                 UserChart::class,
                 UserStatusChart::class,
+                RegistrationsByAcquisitionChart::class,
             ])
             ->middleware([
                 EncryptCookies::class,
