@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\ExpenseController;
 use App\Http\Controllers\Api\V1\GdprController;
 use App\Http\Controllers\Api\V1\HealthCheckController;
 use App\Http\Controllers\Api\V1\LeaseContractController;
+use App\Http\Controllers\Api\V1\LoginHistoryController;
 use App\Http\Controllers\Api\V1\MyReviewsController;
 use App\Http\Controllers\Api\V1\NaturalSearchController;
 use App\Http\Controllers\Api\V1\NewsletterController;
@@ -27,6 +28,8 @@ use App\Http\Controllers\Api\V1\QuarterController;
 use App\Http\Controllers\Api\V1\RecommendationController;
 use App\Http\Controllers\Api\V1\RentEstimatorController;
 use App\Http\Controllers\Api\V1\SearchAlertController;
+use App\Http\Controllers\Api\V1\SignatureController;
+use App\Http\Controllers\Api\V1\TeamController;
 use App\Http\Controllers\Api\V1\TenantController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\VisitTrackingController;
@@ -264,4 +267,30 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/my/notification-preferences', [NotificationPreferenceController::class, 'show']);
         Route::put('/my/notification-preferences', [NotificationPreferenceController::class, 'update']);
     });
+
+    // --- LOGIN HISTORY (owner) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/login-history', [LoginHistoryController::class, 'index']);
+        Route::delete('/my/login-history', [LoginHistoryController::class, 'destroy']);
+    });
+
+    // --- TEAM MANAGEMENT (agency owners) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/team', [TeamController::class, 'index']);
+        Route::post('/my/team/invite', [TeamController::class, 'invite'])->middleware('throttle:10,1');
+        Route::post('/my/team/invitations/{token}/accept', [TeamController::class, 'accept']);
+        Route::delete('/my/team/invitations/{teamInvitation}', [TeamController::class, 'destroy']);
+        Route::delete('/my/team/members/{user}', [TeamController::class, 'removeMember']);
+    });
+
+    // --- E-SIGNATURE (owner) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/lease-contracts/{leaseContract}/signatures', [SignatureController::class, 'index']);
+        Route::post('/my/lease-contracts/{leaseContract}/signatures', [SignatureController::class, 'store'])->middleware('throttle:10,1');
+    });
+
+    // --- E-SIGNATURE (public — no auth required) ---
+    Route::get('/signatures/{token}', [SignatureController::class, 'show']);
+    Route::post('/signatures/{token}/sign', [SignatureController::class, 'sign'])->middleware('throttle:10,1');
+    Route::post('/signatures/{token}/decline', [SignatureController::class, 'decline'])->middleware('throttle:10,1');
 });
