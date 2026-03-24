@@ -19,7 +19,7 @@ final class SanitizeInput
      *
      * @var list<string>
      */
-    private const SANITIZE_FIELDS = [
+    private const array SANITIZE_FIELDS = [
         'comment',
         'description',
         'text',
@@ -40,7 +40,7 @@ final class SanitizeInput
      *
      * @var list<string>
      */
-    private const EXEMPT_FIELDS = [
+    private const array EXEMPT_FIELDS = [
         'password',
         'password_confirmation',
         'current_password',

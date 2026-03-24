@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use App\Models\Review;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -19,8 +20,10 @@ final class TestimonialResource extends JsonResource
     #[\Override]
     public function toArray(Request $request): array
     {
-        $firstname = (string) ($this->user?->firstname ?? '');
-        $lastname = (string) ($this->user?->lastname ?? '');
+        $user = $this->resource->user;
+
+        $firstname = $user instanceof User ? $user->firstname : '';
+        $lastname = $user instanceof User ? $user->lastname : '';
 
         /** Anonymised display name: "Aliou D." */
         $displayName = trim($firstname.($lastname ? ' '.mb_strtoupper(mb_substr($lastname, 0, 1)).'.' : ''));
@@ -30,12 +33,11 @@ final class TestimonialResource extends JsonResource
             mb_substr($firstname, 0, 1).mb_substr($lastname, 0, 1)
         ) ?: '?';
 
-        $roleLabel = $this->user?->role?->getLabel() ?? 'Utilisateur';
-        $cityName = $this->user?->city?->name;
-        $countryCode = null;
+        $roleLabel = $user instanceof User ? $user->role->getLabel() : 'Utilisateur';
+        $cityName = $user instanceof User ? $user->city?->name : null;
 
-        $role = $cityName
-            ? "{$roleLabel} · {$cityName}".($countryCode ? ", {$countryCode}" : '')
+        $role = $cityName !== null && $cityName !== ''
+            ? "{$roleLabel} · {$cityName}"
             : $roleLabel;
 
         return [

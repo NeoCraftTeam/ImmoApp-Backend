@@ -65,6 +65,7 @@ class PaymentsRelationManager extends RelationManager
             ->defaultSort('created_at', 'desc');
     }
 
+    #[\Override]
     public function form(Schema $schema): Schema
     {
         return $schema->components([]);

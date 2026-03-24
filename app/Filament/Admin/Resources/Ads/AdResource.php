@@ -16,6 +16,7 @@ use App\Filament\Resources\Ads\Concerns\SharedAdResource;
 use App\Models\Ad;
 use BackedEnum;
 use Carbon\Carbon;
+use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -33,7 +34,6 @@ use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Actions\BulkAction;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
@@ -128,11 +128,9 @@ class AdResource extends Resource
                             ->numeric()
                             ->prefix('XAF'),
                     ])
-                    ->query(function (Builder $query, array $data): Builder {
-                        return $query
-                            ->when($data['price_from'], fn (Builder $q, $price) => $q->where('price', '>=', $price))
-                            ->when($data['price_to'], fn (Builder $q, $price) => $q->where('price', '<=', $price));
-                    }),
+                    ->query(fn (Builder $query, array $data): Builder => $query
+                        ->when($data['price_from'], fn (Builder $q, $price) => $q->where('price', '>=', $price))
+                        ->when($data['price_to'], fn (Builder $q, $price) => $q->where('price', '<=', $price))),
                 Filter::make('created_at')
                     ->label('Date de publication')
                     ->form([
@@ -143,11 +141,9 @@ class AdResource extends Resource
                             ->label('Au')
                             ->native(false),
                     ])
-                    ->query(function (Builder $query, array $data): Builder {
-                        return $query
-                            ->when($data['created_from'], fn (Builder $q, $date) => $q->whereDate('created_at', '>=', $date))
-                            ->when($data['created_until'], fn (Builder $q, $date) => $q->whereDate('created_at', '<=', $date));
-                    })
+                    ->query(fn (Builder $query, array $data): Builder => $query
+                        ->when($data['created_from'], fn (Builder $q, $date) => $q->whereDate('created_at', '>=', $date))
+                        ->when($data['created_until'], fn (Builder $q, $date) => $q->whereDate('created_at', '<=', $date)))
                     ->indicateUsing(function (array $data): array {
                         $indicators = [];
                         if ($data['created_from'] ?? null) {
@@ -193,7 +189,9 @@ class AdResource extends Resource
                         ->requiresConfirmation()
                         ->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records): void {
-                            $records->each(fn (Ad $ad) => $ad->update(['status' => AdStatus::AVAILABLE]));
+                            Ad::query()->whereKey($records->modelKeys())->update([
+                                'status' => AdStatus::AVAILABLE->value,
+                            ]);
                         }),
                     BulkAction::make('reject')
                         ->label('Rejeter')
@@ -202,7 +200,9 @@ class AdResource extends Resource
                         ->requiresConfirmation()
                         ->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records): void {
-                            $records->each(fn (Ad $ad) => $ad->update(['status' => AdStatus::REJECTED]));
+                            Ad::query()->whereKey($records->modelKeys())->update([
+                                'status' => AdStatus::DECLINED->value,
+                            ]);
                         }),
                     BulkAction::make('archive')
                         ->label('Archiver')
@@ -211,7 +211,7 @@ class AdResource extends Resource
                         ->requiresConfirmation()
                         ->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records): void {
-                            $records->each(fn (Ad $ad) => $ad->update(['status' => AdStatus::ARCHIVED]));
+                            Ad::query()->whereKey($records->modelKeys())->delete();
                         }),
                     DeleteBulkAction::make(),
                     ForceDeleteBulkAction::make(),

@@ -16,7 +16,7 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class CheckFeatureFlag
 {
-    public function __construct(private FeatureFlagService $features) {}
+    public function __construct(private readonly FeatureFlagService $features) {}
 
     public function handle(Request $request, Closure $next, string $feature): Response
     {

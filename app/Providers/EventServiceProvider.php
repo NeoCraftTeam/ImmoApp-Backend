@@ -28,8 +28,6 @@ class EventServiceProvider extends ServiceProvider
 {
     /**
      * The event to listener mappings for the application.
-     *
-     * @var array<class-string, array<int, class-string|string>>
      */
     protected $listen = [
         // Événement déclenché après vérification email
@@ -60,25 +58,25 @@ class EventServiceProvider extends ServiceProvider
             MatchSearchAlertsOnAdAvailable::class,
         ],
 
-        // Security audit trail — log all auth events
+        // Security audit trail — log all auth events (string listeners match framework $listen typing)
         Login::class => [
-            [LogAuthenticationEvents::class, 'handleLogin'],
+            LogAuthenticationEvents::class.'@handleLogin',
         ],
 
         Logout::class => [
-            [LogAuthenticationEvents::class, 'handleLogout'],
+            LogAuthenticationEvents::class.'@handleLogout',
         ],
 
         Failed::class => [
-            [LogAuthenticationEvents::class, 'handleFailed'],
+            LogAuthenticationEvents::class.'@handleFailed',
         ],
 
         Lockout::class => [
-            [LogAuthenticationEvents::class, 'handleLockout'],
+            LogAuthenticationEvents::class.'@handleLockout',
         ],
 
         PasswordReset::class => [
-            [LogAuthenticationEvents::class, 'handlePasswordReset'],
+            LogAuthenticationEvents::class.'@handlePasswordReset',
         ],
     ];
 

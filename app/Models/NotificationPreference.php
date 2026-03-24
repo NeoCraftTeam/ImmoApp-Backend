@@ -26,6 +26,7 @@ final class NotificationPreference extends Model
         'sms_enabled',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [

@@ -25,7 +25,7 @@ use Throwable;
  * Geo proximity → AdGeoController
  * Status management → AdStatusController
  */
-final class AdSearchController
+final readonly class AdSearchController
 {
     public function __construct(private LoggerInterface $log) {}
 

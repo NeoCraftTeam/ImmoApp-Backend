@@ -24,8 +24,11 @@ trait HasLocale
     protected function applyRecipientLocale(): void
     {
         $user = $this->resolveRecipientUser();
-
-        $locale = $user?->locale ?? config('app.locale', 'fr');
+        $fallback = config('app.locale', 'fr');
+        $locale = $fallback;
+        if ($user !== null && $user->locale !== '') {
+            $locale = $user->locale;
+        }
 
         $this->locale($locale);
     }

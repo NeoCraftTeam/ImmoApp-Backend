@@ -476,6 +476,14 @@ final class SocialAuthController
      *
      * @return array{user: User, is_new: bool}
      */
+    /**
+     * @return array{
+     *     user: User,
+     *     is_new: bool,
+     *     requires_link_confirmation?: bool,
+     *     linking_token?: string
+     * }
+     */
     private function findOrCreateUser(mixed $socialUser, string $provider, ?string $role = null): array
     {
         $providerIdField = $provider.'_id';

@@ -22,6 +22,7 @@ final class Expense extends Model
         'receipt_path',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [

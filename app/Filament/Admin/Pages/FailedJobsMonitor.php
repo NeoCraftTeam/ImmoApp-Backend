@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Pages;
 
+use App\Models\QueueFailedJob;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -12,7 +13,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use UnitEnum;
@@ -31,6 +32,7 @@ class FailedJobsMonitor extends Page implements HasTable
 
     protected string $view = 'filament.admin.pages.failed-jobs-monitor';
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [
@@ -59,7 +61,7 @@ class FailedJobsMonitor extends Page implements HasTable
     {
         return $table
             ->query(
-                DB::table('failed_jobs')
+                fn (): Builder => QueueFailedJob::query()
                     ->select(['id', 'uuid', 'connection', 'queue', 'payload', 'exception', 'failed_at'])
                     ->orderByDesc('failed_at')
             )
@@ -94,20 +96,20 @@ class FailedJobsMonitor extends Page implements HasTable
                     ->sortable(),
             ])
             ->actions([
-                \Filament\Tables\Actions\Action::make('retry')
+                Action::make('retry')
                     ->icon('heroicon-o-arrow-path')
                     ->color('warning')
                     ->requiresConfirmation()
-                    ->action(function (Model $record): void {
-                        Artisan::call('queue:retry', ['id' => [$record->getAttribute('uuid')]]);
+                    ->action(function (QueueFailedJob $record): void {
+                        Artisan::call('queue:retry', ['id' => [$record->uuid]]);
                         Notification::make()->title('Job queued for retry.')->success()->send();
                     }),
-                \Filament\Tables\Actions\Action::make('delete')
+                Action::make('delete')
                     ->icon('heroicon-o-trash')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->action(function (Model $record): void {
-                        DB::table('failed_jobs')->where('uuid', $record->getAttribute('uuid'))->delete();
+                    ->action(function (QueueFailedJob $record): void {
+                        DB::table('failed_jobs')->where('uuid', $record->uuid)->delete();
                         Notification::make()->title('Failed job deleted.')->success()->send();
                     }),
             ])

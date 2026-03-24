@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Enums\UserRole;
 use App\Enums\UserType;
 use App\Models\Ad;
+use App\Models\Agency;
 use App\Models\Payment;
 use App\Models\PersonalAccessToken;
 use App\Models\TentativeReservation;
@@ -116,18 +117,20 @@ class AppServiceProvider extends ServiceProvider
     private function configureRateLimiting(): void
     {
         RateLimiter::for('api', function (Request $request) {
-            $user = $request->user();
+            $authUser = $request->user();
 
-            if (!$user) {
+            if (!$authUser instanceof User) {
                 return Limit::perMinute(60)->by($request->ip());
             }
 
-            return match ($user->role) {
+            $agency = $authUser->agency;
+
+            return match ($authUser->role) {
                 UserRole::ADMIN => Limit::none(),
-                UserRole::AGENT => ($user->agency?->hasActiveSubscription() ?? false)
-                    ? Limit::perMinute(500)->by($user->id)
-                    : Limit::perMinute(300)->by($user->id),
-                default => Limit::perMinute(120)->by($user->id),
+                UserRole::AGENT => ($agency instanceof Agency && $agency->hasActiveSubscription())
+                    ? Limit::perMinute(500)->by($authUser->id)
+                    : Limit::perMinute(300)->by($authUser->id),
+                default => Limit::perMinute(120)->by($authUser->id),
             };
         });
 

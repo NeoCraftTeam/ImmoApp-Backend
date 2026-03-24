@@ -250,6 +250,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return in_array($this->role, [UserRole::AGENT, UserRole::ADMIN]);
     }
 
+    /** @return HasMany<Ad, $this> */
     public function ads(): HasMany
     {
         return $this->hasMany(Ad::class);
@@ -286,6 +287,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return $this->belongsTo(City::class);
     }
 
+    /** @return HasMany<Review, $this> */
     public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);

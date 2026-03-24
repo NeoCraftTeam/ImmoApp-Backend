@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Listeners;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Facades\Log;
-use Spatie\Activitylog\Models\Activity;
 
 /**
  * Logs authentication events to both the Laravel log and Spatie Activity Log.
@@ -23,6 +23,9 @@ class LogAuthenticationEvents
     public function handleLogin(Login $event): void
     {
         $user = $event->user;
+        if (!$user instanceof User) {
+            return;
+        }
 
         Log::channel('security')->info('User logged in', [
             'user_id' => $user->getAuthIdentifier(),
@@ -48,7 +51,7 @@ class LogAuthenticationEvents
     {
         $user = $event->user;
 
-        if (!$user) {
+        if (!$user instanceof User) {
             return;
         }
 
@@ -77,9 +80,10 @@ class LogAuthenticationEvents
             'user_agent' => request()->userAgent(),
         ]);
 
-        if ($event->user) {
+        $failedUser = $event->user;
+        if ($failedUser instanceof User) {
             activity('security')
-                ->performedOn($event->user)
+                ->performedOn($failedUser)
                 ->withProperties([
                     'action' => 'login_failed',
                     'ip' => request()->ip(),
@@ -103,6 +107,9 @@ class LogAuthenticationEvents
     public function handlePasswordReset(PasswordReset $event): void
     {
         $user = $event->user;
+        if (!$user instanceof User) {
+            return;
+        }
 
         Log::channel('security')->info('Password reset completed', [
             'user_id' => $user->getAuthIdentifier(),

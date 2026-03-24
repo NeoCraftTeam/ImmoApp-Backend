@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\DB;
  * Extracted from CreditController::unlock() for reuse across API,
  * Filament admin actions, and potential background processes.
  */
-final class UnlockAd
+final readonly class UnlockAd
 {
     public function __construct(private PointService $pointService) {}
 

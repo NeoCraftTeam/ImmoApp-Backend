@@ -12,7 +12,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
-use Laravel\Sanctum\PersonalAccessToken;
 
 final class PasswordController
 {
@@ -107,12 +106,7 @@ final class PasswordController
             'password' => $request->new_password,
         ])->save();
 
-        $currentToken = $user->currentAccessToken();
-        if ($currentToken instanceof PersonalAccessToken) {
-            $user->tokens()->where('id', '!=', $currentToken->getKey())->delete();
-        } else {
-            $user->tokens()->delete();
-        }
+        $user->tokens()->where('id', '!=', $user->currentAccessToken()->getKey())->delete();
 
         Mail::to($user->email, $user->firstname)
             ->queue(new PasswordChangedMail($user->email, $user->firstname));

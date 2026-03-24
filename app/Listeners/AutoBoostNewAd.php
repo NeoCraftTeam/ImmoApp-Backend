@@ -9,7 +9,7 @@ use App\Services\AdBoostService;
 
 class AutoBoostNewAd
 {
-    public function __construct(private AdBoostService $adBoostService) {}
+    public function __construct(private readonly AdBoostService $adBoostService) {}
 
     public function handle(AdCreated $event): void
     {

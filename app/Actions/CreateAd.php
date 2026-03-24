@@ -17,7 +17,7 @@ use Psr\Log\LoggerInterface;
  * Extracted from AdController::store() to make ad creation
  * reusable from API, Filament, bulk import, etc.
  */
-final class CreateAd
+final readonly class CreateAd
 {
     public function __construct(private LoggerInterface $log) {}
 

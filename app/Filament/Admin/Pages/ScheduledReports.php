@@ -69,6 +69,7 @@ class ScheduledReports extends Page
         ];
     }
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [
@@ -91,19 +92,20 @@ class ScheduledReports extends Page
     {
         return Response::streamDownload(function (): void {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['ID', 'Prénom', 'Nom', 'Email', 'Rôle', 'Actif', 'Inscrit le']);
+            fputcsv($handle, ['ID', 'Prénom', 'Nom', 'Email', 'Rôle', 'Actif', 'Inscrit le'], escape: '\\');
 
             User::query()->orderByDesc('created_at')->chunk(500, function ($users) use ($handle): void {
                 foreach ($users as $user) {
                     fputcsv($handle, [
-                        $user->id,
-                        $user->firstname,
-                        $user->lastname,
-                        $user->email,
-                        $user->role?->value,
+                        (string) $user->id,
+                        (string) $user->firstname,
+                        (string) $user->lastname,
+                        (string) $user->email,
+                        $user->role->value,
                         $user->is_active ? 'Oui' : 'Non',
-                        $user->created_at?->toDateString(),
-                    ]);
+                        $user->created_at?->toDateString() ?? '',
+                    ],
+                        escape: '\\');
                 }
             });
 
@@ -117,19 +119,20 @@ class ScheduledReports extends Page
     {
         return Response::streamDownload(function (): void {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['ID', 'Titre', 'Statut', 'Prix', 'Ville', 'Quartier', 'Créé le']);
+            fputcsv($handle, ['ID', 'Titre', 'Statut', 'Prix', 'Ville', 'Quartier', 'Créé le'], escape: '\\');
 
             Ad::query()->with(['quarter.city'])->orderByDesc('created_at')->chunk(500, function ($ads) use ($handle): void {
                 foreach ($ads as $ad) {
                     fputcsv($handle, [
-                        $ad->id,
-                        $ad->title,
-                        $ad->status,
-                        $ad->price,
-                        $ad->quarter?->city?->name,
-                        $ad->quarter?->name,
-                        $ad->created_at?->toDateString(),
-                    ]);
+                        (string) $ad->id,
+                        (string) $ad->title,
+                        $ad->status->value,
+                        (string) $ad->price,
+                        (string) ($ad->quarter?->city->name ?? ''),
+                        $ad->quarter === null ? '' : (string) $ad->quarter->name,
+                        $ad->created_at?->toDateString() ?? '',
+                    ],
+                        escape: '\\');
                 }
             });
 
@@ -143,18 +146,19 @@ class ScheduledReports extends Page
     {
         return Response::streamDownload(function (): void {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['ID', 'Montant', 'Statut', 'Passerelle', 'Utilisateur', 'Créé le']);
+            fputcsv($handle, ['ID', 'Montant', 'Statut', 'Passerelle', 'Utilisateur', 'Créé le'], escape: '\\');
 
             Payment::query()->with('user')->orderByDesc('created_at')->chunk(500, function ($payments) use ($handle): void {
                 foreach ($payments as $payment) {
                     fputcsv($handle, [
-                        $payment->id,
-                        $payment->amount,
-                        $payment->status,
-                        $payment->gateway,
-                        $payment->user?->email,
-                        $payment->created_at?->toDateString(),
-                    ]);
+                        (string) $payment->id,
+                        (string) $payment->amount,
+                        $payment->status->value,
+                        $payment->gateway !== null ? $payment->gateway->value : '',
+                        $payment->user->email,
+                        $payment->created_at?->toDateString() ?? '',
+                    ],
+                        escape: '\\');
                 }
             });
 

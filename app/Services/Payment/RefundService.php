@@ -195,8 +195,9 @@ final readonly class RefundService
     {
         $refund->loadMissing(['user', 'payment']);
 
-        if ($refund->user?->email) {
-            Mail::to($refund->user->email)
+        $user = $refund->user;
+        if ($user instanceof User && $user->email !== '') {
+            Mail::to($user->email)
                 ->queue(new RefundConfirmationMail($refund));
         }
     }

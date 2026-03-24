@@ -9,6 +9,7 @@ use Database\Factories\PointTransactionFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
@@ -18,6 +19,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $description
  * @property string|null $payment_id
  * @property string|null $ad_id
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
  */
 class PointTransaction extends Model
 {

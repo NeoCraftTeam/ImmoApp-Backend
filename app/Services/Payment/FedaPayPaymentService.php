@@ -46,7 +46,15 @@ final readonly class FedaPayPaymentService implements PaymentGatewayInterface
             'currency' => ['iso' => $payload['currency']],
             'callback_url' => $payload['redirect_url'],
             'customer' => [
-                'firstname' => explode(' ', $payload['name'])[0] ?? 'Client',
+                'firstname' => (static function (string $fullName): string {
+                    $trimmed = trim($fullName);
+                    if ($trimmed === '') {
+                        return 'Client';
+                    }
+                    $parts = explode(' ', $trimmed, 2);
+
+                    return $parts[0];
+                })($payload['name']),
                 'lastname' => implode(' ', array_slice(explode(' ', $payload['name']), 1)) ?: '',
                 'email' => $payload['email'],
                 'phone_number' => [

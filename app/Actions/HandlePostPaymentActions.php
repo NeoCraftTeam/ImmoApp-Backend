@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\Mail;
  * Extracted from PaymentController to eliminate duplication between verify(),
  * handleWebhook(), and CreditController::verifyPurchase().
  */
-final class HandlePostPaymentActions
+final readonly class HandlePostPaymentActions
 {
     public function __construct(
         private PointService $pointService,

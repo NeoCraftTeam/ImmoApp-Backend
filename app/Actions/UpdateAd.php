@@ -18,7 +18,7 @@ use Psr\Log\LoggerInterface;
  * Extracted from AdController::update() to make ad updates
  * reusable from API, Filament, and scheduled jobs.
  */
-final class UpdateAd
+final readonly class UpdateAd
 {
     public function __construct(private LoggerInterface $log) {}
 

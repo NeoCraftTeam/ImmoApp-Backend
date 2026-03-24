@@ -6,6 +6,8 @@ namespace App\Filament\Admin\Pages;
 
 use App\Enums\UserRole;
 use App\Models\User;
+use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -15,6 +17,8 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
 
 class ManagePermissions extends Page implements HasTable
@@ -66,7 +70,7 @@ class ManagePermissions extends Page implements HasTable
                     ->options(UserRole::class),
             ])
             ->actions([
-                Tables\Actions\Action::make('changeRole')
+                Action::make('changeRole')
                     ->label('Changer le rôle')
                     ->icon(Heroicon::PencilSquare)
                     ->form([
@@ -83,9 +87,9 @@ class ManagePermissions extends Page implements HasTable
                             ->success()
                             ->send();
                     }),
-                Tables\Actions\Action::make('toggleActive')
+                Action::make('toggleActive')
                     ->label(fn (User $record): string => $record->is_active ? 'Désactiver' : 'Activer')
-                    ->icon(fn (User $record): string|\BackedEnum => $record->is_active ? Heroicon::XCircle : Heroicon::CheckCircle)
+                    ->icon(fn (User $record): \BackedEnum => $record->is_active ? Heroicon::XCircle : Heroicon::CheckCircle)
                     ->color(fn (User $record): string => $record->is_active ? 'danger' : 'success')
                     ->requiresConfirmation()
                     ->action(function (User $record): void {
@@ -98,10 +102,18 @@ class ManagePermissions extends Page implements HasTable
                     }),
             ])
             ->bulkActions([
-                Tables\Actions\BulkAction::make('activateAll')
+                BulkAction::make('activateAll')
                     ->label('Activer la sélection')
                     ->icon(Heroicon::CheckCircle)
-                    ->action(fn ($records) => $records->each->update(['is_active' => true]))
+                    ->action(function (EloquentCollection $records): void {
+                        $records->each(function (Model $model): void {
+                            if (!$model instanceof User) {
+                                return;
+                            }
+
+                            $model->update(['is_active' => true]);
+                        });
+                    })
                     ->deselectRecordsAfterCompletion(),
             ]);
     }

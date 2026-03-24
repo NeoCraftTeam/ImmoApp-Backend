@@ -193,7 +193,7 @@ class UserResource extends Resource
     {
         return $schema
             ->components([
-                \Filament\Infolists\Components\Section::make('Informations personnelles')
+                Section::make('Informations personnelles')
                     ->icon(Heroicon::User)
                     ->columns(2)
                     ->schema([
@@ -357,11 +357,9 @@ class UserResource extends Resource
                         ->label('Au')
                         ->native(false),
                 ])
-                ->query(function (Builder $query, array $data): Builder {
-                    return $query
-                        ->when($data['created_from'], fn (Builder $q, $date) => $q->whereDate('created_at', '>=', $date))
-                        ->when($data['created_until'], fn (Builder $q, $date) => $q->whereDate('created_at', '<=', $date));
-                })
+                ->query(fn (Builder $query, array $data): Builder => $query
+                    ->when($data['created_from'], fn (Builder $q, $date) => $q->whereDate('created_at', '>=', $date))
+                    ->when($data['created_until'], fn (Builder $q, $date) => $q->whereDate('created_at', '<=', $date)))
                 ->indicateUsing(function (array $data): array {
                     $indicators = [];
                     if ($data['created_from'] ?? null) {

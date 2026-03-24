@@ -72,7 +72,7 @@ final class UserRequest extends FormRequest
                 'role' => ['required', 'string', Rule::in(['customer', 'agent', 'admin'])],
                 'type' => ['nullable', 'string', Rule::in(['individual', 'agency'])],
                 'city_id' => ['sometimes', 'uuid', 'exists:city,id'],
-                'avatar' => ['sometimes', 'nullable', 'image', 'max:5120', 'mimes:jpeg,jpg,png,gif,webp'],
+                'avatar' => ['sometimes', 'nullable', 'image', 'max:5120', 'mimes:jpeg,jpg,png,gif,webp', 'dimensions:max_width=2000,max_height=2000'],
             ];
         }
         if ($this->isMethod('put') || $this->isMethod('patch')) {
@@ -84,7 +84,7 @@ final class UserRequest extends FormRequest
                 'email' => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->route('user'))],
                 'password' => ['sometimes', 'string', 'min:8'],
                 'city_id' => ['sometimes', 'uuid', 'exists:city,id'],
-                'avatar' => ['sometimes', 'nullable', 'image', 'max:5120', 'mimes:jpeg,jpg,png,gif,webp'],
+                'avatar' => ['sometimes', 'nullable', 'image', 'max:5120', 'mimes:jpeg,jpg,png,gif,webp', 'dimensions:max_width=2000,max_height=2000'],
                 'location' => ['sometimes', new GeometryGeojsonRule([Point::class])],
                 'latitude' => 'sometimes|nullable|numeric|between:-90,90',
                 'longitude' => 'sometimes|nullable|numeric|between:-180,180',
@@ -122,6 +122,7 @@ final class UserRequest extends FormRequest
             'avatar.image' => 'La photo de profil doit être une image valide.',
             'avatar.max' => 'La photo de profil ne doit pas dépasser 5 Mo.',
             'avatar.mimes' => 'Formats acceptés : JPEG, PNG, GIF, WebP.',
+            'avatar.dimensions' => 'La photo de profil ne doit pas dépasser 2000×2000 pixels.',
         ];
     }
 }

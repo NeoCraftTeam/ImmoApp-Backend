@@ -8,7 +8,7 @@ use App\Http\Requests\RegisterRequest;
 use App\Services\RegistrationService;
 use Illuminate\Http\JsonResponse;
 
-final class RegistrationController
+final readonly class RegistrationController
 {
     public function __construct(private RegistrationService $registrationService) {}
 

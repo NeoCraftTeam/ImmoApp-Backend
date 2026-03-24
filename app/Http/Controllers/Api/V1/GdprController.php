@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Models\Ad;
+use App\Models\Payment;
+use App\Models\PointTransaction;
+use App\Models\Review;
+use App\Models\UnlockedAd;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -35,6 +40,34 @@ final class GdprController
         /** @var User $user */
         $user = $request->user();
 
+        $paymentsPayload = [];
+        foreach ($user->payments()->get() as $payment) {
+            if (!$payment instanceof Payment) {
+                continue;
+            }
+
+            $paymentsPayload[] = [
+                'id' => $payment->id,
+                'amount' => $payment->amount,
+                'status' => $payment->status->value,
+                'gateway' => $payment->gateway?->value,
+                'created_at' => $payment->created_at?->toIso8601String(),
+            ];
+        }
+
+        $unlockedAdsPayload = [];
+        foreach ($user->unlockedAds()->with('ad:id,title')->get() as $unlock) {
+            if (!$unlock instanceof UnlockedAd) {
+                continue;
+            }
+
+            $unlockedAdsPayload[] = [
+                'ad_id' => $unlock->ad_id,
+                'ad_title' => $unlock->ad?->title,
+                'created_at' => $unlock->unlocked_at?->toIso8601String(),
+            ];
+        }
+
         $data = [
             'account' => [
                 'id' => $user->id,
@@ -42,7 +75,7 @@ final class GdprController
                 'lastname' => $user->lastname,
                 'email' => $user->email,
                 'phone_number' => $user->phone_number,
-                'role' => $user->role?->value,
+                'role' => $user->role->value,
                 'type' => $user->type?->value,
                 'city' => $user->city?->name,
                 'created_at' => $user->created_at?->toIso8601String(),
@@ -50,35 +83,25 @@ final class GdprController
                 'last_login_at' => $user->last_login_at,
                 'onboarding_completed_at' => $user->onboarding_completed_at?->toIso8601String(),
             ],
-            'ads' => $user->ads()->with(['adType', 'quarter.city'])->get()->map(fn ($ad) => [
+            'ads' => $user->ads()->with(['adType', 'quarter.city'])->get()->map(fn (Ad $ad): array => [
                 'id' => $ad->id,
                 'title' => $ad->title,
                 'slug' => $ad->slug,
-                'status' => $ad->status,
+                'status' => $ad->status->value,
                 'price' => $ad->price,
                 'created_at' => $ad->created_at?->toIso8601String(),
             ])->toArray(),
-            'reviews' => $user->reviews()->get()->map(fn ($review) => [
+            'reviews' => $user->reviews()->get()->map(fn (Review $review): array => [
                 'id' => $review->id,
                 'rating' => $review->rating,
                 'comment' => $review->comment,
                 'ad_id' => $review->ad_id,
                 'created_at' => $review->created_at?->toIso8601String(),
             ])->toArray(),
-            'payments' => $user->payments()->get()->map(fn ($payment) => [
-                'id' => $payment->id,
-                'amount' => $payment->amount,
-                'status' => $payment->status,
-                'gateway' => $payment->gateway,
-                'created_at' => $payment->created_at?->toIso8601String(),
-            ])->toArray(),
-            'unlocked_ads' => $user->unlockedAds()->with('ad:id,title')->get()->map(fn ($unlock) => [
-                'ad_id' => $unlock->ad_id,
-                'ad_title' => $unlock->ad?->title,
-                'created_at' => $unlock->created_at?->toIso8601String(),
-            ])->toArray(),
-            'point_transactions' => $user->pointTransactions()->get()->map(fn ($pt) => [
-                'type' => $pt->type,
+            'payments' => $paymentsPayload,
+            'unlocked_ads' => $unlockedAdsPayload,
+            'point_transactions' => $user->pointTransactions()->get()->map(fn (PointTransaction $pt): array => [
+                'type' => $pt->type->value,
                 'points' => $pt->points,
                 'description' => $pt->description,
                 'created_at' => $pt->created_at?->toIso8601String(),
@@ -135,7 +158,7 @@ final class GdprController
         DB::transaction(function () use ($user): void {
             $user->tokens()->delete();
 
-            $user->ads()->update(['status' => 'archived']);
+            $user->ads()->delete();
 
             $user->delete();
         });
