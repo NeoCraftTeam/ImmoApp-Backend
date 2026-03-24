@@ -22,3 +22,7 @@ Schedule::job(ExpireStaleReservationsJob::class)->everyThirtyMinutes();
 
 Schedule::command('backup:clean')->daily()->at('01:00');
 Schedule::command('backup:run')->daily()->at('02:00');
+
+// — Automated workflows (Item 25) —
+Schedule::command('app:auto-hide-stale-ads')->dailyAt('03:00');
+Schedule::command('app:send-post-viewing-thanks')->dailyAt('10:00');
