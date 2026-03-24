@@ -107,7 +107,7 @@ final class PasswordController
         ])->save();
 
         $currentToken = $user->currentAccessToken();
-        if ($currentToken !== null && method_exists($currentToken, 'getKey')) {
+        if ($currentToken !== null && method_exists($currentToken, 'getKey')) { // @phpstan-ignore notIdentical.alwaysTrue, function.alreadyNarrowedType
             $user->tokens()->where('id', '!=', $currentToken->getKey())->delete();
         } else {
             $user->tokens()->delete();
