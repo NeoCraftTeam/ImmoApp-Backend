@@ -1,65 +1,10 @@
 <?php
 
 use App\Enums\PaymentStatus;
-use App\Enums\UserRole;
 use App\Models\Payment;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Mail;
-use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
-
-test('guest cannot access admin registration endpoint', function (): void {
-    $response = $this->postJson('/api/v1/auth/registerAdmin', [
-        'firstname' => 'Admin',
-        'lastname' => 'Guest',
-        'email' => 'guest-admin@example.com',
-        'phone_number' => '+237699000001',
-        'password' => 'Password123@',
-        'confirm_password' => 'Password123@',
-    ]);
-
-    $response->assertUnauthorized();
-});
-
-test('non admin cannot access admin registration endpoint', function (): void {
-    $agent = User::factory()->agents()->create();
-    Sanctum::actingAs($agent);
-
-    $response = $this->postJson('/api/v1/auth/registerAdmin', [
-        'firstname' => 'Admin',
-        'lastname' => 'Denied',
-        'email' => 'denied-admin@example.com',
-        'phone_number' => '+237699000002',
-        'password' => 'Password123@',
-        'confirm_password' => 'Password123@',
-    ]);
-
-    $response->assertForbidden();
-});
-
-test('admin can register another admin through protected endpoint', function (): void {
-    Mail::fake();
-    $admin = User::factory()->admin()->create();
-    Sanctum::actingAs($admin);
-
-    $response = $this->postJson('/api/v1/auth/registerAdmin', [
-        'firstname' => 'Super',
-        'lastname' => 'Admin',
-        'email' => 'new-admin@example.com',
-        'phone_number' => '+237699000003',
-        'password' => 'Password123@',
-        'confirm_password' => 'Password123@',
-    ]);
-
-    $response->assertCreated();
-
-    $this->assertDatabaseHas('users', [
-        'email' => 'new-admin@example.com',
-        'role' => UserRole::ADMIN->value,
-    ]);
-});
 
 test('payment webhook rejects invalid signature when secret is configured', function (): void {
     config()->set('payment.gateways.flutterwave.webhook_secret', 'test-secret');

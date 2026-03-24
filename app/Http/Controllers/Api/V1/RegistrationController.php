@@ -54,24 +54,4 @@ final readonly class RegistrationController
 
         return $this->registrationService->register($data, $request);
     }
-
-    /**
-     * @OA\Post(
-     *     path="/api/v1/auth/registerAdmin",
-     *     summary="Enregistrer un administrateur",
-     *     tags={"🔐 Authentification"},
-     *     security={{"sanctum":{}}},
-     *
-     *     @OA\Response(response=201, description="Admin créé"),
-     *     @OA\Response(response=401, description="Non authentifié"),
-     *     @OA\Response(response=403, description="Accès interdit")
-     * )
-     */
-    public function registerAdmin(RegisterRequest $request): JsonResponse
-    {
-        $data = $request->validated();
-        $data['role'] = 'admin';
-
-        return $this->registrationService->register($data, $request);
-    }
 }

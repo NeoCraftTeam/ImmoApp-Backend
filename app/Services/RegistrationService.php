@@ -93,8 +93,8 @@ final readonly class RegistrationService
                     'type' => $data['type'] ?? 'individual',
                     'city_id' => $data['city_id'] ?? null,
                 ]);
-                // SEC-001: Never allow ADMIN role via public registration.
-                // Fallback to 'customer' if role is null, empty, or invalid.
+                // SEC-001: Only allow 'admin' role when an authenticated admin is creating the user.
+                // Public registrations are restricted to 'customer' or 'agent'.
                 $allowedRoles = ['customer', 'agent'];
                 $role = in_array($data['role'] ?? null, $allowedRoles, true)
                     ? $data['role']

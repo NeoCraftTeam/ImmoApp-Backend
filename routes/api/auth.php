@@ -69,8 +69,6 @@ Route::prefix('auth')->group(function (): void {
 
     // Authenticated auth routes
     Route::middleware('auth:sanctum')->group(function (): void {
-        Route::post('registerAdmin', [RegistrationController::class, 'registerAdmin'])
-            ->middleware('can:admin-access');
         Route::post('logout', [AuthController::class, 'logout']);
         Route::post('logout-all', [AuthController::class, 'logoutAll']);
         Route::post('refresh', [AuthController::class, 'refresh'])
