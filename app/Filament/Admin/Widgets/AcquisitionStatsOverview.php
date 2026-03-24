@@ -23,7 +23,7 @@ class AcquisitionStatsOverview extends StatsOverviewWidget
     {
         $metrics = app(AdminMetricsService::class)->getAcquisitionMetrics('30d');
 
-        $byAcq = $metrics['new_registrations_by_acquisition'] ?? [];
+        $byAcq = $metrics['new_registrations_by_acquisition'];
         arsort($byAcq);
         $topAcqKey = !empty($byAcq) ? array_key_first($byAcq) : null;
         $acquisitionLabels = [

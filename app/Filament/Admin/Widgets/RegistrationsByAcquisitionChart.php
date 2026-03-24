@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Widgets;
 
-use App\Models\User;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use stdClass;
 
 class RegistrationsByAcquisitionChart extends ChartWidget
 {
@@ -19,17 +20,11 @@ class RegistrationsByAcquisitionChart extends ChartWidget
     #[\Override]
     protected function getData(): array
     {
-        $rows = Cache::remember('admin_chart_registrations_acquisition_30d', 300, function (): array {
-            return User::query()
-                ->where('created_at', '>=', now()->subDays(30))
-                ->selectRaw("COALESCE(acquisition_source, 'unknown') as src")
-                ->selectRaw('COUNT(*) as cnt')
-                ->groupByRaw("COALESCE(acquisition_source, 'unknown')")
-                ->orderByDesc('cnt')
-                ->get()
-                ->map(fn ($row): array => ['src' => $row->src, 'cnt' => (int) $row->cnt])
-                ->all();
-        });
+        $rows = Cache::remember(
+            'admin_chart_registrations_acquisition_30d',
+            300,
+            fn (): array => $this->registrationsByAcquisitionRows(),
+        );
 
         $labels = array_column($rows, 'src');
         $data = array_column($rows, 'cnt');
@@ -59,6 +54,25 @@ class RegistrationsByAcquisitionChart extends ChartWidget
             ],
             'labels' => $labels,
         ];
+    }
+
+    /**
+     * @return list<array{src: string, cnt: int}>
+     */
+    private function registrationsByAcquisitionRows(): array
+    {
+        return DB::table('users')
+            ->where('created_at', '>=', now()->subDays(30))
+            ->selectRaw("COALESCE(acquisition_source, 'unknown') as src")
+            ->selectRaw('COUNT(*) as cnt')
+            ->groupByRaw("COALESCE(acquisition_source, 'unknown')")
+            ->orderByDesc('cnt')
+            ->get()
+            ->map(fn (stdClass $row): array => [
+                'src' => (string) $row->src,
+                'cnt' => (int) $row->cnt,
+            ])
+            ->all();
     }
 
     #[\Override]
