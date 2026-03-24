@@ -44,7 +44,7 @@ final class RecommendationController
      *
      *     @OA\Response(
      *         response=200,
-     *         description="Liste des annonces recommandées",
+     *         description="Liste des annonces recommandées (profil personnalisé si authentifié, cold start trending/boosted/latest sinon)",
      *
      *         @OA\JsonContent(
      *             type="object",
@@ -58,9 +58,7 @@ final class RecommendationController
      *                 @OA\Property(property="diversity_injected", type="integer", example=3)
      *             )
      *         )
-     *     ),
-     *
-     *     @OA\Response(response=200, description="Liste des annonces recommandées (cold start si non authentifié)")
+     *     )
      * )
      */
     public function index(Request $request): AnonymousResourceCollection
