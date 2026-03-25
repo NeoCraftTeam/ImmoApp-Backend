@@ -44,6 +44,8 @@ final class UserResource extends JsonResource
             'id' => $this->id,
             'firstname' => $this->firstname,
             'lastname' => $this->lastname,
+            'username' => $this->username,
+            'bio' => $this->bio,
             'phone_number' => $this->when(
                 $request->user()?->id === $this->id || $request->user()?->isAdmin(),
                 $this->phone_number

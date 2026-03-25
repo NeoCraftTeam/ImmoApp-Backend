@@ -43,6 +43,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -156,6 +157,8 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     protected $fillable = [
         'firstname',
         'lastname',
+        'username',
+        'bio',
         'email',
         'password',
         'phone_number',
@@ -216,6 +219,10 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             if (empty($user->avatar)) {
                 $user->assignDefaultAvatar();
             }
+
+            if (empty($user->username)) {
+                $user->username = $user->generateUniqueUsername();
+            }
         });
 
         static::created(function (User $user): void {
@@ -236,6 +243,22 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         if ($this->role === UserRole::AGENT && !in_array($this->type, [UserType::INDIVIDUAL, UserType::AGENCY])) {
             throw new InvalidArgumentException('Invalid agent type. Must be either "individual" or "agency".');
         }
+    }
+
+    public function generateUniqueUsername(): string
+    {
+        $base = Str::slug(trim(($this->firstname ?? '').' '.($this->lastname ?? '')));
+        if (empty($base)) {
+            $base = 'user';
+        }
+        $candidate = $base;
+        $i = 2;
+        while (static::where('username', $candidate)->where('id', '!=', $this->id ?? '')->exists()) {
+            $candidate = $base.'-'.$i;
+            $i++;
+        }
+
+        return $candidate;
     }
 
     private function assignDefaultAvatar(): void

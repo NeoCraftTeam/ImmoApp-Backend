@@ -17,16 +17,19 @@ Route::get('/manifest.json', PwaManifestController::class)->name('pwa.manifest')
 
 Route::get('/', function () {
     $host = request()->getHost();
+    $sameHost = static fn (?string $configured): bool => $configured !== null
+        && $configured !== ''
+        && strcasecmp($host, $configured) === 0;
 
-    if (config('filament.panels.admin_domain') && $host === config('filament.panels.admin_domain')) {
+    if ($sameHost(config('filament.panels.admin_domain'))) {
         return redirect('/login');
     }
 
-    if (config('filament.panels.agency_domain') && $host === config('filament.panels.agency_domain')) {
+    if ($sameHost(config('filament.panels.agency_domain'))) {
         return redirect('/login');
     }
 
-    if (config('filament.panels.owner_domain') && $host === config('filament.panels.owner_domain')) {
+    if ($sameHost(config('filament.panels.owner_domain'))) {
         return redirect('/login');
     }
 
