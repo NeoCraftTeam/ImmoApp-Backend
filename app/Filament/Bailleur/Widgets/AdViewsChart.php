@@ -21,6 +21,8 @@ class AdViewsChart extends ChartWidget
 
     protected ?string $maxHeight = '250px';
 
+    private const string CHART_FONT_FAMILY = "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+
     #[\Override]
     protected function getData(): array
     {
@@ -101,7 +103,7 @@ class AdViewsChart extends ChartWidget
                         'pointStyle' => 'circle',
                         'padding' => 16,
                         'font' => [
-                            'family' => 'Inter',
+                            'family' => self::CHART_FONT_FAMILY,
                             'size' => 12,
                             'weight' => '500',
                         ],
@@ -113,13 +115,13 @@ class AdViewsChart extends ChartWidget
                     'beginAtZero' => true,
                     'grid' => ['display' => false],
                     'ticks' => [
-                        'font' => ['family' => 'Inter', 'size' => 11],
+                        'font' => ['family' => self::CHART_FONT_FAMILY, 'size' => 11],
                     ],
                 ],
                 'x' => [
                     'grid' => ['display' => false],
                     'ticks' => [
-                        'font' => ['family' => 'Inter', 'size' => 11],
+                        'font' => ['family' => self::CHART_FONT_FAMILY, 'size' => 11],
                         'maxRotation' => 0,
                     ],
                 ],
