@@ -14,8 +14,8 @@
     @foreach ($respondent['answers'] as $i => $qa)
         <div class="rounded-lg bg-gray-50/80 dark:bg-gray-800/40 p-3">
             <div class="flex items-start gap-2 mb-2">
-                <span class="shrink-0 w-5 h-5 rounded bg-gradient-to-br {{ $p['from'] }} {{ $p['to'] }} flex items-center justify-center">
-                    <span class="text-[8px] font-black text-white tabular-nums">{{ $i + 1 }}</span>
+                <span class="flex h-5 w-5 shrink-0 items-center justify-center rounded {{ $p['solid'] }}">
+                    <span class="text-[8px] font-bold text-white tabular-nums">{{ $i + 1 }}</span>
                 </span>
                 <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 leading-tight">{{ $qa['question'] }}</p>
             </div>
