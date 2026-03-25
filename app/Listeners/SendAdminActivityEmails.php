@@ -69,6 +69,12 @@ class SendAdminActivityEmails
             return;
         }
 
+        // Security log events (login, logout, failed login, password reset) are
+        // audit-trail-only — they must never trigger admin notification emails.
+        if ($activity->log_name === 'security') {
+            return;
+        }
+
         $entityLabel = self::ENTITY_LABELS[$activity->subject_type] ?? ($activity->subject_type ? class_basename($activity->subject_type) : 'Entité');
 
         $subject = $activity->subject;
