@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\AdAnalyticsController;
 use App\Http\Controllers\Api\V1\AdController;
 use App\Http\Controllers\Api\V1\AdGeoController;
 use App\Http\Controllers\Api\V1\AdInteractionController;
+use App\Http\Controllers\Api\V1\AdPdfController;
 use App\Http\Controllers\Api\V1\AdReportController;
 use App\Http\Controllers\Api\V1\AdSearchController;
 use App\Http\Controllers\Api\V1\AdStatusController;
@@ -96,6 +97,11 @@ Route::middleware('auth:sanctum')->prefix('my/ads')->group(function (): void {
 // KeyScore
 Route::get('/ads/{ad}/keyscore', [KeyScoreController::class, 'show'])
     ->middleware('throttle:60,1');
+
+// PDF export — public for available ads, owner/admin for others
+Route::get('/ads/{ad}/pdf', [AdPdfController::class, 'download'])
+    ->middleware(['optional.auth', 'throttle:30,1'])
+    ->name('ads.pdf');
 
 // 3D Tour (public read, protected write)
 Route::get('/ads/{ad}/tour', [TourController::class, 'show'])->middleware('optional.auth');
