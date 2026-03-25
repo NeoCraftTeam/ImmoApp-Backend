@@ -8,11 +8,10 @@ use App\Enums\UserRole;
 use App\Enums\UserType;
 use App\Http\Requests\Api\V1\ClerkExchangeRequest;
 use App\Http\Resources\UserResource;
-use App\Mail\BailleurWelcomeEmail;
 use App\Mail\VerificationCodeMail;
-use App\Mail\WelcomeEmail;
 use App\Models\User;
 use App\Services\ClerkJwtService;
+use App\Services\UserWelcomeService;
 use App\Services\UtmAttributionService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -313,13 +312,7 @@ final class ClerkAuthController
 
             $isNew = true;
 
-            if ($email !== null && !str_ends_with((string) $email, '@clerk.local')) {
-                if ($role === UserRole::AGENT) {
-                    Mail::to($email, $firstName)->queue(new BailleurWelcomeEmail($user));
-                } else {
-                    Mail::to($email, $firstName)->queue(new WelcomeEmail($user));
-                }
-            }
+            app(UserWelcomeService::class)->handle($user);
         } else {
             if ($user->clerk_id === null) {
                 $user->update(['clerk_id' => $clerkId]);
