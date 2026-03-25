@@ -36,27 +36,14 @@
 
         /* ===== ACTIVE SUB BANNER ===== */
         .sub-banner {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            background: #0f172a;
             border-radius: var(--sub-radius);
             padding: 2rem;
             color: white;
             position: relative;
             overflow: hidden;
             margin-bottom: 2.5rem;
-            box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.25);
-        }
-
-        .sub-banner::before {
-            content: '';
-            position: absolute;
-            top: -80px;
-            right: -80px;
-            width: 250px;
-            height: 250px;
-            background: var(--sub-primary);
-            opacity: 0.08;
-            border-radius: 50%;
-            filter: blur(60px);
+            box-shadow: var(--sub-shadow-lg);
         }
 
         .sub-banner-inner {
@@ -91,8 +78,8 @@
 
         .sub-banner-name {
             font-size: 2rem;
-            font-weight: 900;
-            letter-spacing: -1px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
             margin: 0 0 0.5rem;
             line-height: 1;
         }

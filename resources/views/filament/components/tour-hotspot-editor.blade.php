@@ -38,6 +38,11 @@
             color: #3b82f6 !important;
             font-size: 10px !important;
         }
+
+        [data-kh-editor="1"] button:focus-visible {
+            outline: 2px solid #2563eb;
+            outline-offset: 2px;
+        }
     </style>
 
     <div id="{{ $editorId }}" data-kh-editor="1" data-property-id="{{ $record?->id }}" style="display:flex; flex-direction:column; gap:1rem;">
@@ -65,9 +70,9 @@
             <div data-hotspot-list style="position:absolute; bottom:.75rem; left:.75rem; z-index:20; max-width:20rem;"></div>
         </div>
 
-        <div data-dialog style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:50; align-items:center; justify-content:center;">
+        <div data-dialog role="dialog" aria-modal="true" aria-labelledby="{{ $editorId }}-dialog-title" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:50; align-items:center; justify-content:center;">
             <div style="background:#fff; border-radius:1rem; padding:1.5rem; width:100%; max-width:24rem; box-shadow:0 20px 40px rgba(0,0,0,.2); display:flex; flex-direction:column; gap:1rem;">
-                <h3 style="font-weight:700; font-size:1.125rem;">Configurer le lien</h3>
+                <h3 id="{{ $editorId }}-dialog-title" style="font-weight:700; font-size:1.125rem;">Configurer le lien</h3>
 
                 <div>
                     <label style="display:block; font-size:.875rem; font-weight:600; margin-bottom:.25rem;">Pièce de destination</label>

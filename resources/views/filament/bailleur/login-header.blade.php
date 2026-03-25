@@ -5,7 +5,7 @@
     {{-- Title --}}
     <div class="text-center">
         <h1 class="text-2xl font-extrabold tracking-tight text-gray-900 dark:text-white">
-            <span style="background: linear-gradient(135deg, #0D9488, #0F766E); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">KeyHome</span>
+            <span class="text-teal-600 dark:text-teal-400">KeyHome</span>
             <span class="text-gray-700 dark:text-gray-300">Owner</span>
         </h1>
         <p class="mt-2 text-sm text-gray-500 dark:text-gray-400 font-medium">
