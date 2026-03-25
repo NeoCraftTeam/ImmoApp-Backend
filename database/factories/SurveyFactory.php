@@ -18,6 +18,7 @@ class SurveyFactory extends Factory
     {
         return [
             'title' => $this->faker->sentence(4),
+            'slug' => fn (array $attributes): string => Survey::uniqueSlug($attributes['title']),
             'description' => $this->faker->paragraph(),
             'is_active' => true,
             'is_public' => true,

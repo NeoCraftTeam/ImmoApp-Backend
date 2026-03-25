@@ -12,11 +12,15 @@ final class SurveySeeder extends Seeder
 {
     public function run(): void
     {
+        $title = 'Votre expérience sur KeyHome';
+
         $survey = Survey::firstOrCreate(
-            ['title' => 'Votre expérience sur KeyHome'],
+            ['title' => $title],
             [
+                'slug' => Survey::uniqueSlug($title),
                 'description' => 'Aidez-nous à améliorer votre expérience en répondant à quelques questions rapides.',
                 'is_active' => true,
+                'is_public' => true,
             ]
         );
 
