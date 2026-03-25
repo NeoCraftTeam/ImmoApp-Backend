@@ -179,7 +179,14 @@ final readonly class SurveyController
         $submitAnonymously = (bool) ($validated['anonymous'] ?? false);
 
         if ($submitAnonymously) {
-            return $this->submitAsAnonymous($survey, $validated['answers'], $user);
+            $response = $this->submitAsAnonymous($survey, $validated['answers'], $user);
+            try {
+                $this->dispatchSurveyEmails($survey, null, $validated['answers']);
+            } catch (\Throwable) {
+                // Email failures must never block survey submission
+            }
+
+            return $response;
         }
 
         foreach ($validated['answers'] as $response) {
@@ -285,9 +292,11 @@ final readonly class SurveyController
      *
      * @param  array<int, array{question_id: string, answer: mixed}>  $rawAnswers
      */
-    private function dispatchSurveyEmails(Survey $survey, User $user, array $rawAnswers): void
+    private function dispatchSurveyEmails(Survey $survey, ?User $user, array $rawAnswers): void
     {
-        Mail::to($user->email)->queue(new SurveySubmittedMail($survey, $user));
+        if ($user !== null) {
+            Mail::to($user->email)->queue(new SurveySubmittedMail($survey, $user));
+        }
 
         $survey->load('questions');
 
@@ -301,7 +310,9 @@ final readonly class SurveyController
             ];
         })->values()->all();
 
-        $admins = User::where('role', UserRole::ADMIN)->get();
+        $admins = User::where('role', UserRole::ADMIN)
+            ->whereNotNull('email')
+            ->get();
 
         foreach ($admins as $admin) {
             Mail::to($admin->email)->queue(new SurveyAdminNotificationMail($survey, $user, $formattedAnswers));
