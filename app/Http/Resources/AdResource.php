@@ -98,6 +98,7 @@ final class AdResource extends JsonResource
 
                 return [
                     'id' => $owner->id,
+                    'username' => $owner->username,
                     'firstname' => $owner->firstname,
                     'lastname' => $owner->lastname,
                     'display_name' => $owner->fullname,

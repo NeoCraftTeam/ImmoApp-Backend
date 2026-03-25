@@ -276,6 +276,48 @@ final class AdInteractionController
      *     )
      * )
      */
+    /**
+     * Get the authenticated user's recently viewed ads.
+     *
+     * @OA\Get(
+     *     path="/api/v1/my/recently-viewed",
+     *     summary="Get recently viewed ads",
+     *     tags={"📊 Interactions"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Response(response=200, description="List of recently viewed ads",
+     *
+     *         @OA\JsonContent(type="object",
+     *
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/AdResource"))
+     *         )
+     *     )
+     * )
+     */
+    public function recentlyViewed(Request $request): AnonymousResourceCollection
+    {
+        $user = $request->user();
+
+        $viewedAdIds = AdInteraction::where('user_id', $user->id)
+            ->where('type', AdInteraction::TYPE_VIEW)
+            ->whereNotNull('ad_id')
+            ->selectRaw('ad_id, MAX(created_at) as last_viewed')
+            ->groupBy('ad_id')
+            ->orderByDesc('last_viewed')
+            ->limit(10)
+            ->pluck('ad_id');
+
+        $ads = Ad::with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])
+            ->whereIn('id', $viewedAdIds)
+            ->visible()
+            ->publiclyListed()
+            ->get()
+            ->sortBy(fn ($ad) => array_search($ad->id, $viewedAdIds->toArray()))
+            ->values();
+
+        return AdResource::collection($ads);
+    }
+
     public function favorites(Request $request): AnonymousResourceCollection
     {
         $user = $request->user();

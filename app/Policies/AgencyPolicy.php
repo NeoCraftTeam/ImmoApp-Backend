@@ -19,7 +19,7 @@ class AgencyPolicy
 
     public function view(?User $user, Agency $agency): bool
     {
-        return $user && ($user->isAdmin() || $agency->owner_id === $user->id);
+        return true;
     }
 
     public function create(User $user): bool

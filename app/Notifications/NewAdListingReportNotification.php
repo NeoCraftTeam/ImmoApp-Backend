@@ -10,13 +10,17 @@ use App\Models\AdReport;
 use App\Support\PanelUrl;
 use Filament\Actions\Action as FilamentAction;
 use Filament\Notifications\Notification as FilamentNotification;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Notifications\Notification;
 use NotificationChannels\WebPush\WebPushChannel;
 use NotificationChannels\WebPush\WebPushMessage;
 
-class NewAdListingReportNotification extends Notification
+class NewAdListingReportNotification extends Notification implements ShouldQueue
 {
+    use Queueable;
+
     public function __construct(
         public AdReport $report,
     ) {}
@@ -49,20 +53,30 @@ class NewAdListingReportNotification extends Notification
             $body .= "\n\nMessage du client: {$this->report->description}";
         }
 
-        return FilamentNotification::make()
-            ->title('Nouveau signalement annonce')
-            ->body($body)
-            ->warning()
-            ->icon('heroicon-o-flag')
-            ->actions([
-                FilamentAction::make('review')
-                    ->label('Traiter')
-                    ->url($url)
-                    ->color('warning')
-                    ->button()
-                    ->markAsRead(),
-            ])
-            ->getDatabaseMessage();
+        try {
+            return FilamentNotification::make()
+                ->title('Nouveau signalement annonce')
+                ->body($body)
+                ->warning()
+                ->icon('heroicon-o-flag')
+                ->actions([
+                    FilamentAction::make('review')
+                        ->label('Traiter')
+                        ->url($url)
+                        ->color('warning')
+                        ->button()
+                        ->markAsRead(),
+                ])
+                ->getDatabaseMessage();
+        } catch (\Throwable) {
+            return [
+                'title' => 'Nouveau signalement annonce',
+                'body' => $body,
+                'icon' => 'heroicon-o-flag',
+                'color' => 'warning',
+                'url' => $url,
+            ];
+        }
     }
 
     public function toWebPush(object $notifiable, Notification $notification): WebPushMessage
