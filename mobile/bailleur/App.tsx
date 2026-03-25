@@ -328,10 +328,10 @@ function AppContent() {
             section.id = '__kh_biometric_section';
             section.style.cssText = 'margin: 1rem 1rem 0; padding: 1rem; background: white; border-radius: 16px; border: 1px solid rgba(0,0,0,0.06);';
             section.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between">'
-              + '<div><div style="font-weight:600;font-size:0.875rem;color:#1e293b">Verrouillage biométrique</div>'
+              + '<div><div id="__kh_bio_heading" style="font-weight:600;font-size:0.875rem;color:#1e293b">Verrouillage biométrique</div>'
               + '<div id="__kh_bio_label" style="font-size:0.75rem;color:#64748b;margin-top:2px">Chargement...</div></div>'
-              + '<label style="position:relative;display:inline-block;width:48px;height:28px">'
-              + '<input type="checkbox" id="__kh_bio_toggle" style="opacity:0;width:0;height:0" />'
+              + '<label for="__kh_bio_toggle" style="position:relative;display:inline-block;width:48px;height:28px">'
+              + '<input type="checkbox" role="switch" id="__kh_bio_toggle" aria-labelledby="__kh_bio_heading" aria-checked="false" style="opacity:0;width:0;height:0" />'
               + '<span id="__kh_bio_slider" style="position:absolute;cursor:pointer;inset:0;background:#cbd5e1;border-radius:28px;transition:.3s"></span>'
               + '<span id="__kh_bio_dot" style="position:absolute;height:22px;width:22px;left:3px;bottom:3px;background:white;border-radius:50%;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,0.2)"></span>'
               + '</label></div>';
@@ -344,6 +344,7 @@ function AppContent() {
 
             var toggle = document.getElementById('__kh_bio_toggle');
             toggle.addEventListener('change', function() {
+              toggle.setAttribute('aria-checked', toggle.checked ? 'true' : 'false');
               window.KeyHomeBridge.setBiometric(toggle.checked);
             });
           }
@@ -358,7 +359,11 @@ function AppContent() {
                 var slider = document.getElementById('__kh_bio_slider');
                 var dot = document.getElementById('__kh_bio_dot');
                 if (label && d.label) label.textContent = d.available ? d.label : 'Non disponible sur cet appareil';
-                if (toggle) { toggle.checked = !!d.enabled; toggle.disabled = !d.available; }
+                if (toggle) {
+                  toggle.checked = !!d.enabled;
+                  toggle.disabled = !d.available;
+                  toggle.setAttribute('aria-checked', d.enabled ? 'true' : 'false');
+                }
                 if (slider) slider.style.background = d.enabled ? '#10b981' : '#cbd5e1';
                 if (dot) dot.style.transform = d.enabled ? 'translateX(20px)' : 'translateX(0)';
               }
