@@ -54,9 +54,13 @@ final class AdRequest extends FormRequest
                 'surface_min' => ['nullable', 'numeric', 'min:0'],
                 'surface_max' => ['nullable', 'numeric', 'min:0'],
                 'has_parking' => ['nullable', 'boolean'],
+                'has_3d_tour' => ['nullable', 'boolean'],
+                'is_verified' => ['nullable', 'boolean'],
+                'attributes' => ['nullable', 'array', 'max:20'],
+                'attributes.*' => ['string', 'max:100'],
 
                 // Tri
-                'sort' => ['nullable', 'string', 'in:price,surface_area,created_at'],
+                'sort' => ['nullable', 'string', 'in:price,surface_area,created_at,boost_score,reviews_avg_rating,views_count,_geoPoint'],
                 'order' => ['nullable', 'string', 'in:asc,desc'],
 
                 // Pagination

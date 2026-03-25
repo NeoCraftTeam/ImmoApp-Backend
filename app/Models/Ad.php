@@ -144,6 +144,11 @@ class Ad extends Model implements HasMedia
         'verification_status',
         'verification_notes',
         'verification_requested_at',
+        'distance_main_road_m',
+        'distance_shops_m',
+        'distance_transport_m',
+        'distance_school_m',
+        'distance_hospital_m',
     ];
 
     protected $hidden = [
@@ -285,6 +290,8 @@ class Ad extends Model implements HasMedia
             'bedrooms' => (int) $this->bedrooms,
             'bathrooms' => (int) $this->bathrooms,
             'has_parking' => (bool) $this->has_parking,
+            'has_3d_tour' => (bool) $this->has_3d_tour,
+            'is_verified' => (bool) $this->is_verified,
             'status' => $this->status,
             'is_visible' => (bool) $this->is_visible,
 
@@ -303,10 +310,17 @@ class Ad extends Model implements HasMedia
 
             'created_at' => $this->created_at?->timestamp,
 
+            // Rating & popularity
+            'reviews_avg_rating' => (float) ($this->reviews_avg_rating ?? $this->reviews()->avg('rating') ?? 0),
+            'views_count' => (int) ($this->interactions()->where('type', 'view')->count()),
+
             // Boost
             'is_boosted' => (bool) $this->is_boosted,
             'boost_score' => (int) $this->boost_score,
             'boost_expires_at' => $this->boost_expires_at?->timestamp,
+
+            // Amenity slugs for filter-by-attribute support
+            'attributes' => $this->getAttribute('attributes') ?? [],
         ];
     }
 

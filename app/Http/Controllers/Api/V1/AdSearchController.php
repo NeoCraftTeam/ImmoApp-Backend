@@ -77,6 +77,11 @@ final readonly class AdSearchController
             $minSurface = isset($validated['surface_min']) ? (float) $validated['surface_min'] : null;
             $maxSurface = isset($validated['surface_max']) ? (float) $validated['surface_max'] : null;
             $hasParking = isset($validated['has_parking']) ? (bool) $validated['has_parking'] : null;
+            $has3dTour = isset($validated['has_3d_tour']) ? (bool) $validated['has_3d_tour'] : null;
+            $isVerified = isset($validated['is_verified']) ? (bool) $validated['is_verified'] : null;
+            $amenities = isset($validated['attributes']) && is_array($validated['attributes'])
+                ? array_filter(array_map(strval(...), $validated['attributes']))
+                : [];
 
             $sortBy = $validated['sort'] ?? 'created_at';
             $sortOrder = strtolower($validated['order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
@@ -117,16 +122,30 @@ final readonly class AdSearchController
             if ($hasParking !== null) {
                 $filters[] = sprintf('has_parking = %s', $hasParking ? 'true' : 'false');
             }
+            if ($has3dTour !== null) {
+                $filters[] = sprintf('has_3d_tour = %s', $has3dTour ? 'true' : 'false');
+            }
+            if ($isVerified !== null) {
+                $filters[] = sprintf('is_verified = %s', $isVerified ? 'true' : 'false');
+            }
+            foreach ($amenities as $amenity) {
+                $filters[] = sprintf("attributes = '%s'", str_replace("'", "\\'", $amenity));
+            }
 
             $filters[] = "status = 'available'";
             $filters[] = 'is_visible = true';
 
-            $allowedSorts = ['price', 'surface_area', 'created_at', 'boost_score'];
+            $allowedSorts = ['price', 'surface_area', 'created_at', 'boost_score', 'reviews_avg_rating', 'views_count'];
 
-            $builder = Ad::search($q, function (Indexes $index, string $query, array $options) use ($filters, $sortBy, $sortOrder, $allowedSorts) {
+            $latitude = isset($validated['latitude']) ? (float) $validated['latitude'] : null;
+            $longitude = isset($validated['longitude']) ? (float) $validated['longitude'] : null;
+
+            $builder = Ad::search($q, function (Indexes $index, string $query, array $options) use ($filters, $sortBy, $sortOrder, $allowedSorts, $latitude, $longitude) {
                 $options['filter'] = implode(' AND ', $filters);
 
-                if (!in_array($sortBy, $allowedSorts, true)) {
+                if ($sortBy === '_geoPoint' && $latitude !== null && $longitude !== null) {
+                    $options['sort'] = [sprintf('_geoPoint(%f, %f):%s', $latitude, $longitude, $sortOrder)];
+                } elseif (!in_array($sortBy, $allowedSorts, true)) {
                     $options['sort'] = ['boost_score:desc', 'created_at:desc'];
                 } else {
                     $options['sort'] = [sprintf('%s:%s', $sortBy, $sortOrder)];
