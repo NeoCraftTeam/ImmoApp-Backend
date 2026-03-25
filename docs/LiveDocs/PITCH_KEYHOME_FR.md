@@ -52,7 +52,7 @@ Quand le locataire accepte de partager sa position, KeyHome calcule automatiquem
 
 ### 5. Débloquer une annonce — Accéder à l'essentiel
 
-KeyHome fonctionne sur un modèle de déblocage. Tout le monde peut voir les annonces, les photos, les descriptions et les informations générales. Mais pour accéder aux coordonnées complètes du bailleur — son numéro de téléphone, son adresse exacte, son profil complet — le locataire débloque l'annonce via un paiement sécurisé par **MTN Mobile Money ou Orange Money**.
+KeyHome fonctionne sur un modèle de déblocage. Tout le monde peut voir les annonces, les photos, les descriptions et les informations générales. Mais pour accéder aux coordonnées complètes du bailleur — son numéro de téléphone, son adresse exacte, son profil complet — le locataire débloque l'annonce via un paiement sécurisé par **MTN Mobile Money ou Orange Money et même par carte bancaire**.
 
 Ce modèle protège tout le monde : les bailleurs ne sont pas spammés par des curieux, et les locataires qui débloquent une annonce sont des personnes sérieuses, véritablement intéressées.
 
