@@ -6,12 +6,14 @@ use App\Providers\EventServiceProvider;
 use App\Providers\Filament\AdminPanelProvider;
 use App\Providers\Filament\AgencyPanelProvider;
 use App\Providers\Filament\BailleurPanelProvider;
+use App\Providers\MailHeaderServiceProvider;
 use App\Providers\TelescopeServiceProvider;
 
 return array_filter([
     AppServiceProvider::class,
     AuthServiceProvider::class,
     EventServiceProvider::class,
+    MailHeaderServiceProvider::class,
     AdminPanelProvider::class,
     AgencyPanelProvider::class,
     BailleurPanelProvider::class,

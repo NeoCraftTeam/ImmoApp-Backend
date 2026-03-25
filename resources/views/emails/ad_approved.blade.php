@@ -1,4 +1,4 @@
-@extends('emails.layout')
+@extends('emails.owner-layout')
 
 @section('title', 'Votre annonce est publiée')
 
@@ -58,7 +58,7 @@
                     <tr>
                         <td style="padding: 8px 0; font-size: 14px; color: #64748b;">Prix</td>
                         <td style="padding: 8px 0; font-size: 14px; font-weight: 700;
-                                       color: #F6475F;">{{ $adPrice }}</td>
+                                       color: #0d9488;">{{ $adPrice }}</td>
                     </tr>
                 </table>
             </td>

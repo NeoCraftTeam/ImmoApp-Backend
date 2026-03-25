@@ -1,4 +1,4 @@
-@extends('emails.layout')
+@extends('emails.owner-layout')
 
 @section('title', 'Votre annonce n\'a pas été publiée')
 

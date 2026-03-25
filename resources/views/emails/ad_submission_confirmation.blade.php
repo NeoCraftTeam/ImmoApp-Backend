@@ -1,4 +1,4 @@
-@extends('emails.layout')
+@extends('emails.owner-layout')
 
 @section('title', 'Annonce reçue — en attente de validation')
 
