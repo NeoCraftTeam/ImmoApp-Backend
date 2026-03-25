@@ -10,6 +10,7 @@ use App\Http\Resources\UserResource;
 use App\Mail\EmailUpdatedMail;
 use App\Models\Ad;
 use App\Models\AdInteraction;
+use App\Models\Agency;
 use App\Models\UnlockedAd;
 use App\Models\User;
 use Clickbar\Magellan\Data\Geometries\Point;
@@ -20,6 +21,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 final class UserController
@@ -133,6 +135,165 @@ final class UserController
         $users = User::with('city')->paginate(config('pagination.default', 10));
 
         return UserResource::collection($users);
+    }
+
+    /**
+     * Public profile for a landlord/agent — no auth required.
+     * Accepts UUID or username slug as {identifier}.
+     */
+    public function publicProfile(string $identifier): JsonResponse
+    {
+        $isUuid = (bool) preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $identifier);
+        $user = $isUuid
+            ? User::where('id', $identifier)->first()
+            : User::where('username', $identifier)->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'Profil introuvable.'], 404);
+        }
+
+        $user->load(['city', 'agency']);
+
+        $avatarUrl = $user->getFirstMediaUrl('avatars') ?: (
+            $user->avatar
+                ? (str_starts_with((string) $user->avatar, 'http')
+                    ? $user->avatar
+                    : Storage::disk(config('filesystems.app_media_disk'))->url($user->avatar))
+                : null
+        );
+
+        $ads = Ad::where('user_id', $user->id)
+            ->where('status', 'available')
+            ->with(['user.agency', 'quarter.city', 'ad_type', 'media'])
+            ->withAvg('reviews', 'rating')
+            ->withCount('reviews')
+            ->latest()
+            ->paginate(12);
+
+        // Aggregate review stats across all the user's ads
+        $reviewStats = DB::table('reviews')
+            ->join('ad', 'reviews.ad_id', '=', 'ad.id')
+            ->where('ad.user_id', $user->id)
+            ->whereNull('reviews.deleted_at')
+            ->selectRaw('COUNT(*) as total_reviews, ROUND(AVG(reviews.rating), 2) as avg_rating')
+            ->first();
+
+        $totalAds = Ad::where('user_id', $user->id)
+            ->where('status', 'available')
+            ->count();
+
+        // Recent reviews with user info (last 5, only those with a comment)
+        $recentReviews = DB::table('reviews')
+            ->join('ad', 'reviews.ad_id', '=', 'ad.id')
+            ->join('users as reviewer', 'reviews.user_id', '=', 'reviewer.id')
+            ->where('ad.user_id', $user->id)
+            ->whereNull('reviews.deleted_at')
+            ->whereNotNull('reviews.comment')
+            ->where('reviews.comment', '!=', '')
+            ->select(
+                'reviews.id',
+                'reviews.rating',
+                'reviews.comment',
+                'reviews.created_at',
+                'reviewer.firstname as reviewer_firstname',
+                'reviewer.lastname as reviewer_lastname',
+                'ad.title as ad_title',
+            )
+            ->orderByDesc('reviews.created_at')
+            ->limit(5)
+            ->get()
+            ->map(fn ($r) => [
+                'id' => $r->id,
+                'rating' => (int) $r->rating,
+                'comment' => $r->comment,
+                'created_at' => $r->created_at,
+                'reviewer_name' => trim($r->reviewer_firstname.' '.$r->reviewer_lastname),
+                'ad_title' => $r->ad_title,
+            ]);
+
+        // Compute response-time badge from recent viewing reservation activity
+        $responseTimeLabel = $this->computeResponseTimeLabel($user->id);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id' => $user->id,
+                'username' => $user->username,
+                'firstname' => $user->firstname,
+                'lastname' => $user->lastname,
+                'display_name' => $user->fullname,
+                'bio' => $user->bio,
+                'avatar' => $avatarUrl,
+                'type' => $user->type?->value,
+                'city_name' => $user->city?->name,
+                'is_verified' => (bool) $user->email_verified_at,
+                'agency' => $user->agency instanceof Agency ? [
+                    'id' => $user->agency->id,
+                    'name' => $user->agency->name,
+                    'slug' => $user->agency->slug,
+                    'logo' => $user->agency->logo,
+                ] : null,
+                'member_since' => $user->created_at,
+                'total_active_ads' => $totalAds,
+                'review_stats' => [
+                    'avg_rating' => (float) ($reviewStats->avg_rating ?? 0),
+                    'total_reviews' => (int) ($reviewStats->total_reviews ?? 0),
+                ],
+                'response_time_label' => $responseTimeLabel,
+                'recent_reviews' => $recentReviews,
+            ],
+            'ads' => AdResource::collection($ads->items()),
+            'meta' => [
+                'total' => $ads->total(),
+                'current_page' => $ads->currentPage(),
+                'last_page' => $ads->lastPage(),
+                'per_page' => $ads->perPage(),
+            ],
+        ]);
+    }
+
+    /**
+     * Compute a human-readable response time label from recent viewing reservations.
+     * Returns null if the table doesn't exist or has no data yet.
+     */
+    private function computeResponseTimeLabel(string $userId): ?string
+    {
+        try {
+            $adIds = Ad::where('user_id', $userId)->pluck('id');
+            if ($adIds->isEmpty()) {
+                return null;
+            }
+
+            $avgHours = DB::table('viewing_reservations as vr')
+                ->whereIn('vr.ad_id', $adIds)
+                ->whereIn('vr.status', ['confirmed', 'declined'])
+                ->whereNotNull('vr.responded_at')
+                ->whereRaw("vr.responded_at > NOW() - INTERVAL '60 days'")
+                ->selectRaw('AVG(EXTRACT(EPOCH FROM (vr.responded_at - vr.created_at)) / 3600) as avg_hours')
+                ->value('avg_hours');
+
+            if ($avgHours === null) {
+                return null;
+            }
+
+            $h = (float) $avgHours;
+            if ($h < 1) {
+                return "Répond en moins d'1h";
+            }
+            if ($h < 2) {
+                return 'Répond en moins de 2h';
+            }
+            if ($h < 6) {
+                return 'Répond en moins de 6h';
+            }
+            if ($h < 24) {
+                return 'Répond en moins de 24h';
+            }
+
+            return 'Répond sous quelques jours';
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /**

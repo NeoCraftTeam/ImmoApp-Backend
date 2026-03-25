@@ -12,6 +12,7 @@ use App\Support\TourAssetToken;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 final readonly class TourController
 {
@@ -77,6 +78,43 @@ final readonly class TourController
             $scene['hotspots'] = $request->input("scenes.{$i}.hotspots", []);
             $uploadedScenes[] = $scene;
         }
+
+        // Remap hotspot target_scene values from client-side identifiers (title slugs or
+        // temp IDs) to the real backend scene IDs assigned by uploadScene().
+        // Clients send target_scene as the scene title or a local temp ID; after all scenes
+        // are uploaded we resolve each reference against title-slug matching so links work.
+        $idBySlug = [];
+        $idByTitle = [];
+        foreach ($uploadedScenes as $s) {
+            $idBySlug[Str::slug($s['title'])] = $s['id'];
+            $idByTitle[mb_strtolower(trim($s['title']))] = $s['id'];
+        }
+        $validIds = array_column($uploadedScenes, 'id');
+
+        $uploadedScenes = array_map(function (array $scene) use ($validIds, $idBySlug, $idByTitle): array {
+            if (empty($scene['hotspots']) || !is_array($scene['hotspots'])) {
+                return $scene;
+            }
+
+            $scene['hotspots'] = array_values(array_map(function (array $hotspot) use ($validIds, $idBySlug, $idByTitle): array {
+                $target = (string) ($hotspot['target_scene'] ?? '');
+                if ($target === '' || in_array($target, $validIds, true)) {
+                    return $hotspot;
+                }
+
+                // Try to resolve by slug or title
+                $slug = Str::slug($target);
+                if (isset($idBySlug[$slug])) {
+                    $hotspot['target_scene'] = $idBySlug[$slug];
+                } elseif (isset($idByTitle[mb_strtolower(trim($target))])) {
+                    $hotspot['target_scene'] = $idByTitle[mb_strtolower(trim($target))];
+                }
+
+                return $hotspot;
+            }, $scene['hotspots']));
+
+            return $scene;
+        }, $uploadedScenes);
 
         $this->tourService->saveTourConfig($ad, $uploadedScenes);
 
