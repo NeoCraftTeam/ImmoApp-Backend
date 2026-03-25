@@ -126,6 +126,11 @@ return [
     | When set, the panel is served at the root of that domain (path is ignored).
     | Leave null to fall back to path-based routing (/admin, /agency, /owner).
     |
+    | The value must match the HTTP Host header exactly (per environment).
+    | If users see 403 on the panel URL, they are often logged in on another
+    | subdomain with the same session cookie but the wrong role — they are
+    | redirected to login by App\Http\Middleware\FilamentAuthenticate.
+    |
     | Example .env values:
     |   FILAMENT_ADMIN_DOMAIN=admin.keyhome.fr
     |   FILAMENT_AGENCY_DOMAIN=agency.keyhome.fr

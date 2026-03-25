@@ -16,13 +16,13 @@ use App\Filament\Admin\Widgets\StatsOverview;
 use App\Filament\Admin\Widgets\UserChart;
 use App\Filament\Admin\Widgets\UserStatusChart;
 use App\Filament\Pages\Auth\EditProfile;
+use App\Http\Middleware\FilamentAuthenticate;
 use App\Http\Middleware\RequirePasswordChange;
 use App\Models\Ad;
 use DutchCodingCompany\FilamentSocialite\FilamentSocialitePlugin;
 use DutchCodingCompany\FilamentSocialite\Provider;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Auth\MultiFactor\Email\EmailAuthentication;
-use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -167,7 +167,7 @@ class AdminPanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
             ])
             ->authMiddleware([
-                Authenticate::class,
+                FilamentAuthenticate::class,
                 RequirePasswordChange::class,
             ])
             ->plugins([

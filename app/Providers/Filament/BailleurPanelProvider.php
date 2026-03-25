@@ -6,11 +6,11 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\Auth\CustomRegister;
 use App\Filament\Pages\Auth\EditProfile;
+use App\Http\Middleware\FilamentAuthenticate;
 use DutchCodingCompany\FilamentSocialite\FilamentSocialitePlugin;
 use DutchCodingCompany\FilamentSocialite\Provider;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Auth\MultiFactor\Email\EmailAuthentication;
-use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -88,7 +88,7 @@ class BailleurPanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
             ])
             ->authMiddleware([
-                Authenticate::class,
+                FilamentAuthenticate::class,
             ])
             ->renderHook(
                 'panels::head.end',
