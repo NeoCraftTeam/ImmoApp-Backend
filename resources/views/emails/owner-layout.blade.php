@@ -42,7 +42,7 @@
         /* Teal accent bar */
         .accent-bar {
             height: 4px;
-            background: linear-gradient(90deg, #0d9488 0%, #14b8a6 100%);
+            background: #0d9488;
         }
 
         /* Header */
