@@ -76,7 +76,7 @@ class AppServiceProvider extends ServiceProvider
         // Les data: URI sont bloqués par la plupart des clients email modernes.
         View::composer(['emails.*', 'emails.reservation.*'], function ($view): void {
             $logoPath = public_path('images/keyhomelogo_email.png');
-            $assetBase = rtrim(env('MAIL_ASSET_BASE_URL', config('app.url')), '/');
+            $assetBase = rtrim(config('app.mail_asset_base_url', config('app.url')), '/');
             $emailLogoUrl = $assetBase.'/images/keyhomelogo_email.png';
 
             // Base64 kept as last-resort fallback for SMTP preview tools only
@@ -86,8 +86,8 @@ class AppServiceProvider extends ServiceProvider
             }
 
             $view->with([
-                'emailLogoUrl'     => $emailLogoUrl,
-                'emailLogoBase64'  => $emailLogoBase64,
+                'emailLogoUrl' => $emailLogoUrl,
+                'emailLogoBase64' => $emailLogoBase64,
                 'emailFrontendUrl' => config('app.frontend_url', config('app.url')),
             ]);
         });
