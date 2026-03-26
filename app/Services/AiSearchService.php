@@ -131,6 +131,7 @@ Règles :
 - "pas cher", "budget serré" → price_max bas (ex: 100000 pour location, 5000000 pour vente). "haut de gamme", "luxe" → price_min élevé.
 - type_name : utilise les noms exacts des types disponibles.
 - city_name et quarter_name : utilise UNIQUEMENT les noms de la liste fournie.
+- bedrooms doit rester null sauf si un nombre de chambres est EXPLICITEMENT mentionné dans la requête (ex: "2 chambres", "3 pièces"). Ne jamais déduire bedrooms depuis le type de bien : un "studio" → type_name: "Studio", bedrooms: null.
 - Si la requête est trop vague, mets les critères structurés à null et remplis "q" avec les mots-clés.
 
 Référentiel disponible :

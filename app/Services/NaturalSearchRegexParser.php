@@ -57,9 +57,10 @@ class NaturalSearchRegexParser
 
         if (preg_match('/(\d+)\s*(?:pièces?|chambres?|ch\.?|rooms?)/u', $query, $m)) {
             $result['bedrooms'] = (int) $m[1];
-        } elseif (preg_match('/(?:studio|1\s*pièce)/u', $query)) {
+        } elseif (preg_match('/1\s*pièce/u', $query)) {
             $result['bedrooms'] = 1;
         }
+        // Note: "studio" maps to type_name only — no bedrooms deduced (studios have bedrooms=0 in DB)
 
         if (preg_match('/(?:moins de|max|maximum|jusqu\'à|budget)\s*([\d\s]+(?:k|000)?)\s*(?:fcfa|xaf|f)?/u', $query, $m)) {
             $result['price_max'] = $this->parseAmount($m[1]);
