@@ -76,7 +76,7 @@ class AppServiceProvider extends ServiceProvider
         // Les data: URI sont bloqués par la plupart des clients email modernes.
         View::composer(['emails.*', 'emails.reservation.*'], function ($view): void {
             $logoPath = public_path('images/keyhomelogo_email.png');
-            $assetBase = rtrim(config('app.mail_asset_base_url', config('app.url')), '/');
+            $assetBase = rtrim((string) config('app.mail_asset_base_url', config('app.url')), '/');
             $emailLogoUrl = $assetBase.'/images/keyhomelogo_email.png';
 
             // Base64 kept as last-resort fallback for SMTP preview tools only
