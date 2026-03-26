@@ -5,21 +5,21 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar as ExpoStatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  Animated,
-  BackHandler,
-  Easing,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Animated,
+    BackHandler,
+    Easing,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
-import WebView from 'react-native-webview';
 import type { WebViewMessageEvent, WebViewNavigation } from 'react-native-webview';
+import WebView from 'react-native-webview';
 
 import { APP_CONFIG, USER_AGENT } from './src/config';
 import BiometricService from './src/services/BiometricService';
