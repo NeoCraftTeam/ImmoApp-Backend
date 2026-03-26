@@ -74,9 +74,26 @@ return [
         'model' => env('GEMINI_MODEL', 'gemini-2.0-flash'),
     ],
 
+    'together' => [
+        'api_key' => env('TOGETHER_API_KEY'),
+        'model' => env('TOGETHER_MODEL', 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo'),
+    ],
+
+    'mistral' => [
+        'api_key' => env('MISTRAL_API_KEY'),
+        'model' => env('MISTRAL_MODEL', 'mistral-small-latest'),
+    ],
+
     'ai' => [
         // Which provider to use: openai | groq | gemini
         'provider' => env('AI_PROVIDER', 'openai'),
+    ],
+
+    'ai_search' => [
+        // Ordered, comma-separated list of LLM providers to try for natural language search.
+        // First provider with a valid API key and open circuit will be used.
+        // Supported: groq, openai, gemini, together, mistral
+        'providers' => env('AI_SEARCH_PROVIDERS', 'groq,openai,gemini'),
     ],
 
     'whatsapp' => [

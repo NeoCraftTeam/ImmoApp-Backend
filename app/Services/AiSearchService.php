@@ -6,15 +6,18 @@ namespace App\Services;
 
 use App\Models\AdType;
 use App\Models\City;
-use App\Models\Quarter;
+use App\Models\Quarter; // used in enrichWithIds
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Parses natural language real-estate queries into structured search parameters using Groq LLM.
+ * Parses natural language real-estate queries into structured search parameters using an LLM.
  *
- * Falls back to regex-based parsing when Groq is unavailable or returns invalid data.
+ * Tries each configured provider in order (AI_SEARCH_PROVIDERS env, default: groq,openai,gemini).
+ * Each provider has its own circuit breaker — when one exhausts quota or fails 3 times,
+ * the next provider is tried automatically, with no user-visible degradation.
+ * Falls back to regex-based parsing only when ALL providers fail or are unavailable.
  * Results are cached for 24 hours per query.
  */
 class AiSearchService
@@ -25,15 +28,24 @@ class AiSearchService
 
     private const string CONTEXT_CACHE_KEY = 'ai_search:context';
 
-    private const int CONTEXT_CACHE_TTL = 21600; // 6 hours — cities/types rarely change
-
-    private const string CIRCUIT_BREAKER_KEY = 'ai_search:circuit_open';
-
-    private const string FAILURE_COUNT_KEY = 'ai_search:failures';
+    private const int CONTEXT_CACHE_TTL = 21600; // 6 hours
 
     private const int CIRCUIT_FAILURE_THRESHOLD = 3;
 
     private const int CIRCUIT_OPEN_TTL = 300; // 5 minutes
+
+    /**
+     * OpenAI-compatible providers: same request/response shape, only URL + model differ.
+     * Gemini uses a separate code path.
+     *
+     * @var array<string, array{url: string, config_key: string, default_model: string}>
+     */
+    private const array OPENAI_COMPATIBLE = [
+        'groq'     => ['url' => 'https://api.groq.com/openai/v1/chat/completions',    'config_key' => 'services.groq',     'default_model' => 'llama-3.3-70b-versatile'],
+        'openai'   => ['url' => 'https://api.openai.com/v1/chat/completions',          'config_key' => 'services.openai',   'default_model' => 'gpt-4o-mini'],
+        'together' => ['url' => 'https://api.together.xyz/v1/chat/completions',        'config_key' => 'services.together', 'default_model' => 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo'],
+        'mistral'  => ['url' => 'https://api.mistral.ai/v1/chat/completions',          'config_key' => 'services.mistral',  'default_model' => 'mistral-small-latest'],
+    ];
 
     /**
      * Parse a natural language query into structured search parameters.
@@ -50,7 +62,7 @@ class AiSearchService
         $cacheKey = self::CACHE_PREFIX.md5($normalized);
 
         return Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($normalized, $query) {
-            $result = $this->parseWithGroq($normalized);
+            $result = $this->tryAllProviders($normalized);
             if ($result !== null) {
                 return $this->enrichWithIds($result, $query);
             }
@@ -60,33 +72,62 @@ class AiSearchService
     }
 
     /**
-     * @return array<string, mixed>|null Returns null on failure.
+     * Try each configured provider in order. Returns parsed result from the first that succeeds.
+     * Skips providers whose circuit is open or whose API key is not set.
+     *
+     * @return array<string, mixed>|null
      */
-    private function parseWithGroq(string $query): ?array
+    private function tryAllProviders(string $query): ?array
     {
-        $apiKey = config('services.groq.api_key');
+        $providers = array_filter(
+            array_map('trim', explode(',', (string) config('services.ai_search.providers', 'groq,openai,gemini')))
+        );
+
+        foreach ($providers as $name) {
+            if (Cache::has($this->circuitKey($name))) {
+                Log::debug("AiSearchService: circuit open for [{$name}], skipping.");
+                continue;
+            }
+
+            $result = isset(self::OPENAI_COMPATIBLE[$name])
+                ? $this->parseWithOpenAiCompatible($name, $query)
+                : ($name === 'gemini' ? $this->parseWithGemini($query) : null);
+
+            if ($result !== null) {
+                $this->resetCircuit($name);
+                Log::debug("AiSearchService: parsed successfully via [{$name}].");
+
+                return $result;
+            }
+        }
+
+        Log::warning('AiSearchService: all providers failed or skipped, falling back to regex.');
+
+        return null;
+    }
+
+    /**
+     * Call any OpenAI-compatible provider (Groq, OpenAI, Together AI, Mistral…).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function parseWithOpenAiCompatible(string $name, string $query): ?array
+    {
+        $cfg = self::OPENAI_COMPATIBLE[$name];
+        $apiKey = config("{$cfg['config_key']}.api_key");
         if (empty($apiKey)) {
-            Log::debug('AiSearchService: GROQ_API_KEY not configured, falling back to regex.');
-
             return null;
         }
 
-        if (Cache::has(self::CIRCUIT_BREAKER_KEY)) {
-            Log::debug('AiSearchService: circuit open, skipping Groq.');
-
-            return null;
-        }
-
-        $context = $this->buildContext();
-
-        $systemPrompt = $this->systemPrompt($context);
+        $model = config("{$cfg['config_key']}.model", $cfg['default_model']);
+        $systemPrompt = $this->systemPrompt($this->buildContext());
         $userPrompt = "Requête de l'utilisateur : \"{$query}\"\n\nRéponds UNIQUEMENT avec un objet JSON valide, sans markdown ni texte autour.";
 
         try {
             $response = Http::withToken($apiKey)
                 ->timeout(8)
-                ->post('https://api.groq.com/openai/v1/chat/completions', [
-                    'model' => config('services.groq.model', 'llama-3.3-70b-versatile'),
+                ->post($cfg['url'], [
+                    'model' => $model,
                     'messages' => [
                         ['role' => 'system', 'content' => $systemPrompt],
                         ['role' => 'user', 'content' => $userPrompt],
@@ -96,37 +137,106 @@ class AiSearchService
                 ]);
 
             if ($response->failed()) {
-                Log::warning('AiSearchService: Groq API failed', [
-                    'status' => $response->status(),
-                    'body' => $response->body(),
-                ]);
-                $this->recordGroqFailure();
+                Log::warning("AiSearchService: [{$name}] HTTP {$response->status()}", ['body' => substr($response->body(), 0, 200)]);
+                $this->recordFailure($name);
 
                 return null;
             }
 
             $content = trim((string) ($response->json('choices.0.message.content') ?? ''));
-            if ($content === '') {
-                return null;
-            }
-
-            $decoded = $this->extractJson($content);
+            $decoded = $content !== '' ? $this->extractJson($content) : null;
             if ($decoded === null) {
-                Log::warning('AiSearchService: Invalid JSON from Groq', ['content' => substr($content, 0, 200)]);
-                $this->recordGroqFailure();
+                Log::warning("AiSearchService: [{$name}] invalid JSON", ['content' => substr($content, 0, 200)]);
+                $this->recordFailure($name);
 
                 return null;
             }
-
-            Cache::forget(self::FAILURE_COUNT_KEY);
 
             return $this->normalizeParsedResult($decoded);
         } catch (\Throwable $e) {
-            Log::error('AiSearchService: Groq exception: '.$e->getMessage());
-            $this->recordGroqFailure();
+            Log::error("AiSearchService: [{$name}] exception: ".$e->getMessage());
+            $this->recordFailure($name);
 
             return null;
         }
+    }
+
+    /**
+     * Call Google Gemini (generateContent API — different format from OpenAI).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function parseWithGemini(string $query): ?array
+    {
+        $apiKey = config('services.gemini.api_key');
+        if (empty($apiKey)) {
+            return null;
+        }
+
+        $model = config('services.gemini.model', 'gemini-2.0-flash');
+        $systemPrompt = $this->systemPrompt($this->buildContext());
+        $userPrompt = "Requête de l'utilisateur : \"{$query}\"\n\nRéponds UNIQUEMENT avec un objet JSON valide, sans markdown ni texte autour.";
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+
+        try {
+            $response = Http::timeout(8)->post($url, [
+                'contents' => [
+                    ['role' => 'user', 'parts' => [['text' => "{$systemPrompt}\n\n{$userPrompt}"]]],
+                ],
+                'generationConfig' => ['maxOutputTokens' => 300, 'temperature' => 0.2],
+            ]);
+
+            if ($response->failed()) {
+                Log::warning('AiSearchService: [gemini] HTTP '.$response->status(), ['body' => substr($response->body(), 0, 200)]);
+                $this->recordFailure('gemini');
+
+                return null;
+            }
+
+            $content = trim((string) ($response->json('candidates.0.content.parts.0.text') ?? ''));
+            $decoded = $content !== '' ? $this->extractJson($content) : null;
+            if ($decoded === null) {
+                Log::warning('AiSearchService: [gemini] invalid JSON', ['content' => substr($content, 0, 200)]);
+                $this->recordFailure('gemini');
+
+                return null;
+            }
+
+            return $this->normalizeParsedResult($decoded);
+        } catch (\Throwable $e) {
+            Log::error('AiSearchService: [gemini] exception: '.$e->getMessage());
+            $this->recordFailure('gemini');
+
+            return null;
+        }
+    }
+
+    private function circuitKey(string $provider): string
+    {
+        return "ai_search:circuit:{$provider}";
+    }
+
+    private function failureKey(string $provider): string
+    {
+        return "ai_search:failures:{$provider}";
+    }
+
+    private function recordFailure(string $provider): void
+    {
+        $key = $this->failureKey($provider);
+        $failures = (int) Cache::get($key, 0) + 1;
+        Cache::put($key, $failures, self::CONTEXT_CACHE_TTL);
+
+        if ($failures >= self::CIRCUIT_FAILURE_THRESHOLD) {
+            Cache::put($this->circuitKey($provider), true, self::CIRCUIT_OPEN_TTL);
+            Log::warning("AiSearchService: circuit opened for [{$provider}] after {$failures} failures.");
+        }
+    }
+
+    private function resetCircuit(string $provider): void
+    {
+        Cache::forget($this->failureKey($provider));
+        Cache::forget($this->circuitKey($provider));
     }
 
     private function systemPrompt(string $context): string
