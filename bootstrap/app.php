@@ -8,6 +8,7 @@ use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\LivewireLongRunningRequest;
 use App\Http\Middleware\OptionalAuth;
 use App\Http\Middleware\ResolveSanctumBearerUser;
+use App\Http\Middleware\RoleScopedSession;
 use App\Http\Middleware\SanitizeInput;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -38,7 +39,9 @@ return Application::configure(basePath: dirname(__DIR__))
             'feature' => CheckFeatureFlag::class,
             'optional.auth' => OptionalAuth::class,
             'resolve.sanctum.bearer' => ResolveSanctumBearerUser::class,
+            'role.scoped.session' => RoleScopedSession::class,
         ]);
+        $middleware->prependToGroup('web', RoleScopedSession::class);
         $middleware->prependToGroup('web', LivewireLongRunningRequest::class);
         // Enable Sanctum SPA cookie-based authentication for stateful domains
         // Use custom middleware that respects SESSION_SAME_SITE config
