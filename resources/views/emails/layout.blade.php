@@ -239,11 +239,17 @@
             <div class="accent-bar"></div>
 
             <div class="header">
-                <a href="{{ config('app.url') }}" style="display: inline-block;">
-                    @if(!empty($emailLogoBase64))
+                <a href="{{ $emailFrontendUrl ?? config('app.frontend_url', config('app.url')) }}" style="display: inline-block;">
+                    @if(!empty($emailLogoUrl ?? ''))
+                        <img src="{{ $emailLogoUrl }}"
+                            alt="{{ config('app.name') }}"
+                            class="logo-img"
+                            style="max-height: 48px; height: auto; width: auto;" />
+                    @elseif(!empty($emailLogoBase64))
                         <img src="data:image/png;base64,{{ $emailLogoBase64 }}"
                             alt="{{ config('app.name') }}"
-                            class="logo-img" />
+                            class="logo-img"
+                            style="max-height: 48px; height: auto; width: auto;" />
                     @else
                         <span style="font-size:20px;font-weight:700;color:#F6475F;">{{ config('app.name') }}</span>
                     @endif
