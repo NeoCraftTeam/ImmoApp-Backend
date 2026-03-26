@@ -93,9 +93,9 @@ class AiDescriptionEnhancer
 
         $config = $this->providers[$this->activeProvider] ?? null;
 
-        if ($config === null || empty($config['api_key'])) {
+        if ($config === null || !$this->isValidKey($config['api_key'] ?? '')) {
             foreach ($this->providers as $name => $cfg) {
-                if (!empty($cfg['api_key'])) {
+                if ($this->isValidKey($cfg['api_key'] ?? '')) {
                     $this->activeProvider = $name;
                     $config = $cfg;
                     break;
@@ -103,7 +103,7 @@ class AiDescriptionEnhancer
             }
         }
 
-        if ($config === null || empty($config['api_key'])) {
+        if ($config === null || !$this->isValidKey($config['api_key'] ?? '')) {
             Log::warning('AiDescriptionEnhancer: no AI provider is configured.');
 
             return $text;
@@ -190,6 +190,23 @@ class AiDescriptionEnhancer
 
             return $text;
         }
+    }
+
+    /**
+     * Check whether an API key looks usable (not empty, not a placeholder like sk-xxxx).
+     */
+    private function isValidKey(string $key): bool
+    {
+        $key = trim($key);
+
+        if ($key === '') {
+            return false;
+        }
+
+        // Detect placeholder keys: strip a known prefix then check if the remainder is only x's
+        $stripped = preg_replace('/^(sk-|gsk_|AIza)/i', '', $key);
+
+        return $stripped !== '' && !preg_match('/^x+$/i', $stripped);
     }
 
     private function systemPrompt(): string
