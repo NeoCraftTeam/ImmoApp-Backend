@@ -41,10 +41,10 @@ class AiSearchService
      * @var array<string, array{url: string, config_key: string, default_model: string}>
      */
     private const array OPENAI_COMPATIBLE = [
-        'groq'     => ['url' => 'https://api.groq.com/openai/v1/chat/completions',    'config_key' => 'services.groq',     'default_model' => 'llama-3.3-70b-versatile'],
-        'openai'   => ['url' => 'https://api.openai.com/v1/chat/completions',          'config_key' => 'services.openai',   'default_model' => 'gpt-4o-mini'],
+        'groq' => ['url' => 'https://api.groq.com/openai/v1/chat/completions',    'config_key' => 'services.groq',     'default_model' => 'llama-3.3-70b-versatile'],
+        'openai' => ['url' => 'https://api.openai.com/v1/chat/completions',          'config_key' => 'services.openai',   'default_model' => 'gpt-4o-mini'],
         'together' => ['url' => 'https://api.together.xyz/v1/chat/completions',        'config_key' => 'services.together', 'default_model' => 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo'],
-        'mistral'  => ['url' => 'https://api.mistral.ai/v1/chat/completions',          'config_key' => 'services.mistral',  'default_model' => 'mistral-small-latest'],
+        'mistral' => ['url' => 'https://api.mistral.ai/v1/chat/completions',          'config_key' => 'services.mistral',  'default_model' => 'mistral-small-latest'],
     ];
 
     /**
@@ -80,12 +80,13 @@ class AiSearchService
     private function tryAllProviders(string $query): ?array
     {
         $providers = array_filter(
-            array_map('trim', explode(',', (string) config('services.ai_search.providers', 'groq,openai,gemini')))
+            array_map(trim(...), explode(',', (string) config('services.ai_search.providers', 'groq,openai,gemini')))
         );
 
         foreach ($providers as $name) {
             if (Cache::has($this->circuitKey($name))) {
                 Log::debug("AiSearchService: circuit open for [{$name}], skipping.");
+
                 continue;
             }
 

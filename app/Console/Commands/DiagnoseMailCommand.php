@@ -98,7 +98,7 @@ class DiagnoseMailCommand extends Command
             if (!$user) {
                 $this->warn("  No user found with email {$sendTo}. Creating a mock send using Mail::raw().");
                 try {
-                    Mail::raw('Test KeyHome mail — configuration is working.', function ($m) use ($sendTo) {
+                    Mail::raw('Test KeyHome mail — configuration is working.', function ($m) use ($sendTo): void {
                         $m->to($sendTo)->subject('[KeyHome] Test mail');
                     });
                     $this->info('  ✓  Test email dispatched successfully.');

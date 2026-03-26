@@ -37,11 +37,11 @@ class NaturalSearchRegexParser
         ];
 
         $typeMap = [
-            'studio'      => ['studio'],
+            'studio' => ['studio'],
             'appartement' => ['appartement', 'appart', 'flat'],
-            'maison'      => ['maison', 'villa', 'bungalow', 'duplex'],
-            'terrain'     => ['terrain', 'parcelle', 'lot'],
-            'commerce'    => ['commerce', 'boutique', 'local commercial', 'bureau'],
+            'maison' => ['maison', 'villa', 'bungalow', 'duplex'],
+            'terrain' => ['terrain', 'parcelle', 'lot'],
+            'commerce' => ['commerce', 'boutique', 'local commercial', 'bureau'],
         ];
 
         $adTypes = Cache::remember('regex_parser:ad_types', 21600, fn () => AdType::all());
@@ -49,7 +49,7 @@ class NaturalSearchRegexParser
         foreach ($typeMap as $typeName => $keywords) {
             foreach ($keywords as $kw) {
                 if (str_contains($query, $kw)) {
-                    $type = $adTypes->first(fn ($t) => mb_stripos($t->name, $typeName) !== false);
+                    $type = $adTypes->first(fn ($t) => mb_stripos((string) $t->name, $typeName) !== false);
                     if ($type) {
                         $result['type_id'] = $type->id;
                         $result['type_name'] = $type->name;
@@ -90,13 +90,13 @@ class NaturalSearchRegexParser
 
         $cities = Cache::remember('regex_parser:cities_quarters', 21600, fn () => City::with('quarters')->get());
         foreach ($cities as $city) {
-            $cityName = mb_strtolower($city->name);
+            $cityName = mb_strtolower((string) $city->name);
             if (str_contains($query, $cityName)) {
                 $result['city_id'] = $city->id;
                 $result['city_name'] = $city->name;
 
                 foreach ($city->quarters as $quarter) {
-                    $quarterName = mb_strtolower($quarter->name);
+                    $quarterName = mb_strtolower((string) $quarter->name);
                     if (str_contains($query, $quarterName)) {
                         $result['quarter_name'] = $quarter->name;
                         break;
