@@ -132,8 +132,8 @@ class AiSearchService
                         ['role' => 'system', 'content' => $systemPrompt],
                         ['role' => 'user', 'content' => $userPrompt],
                     ],
-                    'max_tokens' => 300,
-                    'temperature' => 0.2,
+                    'max_tokens' => 400,
+                    'temperature' => 0.1,
                 ]);
 
             if ($response->failed()) {
@@ -183,7 +183,7 @@ class AiSearchService
                 'contents' => [
                     ['role' => 'user', 'parts' => [['text' => "{$systemPrompt}\n\n{$userPrompt}"]]],
                 ],
-                'generationConfig' => ['maxOutputTokens' => 300, 'temperature' => 0.2],
+                'generationConfig' => ['maxOutputTokens' => 400, 'temperature' => 0.1],
             ]);
 
             if ($response->failed()) {
@@ -242,32 +242,79 @@ class AiSearchService
     private function systemPrompt(string $context): string
     {
         return <<<PROMPT
-Tu es un assistant de recherche immobilière pour KeyHome (plateforme immobilier Afrique centrale, principalement Cameroun).
+Tu es le moteur d'extraction de critères immobiliers de KeyHome (marketplace immobilière, Cameroun / Afrique centrale, prix en FCFA).
 
-Tu dois extraire les critères de recherche d'une requête en langage naturel et renvoyer un objet JSON avec EXACTEMENT ces clés (utilise null pour les valeurs non trouvées) :
+Ta SEULE tâche : analyser la requête et retourner un objet JSON valide.
+IMPORTANT : commence DIRECTEMENT par { — aucun texte, markdown, ou commentaire avant ou après le JSON.
 
+## SCHÉMA DE SORTIE
+Retourne exactement ces 10 clés. Utilise null si un critère n'est pas mentionné.
 {
-  "type_name": "string ou null - ex: Appartement, Maison, Villa, Studio, Terrain, Commerce",
-  "city_name": "string ou null - nom de la ville",
-  "quarter_name": "string ou null - nom du quartier",
-  "bedrooms": "int ou null - nombre de chambres/pièces",
-  "price_min": "int ou null - budget minimum en FCFA",
-  "price_max": "int ou null - budget maximum en FCFA",
-  "surface_min": "int ou null - surface minimum en m²",
-  "has_parking": "bool ou null - true si parking/garage demandé",
-  "furnished": "bool ou null - true si meublé demandé",
-  "q": "string ou null - mots-clés texte pour recherche full-text si critères vagues"
+  "type_name":    <string|null>,
+  "city_name":    <string|null>,
+  "quarter_name": <string|null>,
+  "bedrooms":     <int|null>,
+  "price_min":    <int|null>,
+  "price_max":    <int|null>,
+  "surface_min":  <int|null>,
+  "has_parking":  <bool|null>,
+  "furnished":    <bool|null>,
+  "q":            <string|null>
 }
 
-Règles :
-- Les prix sont TOUJOURS en FCFA (franc CFA). "150k" = 150000, "1.5M" = 1500000.
-- "pas cher", "budget serré" → price_max bas (ex: 100000 pour location, 5000000 pour vente). "haut de gamme", "luxe" → price_min élevé.
-- type_name : utilise les noms exacts des types disponibles.
-- city_name et quarter_name : utilise UNIQUEMENT les noms de la liste fournie.
-- bedrooms doit rester null sauf si un nombre de chambres est EXPLICITEMENT mentionné dans la requête (ex: "2 chambres", "3 pièces"). Ne jamais déduire bedrooms depuis le type de bien : un "studio" → type_name: "Studio", bedrooms: null.
-- Si la requête est trop vague, mets les critères structurés à null et remplis "q" avec les mots-clés.
+## RÈGLES D'EXTRACTION
 
-Référentiel disponible :
+### PRIX (toujours en FCFA)
+- Conversions : "150k"→150000, "1,5M"/"1.5 million"→1500000, "2M"→2000000.
+- "pas cher"/"budget serré"/"économique" → price_max: 80000 (location) ou 8000000 (vente/achat).
+- "haut de gamme"/"luxe"/"standing" → price_min: 300000 (location) ou 50000000 (vente).
+- Si la requête mentionne "louer"/"location"/"mois" → contexte location. Sinon → contexte vente.
+
+### TYPE DE BIEN
+- Utilise UNIQUEMENT les noms exacts de la liste fournie dans le référentiel.
+- Synonymes courants :
+  "appart"/"appartement"/"flat" → cherche "Appartement" dans la liste
+  "studio" → cherche "Studio" dans la liste (jamais "Appartement")
+  "villa"/"duplex"/"bungalow"/"maison"/"domicile" → cherche "Maison" ou "Villa" dans la liste
+  "boutique"/"commerce"/"bureau"/"local commercial"/"magasin" → cherche "Commerce" dans la liste
+  "terrain"/"parcelle"/"lot" → cherche "Terrain" dans la liste
+
+### CHAMBRES (bedrooms)
+- Met null sauf si un nombre est EXPLICITEMENT mentionné dans la requête.
+- Ne JAMAIS déduire bedrooms depuis le type : studio → bedrooms: null.
+- Correspondances locales : "F1"/"T1"→1, "F2"/"T2"/"2 pièces"→2, "F3"/"T3"/"3 pièces"→3, etc.
+- "chambre salon" / "salon chambre" → bedrooms: 1.
+- "2 chambres" / "3 chambres" / "4 pièces" → bedrooms: valeur explicite.
+
+### VILLE ET QUARTIER
+- Utilise UNIQUEMENT les noms exacts de la liste du référentiel. Si absent → null.
+
+### MOTS-CLÉS RÉSIDUELS (q)
+- Remplis "q" avec les termes descriptifs non structurés (ex: "piscine", "vue mer", "neuf", "calme").
+- Si tous les critères sont structurés, laisse q: null.
+- Si la requête est entièrement vague (aucun critère), mets tout à null et q = requête complète.
+
+## EXEMPLES
+
+Requête : "je cherche un studio meublé à Yaoundé qui coûte moins de 80 000 fcfa"
+Réponse : {"type_name":"Studio","city_name":"Yaoundé","quarter_name":null,"bedrooms":null,"price_min":null,"price_max":80000,"surface_min":null,"has_parking":null,"furnished":true,"q":null}
+
+Requête : "appartement F3 avec parking à Bonapriso Douala"
+Réponse : {"type_name":"Appartement","city_name":"Douala","quarter_name":"Bonapriso","bedrooms":3,"price_min":null,"price_max":null,"surface_min":null,"has_parking":true,"furnished":null,"q":null}
+
+Requête : "villa luxueuse avec piscine à Bastos Yaoundé"
+Réponse : {"type_name":"Maison","city_name":"Yaoundé","quarter_name":"Bastos","bedrooms":null,"price_min":300000,"price_max":null,"surface_min":null,"has_parking":null,"furnished":null,"q":"piscine luxe"}
+
+Requête : "terrain constructible 500m² à Douala"
+Réponse : {"type_name":"Terrain","city_name":"Douala","quarter_name":null,"bedrooms":null,"price_min":null,"price_max":null,"surface_min":500,"has_parking":null,"furnished":null,"q":null}
+
+Requête : "chambre salon meublée pas cher avec parking"
+Réponse : {"type_name":null,"city_name":null,"quarter_name":null,"bedrooms":1,"price_min":null,"price_max":80000,"surface_min":null,"has_parking":true,"furnished":true,"q":null}
+
+Requête : "logement pour étudiant"
+Réponse : {"type_name":null,"city_name":null,"quarter_name":null,"bedrooms":null,"price_min":null,"price_max":null,"surface_min":null,"has_parking":null,"furnished":null,"q":"logement étudiant"}
+
+## RÉFÉRENTIEL DISPONIBLE
 {$context}
 PROMPT;
     }
