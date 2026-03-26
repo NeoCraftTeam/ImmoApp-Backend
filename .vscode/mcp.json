@@ -1,5 +1,5 @@
 {
-    "mcpServers": {
+    "servers": {
         "laravel-boost": {
             "command": "vendor/bin/sail",
             "args": [
@@ -8,7 +8,7 @@
             ]
         },
         "herd": {
-            "command": "/opt/homebrew/Cellar/php/8.5.4/bin/php",
+            "command": "php",
             "args": [
                 "/Applications/Herd.app/Contents/Resources/herd-mcp.phar"
             ],
