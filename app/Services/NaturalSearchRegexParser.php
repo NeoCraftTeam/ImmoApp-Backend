@@ -37,10 +37,11 @@ class NaturalSearchRegexParser
         ];
 
         $typeMap = [
-            'appartement' => ['appartement', 'appart', 'studio', 'flat'],
-            'maison' => ['maison', 'villa', 'bungalow', 'duplex'],
-            'terrain' => ['terrain', 'parcelle', 'lot'],
-            'commerce' => ['commerce', 'boutique', 'local commercial', 'bureau'],
+            'studio'      => ['studio'],
+            'appartement' => ['appartement', 'appart', 'flat'],
+            'maison'      => ['maison', 'villa', 'bungalow', 'duplex'],
+            'terrain'     => ['terrain', 'parcelle', 'lot'],
+            'commerce'    => ['commerce', 'boutique', 'local commercial', 'bureau'],
         ];
 
         $adTypes = Cache::remember('regex_parser:ad_types', 21600, fn () => AdType::all());
@@ -105,7 +106,9 @@ class NaturalSearchRegexParser
             }
         }
 
-        $hasStructured = $result['type_id'] || $result['city_id'] || $result['bedrooms'] || $result['price_max'];
+        $hasStructured = $result['type_id'] || $result['city_id'] || $result['bedrooms']
+            || $result['price_max'] || $result['price_min'] || $result['surface_min']
+            || $result['has_parking'] || $result['furnished'];
         if (!$hasStructured) {
             $result['q'] = $query;
         }

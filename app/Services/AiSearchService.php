@@ -285,17 +285,6 @@ PROMPT;
         });
     }
 
-    private function recordGroqFailure(): void
-    {
-        $failures = (int) Cache::get(self::FAILURE_COUNT_KEY, 0) + 1;
-        Cache::put(self::FAILURE_COUNT_KEY, $failures, self::CONTEXT_CACHE_TTL);
-
-        if ($failures >= self::CIRCUIT_FAILURE_THRESHOLD) {
-            Cache::put(self::CIRCUIT_BREAKER_KEY, true, self::CIRCUIT_OPEN_TTL);
-            Log::warning('AiSearchService: circuit breaker opened after '.$failures.' consecutive failures.');
-        }
-    }
-
     /**
      * @param  array<string, mixed>  $parsed
      * @return array<string, mixed>
@@ -362,7 +351,8 @@ PROMPT;
         }
 
         $hasStructured = $result['type_id'] || $result['city_id'] || $result['bedrooms']
-            || $result['price_max'] || $result['price_min'] || $result['has_parking'] || $result['furnished'];
+            || $result['price_max'] || $result['price_min'] || $result['surface_min']
+            || $result['has_parking'] || $result['furnished'];
         if (!$hasStructured && empty($result['q'])) {
             $result['q'] = $originalQuery;
         }

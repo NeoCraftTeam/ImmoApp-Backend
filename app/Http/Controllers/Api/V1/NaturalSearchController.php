@@ -11,7 +11,9 @@ use Illuminate\Http\Request;
 /**
  * Parses a natural language query into structured search parameters.
  *
- * Uses Groq LLM when configured (GROQ_API_KEY). Falls back to regex-based parsing otherwise.
+ * Delegates to AiSearchService which tries configured LLM providers in order
+ * (AI_SEARCH_PROVIDERS env: groq, openai, gemini, together, mistral).
+ * Falls back to regex-based parsing when all providers fail or are unconfigured.
  * Results are cached for 24 hours per query.
  *
  * Example: "appartement meublé 2 chambres à Douala pas cher avec parking"
