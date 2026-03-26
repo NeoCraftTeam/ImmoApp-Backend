@@ -190,13 +190,21 @@ final readonly class AdSearchController
         $q = (string) ($validated['q'] ?? '');
         $city = $validated['city'] ?? null;
         $type = $validated['type'] ?? null;
+        $typeId = $validated['type_id'] ?? null;
+        $quarterId = $validated['quarter_id'] ?? null;
         $perPage = min(max((int) ($validated['per_page'] ?? config('pagination.per_page', 15)), 1), 100);
         $minBedrooms = isset($validated['bedrooms']) ? (int) $validated['bedrooms'] : null;
+        $minBathrooms = isset($validated['bathrooms']) ? (int) $validated['bathrooms'] : null;
         $minPrice = isset($validated['price_min']) ? (float) $validated['price_min'] : null;
         $maxPrice = isset($validated['price_max']) ? (float) $validated['price_max'] : null;
         $minSurface = isset($validated['surface_min']) ? (float) $validated['surface_min'] : null;
         $maxSurface = isset($validated['surface_max']) ? (float) $validated['surface_max'] : null;
         $hasParking = isset($validated['has_parking']) ? (bool) $validated['has_parking'] : null;
+        $has3dTour = isset($validated['has_3d_tour']) ? (bool) $validated['has_3d_tour'] : null;
+        $isVerified = isset($validated['is_verified']) ? (bool) $validated['is_verified'] : null;
+        $amenities = isset($validated['attributes']) && is_array($validated['attributes'])
+            ? array_filter(array_map(strval(...), $validated['attributes']))
+            : [];
 
         $query = Ad::query()
             ->with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])
@@ -211,16 +219,24 @@ final readonly class AdSearchController
             });
         }
 
-        if ($city) {
-            $query->whereHas('quarter.city', fn ($qb) => $qb->where('name', 'ilike', "%{$city}%"));
+        if ($typeId) {
+            $query->where('type_id', $typeId);
+        } elseif ($type) {
+            $query->whereHas('ad_type', fn ($qb) => $qb->where('name', 'ilike', "%{$type}%"));
         }
 
-        if ($type) {
-            $query->whereHas('ad_type', fn ($qb) => $qb->where('name', 'ilike', "%{$type}%"));
+        if ($quarterId) {
+            $query->where('quarter_id', $quarterId);
+        } elseif ($city) {
+            $query->whereHas('quarter.city', fn ($qb) => $qb->where('name', 'ilike', "%{$city}%"));
         }
 
         if ($minBedrooms !== null) {
             $query->where('bedrooms', '>=', $minBedrooms);
+        }
+
+        if ($minBathrooms !== null) {
+            $query->where('bathrooms', '>=', $minBathrooms);
         }
 
         if ($minPrice !== null) {
@@ -244,6 +260,18 @@ final readonly class AdSearchController
 
         if ($hasParking) {
             $query->where('has_parking', true);
+        }
+
+        if ($has3dTour) {
+            $query->where('has_3d_tour', true);
+        }
+
+        if ($isVerified) {
+            $query->where('is_verified', true);
+        }
+
+        foreach ($amenities as $amenity) {
+            $query->whereJsonContains('attributes', $amenity);
         }
 
         $allowedSorts = ['price', 'surface_area', 'created_at'];

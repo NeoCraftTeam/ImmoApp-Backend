@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\AdType;
 use App\Models\City;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Regex-based natural language search parser.
@@ -42,10 +43,12 @@ class NaturalSearchRegexParser
             'commerce' => ['commerce', 'boutique', 'local commercial', 'bureau'],
         ];
 
+        $adTypes = Cache::remember('regex_parser:ad_types', 21600, fn () => AdType::all());
+
         foreach ($typeMap as $typeName => $keywords) {
             foreach ($keywords as $kw) {
                 if (str_contains($query, $kw)) {
-                    $type = AdType::where('name', 'ilike', "%{$typeName}%")->first();
+                    $type = $adTypes->first(fn ($t) => mb_stripos($t->name, $typeName) !== false);
                     if ($type) {
                         $result['type_id'] = $type->id;
                         $result['type_name'] = $type->name;
@@ -84,7 +87,7 @@ class NaturalSearchRegexParser
             $result['furnished'] = true;
         }
 
-        $cities = City::with('quarters')->get();
+        $cities = Cache::remember('regex_parser:cities_quarters', 21600, fn () => City::with('quarters')->get());
         foreach ($cities as $city) {
             $cityName = mb_strtolower($city->name);
             if (str_contains($query, $cityName)) {

@@ -23,6 +23,18 @@ class AiSearchService
 
     private const string CACHE_PREFIX = 'ai_search:';
 
+    private const string CONTEXT_CACHE_KEY = 'ai_search:context';
+
+    private const int CONTEXT_CACHE_TTL = 21600; // 6 hours — cities/types rarely change
+
+    private const string CIRCUIT_BREAKER_KEY = 'ai_search:circuit_open';
+
+    private const string FAILURE_COUNT_KEY = 'ai_search:failures';
+
+    private const int CIRCUIT_FAILURE_THRESHOLD = 3;
+
+    private const int CIRCUIT_OPEN_TTL = 300; // 5 minutes
+
     /**
      * Parse a natural language query into structured search parameters.
      *
@@ -59,6 +71,12 @@ class AiSearchService
             return null;
         }
 
+        if (Cache::has(self::CIRCUIT_BREAKER_KEY)) {
+            Log::debug('AiSearchService: circuit open, skipping Groq.');
+
+            return null;
+        }
+
         $context = $this->buildContext();
 
         $systemPrompt = $this->systemPrompt($context);
@@ -66,7 +84,7 @@ class AiSearchService
 
         try {
             $response = Http::withToken($apiKey)
-                ->timeout(15)
+                ->timeout(8)
                 ->post('https://api.groq.com/openai/v1/chat/completions', [
                     'model' => config('services.groq.model', 'llama-3.3-70b-versatile'),
                     'messages' => [
@@ -82,6 +100,7 @@ class AiSearchService
                     'status' => $response->status(),
                     'body' => $response->body(),
                 ]);
+                $this->recordGroqFailure();
 
                 return null;
             }
@@ -94,13 +113,17 @@ class AiSearchService
             $decoded = $this->extractJson($content);
             if ($decoded === null) {
                 Log::warning('AiSearchService: Invalid JSON from Groq', ['content' => substr($content, 0, 200)]);
+                $this->recordGroqFailure();
 
                 return null;
             }
 
+            Cache::forget(self::FAILURE_COUNT_KEY);
+
             return $this->normalizeParsedResult($decoded);
         } catch (\Throwable $e) {
             Log::error('AiSearchService: Groq exception: '.$e->getMessage());
+            $this->recordGroqFailure();
 
             return null;
         }
@@ -141,13 +164,26 @@ PROMPT;
 
     private function buildContext(): string
     {
-        $cities = City::with('quarters')->get();
-        $types = AdType::all();
+        return Cache::remember(self::CONTEXT_CACHE_KEY, self::CONTEXT_CACHE_TTL, function () {
+            $cities = City::with('quarters')->get();
+            $types = AdType::all();
 
-        $cityList = $cities->map(fn (City $c) => $c->name.': '.$c->quarters->pluck('name')->join(', '))->join("\n");
-        $typeList = $types->pluck('name')->join(', ');
+            $cityList = $cities->map(fn (City $c) => $c->name.': '.$c->quarters->pluck('name')->join(', '))->join("\n");
+            $typeList = $types->pluck('name')->join(', ');
 
-        return "Villes et quartiers :\n{$cityList}\n\nTypes de biens : {$typeList}";
+            return "Villes et quartiers :\n{$cityList}\n\nTypes de biens : {$typeList}";
+        });
+    }
+
+    private function recordGroqFailure(): void
+    {
+        $failures = (int) Cache::get(self::FAILURE_COUNT_KEY, 0) + 1;
+        Cache::put(self::FAILURE_COUNT_KEY, $failures, self::CONTEXT_CACHE_TTL);
+
+        if ($failures >= self::CIRCUIT_FAILURE_THRESHOLD) {
+            Cache::put(self::CIRCUIT_BREAKER_KEY, true, self::CIRCUIT_OPEN_TTL);
+            Log::warning('AiSearchService: circuit breaker opened after '.$failures.' consecutive failures.');
+        }
     }
 
     /**
