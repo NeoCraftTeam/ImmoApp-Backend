@@ -70,13 +70,26 @@ class AppServiceProvider extends ServiceProvider
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 
-        // Partage le logo encodé en base64 avec toutes les vues emails.* (y compris sous-dossiers)
+        // Partage le logo et l'URL frontend avec toutes les vues emails.*
+        // MAIL_ASSET_BASE_URL doit pointer vers le domaine public (ex: https://keyhome.app)
+        // pour que les clients email (Gmail, Outlook) puissent charger l'image.
+        // Les data: URI sont bloqués par la plupart des clients email modernes.
         View::composer(['emails.*', 'emails.reservation.*'], function ($view): void {
-            $logoPath = public_path('images/keyhomelogo_transparent.png');
-            $view->with('emailLogoBase64', file_exists($logoPath)
-                ? base64_encode((string) file_get_contents($logoPath))
-                : ''
-            );
+            $logoPath = public_path('images/keyhomelogo_email.png');
+            $assetBase = rtrim(env('MAIL_ASSET_BASE_URL', config('app.url')), '/');
+            $emailLogoUrl = $assetBase.'/images/keyhomelogo_email.png';
+
+            // Base64 kept as last-resort fallback for SMTP preview tools only
+            $emailLogoBase64 = '';
+            if (file_exists($logoPath) && filesize($logoPath) < 150000) {
+                $emailLogoBase64 = base64_encode((string) file_get_contents($logoPath));
+            }
+
+            $view->with([
+                'emailLogoUrl'     => $emailLogoUrl,
+                'emailLogoBase64'  => $emailLogoBase64,
+                'emailFrontendUrl' => config('app.frontend_url', config('app.url')),
+            ]);
         });
 
         ResetPassword::createUrlUsing(function (object $notifiable, string $token) {
