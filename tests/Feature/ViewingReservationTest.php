@@ -18,6 +18,10 @@ use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
 
+beforeEach(function (): void {
+    Notification::fake();
+});
+
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
@@ -366,8 +370,6 @@ it('filters personal reservations by status query parameter', function (): void 
 // ===========================================================================
 
 it('allows a client to cancel their own pending reservation', function (): void {
-    Notification::fake();
-
     $owner = User::factory()->create();
     $client = User::factory()->create();
     $ad = makeAd($owner);
@@ -396,8 +398,6 @@ it('allows a client to cancel their own pending reservation', function (): void 
 // ===========================================================================
 
 it('allows a landlord to cancel a reservation on their own property', function (): void {
-    Notification::fake();
-
     $owner = User::factory()->create();
     $client = User::factory()->create();
     $ad = makeAd($owner);
@@ -425,8 +425,6 @@ it('allows a landlord to cancel a reservation on their own property', function (
 // ===========================================================================
 
 it('prevents an unrelated user from cancelling another person\'s reservation', function (): void {
-    Notification::fake();
-
     $owner = User::factory()->create();
     $client = User::factory()->create();
     $stranger = User::factory()->create();
@@ -447,8 +445,6 @@ it('prevents an unrelated user from cancelling another person\'s reservation', f
 // ===========================================================================
 
 it('requires authentication to cancel a reservation', function (): void {
-    Notification::fake();
-
     $owner = User::factory()->create();
     $client = User::factory()->create();
     $ad = makeAd($owner);

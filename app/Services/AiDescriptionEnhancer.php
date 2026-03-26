@@ -93,9 +93,9 @@ class AiDescriptionEnhancer
 
         $config = $this->providers[$this->activeProvider] ?? null;
 
-        if ($config === null || !$this->isValidKey($config['api_key'] ?? '')) {
+        if ($config === null || !$this->isValidKey($config['api_key'])) {
             foreach ($this->providers as $name => $cfg) {
-                if ($this->isValidKey($cfg['api_key'] ?? '')) {
+                if ($this->isValidKey($cfg['api_key'])) {
                     $this->activeProvider = $name;
                     $config = $cfg;
                     break;
@@ -103,7 +103,7 @@ class AiDescriptionEnhancer
             }
         }
 
-        if ($config === null || !$this->isValidKey($config['api_key'] ?? '')) {
+        if ($config === null || !$this->isValidKey($config['api_key'])) {
             Log::warning('AiDescriptionEnhancer: no AI provider is configured.');
 
             return $text;

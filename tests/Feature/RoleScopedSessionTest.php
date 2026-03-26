@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Middleware\RoleScopedSession;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 class RoleScopedSessionTest extends TestCase
@@ -21,9 +22,11 @@ class RoleScopedSessionTest extends TestCase
 
         // Apply middleware
         $middleware = new RoleScopedSession;
-        $middleware->handle($request, function ($req) {
+        $expectedOwnerCookie = Str::snake((string) config('app.name')).'_owner_session';
+
+        $middleware->handle($request, function ($req) use ($expectedOwnerCookie) {
             // Verify session config was modified for owner routes
-            $this->assertEquals('keyhome_owner_session', config('session.cookie'));
+            $this->assertSame($expectedOwnerCookie, config('session.cookie'));
             $this->assertEquals('/owner', config('session.path'));
 
             return $req;
@@ -38,11 +41,13 @@ class RoleScopedSessionTest extends TestCase
         // Create a mock request to customer area
         $request = Request::create('/home', 'GET');
 
+        $expectedCustomerCookie = (string) config('session.cookie');
+
         // Apply middleware
         $middleware = new RoleScopedSession;
-        $middleware->handle($request, function ($req) {
-            // Verify session config remains default for customer routes
-            $this->assertEquals('laravel_session', config('session.cookie'));
+        $middleware->handle($request, function ($req) use ($expectedCustomerCookie) {
+            // Verify session config remains the application default for customer routes
+            $this->assertSame($expectedCustomerCookie, config('session.cookie'));
             $this->assertEquals('/', config('session.path'));
 
             return $req;
@@ -57,11 +62,13 @@ class RoleScopedSessionTest extends TestCase
         // Create a mock request to API area
         $request = Request::create('/api/v1/health', 'GET');
 
+        $expectedCustomerCookie = (string) config('session.cookie');
+
         // Apply middleware
         $middleware = new RoleScopedSession;
-        $middleware->handle($request, function ($req) {
+        $middleware->handle($request, function ($req) use ($expectedCustomerCookie) {
             // API should use default session config
-            $this->assertEquals('laravel_session', config('session.cookie'));
+            $this->assertSame($expectedCustomerCookie, config('session.cookie'));
             $this->assertEquals('/', config('session.path'));
 
             return $req;
@@ -78,9 +85,11 @@ class RoleScopedSessionTest extends TestCase
 
         // Apply middleware
         $middleware = new RoleScopedSession;
-        $middleware->handle($request, function ($req) {
+        $expectedOwnerCookie = Str::snake((string) config('app.name')).'_owner_session';
+
+        $middleware->handle($request, function ($req) use ($expectedOwnerCookie) {
             // Still should have owner session config
-            $this->assertEquals('keyhome_owner_session', config('session.cookie'));
+            $this->assertSame($expectedOwnerCookie, config('session.cookie'));
             $this->assertEquals('/owner', config('session.path'));
 
             return $req;

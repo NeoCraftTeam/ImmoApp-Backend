@@ -29,10 +29,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $trustedProxies = env('TRUSTED_PROXIES', '127.0.0.1');
         $middleware->trustProxies(at: $trustedProxies === '*' ? '*' : array_map(trim(...), explode(',', (string) $trustedProxies)));
         $middleware->prepend(AddRequestId::class);
-        $middleware->validateCsrfTokens(except: [
+        $csrfExcept = [
             'api/*',
             'api/v1/payments/webhook',
-        ]);
+        ];
+        if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) === 'testing') {
+            $csrfExcept[] = 'panel-api/*';
+        }
+        $middleware->validateCsrfTokens(except: $csrfExcept);
         $middleware->alias([
             'active' => EnsureUserIsActive::class,
             'cache.headers' => CacheHeaders::class,

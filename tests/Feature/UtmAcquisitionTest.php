@@ -6,8 +6,13 @@ use App\Models\City;
 use App\Models\SiteVisit;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    Mail::fake();
+});
 
 test('visit tracking accepts utm_content and utm_term', function (): void {
     $response = $this->postJson('/api/v1/track/visit', [

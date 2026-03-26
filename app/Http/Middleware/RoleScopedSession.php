@@ -46,7 +46,7 @@ class RoleScopedSession
      */
     private function getOwnerSessionCookieName(): string
     {
-        $appName = env('APP_NAME', 'keyhome');
+        $appName = (string) config('app.name', 'Laravel');
         $snakeName = Str::snake($appName);
 
         return "{$snakeName}_owner_session";
@@ -57,6 +57,6 @@ class RoleScopedSession
      */
     private function getCustomerSessionCookieName(): string
     {
-        return env('SESSION_COOKIE', Str::snake(env('APP_NAME', 'laravel')).'_session');
+        return (string) config('session.cookie');
     }
 }
