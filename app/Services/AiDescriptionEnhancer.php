@@ -206,7 +206,7 @@ class AiDescriptionEnhancer
         // Detect placeholder keys: strip a known prefix then check if the remainder is only x's
         $stripped = preg_replace('/^(sk-|gsk_|AIza)/i', '', $key);
 
-        return $stripped !== '' && !preg_match('/^x+$/i', $stripped);
+        return $stripped !== '' && !preg_match('/^x+$/i', (string) $stripped);
     }
 
     private function systemPrompt(): string

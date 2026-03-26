@@ -39,7 +39,7 @@ class UserFactory extends Factory
             'role' => $role,
             'type' => $role === UserRole::AGENT ? fake()->randomElement(UserType::cases()) : null,
             'phone_number' => fake()->phoneNumber(),
-            'email' => fake()->unique()->safeEmail(),
+            'email' => fake()->unique()->userName().'@'.fake()->randomElement(['gmail.com', 'yahoo.com', 'outlook.com', 'keyhome.test']),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
