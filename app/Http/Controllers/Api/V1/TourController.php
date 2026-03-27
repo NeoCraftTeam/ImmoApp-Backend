@@ -60,6 +60,7 @@ final readonly class TourController
             'scenes' => ['required', 'array', 'min:1', 'max:20'],
             'scenes.*.title' => ['required', 'string', 'max:50'],
             'scenes.*.image' => ['required', 'file', 'mimes:jpg,jpeg,webp', 'max:30720'],
+            'scenes.*.client_id' => ['nullable', 'string', 'max:100'],
             'scenes.*.hotspots' => ['nullable', 'array'],
             'scenes.*.hotspots.*.pitch' => ['required_with:scenes.*.hotspots', 'numeric', 'between:-90,90'],
             'scenes.*.hotspots.*.yaw' => ['required_with:scenes.*.hotspots', 'numeric', 'between:-180,180'],
@@ -79,30 +80,49 @@ final readonly class TourController
             $uploadedScenes[] = $scene;
         }
 
-        // Remap hotspot target_scene values from client-side identifiers (title slugs or
-        // temp IDs) to the real backend scene IDs assigned by uploadScene().
-        // Clients send target_scene as the scene title or a local temp ID; after all scenes
-        // are uploaded we resolve each reference against title-slug matching so links work.
+        // Remap hotspot target_scene values from client-side identifiers to the real
+        // backend scene IDs assigned by uploadScene().
+        //
+        // Resolution priority:
+        //   1. client_id  — exact match against the temp ID sent by the frontend (e.g. "new-1234567890")
+        //   2. slug match — Str::slug($target) matches a scene title slug
+        //   3. title match — case-insensitive exact title match
+        $idByClientId = [];
         $idBySlug = [];
         $idByTitle = [];
+
+        foreach ($request->input('scenes', []) as $i => $sceneInput) {
+            $clientId = trim((string) ($sceneInput['client_id'] ?? ''));
+            if ($clientId !== '' && isset($uploadedScenes[$i])) {
+                $idByClientId[$clientId] = $uploadedScenes[$i]['id'];
+            }
+        }
+
         foreach ($uploadedScenes as $s) {
             $idBySlug[Str::slug($s['title'])] = $s['id'];
             $idByTitle[mb_strtolower(trim($s['title']))] = $s['id'];
         }
         $validIds = array_column($uploadedScenes, 'id');
 
-        $uploadedScenes = array_map(function (array $scene) use ($validIds, $idBySlug, $idByTitle): array {
+        $uploadedScenes = array_map(function (array $scene) use ($validIds, $idByClientId, $idBySlug, $idByTitle): array {
             if (empty($scene['hotspots']) || !is_array($scene['hotspots'])) {
                 return $scene;
             }
 
-            $scene['hotspots'] = array_values(array_map(function (array $hotspot) use ($validIds, $idBySlug, $idByTitle): array {
+            $scene['hotspots'] = array_values(array_map(function (array $hotspot) use ($validIds, $idByClientId, $idBySlug, $idByTitle): array {
                 $target = (string) ($hotspot['target_scene'] ?? '');
                 if ($target === '' || in_array($target, $validIds, true)) {
                     return $hotspot;
                 }
 
-                // Try to resolve by slug or title
+                // 1. Exact client_id match (temp ID from frontend e.g. "new-1234567890")
+                if (isset($idByClientId[$target])) {
+                    $hotspot['target_scene'] = $idByClientId[$target];
+
+                    return $hotspot;
+                }
+
+                // 2. Title slug fallback
                 $slug = Str::slug($target);
                 if (isset($idBySlug[$slug])) {
                     $hotspot['target_scene'] = $idBySlug[$slug];
