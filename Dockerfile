@@ -22,6 +22,8 @@ RUN apk add --no-cache \
     gifsicle \
     libwebp-tools \
     libavif-apps \
+    perl \
+    perl-image-exiftool \
     oniguruma-dev \
     gettext-dev \
     shadow \
