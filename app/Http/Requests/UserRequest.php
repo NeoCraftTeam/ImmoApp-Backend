@@ -72,7 +72,7 @@ final class UserRequest extends FormRequest
                 'role' => ['required', 'string', Rule::in(['customer', 'agent', 'admin'])],
                 'type' => ['nullable', 'string', Rule::in(['individual', 'agency'])],
                 'city_id' => ['sometimes', 'uuid', 'exists:city,id'],
-                'avatar' => ['sometimes', 'nullable', 'image', 'max:5120', 'mimes:jpeg,jpg,png,gif,webp', 'dimensions:max_width=2000,max_height=2000'],
+                'avatar' => ['sometimes', 'nullable', 'image', 'max:20480', 'mimes:jpeg,jpg,png,gif,webp', 'dimensions:max_width=4000,max_height=4000'],
             ];
         }
         if ($this->isMethod('put') || $this->isMethod('patch')) {
@@ -85,7 +85,7 @@ final class UserRequest extends FormRequest
                 'email' => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->route('user'))],
                 'password' => ['sometimes', 'string', 'min:8'],
                 'city_id' => ['sometimes', 'uuid', 'exists:city,id'],
-                'avatar' => ['sometimes', 'nullable', 'image', 'max:5120', 'mimes:jpeg,jpg,png,gif,webp', 'dimensions:max_width=2000,max_height=2000'],
+                'avatar' => ['sometimes', 'nullable', 'image', 'max:20480', 'mimes:jpeg,jpg,png,gif,webp', 'dimensions:max_width=4000,max_height=4000'],
                 'location' => ['sometimes', new GeometryGeojsonRule([Point::class])],
                 'latitude' => 'sometimes|nullable|numeric|between:-90,90',
                 'longitude' => 'sometimes|nullable|numeric|between:-180,180',
@@ -121,9 +121,9 @@ final class UserRequest extends FormRequest
             'city_id.required' => 'La ville est obligatoire.',
             'phone_number.regex' => 'Le numéro de téléphone doit contenir entre 7 et 20 chiffres (indicatif inclus).',
             'avatar.image' => 'La photo de profil doit être une image valide.',
-            'avatar.max' => 'La photo de profil ne doit pas dépasser 5 Mo.',
+            'avatar.max' => 'La photo de profil ne doit pas dépasser 20 Mo.',
             'avatar.mimes' => 'Formats acceptés : JPEG, PNG, GIF, WebP.',
-            'avatar.dimensions' => 'La photo de profil ne doit pas dépasser 2000×2000 pixels.',
+            'avatar.dimensions' => 'La photo de profil ne doit pas dépasser 4000×4000 pixels.',
         ];
     }
 }
