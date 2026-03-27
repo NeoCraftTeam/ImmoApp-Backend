@@ -78,6 +78,13 @@ final class AdResource extends JsonResource
             'views_count_week' => $this->views_count_week ?? 0,
             'is_verified' => (bool) ($this->is_verified ?? false),
 
+            // Proximity & accessibility — always visible (helps users decide to unlock)
+            'distance_main_road_m' => $this->distance_main_road_m,
+            'distance_shops_m' => $this->distance_shops_m,
+            'distance_transport_m' => $this->distance_transport_m,
+            'distance_school_m' => $this->distance_school_m,
+            'distance_hospital_m' => $this->distance_hospital_m,
+
             // Premium info - only visible when unlocked
             'deposit_amount' => $this->when($this->isUnlockedFor($user), $this->deposit_amount),
             'minimum_lease_duration' => $this->when($this->isUnlockedFor($user), $this->minimum_lease_duration),

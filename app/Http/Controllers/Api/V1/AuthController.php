@@ -104,10 +104,9 @@ final class AuthController
 
             RateLimiter::clear($key);
 
-            if ($request->hasSession()) {
-                $request->session()->regenerate();
-                Auth::guard('web')->login($user);
-            }
+            // Always create session for API login to support session-based auth
+            $request->session()->regenerate();
+            Auth::guard('web')->login($user);
 
             $tokenName = 'api_token_'.now()->timestamp;
             $user->tokens()->where('name', 'like', 'api_token_%')->delete();

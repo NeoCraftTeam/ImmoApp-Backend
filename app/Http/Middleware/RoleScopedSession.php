@@ -26,37 +26,24 @@ class RoleScopedSession
         // Detect owner area by path prefix
         $isOwnerArea = $request->is('owner/*') || $request->is('owner');
 
-        if ($isOwnerArea) {
-            // Owner-scoped session configuration
-            Config::set('session.cookie', $this->getOwnerSessionCookieName());
-            Config::set('session.path', '/owner');
-            Config::set('session.same_site', 'lax');
-        } else {
-            // Customer-scoped session (default)
-            Config::set('session.cookie', $this->getCustomerSessionCookieName());
-            Config::set('session.path', '/');
-            Config::set('session.same_site', 'lax');
-        }
+        // Use unified session configuration to prevent conflicts
+        // Both customer and owner areas share the same session but with role-based access control
+        Config::set('session.cookie', $this->getUnifiedSessionCookieName());
+        Config::set('session.path', '/');
+        Config::set('session.same_site', 'lax');
+        Config::set('session.domain', null); // Let auto-detect based on current domain
 
         return $next($request);
     }
 
     /**
-     * Get owner-specific session cookie name.
+     * Get unified session cookie name for all areas.
      */
-    private function getOwnerSessionCookieName(): string
+    private function getUnifiedSessionCookieName(): string
     {
         $appName = (string) config('app.name', 'Laravel');
         $snakeName = Str::snake($appName);
 
-        return "{$snakeName}_owner_session";
-    }
-
-    /**
-     * Get customer-specific session cookie name (default).
-     */
-    private function getCustomerSessionCookieName(): string
-    {
-        return (string) config('session.cookie');
+        return "{$snakeName}_session";
     }
 }

@@ -28,9 +28,9 @@ class MassiveAdSeeder extends Seeder
 {
     private const TOTAL_ADS = 2000;
 
-    private const IMAGES_PER_AD_MIN = 5;
+    private const IMAGES_PER_AD_MIN = 7;
 
-    private const IMAGES_PER_AD_MAX = 7;
+    private const IMAGES_PER_AD_MAX = 10;
 
     private const SEED_FAST_MODE_DEFAULT = true;
 
@@ -221,8 +221,8 @@ class MassiveAdSeeder extends Seeder
     private function createAds(int $totalAds = self::TOTAL_ADS): void
     {
         $fastMode = config('seeding.massive_ad_fast_mode', self::SEED_FAST_MODE_DEFAULT);
-        $imgMin = $fastMode ? 2 : self::IMAGES_PER_AD_MIN;
-        $imgMax = $fastMode ? 3 : self::IMAGES_PER_AD_MAX;
+        $imgMin = self::IMAGES_PER_AD_MIN;
+        $imgMax = self::IMAGES_PER_AD_MAX;
         $this->command->info("Creating {$totalAds} ads with {$imgMin}-{$imgMax} images each...");
 
         $typeNames = array_keys($this->typeMap);
@@ -312,6 +312,8 @@ class MassiveAdSeeder extends Seeder
                                     $imageErrors++;
                                 }
                             }
+
+                            $this->seedProximityData($ad, $normalizedType);
 
                             $this->createReviewsForAd($ad, $daysAgo);
 
@@ -575,6 +577,59 @@ class MassiveAdSeeder extends Seeder
         shuffle($shuffled);
 
         return array_slice($shuffled, 0, $count);
+    }
+
+    private function seedProximityData(Ad $ad, string $type): void
+    {
+        // 70% of non-terrain/commercial ads get proximity data
+        if (in_array($type, ['terrain', 'commercial', 'commerces'], true)) {
+            return;
+        }
+        if (mt_rand(1, 10) > 7) {
+            return;
+        }
+
+        $isUrban = in_array($type, ['chambre simple', 'chambre meublee', 'studio simple', 'studio meuble'], true);
+        $isApartment = str_contains($type, 'appartement');
+
+        $data = [];
+
+        // Route principale — always present
+        $data['distance_main_road_m'] = $isUrban
+            ? mt_rand(20, 400)
+            : ($isApartment ? mt_rand(50, 800) : mt_rand(100, 2000));
+
+        // Commerces / marchés
+        if (mt_rand(0, 1)) {
+            $data['distance_shops_m'] = $isUrban
+                ? mt_rand(50, 700)
+                : ($isApartment ? mt_rand(100, 1500) : mt_rand(200, 3000));
+        }
+
+        // Transport en commun
+        if (mt_rand(0, 1)) {
+            $data['distance_transport_m'] = $isUrban
+                ? mt_rand(30, 300)
+                : ($isApartment ? mt_rand(50, 600) : mt_rand(100, 1200));
+        }
+
+        // École / Université
+        if (mt_rand(0, 1)) {
+            $data['distance_school_m'] = $isUrban
+                ? mt_rand(100, 1000)
+                : ($isApartment ? mt_rand(200, 2000) : mt_rand(300, 5000));
+        }
+
+        // Hôpital / Clinique
+        if (mt_rand(0, 1)) {
+            $data['distance_hospital_m'] = $isUrban
+                ? mt_rand(300, 2000)
+                : ($isApartment ? mt_rand(500, 5000) : mt_rand(1000, 10000));
+        }
+
+        if (!empty($data)) {
+            $ad->updateQuietly($data);
+        }
     }
 
     private function createReviewsForAd(Ad $ad, int $daysAgo): void
