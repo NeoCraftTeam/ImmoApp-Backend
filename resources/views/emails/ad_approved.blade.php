@@ -66,8 +66,8 @@
     </table>
 
     <div class="btn-wrapper">
-        <a href="{{ config('app.frontend_url') }}" class="btn">
-            Voir mon annonce en ligne
+        <a href="{{ rtrim(config('app.frontend_url', config('app.url')), '/') . '/owner/ads' }}" class="btn">
+            Voir mes annonces
         </a>
     </div>
 

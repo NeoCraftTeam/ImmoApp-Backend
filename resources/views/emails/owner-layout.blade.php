@@ -251,7 +251,7 @@
             <div class="accent-bar"></div>
 
             <div class="header">
-                <a href="{{ $emailFrontendUrl ?? config('app.frontend_url', config('app.url')) }}" style="display: inline-block;">
+                <a href="{{ $emailFrontendUrl ?? (rtrim(config('app.frontend_url', config('app.url')), '/') . '/owner') }}" style="display: inline-block;">
                     @php
                         $resolvedLogoUrl = $emailLogoUrl ?? asset('images/logo-teal.png');
                     @endphp

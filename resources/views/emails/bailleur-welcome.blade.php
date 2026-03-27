@@ -45,14 +45,9 @@
         </tr>
     </table>
 
-    @php
-        $domain = config('filament.panels.owner_domain');
-        $ownerUrl = $domain ? 'https://' . $domain . '/login' : (config('app.url') . '/owner/login');
-    @endphp
-
     <div class="btn-wrapper">
-        <a href="{{ $ownerUrl }}" class="btn">
-            Accéder à l'espace bailleur
+        <a href="{{ rtrim(config('app.frontend_url', config('app.url')), '/') . '/owner/dashboard' }}" class="btn">
+            Accéder à mon espace bailleur
         </a>
     </div>
 

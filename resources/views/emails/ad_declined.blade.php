@@ -46,7 +46,7 @@
     </p>
 
     <div class="btn-wrapper">
-        <a href="{{ config('app.url') . '/owner' }}" class="btn">
+        <a href="{{ rtrim(config('app.frontend_url', config('app.url')), '/') . '/owner/ads' }}" class="btn">
             Modifier et resoumettre mon annonce
         </a>
     </div>
