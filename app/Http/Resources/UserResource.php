@@ -50,6 +50,10 @@ final class UserResource extends JsonResource
                 $request->user()?->id === $this->id || $request->user()?->isAdmin(),
                 $this->phone_number
             ),
+            'phone_is_whatsapp' => $this->when(
+                $request->user()?->id === $this->id || $request->user()?->isAdmin(),
+                (bool) $this->phone_is_whatsapp
+            ),
             'email' => $this->when(
                 $request->user()?->id === $this->id || $request->user()?->isAdmin(),
                 $this->email
