@@ -123,7 +123,7 @@ final readonly class ReservationService implements ReservationServiceInterface
             $reservation->ad->user->notify(new ReservationCancelledNotification($reservation));
         }
 
-        return $reservation->fresh();
+        return $reservation->fresh() ?? $reservation;
     }
 
     /**

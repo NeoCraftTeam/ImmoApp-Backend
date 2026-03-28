@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Actions\Reservation\ConfirmReservationAction;
 use App\Enums\ReservationStatus;
 use App\Http\Requests\Viewing\CancelReservationRequest;
 use App\Http\Requests\Viewing\StoreTentativeReservationRequest;
 use App\Http\Resources\TentativeReservationResource;
 use App\Models\Ad;
 use App\Models\TentativeReservation;
-use App\Notifications\ReservationConfirmedClientNotification;
 use App\Policies\TentativeReservationPolicy;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
@@ -29,6 +29,7 @@ final readonly class ViewingReservationController
     public function __construct(
         private ViewingScheduleServiceInterface $scheduleService,
         private ReservationServiceInterface $reservationService,
+        private ConfirmReservationAction $confirmReservation,
     ) {}
 
     /**
@@ -175,12 +176,10 @@ final readonly class ViewingReservationController
             'Seule une réservation en attente peut être confirmée.'
         );
 
-        $reservation->update(['status' => ReservationStatus::Confirmed]);
-        $reservation->loadMissing('client');
-        $reservation->client->notify(new ReservationConfirmedClientNotification($reservation));
+        $confirmed = $this->confirmReservation->execute($reservation);
 
         return response()->json([
-            'data' => new TentativeReservationResource($reservation->load('ad')),
+            'data' => new TentativeReservationResource($confirmed->load('ad')),
             'message' => 'Visite confirmée. Le locataire a été notifié.',
         ]);
     }

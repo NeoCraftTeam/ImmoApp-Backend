@@ -86,7 +86,7 @@ test('analytics overview requires authentication', function (): void {
 });
 
 test('analytics overview returns empty data for user with no ads', function (): void {
-    $user = User::factory()->create();
+    $user = User::factory()->agents()->create();
     Sanctum::actingAs($user);
 
     $response = $this->getJson('/api/v1/my/ads/analytics');
@@ -97,7 +97,7 @@ test('analytics overview returns empty data for user with no ads', function (): 
 });
 
 test('analytics overview aggregates all interaction types', function (): void {
-    $user = User::factory()->create();
+    $user = User::factory()->agents()->create();
     $ad = Ad::factory()->create(['user_id' => $user->id, 'status' => 'available']);
     $viewer = User::factory()->create();
 
@@ -145,7 +145,7 @@ test('analytics overview aggregates all interaction types', function (): void {
 });
 
 test('analytics overview supports period filtering', function (): void {
-    $user = User::factory()->create();
+    $user = User::factory()->agents()->create();
     $ad = Ad::factory()->create(['user_id' => $user->id, 'status' => 'available']);
     $viewer = User::factory()->create();
 
@@ -177,8 +177,8 @@ test('analytics overview supports period filtering', function (): void {
 });
 
 test('single ad analytics requires ownership', function (): void {
-    $owner = User::factory()->create();
-    $otherUser = User::factory()->create();
+    $owner = User::factory()->agents()->create();
+    $otherUser = User::factory()->agents()->create();
     $ad = Ad::factory()->create(['user_id' => $owner->id, 'status' => 'available']);
 
     Sanctum::actingAs($otherUser);
@@ -187,7 +187,7 @@ test('single ad analytics requires ownership', function (): void {
 });
 
 test('single ad analytics returns detailed metrics', function (): void {
-    $owner = User::factory()->create();
+    $owner = User::factory()->agents()->create();
     $ad = Ad::factory()->create(['user_id' => $owner->id, 'status' => 'available']);
     $viewer1 = User::factory()->create();
     $viewer2 = User::factory()->create();
