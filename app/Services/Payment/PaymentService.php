@@ -14,6 +14,8 @@ use App\Events\PaymentInitiated;
 use App\Events\PaymentSucceeded;
 use App\Exceptions\PaymentGatewayException;
 use App\Models\Payment;
+use App\Models\PointPackage;
+use App\Models\SubscriptionPlan;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -27,19 +29,7 @@ use Illuminate\Support\Str;
  */
 final readonly class PaymentService
 {
-    private PaymentGatewayInterface $gateway;
-
-    private ?PaymentGatewayInterface $fallbackGateway;
-
-    public function __construct()
-    {
-        $this->gateway = $this->resolveGateway(
-            (string) config('payment.default', 'flutterwave')
-        );
-
-        $fallback = config('payment.fallback');
-        $this->fallbackGateway = $fallback ? $this->resolveGateway((string) $fallback) : null;
-    }
+    public function __construct(private PaymentGatewayInterface $gateway, private ?PaymentGatewayInterface $fallbackGateway = null) {}
 
     /**
      * Create a pending payment record and obtain the checkout link.
@@ -321,6 +311,48 @@ final readonly class PaymentService
     public function getGatewayName(): string
     {
         return $this->gateway->getName();
+    }
+
+    /**
+     * Resolve the authoritative server-side price for a payment type.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    public function resolveAmountForType(string $type, array $validated): ?float
+    {
+        return match ($type) {
+            'credit' => $this->resolveCreditAmount($validated['plan_id'] ?? null),
+            'subscription' => $this->resolveSubscriptionAmount($validated['plan_id'] ?? null, $validated['period'] ?? 'monthly'),
+            default => null,
+        };
+    }
+
+    private function resolveCreditAmount(?string $packageId): ?float
+    {
+        if (!$packageId) {
+            return null;
+        }
+
+        $package = PointPackage::where('id', $packageId)->where('is_active', true)->first();
+
+        return $package ? (float) $package->price : null;
+    }
+
+    private function resolveSubscriptionAmount(?string $planId, string $period): ?float
+    {
+        if (!$planId) {
+            return null;
+        }
+
+        $plan = SubscriptionPlan::where('id', $planId)->where('is_active', true)->first();
+
+        if (!$plan) {
+            return null;
+        }
+
+        return $period === 'yearly' && $plan->price_yearly
+            ? (float) $plan->price_yearly
+            : (float) $plan->price;
     }
 
     /**

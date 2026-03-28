@@ -40,7 +40,7 @@ it('uses primary gateway when it succeeds', function (): void {
     config(['payment.default' => 'flutterwave', 'payment.fallback' => null]);
 
     $user = User::factory()->create();
-    $result = (new PaymentService)->createPayment($user, [
+    $result = app(PaymentService::class)->createPayment($user, [
         'amount' => 5000,
         'currency' => 'XAF',
         'type' => 'credit',
@@ -70,7 +70,7 @@ it('falls back to secondary gateway when primary fails', function (): void {
     config(['payment.default' => 'flutterwave', 'payment.fallback' => 'fedapay']);
 
     $user = User::factory()->create();
-    $result = (new PaymentService)->createPayment($user, [
+    $result = app(PaymentService::class)->createPayment($user, [
         'amount' => 5000,
         'currency' => 'XAF',
         'type' => 'credit',
@@ -99,7 +99,7 @@ it('throws exception when both primary and fallback gateways fail', function ():
 
     $user = User::factory()->create();
 
-    expect(fn () => (new PaymentService)->createPayment($user, [
+    expect(fn () => app(PaymentService::class)->createPayment($user, [
         'amount' => 5000,
         'currency' => 'XAF',
         'type' => 'credit',
@@ -119,7 +119,7 @@ it('propagates primary exception when no fallback is configured', function (): v
 
     $user = User::factory()->create();
 
-    expect(fn () => (new PaymentService)->createPayment($user, [
+    expect(fn () => app(PaymentService::class)->createPayment($user, [
         'amount' => 5000,
         'currency' => 'XAF',
         'type' => 'credit',

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Contracts\PaymentGatewayInterface;
 use App\Enums\UserRole;
 use App\Enums\UserType;
 use App\Models\Ad;
@@ -19,6 +20,9 @@ use App\Observers\TentativeReservationObserver;
 use App\Observers\UserObserver;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
+use App\Services\Payment\FedaPayPaymentService;
+use App\Services\Payment\FlutterwavePaymentService;
+use App\Services\Payment\PaymentService;
 use App\Services\ReservationService;
 use App\Services\ViewingScheduleService;
 use Illuminate\Auth\Notifications\ResetPassword;
@@ -45,6 +49,16 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(ViewingScheduleServiceInterface::class, ViewingScheduleService::class);
         $this->app->bind(ReservationServiceInterface::class, ReservationService::class);
+
+        $this->app->singleton(PaymentService::class, function ($app): PaymentService {
+            $defaultName = (string) config('payment.default', 'flutterwave');
+            $fallbackName = config('payment.fallback');
+
+            $gateway = $this->resolvePaymentGateway($app, $defaultName);
+            $fallback = $fallbackName ? $this->resolvePaymentGateway($app, (string) $fallbackName) : null;
+
+            return new PaymentService($gateway, $fallback);
+        });
     }
 
     /**
@@ -182,6 +196,15 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('payments.webhook', fn (Request $r) => Limit::perMinute(config('rate_limiting.payments.webhook', 120))->by($r->ip()));
 
         RateLimiter::for('payments.history', fn (Request $r) => Limit::perMinute(config('rate_limiting.payments.history', 60))->by(optional($r->user())->id ?? $r->ip()));
+    }
+
+    private function resolvePaymentGateway(mixed $app, string $name): PaymentGatewayInterface
+    {
+        return match ($name) {
+            'flutterwave' => $app->make(FlutterwavePaymentService::class),
+            'fedapay' => $app->make(FedaPayPaymentService::class),
+            default => throw new \InvalidArgumentException("Payment gateway [{$name}] not supported."),
+        };
     }
 
     private function ensureLivewireTmpDirectoryExists(): void

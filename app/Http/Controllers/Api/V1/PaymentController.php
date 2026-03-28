@@ -12,10 +12,8 @@ use App\Http\Requests\Api\V1\FlutterwaveInitiateRequest;
 use App\Http\Requests\Api\V1\FlutterwaveVerifyRequest;
 use App\Http\Resources\PaymentResource;
 use App\Models\Payment;
-use App\Models\PointPackage;
 use App\Models\PromoCode;
 use App\Models\PromoCodeUsage;
-use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\Payment\PaymentService;
 use Illuminate\Http\JsonResponse;
@@ -71,7 +69,7 @@ final class PaymentController
         $user = $request->user();
 
         $type = $validated['type'];
-        $amount = $this->resolveAmountForType($type, $validated);
+        $amount = $this->paymentService->resolveAmountForType($type, $validated);
 
         if ($amount === null) {
             return response()->json([
@@ -79,96 +77,61 @@ final class PaymentController
             ], 422);
         }
 
-        $appliedPromoCode = null;
+        // Wrap promo code validation + payment creation in a single transaction
+        // to prevent race conditions on single-use promo codes.
+        return DB::transaction(function () use ($validated, $user, $type, $amount): JsonResponse {
+            $appliedPromoCode = null;
+            $finalAmount = $amount;
 
-        if (!empty($validated['promo_code'])) {
-            $promoCode = PromoCode::where('code', strtoupper((string) $validated['promo_code']))->first();
+            if (!empty($validated['promo_code'])) {
+                $promoCode = PromoCode::where('code', strtoupper((string) $validated['promo_code']))
+                    ->lockForUpdate()
+                    ->first();
 
-            if ($promoCode && $promoCode->isValidForUser($user, $type)) {
-                $amount = max(0.0, $amount - $promoCode->calculateDiscount($amount));
-                $appliedPromoCode = $promoCode;
+                if ($promoCode && $promoCode->isValidForUser($user, $type)) {
+                    $finalAmount = max(0.0, $finalAmount - $promoCode->calculateDiscount($finalAmount));
+                    $appliedPromoCode = $promoCode;
+                }
             }
-        }
 
-        $description = match ($type) {
-            'subscription' => 'Abonnement agence',
-            'credit' => 'Achat de crédits',
-            default => 'Paiement KeyHome',
-        };
+            $description = match ($type) {
+                'subscription' => 'Abonnement agence',
+                'credit' => 'Achat de crédits',
+                default => 'Paiement KeyHome',
+            };
 
-        $result = $this->paymentService->createPayment($user, [
-            'amount' => $amount,
-            'type' => $type,
-            'payment_method' => $validated['payment_method'] ?? 'flutterwave',
-            'phone_number' => $validated['phone_number'] ?? null,
+            $result = $this->paymentService->createPayment($user, [
+                'amount' => $finalAmount,
+                'type' => $type,
+                'payment_method' => $validated['payment_method'] ?? 'flutterwave',
+                'phone_number' => $validated['phone_number'] ?? null,
 
-            'agency_id' => $validated['agency_id'] ?? null,
-            'plan_id' => $validated['plan_id'] ?? null,
-            'period' => $validated['period'] ?? null,
-            'description' => $description,
-            'meta' => [
-                'package_id' => ($type === 'credit') ? ($validated['plan_id'] ?? null) : null,
-            ],
-        ]);
-
-        if ($appliedPromoCode !== null) {
-            PromoCodeUsage::create([
-                'promo_code_id' => $appliedPromoCode->id,
-                'user_id' => $user->id,
-                'payment_id' => $result['payment']->id,
+                'agency_id' => $validated['agency_id'] ?? null,
+                'plan_id' => $validated['plan_id'] ?? null,
+                'period' => $validated['period'] ?? null,
+                'description' => $description,
+                'meta' => [
+                    'package_id' => ($type === 'credit') ? ($validated['plan_id'] ?? null) : null,
+                ],
             ]);
-            $appliedPromoCode->increment('used_count');
-        }
 
-        return response()->json([
-            'reference' => $result['payment']->id,
-            'payment_link' => $result['link'],
-            'tx_ref' => $result['tx_ref'],
-            'gateway' => $result['gateway'],
-            'status' => 'pending',
-        ]);
-    }
+            if ($appliedPromoCode !== null) {
+                PromoCodeUsage::create([
+                    'promo_code_id' => $appliedPromoCode->id,
+                    'user_id' => $user->id,
+                    'payment_id' => $result['payment']->id,
+                ]);
+                $appliedPromoCode->increment('used_count');
+            }
 
-    /**
-     * Resolve the authoritative price for a payment type from server data.
-     *
-     * @param  array<string, mixed>  $validated
-     */
-    private function resolveAmountForType(string $type, array $validated): ?float
-    {
-        return match ($type) {
-            'credit' => $this->resolveCreditAmount($validated['plan_id'] ?? null),
-            'subscription' => $this->resolveSubscriptionAmount($validated['plan_id'] ?? null, $validated['period'] ?? 'monthly'),
-            default => null,
-        };
-    }
-
-    private function resolveCreditAmount(?string $packageId): ?float
-    {
-        if (!$packageId) {
-            return null;
-        }
-
-        $package = PointPackage::where('id', $packageId)->where('is_active', true)->first();
-
-        return $package ? (float) $package->price : null;
-    }
-
-    private function resolveSubscriptionAmount(?string $planId, string $period): ?float
-    {
-        if (!$planId) {
-            return null;
-        }
-
-        $plan = SubscriptionPlan::where('id', $planId)->where('is_active', true)->first();
-
-        if (!$plan) {
-            return null;
-        }
-
-        return $period === 'yearly' && $plan->price_yearly
-            ? (float) $plan->price_yearly
-            : (float) $plan->price;
+            return response()->json([
+                'reference' => $result['payment']->id,
+                'payment_link' => $result['link'],
+                'tx_ref' => $result['tx_ref'],
+                'gateway' => $result['gateway'],
+                'status' => 'pending',
+            ]);
+        });
     }
 
     /**
