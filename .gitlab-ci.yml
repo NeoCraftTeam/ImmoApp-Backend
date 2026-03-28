@@ -1,9 +1,16 @@
+include:
+  - local: 'keyhome-frontend-next/.gitlab-ci.frontend.yml'
+
 stages:
   - prepare
   - quality
+  - install
   - build_and_test # Build + Test en parallèle
+  - test
+  - build
   - deploy
   - smoke_test # Vérification post-déploiement
+  - lighthouse
   - notify
   - cleanup
 
