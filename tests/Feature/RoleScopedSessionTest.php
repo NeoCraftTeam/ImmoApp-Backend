@@ -13,7 +13,7 @@ class RoleScopedSessionTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * Test that owner routes use scoped session configuration.
+     * Test that owner routes use unified session configuration.
      */
     public function test_owner_routes_use_scoped_session(): void
     {
@@ -22,12 +22,12 @@ class RoleScopedSessionTest extends TestCase
 
         // Apply middleware
         $middleware = new RoleScopedSession;
-        $expectedOwnerCookie = Str::snake((string) config('app.name')).'_owner_session';
+        $expectedCookie = Str::snake((string) config('app.name')).'_session';
 
-        $middleware->handle($request, function ($req) use ($expectedOwnerCookie) {
-            // Verify session config was modified for owner routes
-            $this->assertSame($expectedOwnerCookie, config('session.cookie'));
-            $this->assertEquals('/owner', config('session.path'));
+        $middleware->handle($request, function ($req) use ($expectedCookie) {
+            // Verify unified session cookie is used for all routes (including owner)
+            $this->assertSame($expectedCookie, config('session.cookie'));
+            $this->assertEquals('/', config('session.path'));
 
             return $req;
         });
@@ -76,7 +76,7 @@ class RoleScopedSessionTest extends TestCase
     }
 
     /**
-     * Test that nested owner routes are properly scoped.
+     * Test that nested owner routes use unified session.
      */
     public function test_nested_owner_routes_use_scoped_session(): void
     {
@@ -85,12 +85,12 @@ class RoleScopedSessionTest extends TestCase
 
         // Apply middleware
         $middleware = new RoleScopedSession;
-        $expectedOwnerCookie = Str::snake((string) config('app.name')).'_owner_session';
+        $expectedCookie = Str::snake((string) config('app.name')).'_session';
 
-        $middleware->handle($request, function ($req) use ($expectedOwnerCookie) {
-            // Still should have owner session config
-            $this->assertSame($expectedOwnerCookie, config('session.cookie'));
-            $this->assertEquals('/owner', config('session.path'));
+        $middleware->handle($request, function ($req) use ($expectedCookie) {
+            // Unified session: all areas use the same cookie
+            $this->assertSame($expectedCookie, config('session.cookie'));
+            $this->assertEquals('/', config('session.path'));
 
             return $req;
         });
