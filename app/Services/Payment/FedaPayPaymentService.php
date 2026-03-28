@@ -150,7 +150,10 @@ final readonly class FedaPayPaymentService implements PaymentGatewayInterface
         $signature = $headers['X-FEDAPAY-SIGNATURE'] ?? $headers['x-fedapay-signature'] ?? '';
 
         if (!$this->validateWebhookSignature($payload, (string) $signature)) {
-            Log::warning('FedaPay webhook: invalid signature', ['payload' => $payload]);
+            Log::warning('FedaPay webhook: invalid signature', [
+                'ip'    => request()->ip(),
+                'event' => $payload['name'] ?? 'unknown',
+            ]);
 
             throw new InvalidWebhookSignatureException('FedaPay webhook signature invalide.');
         }

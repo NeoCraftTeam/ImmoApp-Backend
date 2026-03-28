@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\AddRequestId;
+use App\Http\Middleware\EnsureOwnerRole;
 use App\Http\Middleware\CacheHeaders;
 use App\Http\Middleware\CheckFeatureFlag;
 use App\Http\Middleware\EnsureFrontendRequestsAreStateful;
@@ -42,6 +43,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'cache.headers' => CacheHeaders::class,
             'feature' => CheckFeatureFlag::class,
             'optional.auth' => OptionalAuth::class,
+            'owner.role' => EnsureOwnerRole::class,
             'resolve.sanctum.bearer' => ResolveSanctumBearerUser::class,
             'role.scoped.session' => RoleScopedSession::class,
         ]);
