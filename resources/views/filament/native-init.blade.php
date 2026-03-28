@@ -18,10 +18,6 @@
                 url: '{{ config("app.url") }}',
                 env: '{{ config("app.env") }}',
             },
-            session: {
-                cookieName: '{{ config("session.cookie") }}',
-                lifetime: {{ config("session.lifetime") }},
-            },
         };
 
         window.nativeAppConfig = config;
