@@ -26,7 +26,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property PaymentType $type
  * @property string $amount
  * @property string $transaction_id
- * @property PaymentGateway|null $gateway
+ * @property string|null $gateway
  * @property PaymentMethod|null $payment_method
  * @property string $user_id
  * @property PaymentStatus $status
@@ -93,7 +93,6 @@ class Payment extends Model
         'type' => PaymentType::class,
         'payment_method' => PaymentMethod::class,
         'status' => PaymentStatus::class,
-        'gateway' => PaymentGateway::class,
         'amount' => 'integer',
         'gateway_response' => 'array',
     ];
@@ -218,7 +217,7 @@ class Payment extends Model
      */
     public function isFlutterwave(): bool
     {
-        return $this->gateway === PaymentGateway::Flutterwave;
+        return $this->gateway === PaymentGateway::Flutterwave->value;
     }
 
     public function getActivitylogOptions(): LogOptions

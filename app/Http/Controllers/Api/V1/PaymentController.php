@@ -183,7 +183,7 @@ final class PaymentController
             'reference' => $payment->id,
             'ad_id' => $payment->ad_id,
             'tx_ref' => $payment->transaction_id,
-            'gateway' => $payment->gateway?->value,
+            'gateway' => $payment->gateway,
             'payment_method' => $payment->payment_method?->value,
             'payment_method_label' => $payment->payment_method?->label(),
         ]);
@@ -261,7 +261,7 @@ final class PaymentController
      *     summary="Webhook passerelle de paiement",
      *     tags={"💰 Paiements"},
      *
-     *     @OA\Parameter(name="gateway", in="path", required=true, @OA\Schema(type="string", enum={"flutterwave","fedapay"})),
+     *     @OA\Parameter(name="gateway", in="path", required=true, @OA\Schema(type="string", enum={"flutterwave"})),
      *
      *     @OA\Response(response=200, description="Webhook traité"),
      *     @OA\Response(response=401, description="Signature invalide")
@@ -276,7 +276,6 @@ final class PaymentController
             'verif-hash' => (string) $request->header('verif-hash', ''),
             'HTTP_VERIF_HASH' => (string) $request->header('verif-hash', ''),
             'flutterwave-signature' => (string) $request->header('flutterwave-signature', ''),
-            'x-fedapay-signature' => (string) $request->header('x-fedapay-signature', ''),
         ];
 
         try {

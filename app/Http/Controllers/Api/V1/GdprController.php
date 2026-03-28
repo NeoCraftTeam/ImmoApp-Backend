@@ -50,7 +50,7 @@ final class GdprController
                 'id' => $payment->id,
                 'amount' => $payment->amount,
                 'status' => $payment->status->value,
-                'gateway' => $payment->gateway?->value,
+                'gateway' => $payment->gateway,
                 'created_at' => $payment->created_at?->toIso8601String(),
             ];
         }

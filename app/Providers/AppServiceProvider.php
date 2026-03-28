@@ -20,7 +20,6 @@ use App\Observers\TentativeReservationObserver;
 use App\Observers\UserObserver;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
-use App\Services\Payment\FedaPayPaymentService;
 use App\Services\Payment\FlutterwavePaymentService;
 use App\Services\Payment\PaymentService;
 use App\Services\ReservationService;
@@ -202,7 +201,6 @@ class AppServiceProvider extends ServiceProvider
     {
         return match ($name) {
             'flutterwave' => $app->make(FlutterwavePaymentService::class),
-            'fedapay' => $app->make(FedaPayPaymentService::class),
             default => throw new \InvalidArgumentException("Payment gateway [{$name}] not supported."),
         };
     }

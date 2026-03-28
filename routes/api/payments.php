@@ -10,9 +10,9 @@ use App\Http\Controllers\Api\V1\RefundController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
 use Illuminate\Support\Facades\Route;
 
-// --- PAYMENTS (multi-gateway: Flutterwave, FedaPay) ---
+// --- PAYMENTS (Flutterwave — extensible to additional gateways) ---
 Route::post('/webhooks/{gateway}', [PaymentController::class, 'handleWebhook'])
-    ->where('gateway', 'flutterwave|fedapay')
+    ->where('gateway', 'flutterwave')
     ->middleware('throttle:payments.webhook');
 
 Route::middleware('auth:sanctum')->group(function (): void {

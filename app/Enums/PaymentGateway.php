@@ -7,5 +7,4 @@ namespace App\Enums;
 enum PaymentGateway: string
 {
     case Flutterwave = 'flutterwave';
-    case FedaPay = 'fedapay';
 }

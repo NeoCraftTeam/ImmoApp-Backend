@@ -51,9 +51,4 @@ class PaymentFactory extends Factory
     {
         return $this->state(['gateway' => 'flutterwave']);
     }
-
-    public function fedapay(): static
-    {
-        return $this->state(['gateway' => 'fedapay']);
-    }
 }

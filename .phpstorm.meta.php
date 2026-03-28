@@ -1684,9 +1684,6 @@ namespace PHPSTORM_META {
             'services.ses.region' => 'string',
             'services.slack.notifications.bot_user_oauth_token' => 'NULL',
             'services.slack.notifications.channel' => 'NULL',
-            'services.fedapay.public_key' => 'string',
-            'services.fedapay.secret_key' => 'string',
-            'services.fedapay.environment' => 'string',
             'session.driver' => 'string',
             'session.lifetime' => 'integer',
             'session.expire_on_close' => 'boolean',
@@ -2452,9 +2449,6 @@ namespace PHPSTORM_META {
             'services.ses.region' => 'string',
             'services.slack.notifications.bot_user_oauth_token' => 'NULL',
             'services.slack.notifications.channel' => 'NULL',
-            'services.fedapay.public_key' => 'string',
-            'services.fedapay.secret_key' => 'string',
-            'services.fedapay.environment' => 'string',
             'session.driver' => 'string',
             'session.lifetime' => 'integer',
             'session.expire_on_close' => 'boolean',
@@ -3220,9 +3214,6 @@ namespace PHPSTORM_META {
             'services.ses.region' => 'string',
             'services.slack.notifications.bot_user_oauth_token' => 'NULL',
             'services.slack.notifications.channel' => 'NULL',
-            'services.fedapay.public_key' => 'string',
-            'services.fedapay.secret_key' => 'string',
-            'services.fedapay.environment' => 'string',
             'session.driver' => 'string',
             'session.lifetime' => 'integer',
             'session.expire_on_close' => 'boolean',
@@ -3515,7 +3506,6 @@ namespace PHPSTORM_META {
 'sentry.tracing.http_client_requests','sentry.tracing.cache','sentry.tracing.redis_commands','sentry.tracing.redis_origin','sentry.tracing.notifications',
 'sentry.tracing.missing_routes','sentry.tracing.continue_after_response','sentry.tracing.default_integrations','services.postmark.token','services.resend.key',
 'services.ses.key','services.ses.secret','services.ses.region','services.slack.notifications.bot_user_oauth_token','services.slack.notifications.channel',
-'services.fedapay.public_key','services.fedapay.secret_key','services.fedapay.environment','session.driver','session.lifetime',
 'session.expire_on_close','session.encrypt','session.files','session.connection','session.table',
 'session.store','session.lottery','session.cookie','session.path','session.domain',
 'session.secure','session.http_only','session.same_site','session.partitioned','telescope.enabled',
@@ -10797,7 +10787,6 @@ namespace PHPSTORM_META {
 'AWS_DEFAULT_REGION','AWS_BUCKET','AWS_USE_PATH_STYLE_ENDPOINT','VITE_APP_NAME','L5_SWAGGER_GENERATE_ALWAYS',
 'EMAIL_CALLBACK_URL','SCOUT_DRIVER','MEILISEARCH_HOST','MEILISEARCH_KEY','SENTRY_LARAVEL_DSN',
 'SENTRY_SEND_DEFAULT_PII','SENTRY_TRACES_SAMPLE_RATE','NIGHTWATCH_TOKEN','LOG_CHANNEL','NIGHTWATCH_REQUEST_SAMPLE_RATE',
-'FEDAPAY_PUBLIC_KEY','FEDAPAY_SECRET_KEY','FEDAPAY_ENVIRONMENT',);
         
                 expectedArguments(\Illuminate\Support\Facades\Gate::has(), 0, argumentsSet('auth'));
     expectedArguments(\Illuminate\Support\Facades\Gate::allows(), 0, argumentsSet('auth'));

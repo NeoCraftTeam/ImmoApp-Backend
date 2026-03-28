@@ -19,8 +19,8 @@ return new class extends Migration
         DB::statement('ALTER TABLE payments ALTER COLUMN transaction_id DROP NOT NULL');
 
         Schema::table('payments', function (Blueprint $table): void {
-            // Which gateway processed this payment (flutterwave | fedapay)
-            $table->string('gateway')->default('fedapay')->after('period');
+            // Which gateway processed this payment (flutterwave)
+            $table->string('gateway')->default('flutterwave')->after('period');
 
             // The checkout URL or payment instruction returned by the gateway
             $table->string('payment_link', 1000)->nullable()->after('gateway');
@@ -37,7 +37,7 @@ return new class extends Migration
 
         // Add 'flutterwave' to the payment_method check constraint
         DB::statement('ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_payment_method_check');
-        DB::statement("ALTER TABLE payments ADD CONSTRAINT payments_payment_method_check CHECK (payment_method::text IN ('orange_money','mobile_money','stripe','fedapay','flutterwave'))");
+        DB::statement("ALTER TABLE payments ADD CONSTRAINT payments_payment_method_check CHECK (payment_method::text IN ('orange_money','mobile_money','stripe','flutterwave'))");
     }
 
     /**
@@ -46,7 +46,7 @@ return new class extends Migration
     public function down(): void
     {
         DB::statement('ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_payment_method_check');
-        DB::statement("ALTER TABLE payments ADD CONSTRAINT payments_payment_method_check CHECK (payment_method::text IN ('orange_money','mobile_money','stripe','fedapay'))");
+        DB::statement("ALTER TABLE payments ADD CONSTRAINT payments_payment_method_check CHECK (payment_method::text IN ('orange_money','mobile_money','stripe'));");
 
         Schema::table('payments', function (Blueprint $table): void {
             $table->dropIndex(['gateway', 'transaction_id']);

@@ -219,9 +219,9 @@ final readonly class RefundService
 
     private function resolveGateway(Payment $payment): PaymentGatewayInterface
     {
-        return match ($payment->gateway?->value) {
+        return match ($payment->gateway) {
             'flutterwave' => new FlutterwavePaymentService,
-            default => throw new \InvalidArgumentException("Gateway non supporté: {$payment->gateway?->value}"),
+            default => throw new \InvalidArgumentException("Gateway non supporté: {$payment->gateway}"),
         };
     }
 }

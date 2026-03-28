@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Payment;
 
 use App\Contracts\PaymentGatewayInterface;
-use App\Enums\PaymentGateway;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
@@ -25,7 +24,7 @@ use Illuminate\Support\Str;
  * Central orchestrator for all payment operations.
  *
  * Delegates to the configured gateway. Supports automatic fallback to a secondary
- * gateway when the primary fails (e.g. Flutterwave → FedaPay).
+ * gateway when the primary fails.
  */
 final readonly class PaymentService
 {
@@ -88,7 +87,7 @@ final readonly class PaymentService
             $payment->payment_method = PaymentMethod::from((string) ($data['payment_method'] ?? 'flutterwave'));
             $payment->user_id = $user->id;
             $payment->status = PaymentStatus::PENDING;
-            $payment->gateway = PaymentGateway::from($usedGateway->getName());
+            $payment->gateway = $usedGateway->getName();
             $payment->payment_link = $result['link'];
             $payment->phone_number = $data['phone_number'] ?? null;
             $payment->ad_id = $data['ad_id'] ?? null;
@@ -382,7 +381,6 @@ final readonly class PaymentService
     {
         return match ($name) {
             'flutterwave' => app(FlutterwavePaymentService::class),
-            'fedapay' => app(FedaPayPaymentService::class),
             default => throw new \InvalidArgumentException("Gateway [{$name}] not supported."),
         };
     }

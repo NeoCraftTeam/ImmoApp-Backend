@@ -382,12 +382,12 @@
                     <div class="meta-value">
                         @php
                             $methodLabels = [
-                                'fedapay' => 'FedaPay',
+                                'flutterwave' => 'Flutterwave',
                                 'orange_money' => 'Orange Money',
                                 'mobile_money' => 'Mobile Money',
                                 'stripe' => 'Stripe',
                             ];
-                            $method = $invoice->payment?->payment_method?->value ?? 'fedapay';
+                            $method = $invoice->payment?->payment_method?->value ?? 'flutterwave';
                         @endphp
                         {{ $methodLabels[$method] ?? ucfirst($method) }}
                     </div>

@@ -45,11 +45,6 @@ return [
             'logo' => env('APP_LOGO_URL'),
         ],
 
-        'fedapay' => [
-            'secret_key' => env('FEDAPAY_SECRET_KEY', ''),
-            'base_url' => env('FEDAPAY_BASE_URL', 'https://api.fedapay.com'),
-            'webhook_secret' => env('FEDAPAY_WEBHOOK_SECRET', ''),
-        ],
 
     ],
 

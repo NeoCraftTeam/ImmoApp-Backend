@@ -20,7 +20,7 @@ final class PaymentResource extends JsonResource
             'status' => $this->status->value,
             'type' => $this->type->value,
             'amount' => $this->amount,
-            'gateway' => $this->gateway?->value,
+            'gateway' => $this->gateway,
             'payment_method' => $this->payment_method?->value,
             'phone_number' => $this->phone_number,
             'payment_link' => $this->payment_link,

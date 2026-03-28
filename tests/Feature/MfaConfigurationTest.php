@@ -17,4 +17,3 @@ test('agency panel has mfa enabled', function (): void {
     expect($providers)->not->toBeEmpty();
     expect($providers)->toHaveCount(2); // App + Email
 });
-

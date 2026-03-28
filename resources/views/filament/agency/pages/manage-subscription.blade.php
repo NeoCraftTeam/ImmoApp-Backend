@@ -725,7 +725,7 @@
                 </div>
                 <h2>En attente de confirmation du paiement…</h2>
                 <p>
-                    Votre paiement est en cours de traitement par FedaPay.<br>
+                    Votre paiement est en cours de traitement par Flutterwave.<br>
                     Cette page se met à jour automatiquement. Vous pouvez aussi revenir ici après avoir finalisé votre paiement.
                 </p>
                 <button wire:click="cancelWaiting" class="sub-awaiting-cancel">
@@ -943,7 +943,7 @@
                 <div class="sub-faq-item">
                     <div class="sub-faq-q">Quand mon abonnement sera-t-il activé ?</div>
                     <div class="sub-faq-a">Votre abonnement est activé instantanément après confirmation du paiement via
-                        FedaPay. Vous recevrez un email de confirmation avec votre facture.</div>
+                        Flutterwave. Vous recevrez un email de confirmation avec votre facture.</div>
                 </div>
                 <div class="sub-faq-item">
                     <div class="sub-faq-q">Que se passe-t-il à l'expiration ?</div>

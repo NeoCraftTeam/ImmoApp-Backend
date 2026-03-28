@@ -154,7 +154,7 @@ class ScheduledReports extends Page
                         (string) $payment->id,
                         (string) $payment->amount,
                         (string) $payment->status->value,
-                        $payment->gateway !== null ? (string) $payment->gateway->value : '',
+                        (string) ($payment->gateway ?? ''),
                         (string) $payment->user->email,
                         $payment->created_at?->toDateString() ?? '',
                     ],
