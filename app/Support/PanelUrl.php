@@ -25,7 +25,6 @@ final class PanelUrl
 
         $domain = match ($panelId) {
             'admin' => (string) config('filament.panels.admin_domain'),
-            'bailleur' => (string) config('filament.panels.owner_domain'),
             'agency' => (string) config('filament.panels.agency_domain'),
             default => '',
         };
@@ -42,7 +41,6 @@ final class PanelUrl
 
         $panelPath = match ($panelId) {
             'admin' => 'admin',
-            'bailleur' => 'owner',
             'agency' => 'agency',
             default => trim($panelId, '/'),
         };

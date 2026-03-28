@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
-use App\Filament\Bailleur\Resources\Viewings\ViewingReservationResource;
 use App\Models\TentativeReservation;
 use App\Support\PanelUrl;
 use Illuminate\Bus\Queueable;
@@ -18,11 +17,7 @@ class ReservationCreatedLandlordNotification extends Notification implements Sho
 {
     private function resolveOwnerReservationsUrl(): string
     {
-        try {
-            return ViewingReservationResource::getUrl(panel: 'bailleur');
-        } catch (\Throwable) {
-            return PanelUrl::for('bailleur', 'viewings/viewing-reservations');
-        }
+        return PanelUrl::for('agency', 'viewings/viewing-reservations');
     }
 
     use Queueable;
