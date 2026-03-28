@@ -89,6 +89,11 @@ final class AdResource extends JsonResource
             'deposit_amount' => $this->when($this->isUnlockedFor($user), $this->deposit_amount),
             'minimum_lease_duration' => $this->when($this->isUnlockedFor($user), $this->minimum_lease_duration),
             'detailed_charges' => $this->when($this->isUnlockedFor($user), $this->detailed_charges),
+            'charges_forfaitaires' => $this->when($this->isUnlockedFor($user), $this->charges_forfaitaires),
+            'charges_montant_forfait' => $this->when($this->isUnlockedFor($user), $this->charges_montant_forfait),
+            'charges_eau' => $this->when($this->isUnlockedFor($user), $this->charges_eau),
+            'charges_electricite' => $this->when($this->isUnlockedFor($user), $this->charges_electricite),
+            'charges_autres' => $this->when($this->isUnlockedFor($user), $this->charges_autres),
             'property_condition_pdf' => $this->when(
                 $this->isUnlockedFor($user) && $this->hasMedia('property_condition'),
                 fn () => $this->getFirstMediaUrl('property_condition')
