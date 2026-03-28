@@ -151,7 +151,7 @@ final readonly class FedaPayPaymentService implements PaymentGatewayInterface
 
         if (!$this->validateWebhookSignature($payload, (string) $signature)) {
             Log::warning('FedaPay webhook: invalid signature', [
-                'ip'    => request()->ip(),
+                'ip' => request()->ip(),
                 'event' => $payload['name'] ?? 'unknown',
             ]);
 

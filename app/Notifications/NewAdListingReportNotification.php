@@ -42,7 +42,7 @@ class NewAdListingReportNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): Mailable
     {
-        return (new NewAdReportMail($this->report, $notifiable))
+        return new NewAdReportMail($this->report, $notifiable)
             ->to($notifiable->email);
     }
 

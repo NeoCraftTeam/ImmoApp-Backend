@@ -125,22 +125,22 @@ final class AdRequest extends FormRequest
                 ],
 
                 // Premium lease conditions
-                'deposit_amount'          => ['nullable', 'string', 'max:50'],
-                'minimum_lease_duration'  => ['nullable', 'string', 'max:50'],
+                'deposit_amount' => ['nullable', 'string', 'max:50'],
+                'minimum_lease_duration' => ['nullable', 'string', 'max:50'],
 
                 // Charges
-                'charges_forfaitaires'    => ['nullable', 'boolean'],
+                'charges_forfaitaires' => ['nullable', 'boolean'],
                 'charges_montant_forfait' => ['nullable', 'numeric', 'min:0'],
-                'charges_eau'             => ['nullable', 'numeric', 'min:0'],
-                'charges_electricite'     => ['nullable', 'numeric', 'min:0'],
-                'charges_autres'          => ['nullable', 'string', 'max:500'],
+                'charges_eau' => ['nullable', 'numeric', 'min:0'],
+                'charges_electricite' => ['nullable', 'numeric', 'min:0'],
+                'charges_autres' => ['nullable', 'string', 'max:500'],
 
                 // Proximity distances (metres)
-                'distance_main_road_m'  => ['nullable', 'integer', 'min:0', 'max:99999'],
-                'distance_shops_m'      => ['nullable', 'integer', 'min:0', 'max:99999'],
-                'distance_transport_m'  => ['nullable', 'integer', 'min:0', 'max:99999'],
-                'distance_school_m'     => ['nullable', 'integer', 'min:0', 'max:99999'],
-                'distance_hospital_m'   => ['nullable', 'integer', 'min:0', 'max:99999'],
+                'distance_main_road_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
+                'distance_shops_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
+                'distance_transport_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
+                'distance_school_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
+                'distance_hospital_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
 
                 // Property condition PDF
                 'property_condition' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
@@ -191,22 +191,22 @@ final class AdRequest extends FormRequest
                 'type_id' => ['sometimes', 'exists:ad_type,id'],
 
                 // Premium lease conditions
-                'deposit_amount'          => ['nullable', 'string', 'max:50'],
-                'minimum_lease_duration'  => ['nullable', 'string', 'max:50'],
+                'deposit_amount' => ['nullable', 'string', 'max:50'],
+                'minimum_lease_duration' => ['nullable', 'string', 'max:50'],
 
                 // Charges
-                'charges_forfaitaires'    => ['nullable', 'boolean'],
+                'charges_forfaitaires' => ['nullable', 'boolean'],
                 'charges_montant_forfait' => ['nullable', 'numeric', 'min:0'],
-                'charges_eau'             => ['nullable', 'numeric', 'min:0'],
-                'charges_electricite'     => ['nullable', 'numeric', 'min:0'],
-                'charges_autres'          => ['nullable', 'string', 'max:500'],
+                'charges_eau' => ['nullable', 'numeric', 'min:0'],
+                'charges_electricite' => ['nullable', 'numeric', 'min:0'],
+                'charges_autres' => ['nullable', 'string', 'max:500'],
 
                 // Proximity distances (metres)
-                'distance_main_road_m'  => ['nullable', 'integer', 'min:0', 'max:99999'],
-                'distance_shops_m'      => ['nullable', 'integer', 'min:0', 'max:99999'],
-                'distance_transport_m'  => ['nullable', 'integer', 'min:0', 'max:99999'],
-                'distance_school_m'     => ['nullable', 'integer', 'min:0', 'max:99999'],
-                'distance_hospital_m'   => ['nullable', 'integer', 'min:0', 'max:99999'],
+                'distance_main_road_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
+                'distance_shops_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
+                'distance_transport_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
+                'distance_school_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
+                'distance_hospital_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
 
                 // Property condition PDF
                 'property_condition' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],

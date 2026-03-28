@@ -1,10 +1,10 @@
 <?php
 
 use App\Http\Middleware\AddRequestId;
-use App\Http\Middleware\EnsureOwnerRole;
 use App\Http\Middleware\CacheHeaders;
 use App\Http\Middleware\CheckFeatureFlag;
 use App\Http\Middleware\EnsureFrontendRequestsAreStateful;
+use App\Http\Middleware\EnsureOwnerRole;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\LivewireLongRunningRequest;
 use App\Http\Middleware\OptionalAuth;

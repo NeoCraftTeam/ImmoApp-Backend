@@ -35,7 +35,7 @@ function unlockAdFor(Ad $ad, User $client): void
     ]);
 }
 
-function validSlotPayload(string $date = null): array
+function validSlotPayload(?string $date = null): array
 {
     return [
         'slot_date' => $date ?? now()->addDays(3)->toDateString(),

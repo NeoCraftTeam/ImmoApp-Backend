@@ -30,7 +30,7 @@ class AdReportReceivedNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): Mailable
     {
-        return (new AdReportReceivedMail($this->report))
+        return new AdReportReceivedMail($this->report)
             ->to($notifiable->email);
     }
 

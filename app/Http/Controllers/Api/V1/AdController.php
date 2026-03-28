@@ -122,7 +122,7 @@ final class AdController
         // caused by double-clicks, network retries, or accidental re-submissions.
         $idempotencyKey = $request->input('_idempotency_key');
         if ($idempotencyKey) {
-            $cacheKey = "ad_create:u{$userId}:k" . md5((string) $idempotencyKey);
+            $cacheKey = "ad_create:u{$userId}:k".md5((string) $idempotencyKey);
             $existingAdId = Cache::get($cacheKey);
             if ($existingAdId) {
                 $existing = Ad::with(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency'])
@@ -132,6 +132,7 @@ final class AdController
                         'ad_id' => $existingAdId,
                         'user_id' => $userId,
                     ]);
+
                     return response()->json([
                         'success' => true,
                         'message' => 'Ad created successfully',
@@ -158,7 +159,7 @@ final class AdController
             // Store idempotency key → ad ID mapping for 5 minutes
             if ($idempotencyKey) {
                 Cache::put(
-                    "ad_create:u{$userId}:k" . md5((string) $idempotencyKey),
+                    "ad_create:u{$userId}:k".md5((string) $idempotencyKey),
                     $ad->id,
                     now()->addMinutes(5)
                 );
