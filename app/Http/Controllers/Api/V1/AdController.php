@@ -17,6 +17,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Psr\Log\LoggerInterface;
 use Throwable;
@@ -114,13 +115,54 @@ final class AdController
     {
         $this->authorize('create', Ad::class);
         $data = $request->validated();
+        $userId = auth()->id();
+
+        // ── Idempotency guard ─────────────────────────────────────────────────
+        // A unique key generated once per form session prevents duplicates
+        // caused by double-clicks, network retries, or accidental re-submissions.
+        $idempotencyKey = $request->input('_idempotency_key');
+        if ($idempotencyKey) {
+            $cacheKey = "ad_create:u{$userId}:k" . md5((string) $idempotencyKey);
+            $existingAdId = Cache::get($cacheKey);
+            if ($existingAdId) {
+                $existing = Ad::with(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency'])
+                    ->find($existingAdId);
+                if ($existing) {
+                    $this->log->info('Idempotency hit — returning existing ad', [
+                        'ad_id' => $existingAdId,
+                        'user_id' => $userId,
+                    ]);
+                    return response()->json([
+                        'success' => true,
+                        'message' => 'Ad created successfully',
+                        'data' => [
+                            'ad' => new AdApiResource($existing),
+                            'images_count' => $existing->getMedia('images')->count(),
+                        ],
+                    ], 201);
+                }
+            }
+        }
+        // ─────────────────────────────────────────────────────────────────────
 
         try {
             $this->log->info('Data received for ad creation:', $data);
             $this->log->info('Files received:', $request->allFiles());
 
             $images = $this->collectUploadedImages($request);
-            $ad = $this->createAdAction->execute($data, $images);
+            $propertyConditionPdf = $request->hasFile('property_condition')
+                ? $request->file('property_condition')
+                : null;
+            $ad = $this->createAdAction->execute($data, $images, $propertyConditionPdf);
+
+            // Store idempotency key → ad ID mapping for 5 minutes
+            if ($idempotencyKey) {
+                Cache::put(
+                    "ad_create:u{$userId}:k" . md5((string) $idempotencyKey),
+                    $ad->id,
+                    now()->addMinutes(5)
+                );
+            }
 
             $ad->load(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency']);
 
@@ -135,7 +177,7 @@ final class AdController
 
         } catch (Throwable $e) {
             $this->log->error('Error creating ad: '.$e->getMessage(), [
-                'user_id' => auth()->id(),
+                'user_id' => $userId,
                 'trace' => $e->getTraceAsString(),
             ]);
 
@@ -227,8 +269,11 @@ final class AdController
             $imagesToDelete = is_array($request->input('images_to_delete'))
                 ? $request->input('images_to_delete')
                 : [];
+            $propertyConditionPdf = $request->hasFile('property_condition')
+                ? $request->file('property_condition')
+                : null;
 
-            $result = $this->updateAdAction->execute($ad, $data, $images, $imagesToDelete);
+            $result = $this->updateAdAction->execute($ad, $data, $images, $imagesToDelete, $propertyConditionPdf);
             $ad = $result['ad'];
 
             $ad->load(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency']);

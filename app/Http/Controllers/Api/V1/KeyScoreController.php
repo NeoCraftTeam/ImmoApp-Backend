@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Models\Ad;
+use App\Models\AdInteraction;
 use App\Services\KeyScoreService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
@@ -27,9 +28,13 @@ final class KeyScoreController
      */
     public function show(Ad $ad, KeyScoreService $service): JsonResponse
     {
-        $cacheKey = 'keyscore_'.$ad->id.'_'.$ad->updated_at->timestamp;
+        $cacheKey = 'keyscore_'.$ad->id.'_'.now()->format('Ymd_H');
 
-        $result = Cache::remember($cacheKey, 3600, fn () => $service->compute($ad));
+        $result = Cache::remember($cacheKey, 3600, function () use ($ad, $service) {
+            $ad->loadCount(['interactions as views_count' => fn ($q) => $q->where('type', AdInteraction::TYPE_VIEW)]);
+
+            return $service->compute($ad);
+        });
 
         return response()->json($result);
     }

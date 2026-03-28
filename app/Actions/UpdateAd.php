@@ -26,11 +26,12 @@ final readonly class UpdateAd
      * @param  array<string, mixed>  $data  Validated ad attributes
      * @param  array<int, UploadedFile>  $newImages  New images to add
      * @param  array<int, string>  $imagesToDelete  Media IDs to remove
+     * @param  UploadedFile|null  $propertyConditionPdf  Replaces existing PDF when provided
      * @return array{ad: Ad, status_changed: bool}
      */
-    public function execute(Ad $ad, array $data, array $newImages = [], array $imagesToDelete = []): array
+    public function execute(Ad $ad, array $data, array $newImages = [], array $imagesToDelete = [], ?UploadedFile $propertyConditionPdf = null): array
     {
-        return DB::transaction(function () use ($ad, $data, $newImages, $imagesToDelete): array {
+        return DB::transaction(function () use ($ad, $data, $newImages, $imagesToDelete, $propertyConditionPdf): array {
             $geo = GeoLocation::fromArray($data);
             if ($geo) {
                 $data['location'] = $geo->toPoint();
@@ -65,6 +66,11 @@ final readonly class UpdateAd
             foreach ($imagesToDelete as $mediaId) {
                 $media = $ad->media()->find($mediaId);
                 $media?->delete();
+            }
+
+            if ($propertyConditionPdf instanceof UploadedFile) {
+                $ad->clearMediaCollection('property_condition');
+                $ad->addMedia($propertyConditionPdf)->toMediaCollection('property_condition');
             }
 
             return ['ad' => $ad, 'status_changed' => $statusChanged];
