@@ -159,7 +159,7 @@ class AppServiceProvider extends ServiceProvider
                 UserRole::AGENT => ($agency instanceof Agency && $agency->hasActiveSubscription())
                     ? Limit::perMinute(500)->by($authUser->id)
                     : Limit::perMinute(300)->by($authUser->id),
-                default => Limit::perMinute(120)->by($authUser->id),
+                default => Limit::perMinute(300)->by($authUser->id),
             };
         });
 
