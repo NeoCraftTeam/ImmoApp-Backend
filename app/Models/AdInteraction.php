@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
@@ -26,6 +28,17 @@ use Illuminate\Support\Carbon;
 class AdInteraction extends Model
 {
     use HasUuids;
+    use MassPrunable;
+
+    /**
+     * Prune interactions older than 2 years.
+     *
+     * @return Builder<static>
+     */
+    public function prunable(): Builder
+    {
+        return static::where('created_at', '<', now()->subYears(2));
+    }
 
     public $timestamps = false;
 
