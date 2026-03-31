@@ -104,7 +104,6 @@ final class AuthController
 
             RateLimiter::clear($key);
 
-            // Create session when available (SPA cookie auth); pure API clients skip this
             if ($request->hasSession()) {
                 $request->session()->regenerate();
                 Auth::guard('web')->login($user);
