@@ -18,6 +18,8 @@ Route::prefix('auth')->group(function (): void {
         ->middleware('throttle:auth.register');
     Route::post('registerAgent', [RegistrationController::class, 'registerAgent'])
         ->middleware('throttle:auth.register');
+    Route::post('check-email', [RegistrationController::class, 'checkEmail'])
+        ->middleware('throttle:30,1');
 
     // Login
     Route::post('login', [AuthController::class, 'login'])
