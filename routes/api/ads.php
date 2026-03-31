@@ -39,7 +39,7 @@ Route::prefix('ads')->middleware('optional.auth')->group(function (): void {
     });
 
     // CRUD write + status — owner/admin only (belt-and-suspenders with AdPolicy)
-    Route::middleware(['auth:sanctum', 'owner.role'])->group(function (): void {
+    Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner'])->group(function (): void {
         Route::post('', [AdController::class, 'store']);
         Route::put('/{ad}', [AdController::class, 'update']);
         Route::delete('/{id}', [AdController::class, 'destroy']);
@@ -89,7 +89,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 });
 
 // Analytics (landlord/agency dashboard)
-Route::middleware(['auth:sanctum', 'owner.role'])->prefix('my/ads')->group(function (): void {
+Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner'])->prefix('my/ads')->group(function (): void {
     Route::get('/', [MyAdsController::class, 'index']);
     Route::get('/analytics', [AdAnalyticsController::class, 'overview']);
     Route::get('/{ad}/analytics', [AdAnalyticsController::class, 'show']);
@@ -106,7 +106,7 @@ Route::get('/ads/{ad}/pdf', [AdPdfController::class, 'download'])
 
 // 3D Tour (public read, protected write)
 Route::get('/ads/{ad}/tour', [TourController::class, 'show'])->middleware('optional.auth');
-Route::middleware(['auth:sanctum', 'owner.role'])->group(function (): void {
+Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner'])->group(function (): void {
     Route::post('/ads/{ad}/tour/scenes', [TourController::class, 'uploadScenes'])
         ->middleware('throttle:10,1');
     Route::match(['patch', 'post'], '/ads/{ad}/tour/scenes/{sceneId}/hotspots', [TourController::class, 'updateHotspots']);

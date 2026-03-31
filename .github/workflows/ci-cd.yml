@@ -65,7 +65,6 @@ jobs:
 
     - name: Static Analysis (PHPStan)
       run: vendor/bin/phpstan analyse --memory-limit=512M --no-progress
-      continue-on-error: true
 
     - name: Generate Key
       run: php artisan key:generate
@@ -124,7 +123,6 @@ jobs:
 
     - name: Lint
       run: npm run lint
-      continue-on-error: true
 
     - name: Unit Tests (Vitest)
       run: npm run test

@@ -95,7 +95,6 @@ Route::prefix('v1')->group(function (): void {
     });
 
     // --- USERS ---
-    Route::get('/users/{identifier}/public-profile', [UserController::class, 'publicProfile']);
     Route::middleware('auth:sanctum')->controller(UserController::class)->group(function (): void {
         Route::get('/users', 'index')->can('viewAny', User::class);
         Route::get('/users/{id}', 'show');
@@ -120,9 +119,6 @@ Route::prefix('v1')->group(function (): void {
 
     // --- MY FAVORITES ---
     Route::middleware('auth:sanctum')->get('/my/favorites', [AdInteractionController::class, 'favorites']);
-
-    // --- MY RECENTLY VIEWED ---
-    Route::middleware('auth:sanctum')->get('/my/recently-viewed', [AdInteractionController::class, 'recentlyViewed']);
 
     // --- NOTIFICATIONS ---
     Route::middleware('auth:sanctum')->prefix('notifications')->controller(NotificationController::class)->group(function (): void {

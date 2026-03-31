@@ -18,3 +18,5 @@ parameters:
         - '#Access to an undefined property App\\Filament\\Admin\\Pages\\ForcePasswordChange::\$form#'
         # Payment amount: model casts to integer (cents), @property says string
         - '#Property App\\Models\\Payment::\$amount \(string\) does not accept int#'
+        # MassPrunable prunable() — PHPStan can't resolve Builder<static> from static::where() call
+        - '#Method App\\Models\\.*::prunable\(\) should return.*Builder<static.*> but returns.*Builder<App\\Models\\.*>#'

@@ -1,5 +1,6 @@
 <?php
 
+use App\Logging\MaskSensitiveDataProcessor;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -56,6 +57,7 @@ return [
             'driver' => 'stack',
             'channels' => explode(',', (string) env('LOG_STACK', 'single')),
             'ignore_exceptions' => false,
+            'processors' => [MaskSensitiveDataProcessor::class],
         ],
 
         'production' => [
@@ -69,6 +71,7 @@ return [
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
+            'processors' => [MaskSensitiveDataProcessor::class],
         ],
 
         'daily' => [
@@ -77,6 +80,7 @@ return [
             'level' => env('LOG_LEVEL', 'debug'),
             'days' => env('LOG_DAILY_DAYS', 14),
             'replace_placeholders' => true,
+            'processors' => [MaskSensitiveDataProcessor::class],
         ],
 
         'slack' => [

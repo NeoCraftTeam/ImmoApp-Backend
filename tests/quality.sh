@@ -107,7 +107,7 @@ fi
 echo ""
 
 # ─── 3. Pint ──────────────────────────────────────────────
-echo -e "${YELLOW}▸ [3/5] Laravel Pint${NC}"
+echo -e "${YELLOW}▸ [4/6] Laravel Pint${NC}"
 if $FIX; then
     ./vendor/bin/pint 2>&1
     if [[ $? -eq 0 ]]; then
