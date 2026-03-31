@@ -7,20 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 
-/**
- * @property string $id
- * @property string $agency_id
- * @property string $invited_by
- * @property string $email
- * @property string $role
- * @property string $token
- * @property Carbon|null $accepted_at
- * @property Carbon|null $expires_at
- * @property Carbon|null $created_at
- * @property Carbon|null $updated_at
- */
 class TeamInvitation extends Model
 {
     use HasUuids;
@@ -46,7 +33,7 @@ class TeamInvitation extends Model
 
     public function isExpired(): bool
     {
-        return $this->expires_at !== null && $this->expires_at->isPast();
+        return $this->expires_at->isPast();
     }
 
     public function isAccepted(): bool

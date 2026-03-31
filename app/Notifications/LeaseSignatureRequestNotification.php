@@ -34,7 +34,7 @@ class LeaseSignatureRequestNotification extends Notification implements ShouldQu
             ->line('Vous avez reçu une demande de signature pour un contrat de bail.')
             ->line('Veuillez consulter et signer le contrat en cliquant sur le bouton ci-dessous.')
             ->action('Consulter et signer le contrat', config('app.frontend_url').'/sign/'.$this->signatureRequest->token)
-            ->line('Cette demande expire le '.($this->signatureRequest->expires_at?->format('d/m/Y') ?? '—').'. Si vous n\'attendiez pas ce message, vous pouvez ignorer cet e-mail.');
+            ->line('Cette demande expire le '.$this->signatureRequest->expires_at->format('d/m/Y').'. Si vous n\'attendiez pas ce message, vous pouvez ignorer cet e-mail.');
     }
 
     /**

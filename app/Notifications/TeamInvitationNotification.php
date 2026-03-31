@@ -34,7 +34,7 @@ class TeamInvitationNotification extends Notification implements ShouldQueue
             ->line('Vous avez été invité(e) à rejoindre une agence sur KeyHome.')
             ->line('Rôle attribué : '.$this->invitation->role)
             ->action('Accepter l\'invitation', config('app.frontend_url').'/owner/team/accept/'.$this->invitation->token)
-            ->line('Cette invitation expire le '.($this->invitation->expires_at?->format('d/m/Y') ?? '—').'. Si vous n\'attendiez pas cette invitation, vous pouvez ignorer cet e-mail.');
+            ->line('Cette invitation expire le '.$this->invitation->expires_at->format('d/m/Y').'. Si vous n\'attendiez pas cette invitation, vous pouvez ignorer cet e-mail.');
     }
 
     /**

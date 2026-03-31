@@ -7,25 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 
-/**
- * @property string $id
- * @property string $lease_contract_id
- * @property string $requested_by
- * @property string $signer_email
- * @property string $signer_name
- * @property string $token
- * @property string $status
- * @property Carbon|null $viewed_at
- * @property Carbon|null $signed_at
- * @property Carbon|null $declined_at
- * @property Carbon|null $expires_at
- * @property string|null $decline_reason
- * @property string|null $signature_hash
- * @property Carbon|null $created_at
- * @property Carbon|null $updated_at
- */
 class LeaseSignatureRequest extends Model
 {
     use HasUuids;
@@ -68,7 +50,7 @@ class LeaseSignatureRequest extends Model
 
     public function isExpired(): bool
     {
-        return $this->expires_at !== null && $this->expires_at->isPast();
+        return $this->expires_at->isPast();
     }
 
     /** @return BelongsTo<LeaseContract, $this> */

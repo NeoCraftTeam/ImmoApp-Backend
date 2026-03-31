@@ -67,12 +67,12 @@ final readonly class RegistrationService
 
             $registrationIp = $request->ip();
             $isLocalhost = in_array($registrationIp, ['127.0.0.1', '::1'], true);
-            if (!$isLocalhost) {
+            if (!$isLocalhost && app()->isProduction()) {
                 $existingAccountsFromIp = User::where('registration_ip', $registrationIp)
                     ->where('created_at', '>=', now()->subDays((int) config('auth.ip_block_days', 30)))
                     ->count();
 
-                if ($existingAccountsFromIp >= (int) config('auth.max_accounts_per_ip', 3)) {
+                if ($existingAccountsFromIp >= (int) config('auth.max_accounts_per_ip', 5)) {
                     $this->log->warning('Multi-account registration attempt blocked by IP', [
                         'ip' => $registrationIp,
                         'existing_accounts' => $existingAccountsFromIp,
