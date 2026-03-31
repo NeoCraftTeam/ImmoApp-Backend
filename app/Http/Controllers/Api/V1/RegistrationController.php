@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Requests\RegisterRequest;
+use App\Models\User;
 use App\Services\RegistrationService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 final readonly class RegistrationController
 {
@@ -53,5 +55,34 @@ final readonly class RegistrationController
         $data['role'] = 'agent';
 
         return $this->registrationService->register($data, $request);
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/v1/auth/check-email",
+     *     tags={"🔐 Authentification"},
+     *     summary="Vérifier la disponibilité d'une adresse email",
+     *     operationId="checkEmail",
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(@OA\Property(property="email", type="string", format="email"))
+     *     ),
+     *
+     *     @OA\Response(response=200, description="Résultat de disponibilité"),
+     *     @OA\Response(response=422, description="Email invalide"),
+     *     @OA\Response(response=429, description="Trop de tentatives")
+     * )
+     */
+    public function checkEmail(Request $request): JsonResponse
+    {
+        $request->validate(['email' => ['required', 'email', 'max:255']]);
+
+        $available = !User::query()
+            ->where('email', $request->string('email')->lower())
+            ->exists();
+
+        return response()->json(['available' => $available]);
     }
 }

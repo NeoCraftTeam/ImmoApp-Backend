@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Models\Ad;
+use App\Models\Agency;
 use App\Models\SubscriptionPlan;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -49,7 +51,9 @@ final class BoostController
 
     /**
      * Boost an ad manually (owner self-service).
-     * Duration defaults to 7 days; score to 50.
+     *
+     * SEC: Requires an active subscription with a boost entitlement.
+     * Score and duration are derived from the subscription plan to prevent abuse.
      */
     public function boost(Request $request, Ad $ad): JsonResponse
     {
@@ -57,13 +61,27 @@ final class BoostController
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $validated = $request->validate([
-            'duration_days' => ['nullable', 'integer', 'min:1', 'max:30'],
-        ]);
+        /** @var User $user */
+        $user = $request->user();
+        /** @var Agency|null $agency */
+        $agency = $user->agency;
 
-        $durationDays = $validated['duration_days'] ?? 7;
+        if (!$agency || !$agency->hasActiveSubscription()) {
+            return response()->json([
+                'message' => 'Un abonnement actif est requis pour booster une annonce.',
+            ], 403);
+        }
 
-        $ad->boost(50, $durationDays);
+        $subscription = $agency->getCurrentSubscription();
+        $plan = $subscription?->plan;
+
+        if (!$plan || !$plan->boost_score) {
+            return response()->json([
+                'message' => 'Votre plan ne permet pas de booster les annonces.',
+            ], 403);
+        }
+
+        $ad->boost($plan->boost_score, $plan->boost_duration_days ?? 7);
 
         return response()->json([
             'message' => 'Annonce boostée avec succès.',

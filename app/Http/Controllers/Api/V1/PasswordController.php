@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password as PasswordRule;
 
 final class PasswordController
 {
@@ -51,7 +52,7 @@ final class PasswordController
         $request->validate([
             'token' => 'required',
             'email' => 'required|email',
-            'password' => 'required|min:8|confirmed',
+            'password' => ['required', 'confirmed', PasswordRule::min(8)->mixedCase()->numbers()->symbols()],
         ]);
 
         $status = Password::reset(
@@ -93,7 +94,7 @@ final class PasswordController
     {
         $request->validate([
             'current_password' => 'required',
-            'new_password' => 'required|confirmed|min:8|different:current_password',
+            'new_password' => ['required', 'confirmed', 'different:current_password', PasswordRule::min(8)->mixedCase()->numbers()->symbols()],
         ]);
 
         $user = $request->user();

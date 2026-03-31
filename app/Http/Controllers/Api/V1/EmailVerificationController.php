@@ -199,6 +199,10 @@ final class EmailVerificationController
             'verified' => true,
             'access_token' => $token->plainTextToken,
             'user' => new UserResource($user),
+            // SEC: Always include role/type at top level so the frontend can
+            // route correctly even if UserResource omits them (unauthenticated request).
+            'role' => $user->role->value,
+            'type' => $user->type?->value,
         ]);
     }
 

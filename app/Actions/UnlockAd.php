@@ -26,23 +26,31 @@ final readonly class UnlockAd
      */
     public function execute(User $user, Ad $ad, int $cost): array
     {
+        // Owner check is idempotent — safe outside transaction.
         if ($ad->user_id === $user->id) {
             return ['status' => 'owner'];
         }
 
-        if (UnlockedAd::where('user_id', $user->id)->where('ad_id', $ad->id)->exists()) {
-            return ['status' => 'already_unlocked'];
-        }
+        // SEC: All state checks MUST be inside the transaction with locks
+        // to prevent TOCTOU double-deduction from concurrent requests.
+        return DB::transaction(function () use ($user, $ad, $cost): array {
+            // Lock the user row first to prevent concurrent balance reads.
+            /** @var User $freshUser */
+            $freshUser = User::query()->lockForUpdate()->findOrFail($user->id);
 
-        if ($user->point_balance < $cost) {
-            return [
-                'status' => 'insufficient_points',
-                'current_balance' => (int) $user->point_balance,
-                'required_points' => $cost,
-            ];
-        }
+            // Check for existing unlock inside the transaction to prevent double-deduction.
+            if (UnlockedAd::where('user_id', $user->id)->where('ad_id', $ad->id)->lockForUpdate()->exists()) {
+                return ['status' => 'already_unlocked'];
+            }
 
-        DB::transaction(function () use ($user, $ad, $cost): void {
+            if ($freshUser->point_balance < $cost) {
+                return [
+                    'status' => 'insufficient_points',
+                    'current_balance' => (int) $freshUser->point_balance,
+                    'required_points' => $cost,
+                ];
+            }
+
             $this->pointService->deduct(
                 $user,
                 $cost,
@@ -50,21 +58,22 @@ final readonly class UnlockAd
                 $ad->id,
             );
 
-            UnlockedAd::firstOrCreate(
-                ['user_id' => $user->id, 'ad_id' => $ad->id],
-                ['unlocked_at' => now()],
-            );
+            UnlockedAd::create([
+                'user_id' => $user->id,
+                'ad_id' => $ad->id,
+                'unlocked_at' => now(),
+            ]);
 
             AdInteraction::create([
                 'user_id' => $user->id,
                 'ad_id' => $ad->id,
                 'type' => AdInteraction::TYPE_UNLOCK,
             ]);
-        });
 
-        return [
-            'status' => 'unlocked',
-            'points_balance' => (int) $user->fresh()->point_balance,
-        ];
+            return [
+                'status' => 'unlocked',
+                'points_balance' => (int) $freshUser->fresh()->point_balance,
+            ];
+        });
     }
 }

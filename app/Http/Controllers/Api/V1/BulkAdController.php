@@ -33,6 +33,15 @@ final class BulkAdController
         $userId = auth()->id();
         $newStatus = AdStatus::from($validated['status']);
 
+        // SEC: Non-admin owners can only transition to safe statuses.
+        // AVAILABLE and DECLINED require admin approval to prevent bypassing moderation.
+        $ownerAllowed = [AdStatus::DRAFT, AdStatus::PENDING, AdStatus::RENT, AdStatus::SOLD];
+        if (!auth()->user()->isAdmin() && !in_array($newStatus, $ownerAllowed, true)) {
+            return response()->json([
+                'message' => 'Vous ne pouvez pas mettre les annonces dans ce statut.',
+            ], 403);
+        }
+
         $ads = Ad::query()
             ->whereIn('id', $validated['ids'])
             ->where('user_id', $userId)

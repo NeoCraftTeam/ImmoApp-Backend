@@ -256,6 +256,14 @@ final class SubscriptionController
             ], 422);
         }
 
+        // SEC: Prevent double subscription payment — reject if already active.
+        $existingActive = $agency->getCurrentSubscription();
+        if ($existingActive && !$existingActive->isExpired()) {
+            return response()->json([
+                'message' => 'Votre agence a déjà un abonnement actif.',
+            ], 409);
+        }
+
         try {
             $result = $this->paymentService->createPayment($user, [
                 'amount' => (float) $amount,
