@@ -3,6 +3,7 @@
 use App\Http\Middleware\AddRequestId;
 use App\Http\Middleware\CacheHeaders;
 use App\Http\Middleware\CheckFeatureFlag;
+use App\Http\Middleware\EnsureCorrectRoleForPanel;
 use App\Http\Middleware\EnsureFrontendRequestsAreStateful;
 use App\Http\Middleware\EnsureOwnerRole;
 use App\Http\Middleware\EnsureUserIsActive;
@@ -11,6 +12,7 @@ use App\Http\Middleware\OptionalAuth;
 use App\Http\Middleware\ResolveSanctumBearerUser;
 use App\Http\Middleware\RoleScopedSession;
 use App\Http\Middleware\SanitizeInput;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -30,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $trustedProxies = env('TRUSTED_PROXIES', '127.0.0.1');
         $middleware->trustProxies(at: $trustedProxies === '*' ? '*' : array_map(trim(...), explode(',', (string) $trustedProxies)));
         $middleware->prepend(AddRequestId::class);
+        $middleware->append(SecurityHeaders::class);
         $csrfExcept = [
             'api/*',
             'api/v1/payments/webhook',
@@ -44,6 +47,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'feature' => CheckFeatureFlag::class,
             'optional.auth' => OptionalAuth::class,
             'owner.role' => EnsureOwnerRole::class,
+            'panel.role' => EnsureCorrectRoleForPanel::class,
             'resolve.sanctum.bearer' => ResolveSanctumBearerUser::class,
             'role.scoped.session' => RoleScopedSession::class,
         ]);

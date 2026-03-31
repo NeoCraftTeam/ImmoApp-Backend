@@ -30,6 +30,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -181,6 +182,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'locale',
         'registration_ip',
         'must_change_password_at',
+        'is_anonymized',
         // Pending OAuth link confirmation
         'pending_oauth_provider',
         'pending_oauth_id',
@@ -340,6 +342,18 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function adInteractions(): HasMany
     {
         return $this->hasMany(AdInteraction::class);
+    }
+
+    /** @return BelongsToMany<User, $this> — bailleurs que cet utilisateur suit */
+    public function following(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'user_follows', 'follower_id', 'followed_id');
+    }
+
+    /** @return BelongsToMany<User, $this> — utilisateurs qui suivent ce bailleur */
+    public function followers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'user_follows', 'followed_id', 'follower_id');
     }
 
     /** @return HasMany<SearchAlert, $this> */
@@ -553,6 +567,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'app_authentication_secret' => 'encrypted',
             'app_authentication_recovery_codes' => 'encrypted:array',
             'has_email_authentication' => 'boolean',
+            'is_anonymized' => 'boolean',
             'onboarding_completed_at' => 'datetime',
             'last_home_visit_at' => 'datetime',
             'preferences' => 'array',
@@ -581,7 +596,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         $requestedAt = now()->translatedFormat('d F Y à H:i');
 
         Mail::to($this->email, $this->firstname)
-            ->queue(new ForgotPasswordMail($resetUrl, $requestedFrom, $requestedAt));
+            ->queue(new ForgotPasswordMail($resetUrl, $requestedFrom, $requestedAt, $this->role->value));
     }
 
     /**
@@ -607,7 +622,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         $requestedAt = now()->translatedFormat('d F Y à H:i');
 
         Mail::to($this->email, $this->firstname)
-            ->queue(new VerificationCodeMail($otp, $requestedFrom, $requestedAt));
+            ->queue(new VerificationCodeMail($otp, $requestedFrom, $requestedAt, $this->role->value));
     }
 
     /**
