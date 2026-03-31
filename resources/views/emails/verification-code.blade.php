@@ -1,11 +1,17 @@
-{{-- Converted from Clerk "verification code (OTP)" email template --}}
-@extends('emails.layout')
+{{-- OTP verification code email — adapts layout for owner (teal) vs client (default) --}}
+@extends($emailLayout ?? 'emails.layout')
 
 @section('title', __('emails.verification_code.subject', ['code' => $otpCode, 'app' => config('app.name')]))
 
 @section('content')
 
     <h1>{{ __('emails.verification_code.heading') }}</h1>
+
+    @if(!empty($isOwner))
+        <p class="text" style="margin-top: 16px; color: #0d9488; font-weight: 600;">
+            Espace Bailleur — vérification de votre compte propriétaire.
+        </p>
+    @endif
 
     <p class="text" style="margin-top: 32px;">
         {{ __('emails.verification_code.enter_code') }}
