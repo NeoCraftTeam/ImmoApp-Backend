@@ -29,17 +29,15 @@ use App\Http\Controllers\Api\V1\RecommendationController;
 use App\Http\Controllers\Api\V1\RentEstimatorController;
 use App\Http\Controllers\Api\V1\SearchAlertController;
 use App\Http\Controllers\Api\V1\SignatureController;
+use App\Http\Controllers\Api\V1\StatsController;
 use App\Http\Controllers\Api\V1\TeamController;
 use App\Http\Controllers\Api\V1\TenantController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\VisitTrackingController;
-use App\Http\Resources\TestimonialResource;
-use App\Models\Ad;
 use App\Models\AdType;
 use App\Models\Agency;
 use App\Models\City;
 use App\Models\Quarter;
-use App\Models\Review;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
@@ -138,39 +136,11 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/track/visit', [VisitTrackingController::class, 'store'])
         ->middleware('throttle:60,1');
 
-    // --- PUBLIC LANDING STATS ---
-    // TODO: extract to StatsController
-    Route::get('/stats/landing', fn () => response()->json([
-        'ads_count' => Ad::query()->publiclyListed()->where('is_visible', true)->count(),
-        'cities_count' => City::query()->count(),
-        'users_count' => User::query()->count(),
-    ]))->middleware('throttle:30,1');
-
-    // --- PUBLIC LANDING TESTIMONIALS ---
-    // TODO: extract to StatsController
-    Route::get('/stats/testimonials', function () {
-        $reviews = Review::query()
-            ->whereNotNull('comment')
-            ->where('rating', '>=', 4)
-            ->with(['user.city'])
-            ->latest()
-            ->limit(8)
-            ->get();
-
-        $averageRating = round(
-            (float) (Review::query()->avg('rating') ?? 4.6),
-            1
-        );
-        $totalCount = Review::query()->count();
-
-        return response()->json([
-            'data' => TestimonialResource::collection($reviews),
-            'meta' => [
-                'average_rating' => $averageRating,
-                'total_count' => $totalCount,
-            ],
-        ]);
-    })->middleware('throttle:30,1');
+    // --- PUBLIC STATS (W37: extracted from inline closures to StatsController) ---
+    Route::controller(StatsController::class)->middleware('throttle:30,1')->group(function (): void {
+        Route::get('/stats/landing', 'landing')->name('stats.landing');
+        Route::get('/stats/testimonials', 'testimonials')->name('stats.testimonials');
+    });
 
     // --- CLERK WEBHOOKS ---
     Route::post('/clerk/webhook', [ClerkWebhookController::class, 'handle'])
