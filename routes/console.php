@@ -27,3 +27,6 @@ Schedule::command('model:prune')->daily()->at('04:00');
 // — Automated workflows (Item 25) —
 Schedule::command('app:auto-hide-stale-ads')->dailyAt('03:00');
 Schedule::command('app:send-post-viewing-thanks')->dailyAt('10:00');
+
+// — GDPR data retention (P2-29) —
+Schedule::command('app:purge-expired-data')->dailyAt('03:30');
