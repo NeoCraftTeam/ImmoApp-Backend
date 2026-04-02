@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\Payments;
 
+use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Filament\Admin\Resources\Payments\Pages\ManagePayments;
 use App\Filament\Exports\PaymentExporter;
@@ -15,6 +16,7 @@ use Filament\Actions\Action as RecordAction;
 use Filament\Actions\ExportAction;
 use Filament\Actions\ImportAction;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
@@ -23,6 +25,8 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -144,6 +148,43 @@ class PaymentResource extends Resource
             ])
             ->filters([
                 TrashedFilter::make(),
+                SelectFilter::make('status')
+                    ->label('Statut')
+                    ->options(PaymentStatus::class),
+                SelectFilter::make('payment_method')
+                    ->label('Moyen de paiement')
+                    ->options(PaymentMethod::class),
+                Filter::make('date_range')
+                    ->label('Période')
+                    ->form([
+                        DatePicker::make('from')->label('Du')->native(false),
+                        DatePicker::make('until')->label('Au')->native(false),
+                    ])
+                    ->query(fn (Builder $query, array $data) => $query
+                        ->when($data['from'], fn ($q) => $q->whereDate('created_at', '>=', $data['from']))
+                        ->when($data['until'], fn ($q) => $q->whereDate('created_at', '<=', $data['until']))
+                    )
+                    ->indicateUsing(function (array $data): array {
+                        $labels = [];
+                        if (!empty($data['from'])) {
+                            $labels[] = 'Du '.$data['from'];
+                        }
+                        if (!empty($data['until'])) {
+                            $labels[] = 'Au '.$data['until'];
+                        }
+
+                        return $labels;
+                    }),
+                Filter::make('amount_range')
+                    ->label('Montant')
+                    ->form([
+                        TextInput::make('min_amount')->label('Montant min (XAF)')->numeric(),
+                        TextInput::make('max_amount')->label('Montant max (XAF)')->numeric(),
+                    ])
+                    ->query(fn (Builder $query, array $data) => $query
+                        ->when($data['min_amount'] ?? null, fn ($q) => $q->where('amount', '>=', $data['min_amount']))
+                        ->when($data['max_amount'] ?? null, fn ($q) => $q->where('amount', '<=', $data['max_amount']))
+                    ),
             ])
             ->recordActions([
                 ViewAction::make(),
