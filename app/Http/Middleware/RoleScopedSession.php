@@ -30,8 +30,8 @@ class RoleScopedSession
         // Both customer and owner areas share the same session but with role-based access control
         Config::set('session.cookie', $this->getUnifiedSessionCookieName());
         Config::set('session.path', '/');
-        Config::set('session.same_site', 'strict');
-        Config::set('session.domain', null); // Let auto-detect based on current domain
+        // Respect SESSION_SAME_SITE from .env (e.g. 'none' for cross-origin dev, 'strict' for production)
+        Config::set('session.same_site', config('session.same_site', 'lax'));
 
         return $next($request);
     }
