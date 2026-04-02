@@ -21,26 +21,6 @@ class WebPushService
     private ?WebPush $webPush = null;
 
     /**
-     * Get or create the WebPush instance with VAPID auth.
-     */
-    private function getWebPush(): WebPush
-    {
-        if ($this->webPush === null) {
-            $this->webPush = new WebPush([
-                'VAPID' => [
-                    'subject' => config('webpush.vapid.subject'),
-                    'publicKey' => config('webpush.vapid.public_key'),
-                    'privateKey' => config('webpush.vapid.private_key'),
-                ],
-            ]);
-
-            $this->webPush->setReuseVAPIDHeaders(true);
-        }
-
-        return $this->webPush;
-    }
-
-    /**
      * Send a push notification to all subscriptions for a given user.
      *
      * @param  array{title?: string, body: string, icon?: string, badge?: string, tag?: string, url?: string, actions?: array<int, array{action: string, title: string}>}  $payload
@@ -154,5 +134,25 @@ class WebPushService
             })
             ->where('created_at', '<', now()->subDays($daysInactive))
             ->delete();
+    }
+
+    /**
+     * Get or create the WebPush instance with VAPID auth.
+     */
+    private function getWebPush(): WebPush
+    {
+        if ($this->webPush === null) {
+            $this->webPush = new WebPush([
+                'VAPID' => [
+                    'subject' => config('webpush.vapid.subject'),
+                    'publicKey' => config('webpush.vapid.public_key'),
+                    'privateKey' => config('webpush.vapid.private_key'),
+                ],
+            ]);
+
+            $this->webPush->setReuseVAPIDHeaders(true);
+        }
+
+        return $this->webPush;
     }
 }

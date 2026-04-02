@@ -195,6 +195,23 @@ class SubscriptionService
     }
 
     /**
+     * Boost all ads from an agency.
+     */
+    protected function boostAgencyAds(Agency $agency, SubscriptionPlan $plan): void
+    {
+        $agency->users()->get()->each(function ($user) use ($plan): void {
+            /** @var User $user */
+            $user->ads()
+                ->where('status', AdStatus::AVAILABLE)
+                ->get()
+                ->each(function ($ad) use ($plan): void {
+                    /** @var Ad $ad */
+                    $ad->boost($plan->boost_score, $plan->boost_duration_days);
+                });
+        });
+    }
+
+    /**
      * Send a renewal reminder with a pre-filled payment link.
      */
     private function sendRenewalReminder(Subscription $subscription): void
@@ -246,23 +263,6 @@ class SubscriptionService
             'agency_id' => $agency->id,
             'payment_link' => $result['link'],
         ]);
-    }
-
-    /**
-     * Boost all ads from an agency.
-     */
-    protected function boostAgencyAds(Agency $agency, SubscriptionPlan $plan): void
-    {
-        $agency->users()->get()->each(function ($user) use ($plan): void {
-            /** @var User $user */
-            $user->ads()
-                ->where('status', AdStatus::AVAILABLE)
-                ->get()
-                ->each(function ($ad) use ($plan): void {
-                    /** @var Ad $ad */
-                    $ad->boost($plan->boost_score, $plan->boost_duration_days);
-                });
-        });
     }
 
     /**

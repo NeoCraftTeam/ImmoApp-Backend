@@ -19,14 +19,6 @@ class TourService
     private const int EXIFTOOL_TIMEOUT_SECONDS = 10;
 
     /**
-     * Get the configured tour storage disk.
-     */
-    private function disk(): Filesystem
-    {
-        return Storage::disk(config('filesystems.tour_disk', config('filesystems.default')));
-    }
-
-    /**
      * Extract GPano XMP metadata from a panoramic image file.
      *
      * Uses exiftool to read the standard Google Photo Sphere (GPano) metadata
@@ -92,65 +84,6 @@ class TourService
 
             return $this->estimateFromDimensions($filePath);
         }
-    }
-
-    /**
-     * Heuristic fallback: estimate panorama coverage from image aspect ratio.
-     *
-     * A true equirectangular 360×180 image has a 2:1 aspect ratio.
-     * iPhone panoramas are typically very wide (~7:1) and only cover ~50° vertically.
-     *
-     * @return array{haov: float, vaov: float, vOffset: float, is_partial: bool}
-     */
-    private function estimateFromDimensions(string $filePath): array
-    {
-        $defaults = ['haov' => 360.0, 'vaov' => 180.0, 'vOffset' => 0.0, 'is_partial' => false];
-
-        $size = @getimagesize($filePath);
-        if ($size === false || $size[0] <= 0 || $size[1] <= 0) {
-            return $defaults;
-        }
-
-        [$width, $height] = $size;
-        $ratio = $width / $height;
-
-        if ($ratio >= 1.8 && $ratio <= 2.2) {
-            return $defaults;
-        }
-
-        if ($ratio > 2.2) {
-            $fullHeight = (int) ($width / 2);
-            $vaov = $height / $fullHeight * 180;
-            $vOffset = 0.0;
-
-            return [
-                'haov' => 360.0,
-                'vaov' => round($vaov, 4),
-                'vOffset' => round($vOffset, 4),
-                'is_partial' => true,
-            ];
-        }
-
-        return $defaults;
-    }
-
-    /**
-     * Locate the exiftool binary, returning null if unavailable.
-     */
-    private function resolveExiftoolBinary(): ?string
-    {
-        $configPath = config('services.exiftool.path');
-        if (is_string($configPath) && $configPath !== '' && is_executable($configPath)) {
-            return $configPath;
-        }
-
-        foreach (['/usr/bin/exiftool', '/usr/local/bin/exiftool', '/opt/homebrew/bin/exiftool'] as $candidate) {
-            if (is_executable($candidate)) {
-                return $candidate;
-            }
-        }
-
-        return null;
     }
 
     /**
@@ -290,5 +223,72 @@ class TourService
 
             $lockedAd->update(['tour_config' => $config]);
         }, attempts: 3);
+    }
+
+    /**
+     * Get the configured tour storage disk.
+     */
+    private function disk(): Filesystem
+    {
+        return Storage::disk(config('filesystems.tour_disk', config('filesystems.default')));
+    }
+
+    /**
+     * Heuristic fallback: estimate panorama coverage from image aspect ratio.
+     *
+     * A true equirectangular 360×180 image has a 2:1 aspect ratio.
+     * iPhone panoramas are typically very wide (~7:1) and only cover ~50° vertically.
+     *
+     * @return array{haov: float, vaov: float, vOffset: float, is_partial: bool}
+     */
+    private function estimateFromDimensions(string $filePath): array
+    {
+        $defaults = ['haov' => 360.0, 'vaov' => 180.0, 'vOffset' => 0.0, 'is_partial' => false];
+
+        $size = @getimagesize($filePath);
+        if ($size === false || $size[0] <= 0 || $size[1] <= 0) {
+            return $defaults;
+        }
+
+        [$width, $height] = $size;
+        $ratio = $width / $height;
+
+        if ($ratio >= 1.8 && $ratio <= 2.2) {
+            return $defaults;
+        }
+
+        if ($ratio > 2.2) {
+            $fullHeight = (int) ($width / 2);
+            $vaov = $height / $fullHeight * 180;
+            $vOffset = 0.0;
+
+            return [
+                'haov' => 360.0,
+                'vaov' => round($vaov, 4),
+                'vOffset' => round($vOffset, 4),
+                'is_partial' => true,
+            ];
+        }
+
+        return $defaults;
+    }
+
+    /**
+     * Locate the exiftool binary, returning null if unavailable.
+     */
+    private function resolveExiftoolBinary(): ?string
+    {
+        $configPath = config('services.exiftool.path');
+        if (is_string($configPath) && $configPath !== '' && is_executable($configPath)) {
+            return $configPath;
+        }
+
+        foreach (['/usr/bin/exiftool', '/usr/local/bin/exiftool', '/opt/homebrew/bin/exiftool'] as $candidate) {
+            if (is_executable($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
     }
 }
