@@ -19,6 +19,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
@@ -253,8 +254,12 @@ final class ClerkAuthController
             return response()->json(['message' => 'Vérification email requise.'], 403);
         }
 
-        if (!$request->filled('phone_number')) {
-            return response()->json(['message' => 'Le numéro de téléphone est obligatoire.'], 422);
+        // phone_number is optional — users may skip profile completion via OAuth flow
+        if ($request->filled('phone_number')) {
+            $phone = (string) $request->input('phone_number');
+            if (!preg_match('/^[\d\s\-\+\(\)]{8,20}$/', $phone)) {
+                return response()->json(['message' => 'Numéro de téléphone invalide.'], 422);
+            }
         }
 
         /** @var array{firstname?: string, lastname?: string, email?: string|null, avatar?: string|null, registration_intent?: string} $pending */
@@ -317,7 +322,14 @@ final class ClerkAuthController
 
             $isNew = true;
 
-            app(UserWelcomeService::class)->handle($user);
+            try {
+                app(UserWelcomeService::class)->handle($user);
+            } catch (\Throwable $e) {
+                Log::error('UserWelcomeService failed', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         } else {
             if ($user->clerk_id === null) {
                 $user->update(['clerk_id' => $clerkId]);
