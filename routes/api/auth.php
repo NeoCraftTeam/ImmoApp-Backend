@@ -23,8 +23,9 @@ Route::prefix('auth')->group(function (): void {
     // gate receives an authenticated user; unauthenticated requests get 401, not 403.
     Route::post('registerAdmin', [RegistrationController::class, 'registerAdmin'])
         ->middleware(['auth:sanctum', 'can:admin-access', 'throttle:auth.register']);
+    // Lowered to 5/min — email enumeration mitigation (W15)
     Route::post('check-email', [RegistrationController::class, 'checkEmail'])
-        ->middleware('throttle:30,1');
+        ->middleware('throttle:5,1');
 
     // Login
     Route::post('login', [AuthController::class, 'login'])

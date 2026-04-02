@@ -24,7 +24,7 @@ final class EnsureEmailIsVerified
      * Route prefixes that are exempt from email verification.
      * Auth routes must remain accessible to unverified users.
      */
-    private const BYPASS_PREFIXES = [
+    private const array BYPASS_PREFIXES = [
         'api/v1/auth/',
     ];
 

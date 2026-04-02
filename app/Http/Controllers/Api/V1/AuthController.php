@@ -27,11 +27,11 @@ use Throwable;
  * Clerk OAuth → ClerkAuthController
  * User preferences → UserPreferenceController
  */
-final class AuthController
+final readonly class AuthController
 {
     public function __construct(
-        private readonly TokenService $tokenService,
-        private readonly LoginService $loginService,
+        private TokenService $tokenService,
+        private LoginService $loginService,
     ) {}
 
     /**
@@ -70,12 +70,7 @@ final class AuthController
                 'message' => 'Identifiants invalides.',
             ], 401);
 
-        } catch (AccountInactiveException $e) {
-            return response()->json([
-                'message' => $e->getMessage(),
-            ], 403);
-
-        } catch (EmailNotVerifiedException $e) {
+        } catch (AccountInactiveException|EmailNotVerifiedException $e) {
             return response()->json([
                 'message' => $e->getMessage(),
             ], 403);
@@ -211,7 +206,7 @@ final class AuthController
             ], 403);
         }
 
-        return (new UserResource($user->load(['agency', 'city'])))
+        return new UserResource($user->load(['agency', 'city']))
             ->additional([
                 'role' => $user->role->value,
                 'type' => $user->type?->value,
@@ -237,7 +232,7 @@ final class AuthController
 
             // Preserve the login-context prefix so a client-context refresh
             // does not accidentally produce an owner-prefixed token.
-            $prefix = str_starts_with($currentToken->name, 'owner_') ? 'owner' : 'client';
+            $prefix = str_starts_with((string) $currentToken->name, 'owner_') ? 'owner' : 'client';
 
             $newToken = $this->tokenService->createForUser($user, 'refreshed', $prefix);
 

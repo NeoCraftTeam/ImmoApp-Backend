@@ -20,9 +20,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 
-final class EmailVerificationController
+final readonly class EmailVerificationController
 {
-    public function __construct(private readonly TokenService $tokenService) {}
+    public function __construct(private TokenService $tokenService) {}
 
     /**
      * @OA\Post(
@@ -135,6 +135,19 @@ final class EmailVerificationController
             'email' => 'required|email',
             'otp' => 'required|string|size:6',
         ]);
+
+        // SEC: IP-level gate before any DB read — prevents unlimited lookups for
+        // non-existent emails where the per-user limiter never fires.
+        $ipKey = 'verify-email-otp:ip:'.$request->ip();
+        if (RateLimiter::tooManyAttempts($ipKey, 20)) {
+            $seconds = RateLimiter::availableIn($ipKey);
+
+            return response()->json([
+                'message' => 'Trop de tentatives. Réessayez dans '.$seconds.' secondes.',
+                'retry_after' => $seconds,
+            ], 429);
+        }
+        RateLimiter::hit($ipKey, 300);
 
         $user = User::where('email', $request->input('email'))->first();
 

@@ -90,6 +90,10 @@ final readonly class RegistrationController
             ->where('email', $request->string('email')->lower())
             ->exists();
 
+        // SEC-W15: constant-time response regardless of availability — prevents
+        // an attacker from building a valid-email list via response-time analysis.
+        usleep(200_000); // 200 ms
+
         return response()->json(['available' => $available]);
     }
 

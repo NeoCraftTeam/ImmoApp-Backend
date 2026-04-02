@@ -664,7 +664,7 @@ final class SocialAuthController
 
         // Also allow hosts from OAUTH_ALLOWED_REDIRECT_HOSTS env var
         $extra = (string) config('app.oauth_allowed_redirect_hosts', '');
-        foreach (array_filter(array_map('trim', explode(',', $extra))) as $h) {
+        foreach (array_filter(array_map(trim(...), explode(',', $extra))) as $h) {
             $allowedHosts[] = $h;
         }
 
