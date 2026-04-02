@@ -340,7 +340,7 @@ production_smoke_test:
       echo "Smoke URL: $SMOKE_URL"
       set +e
       for i in $(seq 1 10); do
-        STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" "${SMOKE_URL}/api/health" 2>/dev/null)
+        STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" "${SMOKE_URL}/api/ping" 2>/dev/null)
         echo "Attempt $i — HTTP $STATUS"
         if [ "$STATUS" = "200" ]; then
           echo "✅ Smoke test passed"
@@ -363,17 +363,13 @@ preprod_smoke_test:
       PREPROD_PORT=$(grep -E "^WEB_PORT=" /opt/keyhome-preprod/.env 2>/dev/null | cut -d= -f2 | tr -d "[:space:]'\"" )
       PREPROD_PORT=${PREPROD_PORT:-9091}
       FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:preprod"
-      echo "Using port: $PREPROD_PORT (same path as web healthcheck: /up)"
+      echo "Using port: $PREPROD_PORT"
       for i in $(seq 1 15); do
-        STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" "http://127.0.0.1:${PREPROD_PORT}/up" 2>/dev/null)
-        echo "Attempt $i — HTTP $STATUS (GET /up)"
+        STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" "http://127.0.0.1:${PREPROD_PORT}/api/ping" 2>/dev/null)
+        echo "Attempt $i — HTTP $STATUS (GET /api/ping)"
         if [ "$STATUS" = "200" ]; then
-          API_STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" "http://127.0.0.1:${PREPROD_PORT}/api/health" 2>/dev/null)
-          echo "API health check — HTTP $API_STATUS (GET /api/health)"
-          if [ "$API_STATUS" = "200" ]; then
-            echo "✅ Smoke test passed"
-            exit 0
-          fi
+          echo "✅ Smoke test passed"
+          exit 0
         fi
         sleep 5
       done

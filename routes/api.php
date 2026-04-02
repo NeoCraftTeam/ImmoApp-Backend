@@ -41,6 +41,9 @@ use App\Models\Quarter;
 use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
+// Public liveness probe — no auth, no infra details. Used by CI smoke tests and uptime monitors.
+Route::get('/ping', fn () => response()->json(['status' => 'ok'], 200));
+
 // Comprehensive health check endpoint (DB, Redis, Queue, Storage, Meilisearch)
 // Protected: requires a valid Sanctum token belonging to an admin user with MFA verified.
 Route::get('/health', HealthCheckController::class)

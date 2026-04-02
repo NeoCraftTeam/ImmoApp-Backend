@@ -39,6 +39,16 @@ test('public api endpoints have basic security headers', function (): void {
 });
 
 /* ──────────────────────────────────────────────────────────────────
+ * Liveness Probe — /api/ping (unauthenticated)
+ * ──────────────────────────────────────────────────────────────── */
+
+test('ping endpoint is publicly accessible without authentication', function (): void {
+    $response = $this->getJson('/api/ping');
+
+    $response->assertOk()->assertJson(['status' => 'ok']);
+});
+
+/* ──────────────────────────────────────────────────────────────────
  * Health Check — Auth Protection (P0)
  * ──────────────────────────────────────────────────────────────── */
 
