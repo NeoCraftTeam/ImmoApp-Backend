@@ -4,10 +4,17 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property Carbon $expires_at
+ * @property Carbon|null $viewed_at
+ * @property Carbon|null $signed_at
+ * @property Carbon|null $declined_at
+ */
 class LeaseSignatureRequest extends Model
 {
     use HasUuids;
