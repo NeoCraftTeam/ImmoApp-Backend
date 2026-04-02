@@ -240,10 +240,7 @@ final class QuarterController
                 'data' => new QuarterResource($quarter),
             ]);
         } catch (Throwable $e) {
-            return response()->json([
-                'message' => 'Erreur de creation',
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
-            ]);
+            throw $e;
         }
     }
 
@@ -448,10 +445,7 @@ final class QuarterController
             ]);
 
         } catch (Throwable $e) {
-            return response()->json([
-                'message' => 'Erreur de mise à jour',
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
-            ], 500); // Ajouter le code d'erreur
+            throw $e;
         }
     }
 
@@ -541,10 +535,7 @@ final class QuarterController
             ], 200);
 
         } catch (Throwable $e) {
-            return response()->json([
-                'message' => 'Erreur de suppression',
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
-            ], 500);
+            throw $e;
         }
     }
 }

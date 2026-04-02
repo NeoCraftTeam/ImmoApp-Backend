@@ -384,14 +384,10 @@ final readonly class AdSearchController
                 'data' => $rows,
             ]);
         } catch (Throwable $e) {
-            $this->log->error('Autocomplete error: '.$e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
+            $this->log->error('Autocomplete error', [
+                'exception' => $e->getMessage(),
             ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Error fetching autocomplete suggestions',
-            ], 500);
+            throw $e;
         }
     }
 
@@ -495,17 +491,11 @@ final readonly class AdSearchController
                 ],
             ]);
         } catch (Throwable $e) {
-            $this->log->error('Facets error: '.$e->getMessage(), [
+            $this->log->error('Facets error', [
+                'exception' => $e->getMessage(),
                 'driver' => DB::getDriverName(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString(),
             ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Error fetching facets',
-            ], 500);
+            throw $e;
         }
     }
 }

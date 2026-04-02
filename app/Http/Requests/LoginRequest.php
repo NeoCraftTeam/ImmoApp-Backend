@@ -27,6 +27,7 @@ final class LoginRequest extends FormRequest
         return [
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
+            'login_context' => ['sometimes', 'string', 'in:owner,client'],
         ];
     }
 

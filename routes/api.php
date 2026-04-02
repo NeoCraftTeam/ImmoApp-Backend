@@ -44,7 +44,9 @@ use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
 // Comprehensive health check endpoint (DB, Redis, Queue, Storage, Meilisearch)
-Route::get('/health', HealthCheckController::class);
+// Protected: requires a valid Sanctum token belonging to an admin user with MFA verified.
+Route::get('/health', HealthCheckController::class)
+    ->middleware(['auth:sanctum', 'can:admin-access', 'mfa.admin']);
 
 // Prefix routes
 Route::prefix('v1')->group(function (): void {
@@ -137,6 +139,7 @@ Route::prefix('v1')->group(function (): void {
         ->middleware('throttle:60,1');
 
     // --- PUBLIC LANDING STATS ---
+    // TODO: extract to StatsController
     Route::get('/stats/landing', fn () => response()->json([
         'ads_count' => Ad::query()->publiclyListed()->where('is_visible', true)->count(),
         'cities_count' => City::query()->count(),
@@ -144,6 +147,7 @@ Route::prefix('v1')->group(function (): void {
     ]))->middleware('throttle:30,1');
 
     // --- PUBLIC LANDING TESTIMONIALS ---
+    // TODO: extract to StatsController
     Route::get('/stats/testimonials', function () {
         $reviews = Review::query()
             ->whereNotNull('comment')

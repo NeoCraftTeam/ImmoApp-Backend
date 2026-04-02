@@ -62,12 +62,12 @@ final class AdController
      *
      * @throws AuthorizationException
      */
-    public function index(): AnonymousResourceCollection
+    public function index(AdRequest $request): AnonymousResourceCollection
     {
         $this->authorize('viewAny', Ad::class);
 
-        $perPage = min(max((int) request('per_page', config('pagination.per_page', 15)), 1), 100);
-        $type = request('type');
+        $perPage = min(max((int) $request->integer('per_page', config('pagination.per_page', 15)), 1), 100);
+        $type = $request->input('type');
 
         $query = Ad::query()
             ->with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')
@@ -80,7 +80,7 @@ final class AdController
             $query->whereHas('ad_type', fn ($q) => $q->where('name', 'ilike', "%{$type}%"));
         }
 
-        if ($excludeIds = request()->input('exclude_ids')) {
+        if ($excludeIds = $request->input('exclude_ids')) {
             $ids = array_values(array_filter(array_map(strval(...), (array) $excludeIds)));
             if ($ids !== []) {
                 $query->whereNotIn('id', $ids);
@@ -177,16 +177,11 @@ final class AdController
             ], 201);
 
         } catch (Throwable $e) {
-            $this->log->error('Error creating ad: '.$e->getMessage(), [
+            $this->log->error('Error creating ad', [
                 'user_id' => $userId,
-                'trace' => $e->getTraceAsString(),
+                'exception' => $e->getMessage(),
             ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Error creating ad',
-                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred.',
-            ], 422);
+            throw $e;
         }
     }
 
@@ -294,17 +289,12 @@ final class AdController
                 'message' => $e->getMessage(),
             ], 422);
         } catch (Throwable $e) {
-            $this->log->error('Error updating ad: '.$e->getMessage(), [
+            $this->log->error('Error updating ad', [
                 'ad_id' => $ad->id,
                 'user_id' => auth()->id(),
-                'trace' => $e->getTraceAsString(),
+                'exception' => $e->getMessage(),
             ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Error updating ad',
-                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while updating the ad.',
-            ], 422);
+            throw $e;
         }
     }
 
@@ -360,18 +350,12 @@ final class AdController
 
         } catch (Throwable $e) {
             DB::rollBack();
-
-            $this->log->error('Error deleting ad: '.$e->getMessage(), [
+            $this->log->error('Error deleting ad', [
                 'ad_id' => $id,
                 'user_id' => auth()->id(),
-                'trace' => $e->getTraceAsString(),
+                'exception' => $e->getMessage(),
             ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'Error deleting ad',
-                'error' => config('app.debug') ? $e->getMessage() : 'An error occurred while deleting the ad.',
-            ], 422);
+            throw $e;
         }
     }
 

@@ -4,21 +4,18 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Exceptions\AccountInactiveException;
+use App\Exceptions\EmailNotVerifiedException;
+use App\Exceptions\RoleContextMismatchException;
 use App\Http\Requests\LoginRequest;
 use App\Http\Resources\UserResource;
-use App\Mail\NewDeviceSignInMail;
-use App\Mail\NewLocationSignInMail;
-use App\Models\LoginHistory;
-use App\Models\User;
-use App\Services\UserAgentParser;
+use App\Services\LoginService;
+use App\Services\TokenService;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Validation\ValidationException;
 use Throwable;
 
 /**
@@ -32,6 +29,11 @@ use Throwable;
  */
 final class AuthController
 {
+    public function __construct(
+        private readonly TokenService $tokenService,
+        private readonly LoginService $loginService,
+    ) {}
+
     /**
      * @OA\Post(
      *     path="/api/v1/auth/login",
@@ -48,130 +50,48 @@ final class AuthController
     public function login(LoginRequest $request): JsonResponse
     {
         try {
-            $credentials = $request->validated();
-            $email = $credentials['email'];
-            $password = $credentials['password'];
-
-            $key = 'login-attempts:'.$request->ip().'|'.mb_strtolower((string) $email);
-            if (RateLimiter::tooManyAttempts($key, 5)) {
-                $seconds = RateLimiter::availableIn($key);
-
-                Log::warning('Too many login attempts', [
-                    'ip' => $request->ip(),
-                    'email' => $email,
-                    'user_agent' => $request->userAgent(),
-                ]);
-
-                return response()->json([
-                    'message' => 'Trop de tentatives de connexion. Réessayez dans '.$seconds.' secondes.',
-                    'retry_after' => $seconds,
-                ], 429);
-            }
-
-            $user = User::where('email', $email)->first();
-
-            if (!$user || !Hash::check($password, $user->password)) {
-                RateLimiter::hit($key, 300);
-
-                Log::warning('Failed login attempt', [
-                    'email' => $email,
-                    'ip_address' => $request->ip(),
-                    'user_agent' => $request->userAgent(),
-                    'timestamp' => now(),
-                ]);
-
-                return response()->json([
-                    'message' => 'Identifiants invalides.',
-                ], 401);
-            }
-
-            if (isset($user->is_active) && !$user->is_active) {
-                Log::info('Login attempt on inactive account', [
-                    'user_id' => $user->id,
-                    'email' => $email,
-                ]);
-
-                return response()->json([
-                    'message' => 'Compte désactivé. Contactez l\'administrateur.',
-                ], 403);
-            }
-
-            if ($user->email_verified_at === null) {
-                return response()->json([
-                    'message' => 'Veuillez vérifier votre adresse email avant de vous connecter.',
-                ], 403);
-            }
-
-            RateLimiter::clear($key);
+            $result = $this->loginService->authenticate($request);
 
             if ($request->hasSession()) {
                 $request->session()->regenerate();
-                Auth::guard('web')->login($user);
+                Auth::guard('web')->login($result->user);
             }
-
-            $tokenName = 'api_token_'.now()->timestamp;
-            $user->tokens()->where('name', 'like', 'api_token_%')->delete();
-
-            $token = $user->createToken(
-                $tokenName,
-                ['*'],
-                now()->addDay()
-            );
-
-            $this->detectNewLocation($user, $request);
-
-            $user->forceFill([
-                'last_login_at' => now(),
-                'last_login_ip' => $request->ip(),
-                'last_login_country' => strtoupper(trim($request->header('CF-IPCountry', ''))) ?: null,
-                'last_login_city' => mb_convert_case(trim($request->header('CF-IPCity', '')), MB_CASE_TITLE) ?: null,
-            ])->save();
-
-            $parsed = UserAgentParser::parse($request->userAgent() ?? '');
-
-            LoginHistory::create([
-                'user_id' => $user->id,
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'device_type' => $parsed['device_type'],
-                'browser' => $parsed['browser_name'],
-                'platform' => $parsed['operating_system'],
-                'country' => strtoupper(trim($request->header('CF-IPCountry', ''))) ?: null,
-                'city' => mb_convert_case(trim($request->header('CF-IPCity', '')), MB_CASE_TITLE) ?: null,
-                'guard' => 'sanctum',
-                'successful' => true,
-            ]);
-
-            Log::info('Successful login', [
-                'user_id' => $user->id,
-                'email' => $email,
-                'is_spa' => $request->hasSession(),
-                'ip' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-            ]);
 
             return response()->json([
                 'message' => 'Connexion réussie.',
-                'access_token' => $token->plainTextToken,
-                'expires_at' => $token->accessToken->expires_at,
+                'access_token' => $result->token->plainTextToken,
+                'expires_at' => $result->token->accessToken->expires_at,
+                'role' => $result->user->role->value,
+                'type' => $result->user->type?->value,
             ]);
 
-        } catch (ValidationException $e) {
+        } catch (AuthenticationException) {
             return response()->json([
-                'message' => 'Données de validation invalides.',
-                'errors' => $e->errors(),
-            ], 422);
+                'message' => 'Identifiants invalides.',
+            ], 401);
+
+        } catch (AccountInactiveException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 403);
+
+        } catch (EmailNotVerifiedException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+            ], 403);
+
+        } catch (RoleContextMismatchException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'code' => 'ROLE_CONTEXT_MISMATCH',
+            ], 403);
 
         } catch (Throwable $e) {
             Log::error('Login error', [
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
-                'trace' => $e->getTraceAsString(),
+                'exception' => $e->getMessage(),
                 'request_data' => $request->except(['password']),
             ]);
-
-            return response()->json([
-                'message' => 'Une erreur est survenue lors de la connexion.',
-            ], 500);
+            throw $e;
         }
     }
 
@@ -217,13 +137,10 @@ final class AuthController
 
         } catch (Throwable $e) {
             Log::error('Logout error', [
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
+                'exception' => $e->getMessage(),
                 'user_id' => $request->user()?->id,
             ]);
-
-            return response()->json([
-                'message' => 'Erreur lors de la déconnexion.',
-            ], 500);
+            throw $e;
         }
     }
 
@@ -263,13 +180,10 @@ final class AuthController
             ]);
         } catch (Throwable $e) {
             Log::error('Logout all error', [
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
+                'exception' => $e->getMessage(),
                 'user_id' => $request->user()?->id,
             ]);
-
-            return response()->json([
-                'message' => 'Erreur lors de la déconnexion.',
-            ], 500);
+            throw $e;
         }
     }
 
@@ -284,9 +198,24 @@ final class AuthController
      *     @OA\Response(response=200, description="Informations utilisateur")
      * )
      */
-    public function me(Request $request): UserResource
+    public function me(Request $request): UserResource|JsonResponse
     {
-        return new UserResource($request->user()->load(['agency', 'city']));
+        $user = $request->user();
+
+        // Reject users with unverified email to prevent AuthProvider from
+        // treating them as authenticated before OTP/email verification.
+        if ($user->email_verified_at === null) {
+            return response()->json([
+                'message' => 'Email non vérifié.',
+                'email_verification_required' => true,
+            ], 403);
+        }
+
+        return (new UserResource($user->load(['agency', 'city'])))
+            ->additional([
+                'role' => $user->role->value,
+                'type' => $user->type?->value,
+            ]);
     }
 
     /**
@@ -306,11 +235,11 @@ final class AuthController
             $user = $request->user();
             $currentToken = $request->user()->currentAccessToken();
 
-            $newToken = $user->createToken(
-                'refreshed_token_'.now()->timestamp,
-                ['*'],
-                now()->addDay()
-            );
+            // Preserve the login-context prefix so a client-context refresh
+            // does not accidentally produce an owner-prefixed token.
+            $prefix = str_starts_with($currentToken->name, 'owner_') ? 'owner' : 'client';
+
+            $newToken = $this->tokenService->createForUser($user, 'refreshed', $prefix);
 
             $currentToken->delete();
 
@@ -322,64 +251,10 @@ final class AuthController
 
         } catch (Throwable $e) {
             Log::error('Token refresh error', [
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
+                'exception' => $e->getMessage(),
                 'user_id' => $request->user()?->id,
             ]);
-
-            return response()->json([
-                'message' => 'Erreur lors du rafraîchissement du token.',
-            ], 500);
-        }
-    }
-
-    /**
-     * Detect new geographic location or IP and send security alert emails.
-     */
-    private function detectNewLocation(User $user, Request $request): void
-    {
-        $currentIp = $request->ip();
-        $cfCountry = $request->header('CF-IPCountry', '');
-        $cfCity = $request->header('CF-IPCity', '');
-
-        $currentCountry = strtoupper(trim($cfCountry));
-        $currentCity = mb_convert_case(trim($cfCity), MB_CASE_TITLE);
-
-        $knownCountry = $user->last_login_country ?? '';
-        $knownCity = $user->last_login_city ?? '';
-        $knownIp = $user->last_login_ip ?? '';
-
-        $locationChanged = $knownCountry !== '' && (
-            $currentCountry !== $knownCountry ||
-            ($currentCity !== '' && $currentCity !== $knownCity)
-        );
-
-        $ua = UserAgentParser::parse($request->userAgent() ?? '');
-
-        if ($locationChanged) {
-            Mail::to($user->email, $user->firstname)->queue(new NewLocationSignInMail(
-                userName: $user->firstname ?? $user->email,
-                city: $currentCity ?: 'Inconnue',
-                country: $currentCountry ?: 'Inconnu',
-                ipAddress: $currentIp,
-                device: $ua['device_type'],
-                browser: $ua['browser_name'],
-                operatingSystem: $ua['operating_system'],
-                loginAt: now()->translatedFormat('d F Y \\à H:i'),
-                secureAccountUrl: config('app.frontend_url').'/security/sessions',
-                supportEmail: config('mail.from.address'),
-            ));
-        } elseif ($currentIp !== $knownIp && $knownIp !== '') {
-            Mail::to($user->email, $user->firstname)->queue(new NewDeviceSignInMail(
-                deviceType: $ua['device_type'],
-                browserName: $ua['browser_name'],
-                operatingSystem: $ua['operating_system'],
-                location: ($currentCity ?: $currentIp).', '.$currentCountry,
-                ipAddress: $currentIp,
-                sessionCreatedAt: now()->translatedFormat('d F Y \\à H:i'),
-                signInMethod: 'Email / Mot de passe',
-                revokeSessionUrl: config('app.frontend_url').'/security/sessions',
-                supportEmail: config('mail.from.address'),
-            ));
+            throw $e;
         }
     }
 }

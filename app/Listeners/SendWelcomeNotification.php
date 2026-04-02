@@ -19,6 +19,12 @@ class SendWelcomeNotification implements ShouldQueue
 {
     use InteractsWithQueue;
 
+    public string $queue = 'notifications';
+
+    public int $tries = 3;
+
+    public int $backoff = 30;
+
     /**
      * Handle the event.
      */

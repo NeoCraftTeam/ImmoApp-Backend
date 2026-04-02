@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Requests\Api\V1\StoreSearchAlertRequest;
+use App\Http\Requests\Api\V1\UpdateSearchAlertRequest;
 use App\Models\SearchAlert;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -33,22 +35,9 @@ final class SearchAlertController
         return JsonResource::collection($alerts);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreSearchAlertRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'label' => ['nullable', 'string', 'max:100'],
-            'city_id' => ['nullable', 'uuid'],
-            'city_name' => ['nullable', 'string', 'max:100'],
-            'type_id' => ['nullable', 'uuid'],
-            'type_name' => ['nullable', 'string', 'max:100'],
-            'quarter_id' => ['nullable', 'uuid'],
-            'price_min' => ['nullable', 'integer', 'min:0'],
-            'price_max' => ['nullable', 'integer', 'min:0'],
-            'bedrooms_min' => ['nullable', 'integer', 'min:0'],
-            'surface_min' => ['nullable', 'integer', 'min:0'],
-            'has_parking' => ['nullable', 'boolean'],
-            'query' => ['nullable', 'string', 'max:200'],
-        ]);
+        $data = $request->validated();
 
         $user = $request->user();
 
@@ -61,25 +50,11 @@ final class SearchAlertController
         return response()->json(new JsonResource($alert), 201);
     }
 
-    public function update(Request $request, SearchAlert $searchAlert): JsonResponse
+    public function update(UpdateSearchAlertRequest $request, SearchAlert $searchAlert): JsonResponse
     {
         $this->authorizeAlert($request, $searchAlert);
 
-        $data = $request->validate([
-            'label' => ['nullable', 'string', 'max:100'],
-            'city_id' => ['nullable', 'uuid'],
-            'city_name' => ['nullable', 'string', 'max:100'],
-            'type_id' => ['nullable', 'uuid'],
-            'type_name' => ['nullable', 'string', 'max:100'],
-            'quarter_id' => ['nullable', 'uuid'],
-            'price_min' => ['nullable', 'integer', 'min:0'],
-            'price_max' => ['nullable', 'integer', 'min:0'],
-            'bedrooms_min' => ['nullable', 'integer', 'min:0'],
-            'surface_min' => ['nullable', 'integer', 'min:0'],
-            'has_parking' => ['nullable', 'boolean'],
-            'query' => ['nullable', 'string', 'max:200'],
-            'is_active' => ['nullable', 'boolean'],
-        ]);
+        $data = $request->validated();
 
         $searchAlert->update($data);
 

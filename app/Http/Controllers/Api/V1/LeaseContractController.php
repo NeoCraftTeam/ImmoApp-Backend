@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Requests\Api\V1\EnhanceLeaseConditionsRequest;
 use App\Http\Requests\Api\V1\GenerateLeaseContractRequest;
+use App\Http\Requests\Api\V1\UpdateLeaseContractRequest;
 use App\Http\Resources\LeaseContractResource;
 use App\Models\Ad;
 use App\Models\LeaseContract;
@@ -55,20 +57,13 @@ final class LeaseContractController
         return new LeaseContractResource($leaseContract->load('ad'));
     }
 
-    public function update(Request $request, LeaseContract $leaseContract): LeaseContractResource|JsonResponse
+    public function update(UpdateLeaseContractRequest $request, LeaseContract $leaseContract): LeaseContractResource|JsonResponse
     {
         if ($leaseContract->user_id !== auth()->id()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        $validated = $request->validate([
-            'tenant_name' => ['sometimes', 'string', 'max:255'],
-            'tenant_phone' => ['sometimes', 'string', 'max:50'],
-            'tenant_email' => ['nullable', 'email', 'max:255'],
-            'tenant_id_number' => ['nullable', 'string', 'max:100'],
-            'unit_reference' => ['nullable', 'string', 'max:100'],
-            'special_conditions' => ['nullable', 'string', 'max:5000'],
-        ]);
+        $validated = $request->validated();
 
         $leaseContract->update($validated);
 
@@ -78,14 +73,10 @@ final class LeaseContractController
     /**
      * Enhance lease contract special conditions using AI.
      */
-    public function enhanceConditions(Request $request): JsonResponse
+    public function enhanceConditions(EnhanceLeaseConditionsRequest $request): JsonResponse
     {
-        $request->validate([
-            'conditions' => ['required', 'string', 'max:5000'],
-        ]);
-
         $enhanced = app(AiDescriptionEnhancer::class)->enhanceLeaseConditions(
-            $request->input('conditions')
+            $request->validated('conditions')
         );
 
         return response()->json(['enhanced' => $enhanced]);

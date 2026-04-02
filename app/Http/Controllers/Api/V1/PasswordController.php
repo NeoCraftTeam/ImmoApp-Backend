@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Requests\Api\V1\ForgotPasswordRequest;
+use App\Http\Requests\Api\V1\ResetPasswordRequest;
+use App\Http\Requests\Api\V1\UpdatePasswordRequest;
 use App\Mail\PasswordChangedMail;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rules\Password as PasswordRule;
 
 final class PasswordController
 {
@@ -27,10 +28,8 @@ final class PasswordController
      *     @OA\Response(response=422, description="Erreur de validation")
      * )
      */
-    public function forgotPassword(Request $request): JsonResponse
+    public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
-        $request->validate(['email' => 'required|email']);
-
         Password::sendResetLink($request->only('email'));
 
         return response()->json(['message' => 'Si cette adresse est enregistrée, un email de réinitialisation a été envoyé.']);
@@ -47,14 +46,8 @@ final class PasswordController
      *     @OA\Response(response=422, description="Token invalide")
      * )
      */
-    public function resetPassword(Request $request): JsonResponse
+    public function resetPassword(ResetPasswordRequest $request): JsonResponse
     {
-        $request->validate([
-            'token' => 'required',
-            'email' => 'required|email',
-            'password' => ['required', 'confirmed', PasswordRule::min(8)->mixedCase()->numbers()->symbols()],
-        ]);
-
         $status = Password::reset(
             $request->only('email', 'password', 'password_confirmation', 'token'),
             function ($user, $password): void {
@@ -90,13 +83,8 @@ final class PasswordController
      *     @OA\Response(response=422, description="Ancien mot de passe incorrect")
      * )
      */
-    public function updatePassword(Request $request): JsonResponse
+    public function updatePassword(UpdatePasswordRequest $request): JsonResponse
     {
-        $request->validate([
-            'current_password' => 'required',
-            'new_password' => ['required', 'confirmed', 'different:current_password', PasswordRule::min(8)->mixedCase()->numbers()->symbols()],
-        ]);
-
         $user = $request->user();
 
         if (!Hash::check($request->current_password, $user->password)) {

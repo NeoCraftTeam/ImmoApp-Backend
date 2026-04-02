@@ -11,11 +11,19 @@ use App\Events\AdStatusTransitioned;
 use App\Mail\AdSubmissionConfirmationMail;
 use App\Models\User;
 use App\Notifications\NewAdPending;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Throwable;
 
-class NotifyAdminsOfPendingAd
+class NotifyAdminsOfPendingAd implements ShouldQueue
 {
+    public string $queue = 'notifications';
+
+    public int $tries = 3;
+
+    public int $backoff = 30;
+
     /**
      * Handle AdCreated or AdStatusTransitioned events.
      *
@@ -37,7 +45,7 @@ class NotifyAdminsOfPendingAd
         if ($event instanceof AdCreated && $ad->user) {
             try {
                 Mail::to($ad->user)->send(new AdSubmissionConfirmationMail($ad));
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 Log::error("Failed to send ad confirmation email to {$ad->user->email}: ".$e->getMessage());
             }
         }
@@ -46,9 +54,19 @@ class NotifyAdminsOfPendingAd
         foreach ($admins as $admin) {
             try {
                 $admin->notify(new NewAdPending($ad));
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 Log::error("Failed to send admin notification to {$admin->email} for ad {$ad->id}: ".$e->getMessage());
             }
         }
+    }
+
+    /**
+     * Handle a listener failure.
+     */
+    public function failed(mixed $event, Throwable $exception): void
+    {
+        Log::error('NotifyAdminsOfPendingAd listener failed', [
+            'exception' => $exception->getMessage(),
+        ]);
     }
 }

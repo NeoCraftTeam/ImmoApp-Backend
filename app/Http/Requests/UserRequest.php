@@ -69,7 +69,7 @@ final class UserRequest extends FormRequest
                 'location' => ['sometimes', new GeometryGeojsonRule([Point::class])],
                 'latitude' => 'nullable|numeric|between:-90,90',
                 'longitude' => 'nullable|numeric|between:-180,180',
-                'role' => ['required', 'string', Rule::in(['customer', 'agent', 'admin'])],
+                'role' => ['required', 'string', Rule::in(['customer', 'agent'])],
                 'type' => ['nullable', 'string', Rule::in(['individual', 'agency'])],
                 'city_id' => ['sometimes', 'uuid', 'exists:city,id'],
                 'avatar' => ['sometimes', 'nullable', 'image', 'max:5120', 'mimes:jpeg,jpg,png,gif,webp', 'dimensions:max_width=2000,max_height=2000'],

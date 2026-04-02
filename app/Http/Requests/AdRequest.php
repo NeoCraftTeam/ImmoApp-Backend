@@ -66,6 +66,10 @@ final class AdRequest extends FormRequest
                 // Pagination
                 'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
 
+                // Exclude specific ads (DoS guard: cap at 50 UUIDs)
+                'exclude_ids' => ['sometimes', 'array', 'max:50'],
+                'exclude_ids.*' => ['string', 'uuid'],
+
                 // Autocomplete
                 'field' => ['nullable', 'string', 'in:city,type,quarter'],
 

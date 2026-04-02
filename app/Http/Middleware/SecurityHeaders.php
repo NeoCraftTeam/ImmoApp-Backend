@@ -39,11 +39,27 @@ final class SecurityHeaders
         // Referrer leakage prevention
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
-        // CSP — restrictive default; adjust script/style sources as needed
-        $response->headers->set(
-            'Content-Security-Policy',
-            "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:; frame-ancestors 'none'",
-        );
+        // CSP — API endpoints receive a strict deny-all (no HTML rendered).
+        // Web/Filament panel responses receive a nonce-based policy.
+        if ($request->is('api/*') && !$request->routeIs('ads.pdf')) {
+            $response->headers->set('Content-Security-Policy', "default-src 'none'");
+        } else {
+            // Generate a per-request nonce for inline scripts (Filament / Alpine / Livewire).
+            // unsafe-eval is intentionally removed — Alpine.js v3 and Livewire 3 do not need it.
+            $nonce = base64_encode(random_bytes(16));
+            $response->headers->set(
+                'Content-Security-Policy',
+                "default-src 'self'; "
+                    ."script-src 'self' 'nonce-{$nonce}' 'unsafe-inline'; "
+                    ."style-src 'self' 'unsafe-inline'; "
+                    ."img-src 'self' data: https:; "
+                    ."font-src 'self' data:; "
+                    ."connect-src 'self' https:; "
+                    ."frame-ancestors 'none'",
+            );
+            // Share nonce with views so Blade templates can use it on inline scripts
+            view()->share('cspNonce', $nonce);
+        }
 
         // Disable unused browser features
         $response->headers->set(

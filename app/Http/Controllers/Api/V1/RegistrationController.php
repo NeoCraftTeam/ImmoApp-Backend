@@ -4,11 +4,18 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\DTOs\RegistrationResult;
 use App\Http\Requests\RegisterRequest;
+use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\RegistrationService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Spatie\MediaLibrary\MediaCollections\Exceptions\FileDoesNotExist;
+use Spatie\MediaLibrary\MediaCollections\Exceptions\FileIsTooBig;
+use Throwable;
 
 final readonly class RegistrationController
 {
@@ -33,7 +40,7 @@ final readonly class RegistrationController
         $data['role'] = 'customer';
         $data['type'] = 'individual';
 
-        return $this->registrationService->register($data, $request);
+        return $this->handleRegistration($data, $request);
     }
 
     /**
@@ -54,7 +61,7 @@ final readonly class RegistrationController
         $data = $request->validated();
         $data['role'] = 'agent';
 
-        return $this->registrationService->register($data, $request);
+        return $this->handleRegistration($data, $request);
     }
 
     /**
@@ -84,5 +91,57 @@ final readonly class RegistrationController
             ->exists();
 
         return response()->json(['available' => $available]);
+    }
+
+    /**
+     * Shared registration handler — maps service result/exceptions to HTTP responses.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function handleRegistration(array $data, RegisterRequest $request): JsonResponse
+    {
+        try {
+            $result = $this->registrationService->register($data, $request);
+
+            return $this->successResponse($result);
+
+        } catch (FileIsTooBig) {
+            return response()->json([
+                'message' => 'Le fichier avatar est trop volumineux.',
+                'max_size' => '2MB',
+            ], 413);
+
+        } catch (FileDoesNotExist) {
+            return response()->json([
+                'message' => 'Le fichier avatar est introuvable.',
+            ], 400);
+
+        } catch (UniqueConstraintViolationException) {
+            Log::warning('Registration duplicate email (DB constraint)', [
+                'email' => $data['email'] ?? 'unknown',
+                'ip' => $request->ip(),
+            ]);
+
+            return response()->json([
+                'message' => 'Cette adresse email est déjà utilisée.',
+            ], 409);
+
+        } catch (Throwable $e) {
+            Log::error('Registration failed', [
+                'exception' => $e->getMessage(),
+                'request_data' => $request->except(['password', 'avatar']),
+            ]);
+            throw $e;
+        }
+    }
+
+    private function successResponse(RegistrationResult $result): JsonResponse
+    {
+        return response()->json([
+            'message' => 'Inscription réussie.',
+            'user' => new UserResource($result->user),
+            'access_token' => $result->token->plainTextToken,
+            'email_verification_required' => $result->emailVerificationRequired,
+        ], 201);
     }
 }

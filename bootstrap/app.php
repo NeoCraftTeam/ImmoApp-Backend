@@ -4,22 +4,30 @@ use App\Http\Middleware\AddRequestId;
 use App\Http\Middleware\CacheHeaders;
 use App\Http\Middleware\CheckFeatureFlag;
 use App\Http\Middleware\EnsureCorrectRoleForPanel;
+use App\Http\Middleware\EnsureEmailIsVerified;
 use App\Http\Middleware\EnsureFrontendRequestsAreStateful;
 use App\Http\Middleware\EnsureOwnerRole;
+use App\Http\Middleware\EnsureTokenMatchesRole;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\LivewireLongRunningRequest;
 use App\Http\Middleware\OptionalAuth;
+use App\Http\Middleware\RequireApiMfa;
 use App\Http\Middleware\ResolveSanctumBearerUser;
 use App\Http\Middleware\RoleScopedSession;
 use App\Http\Middleware\SanitizeInput;
 use App\Http\Middleware\SecurityHeaders;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Auth\AuthenticationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use League\Flysystem\UnableToRetrieveMetadata;
 use Sentry\Laravel\Integration;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -44,12 +52,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'active' => EnsureUserIsActive::class,
             'cache.headers' => CacheHeaders::class,
+            'email.verified' => EnsureEmailIsVerified::class,
             'feature' => CheckFeatureFlag::class,
+            'mfa.admin' => RequireApiMfa::class,
             'optional.auth' => OptionalAuth::class,
             'owner.role' => EnsureOwnerRole::class,
             'panel.role' => EnsureCorrectRoleForPanel::class,
             'resolve.sanctum.bearer' => ResolveSanctumBearerUser::class,
             'role.scoped.session' => RoleScopedSession::class,
+            'token.role' => EnsureTokenMatchesRole::class,
         ]);
         $middleware->prependToGroup('web', RoleScopedSession::class);
         $middleware->prependToGroup('web', LivewireLongRunningRequest::class);
@@ -57,9 +68,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Use custom middleware that respects SESSION_SAME_SITE config
         $middleware->statefulApi();
         $middleware->replaceInGroup('api', Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class, EnsureFrontendRequestsAreStateful::class);
-        // Append is_active check to all sanctum-authenticated API routes
+        // Append is_active check, email verification, and input sanitization to all API routes
         $middleware->appendToGroup('api', [
             EnsureUserIsActive::class,
+            EnsureEmailIsVerified::class,
             SanitizeInput::class,
             CacheHeaders::class,
         ]);
@@ -67,6 +79,43 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         Integration::handles($exceptions);
+
+        $exceptions->renderable(function (ModelNotFoundException $e, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Ressource introuvable.',
+                    'code' => 'NOT_FOUND',
+                ], 404);
+            }
+        });
+
+        $exceptions->renderable(function (AuthorizationException $e, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Action non autorisée.',
+                    'code' => 'FORBIDDEN',
+                ], 403);
+            }
+        });
+
+        $exceptions->renderable(function (AuthenticationException $e, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Non authentifié.',
+                    'code' => 'UNAUTHENTICATED',
+                ], 401);
+            }
+        });
+
+        $exceptions->renderable(function (ThrottleRequestsException $e, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Trop de requêtes. Veuillez réessayer dans quelques instants.',
+                    'code' => 'RATE_LIMITED',
+                    'retry_after' => $e->getHeaders()['Retry-After'] ?? null,
+                ], 429);
+            }
+        });
 
         // Livewire file upload failures must never produce a 500.
         // UnableToRetrieveMetadata: temp file missing (expired, wrong disk, or upload failed)
@@ -90,6 +139,27 @@ return Application::configure(basePath: dirname(__DIR__))
                 report($e);
 
                 return $fileUploadErrorResponse('Le fichier téléversé est invalide ou trop volumineux.');
+            }
+        });
+
+        // Generic API 500 handler — registered LAST so specific handlers above take priority.
+        // Returns consistent JSON for any unhandled exception on API routes.
+        // ValidationException, HttpException (abort()), and known HTTP exceptions are excluded
+        // so they flow through Laravel's native renderer with their correct status codes.
+        $exceptions->renderable(function (Throwable $e, Request $request) {
+            if (
+                $request->is('api/*')
+                && !$e instanceof ValidationException
+                && !$e instanceof HttpException
+                && !$e instanceof AuthenticationException
+                && !$e instanceof AuthorizationException
+                && !$e instanceof ModelNotFoundException
+                && !$e instanceof ThrottleRequestsException
+            ) {
+                return response()->json([
+                    'message' => 'Une erreur interne est survenue.',
+                    'code' => 'SERVER_ERROR',
+                ], 500);
             }
         });
     })->create();

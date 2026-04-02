@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\UserRole;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Services\TokenService;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -21,6 +22,8 @@ use Illuminate\Support\Str;
 
 final class EmailVerificationController
 {
+    public function __construct(private readonly TokenService $tokenService) {}
+
     /**
      * @OA\Post(
      *     path="/api/v1/auth/verifyEmail",
@@ -133,23 +136,21 @@ final class EmailVerificationController
             'otp' => 'required|string|size:6',
         ]);
 
-        $rateLimitKey = 'verify-email-otp:'.$request->ip();
+        $user = User::where('email', $request->input('email'))->first();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Code invalide ou expiré.',
+            ], 400);
+        }
+
+        $rateLimitKey = 'verify-email-otp:'.$user->id.':'.$request->ip();
         if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
             $seconds = RateLimiter::availableIn($rateLimitKey);
 
             return response()->json([
                 'message' => 'Trop de tentatives. Réessayez dans '.$seconds.' secondes.',
             ], 429);
-        }
-
-        $user = User::where('email', $request->input('email'))->first();
-
-        if (!$user) {
-            RateLimiter::hit($rateLimitKey, 300);
-
-            return response()->json([
-                'message' => 'Code invalide ou expiré.',
-            ], 400);
         }
 
         if ($user->hasVerifiedEmail()) {
@@ -180,12 +181,9 @@ final class EmailVerificationController
             'email' => $user->email,
         ]);
 
-        $user->tokens()->delete();
-        $token = $user->createToken(
-            'auth_token_'.now()->timestamp,
-            ['*'],
-            now()->addDay()
-        );
+        $user->tokens()->where('name', 'like', '%_registration_%')->delete();
+
+        $token = $this->tokenService->createForUser($user, 'auth');
 
         auth()->setUser($user);
 
@@ -223,7 +221,15 @@ final class EmailVerificationController
             'email' => 'required|email',
         ]);
 
-        $key = 'resend-verification:'.$request->ip();
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user || $user->hasVerifiedEmail()) {
+            return response()->json([
+                'message' => 'Si cette adresse est enregistrée et non vérifiée, un email a été envoyé.',
+            ]);
+        }
+
+        $key = 'resend-verification:'.$user->id.':'.$request->ip();
         if (RateLimiter::tooManyAttempts($key, 3)) {
             $seconds = RateLimiter::availableIn($key);
 
@@ -233,14 +239,6 @@ final class EmailVerificationController
         }
 
         RateLimiter::hit($key, 300);
-
-        $user = User::where('email', $request->email)->first();
-
-        if (!$user || $user->hasVerifiedEmail()) {
-            return response()->json([
-                'message' => 'Si cette adresse est enregistrée et non vérifiée, un email a été envoyé.',
-            ]);
-        }
 
         $user->sendEmailVerificationNotification();
 

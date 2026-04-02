@@ -48,6 +48,8 @@ class AgencyPanelProvider extends PanelProvider
             ->profile(EditProfile::class)
             ->emailVerification()
             ->databaseTransactions()
+            ->databaseNotifications()
+            ->databaseNotificationsPolling('30s')
             ->colors([
                 'primary' => Color::hex('#2563eb'), // Bleu Agence
             ])

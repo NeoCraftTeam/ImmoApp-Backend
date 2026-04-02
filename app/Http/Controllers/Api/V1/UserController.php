@@ -504,15 +504,10 @@ final class UserController
             DB::rollBack();
 
             Log::error('User creation failed', [
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
-                'data' => $data,
+                'exception' => $e->getMessage(),
                 'ip' => $request->ip(),
             ]);
-
-            return response()->json([
-                'message' => 'Impossible de créer l’utilisateur pour le moment.',
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.', // tu peux supprimer si tu ne veux pas exposer l'erreur
-            ], 500);
+            throw $e;
         }
     }
 
@@ -800,16 +795,11 @@ final class UserController
             DB::rollBack();
 
             Log::error('User update failed', [
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
+                'exception' => $e->getMessage(),
                 'user_id' => $user->id,
-                'data' => $data,
                 'ip' => $request->ip(),
             ]);
-
-            return response()->json([
-                'message' => 'Impossible de mettre à jour l’utilisateur pour le moment.',
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
-            ], 500);
+            throw $e;
         }
     }
 
@@ -923,13 +913,9 @@ final class UserController
         } catch (Throwable $e) {
             Log::error('Failed to delete user', [
                 'user_id' => $user->id,
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
+                'exception' => $e->getMessage(),
             ]);
-
-            return response()->json([
-                'message' => 'Impossible de supprimer l’utilisateur pour le moment.',
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.', // optionnel, à cacher en prod
-            ], 500);
+            throw $e;
         }
     }
 

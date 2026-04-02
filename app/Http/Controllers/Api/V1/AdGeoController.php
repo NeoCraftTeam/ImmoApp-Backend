@@ -199,17 +199,10 @@ final class AdGeoController
             ]);
 
         } catch (Throwable $e) {
-            $this->log->error('Error in ads_nearby: '.$e->getMessage(), [
-                'line' => $e->getLine(),
-                'file' => $e->getFile(),
-                'trace' => $e->getTraceAsString(),
+            $this->log->error('Error in ads_nearby', [
+                'exception' => $e->getMessage(),
             ]);
-
-            return response()->json([
-                'success' => false,
-                'message' => 'An error occurred while fetching nearby ads.',
-                'error' => config('app.debug') ? $e->getMessage() : null,
-            ], 500);
+            throw $e;
         }
     }
 }

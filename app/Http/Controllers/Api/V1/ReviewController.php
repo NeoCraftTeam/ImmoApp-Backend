@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Requests\Api\V1\RespondToReviewRequest;
+use App\Http\Requests\Api\V1\StoreReviewRequest;
 use App\Http\Resources\ReviewResource;
 use App\Models\Ad;
 use App\Models\AdInteraction;
@@ -11,10 +13,8 @@ use App\Models\Review;
 use App\Models\UnlockedAd;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
-use OpenApi\Annotations as OA;
 
 /**
  * @OA\Tag(name="⭐ Avis", description="Gestion des avis sur les annonces")
@@ -94,17 +94,13 @@ final class ReviewController
      *     @OA\Response(response=422, description="Validation échouée ou avis déjà déposé")
      * )
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreReviewRequest $request): JsonResponse
     {
         $this->authorize('create', Review::class);
 
         $user = $request->user();
 
-        $validated = $request->validate([
-            'rating' => ['required', 'integer', 'between:1,5'],
-            'comment' => ['nullable', 'string', 'max:1000'],
-            'ad_id' => ['required', 'exists:ad,id'],
-        ]);
+        $validated = $request->validated();
 
         // Prevent duplicate reviews: one review per user per ad
         $exists = Review::where('user_id', $user->id)
@@ -169,7 +165,7 @@ final class ReviewController
      *     @OA\Response(response=422, description="Réponse déjà donnée")
      * )
      */
-    public function respond(Request $request, Review $review): JsonResponse
+    public function respond(RespondToReviewRequest $request, Review $review): JsonResponse
     {
         $user = $request->user();
 
@@ -187,9 +183,7 @@ final class ReviewController
             ], 422);
         }
 
-        $validated = $request->validate([
-            'response' => ['required', 'string', 'max:1000'],
-        ]);
+        $validated = $request->validated();
 
         $review->update([
             'owner_response' => $validated['response'],

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Requests\Api\V1\StoreExpenseRequest;
 use App\Models\Ad;
 use App\Models\Expense;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 /**
  * Expense tracking per property for landlords.
@@ -28,18 +28,13 @@ final class ExpenseController
         return response()->json($expenses);
     }
 
-    public function store(Request $request, Ad $ad): JsonResponse
+    public function store(StoreExpenseRequest $request, Ad $ad): JsonResponse
     {
         if ($ad->user_id !== auth()->id()) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $validated = $request->validate([
-            'amount' => ['required', 'numeric', 'min:0'],
-            'category' => ['required', 'string', 'in:maintenance,tax,insurance,utilities,renovation,other'],
-            'description' => ['nullable', 'string', 'max:500'],
-            'expense_date' => ['required', 'date'],
-        ]);
+        $validated = $request->validated();
 
         $validated['ad_id'] = $ad->id;
         $validated['user_id'] = auth()->id();

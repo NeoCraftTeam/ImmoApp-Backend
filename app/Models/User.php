@@ -537,7 +537,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     {
         // This method should return true if the user has enabled email authentication.
 
-        return $this->has_email_authentication;
+        return (bool) $this->has_email_authentication;
     }
 
     public function toggleEmailAuthentication(bool $condition): void

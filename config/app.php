@@ -58,6 +58,11 @@ return [
 
     'frontend_url' => env('FRONTEND_URL', 'http://localhost:3000'),
 
+    // Comma-separated list of additional allowed OAuth redirect hosts.
+    // The frontend_url host is always allowed; add custom domains here.
+    // Example: "app.keyhome.com,staging.keyhome.com"
+    'oauth_allowed_redirect_hosts' => env('OAUTH_ALLOWED_REDIRECT_HOSTS', ''),
+
     'mail_asset_base_url' => env('MAIL_ASSET_BASE_URL', env('APP_URL', 'http://localhost')),
 
     /*

@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Requests\Api\V1\StoreTenantRequest;
+use App\Http\Requests\Api\V1\UpdateTenantRequest;
 use App\Models\Tenant;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 
 /**
  * Tenant management for landlords.
@@ -24,15 +25,9 @@ final class TenantController
         return response()->json($tenants);
     }
 
-    public function store(Request $request): JsonResponse
+    public function store(StoreTenantRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:30'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'id_number' => ['nullable', 'string', 'max:100'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-        ]);
+        $validated = $request->validated();
 
         $validated['user_id'] = auth()->id();
         $tenant = Tenant::query()->create($validated);
@@ -51,19 +46,13 @@ final class TenantController
         return response()->json(['data' => $tenant]);
     }
 
-    public function update(Request $request, Tenant $tenant): JsonResponse
+    public function update(UpdateTenantRequest $request, Tenant $tenant): JsonResponse
     {
         if ($tenant->user_id !== auth()->id()) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $validated = $request->validate([
-            'name' => ['sometimes', 'string', 'max:255'],
-            'phone' => ['nullable', 'string', 'max:30'],
-            'email' => ['nullable', 'email', 'max:255'],
-            'id_number' => ['nullable', 'string', 'max:100'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-        ]);
+        $validated = $request->validated();
 
         $tenant->update($validated);
 

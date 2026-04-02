@@ -9,65 +9,65 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Strips HTML tags from incoming request input to prevent stored XSS attacks.
- * Applied to fields that could later be rendered in API responses or frontend views.
+ * Strips HTML tags from ALL incoming string request inputs to prevent stored XSS attacks.
+ *
+ * Uses a denylist approach (sanitize everything except exempted fields) rather than
+ * an allowlist, so new fields are protected by default without requiring registration.
+ * Recursively processes nested arrays.
  */
 final class SanitizeInput
 {
     /**
-     * Fields that should have HTML tags stripped.
-     *
-     * @var list<string>
-     */
-    private const array SANITIZE_FIELDS = [
-        'comment',
-        'description',
-        'text',
-        'title',
-        'name',
-        'bio',
-        'address',
-        'note',
-        'notes',
-        'message',
-        'subject',
-        'conditions',
-        'reason',
-    ];
-
-    /**
-     * Fields that should never be sanitized.
+     * Fields that must never be modified — passwords, tokens, binary data, structured values.
      *
      * @var list<string>
      */
     private const array EXEMPT_FIELDS = [
         'password',
         'password_confirmation',
+        'confirm_password',
         'current_password',
+        'new_password',
         'email',
         'token',
+        'access_token',
+        'refresh_token',
+        '_token',
+        'signature',
+        'otp',
+        'code',
+        'hash',
+        'file',
+        'avatar',
+        'image',
+        'photo',
+        'document',
+        'attachment',
+        'lat',
+        'lng',
+        'latitude',
+        'longitude',
+        'location',
     ];
 
     public function handle(Request $request, Closure $next): Response
     {
-        $input = $request->all();
-
-        $request->merge($this->sanitize($input));
+        $request->merge($this->sanitize($request->all()));
 
         return $next($request);
     }
 
     /**
-     * Recursively sanitize input array.
+     * Recursively strip HTML tags from all string values not in the exempt list.
      *
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function sanitize(array $data, string $parentKey = ''): array
+    private function sanitize(array $data): array
     {
         foreach ($data as $key => $value) {
             if (is_array($value)) {
-                $data[$key] = $this->sanitize($value, (string) $key);
+                $data[$key] = $this->sanitize($value);
 
                 continue;
             }
@@ -80,17 +80,9 @@ final class SanitizeInput
                 continue;
             }
 
-            if ($this->shouldSanitize((string) $key, $parentKey)) {
-                $data[$key] = strip_tags($value);
-            }
+            $data[$key] = strip_tags($value);
         }
 
         return $data;
-    }
-
-    private function shouldSanitize(string $key, string $parentKey): bool
-    {
-        return in_array($key, self::SANITIZE_FIELDS, true)
-            || in_array($parentKey, self::SANITIZE_FIELDS, true);
     }
 }

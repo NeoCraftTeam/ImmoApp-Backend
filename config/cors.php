@@ -1,5 +1,13 @@
 <?php
 
+/*
+ * In production, keep only the production origins listed in `allowed_origins`.
+ * In development, additional local IPs and the Herd `.test` domain are added.
+ * The `allowed_origins_patterns` entry below covers preview-deploy subdomains
+ * (e.g. staging.keyhome.neocraft.dev) — it intentionally limits to known
+ * prefixes rather than matching any arbitrary subdomain.
+ */
+
 return [
 
     /*
@@ -17,7 +25,7 @@ return [
 
     'paths' => ['api/*', 'auth/*', 'sanctum/csrf-cookie', 'login', 'register', 'storage/*'],
 
-    'allowed_methods' => ['*'],
+    'allowed_methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 
     'allowed_origins' => array_filter([
         ...((string) env('APP_ENV') !== 'production' ? [
@@ -35,11 +43,14 @@ return [
         'https://www.neocraft.dev',
     ]),
 
+    // Covers known preview/staging deploy subdomains on keyhome.neocraft.dev.
+    // Intentionally narrower than [a-z0-9-]+ to prevent arbitrary subdomains
+    // from being treated as trusted origins (e.g. attacker-controlled subdomains).
     'allowed_origins_patterns' => [
-        '/^https:\/\/[a-z0-9-]+\.keyhome\.neocraft\.dev$/',
+        '/^https:\/\/(staging|preprod|preview-[a-z0-9-]+)\.keyhome\.neocraft\.dev$/',
     ],
 
-    'allowed_headers' => ['*'],
+    'allowed_headers' => ['Accept', 'Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token', 'X-Inertia'],
 
     'exposed_headers' => [],
 

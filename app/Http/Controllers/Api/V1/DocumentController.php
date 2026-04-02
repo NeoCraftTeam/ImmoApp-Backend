@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Requests\Api\V1\StoreDocumentRequest;
 use App\Models\Ad;
 use App\Models\Document;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -32,17 +32,13 @@ final class DocumentController
         return response()->json(['data' => $documents]);
     }
 
-    public function store(Request $request, Ad $ad): JsonResponse
+    public function store(StoreDocumentRequest $request, Ad $ad): JsonResponse
     {
         if ($ad->user_id !== auth()->id()) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $validated = $request->validate([
-            'type' => ['required', 'string', 'in:permit,insurance,title,receipt,other'],
-            'name' => ['required', 'string', 'max:255'],
-            'file' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:10240'],
-        ]);
+        $validated = $request->validated();
 
         $file = $request->file('file');
         $path = $file->store('documents/'.auth()->id(), 'private');

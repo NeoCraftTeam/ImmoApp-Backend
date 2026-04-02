@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\V1\ApiMfaController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ClerkAuthController;
 use App\Http\Controllers\Api\V1\EmailVerificationController;
@@ -18,6 +19,10 @@ Route::prefix('auth')->group(function (): void {
         ->middleware('throttle:auth.register');
     Route::post('registerAgent', [RegistrationController::class, 'registerAgent'])
         ->middleware('throttle:auth.register');
+    // Admin registration — auth:sanctum MUST come before can:admin-access so the
+    // gate receives an authenticated user; unauthenticated requests get 401, not 403.
+    Route::post('registerAdmin', [RegistrationController::class, 'registerAdmin'])
+        ->middleware(['auth:sanctum', 'can:admin-access', 'throttle:auth.register']);
     Route::post('check-email', [RegistrationController::class, 'checkEmail'])
         ->middleware('throttle:30,1');
 
@@ -67,6 +72,17 @@ Route::prefix('auth')->group(function (): void {
 
         Route::post('confirm-link', 'confirmOAuthLink')
             ->middleware('throttle:auth.update-password');
+
+        // Redeem a short-lived exchange code (from OAuth callback) for a Sanctum token.
+        // Exchange codes are stored in cache for 2 minutes after OAuth callback.
+        Route::get('exchange-token', 'exchangeToken')
+            ->middleware('throttle:20,1');
+    });
+
+    // MFA for admin API access
+    Route::middleware('auth:sanctum')->prefix('mfa')->controller(ApiMfaController::class)->group(function (): void {
+        Route::get('/status', 'status')->middleware('throttle:60,1');
+        Route::post('/verify', 'verify')->middleware('throttle:10,1');
     });
 
     // Authenticated auth routes

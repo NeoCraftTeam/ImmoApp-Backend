@@ -11,6 +11,7 @@ use App\Http\Resources\UserResource;
 use App\Mail\VerificationCodeMail;
 use App\Models\User;
 use App\Services\ClerkJwtService;
+use App\Services\TokenService;
 use App\Services\UserWelcomeService;
 use App\Services\UtmAttributionService;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -24,6 +25,8 @@ use Illuminate\Support\Facades\URL;
 
 final class ClerkAuthController
 {
+    public function __construct(private readonly TokenService $tokenService) {}
+
     /**
      * @OA\Post(
      *     path="/api/v1/auth/clerk/exchange",
@@ -60,8 +63,8 @@ final class ClerkAuthController
                 $user->update(['clerk_id' => $clerkId]);
             }
 
-            $user->tokens()->where('name', 'clerk-exchange')->delete();
-            $token = $user->createToken('clerk-exchange', ['*'], now()->addDay());
+            $prefix = $user->isAgent() || $user->isAdmin() ? 'owner' : 'client';
+            $token = $this->tokenService->rotateForUser($user, 'clerk', "{$prefix}_clerk_%", $prefix);
 
             auth()->setUser($user);
 
@@ -97,9 +100,10 @@ final class ClerkAuthController
         ], $utmFromRequest), now()->addMinutes(15));
 
         $otpCooldownKey = 'clerk_otp_sent_'.$clerkId;
-        $existingOtp = Cache::get('clerk_otp_'.$clerkId);
 
-        if ($existingOtp !== null && Cache::has($otpCooldownKey)) {
+        // Enforce cooldown regardless of whether a prior OTP exists —
+        // prevents email spam if the exchange endpoint is called repeatedly.
+        if (Cache::has($otpCooldownKey)) {
             return response()->json([
                 'state' => 'otp_required',
                 'email_hint' => $email !== null ? $this->maskEmail($email) : null,
@@ -107,7 +111,7 @@ final class ClerkAuthController
         }
 
         $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        Cache::put('clerk_otp_'.$clerkId, $otp, now()->addMinutes(10));
+        Cache::put('clerk_otp_'.$clerkId, $otp, now()->addMinutes(5)); // 5-minute window
         Cache::put($otpCooldownKey, true, now()->addSeconds(60));
 
         if ($email !== null) {
@@ -189,8 +193,9 @@ final class ClerkAuthController
             Cache::forget('clerk_verified_'.$clerkId);
             Cache::forget('clerk_pending_'.$clerkId);
 
-            $user->tokens()->where('name', 'clerk-exchange')->delete();
-            $token = $user->createToken('clerk-exchange', ['*'], now()->addDay());
+            $prefix = $user->isAgent() || $user->isAdmin() ? 'owner' : 'client';
+            $token = $this->tokenService->rotateForUser($user, 'clerk', "{$prefix}_clerk_%", $prefix);
+
             auth()->setUser($user);
 
             if ($request->hasSession()) {
@@ -322,8 +327,9 @@ final class ClerkAuthController
         Cache::forget('clerk_verified_'.$clerkId);
         Cache::forget('clerk_pending_'.$clerkId);
 
-        $user->tokens()->where('name', 'clerk-exchange')->delete();
-        $token = $user->createToken('clerk-exchange', ['*'], now()->addDay());
+        $prefix = $user->isAgent() || $user->isAdmin() ? 'owner' : 'client';
+        $token = $this->tokenService->rotateForUser($user, 'clerk', "{$prefix}_clerk_%", $prefix);
+
         auth()->setUser($user);
 
         if ($request->hasSession()) {

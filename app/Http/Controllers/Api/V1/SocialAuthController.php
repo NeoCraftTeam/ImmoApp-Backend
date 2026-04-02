@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\UserRole;
+use App\Mail\OAuthLinkAttemptMail;
 use App\Models\User;
 use App\Services\UtmAttributionService;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use OpenApi\Attributes as OA;
@@ -211,6 +214,11 @@ final class SocialAuthController
 
         $redirectUri = $request->query('redirect_uri', config('app.frontend_url').'/auth/callback');
 
+        // Validate redirect_uri against allowed hosts before encoding in state
+        if (!$this->isAllowedRedirectUri((string) $redirectUri)) {
+            $redirectUri = config('app.frontend_url').'/auth/callback';
+        }
+
         // Encode redirect_uri in state parameter (stateless approach for API)
         $stateData = [
             'csrf' => Str::random(40),
@@ -256,14 +264,24 @@ final class SocialAuthController
         }
 
         try {
-            // Decode redirect_uri from state parameter
+            // Decode redirect_uri from state parameter and validate against allowed hosts
             $redirectUri = config('app.frontend_url').'/auth/callback';
             $state = $request->query('state');
 
             if ($state) {
                 $stateData = json_decode(base64_decode($state), true);
                 if (is_array($stateData) && isset($stateData['redirect_uri'])) {
-                    $redirectUri = $stateData['redirect_uri'];
+                    $candidate = (string) $stateData['redirect_uri'];
+                    // Only accept the URI if it matches our allowed hosts whitelist
+                    if ($this->isAllowedRedirectUri($candidate)) {
+                        $redirectUri = $candidate;
+                    } else {
+                        Log::warning('OAuth callback: rejected non-whitelisted redirect_uri', [
+                            'redirect_uri' => $candidate,
+                            'provider' => $provider,
+                            'ip' => $request->ip(),
+                        ]);
+                    }
                 }
             }
 
@@ -280,9 +298,16 @@ final class SocialAuthController
 
             $token = $user->createToken('oauth-'.$provider)->plainTextToken;
 
-            return redirect($redirectUri.'?'.http_build_query([
+            // Store the real token in cache under a short-lived exchange code.
+            // The URL only carries the exchange code — never the raw Sanctum token.
+            $exchangeCode = Str::random(64);
+            Cache::put('oauth_token_exchange_'.$exchangeCode, [
                 'token' => $token,
-                'is_new_user' => $result['is_new'] ? '1' : '0',
+                'is_new_user' => $result['is_new'],
+            ], now()->addMinutes(2));
+
+            return redirect($redirectUri.'?'.http_build_query([
+                'exchange_code' => $exchangeCode,
             ]));
 
         } catch (Exception $e) {
@@ -295,6 +320,35 @@ final class SocialAuthController
 
             return redirect($redirectUri.'?message=oauth_failed');
         }
+    }
+
+    /**
+     * Redeem a short-lived OAuth exchange code for a Sanctum token.
+     *
+     * The frontend receives an exchange_code query param after the OAuth callback
+     * redirect and immediately calls this endpoint (within 2 minutes) to get the
+     * real token without it ever appearing in browser history or server logs.
+     */
+    public function exchangeToken(Request $request): JsonResponse
+    {
+        $request->validate([
+            'exchange_code' => ['required', 'string', 'size:64'],
+        ]);
+
+        $cacheKey = 'oauth_token_exchange_'.$request->input('exchange_code');
+        $data = Cache::pull($cacheKey); // pull = get + delete (single-use)
+
+        if ($data === null) {
+            return response()->json([
+                'message' => 'Code d\'échange invalide ou expiré.',
+                'code' => 'EXCHANGE_CODE_INVALID',
+            ], 422);
+        }
+
+        return response()->json([
+            'token' => $data['token'],
+            'is_new_user' => $data['is_new_user'],
+        ]);
     }
 
     /**
@@ -528,8 +582,19 @@ final class SocialAuthController
                     'pending_oauth_id' => $socialUser->getId(),
                     'pending_oauth_avatar' => $socialUser->getAvatar(),
                     'pending_oauth_token' => $linkingToken,
-                    'pending_oauth_expires_at' => now()->addMinutes(15),
+                    'pending_oauth_expires_at' => now()->addMinutes(5), // Reduced from 15min for security
                 ]);
+
+                // Notify the account owner that someone tried to link a provider to their account
+                Mail::to($existingUser->email, $existingUser->firstname ?? $existingUser->email)
+                    ->queue(new OAuthLinkAttemptMail(
+                        userFirstName: $existingUser->firstname ?? 'Utilisateur',
+                        provider: $provider,
+                        ipAddress: $request->ip() ?? 'inconnu',
+                        attemptedAt: now()->translatedFormat('d F Y à H:i'),
+                        secureAccountUrl: config('app.frontend_url').'/security/sessions',
+                        supportEmail: config('mail.from.address'),
+                    ));
 
                 return [
                     'user' => $existingUser,
@@ -574,6 +639,36 @@ final class SocialAuthController
 
             return ['user' => $user, 'is_new' => true];
         });
+    }
+
+    /**
+     * Check whether a redirect_uri is allowed.
+     *
+     * Validates against the configured frontend URL host and any additional
+     * hosts listed in OAUTH_ALLOWED_REDIRECT_HOSTS (comma-separated).
+     */
+    private function isAllowedRedirectUri(string $uri): bool
+    {
+        $host = parse_url($uri, PHP_URL_HOST);
+
+        if (!is_string($host) || $host === '') {
+            return false;
+        }
+
+        // Always allow the configured frontend host
+        $allowedHosts = [];
+        $frontendHost = parse_url((string) config('app.frontend_url', ''), PHP_URL_HOST);
+        if (is_string($frontendHost) && $frontendHost !== '') {
+            $allowedHosts[] = $frontendHost;
+        }
+
+        // Also allow hosts from OAUTH_ALLOWED_REDIRECT_HOSTS env var
+        $extra = (string) config('app.oauth_allowed_redirect_hosts', '');
+        foreach (array_filter(array_map('trim', explode(',', $extra))) as $h) {
+            $allowedHosts[] = $h;
+        }
+
+        return in_array($host, $allowedHosts, true);
     }
 
     /**
