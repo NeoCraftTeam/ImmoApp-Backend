@@ -6,7 +6,6 @@ namespace App\Mail\Concerns;
 
 use App\Models\EmailPreference;
 use App\Models\User;
-use Illuminate\Mail\Mailables\Content;
 
 /**
  * Adds unsubscribe and preference management URLs to marketing emails.

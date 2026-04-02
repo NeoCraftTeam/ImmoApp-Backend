@@ -103,8 +103,6 @@ final class TeamController
 
     public function destroy(TeamInvitation $teamInvitation): JsonResponse
     {
-        $user = auth()->user();
-
         $agency = $teamInvitation->agency;
 
         if (!$agency || $agency->owner_id !== auth()->id()) {

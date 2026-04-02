@@ -47,9 +47,7 @@ class SubscriptionPlanResource extends Resource
     #[\Override]
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     #[\Override]

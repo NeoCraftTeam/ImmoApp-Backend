@@ -23,9 +23,6 @@ class RoleScopedSession
      */
     public function handle(Request $request, Closure $next)
     {
-        // Detect owner area by path prefix
-        $isOwnerArea = $request->is('owner/*') || $request->is('owner');
-
         // Use unified session configuration to prevent conflicts
         // Both customer and owner areas share the same session but with role-based access control
         Config::set('session.cookie', $this->getUnifiedSessionCookieName());

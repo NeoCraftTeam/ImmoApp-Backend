@@ -14,10 +14,7 @@ class AuthServiceProvider extends ServiceProvider
      * Register services.
      */
     #[\Override]
-    public function register(): void
-    {
-        //
-    }
+    public function register(): void {}
 
     /**
      * Boot the application services to define authorization gates that determine user access

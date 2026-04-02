@@ -8,7 +8,6 @@ use Illuminate\Mail\Events\MessageSending;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Symfony\Component\Mime\Address;
-use Symfony\Component\Mime\Email;
 
 /**
  * Ensures every outgoing email:

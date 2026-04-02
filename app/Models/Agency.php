@@ -107,14 +107,12 @@ class Agency extends Model
      */
     public function getCurrentSubscription(): ?Subscription
     {
-        /** @var Subscription|null $subscription */
-        $subscription = $this->subscriptions()
+        /** @var Subscription|null */
+        return $this->subscriptions()
             ->where('status', SubscriptionStatus::ACTIVE)
             ->where('ends_at', '>', now())
             ->latest('ends_at')
             ->first();
-
-        return $subscription;
     }
 
     public function getActivitylogOptions(): LogOptions

@@ -309,7 +309,6 @@ final class RecommendationEngine
         $limit = self::RESULT_LIMIT;
         $trendingLimit = (int) ceil($limit * 0.4);
         $boostedLimit = (int) ceil($limit * 0.3);
-        $latestLimit = $limit - $trendingLimit - $boostedLimit;
 
         $collected = collect();
         $excludeIds = [];

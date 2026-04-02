@@ -16,11 +16,6 @@ final class ViewingSlotsResponseCache
 {
     public const int TTL_SECONDS = 60;
 
-    private static function generationCacheKey(string $adId): string
-    {
-        return "viewing_slots_response_gen:{$adId}";
-    }
-
     /**
      * @template T
      *
@@ -44,5 +39,10 @@ final class ViewingSlotsResponseCache
     {
         $k = self::generationCacheKey($adId);
         Cache::put($k, ((int) Cache::get($k, 0)) + 1, now()->addYears(10));
+    }
+
+    private static function generationCacheKey(string $adId): string
+    {
+        return "viewing_slots_response_gen:{$adId}";
     }
 }

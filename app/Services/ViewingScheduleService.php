@@ -51,10 +51,8 @@ final class ViewingScheduleService implements ViewingScheduleServiceInterface
 
         $this->applyRecurrence($builder, $data);
 
-        /** @var Schedule $saved */
-        $saved = $builder->save();
-
-        return $saved;
+        /** @var Schedule */
+        return $builder->save();
     }
 
     /**
@@ -102,8 +100,8 @@ final class ViewingScheduleService implements ViewingScheduleServiceInterface
      */
     public function reserveSlot(Ad $ad, array $data): Schedule
     {
-        /** @var Schedule $saved */
-        $saved = Zap::for($ad)
+        /** @var Schedule */
+        return Zap::for($ad)
             ->named('Visite provisoire — '.$data['date'])
             ->appointment()
             ->noOverlap()
@@ -111,8 +109,6 @@ final class ViewingScheduleService implements ViewingScheduleServiceInterface
             ->addPeriod($data['starts_at'], $data['ends_at'])
             ->withMetadata($data['metadata'])
             ->save();
-
-        return $saved;
     }
 
     /**
