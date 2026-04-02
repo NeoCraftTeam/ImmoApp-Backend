@@ -56,7 +56,7 @@ it('validates attributes against active catalog values', function (): void {
         $ad = Ad::factory()->create(['user_id' => $owner->id]);
     });
 
-    Sanctum::actingAs($owner);
+    Sanctum::actingAs($owner, ['*']);
 
     $invalidResponse = $this->putJson("/api/v1/ads/{$ad->id}", [
         'attributes' => ['not-existing-attribute'],

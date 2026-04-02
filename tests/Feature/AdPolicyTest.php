@@ -12,7 +12,7 @@ test('admin can update any ad', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);
     $ad = Ad::factory()->create(['user_id' => $owner->id]);
 
-    Sanctum::actingAs($admin);
+    Sanctum::actingAs($admin, ['*']);
     $response = $this->putJson("/api/v1/ads/{$ad->id}", [
         'title' => 'Updated Title',
         'description' => 'New description',
