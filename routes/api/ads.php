@@ -39,7 +39,7 @@ Route::prefix('ads')->middleware('optional.auth')->group(function (): void {
     });
 
     // CRUD write + status — owner/admin only (belt-and-suspenders with AdPolicy)
-    Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner'])->group(function (): void {
+    Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner', 'token.role:agent'])->group(function (): void {
         Route::post('', [AdController::class, 'store']);
         Route::put('/{ad}', [AdController::class, 'update']);
         Route::delete('/{id}', [AdController::class, 'destroy']);
