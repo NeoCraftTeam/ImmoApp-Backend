@@ -50,7 +50,7 @@ it('sets token expiry to one day from now', function (): void {
 
     $token = $service->createForUser($user, 'test');
 
-    expect($token->accessToken->expires_at->diffInHours(now()))->toBeBetween(23, 25);
+    expect(now()->diffInHours($token->accessToken->expires_at))->toBeBetween(23, 25);
 });
 
 // ---------------------------------------------------------------------------
