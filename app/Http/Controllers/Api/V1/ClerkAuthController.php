@@ -24,9 +24,9 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 
-final class ClerkAuthController
+final readonly class ClerkAuthController
 {
-    public function __construct(private readonly TokenService $tokenService) {}
+    public function __construct(private TokenService $tokenService) {}
 
     /**
      * @OA\Post(
@@ -56,10 +56,25 @@ final class ClerkAuthController
 
         $email = $this->resolveClerkEmail($clerkUser);
 
+        // SEC: Look up by clerk_id first. On miss, fall back to email so that cross-provider
+        // logins work (e.g. Facebook → Google with the same verified email). Clerk verifies
+        // email ownership before issuing JWTs, so matching a verified account by email is safe.
+        // We still restrict the email fallback to accounts with a verified email address to
+        // prevent an unverified-email account from being taken over via a Clerk identity.
         $user = User::query()->where('clerk_id', $clerkId)->first()
-            ?? ($email !== null ? User::query()->where('email', $email)->first() : null);
+            ?? ($email !== null ? User::query()->where('email', $email)->whereNotNull('email_verified_at')->first() : null);
 
         if ($user !== null) {
+            // SEC: Block Clerk login for accounts whose email is still unverified
+            // (e.g. registered via email/password but OTP never completed).
+            // Our OTP gate must not be bypassable via a Clerk identity with the same email.
+            if ($user->email_verified_at === null) {
+                return response()->json([
+                    'message' => 'Veuillez vérifier votre adresse email avant de vous connecter.',
+                    'email_verification_required' => true,
+                ], 403);
+            }
+
             if ($user->clerk_id === null || $user->clerk_id !== $clerkId) {
                 $user->update(['clerk_id' => $clerkId]);
             }
@@ -187,6 +202,19 @@ final class ClerkAuthController
             ?? ($email !== null ? User::query()->whereNull('clerk_id')->where('email', $email)->first() : null);
 
         if ($user !== null) {
+            // SEC: Same gate as clerkExchange — OTP proof does not override our email-verification
+            // requirement for accounts that registered but never completed OTP.
+            if ($user->email_verified_at === null) {
+                Cache::forget('clerk_verified_'.$clerkId);
+                Cache::forget('clerk_pending_'.$clerkId);
+                Cache::forget('clerk_otp_'.$clerkId);
+
+                return response()->json([
+                    'message' => 'Veuillez vérifier votre adresse email avant de vous connecter.',
+                    'email_verification_required' => true,
+                ], 403);
+            }
+
             if ($user->clerk_id === null) {
                 $user->update(['clerk_id' => $clerkId]);
             }
