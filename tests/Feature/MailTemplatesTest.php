@@ -18,7 +18,7 @@ uses(RefreshDatabase::class);
 it('queues NewDeviceSignInMail when user logs in from a new IP', function (): void {
     Mail::fake();
 
-    $user = User::factory()->create([
+    $user = User::factory()->customers()->create([
         'password' => bcrypt('Password1!'),
         'last_login_ip' => '1.2.3.4',
     ]);
@@ -36,7 +36,7 @@ it('queues NewDeviceSignInMail when user logs in from a new IP', function (): vo
 it('does not queue NewDeviceSignInMail when logging in from the same IP', function (): void {
     Mail::fake();
 
-    $user = User::factory()->create([
+    $user = User::factory()->customers()->create([
         'password' => bcrypt('Password1!'),
         'last_login_ip' => '127.0.0.1',
     ]);
@@ -52,11 +52,11 @@ it('does not queue NewDeviceSignInMail when logging in from the same IP', functi
 // ── Token cleanup on login ────────────────────────────────────────────────────
 
 it('revokes existing api_token_* tokens on new login', function (): void {
-    $user = User::factory()->create(['password' => bcrypt('Password1!')]);
+    $user = User::factory()->customers()->create(['password' => bcrypt('Password1!')]);
 
-    // Create two old tokens
-    $user->createToken('api_token_111', ['*'], now()->addDays(7));
-    $user->createToken('api_token_222', ['*'], now()->addDays(7));
+    // Create two old tokens matching the client_token_% revocation pattern
+    $user->createToken('client_token_111', ['*'], now()->addDays(7));
+    $user->createToken('client_token_222', ['*'], now()->addDays(7));
     expect($user->tokens()->count())->toBe(2);
 
     $this->postJson('/api/v1/auth/login', [

@@ -20,7 +20,7 @@ class SpaAuthenticationTest extends TestCase
 
     public function test_spa_login_returns_success_and_token(): void
     {
-        $user = User::factory()->create([
+        $user = User::factory()->customers()->create([
             'password' => bcrypt('password'),
             'email_verified_at' => now(),
             'is_active' => true,

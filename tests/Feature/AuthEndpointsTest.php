@@ -41,7 +41,7 @@ it('unauthenticated user cannot get profile', function (): void {
 });
 
 it('authenticated user can refresh token', function (): void {
-    $user = User::factory()->create(['password' => bcrypt('Password123@')]);
+    $user = User::factory()->customers()->create(['password' => bcrypt('Password123@')]);
 
     $loginResponse = $this->postJson('/api/v1/auth/login', [
         'email' => $user->email,
@@ -103,7 +103,7 @@ it('register agent is a public route and succeeds with valid data', function ():
 });
 
 it('authenticated user can update password', function (): void {
-    $user = User::factory()->create(['password' => bcrypt('Password123@')]);
+    $user = User::factory()->customers()->create(['password' => bcrypt('Password123@')]);
 
     $loginResponse = $this->postJson('/api/v1/auth/login', [
         'email' => $user->email,
