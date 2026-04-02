@@ -310,9 +310,10 @@ class Ad extends Model implements HasMedia
 
             'created_at' => $this->created_at?->timestamp,
 
-            // Rating & popularity
-            'reviews_avg_rating' => (float) ($this->reviews_avg_rating ?? $this->reviews()->avg('rating') ?? 0),
-            'views_count' => (int) ($this->interactions()->where('type', 'view')->count()),
+            // Rating & popularity — use eager-loaded aggregates (see makeAllSearchableUsing).
+            // Fallback to 0 if the withAvg/withCount was not applied (e.g. single-model scout index).
+            'reviews_avg_rating' => (float) ($this->reviews_avg_rating ?? 0),
+            'views_count' => (int) ($this->views_count ?? 0),
 
             // Boost
             'is_boosted' => (bool) $this->is_boosted,
@@ -455,7 +456,14 @@ class Ad extends Model implements HasMedia
 
     protected function makeAllSearchableUsing(Builder $query): Builder
     {
-        return $query->with(['quarter.city', 'ad_type']);
+        // PERF-W24: eager-load everything toSearchableArray() needs so bulk indexing
+        // (Ad::all()->searchable()) does not fire an extra query per model.
+        return $query
+            ->with(['quarter.city', 'ad_type'])
+            ->withAvg('reviews', 'rating')
+            ->withCount([
+                'interactions as views_count' => fn (Builder $q) => $q->where('type', 'view'),
+            ]);
     }
 
     public function registerMediaCollections(): void
