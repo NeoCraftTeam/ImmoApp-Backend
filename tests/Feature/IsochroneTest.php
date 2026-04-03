@@ -150,3 +150,21 @@ it('returns 503 when ORS returns a non-200 status', function (): void {
     $this->getJson('/api/v1/isochrones?lat=4.0511&lng=9.7679')
         ->assertStatus(503);
 });
+
+it('respects the _miss cooldown and does not retry ORS within 5 minutes of a failure', function (): void {
+    config(['services.ors.key' => 'test-ors-key']);
+
+    // Simulate a previous failure by seeding the _miss key
+    $missKey = 'isochrone_foot-walking_4.051_9.768_15_miss';
+    Cache::put($missKey, true, 300);
+
+    // The factory would return success, but it should never be called
+    $service = new IsochroneService(
+        fakeIsoHttpFactory(['openrouteservice.org' => fakeIsochroneOrsOk()])
+    );
+    app()->instance(IsochroneService::class, $service);
+
+    // Should return 503 (cooldown active) without calling ORS
+    $this->getJson('/api/v1/isochrones?lat=4.0511&lng=9.7679&profile=foot-walking&range=15')
+        ->assertStatus(503);
+});

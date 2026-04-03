@@ -54,6 +54,11 @@ final readonly class IsochroneService
             return $cached;
         }
 
+        // Honour the short error-cooldown so a broken ORS key won't get hammered
+        if (Cache::has($cacheKey.'_miss')) {
+            return null;
+        }
+
         $payload = $this->compute($lat, $lng, $profile, $rangeMinutes, $apiKey);
 
         if ($payload !== null) {
