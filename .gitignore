@@ -28,6 +28,7 @@ Homestead.json
 /storage/pail
 /storage/postman
 /storage/app/seeder-images
+/storage/media-library/
 .env.backup
 .env.production
 .phpactor.json
