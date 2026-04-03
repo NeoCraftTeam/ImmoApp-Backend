@@ -79,6 +79,7 @@ final class UserRequest extends FormRequest
             return [
                 'firstname' => ['sometimes', 'string', 'max:255'],
                 'lastname' => ['sometimes', 'string', 'max:255'],
+                'bio' => ['sometimes', 'nullable', 'string', 'max:500'],
                 'phone_number' => ['sometimes', 'string', 'regex:/^\+?[0-9]{7,20}$/'],
                 'phone_is_whatsapp' => ['sometimes', 'boolean'],
                 'email' => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->route('user'))],
