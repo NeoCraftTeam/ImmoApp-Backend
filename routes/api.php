@@ -58,6 +58,7 @@ Route::prefix('v1')->group(function (): void {
     require __DIR__.'/api/payments.php';
     require __DIR__.'/api/viewings.php';
     require __DIR__.'/api/surveys.php';
+    require __DIR__.'/api/geo.php';
 
     // --- AD TYPES ---
     Route::controller(AdTypeController::class)->group(function (): void {
