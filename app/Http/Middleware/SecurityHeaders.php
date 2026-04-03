@@ -40,9 +40,25 @@ final class SecurityHeaders
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
 
         // CSP — API endpoints receive a strict deny-all (no HTML rendered).
+        // The Swagger UI documentation page is excluded and gets its own policy.
         // Web/Filament panel responses receive a nonce-based policy.
-        if ($request->is('api/*') && !$request->routeIs('ads.pdf')) {
+        $isApiRoute    = $request->is('api/*') && !$request->routeIs('ads.pdf');
+        $isDocsRoute   = $request->is('api/documentation') || $request->is('docs/*') || $request->is('api/oauth2-callback');
+
+        if ($isApiRoute && !$isDocsRoute) {
             $response->headers->set('Content-Security-Policy', "default-src 'none'");
+        } elseif ($isDocsRoute) {
+            // Swagger UI requires same-origin scripts, CDN scripts (js-cookie), and inline styles.
+            $response->headers->set(
+                'Content-Security-Policy',
+                "default-src 'self'; "
+                    ."script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                    ."style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+                    ."img-src 'self' data: https:; "
+                    ."font-src 'self' data: https://cdn.jsdelivr.net; "
+                    ."connect-src 'self' https:; "
+                    ."frame-ancestors 'none'",
+            );
         } else {
             // Generate a per-request nonce for inline scripts (Filament / Alpine / Livewire).
             // unsafe-eval is intentionally removed — Alpine.js v3 and Livewire 3 do not need it.

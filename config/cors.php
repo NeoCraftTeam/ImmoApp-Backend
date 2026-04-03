@@ -35,6 +35,9 @@ return [
             'https://keyhome.test',
         ] : []),
         'https://api.keyhome.neocraft.dev',
+        'https://preview.keyhome.neocraft.dev',
+        'https://staging.keyhome.neocraft.dev',
+        'https://preprod.keyhome.neocraft.dev',
         'https://keyhome.fr',
         'https://www.keyhome.fr',
         'https://keyhome.app',
@@ -43,11 +46,11 @@ return [
         'https://www.neocraft.dev',
     ]),
 
-    // Covers known preview/staging deploy subdomains on keyhome.neocraft.dev.
-    // Intentionally narrower than [a-z0-9-]+ to prevent arbitrary subdomains
-    // from being treated as trusted origins (e.g. attacker-controlled subdomains).
+    // Covers named preview/staging subdomains on both .neocraft.dev and .neocraft.de.
+    // preview(-[a-z0-9-]+)? matches both bare 'preview' and 'preview-abc123'.
     'allowed_origins_patterns' => [
-        '/^https:\/\/(staging|preprod|preview-[a-z0-9-]+)\.keyhome\.neocraft\.dev$/',
+        '/^https:\/\/(staging|preprod|preview(-[a-z0-9-]+)?)\.keyhome\.neocraft\.dev$/',
+        '/^https:\/\/(staging|preprod|preview(-[a-z0-9-]+)?)\.keyhome\.neocraft\.de$/',
     ],
 
     'allowed_headers' => ['Accept', 'Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token', 'X-Inertia'],
