@@ -237,6 +237,47 @@ it('falls back to mode=air when ORS returns 429 and marks status=degraded', func
         ->assertJsonPath('data.categories.commerce.nearest_poi.name', 'Grand Marché');
 });
 
+it('returns status=ok when no ORS key is set even with POIs (haversine is by design)', function (): void {
+    $ad = makeAd(Point::makeGeodetic(4.0511, 9.7679));
+
+    // Explicitly no ORS key
+    config(['services.ors.key' => null]);
+
+    $elements = [[
+        'type' => 'node', 'id' => 55,
+        'lat' => 4.0515, 'lon' => 9.7680,
+        'tags' => ['highway' => 'bus_stop', 'name' => 'Arrêt Test'],
+    ]];
+
+    $service = new NeighborhoodScorecardService(
+        fakeHttpFactory(['overpass-api.de' => fakeOverpassResponse($elements)])
+    );
+    app()->instance(NeighborhoodScorecardService::class, $service);
+
+    $response = $this->getJson("/api/v1/ads/{$ad->id}/neighborhood-scorecard");
+
+    $response->assertOk()
+        ->assertJsonPath('data.status', 'ok')
+        ->assertJsonPath('data.categories.transport.nearest_poi.mode', 'air');
+});
+
+it('returns status=ok when ORS key is set but there are zero POIs', function (): void {
+    $ad = makeAd(Point::makeGeodetic(4.0511, 9.7679));
+
+    config(['services.ors.key' => 'test-ors-key']);
+
+    $service = new NeighborhoodScorecardService(
+        fakeHttpFactory(['overpass-api.de' => fakeOverpassResponse([])])
+    );
+    app()->instance(NeighborhoodScorecardService::class, $service);
+
+    $response = $this->getJson("/api/v1/ads/{$ad->id}/neighborhood-scorecard");
+
+    $response->assertOk()
+        ->assertJsonPath('data.status', 'ok')
+        ->assertJsonPath('data.categories.transport.nearest_poi', null);
+});
+
 it('returns null nearest_poi for categories with no POI found', function (): void {
     $ad = makeAd(Point::makeGeodetic(4.0511, 9.7679));
 

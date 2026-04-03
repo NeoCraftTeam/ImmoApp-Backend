@@ -93,10 +93,10 @@ final readonly class NeighborhoodScorecardService
         $elements = $rawPois ?? [];
 
         $nearest = $this->findNearestPois($elements, $lat, $lng);
-        [$distances, $mode] = $this->fetchDistances($lat, $lng, $nearest);
+        [$distances, $distStatus] = $this->fetchDistances($lat, $lng, $nearest);
         $categories = $this->buildCategories($nearest, $distances);
 
-        $status = $overpassFailed ? 'unavailable' : ($mode === 'air' ? 'degraded' : 'ok');
+        $status = $overpassFailed ? 'unavailable' : $distStatus;
 
         return [
             'payload' => [
@@ -248,15 +248,22 @@ OSM;
     // ─── ORS walking-distance matrix ─────────────────────────────────────────
 
     /**
+     * Returns per-category distances and a pipeline status:
+     *   'ok'       — haversine-by-design (no ORS key), or ORS succeeded
+     *   'degraded' — ORS was configured but the call failed
+     *
+     * Individual nearest_poi.mode still tells 'walking'|'air' per category.
+     *
      * @param  array<string, array{lat: float|null, lng: float|null}>  $nearest
-     * @return array{0: array<string, array{distance_m: int, mode: 'walking'|'air'}>, 1: 'walking'|'air'}
+     * @return array{0: array<string, array{distance_m: int, mode: 'walking'|'air'}>, 1: 'ok'|'degraded'}
      */
     private function fetchDistances(float $adLat, float $adLng, array $nearest): array
     {
         $apiKey = (string) config('services.ors.key', '');
 
+        // No ORS key — haversine is the designed baseline, not a failure
         if ($apiKey === '') {
-            return [$this->orthodromicDistances($adLat, $adLng, $nearest), 'air'];
+            return [$this->orthodromicDistances($adLat, $adLng, $nearest), 'ok'];
         }
 
         // Collect POIs that have coordinates — build [lng, lat] locations list (ORS order)
@@ -270,8 +277,9 @@ OSM;
             }
         }
 
+        // No POI has coordinates — empty area, not a system failure
         if (count($locations) <= 1) {
-            return [$this->orthodromicDistances($adLat, $adLng, $nearest), 'air'];
+            return [[], 'ok'];
         }
 
         try {
@@ -288,13 +296,12 @@ OSM;
             if (!$response->successful()) {
                 Log::info('NeighborhoodScorecard: ORS non-200, using haversine', ['status' => $response->status()]);
 
-                return [$this->orthodromicDistances($adLat, $adLng, $nearest), 'air'];
+                return [$this->orthodromicDistances($adLat, $adLng, $nearest), 'degraded'];
             }
 
-            // distances[0] is the single-source row; null = no pedestrian route
+            // distances[0] is the single-source row; null = no pedestrian route for that POI
             $row = $response->json('distances.0', []);
             $distances = [];
-            $anyAir = false;
 
             foreach ($orderedCats as $i => $cat) {
                 $raw = $row[$i] ?? null;
@@ -302,18 +309,17 @@ OSM;
                 if ($raw !== null) {
                     $distances[$cat] = ['distance_m' => (int) round((float) $raw), 'mode' => 'walking'];
                 } else {
-                    // No pedestrian route → orthodromic fallback for this POI
+                    // ORS returned null for this route — per-POI haversine fallback
                     $ortho = (int) round($this->haversine($adLat, $adLng, (float) $nearest[$cat]['lat'], (float) $nearest[$cat]['lng']));
                     $distances[$cat] = ['distance_m' => $ortho, 'mode' => 'air'];
-                    $anyAir = true;
                 }
             }
 
-            return [$distances, $anyAir ? 'air' : 'walking'];
+            return [$distances, 'ok'];
         } catch (\Throwable $e) {
             Log::info('NeighborhoodScorecard: ORS failed, using haversine', ['error' => $e->getMessage()]);
 
-            return [$this->orthodromicDistances($adLat, $adLng, $nearest), 'air'];
+            return [$this->orthodromicDistances($adLat, $adLng, $nearest), 'degraded'];
         }
     }
 
