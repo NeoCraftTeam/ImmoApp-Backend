@@ -102,4 +102,8 @@ return [
         'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
     ],
 
+    'ors' => [
+        'key' => env('ORS_API_KEY'),
+    ],
+
 ];
