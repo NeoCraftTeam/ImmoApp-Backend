@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 use App\Services\IsochroneService;
+use GuzzleHttp\Psr7\Response as Psr7Response;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Response as ClientResponse;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
-use GuzzleHttp\Psr7\Response as Psr7Response;
 
 uses(RefreshDatabase::class);
 
@@ -31,20 +31,28 @@ function fakeIsochroneOrsOk(): ClientResponse
 
 function fakeIsoHttpFactory(array $urlMap): HttpFactory
 {
-    $factory = new class ($urlMap) extends HttpFactory {
-        public function __construct(private array $urlMap) {}
+    $factory = new class($urlMap) extends HttpFactory
+    {
+        public function __construct(private readonly array $urlMap) {}
 
-        public function timeout(int $s): static { return $this; }
+        public function timeout(int $s): static
+        {
+            return $this;
+        }
 
-        public function withHeaders(array $h): static { return $this; }
+        public function withHeaders(array $h): static
+        {
+            return $this;
+        }
 
         public function post(string $url, array $data = []): ClientResponse
         {
             foreach ($this->urlMap as $pattern => $response) {
-                if (str_contains($url, $pattern)) {
+                if (str_contains($url, (string) $pattern)) {
                     return $response;
                 }
             }
+
             return new ClientResponse(new Psr7Response(404));
         }
     };
@@ -121,11 +129,11 @@ it('serves a cached isochrone without re-calling ORS', function (): void {
 
     $cacheKey = 'isochrone_foot-walking_4.051_9.768_15';
     Cache::put($cacheKey, [
-        'geojson'       => ['type' => 'FeatureCollection', 'features' => []],
-        'profile'       => 'foot-walking',
+        'geojson' => ['type' => 'FeatureCollection', 'features' => []],
+        'profile' => 'foot-walking',
         'range_minutes' => 15,
-        'center'        => ['lat' => 4.0511, 'lng' => 9.7679],
-        'cached'        => false,
+        'center' => ['lat' => 4.0511, 'lng' => 9.7679],
+        'cached' => false,
     ], 3600);
 
     // HTTP factory that should never be called

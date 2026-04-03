@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 use App\Services\DirectionsService;
+use GuzzleHttp\Psr7\Response as Psr7Response;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Response as ClientResponse;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
-use GuzzleHttp\Psr7\Response as Psr7Response;
 
 uses(RefreshDatabase::class);
 
@@ -18,8 +18,8 @@ function fakeDirOrsOk(float $distanceM = 3_200.0, float $durationS = 480.0): Cli
     $geojson = [
         'type' => 'FeatureCollection',
         'features' => [[
-            'type'       => 'Feature',
-            'geometry'   => ['type' => 'LineString', 'coordinates' => [[9.7679, 4.0511], [9.7720, 4.0550]]],
+            'type' => 'Feature',
+            'geometry' => ['type' => 'LineString', 'coordinates' => [[9.7679, 4.0511], [9.7720, 4.0550]]],
             'properties' => [
                 'summary' => ['distance' => $distanceM, 'duration' => $durationS],
             ],
@@ -33,20 +33,28 @@ function fakeDirOrsOk(float $distanceM = 3_200.0, float $durationS = 480.0): Cli
 
 function fakeDirHttpFactory(array $urlMap): HttpFactory
 {
-    $factory = new class ($urlMap) extends HttpFactory {
-        public function __construct(private array $urlMap) {}
+    $factory = new class($urlMap) extends HttpFactory
+    {
+        public function __construct(private readonly array $urlMap) {}
 
-        public function timeout(int $s): static { return $this; }
+        public function timeout(int $s): static
+        {
+            return $this;
+        }
 
-        public function withHeaders(array $h): static { return $this; }
+        public function withHeaders(array $h): static
+        {
+            return $this;
+        }
 
         public function post(string $url, array $data = []): ClientResponse
         {
             foreach ($this->urlMap as $pattern => $response) {
-                if (str_contains($url, $pattern)) {
+                if (str_contains($url, (string) $pattern)) {
                     return $response;
                 }
             }
+
             return new ClientResponse(new Psr7Response(404));
         }
     };
@@ -145,11 +153,11 @@ it('serves a cached route without re-calling ORS', function (): void {
 
     $cacheKey = 'directions_driving-car_4.051_9.768_4.055_9.772';
     Cache::put($cacheKey, [
-        'geojson'       => ['type' => 'FeatureCollection', 'features' => []],
-        'summary'       => ['distance_m' => 1000, 'duration_s' => 120, 'distance_label' => '1 km', 'duration_label' => '2 min'],
-        'profile'       => 'driving-car',
+        'geojson' => ['type' => 'FeatureCollection', 'features' => []],
+        'summary' => ['distance_m' => 1000, 'duration_s' => 120, 'distance_label' => '1 km', 'duration_label' => '2 min'],
+        'profile' => 'driving-car',
         'profile_label' => 'En voiture',
-        'cached'        => false,
+        'cached' => false,
     ], 3600);
 
     $service = new DirectionsService(fakeDirHttpFactory([]));

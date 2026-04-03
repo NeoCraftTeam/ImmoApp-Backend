@@ -10,11 +10,12 @@ use Illuminate\Support\Facades\Log;
 
 final readonly class DirectionsService
 {
-    private const ORS_URL   = 'https://api.openrouteservice.org/v2/directions';
-    private const CACHE_TTL = 3_600; // 1 h — routes are fairly stable
+    private const string ORS_URL = 'https://api.openrouteservice.org/v2/directions';
+
+    private const int CACHE_TTL = 3_600; // 1 h — routes are fairly stable
 
     /** Supported ORS profiles */
-    public const PROFILES = [
+    public const array PROFILES = [
         'foot-walking',
         'driving-car',
         'cycling-regular',
@@ -22,11 +23,11 @@ final readonly class DirectionsService
     ];
 
     /** Human-readable labels (fr) */
-    public const PROFILE_LABELS = [
-        'foot-walking'    => 'À pied',
-        'driving-car'     => 'En voiture',
+    public const array PROFILE_LABELS = [
+        'foot-walking' => 'À pied',
+        'driving-car' => 'En voiture',
         'cycling-regular' => 'À vélo',
-        'wheelchair'      => 'Fauteuil roulant',
+        'wheelchair' => 'Fauteuil roulant',
     ];
 
     public function __construct(private HttpFactory $http) {}
@@ -102,33 +103,33 @@ final readonly class DirectionsService
                     'instructions' => false,
                 ]);
 
-            if (! $response->successful()) {
+            if (!$response->successful()) {
                 Log::info('DirectionsService: ORS error', ['status' => $response->status()]);
 
                 return null;
             }
 
-            $json    = $response->json();
+            $json = $response->json();
             $segment = $json['features'][0]['properties']['summary'] ?? null;
 
             if ($segment === null) {
                 return null;
             }
 
-            $distanceM  = (int) round((float) ($segment['distance'] ?? 0));
-            $durationS  = (int) round((float) ($segment['duration'] ?? 0));
+            $distanceM = (int) round((float) ($segment['distance'] ?? 0));
+            $durationS = (int) round((float) ($segment['duration'] ?? 0));
 
             return [
-                'geojson'       => $json,
-                'summary'       => [
-                    'distance_m'     => $distanceM,
-                    'duration_s'     => $durationS,
+                'geojson' => $json,
+                'summary' => [
+                    'distance_m' => $distanceM,
+                    'duration_s' => $durationS,
                     'distance_label' => $this->formatDistance($distanceM),
                     'duration_label' => $this->formatDuration($durationS),
                 ],
-                'profile'       => $profile,
+                'profile' => $profile,
                 'profile_label' => self::PROFILE_LABELS[$profile] ?? $profile,
-                'cached'        => false,
+                'cached' => false,
             ];
         } catch (\Throwable $e) {
             Log::info('DirectionsService: request failed', ['error' => $e->getMessage()]);
@@ -148,7 +149,7 @@ final readonly class DirectionsService
 
     private function formatDuration(int $seconds): string
     {
-        $hours   = intdiv($seconds, 3600);
+        $hours = intdiv($seconds, 3600);
         $minutes = intdiv($seconds % 3600, 60);
 
         if ($hours > 0) {

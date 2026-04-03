@@ -10,12 +10,14 @@ use Illuminate\Support\Facades\Log;
 
 final readonly class IsochroneService
 {
-    private const ORS_URL     = 'https://api.openrouteservice.org/v2/isochrones';
-    private const CACHE_TTL   = 86_400;   // 24 h — isochrones are stable
-    private const CACHE_TTL_FAIL = 300;   // 5 min on ORS error
+    private const string ORS_URL = 'https://api.openrouteservice.org/v2/isochrones';
+
+    private const int CACHE_TTL = 86_400;   // 24 h — isochrones are stable
+
+    private const int CACHE_TTL_FAIL = 300;   // 5 min on ORS error
 
     /** Supported ORS foot/vehicle profiles */
-    public const PROFILES = [
+    public const array PROFILES = [
         'foot-walking',
         'driving-car',
         'cycling-regular',
@@ -28,7 +30,7 @@ final readonly class IsochroneService
      * Return an isochrone GeoJSON FeatureCollection for the given point.
      *
      * @return array{geojson: array<string, mixed>, profile: string, range_minutes: int, center: array{lat: float, lng: float}, cached: bool}|null
-     *         Null when ORS is not configured.
+     *                                                                                                                                             Null when ORS is not configured.
      */
     public function get(float $lat, float $lng, string $profile, int $rangeMinutes): ?array
     {
@@ -79,25 +81,25 @@ final readonly class IsochroneService
                 ->timeout(10)
                 ->withHeaders(['Authorization' => $apiKey])
                 ->post(self::ORS_URL.'/'.$profile, [
-                    'locations'   => [[$lng, $lat]],
-                    'range'       => [$rangeMinutes * 60],
-                    'range_type'  => 'time',
-                    'attributes'  => ['area'],
-                    'units'       => 'm',
+                    'locations' => [[$lng, $lat]],
+                    'range' => [$rangeMinutes * 60],
+                    'range_type' => 'time',
+                    'attributes' => ['area'],
+                    'units' => 'm',
                 ]);
 
-            if (! $response->successful()) {
+            if (!$response->successful()) {
                 Log::info('IsochroneService: ORS error', ['status' => $response->status()]);
 
                 return null;
             }
 
             return [
-                'geojson'       => $response->json(),
-                'profile'       => $profile,
+                'geojson' => $response->json(),
+                'profile' => $profile,
                 'range_minutes' => $rangeMinutes,
-                'center'        => ['lat' => $lat, 'lng' => $lng],
-                'cached'        => false,
+                'center' => ['lat' => $lat, 'lng' => $lng],
+                'cached' => false,
             ];
         } catch (\Throwable $e) {
             Log::info('IsochroneService: request failed', ['error' => $e->getMessage()]);
