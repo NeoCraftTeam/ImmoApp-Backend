@@ -42,8 +42,8 @@ final class SecurityHeaders
         // CSP — API endpoints receive a strict deny-all (no HTML rendered).
         // The Swagger UI documentation page is excluded and gets its own policy.
         // Web/Filament panel responses receive a nonce-based policy.
-        $isApiRoute    = $request->is('api/*') && !$request->routeIs('ads.pdf');
-        $isDocsRoute   = $request->is('api/documentation') || $request->is('docs/*') || $request->is('api/oauth2-callback');
+        $isApiRoute = $request->is('api/*') && !$request->routeIs('ads.pdf');
+        $isDocsRoute = $request->is('api/documentation') || $request->is('docs/*') || $request->is('api/oauth2-callback');
 
         if ($isApiRoute && !$isDocsRoute) {
             $response->headers->set('Content-Security-Policy', "default-src 'none'");
