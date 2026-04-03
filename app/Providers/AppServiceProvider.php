@@ -88,19 +88,29 @@ class AppServiceProvider extends ServiceProvider
         // pour que les clients email (Gmail, Outlook) puissent charger l'image.
         // Les data: URI sont bloqués par la plupart des clients email modernes.
         View::composer(['emails.*', 'emails.reservation.*'], function ($view): void {
-            $logoPath = public_path('images/keyhomelogo_email.png');
             $assetBase = rtrim((string) config('app.mail_asset_base_url', config('app.url')), '/');
-            $emailLogoUrl = $assetBase.'/images/keyhomelogo_email.png';
 
-            // Base64 kept as last-resort fallback for SMTP preview tools only
+            // Client (pink) logo
+            $logoPath = public_path('images/keyhomelogo_email.png');
+            $emailLogoUrl = $assetBase.'/images/keyhomelogo_email.png';
             $emailLogoBase64 = '';
             if (file_exists($logoPath) && filesize($logoPath) < 150000) {
                 $emailLogoBase64 = base64_encode((string) file_get_contents($logoPath));
             }
 
+            // Owner (teal) logo — used by owner-layout
+            $tealLogoPath = public_path('images/logo-teal.png');
+            $emailOwnerLogoUrl = $assetBase.'/images/logo-teal.png';
+            $emailOwnerLogoBase64 = '';
+            if (file_exists($tealLogoPath) && filesize($tealLogoPath) < 150000) {
+                $emailOwnerLogoBase64 = base64_encode((string) file_get_contents($tealLogoPath));
+            }
+
             $view->with([
                 'emailLogoUrl' => $emailLogoUrl,
                 'emailLogoBase64' => $emailLogoBase64,
+                'emailOwnerLogoUrl' => $emailOwnerLogoUrl,
+                'emailOwnerLogoBase64' => $emailOwnerLogoBase64,
                 'emailFrontendUrl' => config('app.frontend_url', config('app.url')),
             ]);
         });

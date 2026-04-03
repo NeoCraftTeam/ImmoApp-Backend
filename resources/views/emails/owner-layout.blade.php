@@ -253,10 +253,10 @@
             <div class="header">
                 <a href="{{ $emailFrontendUrl ?? (rtrim(config('app.frontend_url', config('app.url')), '/') . '/owner') }}" style="display: inline-block;">
                     @php
-                        $resolvedLogoUrl = $emailLogoUrl ?? asset('images/logo-teal.png');
+                        $resolvedLogoUrl = $emailOwnerLogoUrl ?? asset('images/logo-teal.png');
                     @endphp
-                    @if(!empty($emailLogoBase64))
-                        <img src="data:image/png;base64,{{ $emailLogoBase64 }}"
+                    @if(!empty($emailOwnerLogoBase64))
+                        <img src="data:image/png;base64,{{ $emailOwnerLogoBase64 }}"
                             alt="{{ config('app.name') }}"
                             class="logo-img"
                             style="max-height: 48px; height: auto; width: auto;" />
