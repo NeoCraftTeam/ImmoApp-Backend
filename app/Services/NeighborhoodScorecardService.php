@@ -190,7 +190,7 @@ OSM;
             $dist = $this->haversine($adLat, $adLng, $poiLat, $poiLng);
 
             if (!isset($acc[$category]['_dist']) || $dist < $acc[$category]['_dist']) {
-                $acc[$category] = array_merge($acc[$category] ?? [], [
+                $acc[$category] = array_merge($acc[$category], [
                     'osm_id' => (string) ($poi['id'] ?? ''),
                     'name' => isset($tags['name']) ? (string) $tags['name'] : null,
                     'lat' => $poiLat,
