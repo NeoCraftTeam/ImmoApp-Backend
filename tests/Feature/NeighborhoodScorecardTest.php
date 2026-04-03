@@ -15,7 +15,7 @@ uses(RefreshDatabase::class);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function makeAd(?Point $location = null): Ad
+function makeScorecardAd(?Point $location = null): Ad
 {
     $user = User::factory()->create();
     $ad   = null;
@@ -91,7 +91,7 @@ it('returns 404 for a non-existent ad', function (): void {
 });
 
 it('returns 422 when the ad has no GPS coordinates', function (): void {
-    $ad = makeAd();
+    $ad = makeScorecardAd();
     // Null out location via raw SQL on the model's own connection (avoids schema-prefix issues)
     $ad->getConnection()->statement(
         'UPDATE '.$ad->getConnection()->getTablePrefix().$ad->getTable().' SET location = NULL WHERE id = ?',
@@ -106,7 +106,7 @@ it('returns 422 when the ad has no GPS coordinates', function (): void {
 // ─── Cache tests ──────────────────────────────────────────────────────────────
 
 it('serves a v2 cached scorecard without re-computing', function (): void {
-    $ad = makeAd(Point::makeGeodetic(4.0511, 9.7679));
+    $ad = makeScorecardAd(Point::makeGeodetic(4.0511, 9.7679));
 
     $cached = [
         'global_score' => 68,
@@ -135,7 +135,7 @@ it('serves a v2 cached scorecard without re-computing', function (): void {
 });
 
 it('invalidates a legacy v1 cache entry and re-computes', function (): void {
-    $ad = makeAd(Point::makeGeodetic(4.0511, 9.7679));
+    $ad = makeScorecardAd(Point::makeGeodetic(4.0511, 9.7679));
 
     // v1 entry: categories have NO nearest_poi key
     $legacyCache = [
@@ -169,7 +169,7 @@ it('invalidates a legacy v1 cache entry and re-computes', function (): void {
 // ─── Overpass / scoring tests ─────────────────────────────────────────────────
 
 it('returns status=unavailable and short-TTL response when Overpass fails', function (): void {
-    $ad = makeAd(Point::makeGeodetic(4.0511, 9.7679));
+    $ad = makeScorecardAd(Point::makeGeodetic(4.0511, 9.7679));
 
     $service = new NeighborhoodScorecardService(
         fakeHttpFactory(['overpass-api.de' => new ClientResponse(new Psr7Response(503))])
@@ -182,7 +182,7 @@ it('returns status=unavailable and short-TTL response when Overpass fails', func
 });
 
 it('returns named nearest_poi and ORS walking distance when ORS is configured', function (): void {
-    $ad = makeAd(Point::makeGeodetic(4.0511, 9.7679));
+    $ad = makeScorecardAd(Point::makeGeodetic(4.0511, 9.7679));
 
     config(['services.ors.key' => 'test-ors-key']);
 
@@ -211,7 +211,7 @@ it('returns named nearest_poi and ORS walking distance when ORS is configured', 
 });
 
 it('falls back to mode=air when ORS returns 429 and marks status=degraded', function (): void {
-    $ad = makeAd(Point::makeGeodetic(4.0511, 9.7679));
+    $ad = makeScorecardAd(Point::makeGeodetic(4.0511, 9.7679));
 
     config(['services.ors.key' => 'test-ors-key']);
 
@@ -238,7 +238,7 @@ it('falls back to mode=air when ORS returns 429 and marks status=degraded', func
 });
 
 it('returns status=ok when no ORS key is set even with POIs (haversine is by design)', function (): void {
-    $ad = makeAd(Point::makeGeodetic(4.0511, 9.7679));
+    $ad = makeScorecardAd(Point::makeGeodetic(4.0511, 9.7679));
 
     // Explicitly no ORS key
     config(['services.ors.key' => null]);
@@ -262,7 +262,7 @@ it('returns status=ok when no ORS key is set even with POIs (haversine is by des
 });
 
 it('returns status=ok when ORS key is set but there are zero POIs', function (): void {
-    $ad = makeAd(Point::makeGeodetic(4.0511, 9.7679));
+    $ad = makeScorecardAd(Point::makeGeodetic(4.0511, 9.7679));
 
     config(['services.ors.key' => 'test-ors-key']);
 
@@ -279,7 +279,7 @@ it('returns status=ok when ORS key is set but there are zero POIs', function ():
 });
 
 it('returns null nearest_poi for categories with no POI found', function (): void {
-    $ad = makeAd(Point::makeGeodetic(4.0511, 9.7679));
+    $ad = makeScorecardAd(Point::makeGeodetic(4.0511, 9.7679));
 
     $service = new NeighborhoodScorecardService(
         fakeHttpFactory(['overpass-api.de' => fakeOverpassResponse([])])
@@ -294,7 +294,7 @@ it('returns null nearest_poi for categories with no POI found', function (): voi
 });
 
 it('computes correct global score from weighted category scores', function (): void {
-    $ad = makeAd(Point::makeGeodetic(4.0511, 9.7679));
+    $ad = makeScorecardAd(Point::makeGeodetic(4.0511, 9.7679));
 
     // 3 bus stops + 2 clinics + 1 school → known scores: transport=75, sante=80, education=55
     $elements = [
