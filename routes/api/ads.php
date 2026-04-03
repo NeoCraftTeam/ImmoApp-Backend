@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\AdSearchController;
 use App\Http\Controllers\Api\V1\AdStatusController;
 use App\Http\Controllers\Api\V1\KeyScoreController;
 use App\Http\Controllers\Api\V1\MyAdsController;
+use App\Http\Controllers\Api\V1\NeighborhoodScorecardController;
 use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\TourController;
 use App\Models\Review;
@@ -98,6 +99,10 @@ Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner'])->prefix('m
 // KeyScore
 Route::get('/ads/{ad}/keyscore', [KeyScoreController::class, 'show'])
     ->middleware('throttle:60,1');
+
+// Neighborhood scorecard (OSM Overpass — cached 7 days)
+Route::get('/ads/{ad}/neighborhood-scorecard', NeighborhoodScorecardController::class)
+    ->middleware(['optional.auth', 'throttle:30,1']);
 
 // PDF export — public for available ads, owner/admin for others
 Route::get('/ads/{ad}/pdf', [AdPdfController::class, 'download'])
