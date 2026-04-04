@@ -35,7 +35,7 @@ class ReviewResource extends Resource
 
     protected static bool $isScopedToTenant = false;
 
-    protected static string|null|\UnitEnum $navigationGroup = 'Utilisateurs';
+    protected static string|null|\UnitEnum $navigationGroup = 'Membres';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::Star;
 
@@ -97,30 +97,69 @@ class ReviewResource extends Resource
     public static function infolist(Schema $schema): Schema
     {
         return $schema
+            ->columns(2)
             ->components([
-                TextEntry::make('rating')
-                    ->label('Note')
-                    ->numeric(),
-                TextEntry::make('comment')
-                    ->label('Commentaire')
-                    ->placeholder('-')
-                    ->columnSpanFull(),
-                TextEntry::make('ad.title')
-                    ->label('Annonce'),
-                TextEntry::make('user.fullname')
-                    ->label('Utilisateur'),
-                TextEntry::make('created_at')
-                    ->label('Créé le')
-                    ->dateTime('d/m/Y à H:i')
-                    ->placeholder('-'),
-                TextEntry::make('updated_at')
-                    ->label('Modifié le')
-                    ->dateTime('d/m/Y à H:i')
-                    ->placeholder('-'),
-                TextEntry::make('deleted_at')
-                    ->label('Supprimé le')
-                    ->dateTime('d/m/Y à H:i')
-                    ->visible(fn (Review $record): bool => $record->trashed()),
+                // ── Évaluation ──────────────────────────────────────────────────
+                Section::make('Évaluation')
+                    ->icon(Heroicon::Star)
+                    ->iconColor('warning')
+                    ->description('Note et commentaire laissés par l\'utilisateur sur ce logement')
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('rating')
+                            ->label('Note globale')
+                            ->badge()
+                            ->size('lg')
+                            ->color(fn (int $state): string => match (true) {
+                                $state >= 4 => 'success',
+                                $state >= 3 => 'warning',
+                                default => 'danger',
+                            })
+                            ->formatStateUsing(fn (int $state): string => str_repeat('★', $state).str_repeat('☆', 5 - $state).'  '.$state.' / 5'
+                            ),
+                        TextEntry::make('user.fullname')
+                            ->label('Auteur de l\'avis')
+                            ->icon(Heroicon::UserCircle)
+                            ->iconColor('primary')
+                            ->weight('semibold'),
+                        TextEntry::make('ad.title')
+                            ->label('Annonce concernée')
+                            ->icon(Heroicon::Megaphone)
+                            ->iconColor('info')
+                            ->limit(80)
+                            ->columnSpanFull(),
+                        TextEntry::make('comment')
+                            ->label('Commentaire')
+                            ->placeholder('Aucun commentaire rédigé')
+                            ->columnSpanFull()
+                            ->prose(),
+                    ]),
+
+                // ── Horodatage ──────────────────────────────────────────────────
+                Section::make('Horodatage')
+                    ->icon(Heroicon::Clock)
+                    ->iconColor('gray')
+                    ->collapsible()
+                    ->collapsed()
+                    ->columns(3)
+                    ->schema([
+                        TextEntry::make('created_at')
+                            ->label('Publié le')
+                            ->icon(Heroicon::CalendarDays)
+                            ->dateTime('d/m/Y à H:i')
+                            ->placeholder('—'),
+                        TextEntry::make('updated_at')
+                            ->label('Modifié le')
+                            ->icon(Heroicon::PencilSquare)
+                            ->dateTime('d/m/Y à H:i')
+                            ->placeholder('—'),
+                        TextEntry::make('deleted_at')
+                            ->label('Supprimé le')
+                            ->icon(Heroicon::Trash)
+                            ->iconColor('danger')
+                            ->dateTime('d/m/Y à H:i')
+                            ->visible(fn (Review $record): bool => $record->trashed()),
+                    ]),
             ]);
     }
 
@@ -170,7 +209,14 @@ class ReviewResource extends Resource
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                ViewAction::make(),
+                ViewAction::make()
+                    ->slideOver()
+                    ->modalIcon('heroicon-o-star')
+                    ->modalIconColor('warning')
+                    ->modalHeading(fn (Review $record): string => str_repeat('★', (int) $record->rating).str_repeat('☆', 5 - (int) $record->rating)
+                        .'  Avis de '.($record->user->fullname ?? 'Utilisateur')
+                    )
+                    ->modalWidth('2xl'),
                 DeleteAction::make()
                     ->successNotificationTitle('Avis supprimé'),
                 ForceDeleteAction::make()

@@ -179,7 +179,15 @@ trait SharedReviewResource
                     ]),
             ])
             ->recordActions([
-                ViewAction::make(),
+                ViewAction::make()
+                    ->slideOver()
+                    ->modalIcon('heroicon-o-star')
+                    ->modalIconColor('warning')
+                    ->modalHeading(fn ($record): string => str_repeat('★', (int) $record->rating)
+                        .str_repeat('☆', 5 - (int) $record->rating)
+                        .'  Avis de '.($record->user->fullname ?? 'Client')
+                    )
+                    ->modalWidth('2xl'),
             ])
             ->toolbarActions([])
             ->emptyStateHeading('Aucun avis pour le moment')

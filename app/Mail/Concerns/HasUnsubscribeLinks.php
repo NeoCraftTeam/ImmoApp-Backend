@@ -32,7 +32,7 @@ trait HasUnsubscribeLinks
     {
         $user = $this->resolveRecipientUser();
 
-        if (!$user) {
+        if (!$user) { // @phpstan-ignore-line booleanNot.alwaysFalse
             return ['unsubscribeUrl' => null, 'preferencesUrl' => null];
         }
 
@@ -69,7 +69,7 @@ trait HasUnsubscribeLinks
     {
         $user = $this->resolveRecipientUser();
 
-        if (!$user) {
+        if (!$user) { // @phpstan-ignore-line booleanNot.alwaysFalse
             return false;
         }
 

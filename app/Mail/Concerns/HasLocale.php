@@ -26,7 +26,7 @@ trait HasLocale
         $user = $this->resolveRecipientUser();
         $fallback = config('app.locale', 'fr');
         $locale = $fallback;
-        if ($user !== null && $user->locale !== '') {
+        if ($user !== null && $user->locale !== '') { // @phpstan-ignore-line notIdentical.alwaysTrue
             $locale = $user->locale;
         }
 

@@ -16,6 +16,7 @@ use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -30,7 +31,7 @@ class UnlockedAdResource extends Resource
 
     protected static bool $isScopedToTenant = false;
 
-    protected static string|null|\UnitEnum $navigationGroup = 'Administration';
+    protected static string|null|\UnitEnum $navigationGroup = 'Finances';
 
     protected static ?int $navigationSort = 2;
 
@@ -81,21 +82,57 @@ class UnlockedAdResource extends Resource
     public static function infolist(Schema $schema): Schema
     {
         return $schema
+            ->columns(2)
             ->components([
-                TextEntry::make('ad.user.fullname')->label('Propriétaire'),
-                TextEntry::make('ad.title')
-                    ->label('Annonce'),
-                TextEntry::make('user.fullname')
-                    ->label('Débloquée par'),
-                TextEntry::make('payment.transaction_id')
-                    ->label('ID Paiement'),
-                TextEntry::make('unlocked_at')
-                    ->label('Débloqué le')
-                    ->dateTime('d/m/Y à H:i'),
-                TextEntry::make('deleted_at')
-                    ->label('Supprimé le')
-                    ->dateTime('d/m/Y à H:i')
-                    ->visible(fn (UnlockedAd $record): bool => $record->trashed()),
+                // ── Opération de déblocage ──────────────────────────────────────
+                Section::make('Déblocage')
+                    ->icon(Heroicon::LockOpen)
+                    ->iconColor('success')
+                    ->description('Détails de l\'opération de déblocage d\'annonce')
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('unlocked_at')
+                            ->label('Débloqué le')
+                            ->icon(Heroicon::CalendarDays)
+                            ->iconColor('success')
+                            ->dateTime('d/m/Y à H:i')
+                            ->badge()
+                            ->color('success'),
+                        TextEntry::make('payment.transaction_id')
+                            ->label('Référence paiement')
+                            ->icon(Heroicon::QrCode)
+                            ->copyable()
+                            ->copyMessage('Référence copiée !')
+                            ->badge()
+                            ->color('gray'),
+                        TextEntry::make('ad.title')
+                            ->label('Annonce débloquée')
+                            ->icon(Heroicon::Megaphone)
+                            ->iconColor('info')
+                            ->columnSpanFull(),
+                    ]),
+
+                // ── Parties impliquées ─────────────────────────────────────────
+                Section::make('Parties impliquées')
+                    ->icon(Heroicon::Users)
+                    ->iconColor('primary')
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('user.fullname')
+                            ->label('Débloquée par (locataire)')
+                            ->icon(Heroicon::UserCircle)
+                            ->iconColor('primary'),
+                        TextEntry::make('ad.user.fullname')
+                            ->label('Propriétaire de l\'annonce')
+                            ->icon(Heroicon::HomeModern)
+                            ->iconColor('warning'),
+                        TextEntry::make('deleted_at')
+                            ->label('Supprimé le')
+                            ->icon(Heroicon::Trash)
+                            ->iconColor('danger')
+                            ->dateTime('d/m/Y à H:i')
+                            ->visible(fn (UnlockedAd $record): bool => $record->trashed()),
+                    ]),
             ]);
     }
 
@@ -130,7 +167,13 @@ class UnlockedAdResource extends Resource
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                ViewAction::make(),
+                ViewAction::make()
+                    ->slideOver()
+                    ->modalIcon('heroicon-o-lock-open')
+                    ->modalIconColor('success')
+                    ->modalHeading(fn (UnlockedAd $record): string => 'Déblocage — '.($record->ad->title ?? 'Annonce')
+                    )
+                    ->modalWidth('2xl'),
             ])
             ->headerActions([
 
