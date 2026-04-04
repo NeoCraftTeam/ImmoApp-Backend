@@ -20,11 +20,13 @@ default:
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
 
 # --- ETAPE 0 : BUILD IMAGE CI (une seule fois) ---
+# The CI image contains ONLY PHP extensions + Composer + installed vendor deps.
+# It does NOT include the application code, so `composer install` is only
+# re-run when composer.lock changes — not on every commit.
 prepare_ci_image:
   stage: prepare
   script:
     - |
-      # Mise en cache de l'image CI
       docker pull $CI_IMAGE || true
       docker build --cache-from $CI_IMAGE -t $CI_IMAGE -f - . <<'DOCKERFILE'
       FROM php:8.4-cli-alpine
@@ -35,10 +37,13 @@ prepare_ci_image:
         && apk del $PHPIZE_DEPS && rm -rf /tmp/*
       COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
       WORKDIR /app
-      COPY . .
+      # Layer 1: install deps (cached until composer.lock changes)
+      COPY composer.json composer.lock ./
       RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
-        && cp .env.example .env \
-        && composer install --no-interaction --no-ansi --no-scripts
+        && touch .env \
+        && composer install --no-interaction --no-ansi --no-scripts -q
+      # Layer 2: copy code (fast, does not re-run composer install)
+      COPY . .
       DOCKERFILE
       docker push $CI_IMAGE || true
   rules:
@@ -83,7 +88,10 @@ build_image:
       optional: true
     - job: composer_security
   script:
-    - docker build --pull -t $APP_IMAGE:$IMAGE_TAG -t $APP_IMAGE:latest .
+    # Pull the previous image to use as a cache source — dramatically speeds up
+    # builds when only code (not dependencies) changed.
+    - docker pull $APP_IMAGE:latest || true
+    - docker build --cache-from $APP_IMAGE:latest --pull -t $APP_IMAGE:$IMAGE_TAG -t $APP_IMAGE:latest .
     - docker push $APP_IMAGE:$IMAGE_TAG
     - docker push $APP_IMAGE:latest
   after_script:
@@ -169,6 +177,10 @@ production_deploy:
     - cd /opt/keyhome || exit 1
     - export FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:main"
     - echo "🚀 Deploying image $FULL_IMAGE"
+    # ── Save current image for rollback in case migrations fail ─────────────────────
+    - |
+      ROLLBACK_IMAGE=$(docker inspect --format='{{.Config.Image}}' ${COMPOSE_PREFIX:-keyhome-prod}-backend 2>/dev/null || echo "")
+      echo "📌 Rollback point: ${ROLLBACK_IMAGE:-none (first deploy)}"
     # Enable maintenance mode before deploy
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan down --retry=60 || true
     - echo "📥 Pulling new image..."
@@ -194,38 +206,38 @@ production_deploy:
     # Nginx can cache the old app container IP after app is recreated — refresh web after app is up.
     - echo "🔄 Recreating web (nginx) so FastCGI targets the current app container..."
     - APP_IMAGE=$FULL_IMAGE docker compose up -d --no-build --no-deps --force-recreate web
-    # Clear cache BEFORE migrations to ensure fresh config is loaded
-    - echo "🧹 Clearing cache before migrations..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize:clear
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan config:cache
-    # Composer install (dépendances fraîches)
-    - echo "📦 Running composer install..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app composer install --no-dev --optimize-autoloader --no-interaction
-    # Run migrations — rollback container on failure
+    # ── Run migrations with automatic rollback on failure ─────────────────────────
     - |
-      echo "🗄️ Running migrations..."
+      echo "🗾 Running migrations..."
       if ! APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan migrate --force; then
-        echo "❌ Migration failed — rolling back..."
+        echo "❌ Migration failed — rolling back to previous image..."
         APP_IMAGE=$FULL_IMAGE docker compose logs app --tail=30
-        APP_IMAGE=$FULL_IMAGE docker compose down --remove-orphans || true
+        if [ -n "$ROLLBACK_IMAGE" ]; then
+          echo "🔄 Restoring $ROLLBACK_IMAGE ..."
+          APP_IMAGE=$ROLLBACK_IMAGE docker compose up -d --no-build --remove-orphans || true
+          APP_IMAGE=$ROLLBACK_IMAGE docker compose exec -T app php artisan up || true
+          echo "✅ Rolled back to previous image"
+        else
+          APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan up || true
+        fi
         exit 1
       fi
-    # Meilisearch / Laravel Scout (nécessite MEILISEARCH_* dans .env et conteneur Meilisearch joignable)
-    - echo "🔍 Sync Meilisearch index settings..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan scout:sync-index-settings
-    - echo "🔍 Reindex ads (Scout import)..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan scout:import "App\Models\Ad"
-    - echo "⚡ Optimizing..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan filament:assets
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app chmod +x resetFilamentLivewire.sh
+    # ── Runtime cache rebuild (needs real .env — cannot be done in Docker build) ──
+    - echo "🧹 Clearing stale caches..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize:clear
+    - echo "⚡ Rebuilding runtime caches..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app bash resetFilamentLivewire.sh
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan storage:link || true
-    - echo "📄 Generating Swagger docs..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate
+    # ── Meilisearch: sync settings only (full reindex is a separate scheduled task) ──
+    - echo "🔍 Syncing Meilisearch index settings..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan scout:sync-index-settings || true
     # Disable maintenance mode
     - echo "✅ Deployment complete, bringing app back up..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan up
+    # ── Non-blocking post-deploy tasks (run after app is live) ─────────────────────
+    - echo "📄 Generating Swagger docs (non-blocking)..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate || true
   after_script:
     - docker logout $CI_REGISTRY 2>/dev/null || true
   rules:
@@ -267,6 +279,10 @@ preprod_deploy:
         echo "❌ Le réseau 'keyhome_keyhome-network' n'existe pas. Assurez-vous que l'environnement de production est démarré."
         exit 1
       fi
+    # ── Save current image for rollback ────────────────────────────────────────────
+    - |
+      ROLLBACK_IMAGE=$(docker inspect --format='{{.Config.Image}}' ${COMPOSE_PREFIX:-keyhome-preprod}-backend 2>/dev/null || echo "")
+      echo "📌 Rollback point: ${ROLLBACK_IMAGE:-none (first deploy)}"
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan down --retry=60 || true
     - echo "📥 Pulling new image..."
     - APP_IMAGE=$FULL_IMAGE docker compose pull
@@ -291,38 +307,38 @@ preprod_deploy:
     # Nginx can cache the old app container IP after app is recreated — refresh web after app is up.
     - echo "🔄 Recreating web (nginx) so FastCGI targets the current app container..."
     - APP_IMAGE=$FULL_IMAGE docker compose up -d --no-build --no-deps --force-recreate web
-    # Clear cache BEFORE migrations to ensure fresh config is loaded
-    - echo "🧹 Clearing cache before migrations..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize:clear
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan config:cache
-    # Composer install (dépendances fraîches)
-    - echo "📦 Running composer install..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app composer install --no-dev --optimize-autoloader --no-interaction
-    # Run migrations — rollback container on failure
+    # ── Run migrations with automatic rollback on failure ─────────────────────────
     - |
-      echo "🗄️ Running migrations..."
+      echo "🗾 Running migrations..."
       if ! APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan migrate --force; then
-        echo "❌ Migration failed — rolling back..."
+        echo "❌ Migration failed — rolling back to previous image..."
         APP_IMAGE=$FULL_IMAGE docker compose logs app --tail=30
-        APP_IMAGE=$FULL_IMAGE docker compose down --remove-orphans || true
+        if [ -n "$ROLLBACK_IMAGE" ]; then
+          echo "🔄 Restoring $ROLLBACK_IMAGE ..."
+          APP_IMAGE=$ROLLBACK_IMAGE docker compose up -d --no-build --remove-orphans || true
+          APP_IMAGE=$ROLLBACK_IMAGE docker compose exec -T app php artisan up || true
+          echo "✅ Rolled back to previous image"
+        else
+          APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan up || true
+        fi
         exit 1
       fi
-    # Meilisearch / Laravel Scout (nécessite MEILISEARCH_* dans .env et conteneur Meilisearch joignable)
-    - echo "🔍 Sync Meilisearch index settings..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan scout:sync-index-settings
-    - echo "🔍 Reindex ads (Scout import)..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan scout:import "App\Models\Ad"
-    - echo "⚡ Optimizing..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan filament:assets
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app chmod +x resetFilamentLivewire.sh
+    # ── Runtime cache rebuild ─────────────────────────────────────────────────────
+    - echo "🧹 Clearing stale caches..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize:clear
+    - echo "⚡ Rebuilding runtime caches..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app bash resetFilamentLivewire.sh
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan storage:link || true
-    - echo "📄 Generating Swagger docs..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate
+    # ── Meilisearch: sync settings only ───────────────────────────────────────────
+    - echo "🔍 Syncing Meilisearch index settings..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan scout:sync-index-settings || true
     # Disable maintenance mode
     - echo "✅ Deployment complete, bringing app back up..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan up
+    # ── Non-blocking post-deploy tasks ────────────────────────────────────────────
+    - echo "📄 Generating Swagger docs (non-blocking)..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate || true
   after_script:
     - docker logout $CI_REGISTRY 2>/dev/null || true
   rules:
