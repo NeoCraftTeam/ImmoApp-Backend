@@ -69,6 +69,8 @@ final readonly class AdSearchController
             $type = $validated['type'] ?? null;
             $typeId = $validated['type_id'] ?? null;
             $quarterId = $validated['quarter_id'] ?? null;
+            $quarterName = $validated['quarter'] ?? null;
+            $transactionType = $validated['transaction_type'] ?? null;
 
             $minBedrooms = isset($validated['bedrooms']) ? (int) $validated['bedrooms'] : null;
             $minBathrooms = isset($validated['bathrooms']) ? (int) $validated['bathrooms'] : null;
@@ -100,6 +102,12 @@ final readonly class AdSearchController
             }
             if (!empty($quarterId)) {
                 $filters[] = sprintf('quarter_id = %d', (int) $quarterId);
+            }
+            if (!empty($quarterName)) {
+                $filters[] = sprintf("quarter = '%s'", str_replace("'", "\\'", $quarterName));
+            }
+            if (!empty($transactionType)) {
+                $filters[] = sprintf("transaction_type = '%s'", $transactionType);
             }
             if ($minBedrooms !== null) {
                 $filters[] = sprintf('bedrooms >= %d', $minBedrooms);
@@ -192,6 +200,8 @@ final readonly class AdSearchController
         $type = $validated['type'] ?? null;
         $typeId = $validated['type_id'] ?? null;
         $quarterId = $validated['quarter_id'] ?? null;
+        $quarterName = $validated['quarter'] ?? null;
+        $transactionType = $validated['transaction_type'] ?? null;
         $perPage = min(max((int) ($validated['per_page'] ?? config('pagination.per_page', 15)), 1), 100);
         $minBedrooms = isset($validated['bedrooms']) ? (int) $validated['bedrooms'] : null;
         $minBathrooms = isset($validated['bathrooms']) ? (int) $validated['bathrooms'] : null;
@@ -227,6 +237,8 @@ final readonly class AdSearchController
 
         if ($quarterId) {
             $query->where('quarter_id', $quarterId);
+        } elseif ($quarterName) {
+            $query->whereHas('quarter', fn ($qb) => $qb->where('name', 'ilike', $quarterName));
         } elseif ($city) {
             $query->whereHas('quarter.city', fn ($qb) => $qb->where('name', 'ilike', "%{$city}%"));
         }
@@ -268,6 +280,10 @@ final readonly class AdSearchController
 
         if ($isVerified) {
             $query->where('is_verified', true);
+        }
+
+        if ($transactionType) {
+            $query->where('transaction_type', $transactionType);
         }
 
         foreach ($amenities as $amenity) {
