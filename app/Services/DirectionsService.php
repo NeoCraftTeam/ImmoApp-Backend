@@ -149,8 +149,23 @@ final readonly class DirectionsService
 
     private function formatDuration(int $seconds): string
     {
-        $hours = intdiv($seconds, 3600);
-        $minutes = intdiv($seconds % 3600, 60);
+        $totalMinutes = intdiv($seconds, 60);
+        $hours = intdiv($totalMinutes, 60);
+        $minutes = $totalMinutes % 60;
+
+        if ($hours >= 24) {
+            $days = intdiv($hours, 24);
+            $remHours = $hours % 24;
+            $dayLabel = trans_choice('directions.day', $days);
+
+            $timePart = $remHours > 0
+                ? $remHours.'h'.($minutes > 0 ? sprintf('%02d', $minutes) : '')
+                : ($minutes > 0 ? sprintf('%02d', $minutes).' min' : '');
+
+            return $timePart !== ''
+                ? $days.' '.$dayLabel.' '.$timePart
+                : $days.' '.$dayLabel;
+        }
 
         if ($hours > 0) {
             return $hours.'h'.($minutes > 0 ? sprintf('%02d', $minutes) : '');

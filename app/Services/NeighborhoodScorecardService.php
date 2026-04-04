@@ -59,16 +59,31 @@ final readonly class NeighborhoodScorecardService
      *   }>
      * }
      */
-    public function compute(float $lat, float $lng): array
+    public function compute(float $lat, float $lng, bool $force = false): array
     {
         $latGrid = round($lat, 3);
         $lngGrid = round($lng, 3);
         $cacheKey = "neighborhood_scorecard_{$latGrid}_{$lngGrid}";
+        $apiKey = (string) config('services.ors.key', '');
 
         $cached = Cache::get($cacheKey);
 
+        // Hard force-refresh: drop the cache immediately and re-compute.
+        if ($force && $cached !== null) {
+            Cache::forget($cacheKey);
+            $cached = null;
+        }
+
         // Invalidate legacy v1 entries (categories have no nearest_poi key)
         if ($cached !== null && !$this->isV2Format($cached)) {
+            Cache::forget($cacheKey);
+            $cached = null;
+        }
+
+        // Invalidate v2 entries that were cached WITHOUT ORS distances when
+        // the ORS key has since been configured — force a fresh computation
+        // so walking distances replace the previous haversine (air) values.
+        if ($cached !== null && $apiKey !== '' && !($cached['ors_used'] ?? false)) {
             Cache::forget($cacheKey);
             $cached = null;
         }
@@ -98,12 +113,15 @@ final readonly class NeighborhoodScorecardService
 
         $status = $overpassFailed ? 'unavailable' : $distStatus;
 
+        $apiKey = (string) config('services.ors.key', '');
+
         return [
             'payload' => [
                 'global_score' => $this->globalScore($categories),
                 'status' => $status,
                 'categories' => $categories,
                 'computed_at' => now()->toIso8601String(),
+                'ors_used' => $apiKey !== '',
             ],
             'ttl' => $overpassFailed ? self::CACHE_TTL_FAIL : self::CACHE_TTL,
         ];

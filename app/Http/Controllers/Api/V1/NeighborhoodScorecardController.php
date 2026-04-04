@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Models\Ad;
 use App\Services\NeighborhoodScorecardService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 
 #[OA\Get(
@@ -25,7 +26,7 @@ use OpenApi\Attributes as OA;
 )]
 final class NeighborhoodScorecardController
 {
-    public function __invoke(Ad $ad, NeighborhoodScorecardService $service): JsonResponse
+    public function __invoke(Request $request, Ad $ad, NeighborhoodScorecardService $service): JsonResponse
     {
         if (!$ad->location) {
             return response()->json([
@@ -36,6 +37,7 @@ final class NeighborhoodScorecardController
         $scorecard = $service->compute(
             $ad->location->getLatitude(),
             $ad->location->getLongitude(),
+            $request->boolean('force', false),
         );
 
         return response()->json(['data' => $scorecard]);
