@@ -1,4 +1,15 @@
-# Image de base PHP 8.4 FPM (Légère et rapide)
+# ── Stage 1: Node.js asset builder ─────────────────────────────────────────
+# Node.js is ONLY needed to compile Vite/Filament assets.
+# Keeping it in a separate stage removes ~80 MB from the production image.
+FROM node:20-alpine AS node-builder
+WORKDIR /app
+# Cache-friendly: only re-runs npm ci when package-lock.json changes
+COPY package.json package-lock.json ./
+RUN npm ci --prefer-offline
+COPY . .
+RUN npm run build && npm cache clean --force
+
+# ── Stage 2: PHP production image ────────────────────────────────────────────
 FROM php:8.4-fpm-alpine
 
 # Installation des dépendances système et extensions PHP nécessaires
@@ -44,9 +55,6 @@ RUN apk add --no-cache \
     && apk del $PHPIZE_DEPS \
     && rm -rf /tmp/*
 
-# Installation de Node.js et npm (requis pour Vite / Filament assets)
-RUN apk add --no-cache nodejs npm
-
 # Installation de Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
@@ -60,28 +68,42 @@ WORKDIR /var/www
 # Création de l'utilisateur pour éviter les problèmes de permissions
 RUN usermod -u 1000 www-data && groupmod -g 1000 www-data
 
-# On copie le code (plus tard, dans le pipeline, on pourra optimiser cela)
+# ── Cache-friendly dependency installation ───────────────────────────────────
+# Copying only composer.lock first means `composer install` is only re-run
+# when dependencies actually change — NOT on every code commit.
+COPY composer.json composer.lock ./
+RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views \
+        storage/logs bootstrap/cache \
+    && touch .env \
+    && composer install --no-dev --no-autoloader --no-scripts --no-interaction
+
+# ── Copy full application codebase ───────────────────────────────────────────
 COPY . .
 
-# Création des répertoires storage requis par artisan package:discover
-RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs \
-    && cp .env.example .env 2>/dev/null || true
+# ── Copy Vite-built assets from the Node stage (no Node.js in final image) ──
+COPY --from=node-builder /app/public/build ./public/build
 
-# Installation des dépendances (SANS les tests/dev)
-# --no-scripts évite package:discover qui boot Laravel et tente une connexion DB (PostgreSQL absent au build)
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-scripts
+# ── Regenerate autoloader with full classmap + publish static assets ─────────
+# Using .env.example as a minimal env so artisan can boot without a real DB.
+# --no-scripts was used above; we now run the static (no-DB) post-install tasks
+# explicitly so they are baked into the image and never needed at deploy time.
+RUN cp .env.example .env \
+    && composer dump-autoload --optimize --no-dev \
+    && php artisan package:discover --ansi 2>/dev/null || true \
+    && php artisan vendor:publish --force --tag=livewire:assets --ansi --no-interaction 2>/dev/null || true \
+    && php artisan filament:assets 2>/dev/null || true \
+    && php scripts/patch-webpush.php 2>/dev/null || true \
+    && rm -f .env
 
-# Build des assets Vite (Filament theme CSS + JS)
-RUN npm ci && npm run build && npm cache clean --force
-
-# Attribution des permissions
+# ── Set permissions ───────────────────────────────────────────────────────────
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
 
 # Exposition du port FPM
 EXPOSE 9000
 
-# Health check — php-fpm responds to fcgi status
+# Healthcheck: verify the PHP-FPM master process is running.
+# `php-fpm -t` only validates config; pgrep confirms the daemon is actually up.
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-    CMD php-fpm -t 2>/dev/null || exit 1
+    CMD pgrep -f 'php-fpm: master' > /dev/null 2>&1 || exit 1
 
 CMD ["php-fpm"]

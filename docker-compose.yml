@@ -9,6 +9,11 @@ services:
       - keyhome-app-code:/shared-code
     networks:
       - keyhome-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.50"
 
   # L'application Laravel (PHP-FPM)
   app:
@@ -48,6 +53,13 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "2.00"
+        reservations:
+          memory: 256m
 
   # Le Worker pour les files d'attente (Mails, notifications, etc.)
   worker:
@@ -84,6 +96,11 @@ services:
       - DB_SSLMODE=prefer
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "1.00"
 
   worker-tours:
     image: ${APP_IMAGE:-keyhome-backend}
@@ -117,6 +134,11 @@ services:
       - DB_SSLMODE=prefer
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+    deploy:
+      resources:
+        limits:
+          memory: 1g       # elevated for panorama image processing
+          cpus: "2.00"
 
   # Laravel Nightwatch Agent (monitoring)
   nightwatch-agent:
@@ -133,6 +155,11 @@ services:
       start_period: 5s
     networks:
       - keyhome-network
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.25"
 
   # Le serveur Web (Nginx)
   web:
@@ -159,6 +186,11 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.50"
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik-public"
@@ -187,13 +219,21 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          cpus: "2.00"
+        reservations:
+          memory: 512m
 
   # Cache (Redis) — enable AOF for persistence when used for cache/queue/session
   redis:
     image: redis:alpine
     container_name: ${COMPOSE_PREFIX:-keyhome-prod}-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory-policy allkeys-lru
+    # --maxmemory caps RAM usage; without it Redis grows unboundedly before evicting.
+    command: redis-server --appendonly yes --maxmemory 384mb --maxmemory-policy allkeys-lru
     networks:
       - keyhome-network
     # FIX: healthcheck manquant — app et worker ne peuvent pas savoir si Redis est prêt
@@ -202,6 +242,11 @@ services:
       interval: 10s
       timeout: 3s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.50"
 
   # Moteur de recherche (Meilisearch)
   meilisearch:
@@ -223,6 +268,11 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.00"
 
   # Interface de gestion de base de données (debug only — use: docker compose --profile debug up pgadmin)
   pgadmin:

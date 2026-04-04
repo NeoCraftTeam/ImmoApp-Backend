@@ -18,6 +18,11 @@ services:
       - preprod-app-code:/shared-code
     networks:
       - preprod-network
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.25"
 
   app:
     image: ${APP_IMAGE:-keyhome-backend}
@@ -48,6 +53,11 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "1.00"
 
   worker:
     image: ${APP_IMAGE:-keyhome-backend}
@@ -79,6 +89,11 @@ services:
       - DB_SSLMODE=prefer
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.50"
 
   nightwatch-agent:
     image: laravelphp/nightwatch-agent:latest
@@ -94,6 +109,11 @@ services:
       start_period: 5s
     networks:
       - preprod-network
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.25"
 
   web:
     image: nginx:alpine
@@ -119,7 +139,12 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-    # FIX: labels Traefik manquants — sans eux Traefik ne sait pas router vers ce service
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.25"
+    # FIX: labels Traefik manquants
     # et ne peut pas choisir le bon réseau (traefik-public vs preprod-network)
     labels:
       - "traefik.enable=true"
