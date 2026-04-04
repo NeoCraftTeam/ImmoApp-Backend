@@ -161,7 +161,12 @@ class AdResource extends Resource
                     ->query(fn (Builder $query) => $query->where('has_3d_tour', true)),
             ])
             ->recordActions([
-                ViewAction::make(),
+                ViewAction::make()
+                    ->slideOver()
+                    ->modalIcon('heroicon-o-megaphone')
+                    ->modalIconColor('primary')
+                    ->modalHeading(fn (Ad $record): string => $record->title)
+                    ->modalWidth('4xl'),
                 EditAction::make()
                     ->successNotificationTitle('Annonce mise à jour')
                     ->mutateFormDataUsing(fn (array $data): array => static::mutateLocationMapData($data)),

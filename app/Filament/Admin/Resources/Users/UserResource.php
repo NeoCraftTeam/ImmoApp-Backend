@@ -57,7 +57,7 @@ class UserResource extends Resource
 {
     protected static ?string $model = User::class;
 
-    protected static string|null|\UnitEnum $navigationGroup = 'Utilisateurs';
+    protected static string|null|\UnitEnum $navigationGroup = 'Membres';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::Users;
 
@@ -192,47 +192,97 @@ class UserResource extends Resource
     public static function infolist(Schema $schema): Schema
     {
         return $schema
+            ->columns(2)
             ->components([
-                Section::make('Informations personnelles')
-                    ->icon(Heroicon::User)
-                    ->columns(2)
+                // ── Profil ───────────────────────────────────────────────────────────
+                Section::make('Profil')
+                    ->icon(Heroicon::UserCircle)
+                    ->iconColor('primary')
+                    ->description('Identité et coordonnées de l\'utilisateur')
+                    ->columns(3)
                     ->schema([
                         ImageEntry::make('avatar')
-                            ->label('Avatar')
+                            ->label('')
                             ->circular()
+                            ->size(80)
                             ->disk(config('filesystems.app_media_disk'))
-                            ->defaultImageUrl(fn ($record) => 'https://ui-avatars.com/api/?name='.urlencode($record->firstname.' '.$record->lastname).'&background=F6475F&color=fff'),
+                            ->defaultImageUrl(fn ($record): string => 'https://ui-avatars.com/api/?name='.urlencode($record->firstname.' '.$record->lastname)
+                                .'&background=F6475F&color=fff&bold=true'
+                            )
+                            ->columnSpanFull(),
                         TextEntry::make('full_name')
                             ->label('Nom complet')
-                            ->formatStateUsing(fn ($record) => $record->firstname.' '.$record->lastname),
+                            ->formatStateUsing(fn ($record): string => $record->firstname.' '.$record->lastname)
+                            ->weight('bold')
+                            ->size('lg')
+                            ->icon(Heroicon::User)
+                            ->columnSpanFull(),
                         TextEntry::make('email')
                             ->label('Email')
-                            ->copyable(),
+                            ->icon(Heroicon::Envelope)
+                            ->iconColor('info')
+                            ->copyable()
+                            ->copyMessage('Email copié !'),
                         TextEntry::make('phone_number')
                             ->label('Téléphone')
-                            ->copyable(),
+                            ->icon(Heroicon::Phone)
+                            ->iconColor('success')
+                            ->copyable()
+                            ->copyMessage('Numéro copié !')
+                            ->placeholder('Non renseigné'),
+                        TextEntry::make('city.name')
+                            ->label('Ville')
+                            ->icon(Heroicon::MapPin)
+                            ->iconColor('warning')
+                            ->placeholder('Non renseignée'),
+                    ]),
+
+                // ── Statut du compte ───────────────────────────────────────────
+                Section::make('Compte')
+                    ->icon(Heroicon::ShieldCheck)
+                    ->iconColor('success')
+                    ->description('Permissions, statut et historique de connexion')
+                    ->columns(3)
+                    ->schema([
                         TextEntry::make('type')
-                            ->label('Type')
-                            ->badge(),
+                            ->label('Type de compte')
+                            ->badge()
+                            ->color(fn ($state): string => match ((string) $state) {
+                                'agency' => 'primary',
+                                'individual' => 'info',
+                                default => 'gray',
+                            }),
                         TextEntry::make('role')
                             ->label('Rôle')
-                            ->badge(),
+                            ->badge()
+                            ->color(fn ($state): string => match ((string) $state) {
+                                'admin' => 'danger',
+                                'agent' => 'warning',
+                                default => 'gray',
+                            }),
                         IconEntry::make('is_active')
-                            ->label('Actif')
-                            ->boolean(),
-                        TextEntry::make('city.name')
-                            ->label('Ville'),
+                            ->label('Compte actif')
+                            ->boolean()
+                            ->trueIcon(Heroicon::CheckCircle)
+                            ->falseIcon(Heroicon::XCircle)
+                            ->trueColor('success')
+                            ->falseColor('danger'),
                         TextEntry::make('email_verified_at')
                             ->label('Email vérifié le')
+                            ->icon(Heroicon::CheckBadge)
+                            ->iconColor('success')
                             ->dateTime('d/m/Y à H:i')
                             ->placeholder('Non vérifié'),
-                        TextEntry::make('created_at')
-                            ->label('Créé le')
-                            ->dateTime('d/m/Y à H:i'),
                         TextEntry::make('last_login_at')
                             ->label('Dernière connexion')
+                            ->icon(Heroicon::Clock)
                             ->dateTime('d/m/Y à H:i')
-                            ->placeholder('Jamais connecté'),
+                            ->placeholder('Jamais connecté')
+                            ->since(),
+                        TextEntry::make('created_at')
+                            ->label('Membre depuis')
+                            ->icon(Heroicon::CalendarDays)
+                            ->since(),
                     ]),
             ]);
     }
@@ -386,7 +436,11 @@ class UserResource extends Resource
     {
         return [
             ViewAction::make()
-                ->iconButton(),
+                ->iconButton()
+                ->slideOver()
+                ->modalIcon('heroicon-o-user-circle')
+                ->modalIconColor('primary')
+                ->modalWidth('2xl'),
             EditAction::make()
                 ->iconButton()
                 ->successNotificationTitle('Utilisateur mis à jour'),

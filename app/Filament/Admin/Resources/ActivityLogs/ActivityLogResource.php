@@ -37,7 +37,7 @@ class ActivityLogResource extends Resource
 {
     protected static ?string $model = Activity::class;
 
-    protected static string|null|UnitEnum $navigationGroup = 'Administration';
+    protected static string|null|UnitEnum $navigationGroup = 'Audit';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
 
@@ -245,12 +245,25 @@ class ActivityLogResource extends Resource
             ])
             ->recordActions([
                 ViewAction::make()
+                    ->slideOver()
                     ->modalWidth('3xl')
-                    ->modalHeading(fn ($record) => match ($record->event) {
-                        'created' => '🟢  Création',
-                        'updated' => '🟠  Modification',
-                        'deleted' => '🔴  Suppression',
-                        default => 'Activité',
+                    ->modalIcon(fn ($record): string => match ($record->event) {
+                        'created' => 'heroicon-o-plus-circle',
+                        'updated' => 'heroicon-o-pencil-square',
+                        'deleted' => 'heroicon-o-trash',
+                        default => 'heroicon-o-shield-check',
+                    })
+                    ->modalIconColor(fn ($record): string => match ($record->event) {
+                        'created' => 'success',
+                        'updated' => 'warning',
+                        'deleted' => 'danger',
+                        default => 'gray',
+                    })
+                    ->modalHeading(fn ($record): string => match ($record->event) {
+                        'created' => 'Création d\'un enregistrement',
+                        'updated' => 'Modification d\'un enregistrement',
+                        'deleted' => 'Suppression d\'un enregistrement',
+                        default => 'Activité de journal',
                     }),
             ]);
     }

@@ -15,6 +15,7 @@ use Filament\Auth\MultiFactor\Email\EmailAuthentication;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Assets\Js;
@@ -50,6 +51,18 @@ class AgencyPanelProvider extends PanelProvider
             ->databaseTransactions()
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')
+            ->spa()
+            ->font('poppins')
+            ->globalSearch(true)
+            ->sidebarCollapsibleOnDesktop()
+            ->unsavedChangesAlerts()
+            ->collapsibleNavigationGroups(true)
+            ->navigationGroups([
+                NavigationGroup::make('Gestion')
+                    ->icon('heroicon-o-home-modern'),
+                NavigationGroup::make('Retours')
+                    ->icon('heroicon-o-star'),
+            ])
             ->colors([
                 'primary' => Color::hex('#2563eb'), // Bleu Agence
             ])

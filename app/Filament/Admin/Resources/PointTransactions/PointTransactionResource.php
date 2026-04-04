@@ -18,7 +18,7 @@ class PointTransactionResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowsRightLeft;
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Système de Crédits';
+    protected static \UnitEnum|string|null $navigationGroup = 'Crédits';
 
     protected static ?string $navigationLabel = 'Transactions';
 

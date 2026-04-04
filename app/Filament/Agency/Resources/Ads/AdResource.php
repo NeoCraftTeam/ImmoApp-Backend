@@ -76,8 +76,13 @@ class AdResource extends Resource
             ->filters([
                 TrashedFilter::make(),
             ])
-            ->actions([
-                ViewAction::make(),
+            ->recordActions([
+                ViewAction::make()
+                    ->slideOver()
+                    ->modalIcon('heroicon-o-megaphone')
+                    ->modalIconColor('primary')
+                    ->modalHeading(fn (Ad $record): string => $record->title)
+                    ->modalWidth('4xl'),
                 EditAction::make()
                     ->slideOver()
                     ->modalWidth(Width::FourExtraLarge)
@@ -86,7 +91,7 @@ class AdResource extends Resource
                 DeleteAction::make()
                     ->successNotificationTitle('Annonce supprimée'),
             ])
-            ->bulkActions([
+            ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),

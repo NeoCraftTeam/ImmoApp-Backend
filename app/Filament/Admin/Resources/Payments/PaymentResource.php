@@ -22,6 +22,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -38,7 +39,7 @@ class PaymentResource extends Resource
 
     protected static bool $isScopedToTenant = false;
 
-    protected static string|null|\UnitEnum $navigationGroup = 'Administration';
+    protected static string|null|\UnitEnum $navigationGroup = 'Finances';
 
     protected static ?int $navigationSort = 1;
 
@@ -62,30 +63,94 @@ class PaymentResource extends Resource
     #[\Override]
     public static function form(Schema $schema): Schema
     {
+        // Form is used only for the refund action; view modal uses infolist()
+        return $schema->components([]);
+    }
+
+    #[\Override]
+    public static function infolist(Schema $schema): Schema
+    {
         return $schema
+            ->columns(2)
             ->components([
-                TextEntry::make('type')
-                    ->label('Type')
-                    ->badge(),
-                TextEntry::make('amount')
-                    ->label('Montant')
-                    ->money('XAF'),
-                TextEntry::make('transaction_id')
-                    ->label('ID Transaction')
-                    ->copyable(),
-                TextEntry::make('payment_method')
-                    ->label('Moyen de paiement')
-                    ->badge(),
-                TextEntry::make('ad.title')
-                    ->label('Annonce'),
-                TextEntry::make('user.fullname')
-                    ->label('Utilisateur'),
-                TextEntry::make('status')
-                    ->label('Statut')
-                    ->badge(),
-                TextEntry::make('created_at')
-                    ->label('Créé le')
-                    ->dateTime('d/m/Y à H:i'),
+                // ── Transaction ─────────────────────────────────────────────
+                Section::make('Transaction')
+                    ->icon(Heroicon::Banknotes)
+                    ->iconColor('success')
+                    ->description('Détails du paiement enregistré')
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('amount')
+                            ->label('Montant')
+                            ->money('XAF')
+                            ->size('lg')
+                            ->weight('bold')
+                            ->icon(Heroicon::Banknotes)
+                            ->iconColor('success'),
+                        TextEntry::make('status')
+                            ->label('Statut')
+                            ->badge()
+                            ->color(fn (Payment $record): string => match ($record->status) {
+                                PaymentStatus::SUCCESS => 'success',
+                                PaymentStatus::PENDING => 'warning',
+                                PaymentStatus::FAILED => 'danger',
+                                default => 'gray',
+                            }),
+                        TextEntry::make('type')
+                            ->label('Type de paiement')
+                            ->badge()
+                            ->color('info'),
+                        TextEntry::make('payment_method')
+                            ->label('Moyen de paiement')
+                            ->badge()
+                            ->color('primary')
+                            ->icon(Heroicon::CreditCard),
+                        TextEntry::make('transaction_id')
+                            ->label('Référence transaction')
+                            ->copyable()
+                            ->copyMessage('Référence copiée !')
+                            ->icon(Heroicon::QrCode)
+                            ->badge()
+                            ->color('gray')
+                            ->columnSpanFull(),
+                    ]),
+
+                // ── Parties concernées ───────────────────────────────────────
+                Section::make('Parties concernées')
+                    ->icon(Heroicon::Users)
+                    ->iconColor('info')
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('user.fullname')
+                            ->label('Utilisateur')
+                            ->icon(Heroicon::UserCircle)
+                            ->iconColor('primary')
+                            ->placeholder('Non associé'),
+                        TextEntry::make('ad.title')
+                            ->label('Annonce concernée')
+                            ->icon(Heroicon::Megaphone)
+                            ->iconColor('warning')
+                            ->limit(60)
+                            ->placeholder('Non associée'),
+                    ]),
+
+                // ── Horodatage ───────────────────────────────────────────────
+                Section::make('Horodatage')
+                    ->icon(Heroicon::Clock)
+                    ->iconColor('gray')
+                    ->collapsible()
+                    ->collapsed()
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('created_at')
+                            ->label('Créé le')
+                            ->icon(Heroicon::CalendarDays)
+                            ->dateTime('d/m/Y à H:i'),
+                        TextEntry::make('updated_at')
+                            ->label('Modifié le')
+                            ->icon(Heroicon::PencilSquare)
+                            ->dateTime('d/m/Y à H:i'),
+                    ]),
             ]);
     }
 
@@ -187,7 +252,14 @@ class PaymentResource extends Resource
                     ),
             ])
             ->recordActions([
-                ViewAction::make(),
+                ViewAction::make()
+                    ->slideOver()
+                    ->modalIcon('heroicon-o-banknotes')
+                    ->modalIconColor('success')
+                    ->modalHeading(fn (Payment $record): string => number_format((float) $record->amount, 0, ',', '\u202f').'\u00a0XAF'
+                        .' \u2014 '.($record->transaction_id ?? 'Transaction')
+                    )
+                    ->modalWidth('2xl'),
                 RecordAction::make('refund')
                     ->label('Rembourser')
                     ->icon(Heroicon::ArrowUturnLeft)

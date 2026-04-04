@@ -29,7 +29,7 @@ final class PromoCodeResource extends Resource
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::Ticket;
 
-    protected static string|null|\UnitEnum $navigationGroup = 'Administration';
+    protected static string|null|\UnitEnum $navigationGroup = 'Finances';
 
     protected static ?int $navigationSort = 8;
 

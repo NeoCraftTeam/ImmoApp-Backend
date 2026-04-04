@@ -16,6 +16,8 @@ class TopAdsTable extends BaseWidget
 {
     protected static ?string $heading = 'Top Annonces';
 
+    protected static ?string $description = 'Vos annonces classées par vues (30 derniers jours)';
+
     protected static ?int $sort = 3;
 
     protected int|string|array $columnSpan = 'full';
@@ -54,6 +56,10 @@ class TopAdsTable extends BaseWidget
                     ->color(fn (mixed $state): string => match ($state->value ?? $state) {
                         'available' => 'success',
                         'pending' => 'warning',
+                        'reserved' => 'info',
+                        'rent' => 'primary',
+                        'sold' => 'gray',
+                        'declined' => 'danger',
                         'unavailable' => 'danger',
                         default => 'gray',
                     }),

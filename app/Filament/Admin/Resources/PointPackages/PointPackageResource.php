@@ -22,7 +22,7 @@ class PointPackageResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedStar;
 
-    protected static \UnitEnum|string|null $navigationGroup = 'Système de Crédits';
+    protected static \UnitEnum|string|null $navigationGroup = 'Crédits';
 
     protected static ?string $navigationLabel = 'Packs de Crédits';
 

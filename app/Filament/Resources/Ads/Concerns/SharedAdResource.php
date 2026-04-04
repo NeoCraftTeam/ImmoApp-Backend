@@ -504,6 +504,9 @@ trait SharedAdResource
     {
         $sections = [
             Section::make('Galerie Photos')
+                ->icon('heroicon-o-camera')
+                ->iconColor('info')
+                ->description('Photos publiées par l\'annonceur')
                 ->schema([
                     ViewEntry::make('images')
                         ->label('')
@@ -512,28 +515,82 @@ trait SharedAdResource
                 ])
                 ->columnSpanFull(),
             Section::make('Détails')
+                ->icon('heroicon-o-home-modern')
+                ->iconColor('primary')
+                ->description('Titre, prix et description du bien')
                 ->schema([
-                    TextEntry::make('title')->label('Titre'),
-                    TextEntry::make('price')->money('xaf')->label('Prix'),
-                    TextEntry::make('adresse')->label('Adresse')->columnSpanFull(),
-                    TextEntry::make('description')->columnSpanFull(),
+                    TextEntry::make('title')
+                        ->label('Titre')
+                        ->weight('bold')
+                        ->size('lg')
+                        ->columnSpanFull(),
+                    TextEntry::make('price')
+                        ->money('xaf')
+                        ->label('Prix mensuel')
+                        ->icon('heroicon-o-banknotes')
+                        ->iconColor('success')
+                        ->weight('bold')
+                        ->size('lg'),
+                    TextEntry::make('status')
+                        ->label('Statut')
+                        ->badge()
+                        ->color(fn ($state): string => match ((string) $state) {
+                            'available' => 'success',
+                            'pending' => 'warning',
+                            'reserved' => 'info',
+                            'rent' => 'primary',
+                            'declined' => 'danger',
+                            'sold' => 'gray',
+                            default => 'gray',
+                        }),
+                    TextEntry::make('adresse')
+                        ->label('Adresse')
+                        ->icon('heroicon-o-map-pin')
+                        ->iconColor('warning')
+                        ->columnSpanFull(),
+                    TextEntry::make('description')
+                        ->label('Description')
+                        ->columnSpanFull()
+                        ->prose(),
                 ])
                 ->columns(2)
                 ->columnSpanFull(),
             Section::make('Caractéristiques')
+                ->icon('heroicon-o-squares-2x2')
+                ->iconColor('info')
+                ->description('Surface, pièces et commodités')
                 ->schema([
-                    TextEntry::make('surface_area')->label('Surface')->suffix(' m²'),
-                    TextEntry::make('bedrooms')->label('Chambres'),
-                    TextEntry::make('bathrooms')->label('Salles de bain'),
-                    IconEntry::make('has_parking')->label('Parking')->boolean(),
+                    TextEntry::make('surface_area')
+                        ->label('Surface')
+                        ->icon('heroicon-o-square-2-stack')
+                        ->suffix(' m²'),
+                    TextEntry::make('bedrooms')
+                        ->label('Chambres')
+                        ->icon('heroicon-o-home')
+                        ->suffix(' 🛍️'),
+                    TextEntry::make('bathrooms')
+                        ->label('Salles de bain')
+                        ->icon('heroicon-o-beaker')
+                        ->suffix(' 🛁'),
+                    IconEntry::make('has_parking')
+                        ->label('Parking')
+                        ->boolean()
+                        ->trueIcon('heroicon-o-check-circle')
+                        ->falseIcon('heroicon-o-x-circle')
+                        ->trueColor('success')
+                        ->falseColor('danger'),
                 ])
                 ->columns(4)
                 ->columnSpanFull(),
             Section::make('Équipements & Services')
+                ->icon('heroicon-o-check-circle')
+                ->iconColor('success')
+                ->description('Équipements sélectionnés par l\'annonceur')
                 ->schema([
                     TextEntry::make('attributes')
                         ->label('')
                         ->badge()
+                        ->color('success')
                         ->formatStateUsing(function ($state) {
                             $labelsBySlug = PropertyAttribute::query()->pluck('name', 'slug')->all();
 
@@ -554,13 +611,25 @@ trait SharedAdResource
                 ->collapsible()
                 ->columnSpanFull(),
             Section::make('Disponibilité')
+                ->icon('heroicon-o-calendar-days')
+                ->iconColor('primary')
+                ->description('Visibilité et période de disponibilité')
                 ->schema([
-                    IconEntry::make('is_visible')->label('Visible')->boolean(),
+                    IconEntry::make('is_visible')
+                        ->label('Visible sur le site')
+                        ->boolean()
+                        ->trueIcon('heroicon-o-eye')
+                        ->falseIcon('heroicon-o-eye-slash')
+                        ->trueColor('success')
+                        ->falseColor('danger'),
                     TextEntry::make('available_from')
                         ->label('Disponible à partir de')
+                        ->icon('heroicon-o-calendar-days')
                         ->formatStateUsing(fn ($state) => $state ? Carbon::parse($state)->format('d/m/Y') : 'Immédiatement'),
                     TextEntry::make('available_to')
                         ->label('Disponible jusqu\'au')
+                        ->icon('heroicon-o-calendar-days')
+                        ->iconColor('warning')
                         ->formatStateUsing(fn ($state) => $state ? Carbon::parse($state)->format('d/m/Y') : 'Indéfiniment'),
                 ])
                 ->columns(3)

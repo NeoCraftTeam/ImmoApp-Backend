@@ -28,7 +28,7 @@ class AgencyResource extends Resource
 
     protected static bool $isScopedToTenant = false;
 
-    protected static string|null|\UnitEnum $navigationGroup = 'Utilisateurs';
+    protected static string|null|\UnitEnum $navigationGroup = 'Membres';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;
 

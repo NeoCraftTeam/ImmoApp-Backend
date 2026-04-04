@@ -119,24 +119,33 @@ class AdminPanelProvider extends PanelProvider
             ->unsavedChangesAlerts()
             ->collapsibleNavigationGroups(true)
             ->navigationGroups([
+                // ── Core ─────────────────────────────────────────────────────────
                 NavigationGroup::make('Annonces')
                     ->icon('heroicon-o-megaphone'),
-                NavigationGroup::make('Villes & Quartiers')
-                    ->icon('heroicon-o-map-pin'),
-                NavigationGroup::make('Utilisateurs')
-                    ->icon('heroicon-o-users'),
+                NavigationGroup::make('Membres')
+                    ->icon('heroicon-o-user-group'),
+                NavigationGroup::make('Finances')
+                    ->icon('heroicon-o-banknotes'),
                 NavigationGroup::make('Abonnements')
-                    ->icon('heroicon-o-credit-card'),
-                NavigationGroup::make('Système de Crédits')
-                    ->icon('heroicon-o-star'),
+                    ->icon('heroicon-o-rectangle-stack'),
+                NavigationGroup::make('Crédits')
+                    ->icon('heroicon-o-sparkles'),
+                // ── Secondary ───────────────────────────────────────────────
+                NavigationGroup::make('Catalogue')
+                    ->icon('heroicon-o-tag'),
+                NavigationGroup::make('Marketing')
+                    ->icon('heroicon-o-envelope')
+                    ->collapsed(),
+                NavigationGroup::make('Analytique')
+                    ->icon('heroicon-o-chart-pie')
+                    ->collapsed(),
+                // ── Admin ─────────────────────────────────────────────────────
+                NavigationGroup::make('Audit')
+                    ->icon('heroicon-o-shield-check')
+                    ->collapsed(),
                 NavigationGroup::make('Configuration')
                     ->icon('heroicon-o-cog-6-tooth')
                     ->collapsed(),
-                NavigationGroup::make('Administration')
-                    ->icon('heroicon-o-shield-check')
-                    ->collapsed(),
-                NavigationGroup::make('Analytique')
-                    ->icon('heroicon-o-chart-pie'),
             ])
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->colors([

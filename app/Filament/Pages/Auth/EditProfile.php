@@ -6,6 +6,7 @@ namespace App\Filament\Pages\Auth;
 
 use App\Filament\Forms\Components\NativePhoneInput;
 use App\Mail\GdprDataExportMail;
+use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Auth\Pages\EditProfile as BaseEditProfile;
 use Filament\Forms\Components\Checkbox;
@@ -120,7 +121,7 @@ class EditProfile extends BaseEditProfile
                             ->modalHeading('Exporter vos données personnelles')
                             ->modalDescription('Un email contenant toutes vos données personnelles (format JSON) sera envoyé à votre adresse email. Cette opération peut prendre quelques minutes.')
                             ->modalSubmitActionLabel('Envoyer l\'export')
-                            ->action('sendGdprExport'),
+                            ->action(fn () => $this->sendGdprExport()),
                     ])
                     ->columnSpanFull(),
             ]);
@@ -128,7 +129,7 @@ class EditProfile extends BaseEditProfile
 
     public function sendGdprExport(): void
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = auth()->user();
 
         try {
@@ -136,11 +137,11 @@ class EditProfile extends BaseEditProfile
 
             Notification::make()
                 ->title('Export envoyé')
-                ->body('Vos données ont été envoyées à ' . $user->email . '. Vérifiez votre boîte mail dans quelques minutes.')
+                ->body('Vos données ont été envoyées à '.$user->email.'. Vérifiez votre boîte mail dans quelques minutes.')
                 ->success()
                 ->duration(8000)
                 ->send();
-        } catch (\Throwable $e) {
+        } catch (\Throwable) {
             Notification::make()
                 ->title('Erreur lors de l\'export')
                 ->body('Impossible d\'envoyer l\'email. Veuillez réessayer.')

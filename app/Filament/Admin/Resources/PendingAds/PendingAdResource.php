@@ -116,7 +116,12 @@ class PendingAdResource extends Resource
                     ->sortable(),
             ])
             ->recordActions([
-                ViewAction::make(),
+                ViewAction::make()
+                    ->slideOver()
+                    ->modalIcon('heroicon-o-clipboard-document-check')
+                    ->modalIconColor('warning')
+                    ->modalHeading(fn (Ad $record): string => $record->title)
+                    ->modalWidth('4xl'),
 
                 // ── Approuver ──
                 Action::make('approve')
