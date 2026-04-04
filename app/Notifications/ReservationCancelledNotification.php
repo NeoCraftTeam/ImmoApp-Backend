@@ -51,8 +51,8 @@ class ReservationCancelledNotification extends Notification implements ShouldQue
 
         return (new WebPushMessage)
             ->title('Visite annulée')
-            ->icon('/pwa/icons/icon-192x192.png')
-            ->badge('/pwa/icons/icon-72x72.png')
+            ->icon('/icons/icon-192x192.png')
+            ->badge('/icons/icon-72x72.png')
             ->body("Visite du {$date} pour « {$this->reservation->ad->title} » annulée par {$this->cancelledByLabel()}")
             ->tag('viewing-cancelled-'.$this->reservation->id)
             ->data(['url' => config('app.frontend_url').'/my/reservations']);

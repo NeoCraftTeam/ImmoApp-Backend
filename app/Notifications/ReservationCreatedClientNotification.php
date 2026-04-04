@@ -50,8 +50,8 @@ class ReservationCreatedClientNotification extends Notification implements Shoul
 
         return (new WebPushMessage)
             ->title('Demande de visite envoyée ✓')
-            ->icon('/pwa/icons/icon-192x192.png')
-            ->badge('/pwa/icons/icon-72x72.png')
+            ->icon('/icons/icon-192x192.png')
+            ->badge('/icons/icon-72x72.png')
             ->body("Visite pour « {$this->reservation->ad->title} » le {$date} — en attente de confirmation")
             ->tag('viewing-client-'.$this->reservation->id)
             ->data(['url' => config('app.frontend_url').'/my/reservations']);

@@ -50,8 +50,8 @@ class ReservationConfirmedClientNotification extends Notification implements Sho
 
         return (new WebPushMessage)
             ->title('Visite confirmée ! 🎉')
-            ->icon('/pwa/icons/icon-192x192.png')
-            ->badge('/pwa/icons/icon-72x72.png')
+            ->icon('/icons/icon-192x192.png')
+            ->badge('/icons/icon-72x72.png')
             ->body("Votre visite du {$date} pour « {$this->reservation->ad->title} » est confirmée !")
             ->tag('viewing-confirmed-'.$this->reservation->id)
             ->data(['url' => config('app.frontend_url').'/my/reservations']);

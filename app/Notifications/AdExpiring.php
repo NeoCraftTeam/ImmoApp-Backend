@@ -58,11 +58,11 @@ class AdExpiring extends Notification implements ShouldQueue
 
         return (new WebPushMessage)
             ->title('Annonce expirante - KeyHome')
-            ->icon('/pwa/icons/icon-192x192.png')
-            ->badge('/pwa/icons/icon-72x72.png')
+            ->icon('/icons/icon-192x192.png')
+            ->badge('/icons/icon-72x72.png')
             ->body($message)
             ->tag('ad-expiring-'.$this->ad->id)
-            ->data(['url' => config('app.frontend_url').'/ads/'.$this->ad->slug.'/renew']);
+            ->data(['url' => config('app.frontend_url').'/owner/ads/'.$this->ad->id]);
     }
 
     /**

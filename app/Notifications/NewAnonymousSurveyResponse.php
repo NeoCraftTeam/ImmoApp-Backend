@@ -120,8 +120,8 @@ class NewAnonymousSurveyResponse extends Notification implements ShouldQueue
     {
         return (new WebPushMessage)
             ->title('Nouveau sondage — KeyHome')
-            ->icon('/pwa/icons/icon-192x192.png')
-            ->badge('/pwa/icons/icon-72x72.png')
+            ->icon('/icons/icon-192x192.png')
+            ->badge('/icons/icon-72x72.png')
             ->body('Nouvelle réponse anonyme reçue pour «'.$this->survey->title.'»')
             ->tag('survey-response-'.$this->survey->id)
             ->data(['url' => $this->resolveAdminSurveyUrl()]);

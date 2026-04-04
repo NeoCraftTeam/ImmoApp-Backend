@@ -53,8 +53,8 @@ class AdStatusChanged extends Notification implements ShouldQueue
     {
         return (new WebPushMessage)
             ->title('Statut modifié - KeyHome')
-            ->icon('/pwa/icons/icon-192x192.png')
-            ->badge('/pwa/icons/icon-72x72.png')
+            ->icon('/icons/icon-192x192.png')
+            ->badge('/icons/icon-72x72.png')
             ->body('Le statut de "'.$this->ad->title.'" est passé à '.$this->newStatus->getLabel())
             ->tag('ad-status-'.$this->ad->id)
             ->data(['url' => config('app.frontend_url').'/ads/'.$this->ad->slug]);

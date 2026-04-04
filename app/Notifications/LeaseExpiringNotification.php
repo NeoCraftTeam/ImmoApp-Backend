@@ -65,8 +65,11 @@ class LeaseExpiringNotification extends Notification implements ShouldQueue
 
         return (new WebPushMessage)
             ->title('Bail expirant bientôt - KeyHome')
+            ->icon('/icons/icon-192x192.png')
+            ->badge('/icons/icon-72x72.png')
             ->body($body)
-            ->action('Voir', config('app.frontend_url').'/owner/bail');
+            ->tag('lease-expiring-'.$this->contract->id)
+            ->data(['url' => config('app.frontend_url').'/owner/lease-contracts']);
     }
 
     /**

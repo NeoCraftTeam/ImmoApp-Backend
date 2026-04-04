@@ -55,10 +55,10 @@ class WebPushService
     {
         $payload = array_merge([
             'title' => 'KeyHome',
-            'icon' => '/pwa/icons/icon-192x192.png',
-            'badge' => '/pwa/icons/icon-72x72.png',
+            'icon' => '/icons/icon-192x192.png',
+            'badge' => '/icons/icon-72x72.png',
             'tag' => 'keyhome-'.($payload['tag'] ?? 'default'),
-            'data' => ['url' => $payload['url'] ?? '/admin'],
+            'data' => ['url' => $payload['url'] ?? config('app.frontend_url', '/').'/home'],
         ], $payload);
 
         try {

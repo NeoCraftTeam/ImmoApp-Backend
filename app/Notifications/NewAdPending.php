@@ -84,8 +84,8 @@ class NewAdPending extends Notification implements ShouldQueue
 
         return (new WebPushMessage)
             ->title('Nouvelle annonce en attente - KeyHome')
-            ->icon('/pwa/icons/icon-192x192.png')
-            ->badge('/pwa/icons/icon-72x72.png')
+            ->icon('/icons/icon-192x192.png')
+            ->badge('/icons/icon-72x72.png')
             ->body("L'annonce \"{$this->ad->title}\" (par {$authorName}) nécessite votre validation.")
             ->tag('ad-pending-'.$this->ad->id)
             ->data(['url' => $this->resolveAdminPendingAdsUrl()]);

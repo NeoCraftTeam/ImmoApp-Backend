@@ -84,8 +84,8 @@ class NewAdListingReportNotification extends Notification implements ShouldQueue
     {
         return (new WebPushMessage)
             ->title('Nouveau signalement - KeyHome')
-            ->icon('/pwa/icons/icon-192x192.png')
-            ->badge('/pwa/icons/icon-72x72.png')
+            ->icon('/icons/icon-192x192.png')
+            ->badge('/icons/icon-72x72.png')
             ->body("Annonce \"{$this->report->ad->title}\" signalee. Action admin requise.")
             ->tag('ad-report-'.$this->report->id)
             ->data(['url' => $this->resolveReviewUrl()]);

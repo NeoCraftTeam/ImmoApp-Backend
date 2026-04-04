@@ -91,8 +91,8 @@ class AdminCrudAction extends Notification implements ShouldQueue
     {
         return (new WebPushMessage)
             ->title('Action admin - KeyHome')
-            ->icon('/pwa/icons/icon-192x192.png')
-            ->badge('/pwa/icons/icon-72x72.png')
+            ->icon('/icons/icon-192x192.png')
+            ->badge('/icons/icon-72x72.png')
             ->body("{$this->actor->firstname} : {$this->details['description']} ({$this->details['entity']} \"{$this->details['entity_name']}\")")
             ->tag('admin-action-'.$this->details['event'].'-'.now()->timestamp)
             ->data(['url' => $this->resolveDetailsUrl($notifiable)]);

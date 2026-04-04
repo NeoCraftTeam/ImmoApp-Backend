@@ -53,8 +53,8 @@ class ReservationExpiredNotification extends Notification implements ShouldQueue
 
         return (new WebPushMessage)
             ->title('Créneau expiré ⏰')
-            ->icon('/pwa/icons/icon-192x192.png')
-            ->badge('/pwa/icons/icon-72x72.png')
+            ->icon('/icons/icon-192x192.png')
+            ->badge('/icons/icon-72x72.png')
             ->body("Votre créneau du {$date} pour « {$this->reservation->ad->title} » a expiré. Choisissez un autre créneau.")
             ->tag('viewing-expired-'.$this->reservation->id)
             ->data(['url' => config('app.frontend_url').'/ads/'.$this->reservation->ad->slug]);

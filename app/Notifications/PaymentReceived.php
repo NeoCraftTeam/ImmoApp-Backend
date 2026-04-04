@@ -52,11 +52,11 @@ class PaymentReceived extends Notification implements ShouldQueue
     {
         return (new WebPushMessage)
             ->title('Paiement reçu - KeyHome')
-            ->icon('/pwa/icons/icon-192x192.png')
-            ->badge('/pwa/icons/icon-72x72.png')
+            ->icon('/icons/icon-192x192.png')
+            ->badge('/icons/icon-72x72.png')
             ->body('Paiement de '.number_format((float) $this->payment->amount, 0, ',', ' ').' FCFA reçu')
             ->tag('payment-'.$this->payment->id)
-            ->data(['url' => config('app.frontend_url').'/profile/payments']);
+            ->data(['url' => config('app.frontend_url').'/owner/payments']);
     }
 
     /**

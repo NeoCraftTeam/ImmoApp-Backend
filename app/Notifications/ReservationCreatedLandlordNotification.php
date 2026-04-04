@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Models\TentativeReservation;
-use App\Support\PanelUrl;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -15,11 +14,6 @@ use NotificationChannels\WebPush\WebPushMessage;
 
 class ReservationCreatedLandlordNotification extends Notification implements ShouldQueue
 {
-    private function resolveOwnerReservationsUrl(): string
-    {
-        return PanelUrl::for('agency', 'viewings/viewing-reservations');
-    }
-
     use Queueable;
 
     public function __construct(
@@ -57,11 +51,11 @@ class ReservationCreatedLandlordNotification extends Notification implements Sho
 
         return (new WebPushMessage)
             ->title('Nouvelle demande de visite 🏠')
-            ->icon('/pwa/icons/icon-192x192.png')
-            ->badge('/pwa/icons/icon-72x72.png')
+            ->icon('/icons/icon-192x192.png')
+            ->badge('/icons/icon-72x72.png')
             ->body("{$clientName} veut visiter « {$this->reservation->ad->title} » le {$date}")
             ->tag('viewing-request-'.$this->reservation->id)
-            ->data(['url' => $this->resolveOwnerReservationsUrl()]);
+            ->data(['url' => config('app.frontend_url').'/owner/viewings']);
     }
 
     /** @return array<string, mixed> */

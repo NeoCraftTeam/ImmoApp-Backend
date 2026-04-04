@@ -48,8 +48,8 @@ class SearchAlertMatchNotification extends Notification implements ShouldQueue
 
         return (new WebPushMessage)
             ->title('Nouvelle annonce pour vous !')
-            ->icon('/pwa/icons/icon-192x192.png')
-            ->badge('/pwa/icons/icon-72x72.png')
+            ->icon('/icons/icon-192x192.png')
+            ->badge('/icons/icon-72x72.png')
             ->body($this->ad->title.' — '.number_format($this->ad->price ?? 0, 0, ',', ' ').' FCFA')
             ->tag('alert-match-'.$this->ad->id)
             ->data(['url' => $adUrl]);

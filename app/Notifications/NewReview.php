@@ -58,8 +58,8 @@ class NewReview extends Notification implements ShouldQueue
 
         return (new WebPushMessage)
             ->title('Nouvel avis - KeyHome')
-            ->icon('/pwa/icons/icon-192x192.png')
-            ->badge('/pwa/icons/icon-72x72.png')
+            ->icon('/icons/icon-192x192.png')
+            ->badge('/icons/icon-72x72.png')
             ->body('Nouvel avis '.$stars.' sur "'.$this->ad->title.'"')
             ->tag('review-'.$this->review->id)
             ->data(['url' => config('app.frontend_url').'/ads/'.$this->ad->slug]);
