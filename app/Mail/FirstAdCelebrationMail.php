@@ -33,23 +33,23 @@ class FirstAdCelebrationMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Bravo pour votre première annonce sur ' . config('app.name') . ' !',
+            subject: 'Bravo pour votre première annonce sur '.config('app.name').' !',
         );
     }
 
     public function content(): Content
     {
-        $domain    = config('filament.panels.agency_domain');
-        $panelUrl  = $domain
-            ? 'https://' . $domain
-            : rtrim(config('app.url'), '/') . '/agency';
+        $domain = config('filament.panels.agency_domain');
+        $panelUrl = $domain
+            ? 'https://'.$domain
+            : rtrim((string) config('app.url'), '/').'/agency';
 
         return new Content(
             view: 'emails.first-ad-celebration',
             with: $this->withUnsubscribe([
                 'authorName' => $this->author->firstname,
-                'adTitle'    => $this->ad->title,
-                'panelUrl'   => $panelUrl,
+                'adTitle' => $this->ad->title,
+                'panelUrl' => $panelUrl,
             ]),
         );
     }
