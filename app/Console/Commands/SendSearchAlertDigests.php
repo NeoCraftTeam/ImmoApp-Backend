@@ -51,6 +51,7 @@ final class SendSearchAlertDigests extends Command
                     if ($dryRun) {
                         $this->line("  [dry-run] Would dispatch digest for user {$user->id} ({$user->email})");
                         $dispatched++;
+
                         continue;
                     }
 
@@ -64,7 +65,7 @@ final class SendSearchAlertDigests extends Command
 
         Log::info('app:send-search-alert-digests', [
             'dispatched' => $dispatched,
-            'dry_run'    => $dryRun,
+            'dry_run' => $dryRun,
         ]);
 
         return self::SUCCESS;

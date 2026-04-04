@@ -18,7 +18,7 @@ use Illuminate\Queue\SerializesModels;
  * Email sent once per digest run: one email covers all alert matches
  * accumulated since the previous digest.
  *
- * @param array<string, array{alert: SearchAlert, ads: Ad[], summary: string}> $groups
+ * @param  array<string, array{alert: SearchAlert, ads: Ad[], summary: string}>  $groups
  */
 final class SearchAlertDigestMail extends Mailable implements ShouldQueue
 {
@@ -40,26 +40,22 @@ final class SearchAlertDigestMail extends Mailable implements ShouldQueue
     {
         $this->onQueue('emails');
         $this->recipientFirstname = (string) ($recipient->firstname ?? '');
-        $this->totalAds           = collect($groups)->sum(fn ($g) => count($g['ads']));
+        $this->totalAds = collect($groups)->sum(fn ($g) => count($g['ads']));
 
-        $this->enrichedGroups = collect($groups)->map(function (array $group): array {
-            return [
-                'alert'   => $group['alert'],
-                'summary' => $group['summary'],
-                'formattedAds' => collect($group['ads'])->take(5)->map(function (Ad $ad): array {
-                    return [
-                        'title'          => $ad->title,
-                        'formattedPrice' => number_format((float) ($ad->price ?? 0), 0, ',', ' ').' FCFA',
-                        'surface'        => $ad->surface_area,
-                        'bedrooms'       => $ad->bedrooms,
-                        'city'           => $ad->quarter?->city?->name,
-                        'quarter'        => $ad->quarter?->name,
-                        'url'            => config('app.frontend_url').'/ads/'.urlencode((string) $ad->id).'/'.urlencode($ad->slug),
-                    ];
-                })->all(),
-                'extraCount' => max(0, count($group['ads']) - 5),
-            ];
-        })->all();
+        $this->enrichedGroups = collect($groups)->map(fn (array $group): array => [
+            'alert' => $group['alert'],
+            'summary' => $group['summary'],
+            'formattedAds' => collect($group['ads'])->take(5)->map(fn (Ad $ad): array => [
+                'title' => $ad->title,
+                'formattedPrice' => number_format((float) ($ad->price ?? 0), 0, ',', ' ').' FCFA',
+                'surface' => $ad->surface_area,
+                'bedrooms' => $ad->bedrooms,
+                'city' => $ad->quarter?->city?->name,
+                'quarter' => $ad->quarter?->name,
+                'url' => config('app.frontend_url').'/ads/'.urlencode((string) $ad->id).'/'.urlencode($ad->slug),
+            ])->all(),
+            'extraCount' => max(0, count($group['ads']) - 5),
+        ])->all();
 
         $this->applyRecipientLocale();
     }

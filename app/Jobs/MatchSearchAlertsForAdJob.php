@@ -6,7 +6,6 @@ namespace App\Jobs;
 
 use App\Models\Ad;
 use App\Models\SearchAlert;
-use App\Models\SearchAlertMatch;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -15,6 +14,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Throwable;
 
 class MatchSearchAlertsForAdJob implements ShouldQueue
@@ -36,7 +36,7 @@ class MatchSearchAlertsForAdJob implements ShouldQueue
         $ad = $this->ad->loadMissing(['quarter.city', 'ad_type']);
 
         $bufferedCount = 0;
-        $now           = now();
+        $now = now();
 
         SearchAlert::query()
             ->where('is_active', true)
@@ -57,14 +57,14 @@ class MatchSearchAlertsForAdJob implements ShouldQueue
                         // Buffer the match for the next digest run.
                         // The unique constraint on (search_alert_id, ad_id) prevents duplicates.
                         DB::table('search_alert_matches')->insertOrIgnore([
-                            'id'               => (string) \Illuminate\Support\Str::uuid(),
-                            'search_alert_id'  => $alert->id,
-                            'user_id'          => $user->id,
-                            'ad_id'            => $ad->id,
-                            'matched_at'       => $now,
-                            'digest_sent_at'   => null,
-                            'created_at'       => $now,
-                            'updated_at'       => $now,
+                            'id' => (string) Str::uuid(),
+                            'search_alert_id' => $alert->id,
+                            'user_id' => $user->id,
+                            'ad_id' => $ad->id,
+                            'matched_at' => $now,
+                            'digest_sent_at' => null,
+                            'created_at' => $now,
+                            'updated_at' => $now,
                         ]);
                         $bufferedCount++;
                     } catch (Throwable $e) {

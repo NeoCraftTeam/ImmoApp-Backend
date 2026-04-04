@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Models\Ad;
+use App\Models\SearchAlert;
 use App\Models\SearchAlertMatch;
 use App\Models\User;
 use App\Notifications\SearchAlertDigestNotification;
@@ -53,13 +55,13 @@ final class SendSearchAlertDigestJob implements ShouldQueue
         // Group matches by alert so each alert gets its own AI summary.
         $byAlert = $matches->groupBy('search_alert_id');
 
-        /** @var array<string, array{alert: \App\Models\SearchAlert, ads: \App\Models\Ad[], summary: string}> $digestGroups */
+        /** @var array<string, array{alert: SearchAlert, ads: Ad[], summary: string}> $digestGroups */
         $digestGroups = [];
 
         foreach ($byAlert as $alertId => $alertMatches) {
             $alert = $alertMatches->first()->searchAlert;
 
-            if (!$alert instanceof \App\Models\SearchAlert) {
+            if (!$alert instanceof SearchAlert) {
                 continue;
             }
 
@@ -72,8 +74,8 @@ final class SendSearchAlertDigestJob implements ShouldQueue
             $summary = $aiDigest->summarize($alert, $ads);
 
             $digestGroups[(string) $alertId] = [
-                'alert'   => $alert,
-                'ads'     => $ads,
+                'alert' => $alert,
+                'ads' => $ads,
                 'summary' => $summary,
             ];
         }
@@ -91,16 +93,16 @@ final class SendSearchAlertDigestJob implements ShouldQueue
 
             // Update last_notified_at on each alert.
             $alertIds = array_keys($digestGroups);
-            \App\Models\SearchAlert::whereIn('id', $alertIds)->update(['last_notified_at' => now()]);
+            SearchAlert::whereIn('id', $alertIds)->update(['last_notified_at' => now()]);
 
             Log::info('SearchAlert digest sent', [
-                'user_id'      => $this->user->id,
-                'alert_count'  => count($digestGroups),
-                'match_count'  => $matches->count(),
+                'user_id' => $this->user->id,
+                'alert_count' => count($digestGroups),
+                'match_count' => $matches->count(),
             ]);
         } catch (Throwable $e) {
             Log::error('SearchAlert digest delivery failed', [
-                'user_id'   => $this->user->id,
+                'user_id' => $this->user->id,
                 'exception' => $e->getMessage(),
             ]);
             throw $e;
@@ -110,7 +112,7 @@ final class SendSearchAlertDigestJob implements ShouldQueue
     public function failed(Throwable $exception): void
     {
         Log::error('SendSearchAlertDigestJob permanently failed', [
-            'user_id'   => $this->user->id,
+            'user_id' => $this->user->id,
             'exception' => $exception->getMessage(),
         ]);
     }

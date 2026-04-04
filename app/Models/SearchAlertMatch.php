@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,10 +18,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $search_alert_id
  * @property string $user_id
  * @property string $ad_id
- * @property \Carbon\Carbon $matched_at
- * @property \Carbon\Carbon|null $digest_sent_at
- * @property \Carbon\Carbon $created_at
- * @property \Carbon\Carbon $updated_at
+ * @property Carbon $matched_at
+ * @property Carbon|null $digest_sent_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 final class SearchAlertMatch extends Model
 {
@@ -37,8 +39,8 @@ final class SearchAlertMatch extends Model
     protected function casts(): array
     {
         return [
-            'matched_at'      => 'datetime',
-            'digest_sent_at'  => 'datetime',
+            'matched_at' => 'datetime',
+            'digest_sent_at' => 'datetime',
         ];
     }
 
@@ -61,7 +63,7 @@ final class SearchAlertMatch extends Model
     }
 
     /** Scope: only records not yet included in a digest. */
-    public function scopePending(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
+    public function scopePending(Builder $query): Builder
     {
         return $query->whereNull('digest_sent_at');
     }
