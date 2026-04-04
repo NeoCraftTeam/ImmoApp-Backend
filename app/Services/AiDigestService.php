@@ -29,23 +29,23 @@ class AiDigestService
     {
         $this->providers = [
             'openai' => [
-                'api_key'  => (string) config('services.openai.api_key', ''),
-                'model'    => (string) config('services.openai.model', 'gpt-4o-mini'),
+                'api_key' => (string) config('services.openai.api_key', ''),
+                'model' => (string) config('services.openai.model', 'gpt-4o-mini'),
                 'base_url' => 'https://api.openai.com/v1/chat/completions',
             ],
             'groq' => [
-                'api_key'  => (string) config('services.groq.api_key', ''),
-                'model'    => (string) config('services.groq.model', 'llama-3.3-70b-versatile'),
+                'api_key' => (string) config('services.groq.api_key', ''),
+                'model' => (string) config('services.groq.model', 'llama-3.3-70b-versatile'),
                 'base_url' => 'https://api.groq.com/openai/v1/chat/completions',
             ],
             'gemini' => [
-                'api_key'  => (string) config('services.gemini.api_key', ''),
-                'model'    => (string) config('services.gemini.model', 'gemini-2.0-flash'),
+                'api_key' => (string) config('services.gemini.api_key', ''),
+                'model' => (string) config('services.gemini.model', 'gemini-2.0-flash'),
                 'base_url' => 'https://generativelanguage.googleapis.com/v1beta/models',
             ],
             'mistral' => [
-                'api_key'  => (string) config('services.mistral.api_key', ''),
-                'model'    => (string) config('services.mistral.model', 'mistral-small-latest'),
+                'api_key' => (string) config('services.mistral.api_key', ''),
+                'model' => (string) config('services.mistral.model', 'mistral-small-latest'),
                 'base_url' => 'https://api.mistral.ai/v1/chat/completions',
             ],
         ];
@@ -56,9 +56,9 @@ class AiDigestService
     /**
      * Generate a 1–2 sentence French digest summary for the given batch.
      *
-     * @param  SearchAlert  $alert   The alert whose criteria produced the matches
-     * @param  Ad[]         $ads     Ads that matched (already limited to a sane count)
-     * @return string                Human-readable summary in French
+     * @param  SearchAlert  $alert  The alert whose criteria produced the matches
+     * @param  Ad[]  $ads  Ads that matched (already limited to a sane count)
+     * @return string Human-readable summary in French
      */
     public function summarize(SearchAlert $alert, array $ads): string
     {
@@ -75,7 +75,7 @@ class AiDigestService
         }
 
         $payload = $this->buildPayload($alert, $ads);
-        $result  = $this->callWithFallback($payload);
+        $result = $this->callWithFallback($payload);
 
         return $result !== '' ? $result : $fallback;
     }
@@ -87,16 +87,16 @@ class AiDigestService
         $alertDesc = $this->describeAlert($alert);
 
         $adLines = collect($ads)->take(5)->map(function (Ad $ad): string {
-            $price    = number_format((float) ($ad->price ?? 0), 0, ',', ' ').' FCFA';
+            $price = number_format((float) ($ad->price ?? 0), 0, ',', ' ').' FCFA';
             $location = $ad->quarter?->name ? "{$ad->quarter->name}" : '';
-            $surface  = $ad->surface_area ? "{$ad->surface_area} m²" : '';
-            $rooms    = $ad->bedrooms ? "{$ad->bedrooms} ch." : '';
-            $details  = implode(', ', array_filter([$surface, $rooms, $location]));
+            $surface = $ad->surface_area ? "{$ad->surface_area} m²" : '';
+            $rooms = $ad->bedrooms ? "{$ad->bedrooms} ch." : '';
+            $details = implode(', ', array_filter([$surface, $rooms, $location]));
 
             return "- {$ad->title} | {$price}".($details !== '' ? " | {$details}" : '');
         })->implode("\n");
 
-        $remaining = count($ads) > 5 ? ' (et '.( count($ads) - 5).' autre(s))' : '';
+        $remaining = count($ads) > 5 ? ' (et '.(count($ads) - 5).' autre(s))' : '';
 
         return "Alerte : {$alertDesc}\nNombre de nouvelles annonces : ".count($ads)."\n\nAnnonces{$remaining} :\n{$adLines}";
     }
@@ -123,9 +123,9 @@ class AiDigestService
      */
     private function templateSummary(SearchAlert $alert, array $ads): string
     {
-        $count    = count($ads);
-        $label    = $alert->label ?? $this->describeAlert($alert);
-        $noun     = $count === 1 ? 'nouvelle annonce correspond' : 'nouvelles annonces correspondent';
+        $count = count($ads);
+        $label = $alert->label ?? $this->describeAlert($alert);
+        $noun = $count === 1 ? 'nouvelle annonce correspond' : 'nouvelles annonces correspondent';
 
         $minPrice = collect($ads)->min('price');
         $maxPrice = collect($ads)->max('price');
@@ -144,13 +144,7 @@ class AiDigestService
 
     private function hasProvider(): bool
     {
-        foreach ($this->providers as $cfg) {
-            if ($this->isValidKey($cfg['api_key'])) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any($this->providers, fn ($cfg) => $this->isValidKey($cfg['api_key']));
     }
 
     private function callWithFallback(string $payload): string
@@ -161,7 +155,7 @@ class AiDigestService
             foreach ($this->providers as $name => $cfg) {
                 if ($this->isValidKey($cfg['api_key'])) {
                     $this->activeProvider = $name;
-                    $config               = $cfg;
+                    $config = $cfg;
                     break;
                 }
             }
@@ -185,12 +179,12 @@ class AiDigestService
             $response = Http::withToken($config['api_key'])
                 ->timeout(20)
                 ->post($config['base_url'], [
-                    'model'       => $config['model'],
-                    'messages'    => [
+                    'model' => $config['model'],
+                    'messages' => [
                         ['role' => 'system', 'content' => $this->systemPrompt()],
                         ['role' => 'user',   'content' => $payload],
                     ],
-                    'max_tokens'  => 120,
+                    'max_tokens' => 120,
                     'temperature' => 0.5,
                 ]);
 
@@ -220,8 +214,8 @@ class AiDigestService
         try {
             $response = Http::timeout(20)->post($url, [
                 'system_instruction' => ['parts' => [['text' => $this->systemPrompt()]]],
-                'contents'           => [['parts' => [['text' => $payload]]]],
-                'generationConfig'   => ['maxOutputTokens' => 120, 'temperature' => 0.5],
+                'contents' => [['parts' => [['text' => $payload]]]],
+                'generationConfig' => ['maxOutputTokens' => 120, 'temperature' => 0.5],
             ]);
 
             if ($response->failed()) {
@@ -257,7 +251,7 @@ PROMPT;
 
     private function isValidKey(string $key): bool
     {
-        $key     = trim($key);
+        $key = trim($key);
         $stripped = preg_replace('/^(sk-|gsk_|AIza)/i', '', $key);
 
         return $key !== '' && $stripped !== '' && !preg_match('/^x+$/i', (string) $stripped);

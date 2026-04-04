@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\AdStatus;
+use App\Enums\TransactionType;
 use App\Enums\UserType;
 use App\Enums\VerificationStatus;
 use App\Exceptions\InvalidStatusTransitionException;
@@ -127,6 +128,7 @@ class Ad extends Model implements HasMedia
         'expires_at',
         'quarter_id',
         'type_id',
+        'transaction_type',
         'agency_id',
         'deposit_amount',
         'minimum_lease_duration',
@@ -179,6 +181,7 @@ class Ad extends Model implements HasMedia
         'charges_montant_forfait' => 'integer',
         'charges_eau' => 'integer',
         'charges_electricite' => 'integer',
+        'transaction_type' => TransactionType::class,
         'has_3d_tour' => 'boolean',
         'tour_config' => 'array',
         'tour_published_at' => 'datetime',
@@ -301,6 +304,7 @@ class Ad extends Model implements HasMedia
             'type' => $this->ad_type?->name,
             'type_id' => $this->type_id,
             'quarter_id' => $this->quarter_id,
+            'transaction_type' => $this->transaction_type?->value,
 
             // Pour la recherche géographique (optionnel)
             '_geo' => $this->location ? [

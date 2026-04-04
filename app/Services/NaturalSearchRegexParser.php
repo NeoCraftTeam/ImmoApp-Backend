@@ -22,6 +22,7 @@ class NaturalSearchRegexParser
         $query = mb_strtolower(trim($query));
         $result = [
             'original_query' => $query,
+            'transaction_type' => null,
             'type_id' => null,
             'type_name' => null,
             'city_id' => null,
@@ -35,6 +36,12 @@ class NaturalSearchRegexParser
             'furnished' => null,
             'q' => null,
         ];
+
+        if (preg_match('/\b(?:à louer|à la location|en location|louer|location|loue|\/mois|mensuel|par mois)\b/u', $query)) {
+            $result['transaction_type'] = 'location';
+        } elseif (preg_match('/\b(?:à vendre|en vente|acheter|achat|vendre|vente|acquisition)\b/u', $query)) {
+            $result['transaction_type'] = 'vente';
+        }
 
         $typeMap = [
             'studio' => ['studio'],

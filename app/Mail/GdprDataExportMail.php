@@ -53,7 +53,7 @@ class GdprDataExportMail extends Mailable implements ShouldQueue
         return [
             Attachment::fromData(
                 fn () => json_encode($this->buildExportPayload(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
-                'keyhome-mes-donnees-' . now()->format('Y-m-d') . '.json'
+                'keyhome-mes-donnees-'.now()->format('Y-m-d').'.json'
             )->withMime('application/json'),
         ];
     }
@@ -65,71 +65,71 @@ class GdprDataExportMail extends Mailable implements ShouldQueue
 
         $paymentsPayload = [];
         foreach ($user->payments()->get() as $payment) {
-            if (! $payment instanceof Payment) {
+            if (!$payment instanceof Payment) {
                 continue;
             }
             $paymentsPayload[] = [
-                'id'         => $payment->id,
-                'amount'     => $payment->amount,
-                'status'     => $payment->status->value,
-                'gateway'    => $payment->gateway,
+                'id' => $payment->id,
+                'amount' => $payment->amount,
+                'status' => $payment->status->value,
+                'gateway' => $payment->gateway,
                 'created_at' => $payment->created_at?->toIso8601String(),
             ];
         }
 
         $unlockedAdsPayload = [];
         foreach ($user->unlockedAds()->with('ad:id,title')->get() as $unlock) {
-            if (! $unlock instanceof UnlockedAd) {
+            if (!$unlock instanceof UnlockedAd) {
                 continue;
             }
             $unlockedAdsPayload[] = [
-                'ad_id'      => $unlock->ad_id,
-                'ad_title'   => $unlock->ad?->title,
+                'ad_id' => $unlock->ad_id,
+                'ad_title' => $unlock->ad?->title,
                 'created_at' => $unlock->unlocked_at?->toIso8601String(),
             ];
         }
 
         return [
             'exported_at' => now()->toIso8601String(),
-            'account'     => [
-                'id'                      => $user->id,
-                'firstname'               => $user->firstname,
-                'lastname'                => $user->lastname,
-                'email'                   => $user->email,
-                'phone_number'            => $user->phone_number,
-                'role'                    => $user->role->value,
-                'type'                    => $user->type?->value,
-                'city'                    => $user->city?->name,
-                'created_at'              => $user->created_at?->toIso8601String(),
-                'email_verified_at'       => $user->email_verified_at?->toIso8601String(),
-                'last_login_at'           => $user->last_login_at,
+            'account' => [
+                'id' => $user->id,
+                'firstname' => $user->firstname,
+                'lastname' => $user->lastname,
+                'email' => $user->email,
+                'phone_number' => $user->phone_number,
+                'role' => $user->role->value,
+                'type' => $user->type?->value,
+                'city' => $user->city?->name,
+                'created_at' => $user->created_at?->toIso8601String(),
+                'email_verified_at' => $user->email_verified_at?->toIso8601String(),
+                'last_login_at' => $user->last_login_at,
                 'onboarding_completed_at' => $user->onboarding_completed_at?->toIso8601String(),
             ],
             'ads' => $user->ads()->with(['adType', 'quarter.city'])->get()
                 ->map(fn (Ad $ad): array => [
-                    'id'         => $ad->id,
-                    'title'      => $ad->title,
-                    'slug'       => $ad->slug,
-                    'status'     => $ad->status->value,
-                    'price'      => $ad->price,
+                    'id' => $ad->id,
+                    'title' => $ad->title,
+                    'slug' => $ad->slug,
+                    'status' => $ad->status->value,
+                    'price' => $ad->price,
                     'created_at' => $ad->created_at?->toIso8601String(),
                 ])->toArray(),
             'reviews' => $user->reviews()->get()
                 ->map(fn (Review $review): array => [
-                    'id'         => $review->id,
-                    'rating'     => $review->rating,
-                    'comment'    => $review->comment,
-                    'ad_id'      => $review->ad_id,
+                    'id' => $review->id,
+                    'rating' => $review->rating,
+                    'comment' => $review->comment,
+                    'ad_id' => $review->ad_id,
                     'created_at' => $review->created_at?->toIso8601String(),
                 ])->toArray(),
-            'payments'           => $paymentsPayload,
-            'unlocked_ads'       => $unlockedAdsPayload,
+            'payments' => $paymentsPayload,
+            'unlocked_ads' => $unlockedAdsPayload,
             'point_transactions' => $user->pointTransactions()->get()
                 ->map(fn (PointTransaction $pt): array => [
-                    'type'        => $pt->type->value,
-                    'points'      => $pt->points,
+                    'type' => $pt->type->value,
+                    'points' => $pt->points,
                     'description' => $pt->description,
-                    'created_at'  => $pt->created_at?->toIso8601String(),
+                    'created_at' => $pt->created_at?->toIso8601String(),
                 ])->toArray(),
             'email_preferences' => $user->emailPreference?->only([
                 'ad_updates', 'search_alerts', 'subscription_updates',

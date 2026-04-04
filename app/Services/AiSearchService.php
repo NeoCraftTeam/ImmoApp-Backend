@@ -249,27 +249,32 @@ Ta SEULE tâche : analyser la requête et retourner un objet JSON valide.
 IMPORTANT : commence DIRECTEMENT par { — aucun texte, markdown, ou commentaire avant ou après le JSON.
 
 ## SCHÉMA DE SORTIE
-Retourne exactement ces 10 clés. Utilise null si un critère n'est pas mentionné.
+Retourne exactement ces 11 clés. Utilise null si un critère n'est pas mentionné.
 {
-  "type_name":    <string|null>,
-  "city_name":    <string|null>,
-  "quarter_name": <string|null>,
-  "bedrooms":     <int|null>,
-  "price_min":    <int|null>,
-  "price_max":    <int|null>,
-  "surface_min":  <int|null>,
-  "has_parking":  <bool|null>,
-  "furnished":    <bool|null>,
-  "q":            <string|null>
+  "transaction_type": <"location"|"vente"|null>,
+  "type_name":        <string|null>,
+  "city_name":        <string|null>,
+  "quarter_name":     <string|null>,
+  "bedrooms":         <int|null>,
+  "price_min":        <int|null>,
+  "price_max":        <int|null>,
+  "surface_min":      <int|null>,
+  "has_parking":      <bool|null>,
+  "furnished":        <bool|null>,
+  "q":                <string|null>
 }
 
 ## RÈGLES D'EXTRACTION
 
+### TYPE DE TRANSACTION (transaction_type)
+- "louer"/"location"/"à louer"/"en location"/"à la location"/"/mois"/"mensuel"/"par mois"/"loue" → "location"
+- "acheter"/"achat"/"à vendre"/"en vente"/"vendre"/"vente"/"acquisition" → "vente"
+- Si non mentionné explicitement → null. Ne JAMAIS déduire depuis le type de bien ou le prix.
+
 ### PRIX (toujours en FCFA)
 - Conversions : "150k"→150000, "1,5M"/"1.5 million"→1500000, "2M"→2000000.
-- "pas cher"/"budget serré"/"économique" → price_max: 80000 (location) ou 8000000 (vente/achat).
-- "haut de gamme"/"luxe"/"standing" → price_min: 300000 (location) ou 50000000 (vente).
-- Si la requête mentionne "louer"/"location"/"mois" → contexte location. Sinon → contexte vente.
+- "pas cher"/"budget serré"/"économique" → price_max: 80000 si location, 8000000 si vente, 80000 si null.
+- "haut de gamme"/"luxe"/"standing" → price_min: 300000 si location, 50000000 si vente, 300000 si null.
 
 ### TYPE DE BIEN
 - Utilise UNIQUEMENT les noms exacts de la liste fournie dans le référentiel.
@@ -297,23 +302,23 @@ Retourne exactement ces 10 clés. Utilise null si un critère n'est pas mentionn
 
 ## EXEMPLES
 
-Requête : "je cherche un studio meublé à Yaoundé qui coûte moins de 80 000 fcfa"
-Réponse : {"type_name":"Studio","city_name":"Yaoundé","quarter_name":null,"bedrooms":null,"price_min":null,"price_max":80000,"surface_min":null,"has_parking":null,"furnished":true,"q":null}
+Requête : "je cherche un studio meublé à louer à Yaoundé moins de 80 000 fcfa"
+Réponse : {"transaction_type":"location","type_name":"Studio","city_name":"Yaoundé","quarter_name":null,"bedrooms":null,"price_min":null,"price_max":80000,"surface_min":null,"has_parking":null,"furnished":true,"q":null}
 
 Requête : "appartement F3 avec parking à Bonapriso Douala"
-Réponse : {"type_name":"Appartement","city_name":"Douala","quarter_name":"Bonapriso","bedrooms":3,"price_min":null,"price_max":null,"surface_min":null,"has_parking":true,"furnished":null,"q":null}
+Réponse : {"transaction_type":null,"type_name":"Appartement","city_name":"Douala","quarter_name":"Bonapriso","bedrooms":3,"price_min":null,"price_max":null,"surface_min":null,"has_parking":true,"furnished":null,"q":null}
 
-Requête : "villa luxueuse avec piscine à Bastos Yaoundé"
-Réponse : {"type_name":"Maison","city_name":"Yaoundé","quarter_name":"Bastos","bedrooms":null,"price_min":300000,"price_max":null,"surface_min":null,"has_parking":null,"furnished":null,"q":"piscine luxe"}
+Requête : "villa à vendre luxueuse avec piscine à Bastos Yaoundé"
+Réponse : {"transaction_type":"vente","type_name":"Maison","city_name":"Yaoundé","quarter_name":"Bastos","bedrooms":null,"price_min":50000000,"price_max":null,"surface_min":null,"has_parking":null,"furnished":null,"q":"piscine luxe"}
 
-Requête : "terrain constructible 500m² à Douala"
-Réponse : {"type_name":"Terrain","city_name":"Douala","quarter_name":null,"bedrooms":null,"price_min":null,"price_max":null,"surface_min":500,"has_parking":null,"furnished":null,"q":null}
+Requête : "terrain constructible 500m² à acheter Douala"
+Réponse : {"transaction_type":"vente","type_name":"Terrain","city_name":"Douala","quarter_name":null,"bedrooms":null,"price_min":null,"price_max":null,"surface_min":500,"has_parking":null,"furnished":null,"q":null}
 
-Requête : "chambre salon meublée pas cher avec parking"
-Réponse : {"type_name":null,"city_name":null,"quarter_name":null,"bedrooms":1,"price_min":null,"price_max":80000,"surface_min":null,"has_parking":true,"furnished":true,"q":null}
+Requête : "chambre salon meublée à louer pas cher avec parking"
+Réponse : {"transaction_type":"location","type_name":null,"city_name":null,"quarter_name":null,"bedrooms":1,"price_min":null,"price_max":80000,"surface_min":null,"has_parking":true,"furnished":true,"q":null}
 
 Requête : "logement pour étudiant"
-Réponse : {"type_name":null,"city_name":null,"quarter_name":null,"bedrooms":null,"price_min":null,"price_max":null,"surface_min":null,"has_parking":null,"furnished":null,"q":"logement étudiant"}
+Réponse : {"transaction_type":null,"type_name":null,"city_name":null,"quarter_name":null,"bedrooms":null,"price_min":null,"price_max":null,"surface_min":null,"has_parking":null,"furnished":null,"q":"logement étudiant"}
 
 ## RÉFÉRENTIEL DISPONIBLE
 {$context}
@@ -339,7 +344,10 @@ PROMPT;
      */
     private function normalizeParsedResult(array $parsed): array
     {
+        $validTxTypes = ['location', 'vente'];
+
         return [
+            'transaction_type' => isset($parsed['transaction_type']) && in_array($parsed['transaction_type'], $validTxTypes, true) ? (string) $parsed['transaction_type'] : null,
             'type_name' => isset($parsed['type_name']) && $parsed['type_name'] !== '' ? (string) $parsed['type_name'] : null,
             'city_name' => isset($parsed['city_name']) && $parsed['city_name'] !== '' ? (string) $parsed['city_name'] : null,
             'quarter_name' => isset($parsed['quarter_name']) && $parsed['quarter_name'] !== '' ? (string) $parsed['quarter_name'] : null,
@@ -361,6 +369,7 @@ PROMPT;
     {
         $result = [
             'original_query' => $originalQuery,
+            'transaction_type' => $parsed['transaction_type'] ?? null,
             'type_id' => null,
             'type_name' => $parsed['type_name'] ?? null,
             'city_id' => null,
@@ -398,9 +407,9 @@ PROMPT;
             }
         }
 
-        $hasStructured = $result['type_id'] || $result['city_id'] || $result['bedrooms']
-            || $result['price_max'] || $result['price_min'] || $result['surface_min']
-            || $result['has_parking'] || $result['furnished'];
+        $hasStructured = $result['transaction_type'] || $result['type_id'] || $result['city_id']
+            || $result['bedrooms'] || $result['price_max'] || $result['price_min']
+            || $result['surface_min'] || $result['has_parking'] || $result['furnished'];
         if (!$hasStructured && empty($result['q'])) {
             $result['q'] = $originalQuery;
         }
@@ -415,6 +424,7 @@ PROMPT;
     {
         return [
             'original_query' => $query,
+            'transaction_type' => null,
             'type_id' => null,
             'type_name' => null,
             'city_id' => null,

@@ -43,6 +43,8 @@ final class AdRequest extends FormRequest
                 // Filtres
                 'city' => ['nullable', 'string', 'max:100'],
                 'type' => ['nullable', 'string', 'max:100'],
+                'quarter' => ['nullable', 'string', 'max:100'],
+                'transaction_type' => ['nullable', 'string', 'in:location,vente'],
                 'bedrooms' => ['nullable', 'integer', 'min:0'],
                 'quarter_id' => ['sometimes', 'exists:quarter,id'],
                 'type_id' => ['sometimes', 'exists:ad_type,id'],
@@ -83,7 +85,8 @@ final class AdRequest extends FormRequest
         if ($this->isMethod('post')) {
             return [
                 'title' => ['required', 'string', 'max:255'],
-                'slug' => ['string', 'max:255', 'unique:ad,slug'], // éviter les doublons
+                'transaction_type' => ['nullable', 'string', 'in:location,vente'],
+                'slug' => ['string', 'max:255', 'unique:ad,slug'],
                 'description' => ['required', 'string'],
                 'adresse' => ['required', 'string', 'max:255'],
                 'price' => ['required', 'numeric', 'min:0'],
@@ -159,6 +162,7 @@ final class AdRequest extends FormRequest
         if ($this->isMethod('put') || $this->isMethod('patch')) {
             return [
                 'title' => ['sometimes', 'string', 'max:255'],
+                'transaction_type' => ['nullable', 'string', 'in:location,vente'],
                 'slug' => [
                     'sometimes',
                     'string',

@@ -16,7 +16,9 @@ use App\Mail\AppointmentReminderMail;
 use App\Mail\BailleurWelcomeEmail;
 use App\Mail\CreditPurchaseConfirmationMail;
 use App\Mail\EmailUpdatedMail;
+use App\Mail\FirstAdCelebrationMail;
 use App\Mail\ForgotPasswordMail;
+use App\Mail\GdprDataExportMail;
 use App\Mail\InvitationMail;
 use App\Mail\MagicLinkSignInMail;
 use App\Mail\MagicLinkSignUpMail;
@@ -493,4 +495,32 @@ it('includes dark mode meta tag in email layout', function (): void {
 
     expect($rendered)->toContain('color-scheme');
     expect($rendered)->toContain('prefers-color-scheme: dark');
+});
+
+// ── New owner mails ────────────────────────────────────────────────────────────
+
+it('renders FirstAdCelebrationMail without errors', function (): void {
+    $user = User::factory()->agents()->create();
+    $ad = Ad::factory()->for($user)->create();
+
+    $mail = new FirstAdCelebrationMail($ad);
+    $rendered = $mail->render();
+
+    expect($rendered)->toContain($user->firstname);
+    expect($rendered)->toContain($ad->title);
+    expect($mail->envelope()->subject)->toContain('première annonce');
+});
+
+it('renders GdprDataExportMail without errors and has json attachment', function (): void {
+    $user = User::factory()->create();
+
+    $mail = new GdprDataExportMail($user);
+    $rendered = $mail->render();
+
+    expect($rendered)->toContain($user->firstname);
+    expect($mail->envelope()->subject)->toContain('RGPD');
+
+    $attachments = $mail->attachments();
+    expect($attachments)->toHaveCount(1);
+    expect($attachments[0]->as)->toContain('.json');
 });

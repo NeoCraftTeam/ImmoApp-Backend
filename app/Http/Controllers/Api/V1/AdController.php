@@ -206,6 +206,11 @@ final class AdController
      */
     public function show(string $id): JsonResponse
     {
+        $isUuid = (bool) preg_match(
+            '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
+            $id
+        );
+
         $ad = Ad::with(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency', 'reviews.user'])
             ->withAvg('reviews', 'rating')
             ->withCount([
@@ -216,7 +221,14 @@ final class AdController
                 'interactions as views_count_week' => fn ($q) => $q->where('type', AdInteraction::TYPE_VIEW)
                     ->where('created_at', '>=', now()->subDays(7)),
             ])
-            ->findOrFail($id);
+            ->where(function ($q) use ($id, $isUuid): void {
+                if ($isUuid) {
+                    $q->where('id', $id)->orWhere('slug', $id);
+                } else {
+                    $q->where('slug', $id);
+                }
+            })
+            ->firstOrFail();
 
         $this->authorize('view', $ad);
 
