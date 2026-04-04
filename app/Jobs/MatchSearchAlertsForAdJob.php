@@ -6,13 +6,14 @@ namespace App\Jobs;
 
 use App\Models\Ad;
 use App\Models\SearchAlert;
+use App\Models\SearchAlertMatch;
 use App\Models\User;
-use App\Notifications\SearchAlertMatchNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -34,13 +35,14 @@ class MatchSearchAlertsForAdJob implements ShouldQueue
     {
         $ad = $this->ad->loadMissing(['quarter.city', 'ad_type']);
 
-        $notifiedCount = 0;
+        $bufferedCount = 0;
+        $now           = now();
 
         SearchAlert::query()
             ->where('is_active', true)
             ->where('user_id', '!=', $ad->user_id)
             ->with('user')
-            ->chunkById(500, function ($alerts) use ($ad, &$notifiedCount): void {
+            ->chunkById(500, function ($alerts) use ($ad, $now, &$bufferedCount): void {
                 foreach ($alerts as $alert) {
                     if (!$alert->matchesAd($ad)) {
                         continue;
@@ -51,22 +53,28 @@ class MatchSearchAlertsForAdJob implements ShouldQueue
                         continue;
                     }
 
-                    if ($alert->last_notified_at && $alert->last_notified_at->gt(now()->subHours(1))) {
-                        continue;
-                    }
-
                     try {
-                        $user->notify(new SearchAlertMatchNotification($ad, $alert));
-                        $alert->update(['last_notified_at' => now()]);
-                        $notifiedCount++;
+                        // Buffer the match for the next digest run.
+                        // The unique constraint on (search_alert_id, ad_id) prevents duplicates.
+                        DB::table('search_alert_matches')->insertOrIgnore([
+                            'id'               => (string) \Illuminate\Support\Str::uuid(),
+                            'search_alert_id'  => $alert->id,
+                            'user_id'          => $user->id,
+                            'ad_id'            => $ad->id,
+                            'matched_at'       => $now,
+                            'digest_sent_at'   => null,
+                            'created_at'       => $now,
+                            'updated_at'       => $now,
+                        ]);
+                        $bufferedCount++;
                     } catch (Throwable $e) {
-                        Log::error("SearchAlert notification failed for alert {$alert->id}: {$e->getMessage()}");
+                        Log::error("SearchAlert buffer failed for alert {$alert->id}: {$e->getMessage()}");
                     }
                 }
             });
 
-        if ($notifiedCount > 0) {
-            Log::info("SearchAlert: matched ad {$ad->id} against {$notifiedCount} alert(s).");
+        if ($bufferedCount > 0) {
+            Log::info("SearchAlert: buffered ad {$ad->id} for {$bufferedCount} alert(s) — digest pending.");
         }
     }
 

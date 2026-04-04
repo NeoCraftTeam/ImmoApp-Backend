@@ -30,3 +30,6 @@ Schedule::command('app:send-post-viewing-thanks')->dailyAt('10:00');
 
 // — GDPR data retention (P2-29) —
 Schedule::command('app:purge-expired-data')->dailyAt('03:30');
+
+// — Smart notification digests —
+Schedule::command('app:send-search-alert-digests')->twiceDaily(8, 18);
