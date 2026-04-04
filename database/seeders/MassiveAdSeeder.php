@@ -715,10 +715,10 @@ class MassiveAdSeeder extends Seeder
     private function depositForType(string $type, int $price): string
     {
         $months = match (true) {
-            $type === 'maison'                          => mt_rand(1, 3),
-            str_contains($type, 'appartement meuble')  => mt_rand(1, 2),
-            str_contains($type, 'appartement')         => mt_rand(1, 2),
-            default                                     => 1,
+            $type === 'maison' => mt_rand(1, 3),
+            str_contains($type, 'appartement meuble') => mt_rand(1, 2),
+            str_contains($type, 'appartement') => mt_rand(1, 2),
+            default => 1,
         };
         $amount = number_format($months * $price, 0, ',', ' ');
 
@@ -743,30 +743,30 @@ class MassiveAdSeeder extends Seeder
     private function chargesForfaitForType(string $type): int
     {
         return match (true) {
-            $type === 'maison'                 => mt_rand(10, 35) * 1000,
+            $type === 'maison' => mt_rand(10, 35) * 1000,
             str_contains($type, 'appartement') => mt_rand(6, 22) * 1000,
-            str_contains($type, 'studio')      => mt_rand(4, 14) * 1000,
-            default                            => mt_rand(2, 8) * 1000,
+            str_contains($type, 'studio') => mt_rand(4, 14) * 1000,
+            default => mt_rand(2, 8) * 1000,
         };
     }
 
     private function generateChargesAutres(): ?string
     {
         $pool = [
-            'Gardiennage'               => [3000, 4000, 5000, 6000, 7000, 8000, 10000],
-            'Enlèvement des ordures'    => [1000, 1500, 2000, 2500, 3000],
+            'Gardiennage' => [3000, 4000, 5000, 6000, 7000, 8000, 10000],
+            'Enlèvement des ordures' => [1000, 1500, 2000, 2500, 3000],
             'Entretien espaces communs' => [2000, 2500, 3000, 4000, 5000],
-            'Groupe électrogène'        => [3000, 4000, 5000, 6000],
-            'Gardien de nuit'           => [3000, 4000, 5000, 6000, 7000],
+            'Groupe électrogène' => [3000, 4000, 5000, 6000],
+            'Gardien de nuit' => [3000, 4000, 5000, 6000, 7000],
             'Nettoyage parties communes' => [1500, 2000, 2500, 3000],
         ];
 
         $items = [];
         foreach ($pool as $label => $amounts) {
             if (mt_rand(0, 2) === 0) {
-                $amount    = $amounts[array_rand($amounts)];
+                $amount = $amounts[array_rand($amounts)];
                 $formatted = number_format($amount, 0, ',', ' ');
-                $items[]   = "{$label} : {$formatted} FCFA/mois";
+                $items[] = "{$label} : {$formatted} FCFA/mois";
             }
         }
 
