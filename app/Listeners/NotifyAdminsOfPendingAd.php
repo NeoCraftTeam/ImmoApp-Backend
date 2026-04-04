@@ -9,6 +9,7 @@ use App\Enums\UserRole;
 use App\Events\AdCreated;
 use App\Events\AdStatusTransitioned;
 use App\Mail\AdSubmissionConfirmationMail;
+use App\Mail\FirstAdCelebrationMail;
 use App\Models\User;
 use App\Notifications\NewAdPending;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -47,6 +48,15 @@ class NotifyAdminsOfPendingAd implements ShouldQueue
                 Mail::to($ad->user)->send(new AdSubmissionConfirmationMail($ad));
             } catch (Throwable $e) {
                 Log::error("Failed to send ad confirmation email to {$ad->user->email}: ".$e->getMessage());
+            }
+
+            $isFirstAd = $ad->user->ads()->count() === 1;
+            if ($isFirstAd) {
+                try {
+                    Mail::to($ad->user)->send(new FirstAdCelebrationMail($ad));
+                } catch (Throwable $e) {
+                    Log::error("Failed to send first-ad celebration email to {$ad->user->email}: ".$e->getMessage());
+                }
             }
         }
 

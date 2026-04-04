@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\Log;
  *   - Automatic fallback to any other configured provider
  *   - Template-based fallback when no AI provider is available
  */
-final class AiDigestService
+class AiDigestService
 {
     /** @var array<string, array{api_key: string, model: string, base_url: string}> */
     private array $providers;

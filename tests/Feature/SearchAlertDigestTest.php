@@ -97,12 +97,12 @@ it('sends a digest notification and marks matches as sent', function (): void {
         'label'     => 'Yaoundé Studio',
     ]);
 
-    $ads = Ad::factory()->count(2)->create([
+    $ads = Ad::withoutEvents(fn () => Ad::factory()->count(2)->create([
         'user_id'    => $landlord->id,
         'quarter_id' => $quarter->id,
         'type_id'    => $adType->id,
         'price'      => 100_000,
-    ]);
+    ]));
 
     foreach ($ads as $ad) {
         SearchAlertMatch::create([
@@ -160,10 +160,10 @@ it('does not re-send already-dispatched matches', function (): void {
         'is_active' => true,
     ]);
 
-    $ad = Ad::factory()->create([
+    $ad = Ad::withoutEvents(fn () => Ad::factory()->create([
         'quarter_id' => $quarter->id,
         'type_id'    => $adType->id,
-    ]);
+    ]));
 
     // Already sent match.
     SearchAlertMatch::create([
@@ -238,10 +238,10 @@ it('dry-run mode prints users without dispatching jobs', function (): void {
         'is_active' => true,
     ]);
 
-    $ad = Ad::factory()->create([
+    $ad = Ad::withoutEvents(fn () => Ad::factory()->create([
         'quarter_id' => $quarter->id,
         'type_id'    => $adType->id,
-    ]);
+    ]));
 
     SearchAlertMatch::create([
         'search_alert_id' => $alert->id,

@@ -113,14 +113,15 @@ it('serves a v2 cached scorecard without re-computing', function (): void {
 
     $cached = [
         'global_score' => 68,
-        'status' => 'ok',
-        'computed_at' => now()->toIso8601String(),
-        'categories' => [
-            'transport' => ['score' => 75, 'poi_count' => 3, 'label' => 'Transport',       'radius_m' => 500,  'nearest_poi' => ['osm_id' => '1', 'name' => 'Gare routière', 'distance_m' => 210, 'mode' => 'walking']],
-            'commerce' => ['score' => 60, 'poi_count' => 2, 'label' => 'Commerces',       'radius_m' => 500,  'nearest_poi' => null],
-            'sante' => ['score' => 80, 'poi_count' => 2, 'label' => 'Santé',           'radius_m' => 1000, 'nearest_poi' => null],
-            'education' => ['score' => 55, 'poi_count' => 1, 'label' => 'Éducation',       'radius_m' => 1000, 'nearest_poi' => null],
-            'securite' => ['score' => 70, 'poi_count' => 1, 'label' => 'Sécurité',        'radius_m' => 1000, 'nearest_poi' => null],
+        'status'       => 'ok',
+        'computed_at'  => now()->toIso8601String(),
+        'ors_used'     => true,
+        'categories'   => [
+            'transport'   => ['score' => 75, 'poi_count' => 3, 'label' => 'Transport',       'radius_m' => 500,  'nearest_poi' => ['osm_id' => '1', 'name' => 'Gare routière', 'distance_m' => 210, 'mode' => 'walking']],
+            'commerce'    => ['score' => 60, 'poi_count' => 2, 'label' => 'Commerces',       'radius_m' => 500,  'nearest_poi' => null],
+            'sante'       => ['score' => 80, 'poi_count' => 2, 'label' => 'Santé',           'radius_m' => 1000, 'nearest_poi' => null],
+            'education'   => ['score' => 55, 'poi_count' => 1, 'label' => 'Éducation',       'radius_m' => 1000, 'nearest_poi' => null],
+            'securite'    => ['score' => 70, 'poi_count' => 1, 'label' => 'Sécurité',        'radius_m' => 1000, 'nearest_poi' => null],
             'vie_sociale' => ['score' => 50, 'poi_count' => 3, 'label' => 'Vie de quartier', 'radius_m' => 500,  'nearest_poi' => null],
         ],
     ];

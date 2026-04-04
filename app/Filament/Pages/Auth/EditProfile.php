@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace App\Filament\Pages\Auth;
 
 use App\Filament\Forms\Components\NativePhoneInput;
+use App\Mail\GdprDataExportMail;
 use Filament\Actions\Action;
 use Filament\Auth\Pages\EditProfile as BaseEditProfile;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Mail;
 
 class EditProfile extends BaseEditProfile
 {
@@ -105,6 +108,44 @@ class EditProfile extends BaseEditProfile
                     ->columns(2)
                     ->collapsed()
                     ->columnSpanFull(),
+                Section::make('Données & confidentialité')
+                    ->icon('heroicon-o-shield-check')
+                    ->description('Accédez à vos données personnelles conformément au RGPD')
+                    ->footerActions([
+                        Action::make('exportGdpr')
+                            ->label('Exporter mes données par email')
+                            ->icon('heroicon-o-arrow-down-tray')
+                            ->color('gray')
+                            ->requiresConfirmation()
+                            ->modalHeading('Exporter vos données personnelles')
+                            ->modalDescription('Un email contenant toutes vos données personnelles (format JSON) sera envoyé à votre adresse email. Cette opération peut prendre quelques minutes.')
+                            ->modalSubmitActionLabel('Envoyer l\'export')
+                            ->action('sendGdprExport'),
+                    ])
+                    ->columnSpanFull(),
             ]);
+    }
+
+    public function sendGdprExport(): void
+    {
+        /** @var \App\Models\User $user */
+        $user = auth()->user();
+
+        try {
+            Mail::to($user->email)->send(new GdprDataExportMail($user));
+
+            Notification::make()
+                ->title('Export envoyé')
+                ->body('Vos données ont été envoyées à ' . $user->email . '. Vérifiez votre boîte mail dans quelques minutes.')
+                ->success()
+                ->duration(8000)
+                ->send();
+        } catch (\Throwable $e) {
+            Notification::make()
+                ->title('Erreur lors de l\'export')
+                ->body('Impossible d\'envoyer l\'email. Veuillez réessayer.')
+                ->danger()
+                ->send();
+        }
     }
 }

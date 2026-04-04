@@ -276,6 +276,11 @@ class MassiveAdSeeder extends Seeder
 
                             $attributes = $this->randomAttributes();
 
+                            $price = mt_rand($priceRange[0], $priceRange[1]);
+                            $isTerrain = in_array($normalizedType, ['terrain', 'commercial', 'commerces']);
+                            $hasForfait = !$isTerrain && (bool) mt_rand(0, 1);
+                            $hasDetailed = !$isTerrain && !$hasForfait;
+
                             $status = AdStatus::from($this->randomStatus());
                             $ad = Ad::forceCreate([
                                 'id' => (string) Str::orderedUuid(),
@@ -283,7 +288,7 @@ class MassiveAdSeeder extends Seeder
                                 'slug' => Ad::generateUniqueSlug($title),
                                 'description' => $description,
                                 'adresse' => $quarterLabel,
-                                'price' => mt_rand($priceRange[0], $priceRange[1]),
+                                'price' => $price,
                                 'surface_area' => $surface,
                                 'bedrooms' => $bedrooms,
                                 'bathrooms' => max(1, (int) round($bedrooms * 0.7)),
@@ -295,6 +300,13 @@ class MassiveAdSeeder extends Seeder
                                 'type_id' => $this->typeMap[$typeName],
                                 'agency_id' => $this->agencyMap[$agentId] ?? null,
                                 'attributes' => $attributes,
+                                'deposit_amount' => $isTerrain ? null : $this->depositForType($normalizedType, $price),
+                                'minimum_lease_duration' => $isTerrain ? null : $this->leaseDurationForType(),
+                                'charges_forfaitaires' => $hasForfait,
+                                'charges_montant_forfait' => $hasForfait ? $this->chargesForfaitForType($normalizedType) : null,
+                                'charges_eau' => $hasDetailed ? mt_rand(2, 8) * 1000 : null,
+                                'charges_electricite' => $hasDetailed ? mt_rand(3, 15) * 1000 : null,
+                                'charges_autres' => $hasDetailed ? $this->generateChargesAutres() : null,
                                 'created_at' => now()->subDays($daysAgo),
                                 'updated_at' => now()->subDays($daysAgo),
                             ]);
@@ -572,7 +584,7 @@ class MassiveAdSeeder extends Seeder
             return [];
         }
 
-        $count = min(mt_rand(2, 6), count($this->attributeSlugs));
+        $count = min(mt_rand(4, 8), count($this->attributeSlugs));
         $shuffled = $this->attributeSlugs;
         shuffle($shuffled);
 
@@ -627,9 +639,7 @@ class MassiveAdSeeder extends Seeder
                 : ($isApartment ? mt_rand(500, 5000) : mt_rand(1000, 10000));
         }
 
-        if (!empty($data)) {
-            $ad->updateQuietly($data);
-        }
+        $ad->updateQuietly($data);
     }
 
     private function createReviewsForAd(Ad $ad, int $daysAgo): void
@@ -638,33 +648,42 @@ class MassiveAdSeeder extends Seeder
             return;
         }
 
-        $reviewCount = mt_rand(0, 5);
-        if ($reviewCount === 0) {
-            return;
-        }
+        $reviewCount = mt_rand(3, 15);
+        $maxPossible = min($reviewCount, count($this->customerIds));
+        $reviewCount = $maxPossible;
 
         $usedCustomers = [];
         $comments = [
-            'Très bon logement, propre et bien situé. Je recommande.',
-            'Séjour agréable, le propriétaire est à l\'écoute. Tout correspondait à la description.',
-            'Logement conforme aux photos. Quartier calme et accessible.',
-            'Excellent rapport qualité-prix. Je reviendrai avec plaisir.',
-            'Belle découverte ! L\'appartement est spacieux et bien équipé.',
-            'Parfait pour un séjour professionnel. WiFi rapide, tout le nécessaire.',
-            'Accueil chaleureux. Le logement est propre et bien entretenu.',
-            'Très satisfait de ma location. Rien à redire.',
-            'Cadre agréable, proche des commodités. Je recommande vivement.',
-            'Logement cosy et fonctionnel. Idéal pour un couple.',
-            'Bonne expérience globale. Le quartier est sûr et animé.',
-            'Conforme à mes attentes. Merci pour la flexibilité sur les horaires.',
-            'Super séjour ! Tout était parfait, du check-in au départ.',
-            'Logement bien aménagé. La climatisation est un vrai plus.',
-            'Propre, moderne et bien situé. Je n\'hésiterai pas à revenir.',
-            'Un peu bruyant la nuit mais le logement est correct.',
-            'Bien pour un court séjour. Manque quelques équipements de base.',
-            'Correct sans plus. Le prix est un peu élevé pour ce que c\'est.',
-            'Propre et fonctionnel. Idéal pour une nuit ou deux.',
-            'Bonne adresse. Le parking à proximité est pratique.',
+            'Logement excellent, exactement comme décrit dans l\'annonce. Propriétaire très sympathique et disponible. Je recommande vivement sans hésitation.',
+            'Appartement propre, bien aménagé et très bien situé. Accès facile, quartier calme et sécurisé. L\'eau et l\'électricité sont disponibles 24h/24. Très satisfait.',
+            'Villa magnifique avec tout le confort moderne. Le gardien est présent la nuit, le parking est spacieux. Je n\'ai rien à redire, c\'est parfait pour une famille.',
+            'Chambre propre et bien entretenue dans une concession calme. Le propriétaire est sérieux, réactif et respectueux. Voisinage agréable. Je reviendrai.',
+            'Studio meublé de qualité, mobilier neuf, climatisation fonctionnelle. Internet inclus. L\'annonce correspondait à 100% à la réalité. Très bonne expérience.',
+            'Superbe appartement, finitions haut de gamme. Quartier résidentiel très bien desservi par les transports. Tout est conforme aux photos.',
+            'Bonne adresse, proximité des commerces et du marché. Eau courante, électricité stable. Le propriétaire nous a aidés pour l\'installation. Très content.',
+            'Logement idéal pour un professionnel. Calme, bien éclairé, cuisine bien équipée. La sécurité du quartier est rassurante. Je recommande à 100%.',
+            'Maison spacieuse avec jardin, forage d\'eau privé et groupe électrogène. Idéale pour une grande famille. Le prix est juste par rapport au standing.',
+            'Très bon logement dans l\'ensemble. Quelques petits détails à finir dans la salle de bain, mais rien de grave. Propriétaire de bonne volonté.',
+            'Appartement conforme à l\'annonce. Bon rapport qualité-prix pour le quartier. Le seul bémol est le bruit de la route principale le matin.',
+            'Bon séjour. Le logement est propre et fonctionnel. Propriétaire disponible sur WhatsApp pour tout problème. Je recommande.',
+            'Chambre correcte et bien entretenue. Eau chaude disponible le matin. Voisinage calme. Légèrement loin du marché mais accessible en moto.',
+            'Studio bien équipé, cuisine fonctionnelle, bonne ventilation naturelle. Quelques coupures d\'électricité occasionnelles mais c\'est la norme dans le quartier.',
+            'Belle villa, bien construite. Le jardin nécessite un peu d\'entretien mais l\'ensemble est en bon état. Quartier résidentiel agréable.',
+            'Logement dans une bonne résidence sécurisée. Gardiennage 24h/24. Parking couvert. L\'appartement est propre et les voisins sont respectueux.',
+            'Appartement meublé de bon standing. Lit confortable, TV écran plat, WiFi rapide. Quelques équipements de cuisine manquants mais globalement satisfait.',
+            'Logement correct sans plus. Le prix est légèrement élevé par rapport à ce qui est proposé. Quelques travaux de rénovation seraient bienvenus.',
+            'Chambre propre mais un peu petite. La douche fonctionne bien, l\'électricité est stable. Quartier un peu bruyant la nuit.',
+            'Studio acceptable pour le prix demandé. La plomberie a quelques problèmes que le propriétaire a promis de réparer.',
+            'Appartement conforme à la description mais les photos le montraient plus lumineux. Correct pour une première installation.',
+            'Maison spacieuse mais nécessitant quelques réparations (carrelage fissuré, peinture à refaire). Propriétaire de bonne volonté.',
+            'Logement décevant par rapport aux photos. La cuisine n\'était pas équipée comme indiqué. Le propriétaire doit corriger son annonce.',
+            'Des problèmes de plomberie récurrents. L\'eau chaude ne fonctionnait pas la moitié du temps. Propriétaire difficile à joindre.',
+            'Quartier moins sécurisé que ce qui était annoncé. Quelques nuisances sonores la nuit. Le logement en lui-même est correct.',
+            'Résidence bien entretenue, ascenseur fonctionnel, parking sécurisé. Appartement lumineux et spacieux. Charges raisonnables. Très satisfait.',
+            'Propriétaire réactif et professionnel. Logement livré propre avec tout le nécessaire. Je n\'hésite pas à recommander cette adresse.',
+            'Très bon rapport qualité-prix. Le quartier est en plein développement, tout est à portée de main. Électricité et eau jamais en panne.',
+            'Séjour professionnel réussi grâce à ce logement bien équipé et bien placé. WiFi excellent, climatisation puissante. Reviendrai sans hésiter.',
+            'Superbe vue depuis le balcon, appartement lumineux, finitions modernes. Le gardiennage 24h/24 est un vrai plus pour la sécurité.',
         ];
 
         for ($i = 0; $i < $reviewCount; $i++) {
@@ -691,5 +710,66 @@ class MassiveAdSeeder extends Seeder
                 'updated_at' => now()->subDays($reviewDaysAgo),
             ]);
         }
+    }
+
+    private function depositForType(string $type, int $price): string
+    {
+        $months = match (true) {
+            $type === 'maison'                          => mt_rand(1, 3),
+            str_contains($type, 'appartement meuble')  => mt_rand(1, 2),
+            str_contains($type, 'appartement')         => mt_rand(1, 2),
+            default                                     => 1,
+        };
+        $amount = number_format($months * $price, 0, ',', ' ');
+
+        return $months === 1
+            ? "1 mois de caution ({$amount} FCFA)"
+            : "{$months} mois de caution ({$amount} FCFA)";
+    }
+
+    private function leaseDurationForType(): string
+    {
+        return $this->pick([
+            'Mensuel, sans engagement',
+            '3 mois renouvelables',
+            '6 mois renouvelables',
+            '6 mois ferme',
+            '1 an renouvelable',
+            '1 an ferme',
+            '2 ans renouvelables',
+        ]);
+    }
+
+    private function chargesForfaitForType(string $type): int
+    {
+        return match (true) {
+            $type === 'maison'                 => mt_rand(10, 35) * 1000,
+            str_contains($type, 'appartement') => mt_rand(6, 22) * 1000,
+            str_contains($type, 'studio')      => mt_rand(4, 14) * 1000,
+            default                            => mt_rand(2, 8) * 1000,
+        };
+    }
+
+    private function generateChargesAutres(): ?string
+    {
+        $pool = [
+            'Gardiennage'               => [3000, 4000, 5000, 6000, 7000, 8000, 10000],
+            'Enlèvement des ordures'    => [1000, 1500, 2000, 2500, 3000],
+            'Entretien espaces communs' => [2000, 2500, 3000, 4000, 5000],
+            'Groupe électrogène'        => [3000, 4000, 5000, 6000],
+            'Gardien de nuit'           => [3000, 4000, 5000, 6000, 7000],
+            'Nettoyage parties communes' => [1500, 2000, 2500, 3000],
+        ];
+
+        $items = [];
+        foreach ($pool as $label => $amounts) {
+            if (mt_rand(0, 2) === 0) {
+                $amount    = $amounts[array_rand($amounts)];
+                $formatted = number_format($amount, 0, ',', ' ');
+                $items[]   = "{$label} : {$formatted} FCFA/mois";
+            }
+        }
+
+        return empty($items) ? null : implode(', ', $items);
     }
 }
