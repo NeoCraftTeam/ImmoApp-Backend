@@ -91,6 +91,8 @@ composer_security:
 # --- ETAPE 2 : BUILD & PUSH (en parallèle avec tests) ---
 build_image:
   stage: build_and_test
+  variables:
+    DOCKER_BUILDKIT: "1"
   needs:
     - job: phpstan
       optional: true
@@ -101,7 +103,7 @@ build_image:
     # Pull the previous image to use as a cache source — dramatically speeds up
     # builds when only code (not dependencies) changed.
     - docker pull $APP_IMAGE:latest || true
-    - docker build --cache-from $APP_IMAGE:latest --pull -t $APP_IMAGE:$IMAGE_TAG .
+    - docker build --cache-from $APP_IMAGE:latest -t $APP_IMAGE:$IMAGE_TAG .
     - docker push $APP_IMAGE:$IMAGE_TAG
     - |
       if [ "$CI_COMMIT_BRANCH" = "main" ]; then
@@ -141,7 +143,7 @@ test_suite:
       # Wait until PostgreSQL accepts connections
       echo "Waiting for PostgreSQL..."
       for i in $(seq 1 30); do
-        docker exec pg-$CI_JOB_ID pg_isready -h 127.0.0.1 -p 5432 -U gitlab -d testing && break
+        docker exec pg-$CI_JOB_ID pg_isready -U gitlab && break
         [ "$i" = "30" ] && echo "PostgreSQL failed to start" && exit 1
         sleep 2
       done
@@ -175,31 +177,54 @@ test_suite:
   rules:
     - if: $CI_COMMIT_BRANCH
 
-# --- ETAPE 3 : DEPLOIEMENT ---
-production_deploy:
+# ── Shared deploy template ─────────────────────────────────────────────────────
+# All differences between prod and preprod are expressed as job-level variables:
+#   DEPLOY_DIR          – root dir on the VPS (/opt/keyhome or /opt/keyhome-preprod)
+#   DEPLOY_BRANCH       – git branch to deploy (main / preprod)
+#   COMPOSE_SRC_FILE    – compose file to copy (docker-compose.yml / docker-compose.preprod.yml)
+#   COMPOSE_FALLBACK    – fallback container-name prefix if COMPOSE_PREFIX not set in .env
+#   REQUIRE_ENV_CHECK   – "true" to abort when .env is missing (preprod only)
+#   REQUIRE_NETWORK_CHECK – "true" to abort when the shared prod network is absent (preprod only)
+.deploy_template: &deploy_template
   stage: deploy
   needs: [build_image, test_suite]
   timeout: 15 minutes
+  interruptible: false
   script:
-    - mkdir -p /opt/keyhome/.docker/nginx/conf.d
-    - cp docker-compose.yml /opt/keyhome/docker-compose.yml
-    - cp -rf .docker/nginx/conf.d/. /opt/keyhome/.docker/nginx/conf.d/
-    # Sync codebase to VPS for reference and manual artisan commands
+    # ── Copy compose file + nginx config ───────────────────────────────────────
+    - mkdir -p $DEPLOY_DIR/.docker/nginx/conf.d
+    - cp $COMPOSE_SRC_FILE $DEPLOY_DIR/docker-compose.yml
+    - cp -rf .docker/nginx/conf.d/. $DEPLOY_DIR/.docker/nginx/conf.d/
+    # ── Sync codebase to VPS for reference and manual artisan commands ─────────
     - |
       AUTHENTICATED_URL="https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/${CI_PROJECT_PATH}.git"
-      if [ -d /opt/keyhome/codebase/.git ]; then
-        cd /opt/keyhome/codebase
+      if [ -d $DEPLOY_DIR/codebase/.git ]; then
+        cd $DEPLOY_DIR/codebase
         git remote set-url origin "$AUTHENTICATED_URL"
-        git fetch origin main && git reset --hard origin/main
+        git fetch origin $DEPLOY_BRANCH && git reset --hard origin/$DEPLOY_BRANCH
       else
-        git clone --depth 1 --branch main "$AUTHENTICATED_URL" /opt/keyhome/codebase
+        git clone --depth 1 --branch $DEPLOY_BRANCH "$AUTHENTICATED_URL" $DEPLOY_DIR/codebase
       fi
-    - cd /opt/keyhome || exit 1
-    - export FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:main"
-    - echo "🚀 Deploying image $FULL_IMAGE"
-    # ── Save current image for rollback in case migrations fail ─────────────────────
+    # ── Optional .env guard (preprod only: REQUIRE_ENV_CHECK=true) ─────────────
     - |
-      ROLLBACK_IMAGE=$(docker inspect --format='{{.Config.Image}}' ${COMPOSE_PREFIX:-keyhome-prod}-backend 2>/dev/null || echo "")
+      if [ "${REQUIRE_ENV_CHECK}" = "true" ] && [ ! -f "$DEPLOY_DIR/.env" ]; then
+        echo "❌ $DEPLOY_DIR/.env n'existe pas."
+        echo "   Créez-le à partir de .env.preprod.example avant le premier déploiement."
+        echo "   Variables critiques : COMPOSE_PREFIX=keyhome-preprod, WEB_PORT=9091, DB_HOST=keyhome-db"
+        exit 1
+      fi
+    # ── Optional network guard (preprod shares prod infra: REQUIRE_NETWORK_CHECK=true) ──
+    - |
+      if [ "${REQUIRE_NETWORK_CHECK}" = "true" ] && ! docker network inspect keyhome_keyhome-network > /dev/null 2>&1; then
+        echo "❌ Le réseau 'keyhome_keyhome-network' n'existe pas. Assurez-vous que l'environnement de production est démarré."
+        exit 1
+      fi
+    - cd $DEPLOY_DIR || exit 1
+    - export FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:${DEPLOY_BRANCH}"
+    - echo "🚀 Deploying image $FULL_IMAGE"
+    # ── Save current image for rollback in case migrations fail ────────────────
+    - |
+      ROLLBACK_IMAGE=$(docker inspect --format='{{.Config.Image}}' ${COMPOSE_PREFIX:-$COMPOSE_FALLBACK}-backend 2>/dev/null || echo "")
       echo "📌 Rollback point: ${ROLLBACK_IMAGE:-none (first deploy)}"
     # Enable maintenance mode before deploy
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan down --retry=60 || true
@@ -207,7 +232,7 @@ production_deploy:
     - APP_IMAGE=$FULL_IMAGE docker compose pull
     - echo "🔄 Starting containers..."
     - APP_IMAGE=$FULL_IMAGE docker compose up -d --no-build --remove-orphans
-    # Wait for app container to be healthy
+    # ── Wait for app container to be healthy ───────────────────────────────────
     - |
       echo "⏳ Waiting for containers to be ready..."
       for i in $(seq 1 60); do
@@ -226,7 +251,7 @@ production_deploy:
     # Nginx can cache the old app container IP after app is recreated — refresh web after app is up.
     - echo "🔄 Recreating web (nginx) so FastCGI targets the current app container..."
     - APP_IMAGE=$FULL_IMAGE docker compose up -d --no-build --no-deps --force-recreate web
-    # ── Run migrations with automatic rollback on failure ─────────────────────────
+    # ── Run migrations with automatic rollback on failure ──────────────────────
     - |
       echo "🗾 Running migrations..."
       if ! APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan migrate --force; then
@@ -255,112 +280,35 @@ production_deploy:
     # Disable maintenance mode
     - echo "✅ Deployment complete, bringing app back up..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan up
-    # ── Non-blocking post-deploy tasks (run after app is live) ─────────────────────
+    # ── Non-blocking post-deploy tasks (run after app is live) ─────────────────
     - echo "📄 Generating Swagger docs (non-blocking)..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate || true
   after_script:
     - docker logout $CI_REGISTRY 2>/dev/null || true
+
+# --- ETAPE 3 : DEPLOIEMENT ---
+production_deploy:
+  <<: *deploy_template
+  variables:
+    DEPLOY_DIR: /opt/keyhome
+    DEPLOY_BRANCH: main
+    COMPOSE_SRC_FILE: docker-compose.yml
+    COMPOSE_FALLBACK: keyhome-prod
+    REQUIRE_ENV_CHECK: "false"
+    REQUIRE_NETWORK_CHECK: "false"
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
 
 # --- DEPLOIEMENT PREPROD ---
 preprod_deploy:
-  stage: deploy
-  needs: [build_image, test_suite]
-  timeout: 15 minutes
-  script:
-    - mkdir -p /opt/keyhome-preprod/.docker/nginx/conf.d
-    # Utilise le docker-compose.preprod.yml (services app uniquement, pas de DB/Redis/Meilisearch)
-    - cp docker-compose.preprod.yml /opt/keyhome-preprod/docker-compose.yml
-    - cp -rf .docker/nginx/conf.d/. /opt/keyhome-preprod/.docker/nginx/conf.d/
-    # Sync codebase from preprod branch
-    - |
-      AUTHENTICATED_URL="https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/${CI_PROJECT_PATH}.git"
-      if [ -d /opt/keyhome-preprod/codebase/.git ]; then
-        cd /opt/keyhome-preprod/codebase
-        git remote set-url origin "$AUTHENTICATED_URL"
-        git fetch origin preprod && git reset --hard origin/preprod
-      else
-        git clone --depth 1 --branch preprod "$AUTHENTICATED_URL" /opt/keyhome-preprod/codebase
-      fi
-    - cd /opt/keyhome-preprod || exit 1
-    - |
-      if [ ! -f .env ]; then
-        echo "❌ /opt/keyhome-preprod/.env n'existe pas."
-        echo "   Créez-le à partir de .env.preprod.example avant le premier déploiement."
-        echo "   Variables critiques : COMPOSE_PREFIX=keyhome-preprod, WEB_PORT=9091, DB_HOST=keyhome-db"
-        exit 1
-      fi
-    - export FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:preprod"
-    - echo "🚀 Deploying PREPROD image $FULL_IMAGE (shared infra with prod)"
-    # Ensure the prod network exists (needed for shared DB/Redis/Meilisearch)
-    - |
-      if ! docker network inspect keyhome_keyhome-network > /dev/null 2>&1; then
-        echo "❌ Le réseau 'keyhome_keyhome-network' n'existe pas. Assurez-vous que l'environnement de production est démarré."
-        exit 1
-      fi
-    # ── Save current image for rollback ────────────────────────────────────────────
-    - |
-      ROLLBACK_IMAGE=$(docker inspect --format='{{.Config.Image}}' ${COMPOSE_PREFIX:-keyhome-preprod}-backend 2>/dev/null || echo "")
-      echo "📌 Rollback point: ${ROLLBACK_IMAGE:-none (first deploy)}"
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan down --retry=60 || true
-    - echo "📥 Pulling new image..."
-    - APP_IMAGE=$FULL_IMAGE docker compose pull
-    - echo "🔄 Starting containers..."
-    - APP_IMAGE=$FULL_IMAGE docker compose up -d --no-build --remove-orphans
-    # Wait for app container to be healthy
-    - |
-      echo "⏳ Waiting for containers to be ready..."
-      for i in $(seq 1 60); do
-        if APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan list > /dev/null 2>&1; then
-          echo "✅ App container is ready"
-          break
-        fi
-        if [ "$i" = "60" ]; then
-          echo "❌ App container failed to start"
-          APP_IMAGE=$FULL_IMAGE docker compose logs app --tail=50
-          APP_IMAGE=$FULL_IMAGE docker compose ps -a
-          exit 1
-        fi
-        sleep 2
-      done
-    # Nginx can cache the old app container IP after app is recreated — refresh web after app is up.
-    - echo "🔄 Recreating web (nginx) so FastCGI targets the current app container..."
-    - APP_IMAGE=$FULL_IMAGE docker compose up -d --no-build --no-deps --force-recreate web
-    # ── Run migrations with automatic rollback on failure ─────────────────────────
-    - |
-      echo "🗾 Running migrations..."
-      if ! APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan migrate --force; then
-        echo "❌ Migration failed — rolling back to previous image..."
-        APP_IMAGE=$FULL_IMAGE docker compose logs app --tail=30
-        if [ -n "$ROLLBACK_IMAGE" ]; then
-          echo "🔄 Restoring $ROLLBACK_IMAGE ..."
-          APP_IMAGE=$ROLLBACK_IMAGE docker compose up -d --no-build --remove-orphans || true
-          APP_IMAGE=$ROLLBACK_IMAGE docker compose exec -T app php artisan up || true
-          echo "✅ Rolled back to previous image"
-        else
-          APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan up || true
-        fi
-        exit 1
-      fi
-    # ── Runtime cache rebuild ─────────────────────────────────────────────────────
-    - echo "🧹 Clearing stale caches..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize:clear
-    - echo "⚡ Rebuilding runtime caches..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app bash resetFilamentLivewire.sh
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan storage:link || true
-    # ── Meilisearch: sync settings only ───────────────────────────────────────────
-    - echo "🔍 Syncing Meilisearch index settings..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan scout:sync-index-settings || true
-    # Disable maintenance mode
-    - echo "✅ Deployment complete, bringing app back up..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan up
-    # ── Non-blocking post-deploy tasks ────────────────────────────────────────────
-    - echo "📄 Generating Swagger docs (non-blocking)..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate || true
-  after_script:
-    - docker logout $CI_REGISTRY 2>/dev/null || true
+  <<: *deploy_template
+  variables:
+    DEPLOY_DIR: /opt/keyhome-preprod
+    DEPLOY_BRANCH: preprod
+    COMPOSE_SRC_FILE: docker-compose.preprod.yml
+    COMPOSE_FALLBACK: keyhome-preprod
+    REQUIRE_ENV_CHECK: "true"
+    REQUIRE_NETWORK_CHECK: "true"
   rules:
     - if: $CI_COMMIT_BRANCH == "preprod"
 
@@ -570,10 +518,9 @@ cleanup:
     - |
       echo "🧹 Starting cleanup..."
 
-      # 1. Supprimer l'image CI de ce pipeline
-      if docker images -q $CI_IMAGE 2>/dev/null | grep -q .; then
-        docker rmi $CI_IMAGE && echo "  ✓ Removed CI image: $CI_IMAGE"
-      fi
+      # 1. La CI image ($CI_IMAGE) est intentionnellement conservée —
+      #    elle sert de cache --cache-from pour le prochain pipeline sur cette branche.
+      #    Seules les images dangling (non taguées) sont supprimées ci-dessous.
 
       # 2. Nettoyer les images dangling (sans tag)
       DANGLING=$(docker images -f "dangling=true" -q 2>/dev/null | wc -l | tr -d ' ')
