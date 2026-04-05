@@ -300,6 +300,7 @@ npm run format:check  # Prettier --check (used in CI)
 npm run test          # Vitest unit tests
 npm run test:e2e      # Playwright e2e tests
 npm run typecheck     # tsc --noEmit
+npm run test:coverage # Vitest + v8 coverage (no enforcement thresholds)
 ```
 
 ### Stack
@@ -372,3 +373,4 @@ LocalStorage keys: `kh_tour_completed_at`, `kh:welcome-dismissed`, `APPTOUR_SHOW
 - **`format` job**: `npm run format:check` — runs Prettier check. Fix by running `npm run format` locally before pushing.
 - **`lint` job**: `npm run lint` — zero errors allowed. Warnings are tolerated but minimised.
 - **Vercel build**: runs `tsc --noEmit` as part of Next.js production build. TypeScript errors fail the build even if ESLint passes. Always check that interface changes don't break downstream callers.
+- **`test_unit` job (coverage)**: Coverage thresholds have been **removed** from `vitest.config.ts`. The job passes/fails based on test results only. Coverage is still collected and reported (reporters: text, json, html, lcov, cobertura) as CI artifacts — do NOT re-add `thresholds` until the test suite has meaningful coverage.
