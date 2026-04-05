@@ -359,6 +359,29 @@ Storybook, Vitest, Playwright.
 - **`.storybook/register-next-config.cjs`**: Has `/* eslint-disable @typescript-eslint/no-require-imports */` at top — intentional CJS file.
 - **`src/app/credits/callback/page.tsx`** and **`src/app/payment-success/page.tsx`**: Recursive `useCallback` patterns that assign `retryTimerRef.current = setTimeout(() => self(attempt+1), ...)` use `/* eslint-disable react-hooks/immutability */ ... /* eslint-enable */` block pairs (single-line `eslint-disable-next-line` only covers the first line of a multi-line statement).
 
+### Frontend Performance Optimizations — Round 2 (Full-App Audit)
+Applied after a comprehensive scan of all major frontend features:
+
+- **`AdCard`** — wrapped in `memo()`. **Most critical fix**: rendered 20–200+ times per page; any parent state change (pagination, category, snackbar) was triggering a full re-render of every card. Also wrapped `handleToggleFavorite` and `handleCardClick` in `useCallback`.
+- **`ComparatorProvider`** — context value was a new object on every render (no `useMemo`). Every `AdCard` subscribes to this context for `isInComparator`; toggling `isOpen` / `drawerMode` / `maxReached` was causing all cards to re-render. Fixed with `useMemo` on the context value object.
+- **`home/page.tsx`** — hero city search `Autocomplete` fired `citiesService.list` on every keystroke (no debounce). Added 300 ms `debouncedCityInput` debounce. Wrapped `handleCitySelect`, `handleIntentChoice`, `handleCategoryChange`, `handlePageChange` in `useCallback`.
+- **`search/page.tsx` (1 988-line file)** — city search Autocomplete had no debounce (same pattern). `activeFilterCount` and `sortLabel` were recomputed on every render (all filter state changes). `clearFilters` created a new function every render. Fixed: 300 ms debounce on `debouncedCityInput`, `useMemo` for `activeFilterCount` and `sortLabel`, `useCallback` for `clearFilters`.
+- **`DashboardLayout`** — large async `onPostponed` callback was inlined in JSX and recreated on every render, causing `SurveyPromptOrBanner` to re-render. Extracted to `handleSurveyPostponed` with `useCallback([activeSurvey?.id, user, refreshUser])`.
+
+### Frontend Performance Optimizations (Ad Creation/Edit Pages)
+Applied to `src/app/(owner)/owner/ads/new/page.tsx`, `src/app/(owner)/owner/ads/[id]/page.tsx`, `src/components/owner/AdForm.tsx`, `src/components/surveys/QuestionRenderer.tsx`, `src/hooks/useAutoSave.ts`:
+
+- **`buildAdFormData`** — hoisted to module scope in `new/page.tsx` (was recreated inside component on every render).
+- **`PROFILE_STEP_ICONS`** — hoisted to module scope in `new/page.tsx` (4 JSX elements were re-allocated per render).
+- **`useProfileCompleteness` steps array** — wrapped in `useMemo([user fields])` (was rebuilt on every render).
+- **All `AdForm` handlers** — wrapped in `useCallback` in both `new/page.tsx` and `[id]/page.tsx` (`handleSubmit`, `handleSaveDraft`, `handleEnhance`, `handleBeforeSubmit`).
+- **Hotspot updates in `[id]/page.tsx`** — changed from serial `for...of await` to `Promise.allSettled(...)` (parallelized N independent API calls).
+- **`initialData` in `[id]/page.tsx`** — hoisted into `useMemo([ad])` before early returns (was recomputed on every snackbar/dialog state change).
+- **`AdForm`** — wrapped in `memo()` from react. **Critical**: without this, all `useCallback` optimizations in parent pages are ineffective.
+- **`QuestionRenderer`** — wrapped in `memo()` (re-rendered on every survey parent state change).
+- **`useAutoSave` `hasDraft`** — converted from `localStorage.getItem()` on every render to `useState` with lazy initializer, updated only on save/`clearDraft`.
+- **Profile city search debounce** — added 300 ms debounce (`debouncedProfileCityInput` state + `useEffect`) in `new/page.tsx`; query key now uses debounced value so API is not hit on every keystroke.
+
 ### Onboarding Event Sequence
 `AppTour close` → `kh:tour-completed` → [3 min delay] → `WelcomeModal (3 steps)` → `kh:welcome-dismissed` → `PushPrompt` → `kh:push-prompt-done` → Survey.
 LocalStorage keys: `kh_tour_completed_at`, `kh:welcome-dismissed`, `APPTOUR_SHOWN_KEY`.
