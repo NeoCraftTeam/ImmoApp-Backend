@@ -34,7 +34,7 @@ The comprehensive security and reliability audit identified **22 critical/high p
 
 ## 📋 Deployment Checklist
 Before deploying to production, ensure:
-1.  [ ] **Environment Variables:** Update `.env` with production FedaPay keys (`FEDAPAY_SECRET_KEY`) and `APP_DEBUG=false`.
+1.  [ ] **Environment Variables:** Update `.env` with production Flutterwave keys (`FLW_SECRET_KEY`, `FLW_SECRET_HASH`) and `APP_DEBUG=false`.
 2.  [ ] **Mapbox Token:** Rotate the exposed token and apply URL restrictions in the Mapbox Dashboard.
 3.  [ ] **Database Migrations:** Run `php artisan migrate --force`.
 4.  [ ] **Cache:** Run `php artisan config:cache` and `php artisan route:cache`.
