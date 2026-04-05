@@ -1,13 +1,34 @@
 # AGENTS.md
 
-This file provides guidance to WARP (warp.dev) when working with code in this repository.
-It is kept up-to-date automatically: every edit to the codebase should be reflected here.
+This file is the **single source of truth** for every LLM (Cascade, Claude, Gemini, Copilot, etc.)
+working on this repository. **Update it after every meaningful code change.**
 
 ## Project
 
-KeyHome Backend — multi-tenant real estate platform for the West African market (XOF/XAF currency).
-Laravel 12 API + 2 active Filament 4 admin panels (Admin, Agency). The customer-facing frontend is a
-separate Next.js 16 app in `keyhome-frontend-next/`.
+KeyHome — multi-tenant real estate marketplace SaaS for francophone sub-Saharan Africa
+(Cameroon / CEMAC / UEMOA, currency XOF/XAF).
+
+**Monorepo layout:**
+- `/` — Laravel 12 backend (API-first REST `/api/v1/`, Filament 4 admin panels)
+- `keyhome-frontend-next/` — Next.js 16 PWA (customer-facing)
+- `mobile/bailleur/` — React Native landlord app (partial)
+- `mobile/agency/` — React Native agency app (partial)
+
+**Active Git branches:**
+- Backend: `preprod` (main working branch → GitLab CI → VPS)
+- Frontend: `cedrickdev` (active dev branch, deploys to Vercel)
+- Both also mirror to GitHub (`NeoCraftTeam/ImmoApp-Backend`, `NeoCraftTeam/keyhome-frontend-next`)
+
+**Brand color:** `#F6475F` (crimson/pink). UI language: French only (`fr_FR` hardcoded).
+
+## Remotes
+
+```
+Backend  → origin  = GitHub (NeoCraftTeam/ImmoApp-Backend)
+         → gitlab  = GitLab (neocraft/immoapp-backend)
+Frontend → origin  = GitLab (neocraft/keyhome-next)
+         → github  = GitHub (NeoCraftTeam/keyhome-frontend-next)
+```
 
 ## Build & Run
 
@@ -112,8 +133,12 @@ vendor/bin/rector process --dry-run
 - `Reservation/`: `ConfirmReservationAction`.
 
 ### Payment System
+- **Only gateway: Flutterwave** (FedaPay was removed). `PaymentGateway` enum has a single case `Flutterwave = 'flutterwave'`.
 - Strategy pattern: `PaymentGatewayInterface` (`app/Contracts/`) implemented by `FlutterwavePaymentService`.
-- `PaymentService` is the central orchestrator — injected via DI in `AppServiceProvider`.
+- `PaymentService` is the central orchestrator — injected via DI in `AppServiceProvider`. Accepts primary/fallback constructor injection for future extensibility.
+- `Payment::gateway` column stored as **plain string** (not enum cast) — future gateways (Wave, Stripe, etc.) can be added without a migration.
+- `Payment::isFlutterwave()` compares `$this->gateway === PaymentGateway::Flutterwave->value`.
+- Webhook route: `POST /api/v1/webhooks/{gateway}` — gateway param constrained to `flutterwave` only.
 - Amounts resolved server-side from `PointPackage`/`SubscriptionPlan` — never trust client amounts.
 - DB locks (`lockForUpdate`) prevent double-spending on verification.
 - Events: `PaymentInitiated`, `PaymentSucceeded`, `PaymentFailed`.
@@ -124,6 +149,7 @@ vendor/bin/rector process --dry-run
 - Frontend uses Clerk for OAuth, exchanged for Sanctum tokens via `/auth/clerk/exchange`.
 - Magic-link sign-in/sign-up supported.
 - Social auth via Laravel Socialite (Apple provider included).
+- **API rate limits**: CUSTOMER 300 req/min, AGENT with subscription 500 req/min, AGENT without subscription 300 req/min, ADMIN unlimited, guest 60 req/min.
 
 ### Filament Panels
 - **Admin** (`app/Filament/Admin/`) — full platform management. Path: `/admin`.
@@ -208,7 +234,14 @@ All prefixed `/api/v1/`: `auth.php`, `ads.php`, `payments.php`, `viewings.php`, 
 - **Resource limits** (all services): `deploy.resources.limits` is set on every container to prevent OOM cascades. Reference values: `app` 1 GB/2 CPU, `worker` 512 MB/1 CPU, `worker-tours` 1 GB/2 CPU (image processing), `db` 2 GB/2 CPU, `redis` 512 MB/0.5 CPU, `meilisearch` 1 GB/1 CPU, `web` 256 MB/0.5 CPU.
 - **Redis** is capped with `--maxmemory 384mb --maxmemory-policy allkeys-lru` so it never silently consumes all available RAM.
 - **Storage (prod)**: Cloudflare R2 — `FILESYSTEM_DISK=r2`. Structure: `avatars/`, `agency-logos/`, `lease-contracts/`, `ads/`, `tours/`. `TOUR_STORAGE_DISK=r2`.
-- **CI/CD**: GitHub Actions (`.github/workflows/`) for `main`/`develop`/`preprod` + GitLab CI/CD (`.gitlab-ci.yml`) with self-hosted runner and Container Registry.
+- **CI/CD (Backend)**: GitLab CI (`.gitlab-ci.yml`) with self-hosted runner + Container Registry — primary pipeline. GitHub Actions (`.github/workflows/`) mirrors for open-source visibility.
+  - Stages: `prepare` → `quality` → `build_and_test` → `deploy` → `smoke_test` → `notify`.
+  - `build_image` job: Docker multi-stage build, pushes to GitLab registry.
+  - `test_suite` job: spins up PostgreSQL container, runs `php artisan test`.
+  - `pg_isready` uses `-h 127.0.0.1 -p 5432` to verify TCP (not Unix socket) before test run.
+- **CI/CD (Frontend)**: GitLab CI (`keyhome-frontend-next/.gitlab-ci.yml`) + Vercel (auto-deploy on push to `cedrickdev`).
+  - `lint` job: `npm run lint` (ESLint). `format` job: `npm run format:check` (Prettier).
+  - `typecheck` job: `npx tsc --noEmit`. `test` job: Vitest. `build` job: Next.js production build.
 - **Proxy**: Traefik (HTTPS Let's Encrypt) in front of `web` service.
 - **Preprod**: `docker-compose.preprod.yml` — shares prod DB/Redis/Meilisearch via external network.
 
@@ -244,24 +277,98 @@ All prefixed `/api/v1/`: `auth.php`, `ads.php`, `payments.php`, `viewings.php`, 
   $query->where(fn ($q) => $isUuid ? $q->where('id', $id)->orWhere('slug', $id) : $q->where('slug', $id));
   ```
   This pattern is applied in `AdController::show()` and must be followed in any controller that accepts an `{id}` route parameter that may be either a UUID or a human-readable slug.
-- **Dockerfile is multi-stage**: Stage 1 (`node-builder`) compiles Vite/Filament assets; Stage 2 (PHP-FPM) produces the production image without Node.js (~80 MB saved). `COPY composer.json composer.lock` precedes `RUN composer install` so the vendor layer is only rebuilt when `composer.lock` changes. Static assets (`vendor:publish --tag=livewire:assets`, `filament:assets`) are baked into the image and must NOT be re-published at deploy time.
+- **Dockerfile is multi-stage** (`Dockerfile`):
+  - Stage `node-builder` (Node 20 Alpine): installs npm deps, stubs `vendor/filament/filament/resources/css/theme.css` so Vite can resolve the `@import` in `resources/css/filament/admin/theme.css` (actual Filament assets are not in Docker build context — `vendor/` is in `.dockerignore`), then runs `npm run build`.
+  - Stage `stage-1` (PHP 8.x FPM Alpine): production image. **Does NOT have `shadow` package** — use Alpine busybox builtins (`deluser`/`addgroup`/`adduser`) instead of `usermod`/`groupmod` to set UID/GID for `www-data`.
+  - `COPY composer.json composer.lock` precedes `RUN composer install` so the vendor layer is only rebuilt when `composer.lock` changes.
+  - Static assets (`vendor:publish --tag=livewire:assets`, `filament:assets`) are baked into the image and must NOT be re-published at deploy time.
 - **Deploy process** (both prod and preprod): pull image → start containers → `migrate --force` (with automatic rollback to previous image on failure) → `optimize:clear` → `bash resetFilamentLivewire.sh` (cache only) → `optimize` → `artisan up` → `l5-swagger:generate` (non-blocking, `|| true`). `composer install` is NOT run at deploy time — it must be in the Docker image.
 - **`scout:import` is NOT run on every deploy.** Only `scout:sync-index-settings` runs on deploy. Full reindexing should be triggered manually or via a scheduled command when the mapping changes.
 - **PHP JIT** is enabled in `.docker/php/opcache.ini` (`opcache.jit=tracing`, `opcache.jit_buffer_size=128M`). Do not disable unless debugging a JIT-specific crash.
 - **`resetFilamentLivewire.sh`** only rebuilds runtime caches (config, routes, views, events, Filament components). Asset publishing has been removed from this script — it is now done at Docker build time.
 
-## Frontend (keyhome-frontend-next/)
+## Frontend (`keyhome-frontend-next/`)
 
+### Commands
 ```bash
 cd keyhome-frontend-next
-npm run dev          # development server
-npm run build        # production build
-npm run lint         # ESLint
-npm run test         # Vitest unit tests
-npm run test:e2e     # Playwright e2e tests
+npm run dev           # development server
+npm run build         # production build (Next.js)
+npm run lint          # ESLint (zero-warning policy in CI)
+npm run format        # Prettier --write
+npm run format:check  # Prettier --check (used in CI)
+npm run test          # Vitest unit tests
+npm run test:e2e      # Playwright e2e tests
+npm run typecheck     # tsc --noEmit
 ```
 
-Stack: Next.js 16, React 19, MUI 7, Tailwind v4, Clerk auth, TanStack Query, Framer Motion, Mapbox GL, Photo Sphere Viewer (360° tours), Recharts, Three.js, next-intl, Storybook, Vitest, Playwright.
-Three themes: `src/theme/tokens.ts` (design tokens), `src/theme/theme.ts` (MUI), `src/theme/ownerTheme.ts` (bailleur).
-22 service files in `src/services/`. 16 custom hooks in `src/hooks/`.
-Env vars: `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_MAPBOX_TOKEN`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `NEXT_PUBLIC_OWNER_PANEL` (`next`=integrated bailleur UI, `laravel`=Filament panel).
+### Stack
+Next.js 16, React 19, MUI v7, Tailwind v4, Clerk auth, TanStack Query v5, Framer Motion, Mapbox GL,
+Photo Sphere Viewer (360° tours), Recharts, Three.js (landing page), next-intl (i18n — FR only),
+Storybook, Vitest, Playwright.
+
+### Structure
+- `src/app/` — Next.js App Router pages. Key routes:
+  - `(public)/` — listing pages, home, search, ad detail.
+  - `(owner)/owner/` — landlord dashboard (ads, expenses, leases, viewings).
+  - `credits/callback/` — Flutterwave payment return page with retry/polling logic.
+  - `payment-success/` — ad unlock payment return page with extended polling.
+- `src/components/` — shared UI components.
+  - `ui/` — base primitives (shadcn-style + MUI hybrids).
+  - `owner/` — landlord-specific components (`AdForm`, `AdFormPhotos`, `AdFormTour`, etc.).
+  - `landing/` — marketing landing page components.
+  - `surveys/` — survey form components (`SurveyForm`, `QuestionRenderer`).
+  - `payment/` — payment history, checkout components.
+- `src/services/` — 22 service files calling `/api/v1/` endpoints.
+- `src/hooks/` — 16 custom hooks.
+- `src/theme/` — `tokens.ts` (design tokens), `theme.ts` (MUI theme), `ownerTheme.ts` (bailleur).
+- `src/types/` — TypeScript interfaces mirroring backend models.
+- `src/tests/` — Vitest unit tests.
+- `e2e/` — Playwright end-to-end tests.
+- `.storybook/` — Storybook config. Uses `register-next-config.cjs` (CJS, `require()` intentional).
+
+### Environment Variables
+| Variable | Purpose |
+|---|---|
+| `NEXT_PUBLIC_API_URL` | Backend API base URL |
+| `NEXT_PUBLIC_MAPBOX_TOKEN` | Mapbox GL maps |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk auth |
+| `CLERK_SECRET_KEY` | Clerk server-side |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Web Push notifications |
+| `NEXT_PUBLIC_OWNER_PANEL` | `next`=integrated UI, `laravel`=Filament panel |
+| `NEXT_PUBLIC_MEILISEARCH_HOST` | MeiliSearch for client-side search |
+| `NEXT_PUBLIC_MEILISEARCH_KEY` | MeiliSearch search-only API key |
+
+### Frontend ESLint Rules (notable)
+- `@typescript-eslint/no-explicit-any` — **error**. Never use `any`; use proper union types or `unknown`.
+- `@typescript-eslint/no-require-imports` — **error**. No `require()` in TS/TSX files (CJS files are exempt with file-level `eslint-disable`).
+- `react-hooks/immutability` — **error**. Cannot access or mutate refs/variables in `useCallback` closures that reference themselves (recursive pattern). Use block-level `/* eslint-disable/enable */` pairs when unavoidable.
+- `react-hooks/globals` — **error**. Cannot reassign module-level variables inside a component's render body. Move to `useEffect`.
+- `react-hooks/refs` — **error**. Cannot read `ref.current` during render. Store anchor elements in state instead of reading from a ref in JSX props.
+- `jsx-a11y/alt-text` — **warning**. All `<img>` must have `alt`.
+
+### Known Frontend Fixes (do not revert)
+- **`src/components/ui/PhoneField.tsx`**: `anchorEl` is stored as `useState<HTMLButtonElement | null>`, updated via callback ref (`ref={setAnchorEl}`) on the trigger button. Do NOT revert to `useRef` + reading `.current` during render.
+- **`src/components/ui/progressive-contact-form.tsx`**: `inputRef` is typed as `useRef<HTMLInputElement | HTMLTextAreaElement>`. Cast to `React.Ref<HTMLInputElement>` for `<Input>` and `React.Ref<HTMLTextAreaElement>` for `<Textarea>`. Never cast to `any`.
+- **`src/components/surveys/QuestionRenderer.tsx`**: `value` prop is `string | number | string[] | null | undefined`. `onChange` callback is `(value: string | number | string[]) => void` — **no `null`** in the callback (MUI `Rating` null is handled internally with `?? 0`).
+- **`src/components/landing/PageTransition.tsx`**: Module-level `_setActive`/`_setTarget` are assigned inside `useEffect(() => { ... })` (no dependency array) — NOT directly in render body.
+- **`src/tests/components/AdCard.test.tsx`**: `import React from 'react'` at top level. The `framer-motion` mock uses this top-level import — no `require()` inside `vi.mock` factories.
+- **`.storybook/register-next-config.cjs`**: Has `/* eslint-disable @typescript-eslint/no-require-imports */` at top — intentional CJS file.
+- **`src/app/credits/callback/page.tsx`** and **`src/app/payment-success/page.tsx`**: Recursive `useCallback` patterns that assign `retryTimerRef.current = setTimeout(() => self(attempt+1), ...)` use `/* eslint-disable react-hooks/immutability */ ... /* eslint-enable */` block pairs (single-line `eslint-disable-next-line` only covers the first line of a multi-line statement).
+
+### Onboarding Event Sequence
+`AppTour close` → `kh:tour-completed` → [3 min delay] → `WelcomeModal (3 steps)` → `kh:welcome-dismissed` → `PushPrompt` → `kh:push-prompt-done` → Survey.
+LocalStorage keys: `kh_tour_completed_at`, `kh:welcome-dismissed`, `APPTOUR_SHOWN_KEY`.
+
+## Known CI/CD Gotchas
+
+### Backend GitLab CI
+- **`build_image` (Dockerfile)**: `vendor/` is in `.dockerignore`. The `node-builder` stage stubs `vendor/filament/filament/resources/css/theme.css` before `npm run build` to satisfy Vite's `@import`. Do NOT remove this stub.
+- **`build_image` (Dockerfile Alpine)**: `php-fpm-alpine` does NOT include the `shadow` package. `usermod`/`groupmod` are unavailable (exit 127). Use `deluser www-data 2>/dev/null; delgroup www-data 2>/dev/null; addgroup -g 1000 -S www-data && adduser -u 1000 -D -S -H -G www-data www-data`.
+- **`test_suite` (PostgreSQL)**: `pg_isready` without `-h` checks the Unix socket which becomes ready before TCP. Always use `pg_isready -U gitlab -h 127.0.0.1 -p 5432` in the wait loop.
+- **`.dockerignore`**: `readme/` is ignored to prevent Docker cache invalidation from documentation commits. `vendor/` and `node_modules/` are always excluded.
+
+### Frontend GitLab CI / Vercel
+- **`format` job**: `npm run format:check` — runs Prettier check. Fix by running `npm run format` locally before pushing.
+- **`lint` job**: `npm run lint` — zero errors allowed. Warnings are tolerated but minimised.
+- **Vercel build**: runs `tsc --noEmit` as part of Next.js production build. TypeScript errors fail the build even if ESLint passes. Always check that interface changes don't break downstream callers.
