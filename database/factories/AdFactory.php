@@ -10,6 +10,7 @@ use App\Models\User;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /** @extends Factory<Ad> */
 class AdFactory extends Factory
@@ -54,7 +55,7 @@ class AdFactory extends Factory
 
         return [
             'title' => $title,
-            'slug' => Ad::generateUniqueSlug($title),
+            'slug' => Str::slug($title).'-'.strtolower(Str::random(6)),
             'description' => fake()->randomElement(self::$descriptions),
             'adresse' => $address,
             'price' => $price,
