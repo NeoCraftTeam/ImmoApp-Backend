@@ -70,7 +70,9 @@ COPY .docker/php/php.ini /usr/local/etc/php/conf.d/php.ini
 WORKDIR /var/www
 
 # Création de l'utilisateur pour éviter les problèmes de permissions
-RUN usermod -u 1000 www-data && groupmod -g 1000 www-data
+# Alpine does not ship usermod/groupmod (shadow pkg) — use busybox builtins instead
+RUN deluser www-data 2>/dev/null; delgroup www-data 2>/dev/null; \
+    addgroup -g 1000 -S www-data && adduser -u 1000 -D -S -H -G www-data www-data
 
 # ── Cache-friendly dependency installation ───────────────────────────────────
 # Copying only composer.lock first means `composer install` is only re-run
