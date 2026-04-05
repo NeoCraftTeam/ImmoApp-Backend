@@ -133,11 +133,7 @@ final readonly class LoginService
             'last_login_city' => mb_convert_case(trim($request->header('CF-IPCity', '')), MB_CASE_TITLE) ?: null,
         ])->save();
 
-        try {
-            $parsed = UserAgentParser::parse($request->userAgent() ?? '');
-        } catch (\Throwable) {
-            $parsed = ['device_type' => 'unknown', 'browser_name' => 'unknown', 'operating_system' => 'unknown'];
-        }
+        $parsed = UserAgentParser::parse($request->userAgent() ?? '');
 
         LoginHistory::create([
             'user_id' => $user->id,
@@ -171,11 +167,7 @@ final readonly class LoginService
             ($currentCity !== '' && $currentCity !== $knownCity)
         );
 
-        try {
-            $ua = UserAgentParser::parse($request->userAgent() ?? '');
-        } catch (\Throwable) {
-            $ua = ['device_type' => 'unknown', 'browser_name' => 'unknown', 'operating_system' => 'unknown'];
-        }
+        $ua = UserAgentParser::parse($request->userAgent() ?? '');
 
         if ($locationChanged) {
             Mail::to($user->email, $user->firstname)->queue(new NewLocationSignInMail(
