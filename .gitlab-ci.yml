@@ -7,6 +7,12 @@ stages:
   - notify
   - cleanup
 
+workflow:
+  rules:
+    - if: $CI_COMMIT_TITLE =~ /\[skip ci\]/i
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
 variables:
   APP_IMAGE: $CI_REGISTRY_IMAGE/app
   IMAGE_TAG: $CI_COMMIT_REF_SLUG
@@ -15,6 +21,7 @@ variables:
 default:
   tags:
     - self-hosted-shell
+  interruptible: true
   before_script:
     # Centralisation de l'authentification Docker
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
@@ -46,6 +53,9 @@ prepare_ci_image:
       COPY . .
       DOCKERFILE
       docker push $CI_IMAGE || true
+  retry:
+    max: 2
+    when: runner_system_failure
   rules:
     - if: $CI_COMMIT_BRANCH
 
@@ -91,19 +101,29 @@ build_image:
     # Pull the previous image to use as a cache source — dramatically speeds up
     # builds when only code (not dependencies) changed.
     - docker pull $APP_IMAGE:latest || true
-    - docker build --cache-from $APP_IMAGE:latest --pull -t $APP_IMAGE:$IMAGE_TAG -t $APP_IMAGE:latest .
+    - docker build --cache-from $APP_IMAGE:latest --pull -t $APP_IMAGE:$IMAGE_TAG .
     - docker push $APP_IMAGE:$IMAGE_TAG
-    - docker push $APP_IMAGE:latest
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        docker tag $APP_IMAGE:$IMAGE_TAG $APP_IMAGE:latest
+        docker push $APP_IMAGE:latest
+      fi
   after_script:
     - docker logout $CI_REGISTRY 2>/dev/null || true
+  retry:
+    max: 2
+    when: runner_system_failure
   rules:
-    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
 
 # --- ETAPE 2 : TESTS (en parallèle avec build) ---
 test_suite:
   stage: build_and_test
   needs: [prepare_ci_image]
   timeout: 10 minutes
+  retry:
+    max: 2
+    when: runner_system_failure
   script:
     - |
       # Create isolated network for this job
@@ -191,7 +211,7 @@ production_deploy:
     - |
       echo "⏳ Waiting for containers to be ready..."
       for i in $(seq 1 60); do
-        if APP_IMAGE=$FULL_IMAGE docker compose exec -T app php -v > /dev/null 2>&1; then
+        if APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan list > /dev/null 2>&1; then
           echo "✅ App container is ready"
           break
         fi
@@ -292,7 +312,7 @@ preprod_deploy:
     - |
       echo "⏳ Waiting for containers to be ready..."
       for i in $(seq 1 60); do
-        if APP_IMAGE=$FULL_IMAGE docker compose exec -T app php -v > /dev/null 2>&1; then
+        if APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan list > /dev/null 2>&1; then
           echo "✅ App container is ready"
           break
         fi
@@ -405,6 +425,10 @@ slack_success:
   stage: notify
   allow_failure: true
   needs:
+    - job: production_smoke_test
+      optional: true
+    - job: preprod_smoke_test
+      optional: true
     - job: production_deploy
       optional: true
     - job: preprod_deploy
@@ -480,8 +504,13 @@ slack_failure:
       optional: true
   script:
     - |
-      if [ -z "$SLACK_WEBHOOK_PREPROD" ]; then
-        echo "SLACK_WEBHOOK_PREPROD not set, skipping notification"
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        WEBHOOK="$SLACK_WEBHOOK_PROD"
+      else
+        WEBHOOK="${SLACK_WEBHOOK_PREPROD:-$SLACK_WEBHOOK_PROD}"
+      fi
+      if [ -z "$WEBHOOK" ]; then
+        echo "No Slack webhook configured for branch $CI_COMMIT_BRANCH, skipping"
         exit 0
       fi
       SHORT_SHA="${CI_COMMIT_SHA:0:8}"
@@ -529,7 +558,7 @@ slack_failure:
             }
           ]
         }]
-      }" $SLACK_WEBHOOK_PREPROD
+      }" $WEBHOOK
   when: on_failure
   rules:
     - if: $CI_COMMIT_BRANCH
