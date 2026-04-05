@@ -73,13 +73,17 @@ class NaturalSearchRegexParser
         }
         // Note: "studio" maps to type_name only — no bedrooms deduced (studios have bedrooms=0 in DB)
 
-        if (preg_match('/(?:moins de|max|maximum|jusqu\'à|budget)\s*([\d\s]+(?:k|000)?)\s*(?:fcfa|xaf|f)?/u', $query, $m)) {
+        // Normalise written French multipliers before price extraction so
+        // "50 milles francs" → "50000 francs", "2 millions fcfa" → "2000000 fcfa".
+        $priceQuery = $this->normalizeWrittenMultipliers($query);
+
+        if (preg_match('/(?:moins de|max|maximum|jusqu\'à|jusqu\'a|budget)\s*([\d\s]+(?:k|000)?)\s*(?:fcfa|xaf|francs?|f\b)?/u', $priceQuery, $m)) {
             $result['price_max'] = $this->parseAmount($m[1]);
-        } elseif (preg_match('/([\d\s]+(?:k|000)?)\s*(?:fcfa|xaf|f)\s*(?:\/mois|par mois)?/u', $query, $m)) {
+        } elseif (preg_match('/([\d\s]+(?:k|000)?)\s*(?:fcfa|xaf|francs?)\s*(?:\/mois|par mois)?/u', $priceQuery, $m)) {
             $result['price_max'] = $this->parseAmount($m[1]);
         }
 
-        if (preg_match('/(?:à partir de|min|minimum|plus de)\s*([\d\s]+(?:k|000)?)\s*(?:fcfa|xaf|f)?/u', $query, $m)) {
+        if (preg_match('/(?:à partir de|a partir de|min|minimum|plus de|au moins)\s*([\d\s]+(?:k|000)?)\s*(?:fcfa|xaf|francs?|f\b)?/u', $priceQuery, $m)) {
             $result['price_min'] = $this->parseAmount($m[1]);
         }
 
@@ -95,16 +99,17 @@ class NaturalSearchRegexParser
             $result['furnished'] = true;
         }
 
+        $normalizedQuery = $this->removeAccents($query);
         $cities = Cache::remember('regex_parser:cities_quarters', 21600, fn () => City::with('quarters')->get());
         foreach ($cities as $city) {
-            $cityName = mb_strtolower((string) $city->name);
-            if (str_contains($query, $cityName)) {
+            $cityNorm = $this->removeAccents(mb_strtolower((string) $city->name));
+            if (str_contains($normalizedQuery, $cityNorm)) {
                 $result['city_id'] = $city->id;
                 $result['city_name'] = $city->name;
 
                 foreach ($city->quarters as $quarter) {
-                    $quarterName = mb_strtolower((string) $quarter->name);
-                    if (str_contains($query, $quarterName)) {
+                    $quarterNorm = $this->removeAccents(mb_strtolower((string) $quarter->name));
+                    if (str_contains($normalizedQuery, $quarterNorm)) {
                         $result['quarter_name'] = $quarter->name;
                         break;
                     }
@@ -123,13 +128,47 @@ class NaturalSearchRegexParser
         return $result;
     }
 
+    private function removeAccents(string $str): string
+    {
+        $map = [
+            'à' => 'a', 'á' => 'a', 'â' => 'a', 'ã' => 'a', 'ä' => 'a', 'å' => 'a',
+            'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i',
+            'ò' => 'o', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o',
+            'ù' => 'u', 'ú' => 'u', 'û' => 'u', 'ü' => 'u',
+            'ý' => 'y', 'ÿ' => 'y',
+            'ç' => 'c', 'ñ' => 'n',
+        ];
+
+        return strtr($str, $map);
+    }
+
+    private function normalizeWrittenMultipliers(string $query): string
+    {
+        // "50 milles" → "50000", "50 mille" → "50000", "50 milliers" → "50000"
+        $query = (string) preg_replace_callback(
+            '/(\d+)\s*mill(?:e|es|ier|iers)\b/u',
+            static fn ($m) => (string) ((int) $m[1] * 1000),
+            $query
+        );
+        // "2 millions" → "2000000", "1 million" → "1000000"
+        $query = (string) preg_replace_callback(
+            '/(\d+)\s*millions?\b/u',
+            static fn ($m) => (string) ((int) $m[1] * 1_000_000),
+            $query
+        );
+
+        return $query;
+    }
+
     private function parseAmount(string $raw): int
     {
-        $clean = preg_replace('/\s+/', '', $raw);
-        if (str_ends_with((string) $clean, 'k')) {
-            return (int) rtrim((string) $clean, 'k') * 1000;
+        $clean = (string) preg_replace('/\s+/', '', trim($raw));
+
+        if (str_ends_with($clean, 'k')) {
+            return (int) rtrim($clean, 'k') * 1000;
         }
 
-        return (int) preg_replace('/\D/', '', (string) $clean);
+        return (int) preg_replace('/\D/', '', $clean);
     }
 }

@@ -54,7 +54,7 @@ class AiSearchService
      */
     public function parse(string $query): array
     {
-        $normalized = mb_strtolower(trim($query));
+        $normalized = $this->preNormalizeQuery(mb_strtolower(trim($query)));
         if ($normalized === '') {
             return $this->emptyResult($query);
         }
@@ -67,8 +67,31 @@ class AiSearchService
                 return $this->enrichWithIds($result, $query);
             }
 
-            return (new NaturalSearchRegexParser)->parse($query);
+            return (new NaturalSearchRegexParser)->parse($normalized);
         });
+    }
+
+    /**
+     * Normalise written French numeric multipliers so both the LLM and the regex
+     * parser receive unambiguous digit strings.
+     * Examples: "50 milles" → "50000", "2 millions" → "2000000"
+     */
+    private function preNormalizeQuery(string $query): string
+    {
+        // mille / milles / millier / milliers  → ×1 000
+        $query = (string) preg_replace_callback(
+            '/(\d+)\s*mill(?:e|es|ier|iers)\b/u',
+            static fn ($m) => (string) ((int) $m[1] * 1000),
+            $query
+        );
+        // million / millions → ×1 000 000
+        $query = (string) preg_replace_callback(
+            '/(\d+)\s*millions?\b/u',
+            static fn ($m) => (string) ((int) $m[1] * 1_000_000),
+            $query
+        );
+
+        return $query;
     }
 
     /**
@@ -272,7 +295,8 @@ Retourne exactement ces 11 clés. Utilise null si un critère n'est pas mentionn
 - Si non mentionné explicitement → null. Ne JAMAIS déduire depuis le type de bien ou le prix.
 
 ### PRIX (toujours en FCFA)
-- Conversions : "150k"→150000, "1,5M"/"1.5 million"→1500000, "2M"→2000000.
+- Conversions : "150k"→150000, "50 milles"/"50 mille"→50000, "1,5M"/"1.5 million"→1500000, "2M"→2000000.
+- "mille"/"milles"/"millier" = ×1 000 (PAS ×1 000 000). Ex : "50 milles" = 50 000 FCFA.
 - "pas cher"/"budget serré"/"économique" → price_max: 80000 si location, 8000000 si vente, 80000 si null.
 - "haut de gamme"/"luxe"/"standing" → price_min: 300000 si location, 50000000 si vente, 300000 si null.
 

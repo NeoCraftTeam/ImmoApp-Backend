@@ -62,6 +62,32 @@ it('falls back to full-text q when no structured criteria found', function (): v
         ->and($data['city_id'])->toBeNull();
 });
 
+it('parses "milles francs" price and accent-free city name', function (): void {
+    $response = $this->postJson('/api/v1/search/parse', [
+        'q' => 'je recherche une maison a moins de 50 milles francs dans la ville de yaounde',
+    ]);
+
+    $response->assertSuccessful();
+    $data = $response->json();
+
+    expect($data['type_name'])->toBe('Maison')
+        ->and($data['city_name'])->toBe('Yaoundé')
+        ->and($data['price_max'])->toBe(50000);
+});
+
+it('parses abbreviated "50k fcfa" price', function (): void {
+    $response = $this->postJson('/api/v1/search/parse', [
+        'q' => 'maison à Douala moins de 80k fcfa',
+    ]);
+
+    $response->assertSuccessful();
+    $data = $response->json();
+
+    expect($data['type_name'])->toBe('Maison')
+        ->and($data['city_name'])->toBe('Douala')
+        ->and($data['price_max'])->toBe(80000);
+});
+
 it('caches parsed results', function (): void {
     $response1 = $this->postJson('/api/v1/search/parse', [
         'q' => 'appartement à Douala',
