@@ -241,7 +241,9 @@ All prefixed `/api/v1/`: `auth.php`, `ads.php`, `payments.php`, `viewings.php`, 
   - `pg_isready` uses `-h 127.0.0.1 -p 5432` to verify TCP (not Unix socket) before test run.
 - **CI/CD (Frontend)**: GitLab CI (`keyhome-frontend-next/.gitlab-ci.yml`) + Vercel (auto-deploy on push to `cedrickdev`).
   - `lint` job: `npm run lint` (ESLint). `format` job: `npm run format:check` (Prettier).
-  - `typecheck` job: `npx tsc --noEmit`. `test` job: Vitest. `build` job: Next.js production build.
+  - `typecheck` job: `npx tsc --noEmit`. `test:unit` job: Vitest (no coverage thresholds).
+  - **`cedrickdev` branch**: `build:check` (`npm run build`) runs as quality gate. Vercel deploys the preview automatically — NO `build:preprod` or `deploy:preprod` jobs in CI.
+  - **`main` branch**: `build:prod` (vercel build --prod) → `deploy:production` (vercel deploy --prebuilt). Requires `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` GitLab CI variables.
 - **Proxy**: Traefik (HTTPS Let's Encrypt) in front of `web` service.
 - **Preprod**: `docker-compose.preprod.yml` — shares prod DB/Redis/Meilisearch via external network.
 
@@ -374,3 +376,4 @@ LocalStorage keys: `kh_tour_completed_at`, `kh:welcome-dismissed`, `APPTOUR_SHOW
 - **`lint` job**: `npm run lint` — zero errors allowed. Warnings are tolerated but minimised.
 - **Vercel build**: runs `tsc --noEmit` as part of Next.js production build. TypeScript errors fail the build even if ESLint passes. Always check that interface changes don't break downstream callers.
 - **`test_unit` job (coverage)**: Coverage thresholds have been **removed** from `vitest.config.ts`. The job passes/fails based on test results only. Coverage is still collected and reported (reporters: text, json, html, lcov, cobertura) as CI artifacts — do NOT re-add `thresholds` until the test suite has meaningful coverage.
+- **`build:preprod` + `deploy:preprod` removed**: Vercel handles `cedrickdev` preview deployments automatically. `build:check` (`npm run build`) runs on all non-`main` branches including `cedrickdev` as the quality gate. The `VERCEL_TOKEN`/`VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` variables are only needed for `main` (production deploy).
