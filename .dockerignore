@@ -42,6 +42,7 @@ storage/framework/views/
 *.md
 audit/
 docs/
+readme/
 skills/
 data.ms/
 dumps/

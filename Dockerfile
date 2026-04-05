@@ -7,6 +7,11 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --prefer-offline
 COPY . .
+# Stub the Filament vendor CSS so Tailwind/Vite can resolve the @import in
+# resources/css/filament/admin/theme.css. The real Filament assets are
+# published later by `php artisan filament:assets` in the PHP stage.
+RUN mkdir -p vendor/filament/filament/resources/css \
+    && touch vendor/filament/filament/resources/css/theme.css
 RUN npm run build && npm cache clean --force
 
 # ── Stage 2: PHP production image ────────────────────────────────────────────
