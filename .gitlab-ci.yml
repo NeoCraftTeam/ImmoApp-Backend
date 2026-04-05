@@ -140,10 +140,12 @@ test_suite:
         -e POSTGRES_PASSWORD=test_pass \
         postgis/postgis:15-3.3-alpine
 
-      # Wait until PostgreSQL accepts connections
+      # Wait until PostgreSQL accepts TCP connections (not just Unix socket).
+      # pg_isready without -h checks /var/run/postgresql (Unix socket) which
+      # becomes ready before TCP is bound — causing cross-container ECONNREFUSED.
       echo "Waiting for PostgreSQL..."
       for i in $(seq 1 30); do
-        docker exec pg-$CI_JOB_ID pg_isready -U gitlab && break
+        docker exec pg-$CI_JOB_ID pg_isready -U gitlab -h 127.0.0.1 -p 5432 && break
         [ "$i" = "30" ] && echo "PostgreSQL failed to start" && exit 1
         sleep 2
       done
