@@ -16,6 +16,7 @@ use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use OpenApi\Annotations as OA;
 
@@ -78,10 +79,10 @@ final class SubscriptionController
      */
     public function plans(): AnonymousResourceCollection
     {
-        $plans = SubscriptionPlan::query()
+        $plans = Cache::remember('subscription:plans:active', now()->addHours(24), fn () => SubscriptionPlan::query()
             ->where('is_active', true)
             ->orderBy('sort_order')
-            ->get();
+            ->get());
 
         return SubscriptionPlanResource::collection($plans);
     }

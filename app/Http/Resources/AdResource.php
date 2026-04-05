@@ -41,6 +41,10 @@ final class AdResource extends JsonResource
         $reviewsCount = $this->reviews_count
             ?? ($this->relationLoaded('reviews') ? $this->reviews->count() : 0);
 
+        // Cache media collection to avoid repeated queries
+        $allImages = $this->getMedia('images');
+        $accessibleImages = $this->getAccessibleImages($user);
+
         return [
             'id' => $this->id,
             'title' => $this->title,
@@ -69,7 +73,7 @@ final class AdResource extends JsonResource
             'tour_config' => $this->when($this->has_3d_tour && $canAccessTour, $signedTourConfig),
             'tour_scenes_count' => $this->when($this->has_3d_tour, $this->tour_scenes_count),
             'tour_published_at' => $this->when($this->has_3d_tour, $this->tour_published_at),
-            'total_images' => $this->getMedia('images')->count(),
+            'total_images' => $allImages->count(),
             'rating' => $avgRating ? (float) $avgRating : null,
             'reviews_count' => (int) $reviewsCount,
             'is_favorited' => $this->isFavoritedBy($user),
@@ -126,14 +130,14 @@ final class AdResource extends JsonResource
             'published_by' => $this->getPublisherName(),
             'quarter' => new QuarterResource($this->whenLoaded('quarter')),
             'type' => new AdTypeResource($this->whenLoaded('ad_type')),
-            'images' => $this->getAccessibleImages($user)->map(fn ($media) => [
+            'images' => $accessibleImages->map(fn ($media) => [
                 'id' => $media->id,
                 'url' => $media->getUrl(),
                 'placeholder' => $media->hasGeneratedConversion('placeholder') ? $media->getUrl('placeholder') : null,
                 'thumb' => $media->hasGeneratedConversion('thumb') ? $media->getUrl('thumb') : $media->getUrl(),
                 'large' => $media->hasGeneratedConversion('large') ? $media->getUrl('large') : $media->getUrl(),
                 'mime_type' => $media->mime_type,
-                'is_primary' => $this->getMedia('images')->first()?->id === $media->id,
+                'is_primary' => $allImages->first()?->id === $media->id,
             ]),
             'reviews' => ReviewResource::collection($this->whenLoaded('reviews')),
         ];

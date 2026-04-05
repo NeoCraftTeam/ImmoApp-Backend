@@ -10,6 +10,7 @@ use App\Models\City;
 use App\Models\Review;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Public landing-page statistics — extracted from inline closure routes (W37).
@@ -27,11 +28,13 @@ final class StatsController
      */
     public function landing(): JsonResponse
     {
-        return response()->json([
+        $stats = Cache::remember('landing:stats', now()->addMinutes(5), fn () => [
             'ads_count' => Ad::query()->publiclyListed()->where('is_visible', true)->count(),
             'cities_count' => City::query()->count(),
             'users_count' => User::query()->count(),
         ]);
+
+        return response()->json($stats);
     }
 
     /**
@@ -45,26 +48,24 @@ final class StatsController
      */
     public function testimonials(): JsonResponse
     {
-        $reviews = Review::query()
-            ->whereNotNull('comment')
-            ->where('rating', '>=', 4)
-            ->with(['user.city'])
-            ->latest()
-            ->limit(8)
-            ->get();
+        $data = Cache::remember('landing:testimonials', now()->addMinutes(10), function () {
+            $reviews = Review::query()
+                ->whereNotNull('comment')
+                ->where('rating', '>=', 4)
+                ->with(['user.city'])
+                ->latest()
+                ->limit(8)
+                ->get();
 
-        $averageRating = round(
-            (float) (Review::query()->avg('rating') ?? 4.6),
-            1
-        );
-        $totalCount = Review::query()->count();
+            return [
+                'data' => TestimonialResource::collection($reviews),
+                'meta' => [
+                    'average_rating' => round((float) (Review::query()->avg('rating') ?? 4.6), 1),
+                    'total_count' => Review::query()->count(),
+                ],
+            ];
+        });
 
-        return response()->json([
-            'data' => TestimonialResource::collection($reviews),
-            'meta' => [
-                'average_rating' => $averageRating,
-                'total_count' => $totalCount,
-            ],
-        ]);
+        return response()->json($data);
     }
 }

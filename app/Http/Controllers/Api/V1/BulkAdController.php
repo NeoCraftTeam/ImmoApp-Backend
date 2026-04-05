@@ -8,6 +8,7 @@ use App\Enums\AdStatus;
 use App\Models\Ad;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
@@ -50,14 +51,16 @@ final class BulkAdController
         $updated = 0;
         $failed = [];
 
-        foreach ($ads as $ad) {
-            try {
-                $ad->transitionTo($newStatus);
-                $updated++;
-            } catch (\Throwable) {
-                $failed[] = $ad->id;
+        DB::transaction(function () use ($ads, $newStatus, &$updated, &$failed): void {
+            foreach ($ads as $ad) {
+                try {
+                    $ad->transitionTo($newStatus);
+                    $updated++;
+                } catch (\Throwable) {
+                    $failed[] = $ad->id;
+                }
             }
-        }
+        });
 
         return response()->json([
             'message' => "{$updated} annonce(s) mise(s) à jour.",

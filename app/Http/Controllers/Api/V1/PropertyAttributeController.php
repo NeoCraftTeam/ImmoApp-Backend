@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Models\PropertyAttribute;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 use OpenApi\Attributes as OA;
 
 final class PropertyAttributeController
@@ -24,10 +25,15 @@ final class PropertyAttributeController
     )]
     public function index(): JsonResponse
     {
+        $data = Cache::remember('property_attributes:all', now()->addHours(24), fn () => [
+            'flat' => PropertyAttribute::toApiArray(),
+            'grouped' => PropertyAttribute::toApiGroupedArray(),
+        ]);
+
         return response()->json([
             'success' => true,
-            'data' => PropertyAttribute::toApiArray(),
-            'grouped' => PropertyAttribute::toApiGroupedArray(),
+            'data' => $data['flat'],
+            'grouped' => $data['grouped'],
         ]);
     }
 }

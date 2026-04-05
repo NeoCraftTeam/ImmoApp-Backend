@@ -9,6 +9,7 @@ use App\Http\Resources\AdTypeResource;
 use App\Models\AdType;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Cache;
 
 final class AdTypeController
 {
@@ -41,7 +42,7 @@ final class AdTypeController
      */
     public function index()
     {
-        $adTypes = AdType::all();
+        $adTypes = Cache::remember('ad_types:all', now()->addHours(1), fn () => AdType::all());
 
         return AdTypeResource::collection($adTypes);
     }
@@ -88,6 +89,7 @@ final class AdTypeController
             }
 
             $type = AdType::create($request->validated());
+            Cache::forget('ad_types:all');
 
             return response()->json([
                 'message' => 'Crée avec succès',
@@ -189,6 +191,7 @@ final class AdTypeController
                 ], 400); // 400 = Bad Request
             }
             $adType->update($request->validated());
+            Cache::forget('ad_types:all');
 
             return response()->json([
                 'message' => 'Mise à jour avec succès',
@@ -234,6 +237,7 @@ final class AdTypeController
 
         try {
             $adType->delete();
+            Cache::forget('ad_types:all');
 
             return response()->json([
                 'message' => 'Supprimée avec succès',

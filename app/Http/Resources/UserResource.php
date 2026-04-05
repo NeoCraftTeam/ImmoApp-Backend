@@ -9,6 +9,7 @@ use App\Models\City;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -73,8 +74,8 @@ final class UserResource extends JsonResource
             'city_name' => $this->when(
                 !empty($this->city_id),
                 fn () => $this->relationLoaded('city')
-                    ? $this->city->name
-                    : City::find($this->city_id)?->name
+                    ? $this->city?->name
+                    : Cache::remember("city:name:{$this->city_id}", now()->addHours(1), fn () => City::find($this->city_id)?->name)
             ),
             'point_balance' => $this->when(
                 $request->user()?->id === $this->id,
