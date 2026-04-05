@@ -383,19 +383,18 @@ slack_success:
       optional: true
   script:
     - |
-      if [ -z "$SLACK_WEBHOOK_PROD" ]; then
-        echo "SLACK_WEBHOOK_PROD not set, skipping notification"
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        WEBHOOK="$SLACK_WEBHOOK_PROD"
+        DEPLOY_ENV="Production"
+      else
+        WEBHOOK="${SLACK_WEBHOOK_PREPROD:-$SLACK_WEBHOOK_PROD}"
+        DEPLOY_ENV="Preproduction"
+      fi
+      if [ -z "$WEBHOOK" ]; then
+        echo "No Slack webhook configured for branch $CI_COMMIT_BRANCH, skipping"
         exit 0
       fi
       SHORT_SHA="${CI_COMMIT_SHA:0:8}"
-      DEPLOY_ENV=""
-      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
-        DEPLOY_ENV="Production"
-      elif [ "$CI_COMMIT_BRANCH" = "preprod" ]; then
-        DEPLOY_ENV="Preproduction"
-      else
-        DEPLOY_ENV="Unknown"
-      fi
 
       curl -sS -X POST -H 'Content-type: application/json' \
       --data "{
@@ -409,10 +408,10 @@ slack_success:
             {
               \"type\": \"section\",
               \"fields\": [
-                {\"type\": \"mrkdwn\", \"text\": \"*Environnement:*\n$DEPLOY_ENV\"},
-                {\"type\": \"mrkdwn\", \"text\": \"*Branche:*\n\`$CI_COMMIT_REF_NAME\`\"},
-                {\"type\": \"mrkdwn\", \"text\": \"*Auteur:*\n$GITLAB_USER_NAME\"},
-                {\"type\": \"mrkdwn\", \"text\": \"*Commit:*\n\`$SHORT_SHA\`\"}
+                {\"type\": \"mrkdwn\", \"text\": \"*Environnement:*\\n$DEPLOY_ENV\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*Branche:*\\n\`$CI_COMMIT_REF_NAME\`\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*Auteur:*\\n$GITLAB_USER_NAME\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*Commit:*\\n\`$SHORT_SHA\`\"}
               ]
             },
             {
@@ -427,7 +426,7 @@ slack_success:
             }
           ]
         }]
-      }" $SLACK_WEBHOOK_PROD
+      }" $WEBHOOK
   when: on_success
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
