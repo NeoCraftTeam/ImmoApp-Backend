@@ -16,7 +16,6 @@ FROM php:8.4-fpm-alpine
 RUN apk add --no-cache \
     bash \
     curl \
-    git \
     libpng-dev \
     libzip-dev \
     zlib-dev \
@@ -52,8 +51,8 @@ RUN apk add --no-cache \
     gettext \
     && pecl install redis \
     && docker-php-ext-enable redis \
-    && apk del $PHPIZE_DEPS \
-    && rm -rf /tmp/*
+    && apk del $PHPIZE_DEPS shadow \
+    && rm -rf /tmp/* /var/cache/apk/*
 
 # Installation de Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
@@ -75,7 +74,8 @@ COPY composer.json composer.lock ./
 RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views \
         storage/logs bootstrap/cache \
     && touch .env \
-    && composer install --no-dev --no-autoloader --no-scripts --no-interaction
+    && composer install --no-dev --no-autoloader --no-scripts --no-interaction \
+    && rm -rf /root/.composer /tmp/composer*
 
 # ── Copy full application codebase ───────────────────────────────────────────
 COPY . .
@@ -93,7 +93,13 @@ RUN cp .env.example .env \
     && php artisan vendor:publish --force --tag=livewire:assets --ansi --no-interaction 2>/dev/null || true \
     && php artisan filament:assets 2>/dev/null || true \
     && php scripts/patch-webpush.php 2>/dev/null || true \
-    && rm -f .env
+    && rm -f .env \
+    && find vendor -type d -name '.git' -prune -exec rm -rf {} + 2>/dev/null || true \
+    && find vendor -type d \( -name 'tests' -o -name 'Tests' -o -name 'test' -o -name 'Test' \) -prune -exec rm -rf {} + 2>/dev/null || true \
+    && find vendor -type d \( -name 'docs' -o -name 'doc' -o -name 'examples' -o -name 'example' \) -prune -exec rm -rf {} + 2>/dev/null || true \
+    && find vendor -name '*.md' -delete 2>/dev/null || true \
+    && find vendor -name 'CHANGELOG*' -delete 2>/dev/null || true \
+    && find vendor -name 'phpunit*' -delete 2>/dev/null || true
 
 # ── Set permissions ───────────────────────────────────────────────────────────
 RUN chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
