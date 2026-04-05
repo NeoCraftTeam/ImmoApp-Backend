@@ -47,6 +47,7 @@ Route::prefix('ads')->middleware('optional.auth')->group(function (): void {
 
         Route::post('/{ad}/toggle-visibility', [AdStatusController::class, 'toggleVisibility']);
         Route::post('/{ad}/set-status', [AdStatusController::class, 'setStatus']);
+        Route::post('/{ad}/publish', [AdStatusController::class, 'publish'])->middleware('throttle:20,1');
         Route::post('/{ad}/set-availability', [AdStatusController::class, 'setAvailability']);
     });
 

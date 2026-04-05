@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\CreateAd;
 use App\Actions\UpdateAd;
+use App\Enums\AdStatus;
 use App\Exceptions\InvalidStatusTransitionException;
 use App\Http\Requests\AdRequest;
 use App\Http\Resources\AdResource as AdApiResource;
@@ -123,25 +124,40 @@ final class AdController
         $idempotencyKey = $request->input('_idempotency_key');
         if ($idempotencyKey) {
             $cacheKey = "ad_create:u{$userId}:k".md5((string) $idempotencyKey);
-            $existingAdId = Cache::get($cacheKey);
-            if ($existingAdId) {
-                $existing = Ad::with(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency'])
-                    ->find($existingAdId);
-                if ($existing) {
-                    $this->log->info('Idempotency hit — returning existing ad', [
-                        'ad_id' => $existingAdId,
-                        'user_id' => $userId,
-                    ]);
+            $lock = Cache::lock($cacheKey.':lock', 10);
 
-                    return response()->json([
-                        'success' => true,
-                        'message' => 'Ad created successfully',
-                        'data' => [
-                            'ad' => new AdApiResource($existing),
-                            'images_count' => $existing->getMedia('images')->count(),
-                        ],
-                    ], 201);
+            if (!$lock->get()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Requête en cours de traitement, veuillez patienter.',
+                ], 409);
+            }
+
+            try {
+                $existingAdId = Cache::get($cacheKey);
+                if ($existingAdId) {
+                    $existing = Ad::with(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency'])
+                        ->find($existingAdId);
+                    if ($existing) {
+                        $this->log->info('Idempotency hit — returning existing ad', [
+                            'ad_id' => $existingAdId,
+                            'user_id' => $userId,
+                        ]);
+
+                        return response()->json([
+                            'success' => true,
+                            'message' => 'Ad created successfully',
+                            'data' => [
+                                'ad' => new AdApiResource($existing),
+                                'images_count' => $existing->getMedia('images')->count(),
+                            ],
+                        ], 201);
+                    }
                 }
+            } catch (Throwable $e) {
+                $lock->release();
+
+                throw $e;
             }
         }
         // ─────────────────────────────────────────────────────────────────────
@@ -150,11 +166,14 @@ final class AdController
             $this->log->info('Data received for ad creation:', $data);
             $this->log->info('Files received:', $request->allFiles());
 
+            $isDraft = (bool) ($data['is_draft'] ?? false);
+            unset($data['is_draft']);
+
             $images = $this->collectUploadedImages($request);
             $propertyConditionPdf = $request->hasFile('property_condition')
                 ? $request->file('property_condition')
                 : null;
-            $ad = $this->createAdAction->execute($data, $images, $propertyConditionPdf);
+            $ad = $this->createAdAction->execute($data, $images, $propertyConditionPdf, $isDraft);
 
             // Store idempotency key → ad ID mapping for 5 minutes
             if ($idempotencyKey) {
@@ -163,13 +182,14 @@ final class AdController
                     $ad->id,
                     now()->addMinutes(5)
                 );
+                $lock->release();
             }
 
             $ad->load(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency']);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Ad created successfully',
+                'message' => $isDraft ? 'Draft saved successfully' : 'Ad created successfully',
                 'data' => [
                     'ad' => new AdApiResource($ad),
                     'images_count' => $ad->getMedia('images')->count(),
@@ -177,6 +197,9 @@ final class AdController
             ], 201);
 
         } catch (Throwable $e) {
+            if (isset($lock)) {
+                $lock->release();
+            }
             $this->log->error('Error creating ad', [
                 'user_id' => $userId,
                 'exception' => $e->getMessage(),
@@ -264,9 +287,14 @@ final class AdController
     {
         $this->authorize('update', $ad);
         $data = $request->validated();
+        unset($data['is_draft']);
 
         if (isset($data['status']) && !auth()->user()?->isAdmin()) {
-            unset($data['status']);
+            // Owners can only publish drafts (DRAFT → PENDING)
+            $requestedStatus = AdStatus::tryFrom($data['status']);
+            if (!($ad->status === AdStatus::DRAFT && $requestedStatus === AdStatus::PENDING)) {
+                unset($data['status']);
+            }
         }
 
         try {

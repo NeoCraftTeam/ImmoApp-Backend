@@ -9,6 +9,7 @@ use App\Exceptions\InvalidStatusTransitionException;
 use App\Models\Ad;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
@@ -110,6 +111,91 @@ final class AdStatusController
                 'message' => $e->getMessage(),
             ], 400);
         }
+    }
+
+    /**
+     * Publish a draft ad (transitions DRAFT → PENDING for admin review).
+     *
+     * @OA\Post(
+     *     path="/api/v1/ads/{ad}/publish",
+     *     summary="Publish a draft ad",
+     *     description="Transition a draft ad to pending status for admin review. Validates that all required fields are filled.",
+     *     operationId="publishDraftAd",
+     *     tags={"🏠 Annonces"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, @OA\Schema(type="string")),
+     *
+     *     @OA\Response(response=200, description="Draft published"),
+     *     @OA\Response(response=403, description="Forbidden"),
+     *     @OA\Response(response=404, description="Ad not found"),
+     *     @OA\Response(response=422, description="Missing required fields or not a draft")
+     * )
+     */
+    public function publish(Ad $ad): JsonResponse
+    {
+        $this->authorize('update', $ad);
+
+        return DB::transaction(function () use ($ad): JsonResponse {
+            // Pessimistic lock to prevent concurrent publish attempts
+            $ad = Ad::lockForUpdate()->find($ad->id);
+
+            if ($ad->status !== AdStatus::DRAFT) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Seuls les brouillons peuvent être publiés.',
+                ], 422);
+            }
+
+            // Validate required fields are present before publishing
+            $missing = [];
+            if (!$ad->title) {
+                $missing[] = 'titre';
+            }
+            if (!$ad->description) {
+                $missing[] = 'description';
+            }
+            if (!$ad->adresse) {
+                $missing[] = 'adresse';
+            }
+            if ($ad->getAttribute('price') === null) {
+                $missing[] = 'prix';
+            }
+            if ($ad->getAttribute('surface_area') === null) {
+                $missing[] = 'surface';
+            }
+            if (!$ad->quarter_id) {
+                $missing[] = 'quartier';
+            }
+            if (!$ad->type_id) {
+                $missing[] = 'type';
+            }
+
+            if (!empty($missing)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Veuillez compléter les champs obligatoires avant de publier : '.implode(', ', $missing),
+                    'data' => ['missing_fields' => $missing],
+                ], 422);
+            }
+
+            $ad->transitionTo(AdStatus::PENDING);
+
+            activity()
+                ->causedBy(auth()->user())
+                ->performedOn($ad)
+                ->withProperties(['old_status' => 'draft', 'new_status' => 'pending'])
+                ->log('Ad published from draft');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Annonce soumise pour validation.',
+                'data' => [
+                    'old_status' => 'draft',
+                    'new_status' => 'pending',
+                ],
+            ]);
+        });
     }
 
     /**

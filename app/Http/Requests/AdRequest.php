@@ -83,25 +83,31 @@ final class AdRequest extends FormRequest
         }
 
         if ($this->isMethod('post')) {
-            return [
+            $isDraft = $this->boolean('is_draft');
+
+            // When saving as draft, only title is required — all other fields become optional.
+            $req = $isDraft ? 'sometimes' : 'required';
+
+            $rules = [
+                'is_draft' => ['sometimes', 'boolean'],
                 'title' => ['required', 'string', 'max:255'],
                 'transaction_type' => ['nullable', 'string', 'in:location,vente'],
                 'slug' => ['string', 'max:255', 'unique:ad,slug'],
-                'description' => ['required', 'string'],
-                'adresse' => ['required', 'string', 'max:255'],
-                'price' => ['required', 'numeric', 'min:0'],
-                'surface_area' => ['required', 'numeric', 'min:0'],
-                'bedrooms' => ['required', 'integer', 'min:0'],
-                'bathrooms' => ['required', 'integer', 'min:0'],
-                'has_parking' => ['required', 'string'],
+                'description' => [$req, 'string'],
+                'adresse' => [$req, 'string', 'max:255'],
+                'price' => [$req, 'numeric', 'min:0'],
+                'surface_area' => [$req, 'numeric', 'min:0'],
+                'bedrooms' => [$req, 'integer', 'min:0'],
+                'bathrooms' => [$req, 'integer', 'min:0'],
+                'has_parking' => [$req, 'string'],
                 'location' => [new GeometryGeojsonRule([Point::class])],
-                'latitude' => 'required|numeric|between:-90,90',
-                'longitude' => 'required|numeric|between:-180,180',
+                'latitude' => ($isDraft ? 'sometimes' : 'required').'|numeric|between:-90,90',
+                'longitude' => ($isDraft ? 'sometimes' : 'required').'|numeric|between:-180,180',
                 'radius' => 'nullable|numeric|min:0',
                 'expires_at' => ['nullable', 'date'],
                 // user_id is forced to auth()->id() server-side — not accepted from client
-                'quarter_id' => ['required', 'exists:quarter,id'],
-                'type_id' => ['required', 'exists:ad_type,id'],
+                'quarter_id' => [$req, 'exists:quarter,id'],
+                'type_id' => [$req, 'exists:ad_type,id'],
 
                 // Images,   plusieurs formats possibles
                 'images' => 'sometimes|array|max:10',
@@ -158,9 +164,22 @@ final class AdRequest extends FormRequest
                 // Idempotency (ignored by validated(), handled before)
                 '_idempotency_key' => ['nullable', 'string', 'max:128'],
             ];
+
+            // For drafts, also make nullable the fields that normally require a value
+            if ($isDraft) {
+                $draftNullable = ['description', 'adresse', 'price', 'surface_area', 'bedrooms', 'bathrooms', 'has_parking', 'quarter_id', 'type_id'];
+                foreach ($draftNullable as $field) {
+                    if (!in_array('nullable', $rules[$field], true)) {
+                        $rules[$field][] = 'nullable';
+                    }
+                }
+            }
+
+            return $rules;
         }
         if ($this->isMethod('put') || $this->isMethod('patch')) {
             return [
+                'is_draft' => ['sometimes', 'boolean'],
                 'title' => ['sometimes', 'string', 'max:255'],
                 'transaction_type' => ['nullable', 'string', 'in:location,vente'],
                 'slug' => [
