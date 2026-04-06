@@ -23,6 +23,9 @@ use App\Models\SubscriptionPlan;
 use App\Models\UnlockedAd;
 use App\Models\User;
 use App\Notifications\AdminCrudAction;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
@@ -33,9 +36,12 @@ use Spatie\Activitylog\Models\Activity;
  * When an admin performs a CRUD action, this listener:
  *   1. Sends a confirmation email to the acting admin
  *   2. Sends a notification (mail + Filament DB + WebPush) to all other admins
+ *
+ * Runs via the queue so synchronous mail calls never block HTTP workers.
  */
-class SendAdminActivityEmails
+class SendAdminActivityEmails implements ShouldQueue
 {
+    use InteractsWithQueue, Queueable;
     /**
      * @var array<string, string>
      */

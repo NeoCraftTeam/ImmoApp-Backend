@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\HandlePostPaymentActions;
 use App\Enums\PaymentStatus;
+use App\Jobs\ProcessFlutterwaveWebhookJob;
 use App\Exceptions\InvalidWebhookSignatureException;
 use App\Exceptions\PaymentGatewayException;
 use App\Http\Requests\Api\V1\FlutterwaveInitiateRequest;
@@ -273,36 +274,31 @@ final class PaymentController
 
         $payload = $request->all();
         $headers = [
-            'verif-hash' => (string) $request->header('verif-hash', ''),
-            'HTTP_VERIF_HASH' => (string) $request->header('verif-hash', ''),
+            'verif-hash'           => (string) $request->header('verif-hash', ''),
+            'HTTP_VERIF_HASH'      => (string) $request->header('verif-hash', ''),
             'flutterwave-signature' => (string) $request->header('flutterwave-signature', ''),
         ];
 
+        // 1. Verify signature synchronously — fast hash check, must reply to Flutterwave quickly.
         try {
-            DB::transaction(function () use ($payload, $headers, $gateway): void {
-                $data = $this->paymentService->processWebhook($payload, $headers, $gateway);
-                $txRef = (string) ($data['tx_ref'] ?? '');
-
-                if ($txRef === '') {
-                    return;
-                }
-
-                $payment = Payment::where('transaction_id', $txRef)
-                    ->where('gateway', $gateway)
-                    ->first();
-
-                if (!$payment || !$payment->isPaid()) {
-                    return;
-                }
-
-                $this->postPaymentActions->execute($payment, (array) ($data['raw'] ?? []));
-            });
+            $data  = $this->paymentService->processWebhook($payload, $headers, $gateway);
+            $txRef = (string) ($data['tx_ref'] ?? '');
         } catch (InvalidWebhookSignatureException) {
             return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
         } catch (PaymentGatewayException|\Exception $e) {
-            Log::error("{$gateway} webhook error: ".$e->getMessage());
+            Log::error("{$gateway} webhook signature/parse error: ".$e->getMessage());
 
             return response()->json(['status' => 'error'], 500);
+        }
+
+        // 2. Dispatch heavy DB work + post-payment actions to the queue.
+        //    PHP-FPM worker is released immediately; Flutterwave gets its 200 in < 200 ms.
+        if ($txRef !== '') {
+            ProcessFlutterwaveWebhookJob::dispatch(
+                $txRef,
+                $gateway,
+                (array) ($data['raw'] ?? []),
+            );
         }
 
         return response()->json(['status' => 'ok']);
