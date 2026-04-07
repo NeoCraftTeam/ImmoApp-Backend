@@ -62,7 +62,7 @@ final class CityController
         $cacheKey = 'cities:list:'.md5(($search ?? '').':'.$perPage);
         $ttl = $search ? now()->addMinutes(5) : now()->addHour();
 
-        $cities = Cache::tags(['cities'])->remember(
+        $cities = Cache::remember(
             $cacheKey,
             $ttl,
             fn () => $action->handle($perPage, $search)
@@ -107,7 +107,7 @@ final class CityController
         $this->authorize('create', City::class);
         try {
             $city = $action->handle($request->validated());
-            Cache::tags(['cities'])->flush();
+            Cache::flush(); // invalidate city list cache
 
             return response()->json([
                 'message' => 'Ville crée avec succès',
@@ -209,7 +209,7 @@ final class CityController
 
         try {
             $city = $action->handle($city, $request->validated());
-            Cache::tags(['cities'])->flush();
+            Cache::flush(); // invalidate city list cache
 
             return response()->json([
                 'message' => 'Ville mise à jour avec succès',
@@ -255,7 +255,7 @@ final class CityController
 
         try {
             $action->handle($city);
-            Cache::tags(['cities'])->flush();
+            Cache::flush(); // invalidate city list cache
 
             return response()->json([
                 'message' => 'Ville supprimée avec succès',
