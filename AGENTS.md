@@ -125,6 +125,7 @@ vendor/bin/rector process --dry-run
 - `AdminMetricsService` — dashboard analytics.
 - `AcquisitionChannelClassifier`, `UtmAttributionService` — marketing attribution.
 - `UserWelcomeService`, `WebPushService`, `NativeAppService` — notifications & mobile.
+- `RetentionPushService` — behavioral retention push notifications (5 triggers: win-back after 3d inactivity, search-alert match, price-drop on favorites ≥5 000 FCFA, viewing reminder day-before, lease expiry at 30/7 days). All frequency-capped via Redis. Command: `app:send-retention-pushes` (scheduled twiceDaily 09:00/18:00). `--dry-run` flag available.
 - `PropertyAttributeImportService` — bulk attribute import.
 - `UserAgentParser` — browser/device detection.
 - `Media/MediaPathGenerator` — Spatie media paths.
