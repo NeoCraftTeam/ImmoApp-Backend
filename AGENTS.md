@@ -440,6 +440,13 @@ The frontend exposes **two distinct PWA identities** that install as separate ap
 
 **Customer side nav:** "Devenir hôte" menu item permanently removed from `NavDrawer.tsx`.
 
+**Production-readiness fixes (post-audit, commit `40845d5`):**
+- `next.config.ts`: Added `/manifest-owner.json` header rule (`Content-Type: application/manifest+json` + `Cache-Control: public, max-age=3600`). Without it the owner manifest had no declared content-type and browsers could silently reject it.
+- `manifest.json` (customer): Removed `/owner/dashboard` + `/owner/ads/new` shortcuts — owner actions must not appear in the customer app home-screen shortcut menu. Replaced with `/nearby` and `/search-alerts`.
+- `offline/page.tsx`: Added `export const dynamic = 'force-static'`. The SW precaches `/offline` at install time; without this Next.js server-renders a dynamic page with a fresh CSP nonce, making the SW-cached copy stale/broken.
+- `PWAInstallPrompt.tsx`: Changed dismiss key storage from `sessionStorage` → `localStorage`. The customer banner was re-appearing every new browser session while the owner prompt already used `localStorage`.
+- `sw.js`: Added `/manifest-owner.json` to `PRECACHE_URLS`; bumped `VERSION` `v2` → `v3` so existing installs drop stale caches on next activation.
+
 ### Onboarding Event Sequence
 `AppTour close` → `kh:tour-completed` → [3 min delay] → `WelcomeModal (3 steps)` → `kh:welcome-dismissed` → `PushPrompt` → `kh:push-prompt-done` → Survey.
 LocalStorage keys: `kh_tour_completed_at`, `kh:welcome-dismissed`, `APPTOUR_SHOWN_KEY`.
