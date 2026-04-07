@@ -32,7 +32,19 @@ final readonly class AdImageSearchController
         ]);
 
         $file = $request->file('image');
-        $base64 = base64_encode((string) file_get_contents($file->getRealPath()));
+        $realPath = $file->getRealPath();
+
+        if ($realPath === false) {
+            return response()->json(['message' => 'Impossible de lire le fichier uploadé.'], 422);
+        }
+
+        $contents = file_get_contents($realPath);
+
+        if ($contents === false) {
+            return response()->json(['message' => 'Impossible de lire le fichier uploadé.'], 422);
+        }
+
+        $base64 = base64_encode($contents);
         $mimeType = $file->getMimeType() ?? 'image/jpeg';
 
         $result = $this->aiSearchService->parseFromImage($base64, $mimeType);
