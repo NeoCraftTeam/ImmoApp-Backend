@@ -456,6 +456,30 @@ The frontend exposes **two distinct PWA identities** that install as separate ap
 - Same registrable domain (e.g. `keyhome.app` + `api.keyhome.app`): `SESSION_SAME_SITE=lax` ✅
 - Different domains (e.g. `keyhome.app` + `api.neocraft.dev`): `SESSION_SAME_SITE=none` + `SESSION_SECURE_COOKIE=true` + HTTPS required ✅
 
+### Ad Create Stepper + API-based Draft Mode
+
+**Architecture:**
+- `AdFormWizard` — 6-step wizard (Type → Infos → Détails → Conditions → Médias → Résumé) using `AuthFlowStepper`.
+- `useServerAutoSave` hook — debounced (5 s) server-side auto-save; creates draft on first dirty save, patches via `PATCH /ads/{id}/autosave` on subsequent saves.
+- `AdStatusController::autosave` — lightweight text-field-only PATCH, no image processing, no status transitions.
+- `AdStatusController::publish` — pessimistic-lock transition `DRAFT → PENDING` after all required fields verified.
+- Draft detection on `/owner/ads/new` — queries `GET /my/ads?status=draft&per_page=5`, prompts "Reprendre" if any exist.
+- Profile completeness gate — `handleBeforeSubmit` opens a right-side Drawer to complete profile; auto-save already persists the form data on the server so nothing is lost.
+
+**Draft flow (new ad):**
+1. User fills title → 5 s → auto-save creates draft (`POST /ads` + `is_draft=1`) → `onDraftCreated` → `router.push('/owner/ads/{id}')`.
+2. On edit page: wizard has `draftId = ad.id`; auto-save patches via `PATCH /ads/{id}/autosave`.
+3. Manual "Enregistrer le brouillon" button → `PUT /ads/{id}` with full FormData including images.
+4. "Publier" on review step → `PUT /ads/{id}` update + `POST /ads/{id}/publish` → `DRAFT → PENDING`.
+
+**Bugs fixed in ad stepper audit (6 bugs):**
+- `AdFormWizard.tsx` `onCreateDraftCb`: Booleans (`has_parking=false`) were serialized as JS `String(false)='false'`, which PHP Eloquent's boolean cast treats as truthy → always stored `has_parking=true`. Fixed: `typeof v === 'boolean' ? (v ? '1' : '0') : String(v)`.
+- `[id]/page.tsx` `saveDraftMutation`: Missing charges/lease/distance fields — `deposit_amount`, `minimum_lease_duration`, all `charges_*`, all `distance_*_m`, `is_boost_requested` were silently dropped on manual draft save. Fixed: added all fields, mirroring `buildAdFormData`.
+- `[id]/page.tsx` `saveDraftMutation`: Double `_method=PUT` append — manual code appended `_method=PUT` then `adsService.update()` also appended it. Laravel used the first, second was noise. Fixed: removed manual append.
+- `AdStatusController::autosave`: Wrong table names `exists:quarters,id` / `exists:ad_types,id` — actual tables are `quarter` / `ad_type` (singular, consistent with `Ad::$table = 'ad'`). Incorrect names caused validation to silently pass any UUID without FK checking. Fixed: corrected to `exists:quarter,id` / `exists:ad_type,id`.
+- `new/page.tsx` `onDraftCreated`: Inline arrow function was recreated on every render → `useEffect` in `AdFormWizard` (dep: `onDraftCreated`) could fire spuriously and call `router.push` multiple times. Fixed: wrapped in `useCallback`.
+- `AdFormWizard.tsx` `useServerAutoSave`: `enabled` only checked `!isSubmitting` — auto-save could fire while `draftMutation.isPending`, creating a second orphan draft in a race condition. Fixed: `enabled: !isSubmitting && !isSavingDraft`.
+
 **Production-readiness fixes – round 4 (final deep audit):**
 - `AuthProvider.tsx` `DEVICE_KEYS`: Added `kh_push_dismissed`, `kh_pwa_dismissed`, `kh_owner_pwa_dismissed` to the preserve list. These three keys were missing, so `localStorage.clear()` on logout wiped them — the push notification prompt and both PWA install banners would re-appear on every new login, even if the user had already made a device-level decision to dismiss them. Also removed `kh:push-prompt-done` which is a window `CustomEvent` name, not a localStorage key (it was harmlessly preserved as null each time but was misleading documentation).
 
