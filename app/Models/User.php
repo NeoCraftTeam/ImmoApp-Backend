@@ -177,6 +177,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'oauth_provider',
         'oauth_avatar',
         'onboarding_completed_at',
+        'trust_score_consent',
         'last_home_visit_at',
         'preferences',
         'locale',
@@ -360,6 +361,36 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function searchAlerts(): HasMany
     {
         return $this->hasMany(SearchAlert::class);
+    }
+
+    /** @return HasMany<Document, $this> */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(Document::class);
+    }
+
+    /** @return HasMany<TentativeReservation, $this> */
+    public function clientReservations(): HasMany
+    {
+        return $this->hasMany(TentativeReservation::class, 'client_id');
+    }
+
+    /** @return HasMany<LeaseContract, $this> */
+    public function leaseContracts(): HasMany
+    {
+        return $this->hasMany(LeaseContract::class);
+    }
+
+    /** @return HasMany<LoginHistory, $this> */
+    public function loginHistories(): HasMany
+    {
+        return $this->hasMany(LoginHistory::class);
+    }
+
+    /** @return HasMany<TrustScore, $this> */
+    public function trustScores(): HasMany
+    {
+        return $this->hasMany(TrustScore::class);
     }
 
     /**
@@ -569,6 +600,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'has_email_authentication' => 'boolean',
             'is_anonymized' => 'boolean',
             'onboarding_completed_at' => 'datetime',
+            'trust_score_consent' => 'boolean',
             'last_home_visit_at' => 'datetime',
             'preferences' => 'array',
             'must_change_password_at' => 'datetime',
