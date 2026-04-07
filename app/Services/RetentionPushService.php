@@ -109,13 +109,15 @@ final readonly class RetentionPushService
                         continue;
                     }
 
-                    $cityLabel = $matching->quarter?->city?->name ?? $alert->city_name ?? '';
+                    $cityLabel = $matching->quarter?->city->name ?? $alert->city_name ?? '';
                     $price = $matching->price !== null
                         ? ' — '.number_format((float) $matching->price, 0, ',', ' ').' FCFA'
                         : '';
                     $body = "Nouvelle annonce à {$cityLabel}{$price}.";
 
-                    $result = $this->webPush->sendToUser($alert->user, [
+                    /** @var User $alertUser */
+                    $alertUser = $alert->user;
+                    $result = $this->webPush->sendToUser($alertUser, [
                         'title' => 'Nouvelle annonce pour vous 🔔',
                         'body' => $body,
                         'tag' => "search-alert-{$alert->id}",
@@ -223,7 +225,7 @@ final readonly class RetentionPushService
                 }
 
                 $time = mb_substr((string) $reservation->slot_starts_at, 0, 5);
-                $title = $reservation->ad?->title ?? 'votre visite';
+                $title = $reservation->ad->title;
 
                 $result = $this->webPush->sendToUser($reservation->client, [
                     'title' => 'Rappel de visite ',
