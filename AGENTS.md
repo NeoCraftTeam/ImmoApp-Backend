@@ -440,7 +440,23 @@ The frontend exposes **two distinct PWA identities** that install as separate ap
 
 **Customer side nav:** "Devenir hôte" menu item permanently removed from `NavDrawer.tsx`.
 
-**Production-readiness fixes (post-audit, commit `40845d5`):**
+**Production-readiness fixes – round 2 (session persistence audit):**
+- `config/sanctum.php`: `expiration` `1440` → `43200` (30 days). At 24 h, users who leave the PWA open in the background for a day triggered `kh:auth-expired` and were force-logged out. Tokens must outlive the typical PWA usage window.
+- `config/session.php`: Hard-coded fallback default `120` → `10080` (7 days). If `SESSION_LIFETIME` is missing from `.env`, 2 h was too short for a PWA.
+- `.env.example`: `SESSION_LIFETIME` `120` → `43200` (30 days) + explicit `SESSION_SAME_SITE=lax` with docs. Clerk OAuth users are unaffected (Clerk manages its own session). Email/password users are the beneficiary — their `laravel_session` cookie must survive across PWA restarts.
+- `.env.preprod.example`: Same lifetime increase + `SESSION_SAME_SITE=none` + `SESSION_SECURE_COOKIE=true`. The preprod backend (`preprod-api.keyhome.neocraft.dev`) is on a **different registrable domain** from the frontend (`preprod.keyhome.app`). `SameSite=Lax` (the previous implicit default) silently blocks session cookies in cross-origin XHR requests, making email/password session auth completely non-functional after every PWA restart in preprod.
+
+**PWA session persistence — how it works (email/password users):**
+1. Login → Sanctum Bearer token returned, stored **in-memory only** (XSS-safe); Laravel session cookie also set (`withCredentials: true` in Axios).
+2. PWA reopen → JS module reloads → in-memory token is `null` → `AuthProvider` calls `GET /auth/me` with no Bearer but WITH the session cookie.
+3. Laravel Sanctum stateful middleware authenticates via the cookie → user is restored transparently.
+4. Clerk OAuth users follow a different path: Clerk's own session persists, `isSignedIn=true`, and `AuthProvider` exchanges the Clerk JWT for a fresh Sanctum token — unaffected by any session lifetime setting.
+
+**`SESSION_SAME_SITE` deployment rule:**
+- Same registrable domain (e.g. `keyhome.app` + `api.keyhome.app`): `SESSION_SAME_SITE=lax` ✅
+- Different domains (e.g. `keyhome.app` + `api.neocraft.dev`): `SESSION_SAME_SITE=none` + `SESSION_SECURE_COOKIE=true` + HTTPS required ✅
+
+**Production-readiness fixes – round 1 (post-audit, commit `40845d5`):**
 - `next.config.ts`: Added `/manifest-owner.json` header rule (`Content-Type: application/manifest+json` + `Cache-Control: public, max-age=3600`). Without it the owner manifest had no declared content-type and browsers could silently reject it.
 - `manifest.json` (customer): Removed `/owner/dashboard` + `/owner/ads/new` shortcuts — owner actions must not appear in the customer app home-screen shortcut menu. Replaced with `/nearby` and `/search-alerts`.
 - `offline/page.tsx`: Added `export const dynamic = 'force-static'`. The SW precaches `/offline` at install time; without this Next.js server-renders a dynamic page with a fresh CSP nonce, making the SW-cached copy stale/broken.
