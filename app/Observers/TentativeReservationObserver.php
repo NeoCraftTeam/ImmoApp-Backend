@@ -11,6 +11,7 @@ use App\Notifications\ReservationConfirmedClientNotification;
 use App\Notifications\ReservationCreatedClientNotification;
 use App\Notifications\ReservationCreatedLandlordNotification;
 use App\Notifications\ReservationExpiredNotification;
+use Illuminate\Support\Facades\Cache;
 
 class TentativeReservationObserver
 {
@@ -30,6 +31,9 @@ class TentativeReservationObserver
 
         $reservation->loadMissing(['ad.user', 'client']);
 
+        // Invalidate trust scores for both parties on status changes
+        $this->invalidateTrustScores($reservation);
+
         match ($reservation->status) {
             ReservationStatus::Confirmed => $reservation->client->notify(new ReservationConfirmedClientNotification($reservation)),
             ReservationStatus::Cancelled => $this->notifyCancellation($reservation),
@@ -47,5 +51,18 @@ class TentativeReservationObserver
     private function notifyExpiration(TentativeReservation $reservation): void
     {
         $reservation->client->notify(new ReservationExpiredNotification($reservation));
+    }
+
+    private function invalidateTrustScores(TentativeReservation $reservation): void
+    {
+        $client = $reservation->client;
+        if ($client->trust_score_consent) {
+            Cache::forget("trust_score:{$client->id}:tenant");
+        }
+
+        $landlord = $reservation->ad->user ?? null;
+        if ($landlord?->trust_score_consent) {
+            Cache::forget("trust_score:{$landlord->id}:landlord");
+        }
     }
 }

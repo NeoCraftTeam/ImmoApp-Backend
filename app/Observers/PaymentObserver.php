@@ -34,6 +34,16 @@ class PaymentObserver
         // On invalide le cache seulement si le paiement est un succès (car cela change l'historique significatif)
         if ($payment->status === PaymentStatus::SUCCESS) {
             Cache::forget("reco_v2_user_{$payment->user_id}");
+            $this->invalidateTrustScore($payment);
+        }
+    }
+
+    protected function invalidateTrustScore(Payment $payment): void
+    {
+        $user = $payment->user;
+        if ($user->trust_score_consent) {
+            $context = $user->role->value === 'agent' ? 'landlord' : 'tenant';
+            Cache::forget("trust_score:{$user->id}:{$context}");
         }
     }
 }
