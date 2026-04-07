@@ -456,6 +456,12 @@ The frontend exposes **two distinct PWA identities** that install as separate ap
 - Same registrable domain (e.g. `keyhome.app` + `api.keyhome.app`): `SESSION_SAME_SITE=lax` ✅
 - Different domains (e.g. `keyhome.app` + `api.neocraft.dev`): `SESSION_SAME_SITE=none` + `SESSION_SECURE_COOKIE=true` + HTTPS required ✅
 
+**Production-readiness fixes – round 4 (final deep audit):**
+- `AuthProvider.tsx` `DEVICE_KEYS`: Added `kh_push_dismissed`, `kh_pwa_dismissed`, `kh_owner_pwa_dismissed` to the preserve list. These three keys were missing, so `localStorage.clear()` on logout wiped them — the push notification prompt and both PWA install banners would re-appear on every new login, even if the user had already made a device-level decision to dismiss them. Also removed `kh:push-prompt-done` which is a window `CustomEvent` name, not a localStorage key (it was harmlessly preserved as null each time but was misleading documentation).
+
+**LocalStorage keys (all device-level, must survive logout):**
+`keyhome_cookie_consent_v1`, `kh_tour_completed_at`, `kh:welcome-dismissed`, `APPTOUR_SHOWN_KEY`, `kh_push_dismissed`, `kh_pwa_dismissed`, `kh_owner_pwa_dismissed`.
+
 **Production-readiness fixes – round 3 (deep audit):**
 - `sw.js` fetch handler: Moved `isCacheableApi()` check **before** the `url.origin !== self.location.origin` guard. Previously the guard returned early for all cross-origin requests, making the owner offline API cache (`CACHEABLE_OWNER_PATHS`) completely dead code in any production deployment where the backend lives on a different domain. Now cross-origin API GET requests are network-first cached correctly.
 - `sw.js` header comment: Updated stale "v2" comment to match `VERSION = "v3"`.
