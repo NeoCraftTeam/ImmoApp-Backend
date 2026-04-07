@@ -34,5 +34,8 @@ Schedule::command('app:purge-expired-data')->dailyAt('03:30');
 // — Smart notification digests —
 Schedule::command('app:send-search-alert-digests')->twiceDaily(8, 18);
 
+// — Behavioral retention push notifications —
+Schedule::command('app:send-retention-pushes')->twiceDaily(9, 18);
+
 // — Trust Score nightly recomputation —
 Schedule::command('trustscore:recompute')->dailyAt('02:30');
