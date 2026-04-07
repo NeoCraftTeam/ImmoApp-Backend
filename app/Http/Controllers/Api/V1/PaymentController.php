@@ -6,12 +6,12 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\HandlePostPaymentActions;
 use App\Enums\PaymentStatus;
-use App\Jobs\ProcessFlutterwaveWebhookJob;
 use App\Exceptions\InvalidWebhookSignatureException;
 use App\Exceptions\PaymentGatewayException;
 use App\Http\Requests\Api\V1\FlutterwaveInitiateRequest;
 use App\Http\Requests\Api\V1\FlutterwaveVerifyRequest;
 use App\Http\Resources\PaymentResource;
+use App\Jobs\ProcessFlutterwaveWebhookJob;
 use App\Models\Payment;
 use App\Models\PromoCode;
 use App\Models\PromoCodeUsage;
@@ -274,14 +274,14 @@ final class PaymentController
 
         $payload = $request->all();
         $headers = [
-            'verif-hash'           => (string) $request->header('verif-hash', ''),
-            'HTTP_VERIF_HASH'      => (string) $request->header('verif-hash', ''),
+            'verif-hash' => (string) $request->header('verif-hash', ''),
+            'HTTP_VERIF_HASH' => (string) $request->header('verif-hash', ''),
             'flutterwave-signature' => (string) $request->header('flutterwave-signature', ''),
         ];
 
         // 1. Verify signature synchronously — fast hash check, must reply to Flutterwave quickly.
         try {
-            $data  = $this->paymentService->processWebhook($payload, $headers, $gateway);
+            $data = $this->paymentService->processWebhook($payload, $headers, $gateway);
             $txRef = (string) ($data['tx_ref'] ?? '');
         } catch (InvalidWebhookSignatureException) {
             return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);

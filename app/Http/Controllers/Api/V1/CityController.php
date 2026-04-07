@@ -60,7 +60,7 @@ final class CityController
         $perPage = min((int) request('per_page', 50), 100);
 
         $cacheKey = 'cities:list:'.md5(($search ?? '').':'.$perPage);
-        $ttl      = $search ? now()->addMinutes(5) : now()->addHour();
+        $ttl = $search ? now()->addMinutes(5) : now()->addHour();
 
         $cities = Cache::tags(['cities'])->remember(
             $cacheKey,

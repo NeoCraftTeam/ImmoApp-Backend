@@ -34,7 +34,7 @@ final class ProcessFlutterwaveWebhookJob implements ShouldQueue
     public function __construct(
         public readonly string $txRef,
         public readonly string $gateway,
-        public readonly array  $rawPayload,
+        public readonly array $rawPayload,
     ) {}
 
     public function handle(HandlePostPaymentActions $postPaymentActions): void
@@ -50,7 +50,7 @@ final class ProcessFlutterwaveWebhookJob implements ShouldQueue
             }
 
             Log::info('[Webhook] Processing post-payment actions', [
-                'tx_ref'  => $this->txRef,
+                'tx_ref' => $this->txRef,
                 'gateway' => $this->gateway,
             ]);
 
@@ -61,9 +61,9 @@ final class ProcessFlutterwaveWebhookJob implements ShouldQueue
     public function failed(\Throwable $exception): void
     {
         Log::error('[Webhook] ProcessFlutterwaveWebhookJob failed', [
-            'tx_ref'  => $this->txRef,
+            'tx_ref' => $this->txRef,
             'gateway' => $this->gateway,
-            'error'   => $exception->getMessage(),
+            'error' => $exception->getMessage(),
         ]);
     }
 }

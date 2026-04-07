@@ -42,6 +42,7 @@ use Spatie\Activitylog\Models\Activity;
 class SendAdminActivityEmails implements ShouldQueue
 {
     use InteractsWithQueue, Queueable;
+
     /**
      * @var array<string, string>
      */
