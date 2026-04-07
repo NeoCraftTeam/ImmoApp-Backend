@@ -456,6 +456,11 @@ The frontend exposes **two distinct PWA identities** that install as separate ap
 - Same registrable domain (e.g. `keyhome.app` + `api.keyhome.app`): `SESSION_SAME_SITE=lax` ✅
 - Different domains (e.g. `keyhome.app` + `api.neocraft.dev`): `SESSION_SAME_SITE=none` + `SESSION_SECURE_COOKIE=true` + HTTPS required ✅
 
+**Production-readiness fixes – round 3 (deep audit):**
+- `sw.js` fetch handler: Moved `isCacheableApi()` check **before** the `url.origin !== self.location.origin` guard. Previously the guard returned early for all cross-origin requests, making the owner offline API cache (`CACHEABLE_OWNER_PATHS`) completely dead code in any production deployment where the backend lives on a different domain. Now cross-origin API GET requests are network-first cached correctly.
+- `sw.js` header comment: Updated stale "v2" comment to match `VERSION = "v3"`.
+- `OwnerPWAInstallPrompt.tsx`: Added `sw-updated` event listener + `handleUpdate` callback + `Snackbar`/`Alert` update toast (identical to the one in `PWAInstallPrompt`). Without this, owner panel users were permanently stuck on stale SW versions after each deployment because the update notification never appeared in the `/owner/` scope.
+
 **Production-readiness fixes – round 1 (post-audit, commit `40845d5`):**
 - `next.config.ts`: Added `/manifest-owner.json` header rule (`Content-Type: application/manifest+json` + `Cache-Control: public, max-age=3600`). Without it the owner manifest had no declared content-type and browsers could silently reject it.
 - `manifest.json` (customer): Removed `/owner/dashboard` + `/owner/ads/new` shortcuts — owner actions must not appear in the customer app home-screen shortcut menu. Replaced with `/nearby` and `/search-alerts`.
