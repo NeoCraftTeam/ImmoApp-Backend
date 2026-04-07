@@ -199,6 +199,91 @@ final class AdStatusController
     }
 
     /**
+     * Lightweight JSON-only autosave for text fields of a draft ad.
+     *
+     * @OA\Patch(
+     *     path="/api/v1/ads/{ad}/autosave",
+     *     summary="Autosave draft ad text fields",
+     *     description="Partially updates a draft ad with any subset of allowed text fields. No image processing, no status transition.",
+     *     operationId="autosaveDraftAd",
+     *     tags={"🏠 Annonces"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, @OA\Schema(type="string")),
+     *
+     *     @OA\RequestBody(required=false,
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="title", type="string", nullable=true),
+     *             @OA\Property(property="description", type="string", nullable=true),
+     *             @OA\Property(property="price", type="number", nullable=true)
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=200, description="Autosaved"),
+     *     @OA\Response(response=403, description="Forbidden"),
+     *     @OA\Response(response=404, description="Ad not found"),
+     *     @OA\Response(response=422, description="Not a draft or validation error")
+     * )
+     */
+    public function autosave(Ad $ad): JsonResponse
+    {
+        $this->authorize('update', $ad);
+
+        if ($ad->status !== AdStatus::DRAFT) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Seuls les brouillons peuvent être sauvegardés automatiquement.',
+            ], 422);
+        }
+
+        $validated = request()->validate([
+            'title'                  => ['sometimes', 'nullable', 'string', 'max:255'],
+            'description'            => ['sometimes', 'nullable', 'string'],
+            'adresse'                => ['sometimes', 'nullable', 'string', 'max:500'],
+            'price'                  => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'surface_area'           => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'bedrooms'               => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'bathrooms'              => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'has_parking'            => ['sometimes', 'nullable', 'boolean'],
+            'deposit_amount'         => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'minimum_lease_duration' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'charges_forfaitaires'   => ['sometimes', 'nullable', 'boolean'],
+            'charges_montant_forfait'=> ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'charges_eau'            => ['sometimes', 'nullable', 'boolean'],
+            'charges_electricite'    => ['sometimes', 'nullable', 'boolean'],
+            'charges_autres'         => ['sometimes', 'nullable', 'string'],
+            'quarter_id'             => ['sometimes', 'nullable', 'uuid', 'exists:quarters,id'],
+            'type_id'                => ['sometimes', 'nullable', 'uuid', 'exists:ad_types,id'],
+            'transaction_type'       => ['sometimes', 'nullable', 'string', 'max:50'],
+            'latitude'               => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
+            'longitude'              => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
+            'distance_main_road_m'   => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'distance_shops_m'       => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'distance_transport_m'   => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'distance_school_m'      => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'distance_hospital_m'    => ['sometimes', 'nullable', 'integer', 'min:0'],
+        ]);
+
+        /** @var array<string, mixed> $toUpdate */
+        $toUpdate = array_filter($validated, static fn (mixed $v): bool => $v !== null);
+
+        if (!empty($toUpdate)) {
+            $ad->forceFill($toUpdate);
+            $ad->save();
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Brouillon sauvegardé automatiquement.',
+            'data'    => [
+                'updated_at' => $ad->updated_at->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /**
      * Set ad availability dates.
      *
      * @OA\Post(

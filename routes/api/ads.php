@@ -53,6 +53,7 @@ Route::prefix('ads')->middleware('optional.auth')->group(function (): void {
         Route::post('/{ad}/set-status', [AdStatusController::class, 'setStatus']);
         Route::post('/{ad}/publish', [AdStatusController::class, 'publish'])->middleware('throttle:20,1');
         Route::post('/{ad}/set-availability', [AdStatusController::class, 'setAvailability']);
+        Route::patch('/{ad}/autosave', [AdStatusController::class, 'autosave'])->middleware('throttle:60,1');
     });
 
     // Must be last — captures {id}

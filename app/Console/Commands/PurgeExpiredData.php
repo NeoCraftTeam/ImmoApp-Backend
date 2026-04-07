@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Models\Ad;
+use App\Enums\AdStatus;
 use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -77,6 +79,42 @@ final class PurgeExpiredData extends Command
             'users_purged' => $purged,
             'retention_years' => $years,
             'cutoff_date' => $cutoff->toDateString(),
+        ]);
+
+        // ── Stale draft ads (30-day TTL) ──────────────────────────────────────
+        $draftCutoff = now()->subDays(30);
+        $draftsPurged = 0;
+
+        $this->info(sprintf(
+            '%s draft ads not updated since %s …',
+            $dryRun ? '[DRY RUN] Would soft-delete' : 'Soft-deleting',
+            $draftCutoff->toDateString()
+        ));
+
+        Ad::withoutGlobalScopes()
+            ->where('status', AdStatus::DRAFT->value)
+            ->where('updated_at', '<', $draftCutoff)
+            ->chunkById(100, function ($ads) use ($dryRun, &$draftsPurged): void {
+                foreach ($ads as $ad) {
+                    if ($dryRun) {
+                        $this->line("  [dry-run] Would soft-delete draft ad {$ad->id}, updated_at={$ad->updated_at}");
+                        $draftsPurged++;
+
+                        continue;
+                    }
+
+                    $ad->delete();
+                    $draftsPurged++;
+                }
+            });
+
+        $draftVerb = $dryRun ? 'Would have soft-deleted' : 'Soft-deleted';
+        $this->info("{$draftVerb} {$draftsPurged} stale draft ad(s).");
+
+        Log::channel('audit')->info('Stale draft ads purge completed', [
+            'dry_run' => $dryRun,
+            'drafts_purged' => $draftsPurged,
+            'cutoff_date' => $draftCutoff->toDateString(),
         ]);
 
         return self::SUCCESS;
