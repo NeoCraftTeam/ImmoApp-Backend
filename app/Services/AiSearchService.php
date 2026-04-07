@@ -48,6 +48,120 @@ class AiSearchService
     ];
 
     /**
+     * Parse a property image into structured search parameters.
+     *
+     * Tries GPT-4o-vision first, then Gemini Vision. Image results are NOT
+     * cached (each upload is unique). Returns the same structure as parse().
+     *
+     * @return array<string, mixed>
+     */
+    public function parseFromImage(string $base64Image, string $mimeType = 'image/jpeg'): array
+    {
+        $result = $this->parseImageWithOpenAiVision($base64Image, $mimeType)
+            ?? $this->parseImageWithGeminiVision($base64Image, $mimeType);
+
+        if ($result === null) {
+            return $this->emptyResult('image_search');
+        }
+
+        return $this->enrichWithIds($result, 'image_search');
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function parseImageWithOpenAiVision(string $base64Image, string $mimeType): ?array
+    {
+        $apiKey = config('services.openai.api_key');
+        if (empty($apiKey)) {
+            return null;
+        }
+
+        $model = 'gpt-4o';
+        $systemPrompt = $this->systemPrompt($this->buildContext());
+        $userText = 'Analyse cette photo de bien immobilier et extrais les critères de recherche. Réponds UNIQUEMENT avec un objet JSON valide, sans markdown ni texte autour.';
+
+        try {
+            $response = Http::withToken($apiKey)
+                ->timeout(15)
+                ->post('https://api.openai.com/v1/chat/completions', [
+                    'model' => $model,
+                    'messages' => [
+                        ['role' => 'system', 'content' => $systemPrompt],
+                        ['role' => 'user', 'content' => [
+                            ['type' => 'text', 'text' => $userText],
+                            ['type' => 'image_url', 'image_url' => [
+                                'url' => "data:{$mimeType};base64,{$base64Image}",
+                                'detail' => 'low',
+                            ]],
+                        ]],
+                    ],
+                    'max_tokens' => 400,
+                    'temperature' => 0.1,
+                ]);
+
+            if ($response->failed()) {
+                Log::warning('AiSearchService: [openai-vision] HTTP '.$response->status());
+
+                return null;
+            }
+
+            $content = trim((string) ($response->json('choices.0.message.content') ?? ''));
+            $decoded = $content !== '' ? $this->extractJson($content) : null;
+
+            return $decoded !== null ? $this->normalizeParsedResult($decoded) : null;
+        } catch (\Throwable $e) {
+            Log::error('AiSearchService: [openai-vision] '.$e->getMessage());
+
+            return null;
+        }
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function parseImageWithGeminiVision(string $base64Image, string $mimeType): ?array
+    {
+        $apiKey = config('services.gemini.api_key');
+        if (empty($apiKey)) {
+            return null;
+        }
+
+        $model = config('services.gemini.model', 'gemini-2.0-flash');
+        $systemPrompt = $this->systemPrompt($this->buildContext());
+        $userText = 'Analyse cette photo de bien immobilier et extrais les critères de recherche. Réponds UNIQUEMENT avec un objet JSON valide, sans markdown ni texte autour.';
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+
+        try {
+            $response = Http::timeout(15)->post($url, [
+                'contents' => [[
+                    'role' => 'user',
+                    'parts' => [
+                        ['text' => "{$systemPrompt}\n\n{$userText}"],
+                        ['inline_data' => ['mime_type' => $mimeType, 'data' => $base64Image]],
+                    ],
+                ]],
+                'generationConfig' => ['maxOutputTokens' => 400, 'temperature' => 0.1],
+            ]);
+
+            if ($response->failed()) {
+                Log::warning('AiSearchService: [gemini-vision] HTTP '.$response->status());
+
+                return null;
+            }
+
+            $content = trim((string) ($response->json('candidates.0.content.parts.0.text') ?? ''));
+            $decoded = $content !== '' ? $this->extractJson($content) : null;
+
+            return $decoded !== null ? $this->normalizeParsedResult($decoded) : null;
+        } catch (\Throwable $e) {
+            Log::error('AiSearchService: [gemini-vision] '.$e->getMessage());
+
+            return null;
+        }
+    }
+
+    /**
      * Parse a natural language query into structured search parameters.
      *
      * @return array<string, mixed>

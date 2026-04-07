@@ -95,7 +95,7 @@ vendor/bin/rector process --dry-run
 `PropertyAttribute`, `PropertyAttributeCategory`, `PushSubscription`, `Quarter`, `QueueFailedJob`,
 `Refund`, `Review`, `SearchAlert`, `SearchAlertMatch`, `Setting`, `SiteVisit`, `Subscription`,
 `SubscriptionPlan`, `Survey`, `SurveyQuestion`, `SurveyResponse`, `TeamInvitation`, `Tenant`,
-`TentativeReservation`, `UnlockedAd`, `User`, `Zap/Schedule`, `Zap/SchedulePeriod`.
+`TentativeReservation`, `TrustScore`, `UnlockedAd`, `User`, `Zap/Schedule`, `Zap/SchedulePeriod`.
 - Concerns: `HasPropertyAttributes`, `HasVisibility`.
 - Scopes: `LandlordScope`.
 
@@ -113,11 +113,14 @@ vendor/bin/rector process --dry-run
 - `LeaseContractService` — lease management.
 - `TourService` / `PanoramaProcessor` — 360° virtual tours.
 - `AiDescriptionEnhancer`, `AiDigestService`, `AiSearchService` — AI-powered features.
-- `NaturalSearchRegexParser` — plain-language ad search.
+  - `AiSearchService::parse()` — multi-provider NLP text search (Groq/Llama-3.3-70B → OpenAI GPT-4o-mini → Gemini 2.0 Flash → Together → Mistral) with circuit breakers + 24h cache.
+  - `AiSearchService::parseFromImage()` — vision search: GPT-4o-vision → Gemini Vision fallback. Accepts base64 + MIME type, returns same JSON structure as `parse()`. Not cached (each image is unique).
+- `NaturalSearchRegexParser` — plain-language ad search (regex fallback when all LLM providers fail).
 - `RecommendationEngine` — personalised ad recommendations.
 - `NeighborhoodScorecardService` — location scoring.
 - `IsochroneService`, `DirectionsService` — geo/routing.
 - `KeyScoreService` — proprietary property score.
+- `TrustScoreService` — bidirectional user trust score (tenant + landlord, 7 signals each, 0–100).
 - `FeatureFlagService` — runtime feature toggles.
 - `AdminMetricsService` — dashboard analytics.
 - `AcquisitionChannelClassifier`, `UtmAttributionService` — marketing attribution.
@@ -142,6 +145,25 @@ vendor/bin/rector process --dry-run
 - Amounts resolved server-side from `PointPackage`/`SubscriptionPlan` — never trust client amounts.
 - DB locks (`lockForUpdate`) prevent double-spending on verification.
 - Events: `PaymentInitiated`, `PaymentSucceeded`, `PaymentFailed`.
+
+### TrustScore System
+- **Bidirectional trust scoring** (0–100) for both tenants and landlords, modelled after `KeyScoreService`.
+- `TrustScoreService` (`app/Services/TrustScoreService.php`) — `final readonly`, injected via constructor DI.
+  - **Tenant signals (7, 100 pts):** `payment_reliability`(10), `viewing_attendance`(20), `profile_completeness`(15), `reviews`(20), `account_maturity`(10), `documents`(15), `verification`(10).
+  - **Landlord signals (7, 100 pts):** `ad_quality`(15, via KeyScoreService avg), `response_rate`(15), `reviews`(25), `profile_completeness`(10), `lease_completion`(15), `account_maturity`(10), `verification`(10).
+- `TrustScore` model (`app/Models/TrustScore.php`) — UUID, unique on `(user_id, role_context)`, stores `score`, `tier` (enum cast), `components` (jsonb breakdown), `computed_at`.
+- `TrustScoreTier` enum (`app/Enums/TrustScoreTier.php`) — 5 tiers: `NonVerifie`(0–19), `Bronze`(20–39), `Argent`(40–59), `Or`(60–79), `Platine`(80–100). French labels, Filament color helpers, hex color for frontend.
+- **Consent model:** `trust_score_consent` column on users (nullable boolean). `null` = not asked, `true` = opted in, `false` = opted out. Score only computed/shown when `true`.
+- **Caching:** Redis, 1-hour TTL, key format `trust_score:{userId}:{roleContext}`. Invalidated by `PaymentObserver` and `TentativeReservationObserver`.
+- **API routes:**
+  - `GET /api/v1/users/{user}/trust-score` — public, rate limited 60/min.
+  - `GET /api/v1/my/trust-score` — auth required, returns score or consent prompt.
+  - `POST /api/v1/my/trust-score/consent` — auth required, rate limited 10/min.
+- `TrustScoreResource` (`app/Http/Resources/TrustScoreResource.php`) — formats score, tier, breakdown, tips.
+- `RecomputeTrustScores` command — nightly cron (02:30), processes all consented users in chunks of 500.
+- **Filament integration:** Badge column on `UserResource` with tier coloring, sortable score subquery, `SelectFilter` by tier.
+- **Frontend components:** `TrustScoreBadge` (Chip + Popover), `TrustScoreSection` (breakdown card), `TrustScoreConsentModal` (GDPR opt-in dialog). Integrated into bailleur profile page and ad detail owner section.
+- **Cold-start handling:** New users get 3–8 baseline points. Email/phone verification + profile completion bootstraps to ~25–35 (Bronze).
 
 ### Auth
 - API: Laravel Sanctum (Bearer tokens + SPA session cookies).
@@ -174,14 +196,14 @@ vendor/bin/rector process --dry-run
 `DuplicateAdController`, `EmailVerificationController`, `ExpenseController`, `GdprController`,
 `HealthCheckController`, `InvoiceController`, `IsochroneController`, `KeyScoreController`,
 `LeaseContractController`, `LoginHistoryController`, `MyAdsController`, `MyReviewsController`,
-`NaturalSearchController`, `NeighborhoodScorecardController`, `NewsletterController`,
+`NaturalSearchController`, `AdImageSearchController`, `NeighborhoodScorecardController`, `NewsletterController`,
 `NotificationController`, `NotificationPreferenceController`, `PasswordController`,
 `PaymentController`, `PriceHeatmapController`, `PromoCodeController`, `PropertyAttributeController`,
 `PublicSurveyController`, `PwaController`, `QuarterController`, `RecommendationController`,
 `RefundController`, `RegistrationController`, `RentEstimatorController`, `ReviewController`,
 `SearchAlertController`, `SignatureController`, `SocialAuthController`, `StatsController`,
 `SubscriptionController`, `SurveyController`, `TeamController`, `TenantController`, `TourController`,
-`UserController`, `UserPreferenceController`, `ViewingAvailabilityController`,
+`TrustScoreController`, `UserController`, `UserPreferenceController`, `ViewingAvailabilityController`,
 `ViewingReservationController`, `VisitTrackingController`.
 Non-API controllers: `AnonymousSurveyController`, `EmailPreferenceController`, `MediaProxyController`,
 `PanelSsoController`, `PwaManifestController`, `TourImageProxyController`.
@@ -200,7 +222,7 @@ All prefixed `/api/v1/`: `auth.php`, `ads.php`, `payments.php`, `viewings.php`, 
 `AdReportReason`, `AdReportScamReason`, `AdReportStatus`, `AdStatus`, `CancelledBy`,
 `PaymentGateway`, `PaymentMethod`, `PaymentStatus`, `PaymentType`, `PointTransactionType`,
 `PropertyAttribute`, `RefundStatus`, `ReservationStatus`, `SubscriptionStatus`,
-`SurveyAnonymousAudience`, `TransactionType`, `UserRole`, `UserType`, `VerificationStatus`.
+`SurveyAnonymousAudience`, `TransactionType`, `TrustScoreTier`, `UserRole`, `UserType`, `VerificationStatus`.
 
 ### Events & Listeners
 - Events: `AdCreated`, `AdStatusTransitioned`, `PaymentFailed`, `PaymentInitiated`, `PaymentSucceeded`.
@@ -220,7 +242,7 @@ All prefixed `/api/v1/`: `auth.php`, `ads.php`, `payments.php`, `viewings.php`, 
 `CheckLeaseExpirations`, `CheckSubscriptionExpirations`, `CleanupStalePaymentsCommand`,
 `CreateAdminCommand`, `CreateDemoUsersCommand`, `DiagnoseMailCommand`, `GenerateUtmLinkCommand`,
 `HealthCheckCommand`, `MigrateAdImagesToSpatie`, `ProcessSubscriptionRenewals`, `PurgeExpiredData`,
-`RecalculateQuarterPricing`, `ResetUserOnboardingCommand`, `SendEngagementEmails`, `SendMonthlyReport`,
+`RecalculateQuarterPricing`, `RecomputeTrustScores`, `ResetUserOnboardingCommand`, `SendEngagementEmails`, `SendMonthlyReport`,
 `SendPostViewingThanks`, `SendSearchAlertDigests`, `SendTestPush`, `SyncMeilisearchSettings`,
 `TestMultiTenancyFlow`, `UploadAttributesCommand`.
 
@@ -322,7 +344,8 @@ Storybook, Vitest, Playwright.
   - `landing/` — marketing landing page components.
   - `surveys/` — survey form components (`SurveyForm`, `QuestionRenderer`).
   - `payment/` — payment history, checkout components.
-- `src/services/` — 22 service files calling `/api/v1/` endpoints.
+  - `trust/` — TrustScore components (`TrustScoreBadge`, `TrustScoreSection`, `TrustScoreConsentModal`).
+- `src/services/` — 23 service files calling `/api/v1/` endpoints.
 - `src/hooks/` — 16 custom hooks.
 - `src/theme/` — `tokens.ts` (design tokens), `theme.ts` (MUI theme), `ownerTheme.ts` (bailleur).
 - `src/types/` — TypeScript interfaces mirroring backend models.
