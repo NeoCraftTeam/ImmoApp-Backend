@@ -265,6 +265,16 @@ final class SubscriptionController
             ], 409);
         }
 
+        // Idempotency guard: prevent double-click / retry from creating duplicate payments
+        $lockKey = "subscribe:{$agency->id}:{$plan->id}:{$period}";
+        $lock = Cache::lock($lockKey, 15);
+
+        if (!$lock->get()) {
+            return response()->json([
+                'message' => 'Paiement en cours de traitement, veuillez patienter.',
+            ], 409);
+        }
+
         try {
             $result = $this->paymentService->createPayment($user, [
                 'amount' => (float) $amount,
@@ -282,11 +292,14 @@ final class SubscriptionController
                 ],
             ]);
 
+            $lock->release();
+
             return response()->json([
                 'payment_url' => $result['link'],
                 'message' => 'Redirigez l\'utilisateur vers cette URL pour payer.',
             ]);
         } catch (\Exception $e) {
+            $lock->release();
             Log::error('Erreur création paiement abonnement: '.$e->getMessage());
 
             return response()->json([

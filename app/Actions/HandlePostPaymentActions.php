@@ -79,7 +79,8 @@ final readonly class HandlePostPaymentActions
     private function fulfillCreditPurchase(Payment $payment, array $metadata): void
     {
         $package = $this->resolvePointPackage($payment, $metadata);
-        $buyer = User::find($payment->user_id);
+        // Re-fetch buyer with lock to prevent double-crediting from concurrent webhooks
+        $buyer = User::lockForUpdate()->find($payment->user_id);
 
         if (!$package || !$buyer) {
             return;
