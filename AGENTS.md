@@ -481,6 +481,9 @@ The frontend exposes **two distinct PWA identities** that install as separate ap
 - `AdFormWizard.tsx` `useServerAutoSave`: `enabled` only checked `!isSubmitting` — auto-save could fire while `draftMutation.isPending`, creating a second orphan draft in a race condition. Fixed: `enabled: !isSubmitting && !isSavingDraft`.
 - `[id]/page.tsx` `updateMutation`: same double `_method=PUT` append bug as `saveDraftMutation`. Fixed: removed manual append.
 - `[id]/page.tsx` loading/error skeletons: `Container maxWidth="md"` caused layout jump to `"xl"` when main content loaded. Fixed all 3 containers to `"xl"`.
+- `new/page.tsx` `createMutation`: no `onError` handler — silent failure on ad publication (any 422/500/network error showed no feedback, submit button just re-enabled). Fixed: `onError` added, surfaces server `message` via existing `draftSnackbar` state.
+- `AdFormWizard` `handleSubmit`: no try/catch around `await onSubmit()` — unhandled promise rejection from form event handler on publish failure. Fixed: wrapped in try/catch; `clearDraft()` only called on success path.
+- `AdForm.tsx`: confirmed dead code — never imported by any route. Both ad pages use `AdFormWizard` exclusively.
 
 **Production-readiness fixes – round 4 (final deep audit):**
 - `AuthProvider.tsx` `DEVICE_KEYS`: Added `kh_push_dismissed`, `kh_pwa_dismissed`, `kh_owner_pwa_dismissed` to the preserve list. These three keys were missing, so `localStorage.clear()` on logout wiped them — the push notification prompt and both PWA install banners would re-appear on every new login, even if the user had already made a device-level decision to dismiss them. Also removed `kh:push-prompt-done` which is a window `CustomEvent` name, not a localStorage key (it was harmlessly preserved as null each time but was misleading documentation).
