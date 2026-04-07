@@ -417,6 +417,29 @@ Applied to `src/app/(owner)/owner/ads/new/page.tsx`, `src/app/(owner)/owner/ads/
 - **`useAutoSave` `hasDraft`** — converted from `localStorage.getItem()` on every render to `useState` with lazy initializer, updated only on save/`clearDraft`.
 - **Profile city search debounce** — added 300 ms debounce (`debouncedProfileCityInput` state + `useEffect`) in `new/page.tsx`; query key now uses debounced value so API is not hit on every keystroke.
 
+### PWA Dual-App Isolation (Two Separate Installable Apps)
+
+The frontend exposes **two distinct PWA identities** that install as separate apps on mobile:
+
+| App | Manifest | Scope | Start URL | Theme |
+|---|---|---|---|---|
+| **Customer** | `/manifest.json` | `/` | `/home` | `#F6475F` pink |
+| **Owner / Bailleur** | `/manifest-owner.json` | `/owner/` | `/owner/dashboard` | `#0D9488` teal |
+
+**How it works:**
+- `OwnerManifestSwitch` (`src/components/owner/OwnerManifestSwitch.tsx`) — client component mounted in the `(owner)` layout. On mount it swaps the `<link rel="manifest">` href, `theme-color` meta, `apple-mobile-web-app-title`, and `apple-touch-icon` to the teal owner values. Restores originals on unmount so navigating back to the customer side is seamless.
+- `OwnerPWAInstallPrompt` — owner-specific install banner (separate dismiss key `kh_owner_pwa_dismissed` from the customer banner).
+- Because the owner manifest `scope` is `/owner/`, navigating outside `/owner/*` from within the installed owner PWA opens a new browser tab — keeping the two apps naturally isolated at the OS level.
+
+**Registration role-locking (prevent cross-role signup):**
+- `src/lib/register-intent.ts` exports `registerUrlHasRoleLock`, `readStoredRegisterLock`, `writeStoredRegisterLock`, `clearStoredRegisterLock` — all backed by `sessionStorage` key `kh_register_role_locked`.
+- **Owner flow**: `/owner/register` writes both `'agent'` role and the lock flag, then redirects to `/register`. The register page detects the lock and replaces the `ToggleButtonGroup` with a read-only "Propriétaire / Bailleur" badge — the user cannot switch to customer.
+- **Customer flow**: `/login` links to `/register?lock=1`. The register page reads `?lock=1`, writes the lock flag, strips the URL, and shows a read-only "Particulier" badge.
+- **Direct access** (`/register` with no params): no lock — both roles selectable as before (desktop/browser use case).
+- Lock is cleared in `handleSubmit` alongside `clearStoredRegisterAccountRole()`.
+
+**Customer side nav:** "Devenir hôte" menu item permanently removed from `NavDrawer.tsx`.
+
 ### Onboarding Event Sequence
 `AppTour close` → `kh:tour-completed` → [3 min delay] → `WelcomeModal (3 steps)` → `kh:welcome-dismissed` → `PushPrompt` → `kh:push-prompt-done` → Survey.
 LocalStorage keys: `kh_tour_completed_at`, `kh:welcome-dismissed`, `APPTOUR_SHOWN_KEY`.
