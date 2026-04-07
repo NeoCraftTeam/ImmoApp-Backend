@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\UserRole;
 use App\Http\Requests\UserRequest;
 use App\Http\Resources\AdResource;
 use App\Http\Resources\UserResource;
@@ -241,6 +242,7 @@ final class UserController
                 ],
                 'response_time_label' => $responseTimeLabel,
                 'recent_reviews' => $recentReviews,
+                'trust_score' => $this->getTrustScoreData($user),
             ],
             'ads' => AdResource::collection($ads->items()),
             'meta' => [
@@ -294,6 +296,27 @@ final class UserController
         } catch (Throwable) {
             return null;
         }
+    }
+
+    private function getTrustScoreData(User $user): ?array
+    {
+        if (!$user->trust_score_consent) {
+            return null;
+        }
+
+        $roleContext = $user->role === UserRole::AGENT ? 'landlord' : 'tenant';
+        $trustScore = $user->trustScores()->where('role_context', $roleContext)->first();
+
+        if (!$trustScore) {
+            return null;
+        }
+
+        return [
+            'score' => $trustScore->score,
+            'tier' => $trustScore->tier->value,
+            'tier_label' => $trustScore->tier->label(),
+            'tier_color' => $trustScore->tier->hexColor(),
+        ];
     }
 
     /**

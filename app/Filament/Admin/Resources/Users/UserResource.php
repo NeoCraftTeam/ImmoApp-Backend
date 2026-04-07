@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\Users;
 
+use App\Enums\TrustScoreTier;
 use App\Enums\UserRole;
 use App\Enums\UserType;
 use App\Filament\Admin\Resources\Users\Pages\CreateUser;
@@ -14,6 +15,7 @@ use App\Filament\Admin\Resources\Users\RelationManagers\AdsRelationManager;
 use App\Filament\Admin\Resources\Users\RelationManagers\PaymentsRelationManager;
 use App\Filament\Exports\UserExporter;
 use App\Filament\Imports\UserImporter;
+use App\Models\TrustScore;
 use App\Models\User;
 use BackedEnum;
 use Carbon\Carbon;
@@ -75,7 +77,7 @@ class UserResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['city', 'agency']);
+            ->with(['city', 'agency', 'trustScores']);
     }
 
     #[\Override]
@@ -347,6 +349,31 @@ class UserResource extends Resource
                 ->label('Actif')
                 ->boolean()
                 ->sortable(),
+            TextColumn::make('trustScoreDisplay')
+                ->label('TrustScore')
+                ->badge()
+                ->getStateUsing(function ($record): ?string {
+                    $trustScore = $record->trustScores->first();
+                    if (!$trustScore) {
+                        return null;
+                    }
+
+                    return $trustScore->tier->label().' ('.$trustScore->score.')';
+                })
+                ->color(function ($record): string {
+                    $trustScore = $record->trustScores->first();
+
+                    return $trustScore?->tier->color() ?? 'gray';
+                })
+                ->sortable(query: function ($query, string $direction) {
+                    return $query->orderBy(
+                        TrustScore::select('score')
+                            ->whereColumn('trust_scores.user_id', 'users.id')
+                            ->limit(1),
+                        $direction
+                    );
+                })
+                ->toggleable(),
             TextColumn::make('city.name')
                 ->label('Ville')
                 ->searchable(),
@@ -429,6 +456,17 @@ class UserResource extends Resource
                 ->label('Avec annonces')
                 ->toggle()
                 ->query(fn (Builder $query) => $query->has('ads')),
+            SelectFilter::make('trust_score_tier')
+                ->label('TrustScore')
+                ->options(
+                    collect(TrustScoreTier::cases())
+                        ->mapWithKeys(fn ($tier) => [$tier->value => $tier->label()])
+                        ->all()
+                )
+                ->query(fn (Builder $query, array $data) => $data['value']
+                    ? $query->whereHas('trustScores', fn ($q) => $q->where('tier', $data['value']))
+                    : $query
+                ),
         ];
     }
 
