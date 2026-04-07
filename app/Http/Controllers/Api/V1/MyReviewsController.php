@@ -28,7 +28,7 @@ final class MyReviewsController
     {
         $reviews = Review::query()
             ->whereHas('ad', fn ($q) => $q->where('user_id', auth()->id()))
-            ->with(['user.agency', 'ad'])
+            ->with(['user.agency', 'ad', 'ad.media', 'ad.ad_type', 'ad.quarter.city'])
             ->latest()
             ->paginate(max(1, min(100, (int) request('per_page', 15))));
 

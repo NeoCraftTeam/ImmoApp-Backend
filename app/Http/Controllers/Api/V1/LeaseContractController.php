@@ -38,7 +38,7 @@ final class LeaseContractController
     {
         $contracts = LeaseContract::query()
             ->where('user_id', auth()->id())
-            ->with(['ad'])
+            ->with(['ad', 'ad.media', 'ad.ad_type', 'ad.quarter.city'])
             ->latest()
             ->paginate(max(1, min(100, (int) $request->input('per_page', 15))));
 
@@ -54,7 +54,7 @@ final class LeaseContractController
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
-        return new LeaseContractResource($leaseContract->load('ad'));
+        return new LeaseContractResource($leaseContract->load(['ad', 'ad.media', 'ad.ad_type', 'ad.quarter.city']));
     }
 
     public function update(UpdateLeaseContractRequest $request, LeaseContract $leaseContract): LeaseContractResource|JsonResponse
@@ -67,7 +67,7 @@ final class LeaseContractController
 
         $leaseContract->update($validated);
 
-        return new LeaseContractResource($leaseContract->load('ad'));
+        return new LeaseContractResource($leaseContract->load(['ad', 'ad.media', 'ad.ad_type', 'ad.quarter.city']));
     }
 
     /**
