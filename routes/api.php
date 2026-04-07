@@ -32,6 +32,7 @@ use App\Http\Controllers\Api\V1\SignatureController;
 use App\Http\Controllers\Api\V1\StatsController;
 use App\Http\Controllers\Api\V1\TeamController;
 use App\Http\Controllers\Api\V1\TenantController;
+use App\Http\Controllers\Api\V1\TrustScoreController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\VisitTrackingController;
 use App\Models\AdType;
@@ -112,6 +113,15 @@ Route::prefix('v1')->group(function (): void {
 
     // --- MY UNLOCKED ADS ---
     Route::middleware('auth:sanctum')->get('/my/unlocked-ads', [UserController::class, 'unlockedAds']);
+
+    // --- TRUST SCORE ---
+    Route::get('/users/{user}/trust-score', [TrustScoreController::class, 'show'])
+        ->middleware('throttle:60,1');
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/trust-score', [TrustScoreController::class, 'me']);
+        Route::post('/my/trust-score/consent', [TrustScoreController::class, 'consent'])
+            ->middleware('throttle:10,1');
+    });
 
     // --- GDPR Data Export & Account Deletion ---
     Route::middleware('auth:sanctum')->group(function (): void {
