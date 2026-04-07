@@ -285,6 +285,29 @@ php artisan migrate:fresh --seed              # Purge et re-seed complet
 php artisan media-library:regenerate --force  # Régénérer conversions WebP
 ```
 
+### Notifications de rétention (push comportemental)
+
+Cinq déclencheurs fréquentiellement limités via Redis :
+
+| Déclencheur | Condition | Fréquence max |
+|---|---|---|
+| `win_back` | Aucune connexion depuis ≥ 3 jours | 1 / 7 jours / utilisateur |
+| `search_alert_match` | Nouvelle annonce AVAILABLE correspond à une alerte active | 1 / 24 h / alerte |
+| `price_drop` | Prix d'une annonce favorite baisse de ≥ 5 000 FCFA | 1 / 48 h / (utilisateur, annonce) |
+| `viewing_reminder` | Visite confirmée avec `slot_date` = demain | 1 fois / réservation |
+| `lease_expiry` | Bail expire dans 30 ou 7 jours | 1 / seuil / bail |
+
+```bash
+# Envoi réel (planifié 2× / jour à 09:00 et 18:00)
+php artisan app:send-retention-pushes
+
+# Prévisualisation sans envoi
+php artisan app:send-retention-pushes --dry-run
+
+# Docker
+docker compose exec app php artisan app:send-retention-pushes --dry-run
+```
+
 ### Backups
 
 ```bash
