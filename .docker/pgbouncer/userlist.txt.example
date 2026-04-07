@@ -1,0 +1,11 @@
+# PgBouncer userlist — copy to userlist.txt and fill in the hashed password.
+#
+# Generate the scram-sha-256 hash for your DB user inside the running postgres container:
+#
+#   docker exec -it keyhome-prod-db psql -U postgres -c \
+#     "SELECT concat('\"', usename, '\" \"', passwd, '\"') FROM pg_shadow WHERE usename = 'postgres';"
+#
+# Paste the output line below (the hash starts with SCRAM-SHA-256$...)
+# Format:  "username" "SCRAM-SHA-256$..."
+#
+"postgres" "SCRAM-SHA-256$<iterations>:<salt>$<storedKey>:<serverKey>"

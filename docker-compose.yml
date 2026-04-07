@@ -16,19 +16,20 @@ services:
           cpus: "0.50"
 
   # L'application Laravel (PHP-FPM)
+  # NOTE: container_name intentionally removed so `docker compose up --scale app=N` works.
+  # Nginx upstream (php_fpm) will round-robin across all replicas via Docker DNS.
   app:
     build:
       context: .
       dockerfile: Dockerfile
     image: ${APP_IMAGE:-keyhome-backend}
-    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-backend
     restart: unless-stopped
     working_dir: /var/www
     depends_on:
       code-sync:
         condition: service_completed_successfully
-      db:
-        condition: service_healthy   # FIX: attendre que la DB soit prête avant de démarrer
+      pgbouncer:
+        condition: service_healthy
       redis:
         condition: service_healthy   # FIX: attendre que Redis soit prêt avant de démarrer
     env_file:
@@ -40,8 +41,9 @@ services:
     networks:
       - keyhome-network
     environment:
-      - DB_HOST=db
-      - DB_SSLMODE=prefer
+      - DB_HOST=pgbouncer
+      - DB_HOST_READ=${DB_HOST_READ:-db-replica}
+      - DB_SSLMODE=disable
       - REDIS_HOST=redis
       - APP_ENV=${APP_ENV:-production}
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
@@ -93,7 +95,9 @@ services:
     networks:
       - keyhome-network
     environment:
-      - DB_SSLMODE=prefer
+      - DB_HOST=pgbouncer
+      - DB_HOST_READ=${DB_HOST_READ:-db-replica}
+      - DB_SSLMODE=disable
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
     deploy:
@@ -198,6 +202,92 @@ services:
       - "traefik.http.routers.keyhome-prod.entrypoints=websecure"
       - "traefik.http.routers.keyhome-prod.tls.certresolver=letsencrypt"
       - "traefik.http.services.keyhome-prod.loadbalancer.server.port=80"
+
+  # ── PgBouncer — connection pooler ──────────────────────────────────────────
+  # Routes app/worker connections through a transaction-mode pool.
+  # max_client_conn=500 with default_pool_size=25 means up to 500 PHP connections
+  # share just 25 backend PostgreSQL connections → avoids connection exhaustion.
+  pgbouncer:
+    image: bitnami/pgbouncer:1
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-pgbouncer
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRESQL_HOST: db
+      POSTGRESQL_PORT: "5432"
+      POSTGRESQL_DATABASE: ${DB_DATABASE:-keyhome}
+      PGBOUNCER_DATABASE: ${DB_DATABASE:-keyhome}
+      POSTGRESQL_USERNAME: ${DB_USERNAME:-postgres}
+      POSTGRESQL_PASSWORD: ${DB_PASSWORD:-password}
+      PGBOUNCER_POOL_MODE: transaction
+      PGBOUNCER_MAX_CLIENT_CONN: "500"
+      PGBOUNCER_DEFAULT_POOL_SIZE: "25"
+      PGBOUNCER_RESERVE_POOL_SIZE: "10"
+      PGBOUNCER_RESERVE_POOL_TIMEOUT: "3"
+      PGBOUNCER_IGNORE_STARTUP_PARAMETERS: extra_float_digits
+      PGBOUNCER_AUTH_TYPE: scram-sha-256
+      PGBOUNCER_SERVER_IDLE_TIMEOUT: "600"
+    networks:
+      - keyhome-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U ${DB_USERNAME:-postgres} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.25"
+
+  # ── PostgreSQL read-replica ───────────────────────────────────────────────
+  # Receives WAL stream from the primary `db` container.
+  #
+  # SETUP (one-time, after first deploy):
+  #   1. On the primary, set wal_level=replica and create a replication user:
+  #        ALTER SYSTEM SET wal_level = replica;
+  #        SELECT pg_reload_conf();
+  #        CREATE ROLE replicator WITH REPLICATION LOGIN PASSWORD '${DB_REPLICATION_PASSWORD}';
+  #        -- In pg_hba.conf allow: host replication replicator db-replica md5
+  #   2. Bootstrap the replica:
+  #        docker compose exec db-replica sh -c \
+  #          "PGPASSWORD=${DB_REPLICATION_PASSWORD} pg_basebackup -h db -U replicator \
+  #           -D /var/lib/postgresql/data -P -Xs -R"
+  #   3. Restart db-replica — it will start streaming from the primary.
+  #
+  # Until the replica is bootstrapped, set DB_HOST_READ=db in .env to direct
+  # all read queries back to the primary (safe fallback, no degraded behaviour).
+  db-replica:
+    image: postgis/postgis:15-3.3-alpine
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-db-replica
+    restart: unless-stopped
+    profiles:
+      - replica
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-keyhome}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      PGDATA: /var/lib/postgresql/data
+    volumes:
+      - keyhome-db-replica-data:/var/lib/postgresql/data
+    networks:
+      - keyhome-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-keyhome}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.00"
+        reservations:
+          memory: 256m
 
   # La base de données (Postgres + PostGIS)
   db:
@@ -392,6 +482,8 @@ networks:
 
 volumes:
   keyhome-db-data:
+    driver: local
+  keyhome-db-replica-data:
     driver: local
   keyhome-app-code:
     driver: local
