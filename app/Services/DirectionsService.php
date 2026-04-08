@@ -12,7 +12,7 @@ final readonly class DirectionsService
 {
     private const string ORS_URL = 'https://api.openrouteservice.org/v2/directions';
 
-    private const int CACHE_TTL = 3_600; // 1 h — routes are fairly stable
+    private const int CACHE_TTL = 86_400; // 24 h — road routes change very rarely
 
     /** Supported ORS profiles */
     public const array PROFILES = [
@@ -93,7 +93,8 @@ final readonly class DirectionsService
     ): ?array {
         try {
             $response = $this->http
-                ->timeout(10)
+                ->connectTimeout(3)
+                ->timeout(5)
                 ->withHeaders(['Authorization' => $apiKey])
                 ->post(self::ORS_URL.'/'.$profile.'/geojson', [
                     'coordinates' => [

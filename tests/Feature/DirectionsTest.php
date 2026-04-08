@@ -37,6 +37,11 @@ function fakeDirHttpFactory(array $urlMap): HttpFactory
     {
         public function __construct(private readonly array $urlMap) {}
 
+        public function connectTimeout(int $s): static
+        {
+            return $this;
+        }
+
         public function timeout(int $s): static
         {
             return $this;
