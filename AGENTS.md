@@ -509,6 +509,16 @@ The frontend exposes **two distinct PWA identities** that install as separate ap
 `AppTour close` → `kh:tour-completed` → [3 min delay] → `WelcomeModal (3 steps)` → `kh:welcome-dismissed` → `PushPrompt` → `kh:push-prompt-done` → Survey.
 LocalStorage keys: `kh_tour_completed_at`, `kh:welcome-dismissed`, `APPTOUR_SHOWN_KEY`.
 
+## Known Bugs Fixed
+
+### `GET /api/v1/users/{identifier}/public-profile` — 500 for all seeded owners
+**Symptom:** Every request to a seeded bailleur's public profile page returned HTTP 500 ("Profil introuvable" on the frontend).
+**Root causes (two independent bugs):**
+1. `Ad::getPublisherName()` accesses `$this->agency` directly (lazy load) but `publicProfile()` only eager-loaded `user.agency`, not `agency` on the `Ad` model itself. Added `'agency'` to the `with()` call. Lazy loading is disabled globally, so any un-loaded relation access = 500.
+2. `computeResponseTimeLabel()` queries `viewing_reservations` (table doesn't exist yet). PHP's `catch(Throwable)` recovers at the application layer, but **PostgreSQL still marks the connection-transaction as ABORTED**. All subsequent queries in the same HTTP request (including `SELECT * FROM settings` inside `AdResource`) then fail with `SQLSTATE[25P02]: In failed sql transaction`. Fixed by wrapping the risky query in `DB::transaction()` → PostgreSQL uses a **SAVEPOINT** and rolls back only to it on failure, leaving the outer transaction intact.
+**Pattern:** Any `try { DB::rawQuery(...) } catch (Throwable)` on a table that may not exist **must** use `DB::transaction(fn() => ...)` so PostgreSQL can recover via savepoint instead of aborting the entire outer transaction.
+**Tests:** `tests/Feature/PublicProfileTest.php` (7 tests).
+
 ## Known CI/CD Gotchas
 
 ### Backend GitLab CI
