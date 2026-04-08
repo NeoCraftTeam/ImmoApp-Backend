@@ -91,7 +91,11 @@ class CreateAdminCommand extends Command
                 'type' => null,
                 'email_verified_at' => now(),
                 'is_active' => true,
-                'must_change_password_at' => now(),
+                // Admin chooses their own password in this command — no forced change needed.
+                // Email MFA is pre-enabled so the user can pass MFA on first login
+                // (Filament 4 isRequired:true would otherwise create a setup-loop).
+                'must_change_password_at' => null,
+                'has_email_authentication' => true,
             ]);
             $user->save();
 
