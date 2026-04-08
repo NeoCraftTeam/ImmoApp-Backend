@@ -276,13 +276,15 @@ test_suite:
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app bash resetFilamentLivewire.sh
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan storage:link || true
-    # ── Meilisearch: sync settings only (full reindex is a separate scheduled task) ──
+    # ── Meilisearch: sync settings then full reindex ───────────────────────────
     - echo "🔍 Syncing Meilisearch index settings..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan scout:sync-index-settings || true
     # Disable maintenance mode
     - echo "✅ Deployment complete, bringing app back up..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan up
     # ── Non-blocking post-deploy tasks (run after app is live) ─────────────────
+    - echo "🔄 Re-indexing ads into Meilisearch (non-blocking)..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan scout:import "App\Models\Ad" || true
     - echo "📄 Generating Swagger docs (non-blocking)..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate || true
   after_script:
