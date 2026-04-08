@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\AdInteractionController;
 use App\Http\Controllers\Api\V1\AdTypeController;
-use App\Http\Controllers\Api\V1\BailleurFollowController;
 use App\Http\Controllers\Api\V1\AgencyController;
+use App\Http\Controllers\Api\V1\BailleurFollowController;
 use App\Http\Controllers\Api\V1\BoostController;
 use App\Http\Controllers\Api\V1\BulkAdController;
 use App\Http\Controllers\Api\V1\CityController;

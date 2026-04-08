@@ -16,6 +16,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Laravel\Sanctum\PersonalAccessToken;
 use Throwable;
 
 /**
@@ -118,7 +119,8 @@ final readonly class AuthController
             if ($token = $user->currentAccessToken()) {
                 Log::info('User logout (Token)', [
                     'user_id' => $user->id,
-                    'token_name' => $token instanceof \Laravel\Sanctum\PersonalAccessToken ? $token->name : 'transient',
+                    // @phpstan-ignore instanceof.alwaysTrue
+                    'token_name' => $token instanceof PersonalAccessToken ? $token->name : 'transient',
                 ]);
 
                 $token->delete();

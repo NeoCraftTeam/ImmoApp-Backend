@@ -18,8 +18,8 @@ test('impression tracking is debounced at 30 seconds', function (): void {
 
     Sanctum::actingAs($user);
 
-    $this->postJson("/api/v1/ads/{$ad->id}/impression")->assertStatus(204);
-    $this->postJson("/api/v1/ads/{$ad->id}/impression")->assertStatus(204);
+    $this->postJson("/api/v1/ads/{$ad->slug}/impression")->assertStatus(204);
+    $this->postJson("/api/v1/ads/{$ad->slug}/impression")->assertStatus(204);
 
     expect(
         AdInteraction::where('user_id', $user->id)
