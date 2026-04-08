@@ -165,7 +165,7 @@ final class UserController
 
         $ads = Ad::where('user_id', $user->id)
             ->where('status', 'available')
-            ->with(['user.agency', 'quarter.city', 'ad_type', 'media'])
+            ->with(['user.agency', 'agency', 'quarter.city', 'ad_type', 'media'])
             ->withAvg('reviews', 'rating')
             ->withCount('reviews')
             ->latest()
@@ -266,13 +266,17 @@ final class UserController
                 return null;
             }
 
-            $avgHours = DB::table('viewing_reservations as vr')
+            // Wrapped in a sub-transaction (SAVEPOINT in PostgreSQL) so that if the
+            // viewing_reservations table is missing or any other DB-level error occurs,
+            // PostgreSQL rolls back to the savepoint rather than aborting the entire
+            // outer transaction — which would poison all subsequent queries (SQLSTATE 25P02).
+            $avgHours = DB::transaction(fn () => DB::table('viewing_reservations as vr')
                 ->whereIn('vr.ad_id', $adIds)
                 ->whereIn('vr.status', ['confirmed', 'declined'])
                 ->whereNotNull('vr.responded_at')
                 ->whereRaw("vr.responded_at > NOW() - INTERVAL '60 days'")
                 ->selectRaw('AVG(EXTRACT(EPOCH FROM (vr.responded_at - vr.created_at)) / 3600) as avg_hours')
-                ->value('avg_hours');
+                ->value('avg_hours'));
 
             if ($avgHours === null) {
                 return null;
