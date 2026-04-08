@@ -35,11 +35,11 @@ final class SendRetentionPushes extends Command
         $this->info('🔔 Retention push notifications starting…');
 
         $triggers = [
-            'win_back' => fn () => $service->winBackDormantUsers(),
-            'search_alert_matches' => fn () => $service->notifySearchAlertMatches(),
-            'price_drops' => fn () => $service->notifyPriceDropOnFavorites(),
-            'viewing_reminders' => fn () => $service->notifyViewingReminders(),
-            'lease_expiries' => fn () => $service->notifyLeaseExpiries(),
+            'win_back' => $service->winBackDormantUsers(...),
+            'search_alert_matches' => $service->notifySearchAlertMatches(...),
+            'price_drops' => $service->notifyPriceDropOnFavorites(...),
+            'viewing_reminders' => $service->notifyViewingReminders(...),
+            'lease_expiries' => $service->notifyLeaseExpiries(...),
         ];
 
         $rows = [];

@@ -11,10 +11,10 @@ use App\Services\TrustScoreService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-final class TrustScoreController
+final readonly class TrustScoreController
 {
     public function __construct(
-        private readonly TrustScoreService $trustScoreService,
+        private TrustScoreService $trustScoreService,
     ) {}
 
     public function show(User $user): JsonResponse

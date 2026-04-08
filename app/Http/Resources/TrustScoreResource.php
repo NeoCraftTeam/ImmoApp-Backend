@@ -14,6 +14,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 final class TrustScoreResource extends JsonResource
 {
     /** @return array<string, mixed> */
+    #[\Override]
     public function toArray(Request $request): array
     {
         $tier = $this->tier;
@@ -36,7 +37,7 @@ final class TrustScoreResource extends JsonResource
         $tips = [];
         $components = $this->components ?? [];
 
-        foreach ($components as $key => $component) {
+        foreach ($components as $component) {
             if (isset($component['score'], $component['max']) && $component['score'] < $component['max'] * 0.5) {
                 $tips[] = $component['tip'] ?? '';
             }

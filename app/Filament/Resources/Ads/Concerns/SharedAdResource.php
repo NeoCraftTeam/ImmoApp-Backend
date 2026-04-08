@@ -534,7 +534,7 @@ trait SharedAdResource
                     TextEntry::make('status')
                         ->label('Statut')
                         ->badge()
-                        ->color(fn ($state): string => match ((string) $state) {
+                        ->color(fn ($state): string => match ($state instanceof \BackedEnum ? $state->value : (string) $state) {
                             'available' => 'success',
                             'pending' => 'warning',
                             'reserved' => 'info',

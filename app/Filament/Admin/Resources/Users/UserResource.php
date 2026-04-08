@@ -249,7 +249,7 @@ class UserResource extends Resource
                         TextEntry::make('type')
                             ->label('Type de compte')
                             ->badge()
-                            ->color(fn ($state): string => match ((string) $state) {
+                            ->color(fn ($state): string => match ($state instanceof BackedEnum ? $state->value : (string) $state) {
                                 'agency' => 'primary',
                                 'individual' => 'info',
                                 default => 'gray',
@@ -257,7 +257,7 @@ class UserResource extends Resource
                         TextEntry::make('role')
                             ->label('Rôle')
                             ->badge()
-                            ->color(fn ($state): string => match ((string) $state) {
+                            ->color(fn ($state): string => match ($state instanceof BackedEnum ? $state->value : (string) $state) {
                                 'admin' => 'danger',
                                 'agent' => 'warning',
                                 default => 'gray',
@@ -365,14 +365,12 @@ class UserResource extends Resource
 
                     return $trustScore?->tier->color() ?? 'gray';
                 })
-                ->sortable(query: function ($query, string $direction) {
-                    return $query->orderBy(
-                        TrustScore::select('score')
-                            ->whereColumn('trust_scores.user_id', 'users.id')
-                            ->limit(1),
-                        $direction
-                    );
-                })
+                ->sortable(query: fn ($query, string $direction) => $query->orderBy(
+                    TrustScore::select('score')
+                        ->whereColumn('trust_scores.user_id', 'users.id')
+                        ->limit(1),
+                    $direction
+                ))
                 ->toggleable(),
             TextColumn::make('city.name')
                 ->label('Ville')

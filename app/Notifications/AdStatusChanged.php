@@ -28,7 +28,7 @@ class AdStatusChanged extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        $channels = ['database', 'mail'];
+        $channels = ['database'];
 
         if ($notifiable->pushSubscriptions()->exists()) {
             $channels[] = WebPushChannel::class;

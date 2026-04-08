@@ -60,7 +60,7 @@ class AdminPanelProvider extends PanelProvider
                     ->regenerableRecoveryCodes(false)
                     ->brandName('KeyHome Admin'),
                 EmailAuthentication::make(),
-            ], isRequired: true)
+            ], isRequired: false)
             ->passwordReset()
             ->emailVerification()
             ->emailChangeVerification()
@@ -71,7 +71,6 @@ class AdminPanelProvider extends PanelProvider
             ->brandLogo(fn () => view('filament.admin.brand'))
             ->brandLogoHeight('2.25rem')
             ->authGuard('web')
-            ->spa()
             ->renderHook(
                 'panels::head.end',
                 fn () => view('pwa.head-meta', ['themeColor' => '#F6475F']),
