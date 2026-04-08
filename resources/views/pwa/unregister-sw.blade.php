@@ -8,7 +8,6 @@
         return;
     }
 
-    const marker = 'kh_panel_sw_unregistered_v2';
     const host = window.location.hostname;
     const path = window.location.pathname;
     const isPanelHost = host.startsWith('admin.') || host.startsWith('owner.') || host.startsWith('agency.');
@@ -27,11 +26,10 @@
                 const keys = await caches.keys();
                 await Promise.all(keys.map((key) => caches.delete(key)));
             }
-
-            if (!sessionStorage.getItem(marker)) {
-                sessionStorage.setItem(marker, '1');
-                window.location.reload();
-            }
+            // NOTE: No reload needed — registration.unregister() stops the SW from
+            // controlling the current page immediately. A forced reload was interrupting
+            // Livewire SPA hydration on the admin login page, leaving the button spinner
+            // stuck indefinitely.
         } catch (error) {
             console.warn('[PWA] Unable to unregister service workers on panel:', error);
         }

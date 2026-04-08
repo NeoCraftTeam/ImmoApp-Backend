@@ -45,6 +45,13 @@ final class SecurityHeaders
         $isApiRoute = $request->is('api/*') && !$request->routeIs('ads.pdf');
         $isDocsRoute = $request->is('api/documentation') || $request->is('docs/*') || $request->is('api/oauth2-callback');
 
+        // Filament panels may run on subdomains (admin.*, agency.*) OR on path prefixes (/admin, /agency).
+        $host = $request->getHost();
+        $isFilamentPanel = str_starts_with($host, 'admin.')
+            || str_starts_with($host, 'agency.')
+            || $request->is('admin') || $request->is('admin/*')
+            || $request->is('agency') || $request->is('agency/*');
+
         if ($isApiRoute && !$isDocsRoute) {
             $response->headers->set('Content-Security-Policy', "default-src 'none'");
         } elseif ($isDocsRoute) {
@@ -59,21 +66,38 @@ final class SecurityHeaders
                     ."connect-src 'self' https:; "
                     ."frame-ancestors 'none'",
             );
+        } elseif ($isFilamentPanel) {
+            // Filament panels (Livewire 3 + Alpine.js) are incompatible with nonce-based CSP:
+            // (a) a nonce in script-src silently invalidates unsafe-inline per the CSP spec,
+            //     blocking every Livewire snapshot / Alpine x-data inline script that lacks it;
+            // (b) Alpine.js standard build (used by Filament 4) calls new Function() which
+            //     requires unsafe-eval — the previous comment claiming otherwise was wrong.
+            // Nonce-based CSP would require patching Livewire + Alpine source to inject the
+            // nonce into every emitted script tag — not feasible. Use unsafe-inline + unsafe-eval.
+            // fonts.bunny.net is required by Filament's ->font('poppins') configuration.
+            $response->headers->set(
+                'Content-Security-Policy',
+                "default-src 'self'; "
+                    ."script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+                    ."style-src 'self' 'unsafe-inline' https://fonts.bunny.net; "
+                    ."img-src 'self' data: blob: https:; "
+                    ."font-src 'self' data: https://fonts.bunny.net; "
+                    ."connect-src 'self' https: wss:; "
+                    ."frame-ancestors 'none'",
+            );
         } else {
-            // Generate a per-request nonce for inline scripts (Filament / Alpine / Livewire).
-            // unsafe-eval is intentionally removed — Alpine.js v3 and Livewire 3 do not need it.
+            // Other web routes: nonce-based policy (no Livewire/Alpine inline scripts here).
             $nonce = base64_encode(random_bytes(16));
             $response->headers->set(
                 'Content-Security-Policy',
                 "default-src 'self'; "
-                    ."script-src 'self' 'nonce-{$nonce}' 'unsafe-inline'; "
+                    ."script-src 'self' 'nonce-{$nonce}'; "
                     ."style-src 'self' 'unsafe-inline'; "
                     ."img-src 'self' data: https:; "
                     ."font-src 'self' data:; "
                     ."connect-src 'self' https:; "
                     ."frame-ancestors 'none'",
             );
-            // Share nonce with views so Blade templates can use it on inline scripts
             view()->share('cspNonce', $nonce);
         }
 
