@@ -45,9 +45,18 @@ final class SecurityHeaders
         $isApiRoute = $request->is('api/*') && !$request->routeIs('ads.pdf');
         $isDocsRoute = $request->is('api/documentation') || $request->is('docs/*') || $request->is('api/oauth2-callback');
 
-        // Filament panels may run on subdomains (admin.*, agency.*) OR on path prefixes (/admin, /agency).
+        // Filament panels may run on configured custom domains (FILAMENT_ADMIN_DOMAIN /
+        // FILAMENT_AGENCY_DOMAIN), on convention-based subdomains (admin.*, agency.*),
+        // or on path prefixes (/admin, /agency). Check configured domains first so that
+        // arbitrary subdomains like panel.keyhome.neocraft.dev are correctly identified.
         $host = $request->getHost();
-        $isFilamentPanel = str_starts_with($host, 'admin.')
+        $filamentDomains = array_filter([
+            config('filament.panels.admin_domain'),
+            config('filament.panels.agency_domain'),
+            config('filament.panels.owner_domain'),
+        ]);
+        $isFilamentPanel = in_array($host, $filamentDomains, true)
+            || str_starts_with($host, 'admin.')
             || str_starts_with($host, 'agency.')
             || $request->is('admin') || $request->is('admin/*')
             || $request->is('agency') || $request->is('agency/*');
