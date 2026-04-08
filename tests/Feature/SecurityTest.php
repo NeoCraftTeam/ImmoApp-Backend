@@ -83,23 +83,17 @@ test('health check returns correct json structure', function (): void {
 });
 
 test('health check returns 401 when HEALTH_CHECK_TOKEN is set and token is missing', function (): void {
-    config(['app.health_check_token' => null]); // ensure env override works
-    // Temporarily simulate a required token via env
-    putenv('HEALTH_CHECK_TOKEN=supersecret');
+    config(['services.health.token' => 'supersecret']);
 
     $response = $this->getJson('/api/health');
-
-    putenv('HEALTH_CHECK_TOKEN='); // reset
 
     $response->assertUnauthorized();
 });
 
 test('health check accepts request with correct HEALTH_CHECK_TOKEN bearer', function (): void {
-    putenv('HEALTH_CHECK_TOKEN=supersecret');
+    config(['services.health.token' => 'supersecret']);
 
     $response = $this->getJson('/api/health', ['Authorization' => 'Bearer supersecret']);
-
-    putenv('HEALTH_CHECK_TOKEN='); // reset
 
     expect($response->status())->toBeIn([200, 503]);
     $response->assertJsonStructure(['status', 'checks']);
