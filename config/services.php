@@ -106,4 +106,8 @@ return [
         'key' => env('ORS_API_KEY'),
     ],
 
+    'health' => [
+        'token' => env('HEALTH_CHECK_TOKEN'),
+    ],
+
 ];

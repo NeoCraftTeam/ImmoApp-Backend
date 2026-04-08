@@ -53,7 +53,7 @@ final readonly class ClerkAuthController
             return response()->json(['message' => 'Token Clerk invalide ou expiré.'], 401);
         }
 
-        $clerkId = (string) ($clerkUser['id'] ?? '');
+        $clerkId = (string) $clerkUser['id'];
         $firstName = (string) ($clerkUser['first_name'] ?? 'Utilisateur');
         $lastName = (string) ($clerkUser['last_name'] ?? '');
         $avatar = isset($clerkUser['image_url']) ? (string) $clerkUser['image_url'] : null;
@@ -177,7 +177,7 @@ final readonly class ClerkAuthController
             return response()->json(['message' => 'Token Clerk invalide ou expiré.'], 401);
         }
 
-        $clerkId = (string) ($clerkUser['id'] ?? '');
+        $clerkId = (string) $clerkUser['id'];
         $otp = (string) ($request->input('otp', ''));
 
         $rateLimitKey = 'otp-verify:'.$clerkId;
@@ -285,7 +285,7 @@ final readonly class ClerkAuthController
             return response()->json(['message' => 'Token Clerk invalide ou expiré.'], 401);
         }
 
-        $clerkId = (string) ($clerkUser['id'] ?? '');
+        $clerkId = (string) $clerkUser['id'];
 
         /** @var array{verified?: bool} $pendingCheck */
         $pendingCheck = Cache::get('clerk_pending_'.$clerkId, []);

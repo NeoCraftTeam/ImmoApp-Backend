@@ -41,7 +41,7 @@ final readonly class HealthCheckController
         // ── Optional static-token gate ────────────────────────────────
         // Set HEALTH_CHECK_TOKEN in .env to protect this endpoint.
         // Leave empty for open access (e.g. internal load-balancer probes).
-        $requiredToken = env('HEALTH_CHECK_TOKEN');
+        $requiredToken = config('services.health.token');
         if ($requiredToken && $request->bearerToken() !== $requiredToken) {
             return response()->json(['message' => 'Unauthorized.'], 401);
         }
