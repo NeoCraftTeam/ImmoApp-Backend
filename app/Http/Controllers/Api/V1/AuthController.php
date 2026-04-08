@@ -118,7 +118,7 @@ final readonly class AuthController
             if ($token = $user->currentAccessToken()) {
                 Log::info('User logout (Token)', [
                     'user_id' => $user->id,
-                    'token_name' => $token->name,
+                    'token_name' => $token instanceof \Laravel\Sanctum\PersonalAccessToken ? $token->name : 'transient',
                 ]);
 
                 $token->delete();
