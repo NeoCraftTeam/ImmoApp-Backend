@@ -45,10 +45,11 @@ use Illuminate\Support\Facades\Route;
 // Public liveness probe — no auth, no infra details. Used by CI smoke tests and uptime monitors.
 Route::get('/ping', fn () => response()->json(['status' => 'ok'], 200));
 
-// Comprehensive health check endpoint (DB, Redis, Queue, Storage, Meilisearch)
-// Protected: requires a valid Sanctum token belonging to an admin user with MFA verified.
+// Comprehensive health check — DB · Redis · Queue · Storage · Meilisearch · Flutterwave
+// Auth: optional static bearer token via HEALTH_CHECK_TOKEN env var (see HealthCheckController).
+// Use ?force=true to bypass the 30-second result cache.
 Route::get('/health', HealthCheckController::class)
-    ->middleware(['auth:sanctum', 'can:admin-access', 'mfa.admin']);
+    ->middleware('throttle:30,1');
 
 // Prefix routes
 Route::prefix('v1')->group(function (): void {
@@ -100,6 +101,8 @@ Route::prefix('v1')->group(function (): void {
     });
 
     // --- USERS ---
+    Route::get('/users/{identifier}/public-profile', [UserController::class, 'publicProfile'])
+        ->middleware('throttle:60,1');
     Route::middleware('auth:sanctum')->controller(UserController::class)->group(function (): void {
         Route::get('/users', 'index')->can('viewAny', User::class);
         Route::get('/users/{id}', 'show');
