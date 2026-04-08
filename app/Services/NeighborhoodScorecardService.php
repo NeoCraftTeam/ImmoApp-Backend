@@ -136,6 +136,7 @@ final readonly class NeighborhoodScorecardService
             $response = $this->http
                 ->timeout(15)
                 ->retry(2, 1_500)
+                ->asForm()
                 ->post(self::OVERPASS_URL, ['data' => $this->overpassQuery($lat, $lng)]);
 
             if (!$response->successful()) {
