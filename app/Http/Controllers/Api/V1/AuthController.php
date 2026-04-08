@@ -115,12 +115,14 @@ final readonly class AuthController
         try {
             $user = $request->user();
 
-            /** @phpstan-ignore-next-line */
-            if ($token = $user->currentAccessToken()) {
+            $token = $user->currentAccessToken();
+
+            // TransientToken (Clerk JWT exchange) has no delete() — only revoke DB-backed tokens.
+            // @phpstan-ignore instanceof.alwaysTrue
+            if ($token instanceof PersonalAccessToken) {
                 Log::info('User logout (Token)', [
                     'user_id' => $user->id,
-                    // @phpstan-ignore instanceof.alwaysTrue
-                    'token_name' => $token instanceof PersonalAccessToken ? $token->name : 'transient',
+                    'token_name' => $token->name,
                 ]);
 
                 $token->delete();

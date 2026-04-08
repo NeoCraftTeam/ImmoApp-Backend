@@ -98,10 +98,10 @@ final readonly class AdSearchController
                 $filters[] = sprintf("type = '%s'", str_replace("'", "\\'", $type));
             }
             if (!empty($typeId)) {
-                $filters[] = sprintf('type_id = %d', (int) $typeId);
+                $filters[] = sprintf("type_id = '%s'", str_replace("'", "\\'", (string) $typeId));
             }
             if (!empty($quarterId)) {
-                $filters[] = sprintf('quarter_id = %d', (int) $quarterId);
+                $filters[] = sprintf("quarter_id = '%s'", str_replace("'", "\\'", (string) $quarterId));
             }
             if (!empty($quarterName)) {
                 $filters[] = sprintf("quarter = '%s'", str_replace("'", "\\'", $quarterName));
