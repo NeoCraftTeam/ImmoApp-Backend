@@ -58,6 +58,7 @@ final class SecurityHeaders
         $isFilamentPanel = in_array($host, $filamentDomains, true)
             || str_starts_with($host, 'admin.')
             || str_starts_with($host, 'agency.')
+            || str_starts_with($host, 'panel.')
             || $request->is('admin') || $request->is('admin/*')
             || $request->is('agency') || $request->is('agency/*');
 
