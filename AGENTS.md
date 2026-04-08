@@ -126,6 +126,7 @@ vendor/bin/rector process --dry-run
 - `AcquisitionChannelClassifier`, `UtmAttributionService` — marketing attribution.
 - `UserWelcomeService`, `WebPushService`, `NativeAppService` — notifications & mobile.
 - `RetentionPushService` — behavioral retention push notifications (5 triggers: win-back after 3d inactivity, search-alert match, price-drop on favorites ≥5 000 FCFA, viewing reminder day-before, lease expiry at 30/7 days). All frequency-capped via Redis. Command: `app:send-retention-pushes` (scheduled twiceDaily 09:00/18:00). `--dry-run` flag available.
+- `HealthCheckService` — enterprise health check service. 6 checks: Database, Redis, Queue, Storage, Meilisearch, Flutterwave. 3-tier status: `healthy` / `degraded` / `unhealthy`. Results cached 30 s (Redis). Critical checks: Database + Storage → failure = `unhealthy`. All others → `degraded`. Used by `GET /api/health` and `php artisan app:health-check --force`.
 - `PropertyAttributeImportService` — bulk attribute import.
 - `UserAgentParser` — browser/device detection.
 - `Media/MediaPathGenerator` — Spatie media paths.
