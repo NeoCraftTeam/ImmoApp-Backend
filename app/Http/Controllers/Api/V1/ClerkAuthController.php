@@ -49,6 +49,10 @@ final readonly class ClerkAuthController
             return response()->json(['message' => 'Token Clerk invalide ou expiré.'], 401);
         }
 
+        if (!isset($clerkUser['id']) || empty($clerkUser['email_addresses'])) {
+            return response()->json(['message' => 'Token Clerk invalide ou expiré.'], 401);
+        }
+
         $clerkId = (string) ($clerkUser['id'] ?? '');
         $firstName = (string) ($clerkUser['first_name'] ?? 'Utilisateur');
         $lastName = (string) ($clerkUser['last_name'] ?? '');
@@ -169,6 +173,10 @@ final readonly class ClerkAuthController
             return response()->json(['message' => 'Token Clerk invalide ou expiré.'], 401);
         }
 
+        if (!isset($clerkUser['id']) || empty($clerkUser['email_addresses'])) {
+            return response()->json(['message' => 'Token Clerk invalide ou expiré.'], 401);
+        }
+
         $clerkId = (string) ($clerkUser['id'] ?? '');
         $otp = (string) ($request->input('otp', ''));
 
@@ -270,6 +278,10 @@ final readonly class ClerkAuthController
         $clerkUser = $clerk->verifyAndFetchUser($bearerToken);
 
         if ($clerkUser === null) {
+            return response()->json(['message' => 'Token Clerk invalide ou expiré.'], 401);
+        }
+
+        if (!isset($clerkUser['id']) || empty($clerkUser['email_addresses'])) {
             return response()->json(['message' => 'Token Clerk invalide ou expiré.'], 401);
         }
 
@@ -403,8 +415,12 @@ final readonly class ClerkAuthController
         return count($emailAddresses) > 0 ? ($emailAddresses[0]['email_address'] ?? null) : null;
     }
 
-    private function maskEmail(string $email): string
+    private function maskEmail(string $email): ?string
     {
+        if (!str_contains($email, '@')) {
+            return null;
+        }
+
         [$local, $domain] = explode('@', $email, 2);
         $masked = mb_substr($local, 0, 1).str_repeat('*', max(3, mb_strlen($local) - 1));
 

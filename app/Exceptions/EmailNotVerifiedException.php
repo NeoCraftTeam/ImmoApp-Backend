@@ -8,8 +8,10 @@ use RuntimeException;
 
 final class EmailNotVerifiedException extends RuntimeException
 {
-    public function __construct()
-    {
+    public function __construct(
+        public readonly string $email = '',
+        public readonly string $role = '',
+    ) {
         parent::__construct('Veuillez vérifier votre adresse email avant de vous connecter.');
     }
 }

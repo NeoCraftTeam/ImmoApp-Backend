@@ -70,7 +70,15 @@ final readonly class AuthController
                 'message' => 'Identifiants invalides.',
             ], 401);
 
-        } catch (AccountInactiveException|EmailNotVerifiedException $e) {
+        } catch (EmailNotVerifiedException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'email_verification_required' => true,
+                'email' => $e->email,
+                'role' => $e->role,
+            ], 403);
+
+        } catch (AccountInactiveException $e) {
             return response()->json([
                 'message' => $e->getMessage(),
             ], 403);

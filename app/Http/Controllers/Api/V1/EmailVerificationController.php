@@ -16,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
@@ -167,6 +168,9 @@ final readonly class EmailVerificationController
         }
 
         if ($user->hasVerifiedEmail()) {
+            Cache::forget('email_otp_'.$user->id);
+            RateLimiter::clear($rateLimitKey);
+
             return response()->json([
                 'message' => 'Email déjà vérifié.',
                 'verified' => true,
@@ -183,20 +187,20 @@ final readonly class EmailVerificationController
             ], 400);
         }
 
-        Cache::forget('email_otp_'.$user->id);
-        $user->markEmailAsVerified();
-        event(new Verified($user));
+        $token = DB::transaction(function () use ($user, $rateLimitKey) {
+            Cache::forget('email_otp_'.$user->id);
+            $user->markEmailAsVerified();
+            event(new Verified($user));
+            RateLimiter::clear($rateLimitKey);
+            $user->tokens()->where('name', 'like', '%_registration_%')->delete();
 
-        RateLimiter::clear($rateLimitKey);
+            return $this->tokenService->createForUser($user, 'auth');
+        });
 
         Log::info('Email verified via OTP', [
             'user_id' => $user->id,
             'email' => $user->email,
         ]);
-
-        $user->tokens()->where('name', 'like', '%_registration_%')->delete();
-
-        $token = $this->tokenService->createForUser($user, 'auth');
 
         auth()->setUser($user);
 

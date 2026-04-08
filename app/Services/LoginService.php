@@ -68,7 +68,12 @@ final readonly class LoginService
         }
 
         if ($user->email_verified_at === null) {
-            throw new EmailNotVerifiedException;
+            // Re-trigger OTP so the user can verify immediately.
+            $user->sendEmailVerificationNotification();
+            throw new EmailNotVerifiedException(
+                email: $user->email,
+                role: $user->role->value,
+            );
         }
 
         $loginContext = $request->input('login_context', 'client');
