@@ -79,11 +79,11 @@ test('ad view tracking is debounced', function (): void {
 
     Sanctum::actingAs($user);
 
-    // First view
-    $this->postJson("/api/v1/ads/{$ad->id}/view")->assertStatus(204);
+    // First view — route binds by slug, not UUID
+    $this->postJson("/api/v1/ads/{$ad->slug}/view")->assertStatus(204);
 
     // Second view within 5 minutes — should not create a duplicate
-    $this->postJson("/api/v1/ads/{$ad->id}/view")->assertStatus(204);
+    $this->postJson("/api/v1/ads/{$ad->slug}/view")->assertStatus(204);
 
     expect(
         AdInteraction::where('user_id', $user->id)

@@ -78,11 +78,15 @@ Route::middleware('auth:sanctum')->group(function (): void {
 
 // Interactions (views, favorites, impressions, shares, clicks)
 Route::middleware('optional.auth')->group(function (): void {
-    Route::post('/ads/{ad}/view', [AdInteractionController::class, 'trackView'])
+    // Frontend sends the slug (from URL), so bind by slug column.
+    Route::post('/ads/{ad:slug}/view', [AdInteractionController::class, 'trackView'])
         ->middleware('throttle:120,1');
-    Route::post('/ads/{ad}/impression', [AdInteractionController::class, 'trackImpression'])
+    Route::post('/ads/{ad:slug}/impression', [AdInteractionController::class, 'trackImpression'])
         ->middleware('throttle:300,1');
 });
+
+// Recently viewed ads (authenticated only)
+Route::middleware('auth:sanctum')->get('/my/recently-viewed', [AdInteractionController::class, 'recentlyViewed']);
 
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/ads/{ad}/favorite', [AdInteractionController::class, 'toggleFavorite'])

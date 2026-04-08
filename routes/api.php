@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\AdInteractionController;
 use App\Http\Controllers\Api\V1\AdTypeController;
+use App\Http\Controllers\Api\V1\BailleurFollowController;
 use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\BoostController;
 use App\Http\Controllers\Api\V1\BulkAdController;
@@ -110,6 +111,14 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/users/{user}', 'update');
         Route::delete('/users/{user}', 'destroy');
     });
+
+    // --- BAILLEUR FOLLOW ---
+    // Status: optional auth — guests get following=false, authenticated users get their real state.
+    Route::get('/bailleurs/{username}/follow', [BailleurFollowController::class, 'status'])
+        ->middleware(['optional.auth', 'throttle:60,1']);
+    // Toggle: requires auth.
+    Route::post('/bailleurs/{username}/follow', [BailleurFollowController::class, 'toggle'])
+        ->middleware(['auth:sanctum', 'throttle:30,1']);
 
     // --- RECOMMENDATIONS ---
     Route::middleware('optional.auth')->get('/recommendations', [RecommendationController::class, 'index']);

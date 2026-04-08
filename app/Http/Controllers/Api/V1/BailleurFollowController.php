@@ -85,14 +85,13 @@ final class BailleurFollowController
      */
     public function status(Request $request, string $username): JsonResponse
     {
-        /** @var User $user */
-        $user = $request->user();
-
         $bailleur = User::query()
             ->where('username', $username)
             ->firstOrFail();
 
-        $isFollowing = DB::table('user_follows')
+        $user = $request->user();
+
+        $isFollowing = $user !== null && DB::table('user_follows')
             ->where('follower_id', $user->id)
             ->where('followed_id', $bailleur->id)
             ->exists();
