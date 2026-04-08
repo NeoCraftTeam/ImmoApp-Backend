@@ -6,7 +6,6 @@ use App\Models\City;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\RateLimiter;
-use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
 
@@ -49,39 +48,59 @@ test('ping endpoint is publicly accessible without authentication', function ():
 });
 
 /* ──────────────────────────────────────────────────────────────────
- * Health Check — Auth Protection (P0)
+ * Health Check — Public + Token-Gated Access (P0)
+ *
+ * Design: endpoint is public by default (load-balancer / uptime
+ * monitor probes require no credentials). When HEALTH_CHECK_TOKEN
+ * is set in .env, a static bearer token is required.
  * ──────────────────────────────────────────────────────────────── */
 
-test('unauthenticated request to health check returns 401', function (): void {
+test('health check is publicly accessible without authentication', function (): void {
     $response = $this->getJson('/api/health');
+
+    // 200 (healthy/degraded) or 503 (unhealthy) — never 401/403
+    expect($response->status())->toBeIn([200, 503]);
+    $response->assertJsonStructure(['status', 'checks', 'timestamp']);
+});
+
+test('health check returns correct json structure', function (): void {
+    $response = $this->getJson('/api/health');
+
+    expect($response->status())->toBeIn([200, 503]);
+    $response->assertJsonStructure([
+        'status',
+        'timestamp',
+        'environment',
+        'checks' => [
+            'database',
+            'redis',
+            'queue',
+            'storage',
+            'meilisearch',
+            'flutterwave',
+        ],
+    ]);
+});
+
+test('health check returns 401 when HEALTH_CHECK_TOKEN is set and token is missing', function (): void {
+    config(['app.health_check_token' => null]); // ensure env override works
+    // Temporarily simulate a required token via env
+    putenv('HEALTH_CHECK_TOKEN=supersecret');
+
+    $response = $this->getJson('/api/health');
+
+    putenv('HEALTH_CHECK_TOKEN='); // reset
 
     $response->assertUnauthorized();
 });
 
-test('authenticated non-admin customer cannot access health check', function (): void {
-    $user = User::factory()->customers()->create();
+test('health check accepts request with correct HEALTH_CHECK_TOKEN bearer', function (): void {
+    putenv('HEALTH_CHECK_TOKEN=supersecret');
 
-    $response = $this->actingAs($user)->getJson('/api/health');
+    $response = $this->getJson('/api/health', ['Authorization' => 'Bearer supersecret']);
 
-    $response->assertForbidden();
-});
+    putenv('HEALTH_CHECK_TOKEN='); // reset
 
-test('authenticated agent cannot access health check', function (): void {
-    $user = User::factory()->agents()->create();
-
-    $response = $this->actingAs($user)->getJson('/api/health');
-
-    $response->assertForbidden();
-});
-
-test('authenticated admin can access health check', function (): void {
-    $admin = User::factory()->admin()->create();
-
-    Sanctum::actingAs($admin, ['*']);
-
-    $response = $this->getJson('/api/health');
-
-    // 200 (all healthy) or 503 (some service degraded) — never 401/403
     expect($response->status())->toBeIn([200, 503]);
     $response->assertJsonStructure(['status', 'checks']);
 });

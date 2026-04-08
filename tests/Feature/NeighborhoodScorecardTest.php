@@ -81,6 +81,11 @@ function fakeHttpFactory(array $urlMap): Factory
         {
             return $this;
         }
+
+        public function asForm(): static
+        {
+            return $this;
+        }
     };
 
     return $factory;
