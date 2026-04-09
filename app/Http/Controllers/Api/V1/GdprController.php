@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Mail\AccountDeletedMail;
 use App\Models\Ad;
 use App\Models\Payment;
 use App\Models\PointTransaction;
@@ -13,6 +14,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use OpenApi\Annotations as OA;
 
 /**
@@ -154,6 +156,15 @@ final class GdprController
 
         /** @var User $user */
         $user = $request->user();
+
+        // Send goodbye email *before* soft-delete (synchronous — not queued).
+        Mail::to($user->email)->send(
+            new AccountDeletedMail(
+                userName: $user->firstname ?? 'Utilisateur',
+                userEmail: $user->email,
+                userRole: $user->role,
+            )
+        );
 
         DB::transaction(function () use ($user): void {
             $user->tokens()->delete();

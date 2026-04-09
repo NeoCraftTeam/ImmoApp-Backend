@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\Enums\UserRole;
 use App\Mail\AbandonedSearchMail;
+use App\Mail\AccountDeletedMail;
 use App\Mail\AdApprovedMail;
 use App\Mail\AdDeclinedMail;
 use App\Mail\AdminActionNotifyMail;
@@ -509,6 +511,32 @@ it('renders FirstAdCelebrationMail without errors', function (): void {
     expect($rendered)->toContain($user->firstname);
     expect($rendered)->toContain($ad->title);
     expect($mail->envelope()->subject)->toContain('première annonce');
+});
+
+it('renders AccountDeletedMail for customer (primary layout)', function (): void {
+    $mail = new AccountDeletedMail(
+        userName: 'Jean',
+        userEmail: 'jean@example.com',
+        userRole: UserRole::CUSTOMER,
+    );
+    $rendered = $mail->render();
+
+    expect($rendered)->toContain('Jean');
+    expect($rendered)->toContain('supprimé');
+    expect($mail->envelope()->subject)->toContain('supprimé');
+});
+
+it('renders AccountDeletedMail for owner (teal layout)', function (): void {
+    $mail = new AccountDeletedMail(
+        userName: 'Paul',
+        userEmail: 'paul@example.com',
+        userRole: UserRole::AGENT,
+    );
+    $rendered = $mail->render();
+
+    expect($rendered)->toContain('Paul');
+    expect($rendered)->toContain('propriétaire');
+    expect($mail->envelope()->subject)->toContain('supprimé');
 });
 
 it('renders GdprDataExportMail without errors and has json attachment', function (): void {
