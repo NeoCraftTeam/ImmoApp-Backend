@@ -149,7 +149,7 @@ final class GdprController
     public function deleteAccount(Request $request): JsonResponse
     {
         $request->validate([
-            'confirmation' => ['required', 'string', 'in:DELETE MY ACCOUNT'],
+            'confirmation' => ['required', 'string', 'in:DELETE MY ACCOUNT,SUPPRIMER MON COMPTE'],
         ]);
 
         /** @var User $user */
