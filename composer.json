@@ -23,6 +23,7 @@
         "flowframe/laravel-trend": "^0.4",
         "hammadzafar05/mobile-bottom-nav": "^1.0",
         "http-interop/http-factory-guzzle": "^1.2",
+        "laragear/webauthn": "^5.0",
         "laravel-notification-channels/webpush": "^10.5",
         "laravel/framework": "^12.0",
         "laravel/nightwatch": "^1.21",
@@ -30,6 +31,7 @@
         "laravel/sanctum": "^4.0",
         "laravel/scout": "^10.21",
         "laravel/socialite": "^5.24",
+        "laravel/telescope": "^5.15",
         "laravel/tinker": "^2.10.1",
         "laraveljutsu/zap": "^1.14",
         "laravolt/avatar": "^6.3",
@@ -41,8 +43,7 @@
         "socialiteproviders/apple": "^5.9",
         "spatie/laravel-activitylog": "^4.11",
         "spatie/laravel-backup": "^10.0",
-        "spatie/laravel-medialibrary": "^11.14",
-        "laravel/telescope": "^5.15"
+        "spatie/laravel-medialibrary": "^11.14"
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^3.6",
