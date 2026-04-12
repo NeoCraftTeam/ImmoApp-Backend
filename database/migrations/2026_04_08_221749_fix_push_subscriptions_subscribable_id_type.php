@@ -22,7 +22,7 @@ return new class extends Migration
     public function up(): void
     {
         // 1. Drop the default so the USING cast succeeds
-        DB::statement("ALTER TABLE push_subscriptions ALTER COLUMN subscribable_id DROP DEFAULT");
+        DB::statement('ALTER TABLE push_subscriptions ALTER COLUMN subscribable_id DROP DEFAULT');
 
         // 2. Remove rows with empty/invalid subscribable_id (legacy placeholder rows)
         DB::statement("DELETE FROM push_subscriptions WHERE subscribable_id = '' OR subscribable_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'");
@@ -38,9 +38,9 @@ return new class extends Migration
     public function down(): void
     {
         DB::statement(
-            "ALTER TABLE push_subscriptions
+            'ALTER TABLE push_subscriptions
              ALTER COLUMN subscribable_id TYPE varchar(36)
-             USING subscribable_id::varchar"
+             USING subscribable_id::varchar'
         );
         DB::statement("ALTER TABLE push_subscriptions ALTER COLUMN subscribable_id SET DEFAULT ''");
     }
