@@ -216,6 +216,17 @@ NIGHTWATCH_TOKEN=                       # ⚠️
 TELESCOPE_ENABLED=false                 # désactiver en prod si non nécessaire
 ```
 
+### WebAuthn / Passkeys
+
+```env
+WEBAUTHN_NAME="KeyHome Admin"                                        # Nom affiché dans le dialog du navigateur
+WEBAUTHN_ID=keyhome.app                                              # ⚠️  Relying Party ID (domaine racine)
+WEBAUTHN_ORIGINS=https://admin.keyhome.app,https://app.keyhome.app   # ⚠️  Origines autorisées (virgule) — include frontend origin!
+```
+
+> **API passkey endpoints** (for frontend/PWA): `POST /api/v1/auth/webauthn/login/options`, `POST /api/v1/auth/webauthn/login`, etc.
+> See `WebAuthnApiController` and `AGENTS.md` for full details.
+
 ### Sécurité
 
 ```env
@@ -329,6 +340,7 @@ docker compose exec app php artisan backup:run
 | **Sanctum Bearer** | Tokens API préfixés `kh_` — clients & mobile |
 | **Clerk JWT** | OAuth frontend échangé via `POST /api/v1/auth/clerk/exchange` |
 | **Socialite** | Google, Facebook, Apple (`/api/v1/auth/oauth/{provider}`) |
+| **Passkeys (WebAuthn)** | Connexion biométrique (empreinte, Face ID, clé USB) pour les panels Filament — `laragear/webauthn ^5` |
 | **Magic link** | Sign-in & sign-up sans mot de passe |
 | **MFA** | TOTP + email pour les panels Filament (session) |
 | **Sessions** | Cookie sécurisé (`SESSION_SECURE_COOKIE=true`, `SESSION_SAME_SITE=lax`) |

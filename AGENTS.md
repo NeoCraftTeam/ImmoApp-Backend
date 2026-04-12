@@ -99,7 +99,15 @@ vendor/bin/rector process --dry-run
 - Concerns: `HasPropertyAttributes`, `HasVisibility`.
 - Scopes: `LandlordScope`.
 
+### Contracts (`app/Contracts/`)
+- `PaymentGatewayInterface` — payment gateway abstraction (Flutterwave impl).
+- `AiSearchServiceInterface` — NLP/image search parsing contract (`parse`, `parseFromImage`).
+- `RecommendationEngineInterface` — ad recommendation contract (`recommend`).
+- `TrustScoreServiceInterface` — trust score computation contract (`compute`, `getOrCompute`, `invalidate`).
+- All bound in `AppServiceProvider::register()`.
+
 ### Services (`app/Services/`)
+- `UserProfileService` — public profile assembly, response-time computation, trust-score resolution, unlocked-ads retrieval. Extracted from `UserController` (SRP).
 - `LoginService`, `RegistrationService`, `TokenService`, `ClerkJwtService` — auth flows.
 - `Payment/PaymentService` — orchestrator (Flutterwave gateway via `PaymentGatewayInterface`).
 - `Payment/FlutterwavePaymentService` — Flutterwave implementation.
@@ -117,7 +125,7 @@ vendor/bin/rector process --dry-run
   - `AiSearchService::parseFromImage()` — vision search: GPT-4o-vision → Gemini Vision fallback. Accepts base64 + MIME type, returns same JSON structure as `parse()`. Not cached (each image is unique).
 - `NaturalSearchRegexParser` — plain-language ad search (regex fallback when all LLM providers fail).
 - `RecommendationEngine` — personalised ad recommendations.
-- `NeighborhoodScorecardService` — location scoring.
+- `NeighborhoodScorecardService` — location scoring. Overpass query uses `nwr` (node/way/relation) + `out center;` to capture building-mapped POIs (critical for sub-Saharan Africa where shops/schools are mapped as ways). Includes `public_transport` tags and expanded shop/amenity types. Coordinate parser handles both direct `lat/lon` (nodes) and `center.lat/center.lon` (ways/relations).
 - `IsochroneService`, `DirectionsService` — geo/routing.
 - `KeyScoreService` — proprietary property score.
 - `TrustScoreService` — bidirectional user trust score (tenant + landlord, 7 signals each, 0–100).
@@ -169,11 +177,68 @@ vendor/bin/rector process --dry-run
 
 ### Auth
 - API: Laravel Sanctum (Bearer tokens + SPA session cookies).
-- Filament panels: session-based with MFA (TOTP + email).
+- Filament panels: session-based with MFA (TOTP + email) + **Passkeys (WebAuthn)**.
+- **WebAuthn/Passkeys** (`laragear/webauthn ^5`):
+  - User provider driver: `eloquent-webauthn` with `password_fallback: true` in `config/auth.php`.
+  - `User` model implements `WebAuthnAuthenticatable` + uses `WebAuthnAuthentication` trait.
+  - `User::webAuthnData()` overridden to return `email` + `firstname lastname` (no `name` attribute).
+  - **Filament (admin panel) routes**: `POST /webauthn/register/options`, `POST /webauthn/register`, `POST /webauthn/login/options`, `POST /webauthn/login`, `DELETE /webauthn/credentials/{credential}`.
+  - **API (frontend/PWA) routes** (`WebAuthnApiController`): All under `/api/v1/auth/webauthn/`:
+    - Public: `POST login/options` (returns `X-WebAuthn-Token` header), `POST login` (requires `X-WebAuthn-Token` header, returns Sanctum token + UserResource).
+    - Auth:sanctum: `POST register/options`, `POST register` (optional `alias`), `GET credentials` (list), `PATCH credentials/{id}` (rename), `DELETE credentials/{id}`.
+  - `webauthn/*` routes excluded from CSRF verification in `bootstrap/app.php`.
+  - Custom login page: `app/Filament/Admin/Pages/Auth/AdminLogin.php` (extends Filament Login).
+  - Passkey button injected via `panels::auth.login.form.after` render hook → `filament.admin.components.passkey-login-button` Blade view.
+  - Passkey management: Profile → "Passkeys" section → `filament.admin.components.passkey-manager` Blade view (list, register, name, delete).
+  - **JS: Native WebAuthn API** — `navigator.credentials.create()` / `.get()` with manual base64url ↔ ArrayBuffer conversion. No external JS library (Webpass removed — caused 422 format mismatch).
+  - **Challenge storage: Redis (cache)** — `CacheChallengeRepository` (`app/Services/WebAuthn/`) replaces default `SessionChallengeRepository`. Required because `SESSION_DRIVER=cookie` exceeds 4 KB browser cookie limit when challenge data is added. Bound in `AppServiceProvider::register()`. Uses user ID for authenticated requests, `X-WebAuthn-Token` header for unauthenticated login flows, session ID as fallback.
+  - **Alias/naming**: Registration POST accepts optional `alias` field → saved on `webauthn_credentials.alias` via `$request->save(['alias' => ...])` in `WebAuthnRegisterController`. UI shows name input before biometric prompt.
+  - Config: `config/webauthn.php` (relying party from `APP_NAME`, origins auto-detected). Env: `WEBAUTHN_NAME`, `WEBAUTHN_ID`, `WEBAUTHN_ORIGINS`.
+  - DB table: `webauthn_credentials` (migration `2026_04_12_161011`, `->morph('uuid')` for UUID users).
+  - Google Socialite plugin removed from admin panel — admin auth is email/password + passkeys only.
+  - **Frontend (Next.js) passkey integration**:
+    - Service: `src/services/webauthn.service.ts` — base64url encoding, `navigator.credentials` calls, API wrappers.
+    - Hooks: `src/hooks/usePasskey.ts` — `usePasskeyManager()` (list/register/rename/delete via TanStack Query), `usePasskeyLogin()` (login flow).
+    - Components: `src/components/auth/PasskeyLoginButton.tsx` (login pages), `src/components/security/PasskeyManager.tsx` (settings pages). Both are **theme-aware**: `variant='client'` (default, crimson #F6475F) or `variant='owner'` (teal #0D9488).
+    - Integrated in: client login (`/login`), owner login (`/owner/login`), **client profile `/profile` → "Sécurité" tab (index 4)**, **owner profile `/owner/profile` → "Sécurité" tab (index 2)**. Removed from `/parametres` and `/owner/security` (single source of truth in profile).
+    - **`WebAuthnApiController` token naming**: uses `owner_passkey_token` / `client_passkey_token` (underscore) to match the `owner_` prefix check in `AuthController::refresh()`. Using hyphens caused passkey-issued tokens to be reclassified as client on every refresh.
+    - **Auth redirect fix (critical)**: Two confirmed root causes of owner passkey login redirecting to `/home`:
+      1. `migrateLegacyTokens()` catch block unconditionally nullified `ownerInMemoryToken`/`clientInMemoryToken`. Fixed by saving tokens before migration and restoring them on failure in `src/lib/auth-session.ts`.
+      2. Active Clerk session (CUSTOMER) fired Clerk exchange after passkey login, returning wrong user → role guard redirect. Fixed in `AuthProvider.tsx` by skipping Clerk exchange when `hasAnySanctumInMemory()` is true.
+    - **`PasskeyLoginButton` role-gate**: added role validation after login — if `loginContext === 'owner'` but user isn't AGENT/ADMIN (or vice versa), redirects cleanly rather than persisting a wrong-context token.
+    - **`OwnerLayoutClient` role guard hardened**: changed `if (user.role && !OWNER_ALLOWED_ROLES.includes(user.role))` → `if (!user.role || !OWNER_ALLOWED_ROLES.includes(user.role))` to prevent null-role bypass.
+  - **Passkey email notifications**: `PasskeyNotificationMail` (`app/Mail/`) — sent on passkey add/remove from `WebAuthnApiController::register()` and `destroy()`. Uses `emails.layout` (crimson) for clients, `emails.owner-layout` (teal) for agents/admins. Template: `resources/views/emails/passkey-notification.blade.php`. Modern design with device details, IP, timestamp, security warning. Queued via `ShouldQueue`.
+    - Query key: `passkeyKeys.all` in `src/lib/query-keys.ts`.
 - Frontend uses Clerk for OAuth, exchanged for Sanctum tokens via `/auth/clerk/exchange`.
 - Magic-link sign-in/sign-up supported.
 - Social auth via Laravel Socialite (Apple provider included).
 - **API rate limits**: CUSTOMER 300 req/min, AGENT with subscription 500 req/min, AGENT without subscription 300 req/min, ADMIN unlimited, guest 60 req/min.
+- **Token refresh**: `POST /api/v1/auth/refresh` — rotates the current Sanctum token (delete old → create new), preserves login-context prefix (owner/client). `AuthController::refresh()`.
+- **Session idle timeout** (frontend): `SessionTimeoutGuard` component (`src/components/session/`) monitors user activity via `useIdleTimeout` hook. After **15 min idle** → warning modal with **60 s countdown**. Two buttons: "Prolonger la session" (calls `/auth/refresh` to rotate token) or "Se déconnecter". Auto-logout if countdown reaches 0. Integrated in `providers.tsx` inside `AuthProvider`. Only active when `isAuthenticated`.
+
+### Architecture Decisions
+- **No repository pattern** — Eloquent is used directly in Services and Actions. At this scale (~70 models), the repository pattern adds indirection without meaningful testability gain (Eloquent itself is well-tested). Services are the business-logic boundary; if we outgrow this, we extract repositories per-domain rather than globally. Documented decision — not a TODO.
+- **Interface contracts for key services** — `AiSearchServiceInterface`, `RecommendationEngineInterface`, `TrustScoreServiceInterface` enable swapping implementations and simplify mocking in tests. Bound in `AppServiceProvider::register()`.
+- **UserProfileService extraction** — Public profile assembly, response-time computation, trust-score resolution, and unlocked-ads retrieval extracted from `UserController` to `app/Services/UserProfileService.php` (SRP compliance).
+
+### Frontend Hooks (`keyhome-frontend-next/src/hooks/`)
+- `useSearchFilters` — all search filter state, URL sync, remote data (cities, adTypes, facets, propertyAttributes), derived state (activeFilterCount, sortLabel, clearFilters, buildParams). Extracted from `search/page.tsx`.
+- `useSearchResults` — TanStack Query calls for search results and map-all data, derived `ads`, `mapAds`, `totalPages`, `total`. Extracted from `search/page.tsx`.
+- `useAuthActions` — login, loginOwner, loginWithOAuth, logout, refreshUser, setUser, finalizeAuth, getClerkToken. Extracted from `AuthProvider.tsx`.
+- `useIdleTimeout` — tracks user inactivity and triggers session timeout warning.
+- `useSearchHistory` — manages recent search history in localStorage.
+
+### Frontend Shared Components (`keyhome-frontend-next/src/components/ui/`)
+- `CityAutocomplete` — reusable city autocomplete with debounced search, shared visual config. Props: `value`, `onChange`, `label`, `placeholder`, `size`, `sx`, `required`, `error`, `helperText`, `disabled`. Available for progressive adoption across 13+ consumers.
+
+### Animation System (SKILL.md compliant)
+- **Easing:** All CSS/Framer Motion use out-quint `cubic-bezier(0.22, 1, 0.36, 1)`. Bounce easing `(0.34, 1.56, 0.64, 1)` is banned (SKILL.md: "feels dated and tacky"). Fixed globally in `globals.css` (`--spring`), `theme.ts` (MuiButton, MuiCard, MuiIconButton, MuiFab, MuiSwitch, MuiTabs, MuiAccordion), and per-component in `login/page.tsx`, `HeroSearch.tsx`, `AdCard.tsx`, `PackageCard.tsx`, `SplashTransition.tsx`. Zero bounce easings remain in the codebase.
+- **Page transitions:** `template.tsx` in both `(dashboard)` and `(owner)` route groups. Framer Motion fade+slide (opacity 0→1, y 12→0, 300ms). Respects `useReducedMotion()`.
+- **Section entrance:** `FadeIn` (CSS animation) wraps page headers (breadcrumbs + title + description) on all owner pages (financials, tenants, lease-contracts, reviews, security, subscriptions, parametres, equipe, availability, pro-services, viewings) and dashboard pages (parametres, payments, aide, prix-marche, publish). Staggered with `delay` prop.
+- **Reusable utilities:** `ScrollReveal` (Framer Motion viewport-triggered fade+slide), `StaggerList` (staggered children), `FadeIn` (CSS animation). All respect `prefers-reduced-motion`.
+- **Global accessibility:** `globals.css` has `@media (prefers-reduced-motion: reduce)` that zeroes all `animation-duration`, `transition-duration`, `scroll-behavior`.
+- **Theme-level micro-interactions:** MuiButton active scale(0.96), MuiCard hover translateY(-3px), MuiIconButton hover scale(1.1)/active scale(0.92), MuiFab hover scale(1.08), MuiTextField focus glow ring, MuiTabs indicator smooth slide, MuiAccordion expand transition. All with focus-visible outlines.
+- **Touch targets:** All interactive elements ≥44×44px per SKILL.md adapt guidelines (PageBreadcrumbs back button, NavDrawer items, AdCard buttons, Navbar elements).
 
 ### Filament Panels
 - **Admin** (`app/Filament/Admin/`) — full platform management. Path: `/admin`.
@@ -183,6 +248,9 @@ vendor/bin/rector process --dry-run
   `PointTransactions`, `PromoCodes`, `PropertyAttributeCategories`, `PropertyAttributes`, `Quarters`,
   `Refunds`, `Reviews`, `SiteVisits`, `SubscriptionPlans`, `SubscriptionResource`, `Surveys`,
   `UnlockedAds`, `Users`.
+  Dashboard: Tabbed sections via `HasFiltersForm` (Vue d'ensemble | Acquisition | Revenus | Engagement | Rétention | Avancé).
+  Only 2-6 widgets loaded per tab instead of 22 at once.
+  Geographic widget (`GeographicHeatmapWidget`): Mapbox GL JS map (clusters by city with ad count, zoom for individual ads) + table (offre vs demande). Requires `MAPBOX_TOKEN` env var. Data cached 5 min via `admin_geo_map_data` Redis key. Uses PostGIS `ST_Centroid(ST_Collect(...))` for city-level aggregation.
 - **Agency** (`app/Filament/Agency/`) — multi-tenant (Agency model). Path: `/agency`.
   Provider: `app/Providers/Filament/AgencyPanelProvider.php`.
   Resources: `Ads`, `Payments`, `Reviews`.
@@ -279,7 +347,7 @@ All prefixed `/api/v1/`: `auth.php`, `ads.php`, `payments.php`, `viewings.php`, 
 - `clickbar/laravel-magellan ^2` — PostGIS helpers.
 - `laraveljutsu/zap ^1.14` — viewing schedule engine (`app/Models/Zap/`).
 - `laravel/scout + meilisearch/meilisearch-php` — full-text search.
-- `laravel/sanctum ^4`, `laravel/socialite ^5`, `dutchcodingcompany/filament-socialite`.
+- `laravel/sanctum ^4`, `laravel/socialite ^5`, `dutchcodingcompany/filament-socialite`, `laragear/webauthn ^5`.
 - `laravel/pulse ^1`, `laravel/telescope ^5`, `laravel/nightwatch ^1` — observability.
 - `sentry/sentry-laravel ^4` — error tracking.
 - `laravel-notification-channels/webpush ^10` — push notifications.
@@ -394,6 +462,11 @@ Storybook, Vitest, Playwright.
 - **`src/tests/components/AdCard.test.tsx`**: `import React from 'react'` at top level. The `framer-motion` mock uses this top-level import — no `require()` inside `vi.mock` factories. The `React.createElement` call casts `children as React.ReactNode` because `children` is destructured from `Record<string, unknown>` and `createElement` requires `ReactNode`.
 - **`.storybook/register-next-config.cjs`**: Has `/* eslint-disable @typescript-eslint/no-require-imports */` at top — intentional CJS file.
 - **`src/app/credits/callback/page.tsx`** and **`src/app/payment-success/page.tsx`**: Recursive `useCallback` patterns that assign `retryTimerRef.current = setTimeout(() => self(attempt+1), ...)` use `/* eslint-disable react-hooks/immutability */ ... /* eslint-enable */` block pairs (single-line `eslint-disable-next-line` only covers the first line of a multi-line statement).
+
+- **`VoiceSearchButton` click not working (fixed)**: Root cause: (1) `onClick` was `disabled ? undefined : toggle` — inside MUI `InputAdornment`, clicks bubbled up and focused the input instead. Fix: always attach `onClick` with `e.stopPropagation()`. (2) `onTranscript` was in `toggle`'s dependency array causing stale closures; switched to ref pattern (`onTranscriptRef`). (3) `rec.start()` had no try-catch — mic permission errors were uncaught.
+- **Image search removed from frontend**: `ImageSearchButton` component still exists but is no longer rendered in `HeroSearch` or `NaturalSearchBar`. Both only import the `ParsedSearchParams` type from it.
+- **`useUserLocation` geolocation ask-once (fixed)**: Was using `watchPosition` (continuous tracking) with 10-minute cache — re-prompted on every visit. Fixed: `getCurrentPosition` (one-shot), 24-hour localStorage cache (`user-location`), denial persisted in `user-location-denied` key so user is never re-prompted after refusing. `refresh()` method bypasses both caches for explicit re-requests.
+- **Breadcrumb "Accueil" must link to `/home`**: Dashboard pages (bailleurs profile, agences) were linking Accueil breadcrumb to `/` (landing page) instead of `/home`. Public/marketing pages (blog, conditions, etc.) correctly use `/`.
 
 ### Frontend Performance Optimizations — Round 2 (Full-App Audit)
 Applied after a comprehensive scan of all major frontend features:
@@ -518,6 +591,47 @@ LocalStorage keys: `kh_tour_completed_at`, `kh:welcome-dismissed`, `APPTOUR_SHOW
 2. `computeResponseTimeLabel()` queries `viewing_reservations` (table doesn't exist yet). PHP's `catch(Throwable)` recovers at the application layer, but **PostgreSQL still marks the connection-transaction as ABORTED**. All subsequent queries in the same HTTP request (including `SELECT * FROM settings` inside `AdResource`) then fail with `SQLSTATE[25P02]: In failed sql transaction`. Fixed by wrapping the risky query in `DB::transaction()` → PostgreSQL uses a **SAVEPOINT** and rolls back only to it on failure, leaving the outer transaction intact.
 **Pattern:** Any `try { DB::rawQuery(...) } catch (Throwable)` on a table that may not exist **must** use `DB::transaction(fn() => ...)` so PostgreSQL can recover via savepoint instead of aborting the entire outer transaction.
 **Tests:** `tests/Feature/PublicProfileTest.php` (7 tests).
+
+## Comprehensive Assessment Report Fixes (April 2026)
+
+All 14 items from `COMPREHENSIVE_ASSESSMENT_REPORT.md` have been addressed:
+
+### Critical (all 3 fixed)
+1. **Color contrast WCAG** — `tokens.ts:82` `textSecondary` changed `#717171→#5A5A5A` (5.1:1 ratio).
+2. **Touch target sizes** — `AdCard.tsx` carousel dots 5px→8px + `::before` hitbox; compare button `minHeight/minWidth: 44`.
+3. **Mobile hero height** — `home/page.tsx:203` `minHeight: { xs: 280, sm: 400, md: 480 }` (was 340px).
+
+### High Priority (all 5 fixed)
+4. **Owner dashboard tabs** — `owner/dashboard/page.tsx` refactored with `<Tabs>`: Vue d'ensemble | Analytique | Activité. Hero stats remain always visible.
+5. **Search UX** — `HeroSearch.tsx` now has geolocation button (`onGeolocate` prop, `MyLocationIcon`). Intent dialog result saved to `localStorage('kh:last-intent')` — returning users skip the dialog.
+6. **Dark mode card contrast** — `theme.ts:354` `paper: dark.surface` (was `dark.paper` — #1D1D24→#24242D, ~12% brightness delta).
+7. **`aria-current` on nav** — `Navbar.tsx:158` and `BottomNav.tsx:107` add `aria-current="page"` to active links.
+8. **Email role-based layouts** — 6 templates switched from `emails.layout` to `emails.owner-layout`: `agency-welcome`, `reservation/created-landlord`, `subscription/success`, `subscription/renewal-reminder`, `subscription/expiring`, `subscription/invoice`.
+
+### Medium Priority
+9–10. **Infinite scroll / loading states** — deferred (existing pagination + skeleton loading already adequate).
+11. **Customer empty states** — `home/page.tsx` and `search-alerts/page.tsx` now use shared `EmptyState` component with `variant="customer"`.
+12. **Image aspect ratios** — deferred (3:2 already used in `AdCard`).
+13. **Page transition indicator** — already existed (`RouteProgressBar` in root layout).
+14. **OTP template consolidation** — no actual duplicates found (`verification-code`, `reset-password`, `pricing-verification` serve different purposes).
+
+### Email System Polish
+- **Dev preview** — `GET /dev/email-preview` (local env only). `EmailPreviewController` renders 11 Mailable templates in-browser with fake data. Routes guarded by `app()->environment('local')`.
+- **Logo optimization** — `keyhomelogo_email.png` resized 500×500→96×96 (104KB→7.4KB). Retina-ready for 48px display.
+- **Outlook 2016 compat** — Both `layout.blade.php` and `owner-layout.blade.php` now include MSO conditional `<table>` wrapper (600px width), `mso-padding-alt` for CTA buttons, and `border-radius: 0` fallback. Gmail dark mode uses `[data-ogsc]` selectors (already present).
+
+### Testing Infrastructure
+- **Accessibility audit** — `e2e/accessibility.spec.ts` uses `@axe-core/playwright` to scan customer + owner pages for WCAG 2.1 AA violations. Run: `npx playwright test e2e/accessibility.spec.ts`.
+- **Load test** — `tests/load/load-test.yml` (Artillery). 5 weighted scenarios (browse, search, detail, autocomplete, health). Target: 200 req/s sustained, p95<500ms. Run: `artillery run tests/load/load-test.yml`.
+- **Email rendering** — `tests/Feature/EmailRenderingTest.php` (13 Pest tests). Renders all preview Mailables, asserts valid HTML + MSO conditional comments + correct accent color per layout.
+- **Mobile viewports** — Playwright config now has 3 projects: `chromium` (desktop), `mobile-android` (Pixel 5), `mobile-ios` (iPhone 13).
+- **A/B feature flag** — `ab_search_geolocation` in `config/features.php` (default off). Toggleable from Filament admin or `FEATURE_AB_SEARCH_GEOLOCATION=true` in env.
+
+### Design System Normalization (P0–P1)
+- **Brand tokens** — `tokens.ts` expanded with `primaryAlpha{5,10,12,15,25,30,40,88}`. All hardcoded `rgba(246,71,95,...)` in `AdDetailClient.tsx`, `payment-success/page.tsx` replaced with token references.
+- **Hardcoded grays** — `#999`→`var(--mui-palette-text-secondary)`, `#888`→`textSub` token.
+- **IconButton a11y** — `aria-label` added to 30+ `IconButton` instances across shared components and owner pages.
+- **LocalStorage key** `kh:last-intent` — stores last search intent (`louer`|`acheter`) for returning users.
 
 ## Known CI/CD Gotchas
 
