@@ -148,6 +148,7 @@ return [
                     'type',
                     'type_id',
                     'quarter_id',
+                    'transaction_type',
                     'bedrooms',
                     'bathrooms',
                     'price',

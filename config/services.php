@@ -110,4 +110,8 @@ return [
         'token' => env('HEALTH_CHECK_TOKEN'),
     ],
 
+    'mapbox' => [
+        'token' => env('MAPBOX_TOKEN', ''),
+    ],
+
 ];

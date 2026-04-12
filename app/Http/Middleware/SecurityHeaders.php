@@ -88,11 +88,12 @@ final class SecurityHeaders
             $response->headers->set(
                 'Content-Security-Policy',
                 "default-src 'self'; "
-                    ."script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-                    ."style-src 'self' 'unsafe-inline' https://fonts.bunny.net; "
+                    ."script-src 'self' 'unsafe-inline' 'unsafe-eval' https://api.mapbox.com; "
+                    ."style-src 'self' 'unsafe-inline' https://fonts.bunny.net https://api.mapbox.com; "
                     ."img-src 'self' data: blob: https:; "
                     ."font-src 'self' data: https://fonts.bunny.net; "
                     ."connect-src 'self' https: wss:; "
+                    .'worker-src blob:; '
                     ."frame-ancestors 'none'",
             );
         } else {

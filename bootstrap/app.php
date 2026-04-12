@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\RegistrationEmailTakenException;
 use App\Http\Middleware\AddRequestId;
 use App\Http\Middleware\CacheHeaders;
 use App\Http\Middleware\CheckFeatureFlag;
@@ -25,6 +26,8 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
+use Laragear\WebAuthn\Exceptions\AssertionException;
+use Laragear\WebAuthn\Exceptions\AttestationException;
 use League\Flysystem\UnableToRetrieveMetadata;
 use Sentry\Laravel\Integration;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -44,6 +47,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $csrfExcept = [
             'api/*',
             'api/v1/payments/webhook',
+            'webauthn/*',
         ];
         if (($_ENV['APP_ENV'] ?? getenv('APP_ENV')) === 'testing') {
             $csrfExcept[] = 'panel-api/*';
@@ -117,6 +121,31 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
+        $exceptions->renderable(function (RegistrationEmailTakenException $e, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return $e->toResponse($request);
+            }
+        });
+
+        // WebAuthn — laragear throws English ValidationExceptions; translate to French for API consumers.
+        $exceptions->renderable(function (AssertionException $e, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Authentification par passkey échouée. Veuillez réessayer.',
+                    'code' => 'WEBAUTHN_ASSERTION_FAILED',
+                ], 422);
+            }
+        });
+
+        $exceptions->renderable(function (AttestationException $e, Request $request) {
+            if ($request->is('api/*') || $request->expectsJson()) {
+                return response()->json([
+                    'message' => 'Enregistrement de la passkey échoué. Veuillez réessayer.',
+                    'code' => 'WEBAUTHN_ATTESTATION_FAILED',
+                ], 422);
+            }
+        });
+
         // Livewire file upload failures must never produce a 500.
         // UnableToRetrieveMetadata: temp file missing (expired, wrong disk, or upload failed)
         $fileExpiredMessage = 'Le fichier a peut-être expiré. Téléchargez-le à nouveau puis soumettez le formulaire rapidement.';
@@ -155,6 +184,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 && !$e instanceof AuthorizationException
                 && !$e instanceof ModelNotFoundException
                 && !$e instanceof ThrottleRequestsException
+                && !$e instanceof RegistrationEmailTakenException
             ) {
                 return response()->json([
                     'message' => 'Une erreur interne est survenue.',

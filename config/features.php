@@ -38,4 +38,7 @@ return [
     'review_verification' => env('FEATURE_REVIEW_VERIFICATION', true),
     'gdpr_export' => env('FEATURE_GDPR_EXPORT', true),
 
+    // A/B tests
+    'ab_search_geolocation' => env('FEATURE_AB_SEARCH_GEOLOCATION', false),
+
 ];
