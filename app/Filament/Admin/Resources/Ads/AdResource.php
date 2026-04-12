@@ -13,6 +13,8 @@ use App\Filament\Admin\Resources\Ads\RelationManagers\PaymentsRelationManager;
 use App\Filament\Exports\AdExporter;
 use App\Filament\Imports\AdImporter;
 use App\Filament\Resources\Ads\Concerns\SharedAdResource;
+use App\Mail\AdApprovedMail;
+use App\Mail\AdDeclinedMail;
 use App\Models\Ad;
 use BackedEnum;
 use Carbon\Carbon;
@@ -41,6 +43,8 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use UnitEnum;
 
 class AdResource extends Resource
@@ -194,9 +198,20 @@ class AdResource extends Resource
                         ->requiresConfirmation()
                         ->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records): void {
+                            /** @var Collection<int, Ad> $records */
+                            $records->load('user');
                             Ad::query()->whereKey($records->modelKeys())->update([
                                 'status' => AdStatus::AVAILABLE->value,
                             ]);
+                            foreach ($records as $ad) {
+                                if ($ad->user) {
+                                    try {
+                                        Mail::to($ad->user)->send(new AdApprovedMail($ad));
+                                    } catch (\Throwable $e) {
+                                        Log::error('Bulk approve email failed: '.$e->getMessage());
+                                    }
+                                }
+                            }
                         }),
                     BulkAction::make('reject')
                         ->label('Rejeter')
@@ -205,6 +220,17 @@ class AdResource extends Resource
                         ->requiresConfirmation()
                         ->deselectRecordsAfterCompletion()
                         ->action(function (Collection $records): void {
+                            /** @var Collection<int, Ad> $records */
+                            $records->load('user');
+                            foreach ($records as $ad) {
+                                if ($ad->user) {
+                                    try {
+                                        Mail::to($ad->user)->send(new AdDeclinedMail($ad, 'Annonce refusée par l\'administration.'));
+                                    } catch (\Throwable $e) {
+                                        Log::error('Bulk reject email failed: '.$e->getMessage());
+                                    }
+                                }
+                            }
                             Ad::query()->whereKey($records->modelKeys())->update([
                                 'status' => AdStatus::DECLINED->value,
                             ]);

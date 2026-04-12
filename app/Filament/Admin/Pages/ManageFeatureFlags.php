@@ -14,9 +14,9 @@ class ManageFeatureFlags extends Page
 {
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedFlag;
 
-    protected static ?string $navigationLabel = 'Feature Flags';
+    protected static ?string $navigationLabel = 'Fonctionnalités';
 
-    protected static string|null|UnitEnum $navigationGroup = 'System';
+    protected static string|null|UnitEnum $navigationGroup = 'Configuration';
 
     protected static ?int $navigationSort = 50;
 
@@ -50,7 +50,7 @@ class ManageFeatureFlags extends Page
         $this->loadFlags();
 
         Notification::make()
-            ->title("Feature '{$feature}' ".($this->flags[$feature] ? 'enabled' : 'disabled'))
+            ->title("Fonctionnalité '{$feature}' ".($this->flags[$feature] ? 'activée' : 'désactivée'))
             ->success()
             ->send();
     }
@@ -61,7 +61,7 @@ class ManageFeatureFlags extends Page
         $this->loadFlags();
 
         Notification::make()
-            ->title("Feature '{$feature}' reset to config default")
+            ->title("Fonctionnalité '{$feature}' réinitialisée par défaut")
             ->info()
             ->send();
     }

@@ -24,53 +24,80 @@ use App\Filament\Admin\Widgets\RevenueProjectionChart;
 use App\Filament\Admin\Widgets\StatsOverview;
 use App\Filament\Admin\Widgets\UserChart;
 use App\Filament\Admin\Widgets\UserStatusChart;
+use Filament\Forms\Components\Select;
 use Filament\Pages\Dashboard as BaseDashboard;
+use Filament\Pages\Dashboard\Concerns\HasFiltersForm;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 
 class Dashboard extends BaseDashboard
 {
+    use HasFiltersForm;
+
     protected static ?string $title = 'Tableau de bord';
+
+    public function filtersForm(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                Section::make()
+                    ->schema([
+                        Select::make('tab')
+                            ->label('Section')
+                            ->options([
+                                'overview' => 'Vue d\'ensemble',
+                                'acquisition' => 'Acquisition & Activation',
+                                'revenue' => 'Utilisateurs & Revenus',
+                                'engagement' => 'Engagement & Interactions',
+                                'retention' => 'Rétention',
+                                'advanced' => 'Avancé & Géographie',
+                            ])
+                            ->default('overview')
+                            ->selectablePlaceholder(false),
+                    ])
+                    ->columns(1),
+            ]);
+    }
 
     #[\Override]
     public function getWidgets(): array
     {
-        return [
-            // Existing
-            StatsOverview::class,
-            PendingAdsStats::class,
+        $tab = $this->filters['tab'] ?? 'overview';
 
-            // Acquisition & Activation
-            AcquisitionStatsOverview::class,
-            RegistrationsByAcquisitionChart::class,
-            ActivationStatsOverview::class,
-
-            // Users & Revenue
-            UserChart::class,
-            RevenueChart::class,
-            UserStatusChart::class,
-            AdsByTypeChart::class,
-
-            // Interactions
-            InteractionStatsOverview::class,
-            InteractionTrendChart::class,
-            AdsByCityChart::class,
-
-            // Retention
-            RetentionStatsOverview::class,
-            CohortRetentionChart::class,
-
-            // Revenue Advanced
-            RevenueAdvancedStats::class,
-            RevenueProjectionChart::class,
-
-            // Conversion & Quality
-            ConversionFunnelWidget::class,
-            QualityStatsOverview::class,
-
-            // Geographic
-            GeographicHeatmapWidget::class,
-
-            // Export
-            ExportActionsWidget::class,
-        ];
+        return match ($tab) {
+            'acquisition' => [
+                AcquisitionStatsOverview::class,
+                RegistrationsByAcquisitionChart::class,
+                ActivationStatsOverview::class,
+            ],
+            'revenue' => [
+                UserChart::class,
+                RevenueChart::class,
+                UserStatusChart::class,
+                AdsByTypeChart::class,
+            ],
+            'engagement' => [
+                InteractionStatsOverview::class,
+                InteractionTrendChart::class,
+                AdsByCityChart::class,
+            ],
+            'retention' => [
+                RetentionStatsOverview::class,
+                CohortRetentionChart::class,
+            ],
+            'advanced' => [
+                RevenueAdvancedStats::class,
+                RevenueProjectionChart::class,
+                ConversionFunnelWidget::class,
+                QualityStatsOverview::class,
+                GeographicHeatmapWidget::class,
+                ExportActionsWidget::class,
+            ],
+            default => [
+                StatsOverview::class,
+                PendingAdsStats::class,
+                GeographicHeatmapWidget::class,
+            ],
+        };
     }
 }

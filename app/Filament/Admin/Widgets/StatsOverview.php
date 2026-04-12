@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Widgets;
 
+use App\Enums\PaymentStatus;
 use App\Filament\Admin\Resources\PendingAds\PendingAdResource;
 use App\Models\Ad;
 use App\Models\Agency;
@@ -113,7 +114,7 @@ class StatsOverview extends StatsOverviewWidget
             'monthUsers' => User::whereMonth('created_at', now()->month)->count(),
             'avgRating' => number_format((float) Review::avg('rating'), 1),
             'reviewCount' => Review::count(),
-            'revenue' => Payment::sum('amount'),
+            'revenue' => Payment::where('status', PaymentStatus::SUCCESS)->sum('amount'),
             'agencyCount' => Agency::count(),
             'activeAds' => Ad::where('status', 'available')->count(),
             'avgPrice' => Ad::avg('price'),
@@ -155,6 +156,7 @@ class StatsOverview extends StatsOverviewWidget
     {
         return collect(range(6, 0, -1))
             ->map(fn (int $i): int => (int) Payment::query()
+                ->where('status', PaymentStatus::SUCCESS)
                 ->whereBetween('created_at', [
                     now()->subMonths($i)->startOfMonth(),
                     now()->subMonths($i)->endOfMonth(),

@@ -17,6 +17,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Str;
 use UnitEnum;
 
 /**
@@ -78,11 +79,6 @@ class NotificationCenter extends Page
                                 $this->sendNotification();
                             }),
                     ]),
-                Section::make('Statistiques')
-                    ->description('Aperçu des notifications')
-                    ->icon(Heroicon::ChartBar)
-                    ->schema([])
-                    ->extraAttributes(['class' => 'grid grid-cols-3 gap-4']),
             ]);
     }
 
@@ -106,8 +102,8 @@ class NotificationCenter extends Page
             foreach ($users as $user) {
                 $user->notify(
                     new AdminBroadcastNotification(
-                        strip_tags($data['title'] ?? ''),
-                        strip_tags($data['body'] ?? ''),
+                        Str::limit(strip_tags($data['title'] ?? ''), 255),
+                        Str::limit(strip_tags($data['body'] ?? ''), 2000),
                     )
                 );
                 $count++;

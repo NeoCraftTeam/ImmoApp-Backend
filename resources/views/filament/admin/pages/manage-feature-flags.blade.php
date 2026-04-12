@@ -15,7 +15,7 @@
                         'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' => $enabled,
                         'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' => !$enabled,
                     ])>
-                        {{ $enabled ? 'ON' : 'OFF' }}
+                        {{ $enabled ? 'Actif' : 'Inactif' }}
                     </span>
                 </div>
 
@@ -25,7 +25,7 @@
                         :color="$enabled ? 'danger' : 'success'"
                         wire:click="toggle('{{ $feature }}')"
                     >
-                        {{ $enabled ? 'Disable' : 'Enable' }}
+                        {{ $enabled ? 'Désactiver' : 'Activer' }}
                     </x-filament::button>
 
                     <x-filament::button
@@ -33,7 +33,7 @@
                         color="gray"
                         wire:click="resetFlag('{{ $feature }}')"
                     >
-                        Reset
+                        Réinitialiser
                     </x-filament::button>
                 </div>
             </div>

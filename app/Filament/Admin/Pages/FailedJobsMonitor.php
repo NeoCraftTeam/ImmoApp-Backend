@@ -23,9 +23,9 @@ class FailedJobsMonitor extends Page implements HasTable
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedExclamationTriangle;
 
-    protected static ?string $navigationLabel = 'Failed Jobs';
+    protected static ?string $navigationLabel = 'Jobs échoués';
 
-    protected static string|null|UnitEnum $navigationGroup = 'System';
+    protected static string|null|UnitEnum $navigationGroup = 'Configuration';
 
     protected static ?int $navigationSort = 51;
 
@@ -36,22 +36,22 @@ class FailedJobsMonitor extends Page implements HasTable
     {
         return [
             HeaderAction::make('retryAll')
-                ->label('Retry All')
+                ->label('Tout relancer')
                 ->color('warning')
                 ->icon('heroicon-o-arrow-path')
                 ->requiresConfirmation()
                 ->action(function (): void {
                     Artisan::call('queue:retry', ['id' => ['all']]);
-                    Notification::make()->title('All failed jobs queued for retry.')->success()->send();
+                    Notification::make()->title('Tous les jobs échoués ont été relancés.')->success()->send();
                 }),
             HeaderAction::make('flushAll')
-                ->label('Flush All')
+                ->label('Tout purger')
                 ->color('danger')
                 ->icon('heroicon-o-trash')
                 ->requiresConfirmation()
                 ->action(function (): void {
                     Artisan::call('queue:flush');
-                    Notification::make()->title('All failed jobs flushed.')->success()->send();
+                    Notification::make()->title('Tous les jobs échoués ont été purgés.')->success()->send();
                 }),
         ];
     }
@@ -96,24 +96,26 @@ class FailedJobsMonitor extends Page implements HasTable
             ])
             ->actions([
                 HeaderAction::make('retry')
+                    ->label('Relancer')
                     ->icon('heroicon-o-arrow-path')
                     ->color('warning')
                     ->requiresConfirmation()
                     ->action(function (QueueFailedJob $record): void {
                         Artisan::call('queue:retry', ['id' => [$record->uuid]]);
-                        Notification::make()->title('Job queued for retry.')->success()->send();
+                        Notification::make()->title('Job relancé avec succès.')->success()->send();
                     }),
                 HeaderAction::make('delete')
+                    ->label('Supprimer')
                     ->icon('heroicon-o-trash')
                     ->color('danger')
                     ->requiresConfirmation()
                     ->action(function (QueueFailedJob $record): void {
                         DB::table('failed_jobs')->where('uuid', $record->uuid)->delete();
-                        Notification::make()->title('Failed job deleted.')->success()->send();
+                        Notification::make()->title('Job supprimé.')->success()->send();
                     }),
             ])
-            ->emptyStateHeading('No failed jobs')
-            ->emptyStateDescription('All queue jobs are processing normally.')
+            ->emptyStateHeading('Aucun job échoué')
+            ->emptyStateDescription('Tous les jobs de la file d\'attente fonctionnent normalement.')
             ->emptyStateIcon('heroicon-o-check-circle')
             ->poll('30s');
     }

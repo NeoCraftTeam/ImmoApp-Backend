@@ -15,6 +15,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use UnitEnum;
 
 /**
@@ -193,6 +194,21 @@ class ManageSettings extends Page
         $this->form->getState();
 
         $user = auth()->user();
+
+        $rateLimitKey = "settings_otp:{$section}:{$user->id}";
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 3)) {
+            $seconds = RateLimiter::availableIn($rateLimitKey);
+
+            Notification::make()
+                ->title('Trop de tentatives')
+                ->body("Veuillez patienter {$seconds} secondes avant de demander un nouveau code.")
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        RateLimiter::hit($rateLimitKey, 300);
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
         Cache::put("settings_verification_{$section}_{$user->id}", $code, now()->addMinutes(10));

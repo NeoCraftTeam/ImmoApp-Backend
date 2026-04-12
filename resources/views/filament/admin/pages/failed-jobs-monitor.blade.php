@@ -9,21 +9,21 @@
         <x-filament::section>
             <div class="text-center">
                 <p class="text-2xl font-bold text-primary-600 dark:text-primary-400">{{ $pending }}</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Pending Jobs</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Jobs en attente</p>
             </div>
         </x-filament::section>
 
         <x-filament::section>
             <div class="text-center">
                 <p class="text-2xl font-bold text-warning-600 dark:text-warning-400">{{ $processed }}</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Processing</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">En cours</p>
             </div>
         </x-filament::section>
 
         <x-filament::section>
             <div class="text-center">
                 <p class="text-2xl font-bold text-danger-600 dark:text-danger-400">{{ $failed }}</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Failed Jobs</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Jobs échoués</p>
             </div>
         </x-filament::section>
 
@@ -32,7 +32,7 @@
                 <p class="text-2xl font-bold text-success-600 dark:text-success-400">
                     {{ config('queue.default') }}
                 </p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Queue Driver</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Pilote de file</p>
             </div>
         </x-filament::section>
     </div>
