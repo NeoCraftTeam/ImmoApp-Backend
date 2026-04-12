@@ -47,7 +47,7 @@ final class RegisterRequest extends FormRequest
         return [
             'firstname' => 'required|string|max:50|regex:/^[a-zA-ZÀ-ÿ\s]+$/',
             'lastname' => 'required|string|max:50|regex:/^[a-zA-ZÀ-ÿ\s]+$/',
-            'email' => 'required|email:|max:255|unique:users,email',
+            'email' => 'required|email|max:255',
             'phone_number' => 'required|string|regex:/^[+]?[0-9\s\-\(\)]{10,15}$/',
             'password' => [
                 'required',
@@ -83,7 +83,6 @@ final class RegisterRequest extends FormRequest
             'lastname.regex' => 'Le nom ne peut contenir que des lettres et espaces.',
             'email.required' => 'L\'adresse email est obligatoire.',
             'email.email' => 'L\'adresse email doit être valide.',
-            'email.unique' => 'Cette adresse email est déjà utilisée.',
             'phone_number.required' => 'Le numéro de téléphone est obligatoire.',
             'phone_number.regex' => 'Le numéro de téléphone n\'est pas valide.',
             'password.required' => 'Le mot de passe est obligatoire.',

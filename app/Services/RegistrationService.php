@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\DTOs\RegistrationResult;
+use App\Exceptions\RegistrationEmailTakenException;
 use App\Models\User;
 use App\Support\GeoLocation;
 use Illuminate\Auth\Events\Registered;
@@ -31,6 +32,7 @@ final readonly class RegistrationService
      *
      * @throws ThrottleRequestsException
      * @throws ValidationException
+     * @throws RegistrationEmailTakenException
      */
     public function register(array $data, FormRequest $request): RegistrationResult
     {
@@ -51,7 +53,8 @@ final readonly class RegistrationService
 
         $data = array_merge($request->validated(), $data);
 
-        if (User::where('email', $data['email'])->exists()) {
+        $existingUser = User::query()->where('email', $data['email'])->first();
+        if ($existingUser !== null) {
             RateLimiter::hit($key, 600);
 
             $this->log->warning('Registration attempt with existing email', [
@@ -59,9 +62,7 @@ final readonly class RegistrationService
                 'ip' => $request->ip(),
             ]);
 
-            throw ValidationException::withMessages([
-                'email' => ['Les informations fournies sont invalides.'],
-            ]);
+            throw RegistrationEmailTakenException::forExistingUser($existingUser);
         }
 
         $registrationIp = $request->ip();

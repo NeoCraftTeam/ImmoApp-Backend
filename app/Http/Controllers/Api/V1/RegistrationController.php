@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\DTOs\RegistrationResult;
+use App\Exceptions\RegistrationEmailTakenException;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
@@ -130,6 +131,8 @@ final readonly class RegistrationController
                 'message' => 'Cette adresse email est déjà utilisée.',
             ], 409);
 
+        } catch (RegistrationEmailTakenException $e) {
+            throw $e;
         } catch (Throwable $e) {
             Log::error('Registration failed', [
                 'exception' => $e->getMessage(),

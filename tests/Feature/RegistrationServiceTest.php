@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\DTOs\RegistrationResult;
+use App\Exceptions\RegistrationEmailTakenException;
 use App\Models\User;
 use App\Services\RegistrationService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\RateLimiter;
 
 uses(RefreshDatabase::class);
@@ -68,13 +70,62 @@ it('registers an agent successfully and returns 201', function (): void {
     ]);
 });
 
-it('returns 422 when email already exists', function (): void {
-    $existing = User::factory()->customers()->create();
+it('returns 422 with use_login_or_reset when email already exists and account is verified', function (): void {
+    App::setLocale('fr');
+    $existing = User::factory()->customers()->create([
+        'email_verified_at' => now(),
+        'clerk_id' => null,
+    ]);
     $data = validRegistrationData(['email' => $existing->email]);
 
     $response = $this->postJson('/api/v1/auth/registerCustomer', $data);
 
-    $response->assertUnprocessable();
+    $response->assertUnprocessable()
+        ->assertJsonPath('registration_conflict', 'use_login_or_reset')
+        ->assertJsonPath('errors.email.0', __('auth.registration_email_taken_login_or_reset'));
+});
+
+it('returns 422 with use_clerk_sso when email exists and user is linked to Clerk', function (): void {
+    App::setLocale('fr');
+    $existing = User::factory()->customers()->create([
+        'clerk_id' => 'user_'.uniqid(),
+        'email_verified_at' => now(),
+    ]);
+    $data = validRegistrationData(['email' => $existing->email]);
+
+    $response = $this->postJson('/api/v1/auth/registerCustomer', $data);
+
+    $response->assertUnprocessable()
+        ->assertJsonPath('registration_conflict', 'use_clerk_sso')
+        ->assertJsonPath('errors.email.0', __('auth.registration_email_taken_use_clerk'));
+});
+
+it('returns 422 with complete_email_verification when email exists but is unverified', function (): void {
+    App::setLocale('fr');
+    $existing = User::factory()->customers()->unverified()->create([
+        'clerk_id' => null,
+    ]);
+    $data = validRegistrationData(['email' => $existing->email]);
+
+    $response = $this->postJson('/api/v1/auth/registerCustomer', $data);
+
+    $response->assertUnprocessable()
+        ->assertJsonPath('registration_conflict', 'complete_email_verification')
+        ->assertJsonPath('errors.email.0', __('auth.registration_email_taken_verify_email'));
+});
+
+it('throws RegistrationEmailTakenException from service when email is taken', function (): void {
+    $existing = User::factory()->customers()->create();
+    $data = validRegistrationData(['email' => $existing->email]);
+    $request = FormRequest::create('/api/v1/auth/registerCustomer', 'POST', $data);
+    $request->setContainer(app());
+    $request->setRedirector(app('redirect'));
+    $request->validateResolved();
+
+    $service = app(RegistrationService::class);
+
+    expect(fn () => $service->register($data, $request))
+        ->toThrow(RegistrationEmailTakenException::class);
 });
 
 it('returns 429 when rate limited', function (): void {
