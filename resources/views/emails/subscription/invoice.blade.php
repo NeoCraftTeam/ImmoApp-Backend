@@ -1,4 +1,4 @@
-@extends('emails.layout')
+@extends('emails.owner-layout')
 
 @section('title', 'Facture ' . config('app.name') . ' — ' . $invoice->invoice_number)
 

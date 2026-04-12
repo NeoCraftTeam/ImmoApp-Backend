@@ -229,11 +229,29 @@
         [data-ogsc] .container {
             background-color: #16213e !important;
         }
+        /* Outlook 2016 fixes */
+        .btn {
+            mso-padding-alt: 14px 28px;
+        }
+        table {
+            border-spacing: 0;
+            border-collapse: collapse;
+        }
     </style>
+    <!--[if mso]>
+    <style type="text/css">
+        body { width: 600px !important; margin: 0 auto; }
+        .container { border: none !important; border-radius: 0 !important; }
+        .btn { background-color: #F6475F !important; padding: 14px 28px !important; }
+    </style>
+    <![endif]-->
 </head>
 
 <body>
     <div class="wrapper">
+        <!--[if mso]>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" align="center"><tr><td>
+        <![endif]-->
         <div class="container">
 
             <div class="accent-bar"></div>
@@ -276,6 +294,9 @@
             </div>
 
         </div>
+        <!--[if mso]>
+        </td></tr></table>
+        <![endif]-->
     </div>
 </body>
 

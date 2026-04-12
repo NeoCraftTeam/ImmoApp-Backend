@@ -1,4 +1,4 @@
-@extends('emails.layout')
+@extends('emails.owner-layout')
 
 @section('title', 'Nouvelle demande de visite')
 

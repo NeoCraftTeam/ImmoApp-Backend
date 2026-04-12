@@ -1,4 +1,4 @@
-@extends('emails.layout')
+@extends('emails.owner-layout')
 
 @section('title', 'Renouvellement de votre abonnement — ' . config('app.name'))
 

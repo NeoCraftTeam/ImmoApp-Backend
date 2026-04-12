@@ -1,4 +1,4 @@
-@extends('emails.layout')
+@extends('emails.owner-layout')
 
 @section('title', __('emails.subscription_success.title', ['app' => config('app.name')]))
 
