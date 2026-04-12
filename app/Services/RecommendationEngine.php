@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Contracts\RecommendationEngineInterface;
 use App\Enums\AdStatus;
 use App\Http\Controllers\Api\V1\RecommendationController;
 use App\Models\Ad;
@@ -30,7 +31,7 @@ use Illuminate\Support\Facades\Cache;
  *
  * @see RecommendationController
  */
-final class RecommendationEngine
+final class RecommendationEngine implements RecommendationEngineInterface
 {
     /** Maximum number of results to return */
     private const int RESULT_LIMIT = 15;

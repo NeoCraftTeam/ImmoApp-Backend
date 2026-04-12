@@ -165,16 +165,17 @@ final readonly class NeighborhoodScorecardService
         return <<<OSM
 [out:json][timeout:15];
 (
-  node["highway"="bus_stop"](around:{$n},{$lat},{$lng});
-  node["amenity"~"^(taxi|bus_station)$"](around:{$n},{$lat},{$lng});
-  node["amenity"="marketplace"](around:{$n},{$lat},{$lng});
-  node["shop"~"^(supermarket|convenience|mall|grocery|general)$"](around:{$n},{$lat},{$lng});
-  node["amenity"~"^(hospital|clinic|pharmacy|health_centre|doctors)$"](around:{$f},{$lat},{$lng});
-  node["amenity"~"^(school|university|college|kindergarten)$"](around:{$f},{$lat},{$lng});
-  node["amenity"~"^(police|fire_station)$"](around:{$f},{$lat},{$lng});
-  node["amenity"~"^(restaurant|bank|atm|cafe|fast_food)$"](around:{$n},{$lat},{$lng});
+  nwr["highway"="bus_stop"](around:{$n},{$lat},{$lng});
+  nwr["amenity"~"^(taxi|bus_station)$"](around:{$n},{$lat},{$lng});
+  nwr["public_transport"~"^(stop_position|platform|station)$"](around:{$n},{$lat},{$lng});
+  nwr["amenity"="marketplace"](around:{$n},{$lat},{$lng});
+  nwr["shop"~"^(supermarket|convenience|mall|grocery|general|variety_store|wholesale|department_store)$"](around:{$n},{$lat},{$lng});
+  nwr["amenity"~"^(hospital|clinic|pharmacy|health_centre|doctors)$"](around:{$f},{$lat},{$lng});
+  nwr["amenity"~"^(school|university|college|kindergarten)$"](around:{$f},{$lat},{$lng});
+  nwr["amenity"~"^(police|fire_station)$"](around:{$f},{$lat},{$lng});
+  nwr["amenity"~"^(restaurant|bank|atm|cafe|fast_food|place_of_worship|bar)$"](around:{$n},{$lat},{$lng});
 );
-out;
+out center;
 OSM;
     }
 
@@ -199,8 +200,9 @@ OSM;
 
             $acc[$category]['count'] = ($acc[$category]['count'] ?? 0) + 1;
 
-            $poiLat = isset($poi['lat']) ? (float) $poi['lat'] : null;
-            $poiLng = isset($poi['lon']) ? (float) $poi['lon'] : null; // Overpass uses 'lon'
+            // Nodes have lat/lon directly; ways/relations have center.lat/center.lon
+            $poiLat = isset($poi['lat']) ? (float) $poi['lat'] : (isset($poi['center']['lat']) ? (float) $poi['center']['lat'] : null);
+            $poiLng = isset($poi['lon']) ? (float) $poi['lon'] : (isset($poi['center']['lon']) ? (float) $poi['center']['lon'] : null);
 
             if ($poiLat === null || $poiLng === null) {
                 continue;
@@ -241,11 +243,12 @@ OSM;
         $amenity = (string) ($tags['amenity'] ?? '');
         $highway = (string) ($tags['highway'] ?? '');
         $shop = (string) ($tags['shop'] ?? '');
+        $publicTransport = (string) ($tags['public_transport'] ?? '');
 
-        if ($highway === 'bus_stop' || in_array($amenity, ['taxi', 'bus_station'], true)) {
+        if ($highway === 'bus_stop' || in_array($amenity, ['taxi', 'bus_station'], true) || in_array($publicTransport, ['stop_position', 'platform', 'station'], true)) {
             return 'transport';
         }
-        if ($amenity === 'marketplace' || in_array($shop, ['supermarket', 'convenience', 'mall', 'grocery', 'general'], true)) {
+        if ($amenity === 'marketplace' || in_array($shop, ['supermarket', 'convenience', 'mall', 'grocery', 'general', 'variety_store', 'wholesale', 'department_store'], true)) {
             return 'commerce';
         }
         if (in_array($amenity, ['hospital', 'clinic', 'pharmacy', 'health_centre', 'doctors'], true)) {
@@ -257,7 +260,7 @@ OSM;
         if (in_array($amenity, ['police', 'fire_station'], true)) {
             return 'securite';
         }
-        if (in_array($amenity, ['restaurant', 'bank', 'atm', 'cafe', 'fast_food'], true)) {
+        if (in_array($amenity, ['restaurant', 'bank', 'atm', 'cafe', 'fast_food', 'place_of_worship', 'bar'], true)) {
             return 'vie_sociale';
         }
 

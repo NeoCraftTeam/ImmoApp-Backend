@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Contracts\AiSearchServiceInterface;
 use App\Models\AdType;
-use App\Models\City;
-use App\Models\Quarter; // used in enrichWithIds
+use App\Models\City; // used in enrichWithIds
+use App\Models\Quarter;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -20,7 +21,7 @@ use Illuminate\Support\Facades\Log;
  * Falls back to regex-based parsing only when ALL providers fail or are unavailable.
  * Results are cached for 24 hours per query.
  */
-class AiSearchService
+class AiSearchService implements AiSearchServiceInterface
 {
     private const int CACHE_TTL_SECONDS = 86400; // 24 hours
 

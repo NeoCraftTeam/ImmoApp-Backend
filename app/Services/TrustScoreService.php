@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Contracts\TrustScoreServiceInterface;
 use App\Enums\PaymentStatus;
 use App\Enums\ReservationStatus;
 use App\Enums\TrustScoreTier;
@@ -35,7 +36,7 @@ use Illuminate\Support\Facades\Cache;
  *  - Account maturity       : 10 pts
  *  - Verification status    : 10 pts
  */
-final readonly class TrustScoreService
+final readonly class TrustScoreService implements TrustScoreServiceInterface
 {
     private const int CACHE_TTL = 3600; // 1 hour
 

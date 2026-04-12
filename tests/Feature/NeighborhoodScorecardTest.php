@@ -332,3 +332,26 @@ it('computes correct global score from weighted category scores', function (): v
     //        = 18.75  + 0      + 16      + 8.25   + 1.25   + 0      = 44.25 → 44
     $response->assertJsonPath('data.global_score', 44);
 });
+
+it('handles way/relation POIs with center coordinates', function (): void {
+    $ad = makeScorecardAd(Point::makeGeodetic(4.0511, 9.7679));
+
+    // A school mapped as a "way" (building) — coordinates in center.lat/center.lon
+    $elements = [[
+        'type' => 'way', 'id' => 777,
+        'center' => ['lat' => 4.0520, 'lon' => 9.7685],
+        'tags' => ['amenity' => 'school', 'name' => 'Lycée Bilingue'],
+    ]];
+
+    $service = new NeighborhoodScorecardService(
+        fakeHttpFactory(['overpass-api.de' => fakeOverpassResponse($elements)])
+    );
+    app()->instance(NeighborhoodScorecardService::class, $service);
+
+    $response = $this->getJson("/api/v1/ads/{$ad->id}/neighborhood-scorecard");
+
+    $response->assertOk()
+        ->assertJsonPath('data.categories.education.poi_count', 1)
+        ->assertJsonPath('data.categories.education.nearest_poi.name', 'Lycée Bilingue')
+        ->assertJsonPath('data.categories.education.nearest_poi.osm_id', '777');
+});
