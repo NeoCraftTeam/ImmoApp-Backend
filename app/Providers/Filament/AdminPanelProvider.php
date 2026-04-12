@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers\Filament;
 
 use App\Enums\AdStatus;
+use App\Filament\Admin\Pages\Auth\AdminLogin;
 use App\Filament\Admin\Pages\Dashboard;
 use App\Filament\Admin\Pages\ForcePasswordChange;
 use App\Filament\Admin\Resources\Ads\AdResource;
@@ -19,8 +20,6 @@ use App\Filament\Pages\Auth\EditProfile;
 use App\Http\Middleware\FilamentAuthenticate;
 use App\Http\Middleware\RequirePasswordChange;
 use App\Models\Ad;
-use DutchCodingCompany\FilamentSocialite\FilamentSocialitePlugin;
-use DutchCodingCompany\FilamentSocialite\Provider;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
 use Filament\Auth\MultiFactor\Email\EmailAuthentication;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -52,7 +51,7 @@ class AdminPanelProvider extends PanelProvider
                 config('filament.panels.admin_domain'),
                 fn (Panel $p) => $p->domain(config('filament.panels.admin_domain'))->path(''),
             )
-            ->login()
+            ->login(AdminLogin::class)
             ->multiFactorAuthentication([
                 AppAuthentication::make()
                     ->recoverable()
@@ -111,6 +110,10 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 'panels::head.end',
                 fn () => view('pwa.unregister-sw'),
+            )
+            ->renderHook(
+                'panels::auth.login.form.after',
+                fn () => view('filament.admin.components.passkey-login-button'),
             )
             ->databaseTransactions()
             ->databaseNotifications()
@@ -210,18 +213,6 @@ class AdminPanelProvider extends PanelProvider
                     ])
                     ->moreButton(true)
                     ->moreButtonLabel('Menu'),
-                FilamentSocialitePlugin::make()
-                    ->providers([
-                        Provider::make('google')
-                            ->label('Google')
-                            ->icon('fab-google')
-                            ->color(Color::Rose)
-                            ->outlined(false)
-                            ->stateless(false),
-                    ])
-                    ->registration(false)
-                    ->rememberLogin(true)
-                    ->showDivider(true),
             ]);
     }
 

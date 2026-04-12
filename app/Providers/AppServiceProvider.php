@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Contracts\AiSearchServiceInterface;
 use App\Contracts\PaymentGatewayInterface;
+use App\Contracts\RecommendationEngineInterface;
+use App\Contracts\TrustScoreServiceInterface;
 use App\Enums\UserRole;
 use App\Enums\UserType;
 use App\Models\Ad;
@@ -18,12 +21,16 @@ use App\Observers\AdObserver;
 use App\Observers\PaymentObserver;
 use App\Observers\TentativeReservationObserver;
 use App\Observers\UserObserver;
+use App\Services\AiSearchService;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
 use App\Services\Payment\FlutterwavePaymentService;
 use App\Services\Payment\PaymentService;
+use App\Services\RecommendationEngine;
 use App\Services\ReservationService;
+use App\Services\TrustScoreService;
 use App\Services\ViewingScheduleService;
+use App\Services\WebAuthn\CacheChallengeRepository;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -35,6 +42,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
+use Laragear\WebAuthn\Contracts\WebAuthnChallengeRepository;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Activitylog\Models\Activity;
 
@@ -48,6 +56,14 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->app->bind(ViewingScheduleServiceInterface::class, ViewingScheduleService::class);
         $this->app->bind(ReservationServiceInterface::class, ReservationService::class);
+        $this->app->bind(AiSearchServiceInterface::class, AiSearchService::class);
+        $this->app->bind(RecommendationEngineInterface::class, RecommendationEngine::class);
+        $this->app->bind(TrustScoreServiceInterface::class, TrustScoreService::class);
+
+        // WebAuthn: use cache (Redis) for challenge storage instead of session.
+        // The default SessionChallengeRepository breaks with SESSION_DRIVER=cookie
+        // because the challenge data exceeds the 4 KB browser cookie size limit.
+        $this->app->bind(WebAuthnChallengeRepository::class, CacheChallengeRepository::class);
 
         $this->app->singleton(PaymentService::class, function ($app): PaymentService {
             $defaultName = (string) config('payment.default', 'flutterwave');

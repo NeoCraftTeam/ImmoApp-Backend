@@ -46,6 +46,9 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
+use Laragear\WebAuthn\Contracts\WebAuthnAuthenticatable;
+use Laragear\WebAuthn\WebAuthnAuthentication;
+use Laragear\WebAuthn\WebAuthnData;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\PersonalAccessToken;
 use Laravolt\Avatar\Facade;
@@ -141,12 +144,13 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  *
  * @mixin Eloquent
  */
-class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasAvatar, HasEmailAuthentication, HasMedia, HasName, HasTenants, MustVerifyEmail
+class User extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasAvatar, HasEmailAuthentication, HasMedia, HasName, HasTenants, MustVerifyEmail, WebAuthnAuthenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, HasPushSubscriptions, HasUuids, \Illuminate\Auth\MustVerifyEmail, LogsActivity, Notifiable, softDeletes;
 
     use InteractsWithMedia;
+    use WebAuthnAuthentication;
 
     protected $table = 'users';
 
@@ -497,6 +501,11 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function isAdmin(): bool
     {
         return $this->role === UserRole::ADMIN;
+    }
+
+    public function webAuthnData(): WebAuthnData
+    {
+        return WebAuthnData::make($this->email, trim("{$this->firstname} {$this->lastname}"));
     }
 
     public function getFilamentName(): string

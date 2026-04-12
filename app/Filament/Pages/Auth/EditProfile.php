@@ -12,11 +12,13 @@ use Filament\Auth\Pages\EditProfile as BaseEditProfile;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\ViewField;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Mail;
+use Laragear\WebAuthn\Models\WebAuthnCredential;
 
 class EditProfile extends BaseEditProfile
 {
@@ -109,6 +111,18 @@ class EditProfile extends BaseEditProfile
                     ->columns(2)
                     ->collapsed()
                     ->columnSpanFull(),
+                Section::make('Passkeys')
+                    ->icon('heroicon-o-finger-print')
+                    ->description('Connectez-vous sans mot de passe grâce aux passkeys (empreinte, Face ID, clé USB)')
+                    ->schema([
+                        ViewField::make('passkeys_view')
+                            ->label('')
+                            ->view('filament.admin.components.passkey-manager')
+                            ->viewData(['passkeys' => $this->getPasskeys()])
+                            ->dehydrated(false),
+                    ])
+                    ->collapsed()
+                    ->columnSpanFull(),
                 Section::make('Données & confidentialité')
                     ->icon('heroicon-o-shield-check')
                     ->description('Accédez à vos données personnelles conformément au RGPD')
@@ -125,6 +139,28 @@ class EditProfile extends BaseEditProfile
                     ])
                     ->columnSpanFull(),
             ]);
+    }
+
+    /**
+     * @return list<array{id: string, alias: string|null, created_at: string, last_used: string|null}>
+     */
+    public function getPasskeys(): array
+    {
+        /** @var User $user */
+        $user = auth()->user();
+
+        return $user->webAuthnCredentials()
+            ->whereEnabled()
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn (WebAuthnCredential $cred): array => [
+                'id' => $cred->getKey(),
+                'alias' => $cred->alias ?? null,
+                'created_at' => $cred->created_at->format('d/m/Y à H:i'),
+                'last_used' => $cred->updated_at->diffForHumans(),
+            ])
+            ->values()
+            ->all();
     }
 
     public function sendGdprExport(): void

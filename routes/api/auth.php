@@ -10,7 +10,9 @@ use App\Http\Controllers\Api\V1\PasswordController;
 use App\Http\Controllers\Api\V1\RegistrationController;
 use App\Http\Controllers\Api\V1\SocialAuthController;
 use App\Http\Controllers\Api\V1\UserPreferenceController;
+use App\Http\Controllers\Api\V1\WebAuthnApiController;
 use App\Http\Controllers\EmailPreferenceController;
+use App\Http\Middleware\DynamicWebAuthnRelyingParty;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('auth')->group(function (): void {
@@ -85,6 +87,26 @@ Route::prefix('auth')->group(function (): void {
         Route::get('/status', 'status')->middleware('throttle:60,1');
         Route::post('/verify', 'verify')->middleware('throttle:10,1');
     });
+
+    // ── WebAuthn / Passkeys (API) ─────────────────────────────────
+    Route::prefix('webauthn')
+        ->middleware(DynamicWebAuthnRelyingParty::class)
+        ->group(function (): void {
+            // Public — passkey login (no auth needed)
+            Route::post('login/options', [WebAuthnApiController::class, 'loginOptions'])
+                ->middleware('throttle:auth.login');
+            Route::post('login', [WebAuthnApiController::class, 'login'])
+                ->middleware('throttle:auth.login');
+
+            // Authenticated — passkey registration & management
+            Route::middleware('auth:sanctum')->group(function (): void {
+                Route::post('register/options', [WebAuthnApiController::class, 'registerOptions']);
+                Route::post('register', [WebAuthnApiController::class, 'register']);
+                Route::get('credentials', [WebAuthnApiController::class, 'index']);
+                Route::patch('credentials/{credential}', [WebAuthnApiController::class, 'update']);
+                Route::delete('credentials/{credential}', [WebAuthnApiController::class, 'destroy']);
+            });
+        });
 
     // Authenticated auth routes
     Route::middleware('auth:sanctum')->group(function (): void {

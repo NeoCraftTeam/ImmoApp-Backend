@@ -5,13 +5,17 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\V1\Auth\EmailVerificationController;
 use App\Http\Controllers\Api\V1\TourController;
 use App\Http\Controllers\Auth\VerifyEmailController;
+use App\Http\Controllers\Dev\EmailPreviewController;
 use App\Http\Controllers\EmailPreferenceController;
 use App\Http\Controllers\MediaProxyController;
 use App\Http\Controllers\PanelSsoController;
 use App\Http\Controllers\PwaManifestController;
 use App\Http\Controllers\TourImageProxyController;
+use App\Http\Middleware\DynamicWebAuthnRelyingParty;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Laragear\WebAuthn\Http\Routes as WebAuthnRoutes;
 
 Route::get('/manifest.json', PwaManifestController::class)->name('pwa.manifest');
 
@@ -119,3 +123,27 @@ Route::middleware(['auth'])->prefix('panel-api/v1')->group(function (): void {
     Route::match(['patch', 'post'], '/ads/{ad}/tour/scenes/{sceneId}/hotspots', [TourController::class, 'updateHotspots']);
     Route::delete('/ads/{ad}/tour', [TourController::class, 'destroy']);
 });
+
+// ── WebAuthn Passkey routes (admin panel) ──
+Route::middleware(DynamicWebAuthnRelyingParty::class)->group(function (): void {
+    WebAuthnRoutes::register(
+        attest: 'webauthn/register',
+        assert: 'webauthn/login',
+    );
+});
+
+Route::middleware(['auth'])->delete('/webauthn/credentials/{credential}', function (string $credential) {
+    /** @var User $user */
+    $user = auth()->user();
+    $user->webAuthnCredentials()->where('id', $credential)->delete();
+
+    return response()->noContent();
+})->name('webauthn.credentials.destroy');
+
+// ── Dev-only: Email template previews (local env only) ──
+if (app()->environment('local')) {
+    Route::prefix('dev/email-preview')->group(function (): void {
+        Route::get('/', [EmailPreviewController::class, 'index'])->name('dev.email-preview.index');
+        Route::get('/{slug}', [EmailPreviewController::class, 'show'])->name('dev.email-preview.show');
+    });
+}
