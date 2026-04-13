@@ -286,6 +286,71 @@ class UserResource extends Resource
                             ->icon(Heroicon::CalendarDays)
                             ->since(),
                     ]),
+
+                // ── Score de confiance ─────────────────────────────────────────
+                Section::make('Score de confiance')
+                    ->icon(Heroicon::ShieldCheck)
+                    ->iconColor('warning')
+                    ->description('Scoring bidirectionnel (locataire / bailleur)')
+                    ->columns(2)
+                    ->visible(fn (User $record): bool => $record->trustScores->isNotEmpty())
+                    ->schema([
+                        TextEntry::make('trust_tenant')
+                            ->label('Score Locataire')
+                            ->getStateUsing(function (User $record): string {
+                                $ts = $record->trustScores->firstWhere('role_context', 'tenant');
+
+                                return $ts ? $ts->tier->label().' ('.$ts->score.'%)' : '—';
+                            })
+                            ->badge()
+                            ->color(function (User $record): string {
+                                $ts = $record->trustScores->firstWhere('role_context', 'tenant');
+
+                                return $ts?->tier->color() ?? 'gray';
+                            }),
+                        TextEntry::make('trust_landlord')
+                            ->label('Score Bailleur')
+                            ->getStateUsing(function (User $record): string {
+                                $ts = $record->trustScores->firstWhere('role_context', 'landlord');
+
+                                return $ts ? $ts->tier->label().' ('.$ts->score.'%)' : '—';
+                            })
+                            ->badge()
+                            ->color(function (User $record): string {
+                                $ts = $record->trustScores->firstWhere('role_context', 'landlord');
+
+                                return $ts?->tier->color() ?? 'gray';
+                            }),
+                        TextEntry::make('trust_computed_at')
+                            ->label('Calculé le')
+                            ->getStateUsing(function (User $record): ?string {
+                                $ts = $record->trustScores->first();
+
+                                return $ts?->computed_at?->format('d/m/Y à H:i');
+                            })
+                            ->icon(Heroicon::Clock)
+                            ->placeholder('Jamais calculé'),
+                    ]),
+
+                // ── Agence ──────────────────────────────────────────────────────
+                Section::make('Agence rattachée')
+                    ->icon(Heroicon::BuildingOffice2)
+                    ->iconColor('primary')
+                    ->columns(2)
+                    ->visible(fn (User $record): bool => $record->agency !== null)
+                    ->schema([
+                        TextEntry::make('agency.name')
+                            ->label("Nom de l'agence")
+                            ->icon(Heroicon::BuildingOffice2)
+                            ->iconColor('primary')
+                            ->weight('semibold'),
+                        TextEntry::make('agency.slug')
+                            ->label('Slug')
+                            ->badge()
+                            ->color('gray')
+                            ->copyable()
+                            ->copyMessage('Slug copié !'),
+                    ]),
             ]);
     }
 

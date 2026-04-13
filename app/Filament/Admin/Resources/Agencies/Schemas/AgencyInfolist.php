@@ -56,6 +56,36 @@ class AgencyInfolist
                             ->placeholder('Aucun propriétaire'),
                     ]),
 
+                // ── Statistiques ─────────────────────────────────────────────
+                Section::make('Statistiques')
+                    ->icon(Heroicon::ChartBar)
+                    ->iconColor('info')
+                    ->description('Activité et abonnement de l\'agence')
+                    ->columns(3)
+                    ->schema([
+                        TextEntry::make('ads_count')
+                            ->label('Annonces publiées')
+                            ->getStateUsing(fn (Agency $record): int => $record->users()->withCount('ads')->get()->sum('ads_count'))
+                            ->badge()
+                            ->color('info')
+                            ->icon(Heroicon::Megaphone),
+                        TextEntry::make('members_count')
+                            ->label('Membres')
+                            ->getStateUsing(fn (Agency $record): int => $record->users()->count())
+                            ->badge()
+                            ->color('primary')
+                            ->icon(Heroicon::Users),
+                        TextEntry::make('subscription_status')
+                            ->label('Abonnement actif')
+                            ->getStateUsing(function (Agency $record): string {
+                                $sub = $record->getCurrentSubscription();
+
+                                return (string) data_get($sub, 'plan.name', 'Aucun');
+                            })
+                            ->badge()
+                            ->color(fn (string $state): string => $state === 'Aucun' ? 'gray' : 'success'),
+                    ]),
+
                 // ── Métadonnées ────────────────────────────────────────────────
                 Section::make('Métadonnées')
                     ->icon(Heroicon::Clock)

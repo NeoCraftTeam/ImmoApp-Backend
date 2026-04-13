@@ -57,7 +57,7 @@ class PaymentResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['ad.ad_type', 'user']);
+            ->with(['ad.ad_type', 'user', 'pointPackage']);
     }
 
     #[\Override]
@@ -132,6 +132,29 @@ class PaymentResource extends Resource
                             ->iconColor('warning')
                             ->limit(60)
                             ->placeholder('Non associée'),
+                    ]),
+
+                // ── Passerelle & crédits ────────────────────────────────────
+                Section::make('Passerelle & crédits')
+                    ->icon(Heroicon::CreditCard)
+                    ->iconColor('primary')
+                    ->columns(3)
+                    ->schema([
+                        TextEntry::make('gateway')
+                            ->label('Passerelle')
+                            ->badge()
+                            ->color('info')
+                            ->formatStateUsing(fn (?string $state): string => $state ? ucfirst($state) : '—'),
+                        TextEntry::make('points_awarded')
+                            ->label('Crédits attribués')
+                            ->badge()
+                            ->color('warning')
+                            ->formatStateUsing(fn ($state): string => $state ? number_format((int) $state).' pts' : '—'),
+                        TextEntry::make('pointPackage.name')
+                            ->label('Pack de crédits')
+                            ->badge()
+                            ->color('success')
+                            ->placeholder('—'),
                     ]),
 
                 // ── Horodatage ───────────────────────────────────────────────

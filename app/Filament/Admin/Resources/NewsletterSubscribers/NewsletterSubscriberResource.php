@@ -15,6 +15,8 @@ use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\TextEntry as InfolistTextEntry;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -94,6 +96,76 @@ final class NewsletterSubscriberResource extends Resource
     }
 
     #[\Override]
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema
+            ->columns(2)
+            ->components([
+                Section::make('Coordonnées')
+                    ->icon(Heroicon::Envelope)
+                    ->iconColor('primary')
+                    ->description("Informations d'identification de l'abonné")
+                    ->columns(2)
+                    ->schema([
+                        InfolistTextEntry::make('email')
+                            ->label('Adresse email')
+                            ->icon(Heroicon::Envelope)
+                            ->iconColor('info')
+                            ->copyable()
+                            ->copyMessage('Email copié !'),
+                        InfolistTextEntry::make('name')
+                            ->label('Nom')
+                            ->icon(Heroicon::User)
+                            ->placeholder('Non renseigné'),
+                        InfolistTextEntry::make('locale')
+                            ->label('Langue')
+                            ->badge()
+                            ->color('info')
+                            ->formatStateUsing(fn (?string $state): string => match ($state) {
+                                'fr' => 'Français',
+                                'en' => 'English',
+                                default => $state ?? '—',
+                            }),
+                        InfolistTextEntry::make('source')
+                            ->label("Source d'inscription")
+                            ->badge()
+                            ->color('gray'),
+                    ]),
+
+                Section::make('Statut de l\'abonnement')
+                    ->icon(Heroicon::CheckCircle)
+                    ->iconColor('success')
+                    ->columns(2)
+                    ->schema([
+                        IconEntry::make('is_subscribed')
+                            ->label('Abonnement actif')
+                            ->getStateUsing(fn (NewsletterSubscriber $record): bool => $record->isSubscribed())
+                            ->boolean()
+                            ->trueIcon(Heroicon::CheckCircle)
+                            ->falseIcon(Heroicon::XCircle)
+                            ->trueColor('success')
+                            ->falseColor('danger'),
+                        InfolistTextEntry::make('created_at')
+                            ->label('Inscrit le')
+                            ->icon(Heroicon::CalendarDays)
+                            ->dateTime('d/m/Y à H:i'),
+                        InfolistTextEntry::make('confirmed_at')
+                            ->label('Email confirmé le')
+                            ->icon(Heroicon::CheckBadge)
+                            ->iconColor('success')
+                            ->dateTime('d/m/Y à H:i')
+                            ->placeholder('Non confirmé'),
+                        InfolistTextEntry::make('unsubscribed_at')
+                            ->label('Désabonné le')
+                            ->icon(Heroicon::XCircle)
+                            ->iconColor('danger')
+                            ->dateTime('d/m/Y à H:i')
+                            ->placeholder('Toujours abonné'),
+                    ]),
+            ]);
+    }
+
+    #[\Override]
     public static function table(Table $table): Table
     {
         return $table
@@ -168,7 +240,15 @@ final class NewsletterSubscriberResource extends Resource
                     ->native(false),
             ])
             ->recordActions([
-                ViewAction::make(),
+                ViewAction::make()
+                    ->slideOver()
+                    ->modalWidth('xl')
+                    ->modalIcon(fn (NewsletterSubscriber $record): string => $record->isSubscribed()
+                        ? 'heroicon-o-check-badge'
+                        : 'heroicon-o-envelope'
+                    )
+                    ->modalIconColor(fn (NewsletterSubscriber $record): string => $record->isSubscribed() ? 'success' : 'gray')
+                    ->modalHeading(fn (NewsletterSubscriber $record): string => $record->email),
                 EditAction::make()
                     ->successNotificationTitle('Abonné mis à jour'),
                 DeleteAction::make()
