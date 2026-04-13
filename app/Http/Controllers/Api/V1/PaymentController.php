@@ -17,8 +17,10 @@ use App\Models\PromoCode;
 use App\Models\PromoCodeUsage;
 use App\Models\User;
 use App\Services\Payment\PaymentService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use OpenApi\Annotations as OA;
@@ -335,5 +337,82 @@ final class PaymentController
                 'total' => $payments->total(),
             ],
         ]);
+    }
+
+    /**
+     * Export the authenticated user's full payment history as a branded PDF.
+     *
+     * @OA\Get(
+     *     path="/api/v1/payments/export",
+     *     summary="Exporter l'historique des paiements en PDF",
+     *     tags={"💰 Paiements"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Parameter(name="period", in="query", required=false,
+     *
+     *         @OA\Schema(type="integer", enum={30, 90, 365}, description="Nb de jours à inclure. Omis = tout l'historique.")),
+     *
+     *     @OA\Response(response=200, description="Fichier PDF téléchargeable",
+     *
+     *         @OA\MediaType(mediaType="application/pdf")),
+     *
+     *     @OA\Response(response=401, description="Non authentifié")
+     * )
+     */
+    public function export(Request $request): Response
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $period = $request->integer('period', 0);
+
+        $query = Payment::where('user_id', $user->id)
+            ->with('pointPackage', 'ad')
+            ->orderByDesc('created_at');
+
+        if ($period > 0) {
+            $query->where('created_at', '>=', now()->subDays($period));
+        }
+
+        $payments = $query->get();
+
+        $paidPayments = $payments->filter(fn (Payment $p) => $p->status === PaymentStatus::SUCCESS);
+
+        $totalAmount = $paidPayments->sum(fn (Payment $p) => (float) $p->amount);
+        $creditsEarned = $paidPayments->sum(
+            fn (Payment $p) => $p->pointPackage->points_awarded ?? 0
+        );
+
+        $periodLabel = match ($period) {
+            30 => '30 derniers jours',
+            90 => '90 derniers jours',
+            365 => 'Cette année',
+            default => 'Tout l\'historique',
+        };
+
+        $logoPath = public_path('images/keyhomelogo_transparent.png');
+        $logoBase64 = file_exists($logoPath)
+            ? 'data:image/png;base64,'.base64_encode((string) file_get_contents($logoPath))
+            : null;
+
+        $pdf = Pdf::loadView('pdf.payment-history', [
+            'user' => $user,
+            'payments' => $payments,
+            'totalAmount' => $totalAmount,
+            'totalCount' => $payments->count(),
+            'paidCount' => $paidPayments->count(),
+            'creditsEarned' => $creditsEarned,
+            'periodLabel' => $periodLabel,
+            'generatedAt' => now()->format('d/m/Y à H:i'),
+            'logoBase64' => $logoBase64,
+        ])
+            ->setPaper('a4', 'portrait')
+            ->setOptions([
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => false,
+                'defaultFont' => 'DejaVu Sans',
+            ]);
+
+        return $pdf->download('keyhome-paiements-'.now()->format('Y-m-d').'.pdf');
     }
 }

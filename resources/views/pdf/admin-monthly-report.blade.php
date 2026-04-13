@@ -6,17 +6,17 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 11px; color: #1f2937; line-height: 1.5; }
-        .header { background: linear-gradient(135deg, #0d9488, #0891b2); color: white; padding: 30px; text-align: center; }
+        .header { background: linear-gradient(135deg, #F6475F, #c73048); color: white; padding: 30px; text-align: center; }
         .header h1 { font-size: 24px; margin-bottom: 5px; }
         .header p { opacity: 0.9; font-size: 12px; }
         .content { padding: 25px; }
         .section { margin-bottom: 25px; }
-        .section-title { font-size: 14px; font-weight: 700; color: #0d9488; border-bottom: 2px solid #0d9488; padding-bottom: 5px; margin-bottom: 12px; }
+        .section-title { font-size: 14px; font-weight: 700; color: #F6475F; border-bottom: 2px solid #F6475F; padding-bottom: 5px; margin-bottom: 12px; }
         .metrics-grid { display: table; width: 100%; }
         .metric-row { display: table-row; }
         .metric-label { display: table-cell; padding: 6px 10px; border-bottom: 1px solid #e5e7eb; color: #6b7280; width: 60%; }
         .metric-value { display: table-cell; padding: 6px 10px; border-bottom: 1px solid #e5e7eb; font-weight: 600; text-align: right; }
-        .highlight { background: #f0fdfa; }
+        .highlight { background: #fff1f3; }
         .funnel-step { padding: 8px 12px; margin-bottom: 4px; border-radius: 4px; display: table-row; }
         .footer { text-align: center; padding: 20px; color: #9ca3af; font-size: 10px; border-top: 1px solid #e5e7eb; }
         table { width: 100%; border-collapse: collapse; }

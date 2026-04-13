@@ -26,6 +26,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
         ->middleware('throttle:payments.cancel');
     Route::get('/payments/history', [PaymentController::class, 'history'])
         ->middleware('throttle:payments.history');
+    Route::get('/payments/export', [PaymentController::class, 'export'])
+        ->middleware('throttle:10,1');
 });
 
 // --- REFUNDS (admin) ---
