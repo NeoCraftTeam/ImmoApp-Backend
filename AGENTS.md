@@ -191,7 +191,21 @@ vendor/bin/rector process --dry-run
   - Passkey button injected via `panels::auth.login.form.after` render hook → `filament.admin.components.passkey-login-button` Blade view.
   - Passkey management: Profile → "Passkeys" section → `filament.admin.components.passkey-manager` Blade view (list, register, name, delete).
   - **JS: Native WebAuthn API** — `navigator.credentials.create()` / `.get()` with manual base64url ↔ ArrayBuffer conversion. No external JS library (Webpass removed — caused 422 format mismatch).
-  - **Challenge storage: Redis (cache)** — `CacheChallengeRepository` (`app/Services/WebAuthn/`) replaces default `SessionChallengeRepository`. Required because `SESSION_DRIVER=cookie` exceeds 4 KB browser cookie limit when challenge data is added. Bound in `AppServiceProvider::register()`. Uses user ID for authenticated requests, `X-WebAuthn-Token` header for unauthenticated login flows, session ID as fallback.
+  - **Challenge storage: Redis (cache)** — `CacheChallengeRepository` (`app/Services/WebAuthn/`) replaces default `SessionChallengeRepository`. Required because `SESSION_DRIVER=cookie` exceeds 4 KB browser cookie limit when challenge data is added. Bound in `AppServiceProvider::register()`. Identifier priority: (1) authenticated user ID, (2) `X-WebAuthn-Token` header (API stateless flow), (3) session ID (Filament panel session-based flow).
+    - **⚠️ Critical bug fixed (root cause)**: Passkeys failed 100% of the time on the Filament admin panel.
+      - **Root cause**: The session ID changes between the `/options` and `/login` requests. The Filament panel / Livewire / Laravel auth middleware calls `session()->migrate()` which rotates the session ID. Any mechanism that uses the session ID as the Redis cache key will fail because it stores under session ID A and looks up under session ID B.
+      - **Attempted intermediate fix (also broken)**: Storing a `_wt_assertion` token in session data (survives `migrate()`). Screenshots showed even this failed because the browser somehow sends a different session on the follow-up request (new `Set-Cookie` in 422 response confirmed a new session was created).
+      - **Final fix**: Do NOT depend on the session at all. Always generate a random token for unauthenticated `AssertionCreation`. Surface it in the OPTIONS response body as `_wt` AND in the `X-WebAuthn-Token` header. Both `WebAuthnLoginController::options()` (Filament) and `WebAuthnApiController::loginOptions()` (API) inject `_wt`. The frontend reads `_wt`, strips it from the options object before calling the browser WebAuthn API, and sends it back on the verify request (body field `_wt` and/or `X-WebAuthn-Token` header). `resolveIdentifier()` checks header then body. Zero session dependency.
+      - Applies to both flows: **Filament admin panel** (Alpine.js in `passkey-login-button.blade.php`) and **Next.js PWA** (`webauthn.service.ts`).
+    - **`_wt` body failsafe**: `WebAuthnApiController::loginOptions()` also embeds the challenge token in the response body under `_wt`. Frontend reads header first, then `_wt`. Prevents failure when CDN/proxies strip custom headers.
+    - **Required env vars (production)**: `WEBAUTHN_ID=keyhome.app`, `WEBAUTHN_ORIGINS=https://keyhome.app,https://www.keyhome.app`. RP ID must be a suffix of every origin that registers/uses passkeys.
+    - **Required env vars (local dev)**:
+      ```
+      WEBAUTHN_ID=keyhome.test
+      WEBAUTHN_ORIGINS=http://keyhome.test:3000,https://keyhome.test:3000,http://keyhome.test,https://keyhome.test,http://admin.keyhome.test,https://admin.keyhome.test,http://localhost:3000,http://localhost
+      ```
+      `DynamicWebAuthnRelyingParty` middleware auto-overrides RP ID to `localhost` when origin host is `localhost`. For `keyhome.test:*` origins, the static `WEBAUTHN_ID=keyhome.test` applies (keyhome.test is a valid suffix of all *.keyhome.test origins).
+    - **`WebAuthnApiController::login()`** now wrapped in try-catch — unexpected laragear exceptions are logged to `Log::warning('Passkey API login failed', ...)` instead of bubbling as 500.
   - **Alias/naming**: Registration POST accepts optional `alias` field → saved on `webauthn_credentials.alias` via `$request->save(['alias' => ...])` in `WebAuthnRegisterController`. UI shows name input before biometric prompt.
   - Config: `config/webauthn.php` (relying party from `APP_NAME`, origins auto-detected). Env: `WEBAUTHN_NAME`, `WEBAUTHN_ID`, `WEBAUTHN_ORIGINS`.
   - DB table: `webauthn_credentials` (migration `2026_04_12_161011`, `->morph('uuid')` for UUID users).
@@ -202,6 +216,7 @@ vendor/bin/rector process --dry-run
     - Components: `src/components/auth/PasskeyLoginButton.tsx` (login pages), `src/components/security/PasskeyManager.tsx` (settings pages). Both are **theme-aware**: `variant='client'` (default, crimson #F6475F) or `variant='owner'` (teal #0D9488).
     - Integrated in: client login (`/login`), owner login (`/owner/login`), **client profile `/profile` → "Sécurité" tab (index 4)**, **owner profile `/owner/profile` → "Sécurité" tab (index 2)**. Removed from `/parametres` and `/owner/security` (single source of truth in profile).
     - **`WebAuthnApiController` token naming**: uses `owner_passkey_token` / `client_passkey_token` (underscore) to match the `owner_` prefix check in `AuthController::refresh()`. Using hyphens caused passkey-issued tokens to be reclassified as client on every refresh.
+    - **Critical bug fix — `role` missing from passkey login response**: `UserResource` gates `role` and `type` behind `$request->user()?->id === $this->id`. The passkey login endpoint has no `auth:sanctum` middleware → `$request->user()` = null → `role` absent from JSON → frontend received `user.role = undefined` → role guard in `PasskeyLoginButton` failed → redirected back to `/login`. **Fix**: call `auth()->guard('web')->setUser($user)` in `WebAuthnApiController::login()` after credential verification, before building `UserResource`. This populates `$request->user()` without opening a session.
     - **Auth redirect fix (critical)**: Two confirmed root causes of owner passkey login redirecting to `/home`:
       1. `migrateLegacyTokens()` catch block unconditionally nullified `ownerInMemoryToken`/`clientInMemoryToken`. Fixed by saving tokens before migration and restoring them on failure in `src/lib/auth-session.ts`.
       2. Active Clerk session (CUSTOMER) fired Clerk exchange after passkey login, returning wrong user → role guard redirect. Fixed in `AuthProvider.tsx` by skipping Clerk exchange when `hasAnySanctumInMemory()` is true.
@@ -632,6 +647,74 @@ All 14 items from `COMPREHENSIVE_ASSESSMENT_REPORT.md` have been addressed:
 - **Hardcoded grays** — `#999`→`var(--mui-palette-text-secondary)`, `#888`→`textSub` token.
 - **IconButton a11y** — `aria-label` added to 30+ `IconButton` instances across shared components and owner pages.
 - **LocalStorage key** `kh:last-intent` — stores last search intent (`louer`|`acheter`) for returning users.
+
+### Journal de Sécurité (ActivityLogResource)
+`app/Filament/Admin/Resources/ActivityLogs/ActivityLogResource.php` — full overhaul:
+
+**Table:**
+- Added `log_name` badge column (Sécurité 🔴 / Admin 🔵) — **first column**, with icon.
+- `event` badge now context-aware: security events map `properties.action` → french label (Connexion / Déconnexion / Échec connexion / Réinit. MDP / Verrouillage); CRUD events map event → Création/Modification/Suppression.
+- `event` badge color is also context-aware (info/gray/danger/warning for security; success/warning/danger for CRUD).
+- Added `ip_address` column extracting `properties->ip`.
+- Added `log_name` SelectFilter (Sécurité / Actions Admin).
+
+**ViewAction (slide-over modal):**
+- `modalIcon`, `modalIconColor`, `modalHeading` now context-aware for both security and CRUD events.
+- Modal headings are fully French (e.g. "Connexion administrateur", "Modification d'un enregistrement").
+
+**Infolist — Summary card:**
+- Colored left border: `#F6475F` for security, green/amber/red for CRUD events.
+- Top row: log-type badge (Sécurité/Action Admin) + date.
+- Large description text.
+- Meta row: ACTION pill (colored by event type), ENTITÉ pill (blue), ADMIN name+email.
+- **Network section** (security events only, orange card): Adresse IP, Guard, Navigateur (user-agent truncated to 72 chars).
+
+**Infolist — Diff table:**
+- Section heading "Modifications détaillées" with colored accent bar + field count.
+- Header border uses event-specific accent color (green/amber/red/brand).
+- New/removed-only cells use neutral background (not red/green) to avoid false alarm.
+- Empty state has a proper styled message.
+
+**humanizeFieldName:** Expanded from 18 → 40+ entries covering all common model fields (amounts, timestamps, geo, subscription, payment fields).
+
+### Other Filament Resource Infolist Overhauls
+
+**RefundResource** (`app/Filament/Admin/Resources/Refunds/RefundResource.php`):
+- **Bug fixed:** `form()` was incorrectly using `TextEntry` (infolist components) instead of form fields. `ViewAction` had no config.
+- Added proper `infolist()` with 4 sections: Remboursement (amount, status badge, type, ref), Parties (user + admin who processed), Motif & Notes (reason + admin_note prose), Horodatage.
+- `ViewAction` now: `slideOver()`, contextual `modalIcon`/`modalIconColor` (success/danger/info by status), `modalHeading` with formatted XAF amount.
+
+**NewsletterSubscriberResource** (`app/Filament/Admin/Resources/NewsletterSubscribers/NewsletterSubscriberResource.php`):
+- **Bug fixed:** `ViewAction::make()` with no `infolist()` produced an empty modal.
+- Added `infolist()` with 2 sections: Coordonnées (email copyable, name, locale badge, source badge), Statut (boolean active icon, confirmed_at, unsubscribed_at, created_at).
+- `ViewAction` now: `slideOver()`, `modalIcon` = check-badge if subscribed else envelope, `modalHeading` = email.
+
+**UserResource** (`app/Filament/Admin/Resources/Users/UserResource.php`):
+- Added **Score de confiance** section (visible only if trustScores not empty): tenant badge + landlord badge + computed_at.
+- Added **Agence rattachée** section (visible only if agency not null): name + slug copyable badge.
+
+**PaymentResource** (`app/Filament/Admin/Resources/Payments/PaymentResource.php`):
+- Added **Passerelle & crédits** infolist section: gateway badge (ucfirst), points_awarded badge, pointPackage.name badge.
+- Eager loading updated: `['ad.ad_type', 'user', 'pointPackage']`.
+
+**AgencyInfolist** (`app/Filament/Admin/Resources/Agencies/Schemas/AgencyInfolist.php`):
+- Added **Statistiques** section (3 cols): ads_count via `users()->withCount('ads')`, members_count via `users()->count()`, subscription via `getCurrentSubscription()` + `data_get()` (avoids nullsafe PHPStan issues).
+
+### PDF Exports
+
+#### Payment History PDF (User-facing)
+- **Backend endpoint**: `GET /api/v1/payments/export?period=30|90|365` (auth required, throttle 10/min).
+  - Implemented in `PaymentController::export()`.
+  - Accepts optional `period` (days). Omit for full history.
+  - Returns `application/pdf` download via DomPDF.
+  - Template: `resources/views/pdf/payment-history.blade.php` — brand #F6475F, Stripe-style layout with user info, 3-stat summary cards, full transaction table with type/status/credits/method columns, total row, footer.
+- **Frontend service**: `paymentsService.exportPdf(period?)` in `src/services/payments.service.ts` — fetches blob, triggers browser download.
+- **Owner panel**: `PaymentHistoryTable.tsx` — period chips (Tout/30j/90j/1an) + red PDF button above table.
+- **Client PWA**: `PaymentHistoryTableModern.tsx` — same period chips already present, "Télécharger CSV" button replaced with "Télécharger PDF" (real backend call, not client-side CSV).
+
+#### Admin Report PDF
+- Template `resources/views/pdf/admin-monthly-report.blade.php` rebranded: teal (#0d9488) → brand #F6475F throughout (header gradient, section titles, highlights).
+- Entry point: `ExportActionsWidget::exportPdf()` (Livewire, Filament admin dashboard).
 
 ## Known CI/CD Gotchas
 
