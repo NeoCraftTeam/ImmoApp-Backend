@@ -44,7 +44,7 @@ class WebAuthnLoginController
     {
         try {
             $user = $request->login();
-            Log::debug('[WebAuthn] login() result', ['user' => $user?->getAuthIdentifier(), 'null' => is_null($user)]);
+            Log::debug('[WebAuthn] login() result', ['user_class' => $user ? $user::class : null, 'null' => is_null($user)]);
 
             return response()->noContent($user ? 204 : 422);
         } catch (\Throwable $e) {
