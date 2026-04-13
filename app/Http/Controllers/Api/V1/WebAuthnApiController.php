@@ -13,6 +13,7 @@ use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Laragear\WebAuthn\Http\Requests\AssertedRequest;
 use Laragear\WebAuthn\Http\Requests\AssertionRequest;
@@ -77,11 +78,21 @@ final class WebAuthnApiController
     {
         $responsable = $request->toVerify();
         $response = $responsable->toResponse($request);
-        $options = json_decode((string) $response->getContent(), true);
+        /** @var array<string,mixed> $options */
+        $options = (array) json_decode((string) $response->getContent(), true);
 
         // The token was set on the global request() by CacheChallengeRepository::store(),
         // NOT on $request (which is a FormRequest with its own attributes bag).
-        $challengeToken = request()->attributes->get('webauthn_challenge_token', '');
+        $challengeToken = (string) request()->attributes->get('webauthn_challenge_token', '');
+
+        // Embed the token in the body under a private `_wt` key as a failsafe.
+        // Some reverse proxies / CDN edges (Cloudflare Workers, Vercel Edge) strip
+        // custom response headers, making the X-WebAuthn-Token inaccessible to JS.
+        // The browser WebAuthn API ignores unknown fields in PublicKeyCredentialRequestOptions,
+        // so this does not break the credential.get() call.
+        if ($challengeToken !== '') {
+            $options['_wt'] = $challengeToken;
+        }
 
         return response()->json($options)
             ->header('X-WebAuthn-Token', $challengeToken);
@@ -98,34 +109,56 @@ final class WebAuthnApiController
      */
     public function login(AssertedRequest $request): JsonResponse
     {
-        $credentials = $request->validated();
+        try {
+            $credentials = $request->validated();
 
-        /** @var SessionGuard $guard */
-        $guard = auth()->guard('web');
+            /** @var SessionGuard $guard */
+            $guard = auth()->guard('web');
 
-        // validate() calls WebAuthnUserProvider::retrieveByCredentials() + validateCredentials()
-        // which verifies the assertion (challenge, signature, counter) without starting a session.
-        if (!$guard->validate($credentials)) {
+            // validate() calls WebAuthnUserProvider::retrieveByCredentials() + validateCredentials()
+            // which verifies the assertion (challenge, signature, counter) without starting a session.
+            if (!$guard->validate($credentials)) {
+                return ApiResponse::error('Authentification par passkey échouée.', 401);
+            }
+
+            // Retrieve the authenticated user (already fetched internally by validate)
+            $user = $guard->getLastAttempted();
+
+            if (!$user instanceof User) {
+                return ApiResponse::error('Authentification par passkey échouée.', 401);
+            }
+
+            $loginContext = $request->input('login_context', 'client');
+            $tokenName = $loginContext === 'owner' ? 'owner_passkey_token' : 'client_passkey_token';
+            $token = $user->createToken($tokenName)->plainTextToken;
+
+            // Set the verified user on the guard so $request->user() is populated
+            // when UserResource is built — this ensures 'role' and 'type' fields
+            // are included (they're gated on $request->user()?->id === $this->id).
+            auth()->guard('web')->setUser($user);
+
+            Log::debug('[WebAuthn API] login success', [
+                'user' => $user->id,
+                'email' => $user->email,
+                'role' => $user->role->value,
+                'login_context' => $loginContext,
+            ]);
+
+            return response()->json([
+                'message' => 'Connexion réussie via passkey.',
+                'access_token' => $token,
+                'token_type' => 'Bearer',
+                'user' => new UserResource($user),
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Passkey API login failed', [
+                'error' => $e->getMessage(),
+                'credential_id' => $request->input('id'),
+                'ip' => $request->ip(),
+            ]);
+
             return ApiResponse::error('Authentification par passkey échouée.', 401);
         }
-
-        // Retrieve the authenticated user (already fetched internally by validate)
-        $user = $guard->getLastAttempted();
-
-        if (!$user instanceof User) {
-            return ApiResponse::error('Authentification par passkey échouée.', 401);
-        }
-
-        $loginContext = $request->input('login_context', 'client');
-        $tokenName = $loginContext === 'owner' ? 'owner_passkey_token' : 'client_passkey_token';
-        $token = $user->createToken($tokenName)->plainTextToken;
-
-        return response()->json([
-            'message' => 'Connexion réussie via passkey.',
-            'access_token' => $token,
-            'token_type' => 'Bearer',
-            'user' => new UserResource($user),
-        ]);
     }
 
     // ── Credential management ──────────────────────────────────────────────

@@ -48,6 +48,12 @@
                 }
                 const options = await optRes.json();
 
+                // Extract the one-time challenge token emitted by the server.
+                // It is needed to identify the stored challenge on the verify request
+                // because the session ID can change between the two HTTP requests.
+                const challengeToken = options._wt || optRes.headers.get('X-WebAuthn-Token') || '';
+                delete options._wt; // remove before passing to the WebAuthn browser API
+
                 // Step 2: convert base64url to ArrayBuffer
                 const publicKey = {
                     ...options,
@@ -63,7 +69,7 @@
                 // Step 3: get credential via browser API
                 const credential = await navigator.credentials.get({ publicKey });
 
-                // Step 4: serialize response
+                // Step 4: serialize response — include _wt so the backend can find the challenge
                 const body = {
                     id: credential.id,
                     rawId: this.bufferToB64u(credential.rawId),
@@ -74,12 +80,17 @@
                         signature: this.bufferToB64u(credential.response.signature),
                         userHandle: credential.response.userHandle ? this.bufferToB64u(credential.response.userHandle) : null,
                     },
+                    _wt: challengeToken,
                 };
 
                 // Step 5: send to server (re-read CSRF in case of refresh)
                 const loginRes = await fetch('/webauthn/login', {
                     method: 'POST',
-                    headers: { ...baseHeaders, 'X-XSRF-TOKEN': this.getCsrfToken() || csrf },
+                    headers: {
+                        ...baseHeaders,
+                        'X-XSRF-TOKEN': this.getCsrfToken() || csrf,
+                        ...(challengeToken ? { 'X-WebAuthn-Token': challengeToken } : {}),
+                    },
                     credentials: 'same-origin',
                     body: JSON.stringify(body),
                 });

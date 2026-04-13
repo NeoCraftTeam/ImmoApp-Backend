@@ -6,6 +6,7 @@ namespace App\Services\WebAuthn;
 
 use Illuminate\Contracts\Config\Repository as ConfigContract;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Laragear\WebAuthn\Assertion\Creator\AssertionCreation;
 use Laragear\WebAuthn\Assertion\Validator\AssertionValidation;
 use Laragear\WebAuthn\Attestation\Creator\AttestationCreation;
@@ -21,10 +22,18 @@ use Laragear\WebAuthn\Contracts\WebAuthnChallengeRepository;
  *
  * This implementation stores challenges in Redis (cache) instead, using:
  * - **Authenticated user**: keyed by user ID (works for both session + API/Sanctum)
- * - **Unauthenticated** (passkey login): keyed by a challenge token sent via
- *   `X-WebAuthn-Token` header. The frontend must store the token from the
- *   options response and send it back on the verification request.
- * - **Fallback**: session ID (Filament panel with active session)
+ * - **Unauthenticated** (passkey login, both API and web panel): keyed by a one-time
+ *   random token. The token is set on the request attributes during `store()` so
+ *   the controller can read it and embed it in the response body as `_wt` (and
+ *   optionally as the `X-WebAuthn-Token` response header). The frontend must
+ *   include the token in the following verify request — either via the
+ *   `X-WebAuthn-Token` header or the `_wt` body field.
+ *
+ *   We deliberately do NOT use `session()->getId()` as the cache key. The session
+ *   ID changes between the /options request and the /login request in the Filament
+ *   panel because Livewire or the auth middleware calls `session()->migrate()` which
+ *   rotates the session ID. Using the explicit token avoids this instability entirely.
+ * - **Fallback**: session ID (registration / other authenticated flows)
  */
 final readonly class CacheChallengeRepository implements WebAuthnChallengeRepository
 {
@@ -34,8 +43,15 @@ final readonly class CacheChallengeRepository implements WebAuthnChallengeReposi
     {
         $identifier = $this->resolveIdentifier();
 
-        // For unauthenticated login flows, generate a token and store it
-        // so the controller can include it in the response.
+        // For unauthenticated login (assertion) flows, generate a one-time random
+        // token and store it on the request attributes so controllers can read it
+        // and embed it in the response body as `_wt` (and/or X-WebAuthn-Token header).
+        // The frontend must echo the token back on the verify request.
+        //
+        // We deliberately avoid using session()->getId(): the session ID rotates
+        // between the /options and /login requests in the Filament panel (Livewire /
+        // auth middleware calls session()->migrate()), so a session-ID-keyed cache
+        // entry is never found by the follow-up request.
         if (!$identifier && $ceremony instanceof AssertionCreation) {
             $rawToken = bin2hex(random_bytes(16));
             request()->attributes->set('webauthn_challenge_token', $rawToken);
@@ -50,6 +66,8 @@ final readonly class CacheChallengeRepository implements WebAuthnChallengeReposi
         $ttl = $challenge->timeout + 30;
 
         Cache::put($key, $challenge, $ttl);
+
+        Log::debug('[WebAuthn] STORE', ['key' => $key, 'identifier' => $identifier, 'ttl' => $ttl]);
     }
 
     public function pull(AttestationValidation|AssertionValidation $ceremony): ?Challenge
@@ -61,6 +79,14 @@ final readonly class CacheChallengeRepository implements WebAuthnChallengeReposi
         }
 
         $key = $this->cacheKey($identifier);
+
+        Log::debug('[WebAuthn] PULL', [
+            'key' => $key,
+            'identifier' => $identifier,
+            'header_token' => request()->header('X-WebAuthn-Token'),
+            '_wt_body' => request()->input('_wt'),
+            'exists' => Cache::has($key),
+        ]);
 
         /** @var Challenge|array|null $challenge */
         $challenge = Cache::pull($key);
@@ -89,8 +115,10 @@ final readonly class CacheChallengeRepository implements WebAuthnChallengeReposi
             return 'user:'.$user->getAuthIdentifier();
         }
 
-        // Unauthenticated — use the challenge token from header
-        $token = request()->header('X-WebAuthn-Token');
+        // Unauthenticated — check X-WebAuthn-Token header first (API / PWA flow),
+        // then the _wt body field (Filament web panel flow where the Alpine.js
+        // component passes the token back as a JSON body field).
+        $token = request()->header('X-WebAuthn-Token') ?: request()->input('_wt');
         if ($token) {
             return 'token:'.$token;
         }
