@@ -227,6 +227,16 @@ vendor/bin/rector process --dry-run
 - Frontend uses Clerk for OAuth, exchanged for Sanctum tokens via `/auth/clerk/exchange`.
 - Magic-link sign-in/sign-up supported.
 - Social auth via Laravel Socialite (Apple provider included).
+- **Google One Tap** (`src/components/auth/GoogleOneTap.tsx`):
+  - Mounted **only on `/login`** (CUSTOMER page) — never on `/owner/login` (new One Tap users always get CUSTOMER role).
+  - Activates only when `NEXT_PUBLIC_GOOGLE_CLIENT_ID` is set; returns `null` otherwise (zero-cost no-op).
+  - Flow: GSI library loaded via `<Script strategy="afterInteractive">` → `onLoad` initializes once via `initializedRef` guard → `clerk.authenticateWithGoogleOneTap({ token: credential })` → `clerk.handleGoogleOneTapCallback(res, { signInFallbackRedirectUrl: '/home', signUpFallbackRedirectUrl: '/home' }, customNavigate)` → Next.js client-side navigation (no full reload).
+  - `customNavigate` passes `router.push` so navigation stays client-side.
+  - Auto-cancels and resets when `isAuthenticated` becomes `true` (user already logged in).
+  - Types: `@types/google-one-tap` (devDependency). Import: `import type { CredentialResponse, PromptMomentNotification } from 'google-one-tap'`.
+  - **Required env var**: `NEXT_PUBLIC_GOOGLE_CLIENT_ID` — same Google Client ID configured in Clerk dashboard for Google OAuth provider.
+  - **E2E tests**: `e2e/google-one-tap.spec.ts` — 9 tests (3 skipped without `NEXT_PUBLIC_GOOGLE_CLIENT_ID`). Covers: GSI script presence/absence on `/login` and `/owner/login`, mocked credential callback, mobile layout regression, social buttons coexistence.
+  - **Known gotcha**: `/se connecter/i` regex in Playwright tests matches both "Se connecter" (submit) and "Se connecter avec une Passkey" — always use `{ name: 'Se connecter', exact: true }` in E2E button locators.
 - **API rate limits**: CUSTOMER 300 req/min, AGENT with subscription 500 req/min, AGENT without subscription 300 req/min, ADMIN unlimited, guest 60 req/min.
 - **Token refresh**: `POST /api/v1/auth/refresh` — rotates the current Sanctum token (delete old → create new), preserves login-context prefix (owner/client). `AuthController::refresh()`.
 - **Session idle timeout** (frontend): `SessionTimeoutGuard` component (`src/components/session/`) monitors user activity via `useIdleTimeout` hook. After **15 min idle** → warning modal with **60 s countdown**. Two buttons: "Prolonger la session" (calls `/auth/refresh` to rotate token) or "Se déconnecter". Auto-logout if countdown reaches 0. Integrated in `providers.tsx` inside `AuthProvider`. Only active when `isAuthenticated`.
