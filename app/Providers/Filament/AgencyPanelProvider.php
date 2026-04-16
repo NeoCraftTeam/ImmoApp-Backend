@@ -44,6 +44,10 @@ class AgencyPanelProvider extends PanelProvider
             ->brandLogo(fn () => view('filament.agency.brand'))
             ->brandLogoHeight('3.5rem')
             ->login()
+            ->renderHook(
+                'panels::auth.login.form.after',
+                fn () => view('filament.admin.components.passkey-login-button'),
+            )
             ->passwordReset()
             ->registration(CustomRegister::class)
             ->profile(EditProfile::class)

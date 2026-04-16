@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
+use Laravel\Sanctum\NewAccessToken;
 
 final readonly class LoginService
 {
@@ -81,8 +82,7 @@ final readonly class LoginService
 
         RateLimiter::clear($key);
 
-        $prefix = $loginContext === 'owner' ? 'owner' : 'client';
-        $token = $this->tokenService->rotateForUser($user, 'token', "{$prefix}_token_%", $prefix);
+        $token = $this->rotateApiTokenForLoginContext($user, $loginContext);
 
         $this->detectNewLocation($user, $request);
         $this->recordLogin($user, $request);
@@ -96,6 +96,28 @@ final readonly class LoginService
         ]);
 
         return new LoginResult(user: $user, token: $token);
+    }
+
+    /**
+     * Enforce owner vs client login panel rules, then rotate a Sanctum API token
+     * (same naming and abilities as password login).
+     *
+     * Used by WebAuthn API login after the assertion is verified.
+     *
+     * @throws RoleContextMismatchException
+     */
+    public function issueApiTokenForLoginContext(User $user, string $loginContext): NewAccessToken
+    {
+        $this->enforceRoleContext($user, $loginContext);
+
+        return $this->rotateApiTokenForLoginContext($user, $loginContext);
+    }
+
+    private function rotateApiTokenForLoginContext(User $user, string $loginContext): NewAccessToken
+    {
+        $prefix = $loginContext === 'owner' ? 'owner' : 'client';
+
+        return $this->tokenService->rotateForUser($user, 'token', "{$prefix}_token_%", $prefix);
     }
 
     private function checkRateLimit(string $key, LoginRequest $request, string $email): void

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Exceptions\RoleContextMismatchException;
 use App\Http\Resources\UserResource;
 use App\Mail\PasskeyNotificationMail;
 use App\Models\User;
+use App\Services\LoginService;
 use App\Support\ApiResponse;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Support\Responsable;
@@ -26,8 +28,12 @@ use Laragear\WebAuthn\Http\Requests\AttestedRequest;
  * Registration endpoints require auth:sanctum (user must be logged in).
  * Login endpoints are public (passkey = passwordless).
  */
-final class WebAuthnApiController
+final readonly class WebAuthnApiController
 {
+    public function __construct(
+        private LoginService $loginService,
+    ) {}
+
     // ── Registration (attestation) ─────────────────────────────────────────
 
     /**
@@ -129,8 +135,18 @@ final class WebAuthnApiController
             }
 
             $loginContext = $request->input('login_context', 'client');
-            $tokenName = $loginContext === 'owner' ? 'owner_passkey_token' : 'client_passkey_token';
-            $token = $user->createToken($tokenName)->plainTextToken;
+            if (!in_array($loginContext, ['owner', 'client'], true)) {
+                return ApiResponse::error('Contexte de connexion invalide.', 422);
+            }
+
+            try {
+                $newToken = $this->loginService->issueApiTokenForLoginContext($user, $loginContext);
+            } catch (RoleContextMismatchException $e) {
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'code' => 'ROLE_CONTEXT_MISMATCH',
+                ], 403);
+            }
 
             // Set the verified user on the guard so $request->user() is populated
             // when UserResource is built — this ensures 'role' and 'type' fields
@@ -146,8 +162,9 @@ final class WebAuthnApiController
 
             return response()->json([
                 'message' => 'Connexion réussie via passkey.',
-                'access_token' => $token,
+                'access_token' => $newToken->plainTextToken,
                 'token_type' => 'Bearer',
+                'expires_at' => $newToken->accessToken->expires_at,
                 'user' => new UserResource($user),
             ]);
         } catch (\Throwable $e) {
