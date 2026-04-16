@@ -1,4 +1,20 @@
-# ── Stage 1: Node.js asset builder ─────────────────────────────────────────
+# ── Stage 1: Composer — fetch Filament CSS for the Vite build ───────────────
+# We only need vendor/filament/ (a few MB of CSS) so Tailwind can resolve the
+# @import in resources/css/filament/admin/theme.css. Without the real Filament
+# theme.css the Vite output is an empty CSS file → zero panel styling.
+# --ignore-platform-reqs lets composer run in the generic composer image
+# regardless of PHP version; we are only downloading files, not executing PHP.
+FROM composer:latest AS composer-builder
+WORKDIR /app
+COPY composer.json composer.lock ./
+RUN composer install \
+      --no-dev \
+      --no-autoloader \
+      --no-scripts \
+      --no-interaction \
+      --ignore-platform-reqs
+
+# ── Stage 2: Node.js asset builder ─────────────────────────────────────────
 # Node.js is ONLY needed to compile Vite/Filament assets.
 # Keeping it in a separate stage removes ~80 MB from the production image.
 FROM node:20-alpine AS node-builder
@@ -7,14 +23,14 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --prefer-offline
 COPY . .
-# Stub the Filament vendor CSS so Tailwind/Vite can resolve the @import in
-# resources/css/filament/admin/theme.css. The real Filament assets are
-# published later by `php artisan filament:assets` in the PHP stage.
-RUN mkdir -p vendor/filament/filament/resources/css \
-    && touch vendor/filament/filament/resources/css/theme.css
+# Provide the REAL Filament vendor CSS so Tailwind/Vite compiles a complete
+# panel theme. Filament's theme.css has @import chains across filament/*
+# packages (forms, tables, actions, etc.) so we copy the full vendor/filament
+# directory (~a few MB). No stub needed anymore.
+COPY --from=composer-builder /app/vendor/filament ./vendor/filament
 RUN npm run build && npm cache clean --force
 
-# ── Stage 2: PHP production image ────────────────────────────────────────────
+# ── Stage 3: PHP production image ────────────────────────────────────────────
 FROM php:8.4-fpm-alpine
 
 # Installation des dépendances système et extensions PHP nécessaires
