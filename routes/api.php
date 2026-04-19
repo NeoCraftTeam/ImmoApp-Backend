@@ -35,6 +35,9 @@ use App\Http\Controllers\Api\V1\TeamController;
 use App\Http\Controllers\Api\V1\TenantController;
 use App\Http\Controllers\Api\V1\TrustScoreController;
 use App\Http\Controllers\Api\V1\UserController;
+use App\Http\Controllers\Api\V1\ConversationController;
+use App\Http\Controllers\Api\V1\FcmTokenController;
+use App\Http\Controllers\Api\V1\MessageController;
 use App\Http\Controllers\Api\V1\VisitTrackingController;
 use App\Models\AdType;
 use App\Models\Agency;
@@ -293,4 +296,31 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/signatures/{token}', [SignatureController::class, 'show']);
     Route::post('/signatures/{token}/sign', [SignatureController::class, 'sign'])->middleware('throttle:10,1');
     Route::post('/signatures/{token}/decline', [SignatureController::class, 'decline'])->middleware('throttle:10,1');
+
+    // ─── CHAT ────────────────────────────────────────────────────────────────
+    Route::middleware('auth:sanctum')->group(function (): void {
+        // Conversations
+        Route::prefix('conversations')->group(function (): void {
+            Route::get('/', [ConversationController::class, 'index']);
+            Route::post('/', [ConversationController::class, 'store']);
+            Route::get('/unread-count', [ConversationController::class, 'unreadCount']);
+            Route::get('/{uuid}', [ConversationController::class, 'show']);
+            Route::get('/{uuid}/messages', [ConversationController::class, 'messages']);
+            Route::post('/{uuid}/messages', [ConversationController::class, 'sendMessage'])
+                ->middleware('throttle:60,1');
+            Route::post('/{uuid}/attachments', [ConversationController::class, 'uploadAttachment'])
+                ->middleware('throttle:10,1');
+            Route::patch('/{uuid}/read', [ConversationController::class, 'markAsRead']);
+            Route::post('/{uuid}/typing', [ConversationController::class, 'setTyping'])
+                ->middleware('throttle:30,1');
+            Route::patch('/{uuid}/archive', [ConversationController::class, 'archive']);
+        });
+
+        // Individual message operations
+        Route::delete('/messages/{uuid}', [MessageController::class, 'destroy']);
+
+        // FCM tokens
+        Route::post('/fcm/token', [FcmTokenController::class, 'store']);
+        Route::delete('/fcm/token', [FcmTokenController::class, 'destroy']);
+    });
 });

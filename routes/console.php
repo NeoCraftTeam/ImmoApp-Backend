@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Jobs\CleanExpiredSignedUrlsJob;
 use App\Jobs\ExpireStaleReservationsJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -39,3 +40,6 @@ Schedule::command('app:send-retention-pushes')->twiceDaily(9, 18);
 
 // — Trust Score nightly recomputation —
 Schedule::command('trustscore:recompute')->dailyAt('02:30');
+
+// — Chat: refresh attachment signed URLs before they expire —
+Schedule::job(CleanExpiredSignedUrlsJob::class)->dailyAt('05:00');

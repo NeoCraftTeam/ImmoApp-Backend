@@ -8,8 +8,10 @@ use App\Models\Ad;
 use App\Models\AdInteraction;
 use App\Models\UnlockedAd;
 use App\Models\User;
+use App\Services\Chat\ConversationService;
 use App\Services\PointService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Unlocks an ad for a user by deducting points and recording the interaction.
@@ -19,7 +21,10 @@ use Illuminate\Support\Facades\DB;
  */
 final readonly class UnlockAd
 {
-    public function __construct(private PointService $pointService) {}
+    public function __construct(
+        private PointService $pointService,
+        private ConversationService $conversationService,
+    ) {}
 
     /**
      * @return array{status: string, points_balance?: int, current_balance?: int, required_points?: int}
@@ -69,6 +74,19 @@ final readonly class UnlockAd
                 'ad_id' => $ad->id,
                 'type' => AdInteraction::TYPE_UNLOCK,
             ]);
+
+            // Auto-create the conversation between tenant and landlord/agent.
+            $landlordId = (string) ($ad->user_id ?? '');
+            if ($landlordId !== '' && $landlordId !== $user->id) {
+                try {
+                    $this->conversationService->findOrCreate($ad->id, $user->id, $landlordId);
+                } catch (\Throwable $e) {
+                    Log::warning('[Chat] Could not auto-create conversation after unlock', [
+                        'ad_id'  => $ad->id,
+                        'error'  => $e->getMessage(),
+                    ]);
+                }
+            }
 
             return [
                 'status' => 'unlocked',
