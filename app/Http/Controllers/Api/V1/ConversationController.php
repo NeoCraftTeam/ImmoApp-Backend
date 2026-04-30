@@ -15,6 +15,7 @@ use App\Http\Resources\Chat\MessageResource;
 use App\Models\Ad;
 use App\Models\Conversation;
 use App\Models\Message;
+use App\Models\User;
 use App\Services\Chat\AttachmentService;
 use App\Services\Chat\ConversationService;
 use App\Services\Chat\MessageService;
@@ -22,6 +23,8 @@ use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
+use Illuminate\Http\UploadedFile;
 
 /**
  * Chat conversation and message endpoints.
@@ -31,12 +34,12 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
  *  - Encrypted body, body_iv, and sender PII are never returned.
  *  - Rate limiting applied per action (see routes/api.php).
  */
-final class ConversationController
+final readonly class ConversationController
 {
     public function __construct(
-        private readonly ConversationService $conversations,
-        private readonly MessageService $messages,
-        private readonly AttachmentService $attachments,
+        private ConversationService $conversations,
+        private MessageService $messages,
+        private AttachmentService $attachments,
     ) {}
 
     /**
@@ -45,7 +48,7 @@ final class ConversationController
      */
     public function index(Request $request): AnonymousResourceCollection
     {
-        $user  = $request->user();
+        $user = $request->user();
         $perPage = (int) config('chat.pagination.conversations', 20);
         $paginator = $this->conversations->getConversationsForUser($user, $perPage);
 
@@ -59,12 +62,12 @@ final class ConversationController
      */
     public function store(StoreConversationRequest $request): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
 
-        $ad = Ad::findOrFail($request->validated('ad_id'));
-        /** @var string $landlordId */
-        $landlordId = $ad->user_id ?? $ad->agency?->user_id ?? '';
+        $adId = (string) $request->validated('ad_id');
+        $ad = Ad::findOrFail($adId);
+        $landlordId = (string) $ad->user_id;
 
         try {
             $existed = Conversation::where('ad_id', $ad->id)
@@ -72,11 +75,11 @@ final class ConversationController
                 ->exists();
 
             $conv = $this->conversations->findOrCreate($ad->id, $user->id, $landlordId);
-            $conv->load(['ad:id,title', 'latestMessage', 'tenant:id,firstname,lastname,avatar', 'landlord:id,firstname,lastname,avatar']);
+            $conv->load(['ad:id,title,slug', 'latestMessage', 'tenant:id,firstname,lastname,avatar,last_seen_at', 'landlord:id,firstname,lastname,avatar,last_seen_at']);
 
             $status = $existed ? 200 : 201;
 
-            return (new ConversationResource($conv))
+            return new ConversationResource($conv)
                 ->response()
                 ->setStatusCode($status);
         } catch (ConversationNotAllowedException $e) {
@@ -91,9 +94,9 @@ final class ConversationController
     public function show(Request $request, string $uuid): JsonResponse
     {
         $conv = $this->findConversationForUser($uuid, (string) $request->user()?->id);
-        $conv->load(['ad:id,title', 'latestMessage', 'tenant:id,firstname,lastname,avatar', 'landlord:id,firstname,lastname,avatar']);
+        $conv->load(['ad:id,title,slug', 'latestMessage', 'tenant:id,firstname,lastname,avatar,last_seen_at', 'landlord:id,firstname,lastname,avatar,last_seen_at']);
 
-        return (new ConversationResource($conv))->response();
+        return new ConversationResource($conv)->response();
     }
 
     /**
@@ -103,7 +106,7 @@ final class ConversationController
      */
     public function messages(Request $request, string $uuid): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         $conv = $this->findConversationForUser($uuid, $user->id);
 
@@ -116,9 +119,9 @@ final class ConversationController
         $this->conversations->markAsRead($conv, $user);
 
         return response()->json([
-            'data'          => MessageResource::collection($paginator->items()),
-            'next_cursor'   => $paginator->nextCursor()?->encode(),
-            'has_more'      => $paginator->hasMorePages(),
+            'data' => MessageResource::collection($paginator->items()),
+            'next_cursor' => $paginator->nextCursor()?->encode(),
+            'has_more' => $paginator->hasMorePages(),
         ]);
     }
 
@@ -128,7 +131,7 @@ final class ConversationController
      */
     public function sendMessage(SendMessageRequest $request, string $uuid): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         $conv = $this->findConversationForUser($uuid, $user->id);
 
@@ -143,7 +146,7 @@ final class ConversationController
             $validated['reply_to_id'] ?? null,
         );
 
-        return (new MessageResource($message))
+        return new MessageResource($message)
             ->response()
             ->setStatusCode(201);
     }
@@ -155,11 +158,11 @@ final class ConversationController
      */
     public function uploadAttachment(UploadAttachmentRequest $request, string $uuid): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         $conv = $this->findConversationForUser($uuid, $user->id);
 
-        /** @var \Illuminate\Http\UploadedFile $file */
+        /** @var UploadedFile $file */
         $file = $request->file('file');
 
         try {
@@ -177,14 +180,14 @@ final class ConversationController
      */
     public function markAsRead(Request $request, string $uuid): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         $conv = $this->findConversationForUser($uuid, $user->id);
 
         $this->conversations->markAsRead($conv, $user);
 
         return response()->json([
-            'tenant_last_read_at'   => $conv->fresh()?->tenant_last_read_at?->toIso8601String(),
+            'tenant_last_read_at' => $conv->fresh()?->tenant_last_read_at?->toIso8601String(),
             'landlord_last_read_at' => $conv->fresh()?->landlord_last_read_at?->toIso8601String(),
         ]);
     }
@@ -194,17 +197,21 @@ final class ConversationController
      * Broadcast a typing indicator. No DB write — ephemeral.
      * Returns 204 No Content.
      */
-    public function setTyping(SetTypingRequest $request, string $uuid): \Illuminate\Http\Response
+    public function setTyping(SetTypingRequest $request, string $uuid): Response
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         $conv = $this->findConversationForUser($uuid, $user->id);
 
-        broadcast(new UserTyping(
-            $conv->id,
-            $user->id,
-            (bool) $request->validated('is_typing'),
-        ))->toOthers();
+        try {
+            broadcast(new UserTyping(
+                $conv->id,
+                $user->id,
+                (bool) $request->validated('is_typing'),
+            ))->toOthers();
+        } catch (\Throwable) {
+            // Reverb may be unavailable in local dev — do not fail the HTTP response
+        }
 
         return response()->noContent();
     }
@@ -215,7 +222,7 @@ final class ConversationController
      */
     public function archive(Request $request, string $uuid): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
         $conv = $this->findConversationForUser($uuid, $user->id);
 
@@ -230,7 +237,7 @@ final class ConversationController
      */
     public function unreadCount(Request $request): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
 
         return response()->json($this->conversations->getUnreadCount($user));
@@ -246,10 +253,7 @@ final class ConversationController
     {
         $conv = Conversation::where('id', $uuid)->firstOrFail();
 
-        abort_unless(
-            in_array($userId, [$conv->tenant_id, $conv->landlord_id], true),
-            404,
-        );
+        abort_unless($userId === $conv->tenant_id || $userId === $conv->landlord_id, 404);
 
         return $conv;
     }

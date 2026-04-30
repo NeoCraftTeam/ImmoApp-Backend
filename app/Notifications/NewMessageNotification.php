@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
+use App\Enums\UserRole;
 use App\Models\Message;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -31,10 +33,10 @@ final class NewMessageNotification extends Notification implements ShouldQueue
     public function toArray(mixed $notifiable): array
     {
         return [
-            'type'              => 'chat_message',
+            'type' => 'chat_message',
             'conversation_uuid' => $this->message->conversation_id,
-            'sender_id'         => $this->message->sender_id,
-            'preview'           => $this->message->decrypted_body !== null
+            'sender_id' => $this->message->sender_id,
+            'preview' => $this->message->decrypted_body !== null
                 ? mb_substr($this->message->decrypted_body, 0, 80)
                 : '📎 Pièce jointe',
         ];
@@ -42,18 +44,24 @@ final class NewMessageNotification extends Notification implements ShouldQueue
 
     public function toMail(mixed $notifiable): MailMessage
     {
-        $sender  = $this->message->sender;
-        $name    = $sender ? trim("{$sender->firstname} {$sender->lastname}") : 'Quelqu\'un';
+        $sender = $this->message->sender;
+        $name = $sender ? trim("{$sender->firstname} {$sender->lastname}") : 'Quelqu\'un';
         $preview = $this->message->decrypted_body !== null
             ? mb_substr($this->message->decrypted_body, 0, 100)
             : '📎 Pièce jointe';
 
-        return (new MailMessage())
+        // Recipient-aware deep link: owners/agents land in /owner/messages/, customers in /messages/.
+        $basePath = ($notifiable instanceof User && $notifiable->role === UserRole::AGENT)
+            ? '/owner/messages'
+            : '/messages';
+        $messageUrl = config('app.frontend_url').$basePath.'/'.$this->message->conversation_id;
+
+        return (new MailMessage)
             ->subject("Nouveau message de {$name}")
-            ->greeting("Bonjour !")
+            ->greeting('Bonjour !')
             ->line("{$name} vous a envoyé un message sur KeyHome :")
             ->line("\"{$preview}\"")
-            ->action('Voir le message', url("/messages/{$this->message->conversation_id}"))
+            ->action('Voir le message', $messageUrl)
             ->line('Répondez rapidement pour ne pas faire attendre votre interlocuteur.');
     }
 }

@@ -56,25 +56,25 @@ final readonly class EncryptionService
             throw new RuntimeException('Message encryption failed.');
         }
 
-        $hexIv      = bin2hex($iv);
-        $b64Cipher  = base64_encode($ciphertext);
+        $hexIv = bin2hex($iv);
+        $b64Cipher = base64_encode($ciphertext);
 
         // Prepend HMAC-SHA256 MAC (32 bytes) to the raw ciphertext so that
         // decrypt() can verify integrity before attempting decryption.
-        $mac     = hash_hmac('sha256', $hexIv . $b64Cipher, $this->key, true);
-        $payload = base64_encode($mac . $ciphertext);
+        $mac = hash_hmac('sha256', $hexIv.$b64Cipher, $this->key, true);
+        $payload = base64_encode($mac.$ciphertext);
 
         return [
             'ciphertext' => $payload,
-            'iv'         => $hexIv,
+            'iv' => $hexIv,
         ];
     }
 
     /**
      * Decrypt ciphertext encrypted by {@see encrypt()}.
      *
-     * @param string $ciphertext Base64-encoded ciphertext
-     * @param string $iv         Hex-encoded initialization vector
+     * @param  string  $ciphertext  Base64-encoded ciphertext
+     * @param  string  $iv  Hex-encoded initialization vector
      *
      * @throws RuntimeException on decryption failure
      */
@@ -94,11 +94,11 @@ final readonly class EncryptionService
 
         // Authenticate the payload: HMAC-SHA256(key, hexIv || base64(raw_ciphertext))
         // Matches the MAC computation in encrypt(): hmac(hexIv + base64_encode(raw_ciphertext))
-        $stored    = substr($decoded, 0, 32);
+        $stored = substr($decoded, 0, 32);
         $encrypted = substr($decoded, 32);
-        $expected  = hash_hmac('sha256', $iv . base64_encode($encrypted), $this->key, true);
+        $expected = hash_hmac('sha256', $iv.base64_encode($encrypted), $this->key, true);
 
-        if (! hash_equals($expected, $stored)) {
+        if (!hash_equals($expected, $stored)) {
             throw new RuntimeException('Message decryption failed: authentication error.');
         }
 

@@ -40,7 +40,7 @@ final class MessageRead implements ShouldBroadcastNow
     {
         return [
             'reader_id' => $this->readerId,
-            'read_at'   => $this->readAt,
+            'read_at' => $this->readAt,
         ];
     }
 }

@@ -33,24 +33,24 @@ final class CleanExpiredSignedUrlsJob implements ShouldQueue
             ->chunk(100, function ($messages) use ($service): void {
                 foreach ($messages as $message) {
                     $attachments = $message->attachments;
-                    if (! is_array($attachments) || $attachments === []) {
+                    if (!is_array($attachments) || $attachments === []) {
                         continue;
                     }
 
                     $refreshed = false;
                     foreach ($attachments as &$attachment) {
-                        if (! isset($attachment['url'])) {
+                        if (!isset($attachment['url'])) {
                             continue;
                         }
 
                         try {
                             $attachment['signed_url'] = $service->getSignedUrl($attachment['url']);
-                            $refreshed                = true;
+                            $refreshed = true;
                         } catch (\Throwable $e) {
                             Log::warning('[Chat] Failed to refresh signed URL', [
                                 'message_id' => $message->id,
-                                'path'       => $attachment['url'],
-                                'error'      => $e->getMessage(),
+                                'path' => $attachment['url'],
+                                'error' => $e->getMessage(),
                             ]);
                         }
                     }

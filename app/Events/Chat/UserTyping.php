@@ -13,7 +13,7 @@ use Illuminate\Queue\SerializesModels;
 
 /**
  * Ephemeral typing indicator event.
- * Throttled at the controller level (max 1 per 2 s per user).
+ * Throttled at the route level (max 30 per minute per user).
  * No database write — purely real-time.
  */
 final class UserTyping implements ShouldBroadcastNow
@@ -41,7 +41,7 @@ final class UserTyping implements ShouldBroadcastNow
     public function broadcastWith(): array
     {
         return [
-            'user_id'   => $this->userId,
+            'user_id' => $this->userId,
             'is_typing' => $this->isTyping,
         ];
     }

@@ -10,13 +10,16 @@ use App\Http\Controllers\Api\V1\BoostController;
 use App\Http\Controllers\Api\V1\BulkAdController;
 use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\ClerkWebhookController;
+use App\Http\Controllers\Api\V1\ConversationController;
 use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\DuplicateAdController;
 use App\Http\Controllers\Api\V1\ExpenseController;
+use App\Http\Controllers\Api\V1\FcmTokenController;
 use App\Http\Controllers\Api\V1\GdprController;
 use App\Http\Controllers\Api\V1\HealthCheckController;
 use App\Http\Controllers\Api\V1\LeaseContractController;
 use App\Http\Controllers\Api\V1\LoginHistoryController;
+use App\Http\Controllers\Api\V1\MessageController;
 use App\Http\Controllers\Api\V1\MyReviewsController;
 use App\Http\Controllers\Api\V1\NaturalSearchController;
 use App\Http\Controllers\Api\V1\NewsletterController;
@@ -35,15 +38,14 @@ use App\Http\Controllers\Api\V1\TeamController;
 use App\Http\Controllers\Api\V1\TenantController;
 use App\Http\Controllers\Api\V1\TrustScoreController;
 use App\Http\Controllers\Api\V1\UserController;
-use App\Http\Controllers\Api\V1\ConversationController;
-use App\Http\Controllers\Api\V1\FcmTokenController;
-use App\Http\Controllers\Api\V1\MessageController;
 use App\Http\Controllers\Api\V1\VisitTrackingController;
 use App\Models\AdType;
 use App\Models\Agency;
 use App\Models\City;
 use App\Models\Quarter;
 use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
 
 // Public liveness probe — no auth, no infra details. Used by CI smoke tests and uptime monitors.
@@ -66,8 +68,8 @@ Route::prefix('v1')->group(function (): void {
     require __DIR__.'/api/surveys.php';
     require __DIR__.'/api/geo.php';
 
-    // --- AD TYPES ---
-    Route::controller(AdTypeController::class)->group(function (): void {
+    // --- AD TYPES (public, long-lived reference data) ---
+    Route::controller(AdTypeController::class)->middleware('cdn.cache:3600')->group(function (): void {
         Route::get('/ad-types', 'index');
         Route::get('/ad-types/{adType}', 'show');
     });
@@ -77,19 +79,19 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/ad-types/{adType}', 'destroy')->can('delete', 'adType');
     });
 
-    // --- CITIES ---
+    // --- CITIES (public, long-lived reference data) ---
     Route::controller(CityController::class)->group(function (): void {
-        Route::get('/cities', 'index');
-        Route::get('/cities/{id}', 'show');
+        Route::get('/cities', 'index')->middleware('cdn.cache:3600');
+        Route::get('/cities/{id}', 'show')->middleware('cdn.cache:3600');
         Route::post('/cities', 'store')->middleware('auth:sanctum')->can('create', City::class);
         Route::put('/cities/{city}', 'update')->middleware('auth:sanctum')->can('update', 'city');
         Route::delete('/cities/{city}', 'destroy')->middleware('auth:sanctum')->can('delete', 'city');
     });
 
-    // --- QUARTERS ---
+    // --- QUARTERS (public, long-lived reference data) ---
     Route::controller(QuarterController::class)->group(function (): void {
-        Route::get('/quarters', 'index');
-        Route::get('/quarters/{id}', 'show');
+        Route::get('/quarters', 'index')->middleware('cdn.cache:3600');
+        Route::get('/quarters/{id}', 'show')->middleware('cdn.cache:3600');
         Route::post('/quarters', 'store')->middleware('auth:sanctum')->can('create', Quarter::class);
         Route::put('/quarters/{quarter}', 'update')->middleware('auth:sanctum')->can('update', 'quarter');
         Route::delete('/quarters/{quarter}', 'destroy')->middleware('auth:sanctum')->can('delete', 'quarter');
@@ -158,17 +160,18 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/{id}', 'destroy');
     });
 
-    // --- PROPERTY ATTRIBUTES (public) ---
-    Route::get('/property-attributes', [PropertyAttributeController::class, 'index']);
+    // --- PROPERTY ATTRIBUTES (public, reference data) ---
+    Route::get('/property-attributes', [PropertyAttributeController::class, 'index'])
+        ->middleware('cdn.cache:1800');
 
     // --- VISIT TRACKING (anonymous) ---
     Route::post('/track/visit', [VisitTrackingController::class, 'store'])
         ->middleware('throttle:60,1');
 
-    // --- PUBLIC STATS (W37: extracted from inline closures to StatsController) ---
+    // --- PUBLIC STATS ---
     Route::controller(StatsController::class)->middleware('throttle:30,1')->group(function (): void {
-        Route::get('/stats/landing', 'landing')->name('stats.landing');
-        Route::get('/stats/testimonials', 'testimonials')->name('stats.testimonials');
+        Route::get('/stats/landing', 'landing')->name('stats.landing')->middleware('cdn.cache:300');
+        Route::get('/stats/testimonials', 'testimonials')->name('stats.testimonials')->middleware('cdn.cache:3600');
     });
 
     // --- CLERK WEBHOOKS ---
@@ -296,6 +299,11 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/signatures/{token}', [SignatureController::class, 'show']);
     Route::post('/signatures/{token}/sign', [SignatureController::class, 'sign'])->middleware('throttle:10,1');
     Route::post('/signatures/{token}/decline', [SignatureController::class, 'decline'])->middleware('throttle:10,1');
+
+    // ─── BROADCASTING AUTH (Sanctum Bearer token) ──────────────────────────
+    // The default /broadcasting/auth route uses the 'web' middleware (session auth).
+    // The Next.js PWA sends a Sanctum Bearer token, so we need this API route.
+    Route::middleware('auth:sanctum')->post('/broadcasting/auth', fn (Request $request) => Broadcast::auth($request));
 
     // ─── CHAT ────────────────────────────────────────────────────────────────
     Route::middleware('auth:sanctum')->group(function (): void {

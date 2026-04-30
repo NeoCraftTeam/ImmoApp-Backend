@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Models\FcmToken;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 /**
  * Register / refresh FCM tokens for push notifications.
@@ -20,18 +22,18 @@ final class FcmTokenController
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'token'    => ['required', 'string'],
+            'token' => ['required', 'string'],
             'platform' => ['required', 'string', 'in:web,android,ios'],
         ]);
 
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
 
         FcmToken::updateOrCreate(
             ['token' => $validated['token']],
             [
-                'user_id'      => $user->id,
-                'platform'     => $validated['platform'],
+                'user_id' => $user->id,
+                'platform' => $validated['platform'],
                 'last_used_at' => now(),
             ],
         );
@@ -43,7 +45,7 @@ final class FcmTokenController
      * DELETE /api/v1/fcm/token
      * Remove a FCM token (on logout or permission revocation).
      */
-    public function destroy(Request $request): \Illuminate\Http\Response
+    public function destroy(Request $request): Response
     {
         $validated = $request->validate([
             'token' => ['required', 'string'],

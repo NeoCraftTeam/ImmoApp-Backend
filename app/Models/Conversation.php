@@ -6,12 +6,14 @@ namespace App\Models;
 
 use App\Enums\ConversationStatus;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
@@ -19,17 +21,17 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property string $tenant_id
  * @property string $landlord_id
  * @property ConversationStatus $status
- * @property \Illuminate\Support\Carbon|null $tenant_last_read_at
- * @property \Illuminate\Support\Carbon|null $landlord_last_read_at
- * @property \Illuminate\Support\Carbon|null $last_message_at
+ * @property Carbon|null $tenant_last_read_at
+ * @property Carbon|null $landlord_last_read_at
+ * @property Carbon|null $last_message_at
  * @property string|null $last_message_preview
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
  * @property-read Ad|null $ad
  * @property-read User|null $tenant
  * @property-read User|null $landlord
- * @property-read \Illuminate\Database\Eloquent\Collection<int,Message> $messages
+ * @property-read Collection<int,Message> $messages
  * @property-read Message|null $latestMessage
  */
 class Conversation extends Model
@@ -45,18 +47,20 @@ class Conversation extends Model
         'landlord_last_read_at',
         'last_message_at',
         'last_message_preview',
+        'last_message_id',
     ];
 
     protected $with = [];
 
     /** @return array<string, mixed> */
+    #[\Override]
     protected function casts(): array
     {
         return [
-            'status'                => ConversationStatus::class,
-            'tenant_last_read_at'   => 'datetime',
+            'status' => ConversationStatus::class,
+            'tenant_last_read_at' => 'datetime',
             'landlord_last_read_at' => 'datetime',
-            'last_message_at'       => 'datetime',
+            'last_message_at' => 'datetime',
         ];
     }
 

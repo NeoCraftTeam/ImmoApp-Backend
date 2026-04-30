@@ -42,7 +42,7 @@ final class SendOfflineEmailNotificationJob implements ShouldQueue
         }
 
         // Skip if the message has already been read (user opened the conversation)
-        if ($message->status?->value === 'read') {
+        if ($message->status->value === 'read') {
             return;
         }
 

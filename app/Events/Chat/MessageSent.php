@@ -11,6 +11,7 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * Broadcast when a new message is sent.
@@ -41,21 +42,39 @@ final class MessageSent implements ShouldBroadcastNow
         $sender = $this->message->sender;
 
         return [
-            'uuid'              => $this->message->id,
+            'uuid' => $this->message->id,
             'conversation_uuid' => $this->message->conversation_id,
-            'sender_id'         => $this->message->sender_id,
-            'sender'            => $sender ? [
-                'id'     => $sender->id,
-                'name'   => trim("{$sender->firstname} {$sender->lastname}"),
-                'avatar' => $sender->avatar,
+            'sender_id' => $this->message->sender_id,
+            'sender' => $sender ? [
+                'id' => $sender->id,
+                'name' => trim("{$sender->firstname} {$sender->lastname}"),
+                'avatar' => $this->resolveAvatarUrl($sender->getFirstMediaUrl('avatars') ?: $sender->avatar),
             ] : null,
-            'type'              => $this->message->type->value,
-            'body'              => $this->message->decrypted_body,
-            'attachments'       => $this->message->attachments,
-            'reply_to'          => $this->buildReplyTo(),
-            'status'            => $this->message->status->value,
-            'created_at'        => $this->message->created_at?->toIso8601String(),
+            'type' => $this->message->type->value,
+            'body' => $this->message->decrypted_body,
+            'attachments' => $this->message->attachments,
+            'reply_to' => $this->buildReplyTo(),
+            'status' => $this->message->status->value,
+            'read_at' => $this->message->read_at?->toIso8601String(),
+            'deleted_at' => $this->message->deleted_at?->toIso8601String(),
+            'created_at' => $this->message->created_at?->toIso8601String(),
         ];
+    }
+
+    private function resolveAvatarUrl(?string $avatar): ?string
+    {
+        if (!$avatar) {
+            return null;
+        }
+        if (str_starts_with($avatar, 'http')) {
+            return $avatar;
+        }
+        $disk = config('filesystems.app_media_disk');
+        if (Storage::disk($disk)->exists($avatar)) {
+            return Storage::disk($disk)->url($avatar);
+        }
+
+        return null;
     }
 
     /** @return array<string, mixed>|null */
@@ -67,8 +86,8 @@ final class MessageSent implements ShouldBroadcastNow
         }
 
         return [
-            'uuid'      => $reply->id,
-            'body'      => $reply->decrypted_body !== null
+            'uuid' => $reply->id,
+            'body' => $reply->decrypted_body !== null
                 ? mb_substr($reply->decrypted_body, 0, 80)
                 : null,
             'sender_id' => $reply->sender_id,

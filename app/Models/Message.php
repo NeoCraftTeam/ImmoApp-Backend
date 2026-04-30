@@ -6,28 +6,30 @@ namespace App\Models;
 
 use App\Enums\MessageStatus;
 use App\Enums\MessageType;
+use App\Services\Chat\EncryptionService;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
  * @property string $conversation_id
  * @property string $sender_id
  * @property MessageType $type
- * @property string|null $body  (stored encrypted; access via decrypted_body)
+ * @property string|null $body (stored encrypted; access via decrypted_body)
  * @property string|null $body_iv
  * @property array<int, array<string, mixed>>|null $attachments
  * @property string|null $reply_to_id
  * @property MessageStatus $status
- * @property \Illuminate\Support\Carbon|null $read_at
- * @property \Illuminate\Support\Carbon|null $delivered_at
- * @property \Illuminate\Support\Carbon|null $edited_at
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property Carbon|null $read_at
+ * @property Carbon|null $delivered_at
+ * @property Carbon|null $edited_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
  * @property-read Conversation|null $conversation
  * @property-read User|null $sender
  * @property-read Message|null $replyTo
@@ -55,15 +57,16 @@ class Message extends Model
     protected $hidden = ['body', 'body_iv'];
 
     /** @return array<string, mixed> */
+    #[\Override]
     protected function casts(): array
     {
         return [
-            'attachments'  => 'array',
-            'read_at'      => 'datetime',
+            'attachments' => 'array',
+            'read_at' => 'datetime',
             'delivered_at' => 'datetime',
-            'edited_at'    => 'datetime',
-            'status'       => MessageStatus::class,
-            'type'         => MessageType::class,
+            'edited_at' => 'datetime',
+            'status' => MessageStatus::class,
+            'type' => MessageType::class,
         ];
     }
 
@@ -97,8 +100,8 @@ class Message extends Model
         }
 
         try {
-            /** @var \App\Services\Chat\EncryptionService $enc */
-            $enc = app(\App\Services\Chat\EncryptionService::class);
+            /** @var EncryptionService $enc */
+            $enc = app(EncryptionService::class);
 
             return $enc->decrypt($this->body, $this->body_iv);
         } catch (\Throwable) {

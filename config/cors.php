@@ -23,7 +23,7 @@ return [
     |
     */
 
-    'paths' => ['api/*', 'auth/*', 'sanctum/csrf-cookie', 'login', 'register', 'storage/*'],
+    'paths' => ['api/*', 'auth/*', 'sanctum/csrf-cookie', 'broadcasting/*', 'login', 'register', 'storage/*'],
 
     'allowed_methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 
@@ -48,7 +48,7 @@ return [
         '/^https:\/\/(staging|preprod|preview(-[a-z0-9-]+)?)\.keyhome\.neocraft\.dev$/',
     ],
 
-    'allowed_headers' => ['Accept', 'Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token', 'X-Inertia', 'X-WebAuthn-Token'],
+    'allowed_headers' => ['Accept', 'Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token', 'X-Inertia', 'X-WebAuthn-Token', 'X-Socket-Id'],
 
     'exposed_headers' => ['X-WebAuthn-Token'],
 

@@ -24,6 +24,7 @@ final readonly class MessageService
 {
     public function __construct(
         private EncryptionService $encryption,
+        private ConversationService $conversations,
     ) {}
 
     /**
@@ -32,7 +33,7 @@ final readonly class MessageService
      * Encrypts the body, creates the record, updates conversation metadata,
      * broadcasts the event, and dispatches push/email notification jobs.
      *
-     * @param array<int, array<string, mixed>>|null $attachments
+     * @param  array<int, array<string, mixed>>|null  $attachments
      *
      * @throws RuntimeException if sender is not a conversation participant
      */
@@ -44,41 +45,36 @@ final readonly class MessageService
         ?array $attachments = null,
         ?string $replyToId = null,
     ): Message {
-        abort_unless(
-            in_array($sender->id, [$conv->tenant_id, $conv->landlord_id], true),
-            404,
-        );
+        abort_unless($sender->id === $conv->tenant_id || $sender->id === $conv->landlord_id, 404);
 
         $encrypted = null;
-        $iv        = null;
+        $iv = null;
 
         if ($body !== '') {
-            $result    = $this->encryption->encrypt($body);
+            $result = $this->encryption->encrypt($body);
             $encrypted = $result['ciphertext'];
-            $iv        = $result['iv'];
+            $iv = $result['iv'];
         }
-
-        $preview = mb_substr(strip_tags($body), 0, 200);
 
         $message = DB::transaction(function () use (
             $conv, $sender, $encrypted, $iv, $type,
-            $attachments, $replyToId, $preview
+            $attachments, $replyToId
         ): Message {
             $msg = Message::create([
                 'conversation_id' => $conv->id,
-                'sender_id'       => $sender->id,
-                'type'            => MessageType::from($type),
-                'body'            => $encrypted,
-                'body_iv'         => $iv,
-                'attachments'     => $attachments,
-                'reply_to_id'     => $replyToId,
-                'status'          => MessageStatus::Sent,
+                'sender_id' => $sender->id,
+                'type' => MessageType::from($type),
+                'body' => $encrypted,
+                'body_iv' => $iv,
+                'attachments' => $attachments,
+                'reply_to_id' => $replyToId,
+                'status' => MessageStatus::Sent,
             ]);
 
             $conv->update([
-                'last_message_at'      => now(),
-                'last_message_preview' => $preview,
-                'last_message_id'      => $msg->id,
+                'last_message_at' => now(),
+                'last_message_preview' => null,
+                'last_message_id' => $msg->id,
             ]);
 
             return $msg;
@@ -86,11 +82,17 @@ final readonly class MessageService
 
         $message->load(['sender:id,firstname,lastname,avatar', 'replyTo']);
 
-        broadcast(new MessageSent($message))->toOthers();
+        try {
+            broadcast(new MessageSent($message))->toOthers();
+        } catch (\Throwable) {
+            // Reverb may be unavailable in local dev — do not fail the HTTP response
+        }
 
         $recipientId = $sender->id === $conv->tenant_id
             ? $conv->landlord_id
             : $conv->tenant_id;
+
+        $this->conversations->invalidateUnreadCache($recipientId);
 
         SendChatPushNotificationJob::dispatch($recipientId, $message->id);
         SendOfflineEmailNotificationJob::dispatch($recipientId, $message->id)
@@ -114,14 +116,18 @@ final readonly class MessageService
             $message->delete();
         });
 
-        broadcast(new MessageDeleted($message->conversation_id, $message->id));
+        try {
+            broadcast(new MessageDeleted($message->conversation_id, $message->id));
+        } catch (\Throwable) {
+            // Reverb may be unavailable in local dev — do not fail the HTTP response
+        }
     }
 
     /**
      * Return cursor-paginated message history for a conversation.
      * Messages are ordered newest-first; client reverses for display.
      *
-     * @return CursorPaginator<Message>
+     * @return CursorPaginator<int, Message>
      */
     public function getHistory(
         Conversation $conv,

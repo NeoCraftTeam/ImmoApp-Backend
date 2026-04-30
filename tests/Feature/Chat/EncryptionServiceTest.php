@@ -9,8 +9,8 @@ beforeEach(function (): void {
 });
 
 it('encrypts and decrypts a plaintext message correctly', function (): void {
-    $service = new EncryptionService();
-    $plain   = 'Bonjour, est-ce que l\'appartement est encore disponible ?';
+    $service = new EncryptionService;
+    $plain = 'Bonjour, est-ce que l\'appartement est encore disponible ?';
 
     $result = $service->encrypt($plain);
 
@@ -24,10 +24,10 @@ it('encrypts and decrypts a plaintext message correctly', function (): void {
 });
 
 it('produces different ciphertext for the same plaintext (unique IVs)', function (): void {
-    $service = new EncryptionService();
-    $plain   = 'Test message';
+    $service = new EncryptionService;
+    $plain = 'Test message';
 
-    $first  = $service->encrypt($plain);
+    $first = $service->encrypt($plain);
     $second = $service->encrypt($plain);
 
     expect($first['ciphertext'])->not->toBe($second['ciphertext'])
@@ -37,14 +37,14 @@ it('produces different ciphertext for the same plaintext (unique IVs)', function
 it('throws an exception when the encryption key is missing', function (): void {
     config(['chat.encryption_key' => null]);
 
-    expect(fn () => new EncryptionService())->toThrow(\RuntimeException::class);
+    expect(fn () => new EncryptionService)->toThrow(RuntimeException::class);
 });
 
 it('throws an exception when decrypting with a wrong IV', function (): void {
-    $service = new EncryptionService();
-    $result  = $service->encrypt('test');
+    $service = new EncryptionService;
+    $result = $service->encrypt('test');
 
     // 32 hex chars = valid format but wrong value → MAC auth failure → RuntimeException
     expect(fn () => $service->decrypt($result['ciphertext'], str_repeat('00', 16)))
-        ->toThrow(\RuntimeException::class);
+        ->toThrow(RuntimeException::class);
 });

@@ -21,21 +21,21 @@ beforeEach(function (): void {
 
 function makeConversationParticipants(): array
 {
-    $tenant   = User::factory()->create();
+    $tenant = User::factory()->create();
     $landlord = User::factory()->create();
-    $ad       = Ad::factory()->create(['user_id' => $landlord->id]);
+    $ad = Ad::factory()->create(['user_id' => $landlord->id]);
 
     UnlockedAd::create([
-        'user_id'      => $tenant->id,
-        'ad_id'        => $ad->id,
-        'unlocked_at'  => now(),
+        'user_id' => $tenant->id,
+        'ad_id' => $ad->id,
+        'unlocked_at' => now(),
     ]);
 
     $conversation = Conversation::create([
-        'ad_id'       => $ad->id,
-        'tenant_id'   => $tenant->id,
+        'ad_id' => $ad->id,
+        'tenant_id' => $tenant->id,
         'landlord_id' => $landlord->id,
-        'status'      => ConversationStatus::Active,
+        'status' => ConversationStatus::Active,
     ]);
 
     return compact('tenant', 'landlord', 'ad', 'conversation');
@@ -65,13 +65,13 @@ it('does not return conversations belonging to other users', function (): void {
 // ─── POST /conversations ───────────────────────────────────────────────────────
 
 it('creates a conversation after the ad is unlocked', function (): void {
-    $tenant   = User::factory()->create();
+    $tenant = User::factory()->create();
     $landlord = User::factory()->create();
-    $ad       = Ad::factory()->create(['user_id' => $landlord->id]);
+    $ad = Ad::factory()->create(['user_id' => $landlord->id]);
 
     UnlockedAd::create([
-        'user_id'     => $tenant->id,
-        'ad_id'       => $ad->id,
+        'user_id' => $tenant->id,
+        'ad_id' => $ad->id,
         'unlocked_at' => now(),
     ]);
 
@@ -90,9 +90,9 @@ it('returns 200 (not 201) for an existing conversation', function (): void {
 });
 
 it('returns 403 when the ad has not been unlocked', function (): void {
-    $tenant   = User::factory()->create();
+    $tenant = User::factory()->create();
     $landlord = User::factory()->create();
-    $ad       = Ad::factory()->create(['user_id' => $landlord->id]);
+    $ad = Ad::factory()->create(['user_id' => $landlord->id]);
 
     $this->actingAs($tenant)
         ->postJson('/api/v1/conversations', ['ad_id' => $ad->id])

@@ -18,9 +18,9 @@ return [
     |--------------------------------------------------------------------------
     */
     'rate_limits' => [
-        'send_message'      => 60,
+        'send_message' => 60,
         'upload_attachment' => 10,
-        'set_typing'        => 30,
+        'set_typing' => 30,
     ],
 
     /*
@@ -30,7 +30,7 @@ return [
     */
     'uploads' => [
         'image_max_mb' => 10,
-        'file_max_mb'  => 20,
+        'file_max_mb' => 20,
         'allowed_mimes' => [
             'image/jpeg',
             'image/png',
@@ -48,7 +48,7 @@ return [
     */
     'pagination' => [
         'conversations' => 20,
-        'messages'      => 30,
+        'messages' => 30,
     ],
 
     /*

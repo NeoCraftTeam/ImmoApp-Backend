@@ -32,8 +32,8 @@ final readonly class ConversationService
             ->whereNull('deleted_at')
             ->exists();
 
-        if (! $unlocked) {
-            throw new ConversationNotAllowedException();
+        if (!$unlocked) {
+            throw new ConversationNotAllowedException;
         }
 
         return Conversation::firstOrCreate(
@@ -44,18 +44,33 @@ final readonly class ConversationService
 
     /**
      * Return paginated conversations for a user, ordered by last activity.
+     * Uses a subquery to compute unread_count in a single query (avoids N+1).
      *
-     * @return LengthAwarePaginator<Conversation>
+     * @return LengthAwarePaginator<int, Conversation>
      */
     public function getConversationsForUser(User $user, int $perPage = 20): LengthAwarePaginator
     {
-        return Conversation::forUser($user->id)
+        $userId = $user->id;
+
+        // Build last-read expression using the known userId (safe: from authenticated User model, always UUID).
+        $lastReadExpr = DB::raw(
+            "CASE WHEN conversations.tenant_id = '{$userId}' THEN conversations.tenant_last_read_at ELSE conversations.landlord_last_read_at END"
+        );
+
+        return Conversation::forUser($userId)
             ->with([
                 'latestMessage',
-                'ad:id,title',
-                'tenant:id,firstname,lastname,avatar',
-                'landlord:id,firstname,lastname,avatar',
+                'ad:id,title,slug',
+                'tenant:id,firstname,lastname,avatar,last_seen_at',
+                'landlord:id,firstname,lastname,avatar,last_seen_at',
             ])
+            ->withCount(['messages as computed_unread_count' => function ($q) use ($userId, $lastReadExpr): void {
+                $q->where('sender_id', '!=', $userId)
+                    ->where(function ($sub) use ($lastReadExpr): void {
+                        $sub->whereNull($lastReadExpr)
+                            ->orWhereColumn('messages.created_at', '>', $lastReadExpr);
+                    });
+            }])
             ->orderByDesc('last_message_at')
             ->paginate($perPage);
     }
@@ -83,20 +98,24 @@ final readonly class ConversationService
 
         $this->invalidateUnreadCache($reader->id);
 
-        broadcast(new MessageRead($conv->id, $reader->id, now()->toIso8601String()));
+        try {
+            broadcast(new MessageRead($conv->id, $reader->id, now()->toIso8601String()));
+        } catch (\Throwable) {
+            // Reverb may be unavailable in local dev — do not fail the HTTP response
+        }
     }
 
     /**
      * Archive a conversation. Only participants may archive.
+     * Idempotent: no-op if already archived.
      */
     public function archive(Conversation $conv, User $user): void
     {
-        abort_unless(
-            in_array($user->id, [$conv->tenant_id, $conv->landlord_id], true),
-            404,
-        );
+        abort_unless($user->id === $conv->tenant_id || $user->id === $conv->landlord_id, 404);
 
-        $conv->update(['status' => ConversationStatus::Archived]);
+        if ($conv->status !== ConversationStatus::Archived) {
+            $conv->update(['status' => ConversationStatus::Archived]);
+        }
     }
 
     /**

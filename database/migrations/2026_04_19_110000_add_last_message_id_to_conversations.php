@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Schema;
  * Using a FK instead of latestOfMany() avoids the PostgreSQL MAX(uuid) error
  * and eliminates a correlated subquery on every conversation list load.
  */
-return new class () extends Migration
+return new class extends Migration
 {
     public function up(): void
     {

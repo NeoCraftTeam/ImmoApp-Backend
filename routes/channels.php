@@ -6,10 +6,6 @@ use App\Models\Conversation;
 use App\Models\User;
 use Illuminate\Support\Facades\Broadcast;
 
-Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
-    return (int) $user->id === (int) $id;
-});
-
 /*
 |--------------------------------------------------------------------------
 | Chat — Private Conversation Channel
@@ -33,9 +29,13 @@ Broadcast::channel('conversation.{uuid}', function (User $user, string $uuid): b
 |--------------------------------------------------------------------------
 */
 Broadcast::channel('online-users', function (User $user): array {
+    $ua = (string) request()->header('User-Agent', '');
+    $isMobile = (bool) preg_match('/Mobile|Android|iPhone|iPad|iPod/i', $ua);
+
     return [
-        'id'     => $user->id,
-        'name'   => trim("{$user->firstname} {$user->lastname}"),
+        'id' => $user->id,
+        'name' => trim("{$user->firstname} {$user->lastname}"),
         'avatar' => $user->avatar,
+        'device' => $isMobile ? 'mobile' : 'desktop',
     ];
 });

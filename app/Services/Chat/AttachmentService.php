@@ -7,6 +7,7 @@ namespace App\Services\Chat;
 use App\Models\Conversation;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 
 /**
@@ -40,25 +41,25 @@ final readonly class AttachmentService
      */
     public function upload(UploadedFile $file, Conversation $conversation): array
     {
-        $mime = $file->getMimeType() ?? '';
-        $type = $this->resolveType($mime, $file->getSize() ?? 0);
+        $mime = $file->getMimeType() ?: '';
+        $type = $this->resolveType($mime, (int) $file->getSize());
 
-        $uuid     = (string) \Illuminate\Support\Str::uuid();
-        $ext      = $file->getClientOriginalExtension();
-        $prefix   = (string) config('chat.attachment_prefix', 'chats');
-        $path     = "{$prefix}/{$conversation->id}/{$uuid}.{$ext}";
+        $uuid = (string) Str::uuid();
+        $ext = $file->getClientOriginalExtension();
+        $prefix = (string) config('chat.attachment_prefix', 'chats');
+        $path = "{$prefix}/{$conversation->id}/{$uuid}.{$ext}";
 
         Storage::disk('r2')->put($path, (string) file_get_contents($file->getRealPath()), 'private');
 
         $signedUrl = $this->getSignedUrl($path);
 
         return [
-            'url'           => $path,
-            'signed_url'    => $signedUrl,
+            'url' => $path,
+            'signed_url' => $signedUrl,
             'original_name' => $file->getClientOriginalName(),
-            'mime_type'     => $mime,
-            'size'          => $file->getSize() ?? 0,
-            'type'          => $type,
+            'mime_type' => $mime,
+            'size' => (int) $file->getSize(),
+            'type' => $type,
         ];
     }
 
@@ -66,7 +67,7 @@ final readonly class AttachmentService
      * Generate a signed URL with 24-hour expiry for an R2-stored file.
      * Never expose the raw storage path to clients.
      *
-     * @param string $path Internal R2 storage path
+     * @param  string  $path  Internal R2 storage path
      */
     public function getSignedUrl(string $path): string
     {
@@ -86,11 +87,11 @@ final readonly class AttachmentService
     private function resolveType(string $mime, int $sizeBytes): string
     {
         $imageLimitBytes = (int) config('chat.uploads.image_max_mb', 10) * 1024 * 1024;
-        $fileLimitBytes  = (int) config('chat.uploads.file_max_mb', 20) * 1024 * 1024;
+        $fileLimitBytes = (int) config('chat.uploads.file_max_mb', 20) * 1024 * 1024;
 
         if (in_array($mime, self::IMAGE_MIMES, true)) {
             if ($sizeBytes > $imageLimitBytes) {
-                throw new InvalidArgumentException("Image too large (max 10 MB).");
+                throw new InvalidArgumentException('Image too large (max 10 MB).');
             }
 
             return 'image';
@@ -98,7 +99,7 @@ final readonly class AttachmentService
 
         if (in_array($mime, self::DOCUMENT_MIMES, true)) {
             if ($sizeBytes > $fileLimitBytes) {
-                throw new InvalidArgumentException("Document too large (max 20 MB).");
+                throw new InvalidArgumentException('Document too large (max 20 MB).');
             }
 
             return 'file';

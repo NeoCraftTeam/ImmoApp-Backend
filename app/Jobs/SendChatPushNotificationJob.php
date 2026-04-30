@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Enums\UserRole;
 use App\Models\FcmToken;
 use App\Models\Message;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Kreait\Firebase\Exception\Messaging\NotFound;
 use Kreait\Firebase\Factory;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
@@ -51,18 +54,24 @@ final class SendChatPushNotificationJob implements ShouldQueue
             return;
         }
 
-        $sender  = $message->sender;
-        $title   = $sender ? trim("{$sender->firstname} {$sender->lastname}") : 'KeyHome';
-        $body    = $message->decrypted_body !== null
+        $sender = $message->sender;
+        $title = $sender ? trim("{$sender->firstname} {$sender->lastname}") : 'KeyHome';
+        $body = $message->decrypted_body !== null
             ? mb_substr($message->decrypted_body, 0, 100)
             : '📎 Pièce jointe';
 
+        // Build the deep-link URL for the conversation so notification taps
+        // go directly to the right chat panel (owner vs client).
+        $recipient = User::find($this->recipientId);
+        $basePath = $recipient?->role === UserRole::AGENT ? '/owner/messages' : '/messages';
+        $conversationUrl = $basePath.'/'.$message->conversation_id;
+
         $credentialsPath = (string) config('chat.firebase.credentials');
-        if (! file_exists(storage_path('../' . ltrim($credentialsPath, '/')))) {
+        if (!file_exists(storage_path('../'.ltrim($credentialsPath, '/')))) {
             $credentialsPath = storage_path('app/firebase-credentials.json');
         }
 
-        if (! file_exists($credentialsPath)) {
+        if (!file_exists($credentialsPath)) {
             Log::warning('[FCM] Firebase credentials not found. Skipping push notification.', [
                 'path' => $credentialsPath,
             ]);
@@ -71,35 +80,37 @@ final class SendChatPushNotificationJob implements ShouldQueue
         }
 
         try {
-            $factory   = (new Factory())->withServiceAccount($credentialsPath);
+            $factory = (new Factory)->withServiceAccount($credentialsPath);
             $messaging = $factory->createMessaging();
 
             $invalidTokenIds = [];
 
             foreach ($tokens as $tokenId => $token) {
                 try {
-                    $cloudMessage = CloudMessage::withTarget('token', $token)
+                    $cloudMessage = CloudMessage::new()
+                        ->withToken($token)
                         ->withNotification(Notification::create($title, $body))
                         ->withData([
-                            'type'              => 'chat_message',
+                            'type' => 'chat_message',
                             'conversation_uuid' => $message->conversation_id,
-                            'sender_id'         => $message->sender_id,
+                            'sender_id' => $message->sender_id,
+                            'url' => $conversationUrl,
                         ]);
 
                     $messaging->send($cloudMessage);
 
                     FcmToken::where('id', $tokenId)->update(['last_used_at' => now()]);
-                } catch (\Kreait\Firebase\Exception\Messaging\NotFound $e) {
+                } catch (NotFound) {
                     $invalidTokenIds[] = $tokenId;
                 } catch (\Throwable $e) {
                     Log::error('[FCM] Failed to send push notification', [
                         'token_id' => $tokenId,
-                        'error'    => $e->getMessage(),
+                        'error' => $e->getMessage(),
                     ]);
                 }
             }
 
-            if (! empty($invalidTokenIds)) {
+            if (!empty($invalidTokenIds)) {
                 FcmToken::whereIn('id', $invalidTokenIds)->delete();
             }
         } catch (\Throwable $e) {

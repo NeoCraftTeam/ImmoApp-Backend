@@ -25,6 +25,7 @@ final class UploadAttachmentRequest extends FormRequest
                 'required',
                 'file',
                 'max:20480', // 20 MB max at form level; AttachmentService enforces per-type limits
+                'mimes:jpeg,jpg,png,webp,pdf,doc,docx',
             ],
         ];
     }
