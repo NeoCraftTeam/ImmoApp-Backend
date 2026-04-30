@@ -106,8 +106,59 @@ alone unless rolling back the entire chat feature.
 - Prod: `memory: 384m`, `cpus: 0.75` (~5 k concurrent connections per instance).
 - Preprod: `memory: 256m`, `cpus: 0.50`.
 
-Reverb is single-process. To scale beyond ~10 k concurrent connections, enable
-horizontal scaling via Redis pub/sub:
+## Kernel & runtime tuning
+
+Two non-default tunings ship with the `reverb` service. Without **both**,
+the daemon caps out around 1 k connections per instance regardless of the
+memory/cpu limits above.
+
+### 1. `nofile` ulimit — 10 000
+
+Each WebSocket client consumes ≥ 1 file descriptor. Containers do **not**
+honour `/etc/security/limits.conf` on the host (that file is consumed by
+PAM at login time); they inherit `nofile` from the docker daemon (typically
+1024 soft / 1048576 hard). Both compose files set:
+
+```yaml
+ulimits:
+  nofile:
+    soft: 10000
+    hard: 10000
+```
+
+Verify after rollout:
+
+```bash
+docker compose exec reverb sh -c 'cat /proc/1/limits | grep "open files"'
+# Max open files            10000                10000                files
+```
+
+### 2. PHP `ext-uv` — libuv event loop
+
+Reverb runs on top of ReactPHP's event loop. The default fallback is PHP's
+`stream_select()` which is **O(n) per tick** and is also capped at 1024 file
+descriptors by `FD_SETSIZE` on most builds — so even with the 10 000 nofile
+ulimit, `stream_select` would silently truncate the fd set.
+
+The Dockerfile installs `ext-uv` (`pecl install uv`) which binds **libuv**
+(epoll on Linux, kqueue on BSD/macOS). ReactPHP automatically picks it up
+when the extension is loaded — no app code change required. Loop driver
+priority: `ev` → `uv` ← us → `event` → `stream_select`.
+
+Verify after rebuild:
+
+```bash
+docker compose exec reverb php -m | grep -i uv          # uv
+docker compose exec reverb php -r 'echo UV::poll_in;'   # integer
+```
+
+Reverb's `--debug` startup logs should also show the loop class name (e.g.
+`ExtUvLoop`), not `StreamSelectLoop`.
+
+## Horizontal scaling
+
+Reverb is single-process per container. To scale beyond ~10 k concurrent
+connections per instance, enable horizontal scaling via Redis pub/sub:
 
 ```
 REVERB_SCALING_ENABLED=true

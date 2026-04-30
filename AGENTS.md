@@ -1120,6 +1120,17 @@ Reverb (`php artisan reverb:start`) was completely missing from the deployed sta
 
 **Files changed:** `docker-compose.yml`, `docker-compose.preprod.yml`, `.env.example`, `.env.preprod.example`, `docs/REVERB_DEPLOY.md` (new).
 
+### Session — Reverb perf tuning (Apr 2026)
+
+Follow-up to the deployment session: the initial `reverb` service shipped with default container limits, which would have capped a single instance at ~1 k concurrent WebSocket connections regardless of CPU/memory headroom.
+
+1. **`nofile` ulimit → 10 000.** Containers do *not* honour `/etc/security/limits.conf` on the host (that file is consumed by PAM at login time); they inherit `nofile` from the docker daemon (typically 1024 soft). Added a per-service `ulimits: { nofile: { soft: 10000, hard: 10000 } }` block to both `docker-compose.yml` and `docker-compose.preprod.yml` on the `reverb` service. Verify with `docker compose exec reverb sh -c 'cat /proc/1/limits | grep "open files"'`.
+2. **`ext-uv` PHP extension.** ReactPHP's default fallback loop is `stream_select()`, O(n) per tick and capped at 1024 fds by `FD_SETSIZE` regardless of the ulimit above. Installed `ext-uv` in the Alpine `Dockerfile` (`apk add libuv-dev` + `yes '' | pecl install uv` + `docker-php-ext-enable uv`) so ReactPHP autodetects libuv (epoll on Linux, kqueue on BSD/macOS) — O(1) per tick, scales to the 10 k fd ceiling. Loop priority order: `ev` → `uv` ← us → `event` → `stream_select`. Verify with `docker compose exec reverb php -m | grep uv`.
+
+Both tunings are documented in `docs/REVERB_DEPLOY.md` under "Kernel & runtime tuning". Image-size delta from `ext-uv`: ~2 MB.
+
+**Files changed:** `docker-compose.yml`, `docker-compose.preprod.yml`, `Dockerfile`, `docs/REVERB_DEPLOY.md`.
+
 ### Frontend GitLab CI / Vercel
 - **`format` job**: `npm run format:check` — runs Prettier check. Fix by running `npm run format` locally before pushing.
 - **`lint` job**: `npm run lint` — zero errors allowed. Warnings are tolerated but minimised.
