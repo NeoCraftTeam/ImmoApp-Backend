@@ -128,6 +128,13 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+    # Each WS client consumes ≥1 fd; default container nofile is 1024 (set by
+    # the docker daemon, not by host's /etc/security/limits.conf). Reverb's
+    # docs recommend 10000 — enough for several thousand concurrent clients.
+    ulimits:
+      nofile:
+        soft: 10000
+        hard: 10000
     deploy:
       resources:
         limits:

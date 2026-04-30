@@ -186,6 +186,15 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+    # Each WebSocket client consumes ≥1 open file descriptor. The docker daemon
+    # default (typically 1024 soft) is what containers inherit — /etc/security/
+    # limits.conf on the host applies to PAM logins, NOT to containers. Reverb's
+    # docs recommend nofile=10000 to comfortably handle a few thousand concurrent
+    # connections. Set both soft + hard so the daemon never has to escalate.
+    ulimits:
+      nofile:
+        soft: 10000
+        hard: 10000
     deploy:
       resources:
         limits:
