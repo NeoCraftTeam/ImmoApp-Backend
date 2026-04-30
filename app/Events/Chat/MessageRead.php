@@ -7,14 +7,22 @@ namespace App\Events\Chat;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
-use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
  * Broadcast when a participant marks messages as read.
+ *
+ * Uses ShouldBroadcast (queued) — NOT ShouldBroadcastNow — because the
+ * sender of markAsRead does not need to wait for Reverb's HTTP ACK to
+ * complete the request. The recipient's read-receipt tick turning blue
+ * a few hundred ms later is imperceptible, and the queue worker picks
+ * the job up within ~50ms in normal conditions. This avoids 500-1500ms
+ * of synchronous HTTP latency in the markAsRead request lifecycle (the
+ * cause of Nightwatch slow-request alerts on PATCH /conversations/{uuid}/read).
  */
-final class MessageRead implements ShouldBroadcastNow
+final class MessageRead implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 

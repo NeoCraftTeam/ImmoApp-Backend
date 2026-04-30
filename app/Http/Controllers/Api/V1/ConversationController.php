@@ -186,9 +186,13 @@ final readonly class ConversationController
 
         $this->conversations->markAsRead($conv, $user);
 
+        // Single refresh — ConversationService::markAsRead() updated the row,
+        // but we need the new timestamp for the API response.
+        $fresh = $conv->fresh();
+
         return response()->json([
-            'tenant_last_read_at' => $conv->fresh()?->tenant_last_read_at?->toIso8601String(),
-            'landlord_last_read_at' => $conv->fresh()?->landlord_last_read_at?->toIso8601String(),
+            'tenant_last_read_at' => $fresh?->tenant_last_read_at?->toIso8601String(),
+            'landlord_last_read_at' => $fresh?->landlord_last_read_at?->toIso8601String(),
         ]);
     }
 
