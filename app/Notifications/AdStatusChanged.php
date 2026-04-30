@@ -45,7 +45,7 @@ class AdStatusChanged extends Notification implements ShouldQueue
             ->line('Le statut de votre annonce "'.$this->ad->title.'" a été modifié.')
             ->line('Ancien statut: '.$this->oldStatus->getLabel())
             ->line('Nouveau statut: '.$this->newStatus->getLabel())
-            ->action('Voir l\'annonce', config('app.frontend_url').'/ads/'.$this->ad->slug)
+            ->action('Gérer l\'annonce', config('app.frontend_url').'/owner/ads/'.$this->ad->id)
             ->line('Merci d\'utiliser KeyHome !');
     }
 
@@ -57,7 +57,7 @@ class AdStatusChanged extends Notification implements ShouldQueue
             ->badge('/icons/icon-72x72.png')
             ->body('Le statut de "'.$this->ad->title.'" est passé à '.$this->newStatus->getLabel())
             ->tag('ad-status-'.$this->ad->id)
-            ->data(['url' => config('app.frontend_url').'/ads/'.$this->ad->slug]);
+            ->data(['url' => config('app.frontend_url').'/owner/ads/'.$this->ad->id]);
     }
 
     /**
