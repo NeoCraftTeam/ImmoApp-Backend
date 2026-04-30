@@ -144,6 +144,63 @@ services:
           memory: 1g       # elevated for panorama image processing
           cpus: "2.00"
 
+  # ── Reverb — Laravel WebSocket server (Pusher protocol) ──────────────────
+  # Powers the chat real-time pipeline: message delivery, presence channels
+  # (online users), typing indicators, read receipts, last-seen heartbeat.
+  # Listens on :8080 inside the network. Traefik terminates TLS on
+  # `${REVERB_DOMAIN}` and forwards WSS → :8080. The Pusher protocol upgrades
+  # an HTTP/1.1 connection so no extra Traefik config is required beyond the
+  # standard router (websocket support is on by default).
+  reverb:
+    image: ${APP_IMAGE:-keyhome-backend}
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-reverb
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    depends_on:
+      code-sync:
+        condition: service_completed_successfully
+      app:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - keyhome-app-code:/var/www
+      - keyhome-storage-data:/var/www/storage
+      - ./.env:/var/www/.env
+    networks:
+      - keyhome-network
+      - traefik-public
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - DB_HOST=pgbouncer
+      - DB_SSLMODE=disable
+      - REDIS_HOST=redis
+    # Process probe — matches the existing worker healthcheck pattern.
+    # `reverb:start` runs in the foreground; pgrep confirms the daemon is alive.
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'reverb:start' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+          cpus: "0.75"
+        reservations:
+          memory: 128m
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.keyhome-reverb.rule=Host(`${REVERB_DOMAIN:-reverb.keyhome.app}`)"
+      - "traefik.http.routers.keyhome-reverb.entrypoints=websecure"
+      - "traefik.http.routers.keyhome-reverb.tls.certresolver=letsencrypt"
+      - "traefik.http.services.keyhome-reverb.loadbalancer.server.port=8080"
+
   # Laravel Nightwatch Agent (monitoring)
   nightwatch-agent:
     image: laravelphp/nightwatch-agent:latest

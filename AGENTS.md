@@ -736,6 +736,80 @@ All 14 items from `COMPREHENSIVE_ASSESSMENT_REPORT.md` have been addressed:
 - Template `resources/views/pdf/admin-monthly-report.blade.php` rebranded: teal (#0d9488) → brand #F6475F throughout (header gradient, section titles, highlights).
 - Entry point: `ExportActionsWidget::exportPdf()` (Livewire, Filament admin dashboard).
 
+## Chat System — Bug Fixes & UI Redesign (Session 3)
+
+### Bug Fixes
+- **Bug A — PusherJS v8 auth 404**: `src/lib/echo.ts` — replaced deprecated `authorizer` with `channelAuthorization.customHandler` (PusherJS v8 breaking change).
+- **Bug B — Hydration mismatch**: `src/hooks/usePasskey.ts` — replaced `useMemo(() => isWebAuthnSupported(), [])` with `useState(false) + useEffect` so server and client both start with `false`; client updates after mount.
+- **Bug C — Avatar URLs**: `app/Events/Chat/MessageSent.php`, `app/Http/Resources/Chat/ConversationResource.php`, `app/Http/Resources/Chat/MessageResource.php` — added `resolveAvatarUrl()` helper that mirrors `User::getFilamentAvatarUrl()` logic (checks `http` prefix, then `Storage::disk()->url()`). Added `read_at`/`deleted_at` to broadcast payload.
+
+### MUI X Chat Migration (Apr 2026)
+
+Chat UI replaced with `@mui/x-chat` (v9.0.0-alpha.1) — adapter-driven ChatBox component.
+
+**New files:**
+- **`src/lib/keyhome-chat-adapter.ts`** — `ChatAdapter<string>` implementation bridging Laravel API + Echo/Pusher WebSockets. Handles `listConversations`, `listMessages`, `sendMessage`, `setTyping`, `markRead`, `subscribe`. Message dedup via `recentlySentIds` Set. Optimistic→confirmed swap via `message-removed` + `message-added` events. Lazy per-conversation channel subscriptions. Presence via `online-users` channel. Never calls `echo.leave()`.
+- **`src/lib/chat-locale-fr.ts`** — French locale for MUI X Chat (`ChatLocaleText` partial). All UI strings in `fr_FR`.
+- **`src/components/chat/KeyHomeChatBox.tsx`** — Themed wrapper. Exports `KeyHomeChatBox` (client pink) and `OwnerChatBox` (owner teal). Wires adapter, `currentUser`, French locale, accent `sx` overrides, URL-driven `onActiveConversationChange`, attachment config (JPEG/PNG/WEBP/GIF/PDF/DOC, 20 MB max, 5 files). **Height strategy:** `Box(flex:1, position:relative)` → `Box(position:absolute, inset:0)` → `ChatBox(height:100%)`. The absolute-positioning provides a definite CSS height context for the ChatBox root (which has `height: 100%` baked into its styled component). This bypasses the flex-computed-height-as-definite-height browser inconsistency.
+
+**Updated pages (simplified — ChatBox handles list + thread layout internally):**
+- `/messages/page.tsx` → `<KeyHomeChatBox />`
+- `/messages/[uuid]/page.tsx` → `<KeyHomeChatBox initialActiveConversationId={uuid} />`
+- `/owner/messages/page.tsx` → `<OwnerChatBox />`
+- `/owner/messages/[uuid]/page.tsx` → `<OwnerChatBox initialActiveConversationId={uuid} />`
+
+**Architecture decisions:**
+- Adapter-driven (uncontrolled mode) — ChatStore manages all state; adapter handles data loading + WS subscriptions.
+- Message role mapping: own = `'user'` (right-aligned), other = `'assistant'` (left-aligned). This is a rendering convention for P2P chat.
+- `sendMessage` returns an immediately-closed `ReadableStream` (no AI streaming). After API confirms, emits `message-removed` (local ID) + `message-added` (server UUID) to swap optimistic with confirmed.
+- WS dedup: `recentlySentIds` Set prevents duplicate add when own message arrives via broadcast.
+- `ChatNotificationListener` kept in layout for toast notifications + badge updates (operates on TanStack Query cache, no conflict with ChatStore).
+
+**Preserved files (still used by adapter / layout):**
+- `src/lib/chat-api.ts` — API functions
+- `src/lib/echo.ts` — Echo singleton
+- `src/components/chat/chat-theme.ts` — ChatTheme type + CLIENT_THEME / OWNER_THEME
+- `src/components/chat/ChatBadgeIcon.tsx` — Navbar unread badge
+- `src/components/chat/ChatNotificationListener.tsx` — Global WS toast + cache sync
+
+**Legacy components (superseded by ChatBox, can be removed):**
+- `ConversationList`, `ConversationItem`, `ChatWindow`, `ChatHeader`, `MessageBubble`, `MessageInput`, `TypingIndicator`, `OnlineStatus`, `ReplyPreview`, `AttachmentPreview`
+- `ChatPageWrapper` (no longer used — KeyHomeChatBox has its own height wrapper)
+- `useChat.ts`, `useConversations.ts`, `usePresence.ts`, `useTypingIndicator.ts`
+
+### UI Redesign — Theme System
+- **`src/components/chat/chat-theme.ts`** — new file. Exports `CLIENT_THEME` (pink `#F6475F`) and `OWNER_THEME` (teal `#0D9488`) with `accent`, `accentHover`, `accentLight`, `accentLighter` fields. All chat components accept optional `theme?: ChatTheme` prop (default `CLIENT_THEME`).
+- All 6 chat components updated: `ConversationItem`, `ConversationList`, `ChatHeader`, `OnlineStatus`, `MessageBubble`, `MessageInput`, `ChatWindow`.
+- Owner pages pass `OWNER_THEME`; client pages pass `CLIENT_THEME` explicitly.
+
+### Layout Fixes
+- **`ChatPageWrapper`** — added `ownerLayout` prop. When `true`, uses `flex:1 + minHeight:0 + overflow:hidden` instead of fixed `calc(100dvh - …)` height (owner layout is already a flex child).
+- **`OwnerLayoutClient`** — on mobile: hides `OwnerBottomNav` on all `/owner/messages/*` pages; hides `OwnerNavbar` on conversation detail pages. Content box switches to `flex column + overflow:hidden` on messages pages.
+- **`DashboardLayout`** — on mobile: hides `Navbar` + `BottomNav` on `/messages/[uuid]` pages for immersive full-screen chat.
+
+### Presence
+- **`src/components/chat/GlobalPresenceChannel.tsx`** — new component. Joins `online-users` presence channel for the duration of the session so the user appears online even when not in a chat window. Mounted in both `DashboardLayout` and `OwnerLayoutClient` alongside `FcmRegistrar`.
+
+### Enterprise Audit Fixes (Session 4 — 9 bugs)
+
+1. **Security — `disconnectEcho()` never called on logout** (`useAuthActions.ts`): After logout, the Echo singleton (WebSocket) stayed alive with the previous user's auth credentials. Fix: call `disconnectEcho()` immediately in step 3 of the logout function (before `clearSession()`). Root cause: `disconnectEcho` was exported but never imported by `useAuthActions`.
+
+2. **Race condition — `loadMore` duplicate requests** (`useChat.ts`): `handleScroll` fires many times/second; `void loadMore()` was called each time `scrollTop < 50`. Since `hasMore` is React state and only updates after the response, multiple concurrent `fetchMessages` calls fired with the same cursor, prepending duplicate messages. Fix: added `isLoadingMoreRef` ref guard that short-circuits if a load is already in progress.
+
+3. **UX — `ConversationResource` missing `sender_id` in `last_message`** (`ConversationResource.php`): The conversation list API did not include `sender_id` in the `last_message` object. Without it, the frontend could not display "Vous : ..." for own messages. Fix: added `'sender_id' => $last->sender_id` to the `last_message` array.
+
+4. **UX — `window.confirm` for archive** (`ChatWindow.tsx`): `window.confirm` is a blocking native dialog that looks broken in PWA standalone mode and is blocked in some browsers/iframes. Fix: replaced with an inline amber confirmation banner (`showArchiveConfirm` state) with "Annuler" / "Archiver" buttons themed per panel.
+
+5. **a11y — ESC key doesn't close lightbox** (`AttachmentPreview.tsx`): The image lightbox had no keyboard escape handler. Fix: added `useEffect` that registers `keydown` listener for `Escape` when `lightboxOpen = true`, removes it on cleanup.
+
+6. **Memory leak — long press timeout not cleaned on unmount** (`MessageBubble.tsx`): `longPressRef.current = setTimeout(handleLongPress, 500)` was never cleared if the component unmounted mid-touch. Fix: added `useEffect(() => () => { if (longPressRef.current) clearTimeout(longPressRef.current); }, [])`. Also fixed missing `useEffect` import.
+
+7. **Perf — `handleSendMessage` deps included full `messages` array** (`useChat.ts`): `useCallback` with `[conversationUuid, user, messages]` caused the send callback to be recreated on every incoming message (propagating to `MessageInput`). Fix: extracted `messagesRef` (updated each render, never in deps) and replaced `messages.find(...)` with `messagesRef.current.find(...)`. Deps reduced to `[conversationUuid, user]`.
+
+8. **Perf — Date groups computed inline on every render** (`ChatWindow.tsx`): The `groups` array was rebuilt from scratch on every render (state changes, re-renders from parent). Fix: wrapped in `useMemo([messages])`.
+
+9. **UX — No "Vous :" prefix for own last messages** (`ConversationItem.tsx`): All messaging apps (WhatsApp, iMessage, Telegram) prefix the last message with "Vous :" when it was sent by the current user. Fix: imported `useAuth`, computed `isOwnLastMsg = lastMsg?.sender_id === user?.id`, prefixed `rawPreview` with `"Vous : "` when true. Depends on fix #3 (backend `sender_id` field).
+
 ## Known CI/CD Gotchas
 
 ### Backend GitLab CI
@@ -743,6 +817,308 @@ All 14 items from `COMPREHENSIVE_ASSESSMENT_REPORT.md` have been addressed:
 - **`build_image` (Dockerfile Alpine)**: `php-fpm-alpine` does NOT include the `shadow` package. `usermod`/`groupmod` are unavailable (exit 127). Use `deluser www-data 2>/dev/null; delgroup www-data 2>/dev/null; addgroup -g 1000 -S www-data && adduser -u 1000 -D -S -H -G www-data www-data`.
 - **`test_suite` (PostgreSQL)**: `pg_isready` without `-h` checks the Unix socket which becomes ready before TCP. Always use `pg_isready -U gitlab -h 127.0.0.1 -p 5432` in the wait loop.
 - **`.dockerignore`**: `readme/` is ignored to prevent Docker cache invalidation from documentation commits. `vendor/` and `node_modules/` are always excluded.
+
+### Chat Polish Session 5 — Console Bugs + UX (Apr 2026)
+
+**Bug fixes (frontend-only, 0 backend changes):**
+1. **CSP R2 images blocked** — `img-src` / `connect-src` in `src/proxy.ts` and `next.config.ts` `remotePatterns` only had `*.r2.dev`; signed chat-attachment URLs use `*.r2.cloudflarestorage.com`. Added that domain.
+2. **SW CORS errors** — `public/sw.js` intercepted cross-origin API requests via `isCacheableApi()` without an origin guard. When the frontend and API are on different origins (dev), the re-fetch from the SW context failed CORS, returning `Response.error()`. Fix: moved same-origin guard (`url.origin === self.location.origin`) **before** the cacheable-API branch. Bumped `VERSION` to `v6`.
+3. **MUI Menu Fragment warnings** — `<Menu>` clones children for focus management; `<>…</>` Fragments are opaque. Fixed in `OwnerNavbar.tsx` and `owner/ads/page.tsx` by replacing Fragments with keyed arrays.
+4. **WebAuthn 403** — The 403 is intentional (`RoleContextMismatchException`) when a passkey belongs to a different role context. Frontend now catches the `ROLE_CONTEXT_MISMATCH` code in `webauthn.service.ts` and throws a clear French error message surfaced by `usePasskeyLogin`.
+5. **Recharts `width(-1)`** — `MiniMetricSparkline.tsx` used `height="100%"` on `ResponsiveContainer` inside a container that briefly had zero dimensions. Fix: pass explicit `height={CHART_H}` number and early-return an empty `Box` when `data.length === 0`.
+
+**Chat UX improvements:**
+6. **Instant message-view open** — Both `/messages/[uuid]` and `/owner/messages/[uuid]` now use `useQuery` with `initialData` pulled from the TanStack `['conversations']` list cache. Header renders on tick 0 from cached data; no more full-page spinner.
+7. **Message skeleton** — `ChatWindow` loading state replaced spinner with 4-bubble skeleton placeholders (2 left, 2 right) with `animate-pulse`.
+8. **Typing indicator faster** — `useTypingIndicator` debounce reduced 300→100 ms; `STOP_AFTER_MS` stays 2 s.
+9. **Bubble polish** — Same-sender gap tightened to 1 px (`mt-px`), sender-change gap widened to 8 px (`mt-2`). Other's bubble shadow softened to `0 1px 2px rgba(0,0,0,0.04)`.
+10. **Chat wallpaper** — Message list background changed from `bg-gray-50` to `#f7f7f8` for subtle contrast.
+11. **Header** — Mobile padding tightened (`py-2`). Online dot now has a `animate-ping` pulse ring.
+12. **Send button** — Hit target enlarged to 44×44 px on mobile (`p-3 md:p-2.5`, `minWidth/minHeight: 44`). Icon slightly bigger (`18px`).
+
+**Files changed:** `src/proxy.ts`, `next.config.ts`, `public/sw.js`, `src/components/owner/OwnerNavbar.tsx`, `src/app/(owner)/owner/ads/page.tsx`, `src/services/webauthn.service.ts`, `src/components/owner/dashboard/MiniMetricSparkline.tsx`, `src/app/(dashboard)/messages/[uuid]/page.tsx`, `src/app/(owner)/owner/messages/[uuid]/page.tsx`, `src/components/chat/ChatWindow.tsx`, `src/components/chat/MessageBubble.tsx`, `src/components/chat/ChatHeader.tsx`, `src/components/chat/MessageInput.tsx`, `src/hooks/useTypingIndicator.ts`.
+
+### Chat Production-Readiness Audit — Session 6 (Apr 2026)
+
+**Security fixes:**
+1. **Attachments injection** — `SendMessageRequest` had no per-item validation on `attachments.*` array. Arbitrary JSON (XSS payloads, fake signed_urls) could be stored in jsonb. Fix: added strict per-field rules for `url`, `signed_url` (must be valid URL), `original_name` (max 255), `mime_type` (whitelist), `size` (int, max 20MB), `type` (in:image,file). Max 5 attachments per message.
+2. **Upload MIME at form level** — `UploadAttachmentRequest` accepted any MIME; validation happened only in `AttachmentService` after full upload. Fix: added `mimes:jpeg,jpg,png,webp,pdf,doc,docx` to form-level rules so invalid files are rejected before processing.
+3. **`last_message_preview` plaintext** — Verified already `null` (no plaintext stored). `ConversationResource` uses `latestMessage->decrypted_body` at query time.
+
+**Performance fixes:**
+4. **N+1 on conversation list** — `ConversationResource::unreadCountFor()` ran 1 COUNT query per conversation. Fix: `ConversationService::getConversationsForUser()` now uses `withCount(['messages as computed_unread_count' => ...])` with a `CASE WHEN` expression to pick `tenant_last_read_at` or `landlord_last_read_at`. `ConversationResource` reads `computed_unread_count` when available, falls back to `unreadCountFor()`.
+5. **Missing composite index** — Added migration `2026_04_20_140000_add_composite_indexes_to_messages_table.php` for `(conversation_id, sender_id, status)` — used by `markAsRead` bulk UPDATE and unread count queries.
+
+**Reliability fixes:**
+6. **Optimistic send race** — `useChat.ts` `.message.sent` listener used prefix scan (`startsWith(OPTIMISTIC_PREFIX)`) to replace optimistic messages. If 2 rapid sends occurred, the WS event for msg#1 could replace msg#2's optimistic entry. Fix: simplified to rely on `toOthers()` (own messages never arrive via WS); duplicates filtered by exact UUID match.
+7. **useConversations stale closure** — Dependency array used `conversations.length` (only re-ran when count changed, not content). Fix: compute stable `convUuids` string (sorted, joined) and use as dependency so WS subscriptions update when conversations change.
+8. **Archive idempotency** — `ConversationService::archive()` now checks `$conv->status !== Archived` before writing, preventing wasteful no-op DB updates.
+
+**Accepted risks:**
+- `MessageSent` broadcasts decrypted body over WebSocket — **required** for real-time display. Channel auth (only 2 participants can subscribe) is the mitigation.
+- `DB::raw` in `getConversationsForUser` interpolates `$user->id` — safe because it's always a UUID from the authenticated `User` model, never user input.
+
+**Test results:** 775 passed, 0 failed. PHPStan [OK]. Pint [OK].
+
+### Session 7 — Chat Audit Fix (Apr 2026)
+Comprehensive audit of owner↔client messaging. 7 fixes:
+
+1. **Unread cache stale on send** — `MessageService::send()` now calls `invalidateUnreadCache($recipientId)` via injected `ConversationService`. Previously only `markAsRead` invalidated cache → recipient's unread total was stale up to 30 s.
+2. **`App.Models.User.{id}` channel removed** — Used `(int) $user->id === (int) $id` with UUID strings → both cast to `0` → **any authenticated user matched any channel**. Dead code (never subscribed to anywhere). Deleted.
+3. **`reply_to_id` + soft-delete** — `SendMessageRequest` now uses `Rule::exists('messages', 'id')->whereNull('deleted_at')` so users cannot reply to soft-deleted messages.
+4. **Broadcasting auth 403 flood** — `echo.ts` `customHandler` now short-circuits with error when `getAuthToken()` returns null (Clerk token not ready). Prevents 10+ useless POST `/broadcasting/auth` that always 403.
+5. **Mobile chat height overflow** — `ChatPageWrapper` used `calc(100dvh - 56px)` but was nested inside flex parent chain that already handled height. Fixed: `DashboardLayout` uses `height: 100dvh` + `overflow: hidden` on messages pages; `PageTransition` changed `minHeight → height: 100%`; `ChatPageWrapper` uses `flex:1 + height:100%`.
+6. **Dead `UserPresence` event** — `app/Events/Chat/UserPresence.php` was never broadcast anywhere (presence relies on Echo's native `join('online-users')` channel). Deleted.
+7. **Stale comments aligned** — `useChat.ts` "debounced 300ms" → 100ms; `useTypingIndicator.ts` same; `UserTyping.php` "max 1 per 2s" → "max 30 per minute".
+
+8. **`usePresence` destroyed shared presence channel** — `usePresence` hook called `echo.leave('online-users')` on cleanup, which tore down the global presence subscription owned by `GlobalPresenceChannel`. When user navigated away from a chat, they appeared offline to everyone. Fixed: `usePresence` now binds/unbinds directly on the Pusher channel object (not via Echo's `.here()`/`.joining()`/`.leaving()` wrappers) so it can clean up its own handlers without calling `echo.leave()`.
+
+9. **`ChatNotificationListener` destroyed shared conversation channels** — `echo.leave()` in cleanup tore down subscriptions shared with `useConversations` and `useChat`. When the conversation list changed, the active chat window silently lost real-time updates. Fixed: uses direct Pusher `bind()`/`unbind()` on `echoChannel.subscription`.
+10. **`useConversations` destroyed shared conversation channels** — Same `echo.leave()` bug. Fixed with direct Pusher `bind()`/`unbind()`.
+11. **`useChat` destroyed shared conversation channels** — Same `echo.leave()` bug across 4 events (`message.sent`, `messages.read`, `message.deleted`, `user.typing`). Fixed with direct Pusher `bind()`/`unbind()`.
+
+12. **Broadcasting auth 403** — The default `/broadcasting/auth` route uses the `web` middleware (session auth). The Next.js PWA sends a Sanctum Bearer token → `$request->user()` returned null → 403 on every channel subscription. Fixed: added `POST /api/v1/broadcasting/auth` in `routes/api.php` with `auth:sanctum` middleware, updated `echo.ts` `customHandler` endpoint to `/api/v1/broadcasting/auth`. The old web route remains for Filament panels (session auth).
+
+**Audit corrections:** `GlobalPresenceChannel` is correctly mounted in both `DashboardLayout` and `OwnerLayoutClient` (audit finding was wrong).
+
+**Echo channel ownership rule:** No hook/component may call `echo.leave()` on a shared channel. Only two legitimate `leave`/`disconnect` call sites exist:
+- `GlobalPresenceChannel` → `echo.leave('online-users')` (on auth change / unmount)
+- `disconnectEcho()` → `echo.disconnect()` (on logout — tears down entire WebSocket)
+All other code (`usePresence`, `useChat`, `useConversations`, `ChatNotificationListener`) must use `echoChannel.subscription.bind()`/`unbind()` to add/remove their specific handlers.
+
+**Broadcasting auth routes:**
+- `POST /broadcasting/auth` — web middleware (session auth, used by Filament panels)
+- `POST /api/v1/broadcasting/auth` — api middleware + `auth:sanctum` (Bearer token, used by Next.js PWA)
+
+**Test results:** 776 passed, 0 failed. PHPStan [OK]. Pint [OK]. TypeScript `tsc --noEmit` clean.
+
+### CDN Strategy (Apr 2026)
+
+**Architecture:**
+- Frontend (Next.js / Vercel) → Vercel Edge Network (automatic, no config) ✓
+- Chat attachments (R2) → Cloudflare edge (automatic via R2 public bucket) ✓
+- Backend API (Laravel VPS) → **Cloudflare reverse proxy** ← the improvement
+
+**Chosen CDN: Cloudflare** (already have account via R2)
+- Only CDN with PoPs in Abidjan, Dakar, Lagos, Nairobi covering CEMAC/UEMOA market
+- Acts as reverse proxy for `api.keyhome.neocraft.dev` — zero infra change needed
+- Free plan covers the use case
+
+**Code changes made:**
+- `app/Http/Middleware/CacheHeaders.php` — global API GET middleware (applied to all API routes via `appendToGroup`):
+  - Authenticated: `private, no-store`
+  - Public (default): `public, max-age=60, s-maxage=60, stale-while-revalidate=300, stale-if-error=3600`
+  - Does NOT overwrite if `CdnCache` already set a header
+  - `Vary: Accept-Encoding` only (not `Accept` or `Authorization`)
+- `app/Http/Middleware/CdnCache.php` — per-route configurable TTL for reference data:
+  - Usage: `->middleware('cdn.cache:3600')`
+  - Sets: `public, max-age={ttl}, s-maxage={ttl}, stale-while-revalidate={ttl*24 capped 86400}, stale-if-error=604800`
+  - Alias: `cdn.cache` registered in `bootstrap/app.php`
+
+**Routes with cdn.cache applied:**
+| Route | TTL | Reason |
+|---|---|---|
+| `GET /api/v1/cities` | 3600s | Reference data, rarely changes |
+| `GET /api/v1/cities/{id}` | 3600s | Same |
+| `GET /api/v1/quarters` | 3600s | Same |
+| `GET /api/v1/quarters/{id}` | 3600s | Same |
+| `GET /api/v1/ad-types` | 3600s | Same |
+| `GET /api/v1/ad-types/{id}` | 3600s | Same |
+| `GET /api/v1/property-attributes` | 1800s | Semi-static |
+| `GET /api/v1/subscriptions/plans` | 1800s | Rarely changes |
+| `GET /api/v1/credits/packages` | 1800s | Rarely changes |
+| `GET /api/v1/stats/landing` | 300s | Aggregated, refreshed every 5min |
+| `GET /api/v1/stats/testimonials` | 3600s | Stable content |
+
+**Cloudflare setup (one-time, in Cloudflare dashboard):**
+
+1. **Add site**: add `keyhome.neocraft.dev` (or `keyhome.app` for prod) to Cloudflare
+2. **DNS record**: `api.keyhome.neocraft.dev` → A record → VPS IP → orange cloud (Proxied)
+3. **SSL/TLS mode**: Full (strict) — Cloudflare ↔ origin uses HTTPS (Traefik handles TLS)
+4. **Cache Rules** (Cloudflare dashboard → Caching → Cache Rules):
+   - Rule 1: `uri.path contains "/api/"` AND `http.request.method eq "GET"` AND `not http.request.headers["authorization"] exists` → Cache TTL: Respect origin (`Cache-Control` s-maxage)
+   - Rule 2: `http.request.method in {"POST" "PUT" "PATCH" "DELETE"}` → Bypass cache
+   - Rule 3: `uri.path contains "/api/v1/broadcasting"` → Bypass cache
+   - Rule 4: `uri.path contains "/api/v1/webhooks"` → Bypass cache
+5. **Trusted proxy**: add Cloudflare IP ranges to `TRUSTED_PROXIES` env var (or use `*` if behind Traefik)
+
+**Cache invalidation:** When admin changes cities/ad-types/plans, add `cache()->forget(...)` or use Cloudflare's Cache Purge API (`POST /zones/{zone_id}/purge_cache`). Currently no automatic invalidation — manual for now.
+
+### Session Timeout Guard (Apr 2026 — bug fix + enterprise rewrite)
+
+**Bug fixed: "Prolonger la session" disconnected the user instead of refreshing the token.**
+
+Root cause (3 independent issues stacked):
+1. **`/auth/refresh` missing from `AUTH_ROUTES` in `api.ts`** — when the refresh call returned a 401 (any network error), the Axios error interceptor dispatched `kh:auth-expired`, which caused `AuthProvider` to immediately wipe all user state **and** tokens. The `catch` block in the old `handleExtend` then also called `logout()`, causing a cascading double-logout.
+2. **After a successful refresh**, `persistOwnerToken/persistClientToken` updated the module-level token variable but `AuthProvider`'s React `token` state remained stale (no `setToken()` call).
+3. **No Page Visibility API support** — idle timer kept running when the tab was hidden; on return the countdown fired immediately even though the user was active elsewhere.
+
+**Fixes:**
+- `src/lib/api.ts` — added `/auth/refresh` to `AUTH_ROUTES`. A 401 on the refresh endpoint now **only** triggers the guard's own error path, not the global auth-expired event.
+- `src/providers/AuthProvider.tsx` — added `refreshSession(): Promise<boolean>` to `AuthContextType` and implementation. Calls `/auth/refresh`, updates both the module-level slot (`persistOwnerToken/persistClientToken`) AND the `token` React state via `setToken()`. Returns `false` on failure — caller decides whether to force-logout.
+- `src/hooks/useIdleTimeout.ts` — full enterprise rewrite:
+  - **Page Visibility API**: on `visibilitychange → visible`, checks elapsed idle time vs `idleMs + countdownMs`. If fully elapsed → fires `onTimeout()` immediately. If in the warning window → shows countdown with correct remaining seconds.
+  - **BroadcastChannel** (`kh:session-keep-alive`): when `extendSession()` is called, broadcasts `{ type: 'extend' }` to all tabs. Each tab subscribes and calls `resetIdleTimer()` on receipt — no duplicate warnings across tabs.
+  - `warningActiveRef` prevents activity events from resetting the timer while the warning modal is open (only "Prolonger" button can dismiss it).
+- `src/components/session/SessionTimeoutGuard.tsx` — uses `refreshSession()` from context (no direct token knowledge), adds `refreshError` state shown for 2 s before force-logout redirect.
+- `src/components/session/SessionTimeoutModal.tsx` — added `refreshError?: boolean` prop. When true: replaces countdown content with an error `Alert` ("Session expirée, redirection…") and disables both buttons. Added spinner inside "Prolonger" button during async refresh. Added `disableEscapeKeyDown` to prevent user from accidentally dismissing the modal.
+
+**Correct flow (after fix):**
+1. User idle 15 min → modal appears with 60 s countdown
+2. User clicks "Prolonger" → `POST /auth/refresh` (Bearer = current Sanctum token)
+3. **Success** → new token persisted (module-level + React state) → `extendSession()` → idle timer reset → modal closes → all other tabs also reset via BroadcastChannel
+4. **Failure (token expired)** → `refreshSession()` returns `false` → `refreshError=true` → error UI shown 2 s → `logout()` → redirect to correct login page (owner or client)
+
+### Chat Display Fix — Session 7 (Apr 2026)
+
+**Symptoms reported:** chat not scrollable; messages not instant (had to reload page); ChatHeader (participant profile) not visible on client side.
+
+**Root causes & fixes:**
+
+1. **`@mui/x-chat` is AI/LLM-only, not P2P** — `src/components/chat/KeyHomeChatBox.tsx` previously wrapped MUI X `<ChatBox>` whose `sendMessage` contract requires a `ReadableStream` of AI response chunks. P2P chat returns an empty stream, causing phantom assistant messages and broken UI states. Fix: complete rewrite of `KeyHomeChatBox` as a split-pane layout over the existing native components (`ConversationList` + `ChatWindow`). Desktop = 320 px sidebar + flex-1 thread; mobile = full-screen list OR window based on `initialActiveConversationId`. Resolves active conversation from TanStack cache first, falls back to `GET /conversations/{uuid}` for deep links. Files `lib/keyhome-chat-adapter.ts` and `lib/chat-locale-fr.ts` are now orphaned but kept (no runtime references).
+
+2. **Height chain ambiguity → not scrollable, ChatHeader hidden** — `ChatPageWrapper` used `flex:1 + height:100%` together which is fragile; combined with `flex` direction confusion in nested wrappers, `ChatWindow`'s `flex-1 + min-h-0` chain didn't always get a definite height, so the messages list couldn't scroll and `ChatHeader` (`shrink-0`) was sometimes pushed out. Fix: in `KeyHomeChatBox`, replace `<ChatPageWrapper>` with `<div className="absolute inset-0 flex …">`. The DashboardLayout / OwnerLayoutClient already provide a `position: absolute, inset: 0` ancestor on messages pages, so anchoring the chat to `inset:0` gives a guaranteed definite height regardless of intermediate flex layers (`PageTransition`, etc.). Also added `relative` to `ChatWindow`'s root so the scroll-to-bottom button positions inside it.
+
+3. **WebSocket subscription race → messages not instant** — `useChat.ts` and `useConversations.ts` read `(echoChannel as any).subscription` synchronously and bailed early when `undefined`, with no retry. While `laravel-echo`'s `PusherChannel` constructor sets `subscription` synchronously, in StrictMode / fast nav / freshly-recreated singleton (after `disconnectEcho()`) the underlying pusher channel can be momentarily missing or not yet subscribed, silently dropping events. Fix: race-safe `tryBind()` helper retries every 50 ms (max 1 s = 20 attempts) until `pusherCh` is available, then binds all handlers atomically. Cleanup cancels pending retries and only unbinds when bindings were applied. Pattern matches the proven `usePresence.ts`. Applied to both `useChat` (per-conversation) and `useConversations` (per-UUID in the list).
+
+**Files changed:** `src/components/chat/KeyHomeChatBox.tsx` (full rewrite), `src/components/chat/ChatWindow.tsx` (added `relative`), `src/hooks/useChat.ts` (race-safe binding), `src/hooks/useConversations.ts` (race-safe binding).
+
+### Chat Real-time Fix — Session 8 (Apr 2026)
+
+**Root cause (macOS-specific):** `REVERB_HOST=0.0.0.0` in `.env` was used for **both** the Reverb server bind address AND the broadcasting driver's outbound connection target. On macOS, binding on `0.0.0.0` is correct (listens on all interfaces), but *connecting outbound* to `0.0.0.0` is undefined behavior and silently fails. The Laravel HTTP server caught the `\Throwable` in `MessageService::send()` and `ConversationService::markAsRead()`, so the broadcast was swallowed. Reverb never received the event; the frontend never got a WebSocket push. Users had to reload the page to see new messages.
+
+**Fix:** Changed `REVERB_HOST=0.0.0.0` → `REVERB_HOST=localhost` in `.env`. The server bind address is controlled by `REVERB_SERVER_HOST` (default `0.0.0.0`, unchanged), so Reverb still listens on all interfaces. The broadcasting driver now connects to `http://localhost:8080` which always works on macOS.
+
+**Secondary fix — `X-Socket-Id` header for `->toOthers()`:**
+- Added `getEchoSocketId()` to `src/lib/echo.ts` — returns the Pusher socket ID without creating a new Echo instance.
+- Added a synchronous Axios interceptor in `src/lib/api.ts` that attaches `X-Socket-Id: {socketId}` to every request when the Echo singleton is already connected. This enables Laravel's `->toOthers()` to correctly exclude the sender's socket from the broadcast, preventing the sender from receiving their own messages via WebSocket (previously they relied on the dedup check in `onMessageSent`).
+- Added `X-Socket-Id` to `config/cors.php` `allowed_headers` so the CORS preflight allows this header.
+
+**Verb config disambiguation:**
+- `REVERB_SERVER_HOST` — interface the Reverb *server process* binds on (default `0.0.0.0`). Not set in `.env`; uses default.
+- `REVERB_HOST` — public hostname used in WebSocket handshake AND the host the broadcasting *driver* connects to. Set to `localhost` for local dev; set to the public hostname (e.g. `reverb.keyhome.app`) in production.
+
+**Files changed:** `.env` (`REVERB_HOST`), `config/cors.php` (`X-Socket-Id`), `src/lib/echo.ts` (`getEchoSocketId`), `src/lib/api.ts` (socket interceptor).
+
+### Chat UI/UX — Session 9 (Apr 2026)
+
+#### 1. Owner panel always light
+**Root cause:** `OwnerThemeProvider` read `useThemeMode()` and applied `ownerDarkTheme` when OS was in dark mode.  
+**Fix:** `src/providers/OwnerThemeProvider.tsx` — hard-coded `ownerLightTheme`; removed `ownerDarkTheme` dependency and `useThemeMode` import. The owner dashboard is a professional management tool that must always be light.
+
+#### 2. Client chat dark mode
+`src/components/chat/chat-theme.ts` — extended `ChatTheme` interface with 8 new surface tokens:
+- `isDark: boolean` — dark variant flag
+- `listBg` — sidebar/list background
+- `surfaceBg` / `surfaceText` — received message bubble bg + text
+- `textPrimary` / `textSecondary` / `textMuted` — text hierarchy
+- `inputBg` — textarea/search field background
+
+`CLIENT_DARK_THEME` added (slate palette, pink accent unchanged). `CLIENT_THEME` and `OWNER_THEME` backfilled with the new fields (all light values).
+
+`src/components/chat/KeyHomeChatBox.tsx` — `theme` prop is now optional; when omitted (client pages), auto-selects `CLIENT_DARK_THEME` when `useThemeMode()` returns `'dark'`, else `CLIENT_THEME`. `OwnerChatBox` still passes `OWNER_THEME` explicitly → unaffected.
+
+**Components updated to use theme tokens (no more hardcoded colours):**
+- `ConversationList.tsx` — `bg-white` → `theme.listBg`; search bg, text, empty state text
+- `ConversationItem.tsx` — all `text-gray-*` classes → `theme.textPrimary/Secondary/Muted`; border divider adapts in dark
+- `MessageBubble.tsx` — received bubble: removed `bg-white text-gray-800`, now uses `theme.surfaceBg/surfaceText`; deleted bubble, system pill, timestamps, and hover action buttons all adapt
+- `MessageInput.tsx` — container bg, textarea bg/text/ring, document pill text all use theme tokens
+
+#### 3. Instant message input clear
+**Bug:** `handleSend` in `MessageInput.tsx` awaited `onSend()` before calling `setBody('')`, so text stayed visible until the API responded (noticeable 1–2 s lag).  
+**Fix:** capture `bodyToSend` + `attachmentToSend`, call `setBody('')` + `clearPending()` + reset textarea height **before** `await onSend(...)`. On error, restore body so the user can retry.
+
+#### 4. Conversation list — avatar/name/last-message hierarchy
+`ConversationItem.tsx` restructured:
+- **Row 1:** participant name + timestamp (most prominent)
+- **Row 2:** last message preview + unread badge
+- **Row 3:** `🏠 Ad title` (subtle, accent-coloured, below the message so name+preview have visual priority)
+- **Avatar corner badge:** 22×22 px property cover thumbnail pinned bottom-right of the 48 px avatar so the linked ad is identifiable at a glance without text
+
+#### 5. FCM push notification bugs fixed
+`app/Jobs/SendChatPushNotificationJob.php`:
+- Loads the recipient user to resolve role (`AGENT` → `/owner/messages/{uuid}`, `CUSTOMER` → `/messages/{uuid}`)
+- Adds `url` key to `withData()` so notification taps deep-link directly to the conversation
+
+`public/sw.js` push handler:
+- FCM wraps title/body inside `payload.notification.*` sub-object (not at top level). Previous `{...defaults, ...payload}` spread left `data.title = "KeyHome"` → fixed by explicitly promoting `payload.notification.title/body`
+- Hoists `payload.data.url` into `notification.data.url` so `notificationclick` can navigate to the correct conversation
+
+#### 6. Ad context in conversation list (previous session)
+`ConversationResource.php` — added `slug` to the ad array.  
+`types/chat.ts` — added `slug` to `ConversationAd` interface.  
+`ChatHeader.tsx` — redesigned with a clickable "Annonce liée" card (cover thumbnail + title + `ExternalLink` → `/ads/[slug]`); participant avatar/name links to `/proprietaires/[id]`.
+
+#### 7. Cross-panel security guard & panel-aware chat links
+**Bug:** Owner/agent clicking "Voir l'annonce" in chat navigated to `/ads/[slug]` (client panel), loading the client layout with owner session — cross-panel access.
+
+**Fix — 3 layers:**
+1. **`ChatTheme.isOwnerPanel: boolean`** — new field on all 4 theme variants. `CLIENT_THEME`/`CLIENT_DARK_THEME` = `false`, `OWNER_THEME`/`OWNER_DARK_THEME` = `true`. Flows through all chat components via existing `theme` prop.
+2. **`ChatHeader.tsx`** — `adHref` now panel-aware: `theme.isOwnerPanel ? /owner/ads/${ad.id} : /ads/${ad.slug}`. Profile link similarly redirects to `/owner/tenants` for owners.
+3. **`MessageBubble.tsx` → `UrlChip`** — new `resolveAdHref()` rewrites internal `/ads/[slug]` URLs to `/owner/ads/[slug]` when `isOwnerPanel=true`. Always opens in a new tab (`target="_blank"`) so the conversation isn't lost. The backend `AdController::show()` accepts both UUID and slug (lines 247-253), so `/owner/ads/[slug]` resolves correctly.
+4. **`ConversationItem.tsx`** — ad pill chip in the conversation list also panel-aware (`/owner/ads/${ad.id}` vs `/ads/${ad.slug}`).
+5. **`DashboardLayout`** — cross-panel guard: if authenticated user has `AGENT`/`ADMIN` role and accesses a `PRIVATE_PATHS` client route, redirect to `/owner/dashboard`. Public pages (`/ads/[slug]`, `/home`) remain accessible.
+6. **`NewMessageNotification.php`** — email link now recipient-aware: `AGENT` → `/owner/messages/{uuid}`, others → `/messages/{uuid}`. Prevents owners landing in client panel from email taps.
+7. **`AdStatusChanged.php`** — owner-targeted notification (dispatched by `NotifyOwnerOfStatusChange` listener). Email action button + web push `data.url` switched from `/ads/{slug}` (client) to `/owner/ads/{id}` (owner panel).
+8. **Lint cleanup** — fixed 3 React Compiler / ESLint errors that were silently in the build: `ChatNotificationListener.tsx` ref mutation during render (moved to `useEffect`), `useTypingIndicator.ts` manual memoization warning (block-disable), `echo.ts` `as any` (replaced with `as unknown as never`).
+
+### Session — Chat / PWA / Theme Polish (Apr 2026)
+
+10 fixes across the chat experience, PWA delivery and theme consistency.
+
+**Chat / messaging:**
+1. **Unread badge counts conversations, not messages** — `ChatBadgeIcon.tsx`, `OwnerSidebar.tsx`, `ConversationList.tsx` now derive the badge from `conversations.length` (or `filter(c => c.unread_count > 0).length`) instead of summing `total`. WhatsApp-style behaviour matching user mental model.
+2. **`ad.slug` no longer null in chat** — `ConversationController::store()`, `::show()` and `ConversationService::getConversationsForUser()` now eager-load `'ad:id,title,slug'` (was `'ad:id,title'`). Frontend `Link` to `/ads/{slug}` now resolves correctly instead of `/ads/null`.
+3. **Owner ad-edit success button relabeled** — `(owner)/owner/ads/[id]/page.tsx` button now reads "Aperçu public (nouvel onglet)" and uses `noopener,noreferrer` rel attributes. Clarifies that the button opens the public client-side preview, not the owner editor.
+4. **Branded chat toast** — replaced notistack's sky-blue `info` variant with custom `ChatToast` component (`components/chat/ChatToast.tsx`). Registered as the `chatMessage` variant in `ToastProvider`. `ChatNotificationListener` accepts an `accentColor` prop (`#F6475F` for client, `#0D9488` for owner). Toast features panel-aware accent border, gradient icon, click-to-open, dedicated dismiss button, French aria labels.
+5. **Smart back button on chat list** — added `lib/smart-back.ts` (`smartBack(router, fallbackHref)`). If `document.referrer` is empty, cross-origin or matches an auth path (`/login`, `/register`, `/verify-email`, etc.), navigation falls back to the provided href; otherwise `router.back()`. `ConversationList` back button now uses this. Client fallback `/home` (was `/`).
+6. **Chat list scroll containment** — `ConversationList.tsx` scroll container now uses `min-h-0 overflow-y-auto` with explicit `overscrollBehavior: 'contain'` style and `onWheel={(e) => e.stopPropagation()}` to defensively block wheel events from bubbling to `<body>` when the list isn't tall enough to internally scroll. Inner virtualizer container has `Math.max(totalSize, 1)px` so wheel always has a target.
+7. **Image attachment responsiveness** — `AttachmentPreview.tsx` swapped Next.js `<Image>` (whose inline `width`/`height` attrs were overriding Tailwind `max-h-64`) for a plain `<img>` wrapped in a sized button with `maxWidth: 'min(280px, 70vw)'`, `maxHeight: 280`, `objectFit: 'contain'`, `width: 'fit-content'`. Tall portrait screenshots now render at proper aspect ratio inside the 75% bubble across all viewports; tap-to-zoom lightbox unchanged.
+
+**PWA / push delivery:**
+8. **Single service worker** — removed dual-SW race that silently dropped FCM push events on standalone PWA installs. `useFcmToken.ts` now reuses `await navigator.serviceWorker.ready` instead of registering a separate `firebase-messaging-sw.js`. `public/sw.js` push handler is panel-aware: chat-message payloads (`data.type === 'chat_message'`) get tagged `chat-{conversation_uuid}` with `renotify: true` so multiple messages stack per conversation. SW version bumped `v7 → v8`. Old `firebase-messaging-sw.js` replaced with a self-unregistering stub for users with the old SW cached.
+
+**Presence / last seen:**
+11. **"Vu il y a X" now works** — `OnlineStatus` UI already supported `lastSeenAt`, but no data flowed. Added:
+    - Migration `add_last_seen_at_to_users_table` (nullable `timestampTz` + index).
+    - `TouchLastSeen` middleware appended to the `api` group: throttles `users.last_seen_at` updates to once per minute per user via Cache; uses raw `DB::update` to skip Eloquent observers (no `updated_at` mutation, no observer cascades). Heartbeat write failures are swallowed so they never break a real API response.
+    - `ConversationResource` exposes `other_participant.last_seen_at` (ISO-8601 or `null`).
+    - `ConversationService::getConversationsForUser()`, `ConversationController::store/show` eager-load `last_seen_at` on tenant/landlord.
+    - Frontend `ConversationParticipant` type gains `last_seen_at: string | null`.
+    - `ChatHeader` now passes `lastSeenAt={participant?.last_seen_at}` to both branches of `OnlineStatus`. Offline users now display "Vu il y a 3 min" / "Vu hier" via `date-fns/formatDistanceToNow` with French locale, instead of just "Hors ligne".
+
+**Theme / session:**
+9. **`SessionTimeoutGuard` mounted per panel** — moved out of `app/providers.tsx` (global root) into `(dashboard)/layout.tsx` and `(owner)/layout.tsx`. Modal now correctly inherits panel-specific `primary.main` color: pink for client, teal for owner. Previously the guard rendered above `OwnerThemeProvider` and always showed pink.
+10. **Theme policy clarified** — `OwnerThemeProvider` now uses the resolved `mode` (was `choice === 'dark' ? 'dark' : 'light'`, ignoring `system`). Owner panel now follows OS preference like the client panel. `LandingThemeProvider` now uses `choice !== 'light'` so the public marketing landing defaults to dark unless the user explicitly picks light. Authenticated panels (client + owner) follow system; landing forces dark by default.
+
+**Files changed (frontend):** `src/components/chat/{ChatBadgeIcon,ChatNotificationListener,ChatToast,ConversationList,AttachmentPreview}.tsx`, `src/components/owner/OwnerSidebar.tsx`, `src/components/owner/OwnerLayoutClient.tsx`, `src/providers/{ToastProvider,OwnerThemeProvider}.tsx`, `src/components/landing/LandingThemeContext.tsx`, `src/app/providers.tsx`, `src/app/(dashboard)/layout.tsx`, `src/app/(dashboard)/messages/{page,[uuid]/page}.tsx`, `src/app/(owner)/layout.tsx`, `src/app/(owner)/owner/ads/[id]/page.tsx`, `src/hooks/useFcmToken.ts`, `src/lib/smart-back.ts` (new), `public/sw.js`, `public/firebase-messaging-sw.js`.
+
+**Files changed (backend):** `app/Http/Controllers/Api/V1/ConversationController.php`, `app/Services/Chat/ConversationService.php`.
+
+**Test results:** Backend 776 passed (1 risky pre-existing). Frontend `tsc --noEmit` clean, `npm run lint` 0 errors / 50 pre-existing warnings, `npm run build` succeeds.
+
+### Session — Reverb VPS Deployment (Apr 2026)
+
+Reverb (`php artisan reverb:start`) was completely missing from the deployed stack — the chat real-time pipeline silently degraded to "refresh to see messages" in preprod/prod. Fixed:
+
+1. **`docker-compose.yml`** (prod) — new `reverb` service: same `${APP_IMAGE}` as `app`/`worker`, runs `reverb:start --host=0.0.0.0 --port=8080`, joins `keyhome-network` + `traefik-public`, depends on `app`+`redis` healthy. Healthcheck via `pgrep -f 'reverb:start'`. Resource caps `384m / 0.75 cpu`. Traefik labels route `${REVERB_DOMAIN:-reverb.keyhome.app}` (TLS via Let's Encrypt) → port 8080.
+2. **`docker-compose.preprod.yml`** — symmetric service with `${REVERB_DOMAIN:-reverb-api.keyhome.neocraft.dev}`. Joins `preprod-network` + `keyhome-prod-network` (shared Redis) + `traefik-public`. Caps `256m / 0.50 cpu`.
+3. **`.env.example`** — corrected the prod template that conflated public-hostname vars (`REVERB_HOST`/`REVERB_PORT`/`REVERB_SCHEME` consumed by Pusher SDK + broadcaster auth signatures) with internal-listen vars (`REVERB_SERVER_HOST`/`REVERB_SERVER_PORT` consumed by the daemon). Old template had `REVERB_HOST=0.0.0.0` which would break frontend connections in prod. Added `REVERB_DOMAIN` for compose.
+4. **`.env.preprod.example`** — flipped `BROADCAST_CONNECTION=log → reverb` (was silently logging all broadcasts to file) and added the full Reverb env block with key-generation comments.
+5. **`docs/REVERB_DEPLOY.md`** — full deploy runbook: env-var matrix per environment, DNS records, `docker compose up -d reverb` steps, sanity checks (`wscat`, presence test), rollback, scaling via `REVERB_SCALING_ENABLED=true` + Redis pub/sub.
+
+**DNS prerequisite (manual, must precede deploy):**
+- `reverb.keyhome.app` A record → prod VPS IP
+- `reverb-api.keyhome.neocraft.dev` A record → preprod VPS IP
+
+**Vercel frontend env vars (must be added before frontend redeploy):**
+- `NEXT_PUBLIC_REVERB_APP_KEY` (must equal backend `REVERB_APP_KEY`)
+- `NEXT_PUBLIC_REVERB_HOST` = matching public hostname
+- `NEXT_PUBLIC_REVERB_PORT=443`, `NEXT_PUBLIC_REVERB_SCHEME=https`
+
+**Local-dev `.env`** unchanged — already had `BROADCAST_CONNECTION=reverb` and direct localhost config that works with `composer run dev`.
+
+**Files changed:** `docker-compose.yml`, `docker-compose.preprod.yml`, `.env.example`, `.env.preprod.example`, `docs/REVERB_DEPLOY.md` (new).
 
 ### Frontend GitLab CI / Vercel
 - **`format` job**: `npm run format:check` — runs Prettier check. Fix by running `npm run format` locally before pushing.

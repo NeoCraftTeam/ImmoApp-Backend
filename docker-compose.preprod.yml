@@ -95,6 +95,52 @@ services:
           memory: 256m
           cpus: "0.50"
 
+  # ── Reverb — WebSocket server for chat real-time pipeline ────────────────
+  # Uses the SHARED prod Redis (keyhome-prod-redis) for broadcast pub/sub via
+  # the keyhome-prod-network. Isolated from prod by REDIS_PREFIX in .env.
+  reverb:
+    image: ${APP_IMAGE:-keyhome-backend}
+    container_name: ${COMPOSE_PREFIX:-keyhome-preprod}-reverb
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    depends_on:
+      code-sync:
+        condition: service_completed_successfully
+      app:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - preprod-app-code:/var/www
+      - preprod-storage-data:/var/www/storage
+      - ./.env:/var/www/.env
+    networks:
+      - preprod-network
+      - keyhome-prod-network
+      - traefik-public
+    environment:
+      - APP_ENV=${APP_ENV:-staging}
+      - DB_SSLMODE=prefer
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'reverb:start' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.50"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.keyhome-preprod-reverb.rule=Host(`${REVERB_DOMAIN:-reverb-api.keyhome.neocraft.dev}`)"
+      - "traefik.http.routers.keyhome-preprod-reverb.entrypoints=websecure"
+      - "traefik.http.routers.keyhome-preprod-reverb.tls.certresolver=letsencrypt"
+      - "traefik.http.services.keyhome-preprod-reverb.loadbalancer.server.port=8080"
+
   nightwatch-agent:
     image: laravelphp/nightwatch-agent:latest
     container_name: ${COMPOSE_PREFIX:-keyhome-preprod}-nightwatch-agent
