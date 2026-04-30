@@ -3,6 +3,7 @@
 use App\Exceptions\RegistrationEmailTakenException;
 use App\Http\Middleware\AddRequestId;
 use App\Http\Middleware\CacheHeaders;
+use App\Http\Middleware\CdnCache;
 use App\Http\Middleware\CheckFeatureFlag;
 use App\Http\Middleware\EnsureCorrectRoleForPanel;
 use App\Http\Middleware\EnsureEmailIsVerified;
@@ -57,6 +58,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'active' => EnsureUserIsActive::class,
             'cache.headers' => CacheHeaders::class,
+            'cdn.cache' => CdnCache::class,
             'email.verified' => EnsureEmailIsVerified::class,
             'feature' => CheckFeatureFlag::class,
             'mfa.admin' => RequireApiMfa::class,

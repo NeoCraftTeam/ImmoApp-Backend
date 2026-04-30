@@ -10,8 +10,25 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Adds Cache-Control headers to public API GET responses.
- * Authenticated responses get private caching; public responses get shared caching.
+ * Adds sensible Cache-Control headers to every API GET response.
+ *
+ * ┌────────────────────┬────────────────────────────────────────────────────────┐
+ * │ Authenticated GET  │ private, no-store                                      │
+ * │                    │ Browser: never cache. CDN: skips automatically when    │
+ * │                    │ Authorization header is present.                       │
+ * ├────────────────────┼────────────────────────────────────────────────────────┤
+ * │ Public GET (guest) │ public, max-age=60, s-maxage=60,                       │
+ * │ (default / dynamic)│ stale-while-revalidate=300, stale-if-error=3600        │
+ * │                    │ CDN keeps for 60s, serves stale while revalidating     │
+ * │                    │ for 5min; falls back to stale for 1h on origin errors. │
+ * └────────────────────┴────────────────────────────────────────────────────────┘
+ *
+ * High-TTL reference data (cities, ad-types, etc.) is handled by the separate
+ * CdnCache middleware which is applied per-route and overrides these defaults.
+ *
+ * Note: Cloudflare ignores responses with an Authorization request header by
+ * default, so `Vary: Authorization` is unnecessary. We only vary on
+ * Accept-Encoding (gzip vs. brotli) which affects the compressed body.
  */
 final class CacheHeaders
 {
@@ -29,12 +46,21 @@ final class CacheHeaders
         }
 
         if ($request->user()) {
-            $response->headers->set('Cache-Control', 'private, no-cache, must-revalidate');
+            $response->headers->set('Cache-Control', 'private, no-store');
         } else {
-            $response->headers->set('Cache-Control', 'public, max-age=60, s-maxage=120');
+            // Don't overwrite if CdnCache already set a longer TTL for this route.
+            if (!$response->headers->has('Cache-Control')) {
+                $response->headers->set(
+                    'Cache-Control',
+                    'public, max-age=60, s-maxage=60, stale-while-revalidate=300, stale-if-error=3600',
+                );
+            }
         }
 
-        $response->headers->set('Vary', 'Accept, Authorization');
+        // Vary only on encoding — we always return JSON so Accept variation is wasteful.
+        if (!$response->headers->has('Vary')) {
+            $response->headers->set('Vary', 'Accept-Encoding');
+        }
 
         return $response;
     }
