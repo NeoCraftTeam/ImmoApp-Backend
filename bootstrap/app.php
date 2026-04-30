@@ -18,6 +18,7 @@ use App\Http\Middleware\ResolveSanctumBearerUser;
 use App\Http\Middleware\RoleScopedSession;
 use App\Http\Middleware\SanitizeInput;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\TouchLastSeen;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -81,6 +82,7 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureEmailIsVerified::class,
             SanitizeInput::class,
             CacheHeaders::class,
+            TouchLastSeen::class,
         ]);
         $middleware->throttleApi();
     })
