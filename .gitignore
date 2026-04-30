@@ -29,12 +29,14 @@ Homestead.json
 /storage/postman
 /storage/app/seeder-images
 /storage/media-library/
+/storage/app/firebase-credentials.json
 .env.backup
 .env.production
 .phpactor.json
 auth.json
 # public/storage and public/hot are already listed above
 .idea/*
+.windsurf/
 *.DS_Store
 docker-compose.override.yml
 data.ms/
