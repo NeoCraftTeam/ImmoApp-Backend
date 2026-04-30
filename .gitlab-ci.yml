@@ -328,7 +328,7 @@ production_smoke_test:
       echo "Smoke URL: $SMOKE_URL"
       set +e
       for i in $(seq 1 10); do
-        STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" "${SMOKE_URL}/api/ping" 2>/dev/null)
+        STATUS=$(curl --globoff --silent --output /dev/null --write-out "%{http_code}" "${SMOKE_URL}/api/ping" 2>/dev/null)
         echo "Attempt $i — HTTP $STATUS"
         if [ "$STATUS" = "200" ]; then
           echo "✅ Smoke test passed"
@@ -353,7 +353,7 @@ preprod_smoke_test:
       FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:preprod"
       echo "Using port: $PREPROD_PORT"
       for i in $(seq 1 15); do
-        STATUS=$(curl --silent --output /dev/null --write-out "%{http_code}" "http://127.0.0.1:${PREPROD_PORT}/api/ping" 2>/dev/null)
+        STATUS=$(curl --globoff --silent --output /dev/null --write-out "%{http_code}" "http://127.0.0.1:${PREPROD_PORT}/api/ping" 2>/dev/null)
         echo "Attempt $i — HTTP $STATUS (GET /api/ping)"
         if [ "$STATUS" = "200" ]; then
           echo "✅ Smoke test passed"
@@ -367,7 +367,7 @@ preprod_smoke_test:
       echo "--- docker compose logs (web, app) ---"
       cd /opt/keyhome-preprod && APP_IMAGE=$FULL_IMAGE docker compose logs web app --tail=120 || true
       echo "--- curl -v /up (last 40 lines) ---"
-      curl -v --max-time 15 "http://127.0.0.1:${PREPROD_PORT}/up" 2>&1 | tail -40 || true
+      curl --globoff -v --max-time 15 "http://127.0.0.1:${PREPROD_PORT}/up" 2>&1 | tail -40 || true
       exit 1
   rules:
     - if: $CI_COMMIT_BRANCH == "preprod"
@@ -400,7 +400,7 @@ slack_success:
       fi
       SHORT_SHA="${CI_COMMIT_SHA:0:8}"
 
-      curl -sS -X POST -H 'Content-type: application/json' \
+      curl --globoff -sS -X POST -H 'Content-type: application/json' \
       --data "{
         \"attachments\": [{
           \"color\": \"#28a745\",
@@ -430,7 +430,7 @@ slack_success:
             }
           ]
         }]
-      }" $WEBHOOK
+      }" "$WEBHOOK"
   when: on_success
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
@@ -467,7 +467,7 @@ slack_failure:
       SHORT_SHA="${CI_COMMIT_SHA:0:8}"
 
       # Récupérer le vrai job qui a échoué via l'API GitLab
-      FAILED_JOBS_JSON=$(curl -sS --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+      FAILED_JOBS_JSON=$(curl --globoff -sS --header "JOB-TOKEN: $CI_JOB_TOKEN" \
         "$CI_API_V4_URL/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/jobs?scope[]=failed" 2>/dev/null || echo "[]")
 
       # Extraire le premier job échoué (sans jq, avec grep/sed)
@@ -478,7 +478,7 @@ slack_failure:
       [ -z "$FAILED_JOB" ] && FAILED_JOB="Voir la pipeline"
       [ -z "$FAILED_STAGE" ] && FAILED_STAGE="unknown"
 
-      curl -sS -X POST -H 'Content-type: application/json' \
+      curl --globoff -sS -X POST -H 'Content-type: application/json' \
       --data "{
         \"attachments\": [{
           \"color\": \"#dc3545\",
@@ -509,7 +509,7 @@ slack_failure:
             }
           ]
         }]
-      }" $WEBHOOK
+      }" "$WEBHOOK"
   when: on_failure
   rules:
     - if: $CI_COMMIT_BRANCH
