@@ -57,7 +57,7 @@ RUN apk add --no-cache \
     perl-image-exiftool \
     oniguruma-dev \
     gettext-dev \
-    libuv-dev \
+    libev-dev \
     shadow \
     $PHPIZE_DEPS \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-avif \
@@ -73,13 +73,18 @@ RUN apk add --no-cache \
     gettext \
     && pecl install redis \
     && docker-php-ext-enable redis \
-    # ext-uv: libuv-backed event loop used by Reverb's WebSocket server.
-    # The default ReactPHP stream_select loop is O(n) per tick and caps out
-    # well below 1k concurrent clients; libuv (epoll/kqueue) is O(1) and
-    # scales to the 10k nofile ulimit set in docker-compose. The 'yes ""'
-    # accepts pecl's interactive "Specify libuv install prefix" prompt.
-    && yes '' | pecl install uv \
-    && docker-php-ext-enable uv \
+    # ext-ev: libev-backed event loop used by Reverb's WebSocket server.
+    # The default ReactPHP stream_select loop is O(n) per tick and is also
+    # capped at 1024 fds by FD_SETSIZE — useless against the 10k nofile
+    # ulimit set in docker-compose. ext-ev binds libev (epoll on Linux,
+    # kqueue on BSD) which is O(1) per tick and scales to the full ulimit.
+    # ReactPHP loop priority: ev > uv > event > stream_select, so ev gets
+    # picked up automatically with no app code change.
+    # NOTE: chose ext-ev over ext-uv because the PECL `uv` package has been
+    # unmaintained since 2022 (v0.3.0) and no longer compiles on PHP 8.4.
+    # `ev` 1.1.5 (2023) supports PHP 8+ and is actively maintained.
+    && pecl install ev \
+    && docker-php-ext-enable ev \
     && apk del $PHPIZE_DEPS shadow \
     && rm -rf /tmp/* /var/cache/apk/*
 

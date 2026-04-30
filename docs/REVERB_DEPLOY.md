@@ -133,27 +133,33 @@ docker compose exec reverb sh -c 'cat /proc/1/limits | grep "open files"'
 # Max open files            10000                10000                files
 ```
 
-### 2. PHP `ext-uv` — libuv event loop
+### 2. PHP `ext-ev` — libev event loop
 
 Reverb runs on top of ReactPHP's event loop. The default fallback is PHP's
 `stream_select()` which is **O(n) per tick** and is also capped at 1024 file
 descriptors by `FD_SETSIZE` on most builds — so even with the 10 000 nofile
 ulimit, `stream_select` would silently truncate the fd set.
 
-The Dockerfile installs `ext-uv` (`pecl install uv`) which binds **libuv**
-(epoll on Linux, kqueue on BSD/macOS). ReactPHP automatically picks it up
-when the extension is loaded — no app code change required. Loop driver
-priority: `ev` → `uv` ← us → `event` → `stream_select`.
+The Dockerfile installs `ext-ev` (`pecl install ev` + `apk add libev-dev`)
+which binds **libev** (epoll on Linux, kqueue on BSD/macOS). ReactPHP
+automatically picks it up when the extension is loaded — no app code change
+required. Loop driver priority: `ev` ← us → `uv` → `event` → `stream_select`.
+
+**Why `ev` and not `uv`:** the PECL `uv` package has been unmaintained
+since 2022 (v0.3.0) and no longer compiles cleanly on PHP 8.4. `ext-ev`
+1.1.5 (2023) is actively maintained and supports PHP 8+. It is also
+*higher* priority than `uv` in ReactPHP's loop autodetection, so even
+if both were installed `ev` would win.
 
 Verify after rebuild:
 
 ```bash
-docker compose exec reverb php -m | grep -i uv          # uv
-docker compose exec reverb php -r 'echo UV::poll_in;'   # integer
+docker compose exec reverb php -m | grep -i ev    # ev
+docker compose exec reverb php -r 'echo Ev::version();'   # "4.x.x"
 ```
 
 Reverb's `--debug` startup logs should also show the loop class name (e.g.
-`ExtUvLoop`), not `StreamSelectLoop`.
+`ExtEvLoop`), not `StreamSelectLoop`.
 
 ## Horizontal scaling
 
