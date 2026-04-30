@@ -39,7 +39,8 @@ Route::middleware(['auth:sanctum', 'can:admin-access'])->prefix('admin/payments/
 });
 
 // --- SUBSCRIPTIONS (agencies) ---
-Route::get('/subscriptions/plans', [SubscriptionController::class, 'plans']);
+Route::get('/subscriptions/plans', [SubscriptionController::class, 'plans'])
+    ->middleware('cdn.cache:1800');
 Route::middleware('auth:sanctum')->prefix('subscriptions')->group(function (): void {
     Route::get('/current', [SubscriptionController::class, 'current']);
     Route::post('/subscribe', [SubscriptionController::class, 'subscribe'])
@@ -52,7 +53,8 @@ Route::middleware('auth:sanctum')->prefix('subscriptions')->group(function (): v
 });
 
 // --- CREDITS / POINTS ---
-Route::get('/credits/packages', [CreditController::class, 'packages']);
+Route::get('/credits/packages', [CreditController::class, 'packages'])
+    ->middleware('cdn.cache:1800');
 Route::middleware('auth:sanctum')->prefix('credits')->group(function (): void {
     Route::get('/balance', [CreditController::class, 'balance']);
     Route::post('/purchase/{package}', [CreditController::class, 'purchase'])
