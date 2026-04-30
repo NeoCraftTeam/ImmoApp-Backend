@@ -82,8 +82,8 @@ final readonly class UnlockAd
                     $this->conversationService->findOrCreate($ad->id, $user->id, $landlordId);
                 } catch (\Throwable $e) {
                     Log::warning('[Chat] Could not auto-create conversation after unlock', [
-                        'ad_id'  => $ad->id,
-                        'error'  => $e->getMessage(),
+                        'ad_id' => $ad->id,
+                        'error' => $e->getMessage(),
                     ]);
                 }
             }
