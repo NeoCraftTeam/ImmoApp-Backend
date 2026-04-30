@@ -57,6 +57,7 @@ RUN apk add --no-cache \
     perl-image-exiftool \
     oniguruma-dev \
     gettext-dev \
+    libuv-dev \
     shadow \
     $PHPIZE_DEPS \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-avif \
@@ -72,6 +73,13 @@ RUN apk add --no-cache \
     gettext \
     && pecl install redis \
     && docker-php-ext-enable redis \
+    # ext-uv: libuv-backed event loop used by Reverb's WebSocket server.
+    # The default ReactPHP stream_select loop is O(n) per tick and caps out
+    # well below 1k concurrent clients; libuv (epoll/kqueue) is O(1) and
+    # scales to the 10k nofile ulimit set in docker-compose. The 'yes ""'
+    # accepts pecl's interactive "Specify libuv install prefix" prompt.
+    && yes '' | pecl install uv \
+    && docker-php-ext-enable uv \
     && apk del $PHPIZE_DEPS shadow \
     && rm -rf /tmp/* /var/cache/apk/*
 
