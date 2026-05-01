@@ -139,7 +139,12 @@ final class AgencyController
         $ads = Ad::where('user_id', $agency->owner_id)
             ->where('status', 'available')
             ->where('is_visible', true)
-            ->with(['quarter.city', 'ad_type', 'media'])
+            ->with([
+                'quarter:id,name,city_id',
+                'quarter.city:id,name',
+                'ad_type:id,name',
+                'media',
+            ])
             ->withAvg('reviews', 'rating')
             ->withCount('reviews')
             ->latest()

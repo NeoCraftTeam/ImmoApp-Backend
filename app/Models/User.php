@@ -67,7 +67,6 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property string|null $phone_number
  * @property string $email
  * @property Carbon|null $email_verified_at
- * @property Carbon|null $last_seen_at
  * @property string $password
  * @property string $avatar
  * @property UserType|null $type
@@ -612,7 +611,6 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'onboarding_completed_at' => 'datetime',
             'trust_score_consent' => 'boolean',
             'last_home_visit_at' => 'datetime',
-            'last_seen_at' => 'datetime',
             'preferences' => 'array',
             'must_change_password_at' => 'datetime',
         ];

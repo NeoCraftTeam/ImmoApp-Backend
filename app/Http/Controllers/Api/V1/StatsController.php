@@ -28,7 +28,9 @@ final class StatsController
      */
     public function landing(): JsonResponse
     {
-        $stats = Cache::remember('landing:stats', now()->addMinutes(5), fn () => [
+        // 30 min TTL — counts move slowly; cold-path COUNT(*) on Ads is the dominant cost.
+        // Warm via scheduler (see Console\Kernel) so end-users never hit cold cache.
+        $stats = Cache::remember('landing:stats', now()->addMinutes(30), fn () => [
             'ads_count' => Ad::query()->publiclyListed()->where('is_visible', true)->count(),
             'cities_count' => City::query()->count(),
             'users_count' => User::query()->count(),
@@ -52,7 +54,7 @@ final class StatsController
             $reviews = Review::query()
                 ->whereNotNull('comment')
                 ->where('rating', '>=', 4)
-                ->with(['user.city'])
+                ->with(['user:id,firstname,lastname,role,city_id' => ['city:id,name']])
                 ->latest()
                 ->limit(8)
                 ->get();

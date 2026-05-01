@@ -10,6 +10,7 @@ use App\Models\SubscriptionPlan;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Owner ad boost endpoints.
@@ -21,11 +22,16 @@ final class BoostController
      */
     public function plans(): JsonResponse
     {
-        $plans = SubscriptionPlan::query()
-            ->where('is_active', true)
-            ->whereNotNull('boost_score')
-            ->orderBy('sort_order')
-            ->get(['id', 'name', 'price', 'boost_score', 'boost_duration_days', 'description']);
+        // Boost plans rarely change; cache the slimmed projection for 1 hour.
+        $plans = Cache::remember(
+            'boost:plans:active',
+            now()->addHour(),
+            fn () => SubscriptionPlan::query()
+                ->where('is_active', true)
+                ->whereNotNull('boost_score')
+                ->orderBy('sort_order')
+                ->get(['id', 'name', 'price', 'boost_score', 'boost_duration_days', 'description']),
+        );
 
         return response()->json(['data' => $plans]);
     }

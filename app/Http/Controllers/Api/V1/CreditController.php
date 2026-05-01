@@ -18,6 +18,7 @@ use App\Services\Payment\PaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use OpenApi\Annotations as OA;
 
@@ -51,7 +52,13 @@ final class CreditController
      */
     public function packages(): AnonymousResourceCollection
     {
-        $packages = PointPackage::active()->get();
+        // Packages change rarely; cache the eager-loaded collection for 1 hour.
+        // Filament admin invalidates via PointPackageObserver on save/delete.
+        $packages = Cache::remember(
+            'credits:packages:active',
+            now()->addHour(),
+            fn () => PointPackage::active()->get(),
+        );
 
         return PointPackageResource::collection($packages);
     }

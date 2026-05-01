@@ -66,7 +66,6 @@ final class InvoiceController
 
         $invoices = Invoice::query()
             ->where('agency_id', $agency->id)
-            ->with('agency')
             ->orderByDesc('issued_at')
             ->paginate(15);
 

@@ -71,6 +71,7 @@ RUN apk add --no-cache \
     opcache \
     exif \
     gettext \
+    pcntl \
     && pecl install redis \
     && docker-php-ext-enable redis \
     # ext-ev: libev-backed event loop used by Reverb's WebSocket server.

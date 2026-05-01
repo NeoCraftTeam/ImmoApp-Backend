@@ -36,6 +36,7 @@ return [
             'https://keyhome.test:3000',
         ] : []),
         'https://api.keyhome.neocraft.dev',
+        'https://keyhome.neocraft.dev',
         'https://preview.keyhome.neocraft.dev',
         'https://keyhome.app',
         'https://www.keyhome.app',

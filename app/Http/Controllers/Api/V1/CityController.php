@@ -107,7 +107,7 @@ final class CityController
         $this->authorize('create', City::class);
         try {
             $city = $action->handle($request->validated());
-            Cache::flush(); // invalidate city list cache
+            $this->invalidateCityCache();
 
             return response()->json([
                 'message' => 'Ville crée avec succès',
@@ -209,7 +209,7 @@ final class CityController
 
         try {
             $city = $action->handle($city, $request->validated());
-            Cache::flush(); // invalidate city list cache
+            $this->invalidateCityCache();
 
             return response()->json([
                 'message' => 'Ville mise à jour avec succès',
@@ -255,7 +255,7 @@ final class CityController
 
         try {
             $action->handle($city);
-            Cache::flush(); // invalidate city list cache
+            $this->invalidateCityCache();
 
             return response()->json([
                 'message' => 'Ville supprimée avec succès',
@@ -266,5 +266,11 @@ final class CityController
                 'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
             ], 500); // 500 = Internal Server Error
         }
+    }
+
+    private function invalidateCityCache(): void
+    {
+        Cache::forget('cities:list:'.md5(':50'));
+        Cache::forget('cities:list:'.md5(':100'));
     }
 }

@@ -3,7 +3,6 @@
 use App\Exceptions\RegistrationEmailTakenException;
 use App\Http\Middleware\AddRequestId;
 use App\Http\Middleware\CacheHeaders;
-use App\Http\Middleware\CdnCache;
 use App\Http\Middleware\CheckFeatureFlag;
 use App\Http\Middleware\EnsureCorrectRoleForPanel;
 use App\Http\Middleware\EnsureEmailIsVerified;
@@ -18,7 +17,6 @@ use App\Http\Middleware\ResolveSanctumBearerUser;
 use App\Http\Middleware\RoleScopedSession;
 use App\Http\Middleware\SanitizeInput;
 use App\Http\Middleware\SecurityHeaders;
-use App\Http\Middleware\TouchLastSeen;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -39,7 +37,6 @@ return Application::configure(basePath: dirname(__DIR__))
         web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
-        channels: __DIR__.'/../routes/channels.php',
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -59,7 +56,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'active' => EnsureUserIsActive::class,
             'cache.headers' => CacheHeaders::class,
-            'cdn.cache' => CdnCache::class,
             'email.verified' => EnsureEmailIsVerified::class,
             'feature' => CheckFeatureFlag::class,
             'mfa.admin' => RequireApiMfa::class,
@@ -82,7 +78,6 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureEmailIsVerified::class,
             SanitizeInput::class,
             CacheHeaders::class,
-            TouchLastSeen::class,
         ]);
         $middleware->throttleApi();
     })

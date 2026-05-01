@@ -143,7 +143,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik-public"
-      - "traefik.http.routers.keyhome-preprod-reverb.rule=Host(`${REVERB_DOMAIN:-reverb-api.keyhome.neocraft.dev}`)"
+      - "traefik.http.routers.keyhome-preprod-reverb.rule=Host(`${REVERB_DOMAIN:-reverb.keyhome.neocraft.dev}`)"
       - "traefik.http.routers.keyhome-preprod-reverb.entrypoints=websecure"
       - "traefik.http.routers.keyhome-preprod-reverb.tls.certresolver=letsencrypt"
       - "traefik.http.services.keyhome-preprod-reverb.loadbalancer.server.port=8080"

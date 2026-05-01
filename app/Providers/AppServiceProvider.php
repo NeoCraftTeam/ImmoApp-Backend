@@ -14,11 +14,15 @@ use App\Models\Ad;
 use App\Models\Agency;
 use App\Models\Payment;
 use App\Models\PersonalAccessToken;
+use App\Models\PointPackage;
+use App\Models\SubscriptionPlan;
 use App\Models\TentativeReservation;
 use App\Models\User;
 use App\Observers\ActivityObserver;
 use App\Observers\AdObserver;
 use App\Observers\PaymentObserver;
+use App\Observers\PointPackageObserver;
+use App\Observers\SubscriptionPlanObserver;
 use App\Observers\TentativeReservationObserver;
 use App\Observers\UserObserver;
 use App\Services\AiSearchService;
@@ -96,6 +100,8 @@ class AppServiceProvider extends ServiceProvider
         TentativeReservation::observe(TentativeReservationObserver::class);
         Activity::observe(ActivityObserver::class);
         User::observe(UserObserver::class);
+        PointPackage::observe(PointPackageObserver::class);
+        SubscriptionPlan::observe(SubscriptionPlanObserver::class);
 
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
 

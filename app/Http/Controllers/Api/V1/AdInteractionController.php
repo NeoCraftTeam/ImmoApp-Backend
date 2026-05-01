@@ -307,7 +307,15 @@ final class AdInteractionController
             ->limit(10)
             ->pluck('ad_id');
 
-        $ads = Ad::with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])
+        $ads = Ad::with([
+            'quarter:id,name,city_id',
+            'quarter.city:id,name',
+            'ad_type:id,name',
+            'media',
+            'user:id,firstname,lastname,avatar,agency_id,city_id',
+            'user.agency:id,name,slug,logo',
+            'agency:id,name,slug,logo',
+        ])
             ->whereIn('id', $viewedAdIds)
             ->visible()
             ->publiclyListed()
@@ -336,7 +344,19 @@ final class AdInteractionController
             ])
             ->pluck('ad_id');
 
-        $ads = Ad::with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])
+        if ($favoritedAdIds->isEmpty()) {
+            return AdResource::collection(collect());
+        }
+
+        $ads = Ad::with([
+            'quarter:id,name,city_id',
+            'quarter.city:id,name',
+            'ad_type:id,name',
+            'media',
+            'user:id,firstname,lastname,avatar,agency_id,city_id',
+            'user.agency:id,name,slug,logo',
+            'agency:id,name,slug,logo',
+        ])
             ->whereIn('id', $favoritedAdIds)
             ->visible()
             ->publiclyListed()

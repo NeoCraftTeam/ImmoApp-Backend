@@ -25,12 +25,12 @@ falls back to "refresh to see new messages".
 | `REVERB_APP_ID` | `keyhome_chat` | `keyhome_preprod` | `keyhome_prod` |
 | `REVERB_APP_KEY` | (any 32-hex) | **generate, secret** | **generate, secret** |
 | `REVERB_APP_SECRET` | (any 64-hex) | **generate, secret** | **generate, secret** |
-| `REVERB_HOST` | `127.0.0.1` | `reverb-api.keyhome.neocraft.dev` | `reverb.keyhome.app` |
+| `REVERB_HOST` | `127.0.0.1` | `reverb.keyhome.neocraft.dev` | `reverb.keyhome.app` |
 | `REVERB_PORT` | `8080` | `443` | `443` |
 | `REVERB_SCHEME` | `http` | `https` | `https` |
 | `REVERB_SERVER_HOST` | `0.0.0.0` | `0.0.0.0` | `0.0.0.0` |
 | `REVERB_SERVER_PORT` | `8080` | `8080` | `8080` |
-| `REVERB_DOMAIN` | (n/a) | `reverb-api.keyhome.neocraft.dev` | `reverb.keyhome.app` |
+| `REVERB_DOMAIN` | (n/a) | `reverb.keyhome.neocraft.dev` | `reverb.keyhome.app` |
 
 `REVERB_DOMAIN` is consumed only by the docker-compose Traefik label.
 `REVERB_HOST`/`REVERB_PORT`/`REVERB_SCHEME` are consumed by Laravel's broadcaster
@@ -42,7 +42,7 @@ auth signatures **and** the Pusher SDK on the frontend.
 
 ```
 NEXT_PUBLIC_REVERB_APP_KEY=<same as backend REVERB_APP_KEY>
-NEXT_PUBLIC_REVERB_HOST=reverb.keyhome.app          # or reverb-api.keyhome.neocraft.dev for preprod
+NEXT_PUBLIC_REVERB_HOST=reverb.keyhome.app          # or reverb.keyhome.neocraft.dev for preprod
 NEXT_PUBLIC_REVERB_PORT=443
 NEXT_PUBLIC_REVERB_SCHEME=https
 ```
@@ -54,7 +54,7 @@ existing `api.keyhome.app` / `api.keyhome.neocraft.dev` records:
 
 ```
 reverb.keyhome.app                  A   <vps-ip>
-reverb-api.keyhome.neocraft.dev     A   <vps-ip>
+reverb.keyhome.neocraft.dev     A   <vps-ip>
 ```
 
 Traefik will issue Let's Encrypt certs automatically on first connection

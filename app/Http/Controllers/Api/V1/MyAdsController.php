@@ -41,7 +41,15 @@ final class MyAdsController
 
         $query = Ad::query()
             ->where('user_id', $userId)
-            ->with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])
+            ->with([
+                'quarter:id,name,city_id',
+                'quarter.city:id,name',
+                'ad_type:id,name',
+                'media',
+                'user:id,firstname,lastname,avatar,agency_id,city_id',
+                'user.agency:id,name,slug,logo',
+                'agency:id,name,slug,logo',
+            ])
             ->withAvg('reviews', 'rating')
             ->withCount('reviews')
             ->withTrashed();

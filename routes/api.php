@@ -68,8 +68,8 @@ Route::prefix('v1')->group(function (): void {
     require __DIR__.'/api/surveys.php';
     require __DIR__.'/api/geo.php';
 
-    // --- AD TYPES (public, long-lived reference data) ---
-    Route::controller(AdTypeController::class)->middleware('cdn.cache:3600')->group(function (): void {
+    // --- AD TYPES ---
+    Route::controller(AdTypeController::class)->group(function (): void {
         Route::get('/ad-types', 'index');
         Route::get('/ad-types/{adType}', 'show');
     });
@@ -79,19 +79,19 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/ad-types/{adType}', 'destroy')->can('delete', 'adType');
     });
 
-    // --- CITIES (public, long-lived reference data) ---
+    // --- CITIES ---
     Route::controller(CityController::class)->group(function (): void {
-        Route::get('/cities', 'index')->middleware('cdn.cache:3600');
-        Route::get('/cities/{id}', 'show')->middleware('cdn.cache:3600');
+        Route::get('/cities', 'index');
+        Route::get('/cities/{id}', 'show');
         Route::post('/cities', 'store')->middleware('auth:sanctum')->can('create', City::class);
         Route::put('/cities/{city}', 'update')->middleware('auth:sanctum')->can('update', 'city');
         Route::delete('/cities/{city}', 'destroy')->middleware('auth:sanctum')->can('delete', 'city');
     });
 
-    // --- QUARTERS (public, long-lived reference data) ---
+    // --- QUARTERS ---
     Route::controller(QuarterController::class)->group(function (): void {
-        Route::get('/quarters', 'index')->middleware('cdn.cache:3600');
-        Route::get('/quarters/{id}', 'show')->middleware('cdn.cache:3600');
+        Route::get('/quarters', 'index');
+        Route::get('/quarters/{id}', 'show');
         Route::post('/quarters', 'store')->middleware('auth:sanctum')->can('create', Quarter::class);
         Route::put('/quarters/{quarter}', 'update')->middleware('auth:sanctum')->can('update', 'quarter');
         Route::delete('/quarters/{quarter}', 'destroy')->middleware('auth:sanctum')->can('delete', 'quarter');
@@ -160,18 +160,17 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/{id}', 'destroy');
     });
 
-    // --- PROPERTY ATTRIBUTES (public, reference data) ---
-    Route::get('/property-attributes', [PropertyAttributeController::class, 'index'])
-        ->middleware('cdn.cache:1800');
+    // --- PROPERTY ATTRIBUTES (public) ---
+    Route::get('/property-attributes', [PropertyAttributeController::class, 'index']);
 
     // --- VISIT TRACKING (anonymous) ---
     Route::post('/track/visit', [VisitTrackingController::class, 'store'])
         ->middleware('throttle:60,1');
 
-    // --- PUBLIC STATS ---
+    // --- PUBLIC STATS (W37: extracted from inline closures to StatsController) ---
     Route::controller(StatsController::class)->middleware('throttle:30,1')->group(function (): void {
-        Route::get('/stats/landing', 'landing')->name('stats.landing')->middleware('cdn.cache:300');
-        Route::get('/stats/testimonials', 'testimonials')->name('stats.testimonials')->middleware('cdn.cache:3600');
+        Route::get('/stats/landing', 'landing')->name('stats.landing');
+        Route::get('/stats/testimonials', 'testimonials')->name('stats.testimonials');
     });
 
     // --- CLERK WEBHOOKS ---

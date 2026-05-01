@@ -38,7 +38,13 @@ final readonly class UserProfileService
 
         $ads = Ad::where('user_id', $user->id)
             ->where('status', 'available')
-            ->with(['user.agency', 'agency', 'quarter.city', 'ad_type', 'media'])
+            ->with([
+                'user:id,username,firstname,lastname,phone_number,phone_is_whatsapp,email,avatar' => ['agency:id,name,slug,logo'],
+                'agency:id,name,slug,logo',
+                'quarter:id,name,city_id' => ['city:id,name'],
+                'ad_type:id,name,desc',
+                'media',
+            ])
             ->withAvg('reviews', 'rating')
             ->withCount('reviews')
             ->latest()
@@ -193,7 +199,13 @@ final readonly class UserProfileService
     {
         $adIds = UnlockedAd::where('user_id', $userId)->pluck('ad_id');
 
-        return Ad::with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency', 'reviews.user'])
+        return Ad::with([
+            'quarter:id,name,city_id' => ['city:id,name'],
+            'ad_type:id,name,desc',
+            'media',
+            'user:id,username,firstname,lastname,phone_number,phone_is_whatsapp,email,avatar' => ['agency:id,name,slug,logo'],
+            'agency:id,name,slug,logo',
+        ])
             ->withAvg('reviews', 'rating')
             ->withCount([
                 'reviews',

@@ -148,12 +148,25 @@ final readonly class ViewingReservationController
      */
     public function myReservationsAsLandlord(Request $request): AnonymousResourceCollection
     {
+        // Join ad on user_id (indexed) instead of whereHas subquery for a faster
+        // execution plan, then select only tentative_reservations.* to avoid the
+        // implicit ambiguity. Eager-load relations with explicit column lists.
         $paginator = TentativeReservation::query()
-            ->whereHas('ad', fn ($q) => $q->where('user_id', $request->user()->id))
-            ->with(['ad.quarter', 'ad.media', 'client'])
-            ->orderByDesc('slot_date')
-            ->orderBy('slot_starts_at')
-            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->input('status')))
+            ->select('tentative_reservations.*')
+            ->join('ad', 'ad.id', '=', 'tentative_reservations.ad_id')
+            ->where('ad.user_id', $request->user()->id)
+            ->with([
+                'ad:id,title,slug,user_id,quarter_id',
+                'ad.quarter:id,name,city_id',
+                'ad.media',
+                'client:id,firstname,lastname,avatar,phone_number,email',
+            ])
+            ->when(
+                $request->filled('status'),
+                fn ($q) => $q->where('tentative_reservations.status', $request->input('status'))
+            )
+            ->orderByDesc('tentative_reservations.slot_date')
+            ->orderBy('tentative_reservations.slot_starts_at')
             ->paginate(max(1, min(50, (int) $request->input('per_page', 15))));
 
         return TentativeReservationResource::collection($paginator);

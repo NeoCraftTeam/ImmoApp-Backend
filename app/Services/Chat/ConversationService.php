@@ -134,20 +134,33 @@ final readonly class ConversationService
             return $cached;
         }
 
-        $conversations = Conversation::forUser($user->id)
-            ->active()
-            ->get(['id', 'tenant_id', 'tenant_last_read_at', 'landlord_last_read_at']);
+        // Single SQL aggregation — replaces the previous N+1 loop that ran one
+        // COUNT(*) per conversation. Joins messages once, picks the correct
+        // last-read timestamp per row via CASE, groups by conversation id.
+        $userId = $user->id;
+        $rows = DB::table('conversations')
+            ->join('messages', 'messages.conversation_id', '=', 'conversations.id')
+            ->where('conversations.status', ConversationStatus::Active->value)
+            ->where(function ($q) use ($userId): void {
+                $q->where('conversations.tenant_id', $userId)
+                    ->orWhere('conversations.landlord_id', $userId);
+            })
+            ->where('messages.sender_id', '!=', $userId)
+            ->whereNull('messages.deleted_at')
+            ->whereRaw(
+                "messages.created_at > COALESCE(
+                    CASE WHEN conversations.tenant_id = ? THEN conversations.tenant_last_read_at
+                         ELSE conversations.landlord_last_read_at END,
+                    '1970-01-01'::timestamp
+                )",
+                [$userId]
+            )
+            ->groupBy('conversations.id')
+            ->select('conversations.id as uuid', DB::raw('COUNT(*) as count'))
+            ->get();
 
-        $items = [];
-        $total = 0;
-
-        foreach ($conversations as $conv) {
-            $count = $conv->unreadCountFor($user);
-            if ($count > 0) {
-                $items[] = ['uuid' => $conv->id, 'count' => $count];
-                $total += $count;
-            }
-        }
+        $items = $rows->map(fn ($r) => ['uuid' => (string) $r->uuid, 'count' => (int) $r->count])->values()->all();
+        $total = (int) $rows->sum('count');
 
         $result = ['total' => $total, 'conversations' => $items];
 

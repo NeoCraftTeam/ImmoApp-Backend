@@ -12,6 +12,7 @@ use App\Http\Requests\Chat\StoreConversationRequest;
 use App\Http\Requests\Chat\UploadAttachmentRequest;
 use App\Http\Resources\Chat\ConversationResource;
 use App\Http\Resources\Chat\MessageResource;
+use App\Jobs\MarkConversationReadJob;
 use App\Models\Ad;
 use App\Models\Conversation;
 use App\Models\Message;
@@ -116,7 +117,10 @@ final readonly class ConversationController
             (int) config('chat.pagination.messages', 30),
         );
 
-        $this->conversations->markAsRead($conv, $user);
+        // markAsRead is offloaded to a queued job: the bulk UPDATE on messages,
+        // the timestamp UPDATE on conversations, and the Reverb broadcast were
+        // collectively pushing this endpoint over the 1 s Nightwatch threshold.
+        MarkConversationReadJob::dispatch($conv->id, $user->id);
 
         return response()->json([
             'data' => MessageResource::collection($paginator->items()),

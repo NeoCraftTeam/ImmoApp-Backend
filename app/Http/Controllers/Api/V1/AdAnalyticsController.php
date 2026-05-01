@@ -9,6 +9,7 @@ use App\Models\AdInteraction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use OpenApi\Annotations as OA;
 
 /**
@@ -78,8 +79,8 @@ final class AdAnalyticsController
     public function overview(Request $request): JsonResponse
     {
         $user = $request->user();
-        $days = $this->parsePeriod($request->query('period', '30d'));
-        $since = now()->subDays($days);
+        $period = $request->query('period', '30d');
+        $days = $this->parsePeriod($period);
 
         // Get all ad IDs owned by the user
         $adIds = Ad::where('user_id', $user->id)->pluck('id');
@@ -87,7 +88,7 @@ final class AdAnalyticsController
         if ($adIds->isEmpty()) {
             return response()->json([
                 'data' => [
-                    'period' => $request->query('period', '30d'),
+                    'period' => $period,
                     'totals' => $this->emptyTotals(),
                     'trends' => [],
                     'top_ads' => [],
@@ -95,23 +96,19 @@ final class AdAnalyticsController
             ]);
         }
 
-        // ── Totals ────────────────────────────────────────────────────
-        $totals = $this->computeTotals($adIds, $since);
+        $cacheKey = "analytics:overview:{$user->id}:{$period}";
+        $data = Cache::remember($cacheKey, now()->addMinutes(5), function () use ($adIds, $days, $period) {
+            $since = now()->subDays($days);
 
-        // ── Daily trends ──────────────────────────────────────────────
-        $trends = $this->computeTrends($adIds, $since);
+            return [
+                'period' => $period,
+                'totals' => $this->computeTotals($adIds, $since),
+                'trends' => $this->computeTrends($adIds, $since),
+                'top_ads' => $this->computeTopAds($adIds, $since, 5),
+            ];
+        });
 
-        // ── Top 5 ads by views ────────────────────────────────────────
-        $topAds = $this->computeTopAds($adIds, $since, 5);
-
-        return response()->json([
-            'data' => [
-                'period' => $request->query('period', '30d'),
-                'totals' => $totals,
-                'trends' => $trends,
-                'top_ads' => $topAds,
-            ],
-        ]);
+        return response()->json(['data' => $data]);
     }
 
     /**
@@ -153,39 +150,37 @@ final class AdAnalyticsController
             return response()->json(['message' => 'Cette annonce ne vous appartient pas.'], 403);
         }
 
-        $days = $this->parsePeriod($request->query('period', '30d'));
-        $since = now()->subDays($days);
-        $adIds = collect([$ad->id]);
+        $period = $request->query('period', '30d');
+        $days = $this->parsePeriod($period);
 
-        // ── Totals ────────────────────────────────────────────────────
-        $totals = $this->computeTotals($adIds, $since);
+        $cacheKey = "analytics:ad:{$ad->id}:{$period}";
+        $data = Cache::remember($cacheKey, now()->addMinutes(5), function () use ($ad, $days, $period) {
+            $since = now()->subDays($days);
+            $adIds = collect([$ad->id]);
 
-        // ── Daily breakdown ───────────────────────────────────────────
-        $daily = $this->computeDaily($ad->id, $since);
+            $totals = $this->computeTotals($adIds, $since);
+            $daily = $this->computeDaily($ad->id, $since);
 
-        // ── Conversion funnel ─────────────────────────────────────────
-        $funnel = [
-            'impressions' => $totals['impressions'],
-            'views' => $totals['views'],
-            'contacts' => $totals['contact_clicks'] + $totals['phone_clicks'],
-            'unlocks' => $totals['unlocks'],
-            'impression_to_view_rate' => $totals['impressions'] > 0
-                ? round(($totals['views'] / $totals['impressions']) * 100, 2)
-                : 0,
-            'view_to_contact_rate' => $totals['views'] > 0
-                ? round((($totals['contact_clicks'] + $totals['phone_clicks']) / $totals['views']) * 100, 2)
-                : 0,
-            'view_to_unlock_rate' => $totals['views'] > 0
-                ? round(($totals['unlocks'] / $totals['views']) * 100, 2)
-                : 0,
-        ];
+            $funnel = [
+                'impressions' => $totals['impressions'],
+                'views' => $totals['views'],
+                'contacts' => $totals['contact_clicks'] + $totals['phone_clicks'],
+                'unlocks' => $totals['unlocks'],
+                'impression_to_view_rate' => $totals['impressions'] > 0
+                    ? round(($totals['views'] / $totals['impressions']) * 100, 2)
+                    : 0,
+                'view_to_contact_rate' => $totals['views'] > 0
+                    ? round((($totals['contact_clicks'] + $totals['phone_clicks']) / $totals['views']) * 100, 2)
+                    : 0,
+                'view_to_unlock_rate' => $totals['views'] > 0
+                    ? round(($totals['unlocks'] / $totals['views']) * 100, 2)
+                    : 0,
+            ];
 
-        // ── Audience analysis ─────────────────────────────────────────
-        $audience = $this->computeAudience($ad->id, $since);
+            $audience = $this->computeAudience($ad->id, $since);
 
-        return response()->json([
-            'data' => [
-                'period' => $request->query('period', '30d'),
+            return [
+                'period' => $period,
                 'ad' => [
                     'id' => $ad->id,
                     'title' => $ad->title,
@@ -196,8 +191,10 @@ final class AdAnalyticsController
                 'daily' => $daily,
                 'funnel' => $funnel,
                 'audience' => $audience,
-            ],
-        ]);
+            ];
+        });
+
+        return response()->json(['data' => $data]);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -394,8 +391,11 @@ final class AdAnalyticsController
         $favCounts = $rows->pluck('favs', 'ad_id');
         $unlockCounts = $rows->pluck('unlocks', 'ad_id');
 
-        // Load ads
-        $ads = Ad::whereIn('id', $viewCounts->keys())->get()->keyBy('id');
+        // Load ads — only columns used in the response
+        $ads = Ad::whereIn('id', $viewCounts->keys())
+            ->select(['id', 'title', 'status'])
+            ->get()
+            ->keyBy('id');
 
         $result = [];
         foreach ($viewCounts as $adId => $views) {

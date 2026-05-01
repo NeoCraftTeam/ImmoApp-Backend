@@ -50,7 +50,7 @@ final class ReviewController
     public function index(Ad $ad): AnonymousResourceCollection
     {
         $reviews = $ad->reviews()
-            ->with('user')
+            ->with('user:id,firstname,lastname,avatar')
             ->latest()
             ->paginate(15);
 
