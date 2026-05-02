@@ -118,7 +118,6 @@ final readonly class AuthController
             $token = $user->currentAccessToken();
 
             // TransientToken (Clerk JWT exchange) has no delete() — only revoke DB-backed tokens.
-            // @phpstan-ignore instanceof.alwaysTrue
             if ($token instanceof PersonalAccessToken) {
                 Log::info('User logout (Token)', [
                     'user_id' => $user->id,
@@ -244,11 +243,17 @@ final readonly class AuthController
 
             // Preserve the login-context prefix so a client-context refresh
             // does not accidentally produce an owner-prefixed token.
-            $prefix = str_starts_with((string) $currentToken->name, 'owner_') ? 'owner' : 'client';
+            // TransientToken (Clerk JWT exchange) has no $name property — default to role-based prefix.
+            $prefix = ($currentToken instanceof PersonalAccessToken && str_starts_with((string) $currentToken->name, 'owner_'))
+                ? 'owner'
+                : 'client';
 
             $newToken = $this->tokenService->createForUser($user, 'refreshed', $prefix);
 
-            $currentToken->delete();
+            // TransientToken has no delete() — only revoke DB-backed tokens.
+            if ($currentToken instanceof PersonalAccessToken) {
+                $currentToken->delete();
+            }
 
             return response()->json([
                 'access_token' => $newToken->plainTextToken,

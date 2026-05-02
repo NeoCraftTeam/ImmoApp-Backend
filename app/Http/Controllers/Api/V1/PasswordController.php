@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\PersonalAccessToken;
 
 final class PasswordController
 {
@@ -96,7 +97,7 @@ final class PasswordController
         ])->save();
 
         $currentToken = $user->currentAccessToken();
-        if ($currentToken !== null && method_exists($currentToken, 'getKey')) { // @phpstan-ignore notIdentical.alwaysTrue, function.alreadyNarrowedType
+        if ($currentToken instanceof PersonalAccessToken) {
             $user->tokens()->where('id', '!=', $currentToken->getKey())->delete();
         } else {
             $user->tokens()->delete();

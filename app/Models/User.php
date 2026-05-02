@@ -84,6 +84,9 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property-read int|null $payments_count
  * @property-read Collection<int, PersonalAccessToken> $tokens
  * @property-read int|null $tokens_count
+ *
+ * @method \Laravel\Sanctum\PersonalAccessToken|\Laravel\Sanctum\TransientToken|null currentAccessToken()
+ *
  * @property-read Collection<int, UnlockedAd> $unlockedAds
  * @property-read int|null $unlocked_ads_count
  * @property array<string>|null $app_authentication_recovery_codes
@@ -131,6 +134,7 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property string|null $utm_content
  * @property string|null $utm_term
  * @property string|null $referrer_domain
+ * @property string|null $chat_e2ee_public_key_pem
  * @property-read City|null $city
  * @property-read MediaCollection<int, Media> $media
  * @property-read Collection<int, Review> $reviews
@@ -194,6 +198,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'pending_oauth_avatar',
         'pending_oauth_token',
         'pending_oauth_expires_at',
+        'chat_e2ee_public_key_pem',
     ];
 
     /**
@@ -611,6 +616,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'onboarding_completed_at' => 'datetime',
             'trust_score_consent' => 'boolean',
             'last_home_visit_at' => 'datetime',
+            'last_seen_at' => 'datetime',
             'preferences' => 'array',
             'must_change_password_at' => 'datetime',
         ];
