@@ -64,6 +64,18 @@ it('does not return an inactive survey as active', function (): void {
     $response->assertNotFound();
 });
 
+it('invalidates the active survey cache when the survey is updated', function (): void {
+    $survey = Survey::factory()->create(['title' => 'Sondage actif']);
+
+    $this->getJson('/api/v1/surveys/active')
+        ->assertOk()
+        ->assertJsonPath('data.id', $survey->id);
+
+    $survey->update(['is_active' => false]);
+
+    $this->getJson('/api/v1/surveys/active')->assertNotFound();
+});
+
 // ── GET /api/v1/surveys/{survey} ──────────────────────────────────────────
 
 it('returns a survey with its questions for any user', function (): void {

@@ -16,6 +16,7 @@ use App\Models\SurveyResponse;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -53,7 +54,18 @@ final readonly class SurveyController
      */
     public function active(): JsonResponse|SurveyResource
     {
-        $survey = Survey::active()->latest()->first();
+        $surveyId = Cache::remember(
+            'surveys:active:id',
+            now()->addMinutes(5),
+            fn (): ?string => Survey::query()
+                ->active()
+                ->latest()
+                ->value('id')
+        );
+
+        $survey = $surveyId
+            ? Survey::query()->find($surveyId)
+            : null;
 
         if (!$survey) {
             return response()->json(['message' => 'Aucun sondage actif.'], 404);

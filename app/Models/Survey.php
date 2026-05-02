@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 /**
@@ -62,6 +63,14 @@ class Survey extends Model
             if ($survey->isDirty('title') && !$survey->isDirty('slug')) {
                 $survey->slug = static::uniqueSlug($survey->title, $survey->id);
             }
+        });
+
+        static::saved(static function (): void {
+            Cache::forget('surveys:active:id');
+        });
+
+        static::deleted(static function (): void {
+            Cache::forget('surveys:active:id');
         });
     }
 
