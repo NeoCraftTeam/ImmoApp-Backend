@@ -12,23 +12,18 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Broadcast when a participant marks messages as read.
- *
- * Uses ShouldBroadcastNow for parity with MessageSent / MessageDeleted —
- * read-receipts must update on the other side with the same perceived
- * latency as a new message. The mark-as-read DB writes already happen
- * asynchronously via MarkConversationReadJob (chat queue), so the HTTP
- * response that triggered this read has already returned by the time
- * we broadcast. The "now" path is fine.
+ * Broadcast when a participant adds an emoji reaction to a message.
+ * Sent on the conversation channel; the sender is excluded via toOthers().
  */
-final class MessageRead implements ShouldBroadcastNow
+final class MessageReactionAdded implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public function __construct(
         public readonly string $conversationId,
-        public readonly string $readerId,
-        public readonly string $readAt,
+        public readonly string $messageId,
+        public readonly string $userId,
+        public readonly string $emoji,
     ) {}
 
     /** @return array<Channel> */
@@ -39,15 +34,16 @@ final class MessageRead implements ShouldBroadcastNow
 
     public function broadcastAs(): string
     {
-        return 'messages.read';
+        return 'message.reaction.added';
     }
 
     /** @return array<string, mixed> */
     public function broadcastWith(): array
     {
         return [
-            'reader_id' => $this->readerId,
-            'read_at' => $this->readAt,
+            'message_uuid' => $this->messageId,
+            'user_id' => $this->userId,
+            'emoji' => $this->emoji,
         ];
     }
 }

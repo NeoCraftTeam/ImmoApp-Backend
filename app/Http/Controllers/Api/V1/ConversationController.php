@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\ConversationStatus;
 use App\Events\Chat\UserTyping;
 use App\Exceptions\Chat\ConversationNotAllowedException;
 use App\Http\Requests\Chat\SendMessageRequest;
@@ -21,6 +22,7 @@ use App\Services\Chat\AttachmentService;
 use App\Services\Chat\ConversationService;
 use App\Services\Chat\MessageService;
 use App\Support\ApiResponse;
+use App\Support\ChatE2eeSchema;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -76,7 +78,12 @@ final readonly class ConversationController
                 ->exists();
 
             $conv = $this->conversations->findOrCreate($ad->id, $user->id, $landlordId);
-            $conv->load(['ad:id,title,slug', 'latestMessage', 'tenant:id,firstname,lastname,avatar,last_seen_at', 'landlord:id,firstname,lastname,avatar,last_seen_at']);
+            $conv->load([
+                'ad:id,title,slug',
+                'latestMessage',
+                ChatE2eeSchema::userParticipantEagerLoadSpec('tenant'),
+                ChatE2eeSchema::userParticipantEagerLoadSpec('landlord'),
+            ]);
 
             $status = $existed ? 200 : 201;
 
@@ -95,7 +102,12 @@ final readonly class ConversationController
     public function show(Request $request, string $uuid): JsonResponse
     {
         $conv = $this->findConversationForUser($uuid, (string) $request->user()?->id);
-        $conv->load(['ad:id,title,slug', 'latestMessage', 'tenant:id,firstname,lastname,avatar,last_seen_at', 'landlord:id,firstname,lastname,avatar,last_seen_at']);
+        $conv->load([
+            'ad:id,title,slug',
+            'latestMessage',
+            ChatE2eeSchema::userParticipantEagerLoadSpec('tenant'),
+            ChatE2eeSchema::userParticipantEagerLoadSpec('landlord'),
+        ]);
 
         return new ConversationResource($conv)->response();
     }
@@ -117,10 +129,11 @@ final readonly class ConversationController
             (int) config('chat.pagination.messages', 30),
         );
 
-        // markAsRead is offloaded to a queued job: the bulk UPDATE on messages,
-        // the timestamp UPDATE on conversations, and the Reverb broadcast were
-        // collectively pushing this endpoint over the 1 s Nightwatch threshold.
-        MarkConversationReadJob::dispatch($conv->id, $user->id);
+        // Mark-as-read only for the first page (no cursor). Pagination requests
+        // must not enqueue duplicate jobs, bulk UPDATEs, and broadcasts.
+        if (!filled($request->query('cursor'))) {
+            MarkConversationReadJob::dispatch($conv->id, $user->id);
+        }
 
         return response()->json([
             'data' => MessageResource::collection($paginator->items()),
@@ -141,6 +154,15 @@ final readonly class ConversationController
 
         $validated = $request->validated();
 
+        $e2ee = null;
+        if ($request->boolean('is_client_sealed')) {
+            $e2ee = [
+                'ciphertext_b64' => (string) $validated['e2ee_ciphertext_b64'],
+                'iv_b64' => (string) $validated['e2ee_iv_b64'],
+                'wrapped_keys' => $validated['e2ee_wrapped_keys'] ?? null,
+            ];
+        }
+
         $message = $this->messages->send(
             $conv,
             $user,
@@ -148,6 +170,7 @@ final readonly class ConversationController
             (string) ($validated['type'] ?? 'text'),
             $validated['attachments'] ?? null,
             $validated['reply_to_id'] ?? null,
+            $e2ee,
         );
 
         return new MessageResource($message)
@@ -165,6 +188,12 @@ final readonly class ConversationController
         /** @var User $user */
         $user = $request->user();
         $conv = $this->findConversationForUser($uuid, $user->id);
+
+        abort_if(
+            $conv->status === ConversationStatus::Archived,
+            422,
+            'Cannot upload attachments to an archived conversation.',
+        );
 
         /** @var UploadedFile $file */
         $file = $request->file('file');

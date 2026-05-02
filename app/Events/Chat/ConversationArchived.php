@@ -12,23 +12,20 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Broadcast when a participant marks messages as read.
+ * Broadcast when a conversation is archived by a participant.
  *
- * Uses ShouldBroadcastNow for parity with MessageSent / MessageDeleted —
- * read-receipts must update on the other side with the same perceived
- * latency as a new message. The mark-as-read DB writes already happen
- * asynchronously via MarkConversationReadJob (chat queue), so the HTTP
- * response that triggered this read has already returned by the time
- * we broadcast. The "now" path is fine.
+ * Both participants receive the event via the private conversation channel
+ * (broadcasted with toOthers() so the sender does not receive their own
+ * action). The recipient's UI removes the conversation from their list /
+ * shows the archived banner without a refetch.
  */
-final class MessageRead implements ShouldBroadcastNow
+final class ConversationArchived implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public function __construct(
         public readonly string $conversationId,
-        public readonly string $readerId,
-        public readonly string $readAt,
+        public readonly string $archivedById,
     ) {}
 
     /** @return array<Channel> */
@@ -39,15 +36,16 @@ final class MessageRead implements ShouldBroadcastNow
 
     public function broadcastAs(): string
     {
-        return 'messages.read';
+        return 'conversation.archived';
     }
 
     /** @return array<string, mixed> */
     public function broadcastWith(): array
     {
         return [
-            'reader_id' => $this->readerId,
-            'read_at' => $this->readAt,
+            'conversation_uuid' => $this->conversationId,
+            'archived_by_id' => $this->archivedById,
+            'archived_at' => now()->toIso8601String(),
         ];
     }
 }

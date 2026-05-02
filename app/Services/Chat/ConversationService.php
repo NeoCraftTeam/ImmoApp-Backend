@@ -6,11 +6,13 @@ namespace App\Services\Chat;
 
 use App\Enums\ConversationStatus;
 use App\Enums\MessageStatus;
+use App\Events\Chat\ConversationArchived;
 use App\Events\Chat\MessageRead;
 use App\Exceptions\Chat\ConversationNotAllowedException;
 use App\Models\Conversation;
 use App\Models\UnlockedAd;
 use App\Models\User;
+use App\Support\ChatE2eeSchema;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -23,11 +25,39 @@ final readonly class ConversationService
     /**
      * Idempotently find or create a conversation for a given ad+tenant pair.
      *
+     * Semantics:
+     *   - If a conversation already exists for this (ad, tenant) pair, return it
+     *     immediately. The unlock requirement is only enforced when a brand-new
+     *     conversation needs to be created. This is intentional: once a
+     *     conversation has been started, it must not break because the original
+     *     unlock row was soft-deleted (refund, expiration, admin action, …).
+     *     The relationship has already been "paid for".
+     *   - If no conversation exists yet, the tenant MUST have an active
+     *     UnlockedAd row for the ad — otherwise we throw
+     *     ConversationNotAllowedException so the caller can prompt for unlock.
+     *   - If the conversation was previously archived, we reactivate it so the
+     *     tenant can resume the chat from the ad detail page.
+     *
      * @throws ConversationNotAllowedException if the tenant has not unlocked the ad
      */
     public function findOrCreate(string $adId, string $tenantId, string $landlordId): Conversation
     {
-        $unlocked = UnlockedAd::where('ad_id', $adId)
+        $existing = Conversation::query()
+            ->where('ad_id', $adId)
+            ->where('tenant_id', $tenantId)
+            ->first();
+
+        if ($existing !== null) {
+            // Reopen archived conversations on a fresh "Send a message" click.
+            if ($existing->status === ConversationStatus::Archived) {
+                $existing->update(['status' => ConversationStatus::Active]);
+            }
+
+            return $existing;
+        }
+
+        $unlocked = UnlockedAd::query()
+            ->where('ad_id', $adId)
             ->where('user_id', $tenantId)
             ->whereNull('deleted_at')
             ->exists();
@@ -36,10 +66,12 @@ final readonly class ConversationService
             throw new ConversationNotAllowedException;
         }
 
-        return Conversation::firstOrCreate(
-            ['ad_id' => $adId, 'tenant_id' => $tenantId],
-            ['landlord_id' => $landlordId, 'status' => ConversationStatus::Active],
-        );
+        return Conversation::create([
+            'ad_id' => $adId,
+            'tenant_id' => $tenantId,
+            'landlord_id' => $landlordId,
+            'status' => ConversationStatus::Active,
+        ]);
     }
 
     /**
@@ -60,9 +92,27 @@ final readonly class ConversationService
         return Conversation::forUser($userId)
             ->with([
                 'latestMessage',
-                'ad:id,title,slug',
-                'tenant:id,firstname,lastname,avatar,last_seen_at',
-                'landlord:id,firstname,lastname,avatar,last_seen_at',
+                'ad' => function ($query): void {
+                    $query->select('id', 'title', 'slug')
+                        ->with(['media' => function ($mediaQuery): void {
+                            $mediaQuery->where('collection_name', 'images')
+                                ->orderBy('order_column');
+                        }]);
+                },
+                'tenant' => function ($query): void {
+                    $query->select(...ChatE2eeSchema::userParticipantSelectColumns())
+                        ->with(['media' => function ($mediaQuery): void {
+                            $mediaQuery->where('collection_name', 'avatars')
+                                ->orderBy('order_column');
+                        }]);
+                },
+                'landlord' => function ($query): void {
+                    $query->select(...ChatE2eeSchema::userParticipantSelectColumns())
+                        ->with(['media' => function ($mediaQuery): void {
+                            $mediaQuery->where('collection_name', 'avatars')
+                                ->orderBy('order_column');
+                        }]);
+                },
             ])
             ->withCount(['messages as computed_unread_count' => function ($q) use ($userId, $lastReadExpr): void {
                 $q->where('sender_id', '!=', $userId)
@@ -99,7 +149,8 @@ final readonly class ConversationService
         $this->invalidateUnreadCache($reader->id);
 
         try {
-            broadcast(new MessageRead($conv->id, $reader->id, now()->toIso8601String()));
+            broadcast(new MessageRead($conv->id, $reader->id, now()->toIso8601String()))
+                ->toOthers();
         } catch (\Throwable) {
             // Reverb may be unavailable in local dev — do not fail the HTTP response
         }
@@ -108,13 +159,24 @@ final readonly class ConversationService
     /**
      * Archive a conversation. Only participants may archive.
      * Idempotent: no-op if already archived.
+     *
+     * Broadcasts ConversationArchived (toOthers) so the other participant's
+     * UI updates in real time without polling.
      */
     public function archive(Conversation $conv, User $user): void
     {
         abort_unless($user->id === $conv->tenant_id || $user->id === $conv->landlord_id, 404);
 
-        if ($conv->status !== ConversationStatus::Archived) {
-            $conv->update(['status' => ConversationStatus::Archived]);
+        if ($conv->status === ConversationStatus::Archived) {
+            return;
+        }
+
+        $conv->update(['status' => ConversationStatus::Archived]);
+
+        try {
+            broadcast(new ConversationArchived($conv->id, $user->id))->toOthers();
+        } catch (\Throwable) {
+            // Reverb may be unavailable in local dev — do not fail the HTTP response
         }
     }
 

@@ -24,7 +24,8 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $tenant_last_read_at
  * @property Carbon|null $landlord_last_read_at
  * @property Carbon|null $last_message_at
- * @property string|null $last_message_preview
+ * @property string|null $e2ee_wrapped_key_tenant
+ * @property string|null $e2ee_wrapped_key_landlord
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
@@ -48,6 +49,8 @@ class Conversation extends Model
         'last_message_at',
         'last_message_preview',
         'last_message_id',
+        'e2ee_wrapped_key_tenant',
+        'e2ee_wrapped_key_landlord',
     ];
 
     protected $with = [];

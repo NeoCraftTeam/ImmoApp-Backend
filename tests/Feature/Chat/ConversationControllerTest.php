@@ -3,11 +3,15 @@
 declare(strict_types=1);
 
 use App\Enums\ConversationStatus;
+use App\Jobs\MarkConversationReadJob;
 use App\Models\Ad;
 use App\Models\Conversation;
+use App\Models\Message;
 use App\Models\UnlockedAd;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
 
 uses(RefreshDatabase::class);
@@ -121,6 +125,75 @@ it('returns message history for a participant', function (): void {
         ->assertJsonStructure(['data', 'next_cursor', 'has_more']);
 });
 
+it('dispatches mark-as-read job only for the first page of message history', function (): void {
+    Bus::fake();
+    config(['chat.pagination.messages' => 1]);
+    ['tenant' => $tenant, 'conversation' => $conv] = makeConversationParticipants();
+
+    $this->actingAs($tenant)
+        ->postJson("/api/v1/conversations/{$conv->id}/messages", ['body' => 'first'])
+        ->assertCreated();
+    $this->actingAs($tenant)
+        ->postJson("/api/v1/conversations/{$conv->id}/messages", ['body' => 'second'])
+        ->assertCreated();
+
+    $firstPage = $this->actingAs($tenant)
+        ->getJson("/api/v1/conversations/{$conv->id}/messages")
+        ->assertOk();
+
+    Bus::assertDispatchedTimes(MarkConversationReadJob::class, 1);
+
+    $cursor = $firstPage->json('next_cursor');
+    expect($cursor)->not->toBeNull();
+
+    $this->actingAs($tenant)
+        ->getJson("/api/v1/conversations/{$conv->id}/messages?cursor=".urlencode((string) $cursor))
+        ->assertOk();
+
+    Bus::assertDispatchedTimes(MarkConversationReadJob::class, 1);
+});
+
+it('rejects reply_to_id when the message belongs to another conversation', function (): void {
+    $tenant = User::factory()->create();
+    $landlord1 = User::factory()->create();
+    $landlord2 = User::factory()->create();
+    $ad1 = Ad::factory()->create(['user_id' => $landlord1->id]);
+    $ad2 = Ad::factory()->create(['user_id' => $landlord2->id]);
+
+    foreach ([$ad1, $ad2] as $ad) {
+        UnlockedAd::create([
+            'user_id' => $tenant->id,
+            'ad_id' => $ad->id,
+            'unlocked_at' => now(),
+        ]);
+    }
+
+    $conv1 = Conversation::create([
+        'ad_id' => $ad1->id,
+        'tenant_id' => $tenant->id,
+        'landlord_id' => $landlord1->id,
+        'status' => ConversationStatus::Active,
+    ]);
+    $conv2 = Conversation::create([
+        'ad_id' => $ad2->id,
+        'tenant_id' => $tenant->id,
+        'landlord_id' => $landlord2->id,
+        'status' => ConversationStatus::Active,
+    ]);
+
+    $foreignReplyId = $this->actingAs($tenant)
+        ->postJson("/api/v1/conversations/{$conv2->id}/messages", ['body' => 'In conv 2'])
+        ->assertCreated()
+        ->json('data.uuid');
+
+    $this->actingAs($tenant)
+        ->postJson("/api/v1/conversations/{$conv1->id}/messages", [
+            'body' => 'Wrong thread',
+            'reply_to_id' => $foreignReplyId,
+        ])
+        ->assertUnprocessable();
+});
+
 // ─── POST /conversations/{uuid}/messages ──────────────────────────────────────
 
 it('sends a message in a conversation', function (): void {
@@ -132,6 +205,31 @@ it('sends a message in a conversation', function (): void {
         ])
         ->assertCreated()
         ->assertJsonPath('data.body', 'Bonjour, le logement est-il toujours disponible ?');
+});
+
+it('sends a voice note with type audio and attachments', function (): void {
+    ['tenant' => $tenant, 'conversation' => $conv] = makeConversationParticipants();
+
+    $path = 'chats/'.$conv->id.'/'.fake()->uuid().'.webm';
+
+    $this->actingAs($tenant)
+        ->postJson("/api/v1/conversations/{$conv->id}/messages", [
+            'type' => 'audio',
+            'attachments' => [[
+                'url' => $path,
+                'signed_url' => 'https://example.com/signed-voice.webm',
+                'original_name' => 'voice.webm',
+                'mime_type' => 'audio/webm',
+                'size' => 2048,
+                'type' => 'audio',
+                'audio_duration_ms' => 1500,
+            ]],
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.type', 'audio')
+        ->assertJsonPath('data.attachments.0.type', 'audio');
+
+    expect(Message::query()->first()?->type->value)->toBe('audio');
 });
 
 it('does not expose the encrypted body or IV in the response', function (): void {
@@ -163,6 +261,28 @@ it('non-participant cannot send a message', function (): void {
     $this->actingAs($outsider)
         ->postJson("/api/v1/conversations/{$conv->id}/messages", ['body' => 'Hi'])
         ->assertNotFound();
+});
+
+it('rejects sending a message to an archived conversation', function (): void {
+    ['tenant' => $tenant, 'conversation' => $conv] = makeConversationParticipants();
+    $conv->update(['status' => ConversationStatus::Archived]);
+
+    $this->actingAs($tenant)
+        ->postJson("/api/v1/conversations/{$conv->id}/messages", ['body' => 'Hi'])
+        ->assertUnprocessable();
+});
+
+it('rejects attachment upload to an archived conversation', function (): void {
+    ['tenant' => $tenant, 'conversation' => $conv] = makeConversationParticipants();
+    $conv->update(['status' => ConversationStatus::Archived]);
+
+    $this->actingAs($tenant)
+        ->post("/api/v1/conversations/{$conv->id}/attachments", [
+            'file' => UploadedFile::fake()->create('doc.pdf', 100, 'application/pdf'),
+        ], [
+            'Accept' => 'application/json',
+        ])
+        ->assertUnprocessable();
 });
 
 // ─── DELETE /messages/{uuid} ──────────────────────────────────────────────────

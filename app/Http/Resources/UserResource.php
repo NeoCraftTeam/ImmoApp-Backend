@@ -93,6 +93,10 @@ final class UserResource extends JsonResource
                 $request->user()?->id === $this->id,
                 $this->preferences ?? [],
             ),
+            'chat_e2ee_public_key_pem' => $this->when(
+                $request->user()?->id === $this->id,
+                $this->chat_e2ee_public_key_pem,
+            ),
         ];
     }
 

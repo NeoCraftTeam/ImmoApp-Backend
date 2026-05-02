@@ -36,9 +36,11 @@ final class NewMessageNotification extends Notification implements ShouldQueue
             'type' => 'chat_message',
             'conversation_uuid' => $this->message->conversation_id,
             'sender_id' => $this->message->sender_id,
-            'preview' => $this->message->decrypted_body !== null
-                ? mb_substr($this->message->decrypted_body, 0, 80)
-                : '📎 Pièce jointe',
+            'preview' => $this->message->is_client_sealed
+                ? '🔐 Message sécurisé'
+                : ($this->message->decrypted_body !== null
+                    ? mb_substr($this->message->decrypted_body, 0, 80)
+                    : '📎 Pièce jointe'),
         ];
     }
 
@@ -46,12 +48,14 @@ final class NewMessageNotification extends Notification implements ShouldQueue
     {
         $sender = $this->message->sender;
         $name = $sender ? trim("{$sender->firstname} {$sender->lastname}") : 'Quelqu\'un';
-        $preview = $this->message->decrypted_body !== null
-            ? mb_substr($this->message->decrypted_body, 0, 100)
-            : '📎 Pièce jointe';
+        $preview = $this->message->is_client_sealed
+            ? '🔐 Message sécurisé (chiffrement de bout en bout)'
+            : ($this->message->decrypted_body !== null
+                ? mb_substr($this->message->decrypted_body, 0, 100)
+                : '📎 Pièce jointe');
 
-        // Recipient-aware deep link: owners/agents land in /owner/messages/, customers in /messages/.
-        $basePath = ($notifiable instanceof User && $notifiable->role === UserRole::AGENT)
+        // Recipient-aware deep link: owners/agents/admins land in /owner/messages/, customers in /messages/.
+        $basePath = ($notifiable instanceof User && in_array($notifiable->role, [UserRole::AGENT, UserRole::ADMIN], true))
             ? '/owner/messages'
             : '/messages';
         $messageUrl = config('app.frontend_url').$basePath.'/'.$this->message->conversation_id;

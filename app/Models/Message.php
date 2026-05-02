@@ -7,10 +7,12 @@ namespace App\Models;
 use App\Enums\MessageStatus;
 use App\Enums\MessageType;
 use App\Services\Chat\EncryptionService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
@@ -33,7 +35,9 @@ use Illuminate\Support\Carbon;
  * @property-read Conversation|null $conversation
  * @property-read User|null $sender
  * @property-read Message|null $replyTo
+ * @property-read Collection<int, MessageReaction> $reactions
  * @property-read string|null $decrypted_body
+ * @property bool $is_client_sealed
  */
 class Message extends Model
 {
@@ -51,6 +55,7 @@ class Message extends Model
         'read_at',
         'delivered_at',
         'edited_at',
+        'is_client_sealed',
     ];
 
     /** Never expose raw encrypted body or IV in API responses. */
@@ -67,6 +72,7 @@ class Message extends Model
             'edited_at' => 'datetime',
             'status' => MessageStatus::class,
             'type' => MessageType::class,
+            'is_client_sealed' => 'boolean',
         ];
     }
 
@@ -87,6 +93,12 @@ class Message extends Model
         return $this->belongsTo(self::class, 'reply_to_id');
     }
 
+    /** @return HasMany<MessageReaction, $this> */
+    public function reactions(): HasMany
+    {
+        return $this->hasMany(MessageReaction::class);
+    }
+
     // ─── Accessors / Mutators ───────────────────────────────────────
 
     /**
@@ -95,6 +107,10 @@ class Message extends Model
      */
     public function getDecryptedBodyAttribute(): ?string
     {
+        if ($this->is_client_sealed) {
+            return null;
+        }
+
         if ($this->body === null || $this->body_iv === null) {
             return null;
         }

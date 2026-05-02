@@ -47,6 +47,10 @@ final class SendChatPushNotificationJob implements ShouldQueue
             return;
         }
 
+        if ($message->trashed()) {
+            return;
+        }
+
         $tokens = FcmToken::where('user_id', $this->recipientId)
             ->pluck('token', 'id');
 
@@ -56,14 +60,20 @@ final class SendChatPushNotificationJob implements ShouldQueue
 
         $sender = $message->sender;
         $title = $sender ? trim("{$sender->firstname} {$sender->lastname}") : 'KeyHome';
-        $body = $message->decrypted_body !== null
-            ? mb_substr($message->decrypted_body, 0, 100)
-            : '📎 Pièce jointe';
+
+        $body = $message->is_client_sealed
+            ? '🔐 Message sécurisé'
+            : ($message->decrypted_body !== null
+                ? mb_substr($message->decrypted_body, 0, 100)
+                : '📎 Pièce jointe');
 
         // Build the deep-link URL for the conversation so notification taps
         // go directly to the right chat panel (owner vs client).
+        // ADMIN users use the owner panel as well — only CUSTOMER goes client-side.
         $recipient = User::find($this->recipientId);
-        $basePath = $recipient?->role === UserRole::AGENT ? '/owner/messages' : '/messages';
+        $isOwnerPanel = $recipient !== null
+            && in_array($recipient->role, [UserRole::AGENT, UserRole::ADMIN], true);
+        $basePath = $isOwnerPanel ? '/owner/messages' : '/messages';
         $conversationUrl = $basePath.'/'.$message->conversation_id;
 
         $credentialsPath = (string) config('chat.firebase.credentials');

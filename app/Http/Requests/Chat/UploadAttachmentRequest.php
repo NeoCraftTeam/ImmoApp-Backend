@@ -25,7 +25,8 @@ final class UploadAttachmentRequest extends FormRequest
                 'required',
                 'file',
                 'max:20480', // 20 MB max at form level; AttachmentService enforces per-type limits
-                'mimes:jpeg,jpg,png,webp,pdf,doc,docx',
+                // GIF (modern UX), audio (voice notes) added — AttachmentService validates real MIME type.
+                'mimes:jpeg,jpg,png,webp,gif,pdf,doc,docx,webm,mp4,mp3,mpga,ogg,wav,m4a',
             ],
         ];
     }

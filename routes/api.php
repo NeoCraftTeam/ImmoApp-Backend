@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\BailleurFollowController;
 use App\Http\Controllers\Api\V1\BoostController;
 use App\Http\Controllers\Api\V1\BulkAdController;
+use App\Http\Controllers\Api\V1\ChatE2eeIdentityController;
 use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\ClerkWebhookController;
 use App\Http\Controllers\Api\V1\ConversationController;
@@ -323,8 +324,17 @@ Route::prefix('v1')->group(function (): void {
             Route::patch('/{uuid}/archive', [ConversationController::class, 'archive']);
         });
 
+        // Chat E2EE identity (RSA public key registration — private key stays on device)
+        Route::get('/my/chat-e2ee/public-key', [ChatE2eeIdentityController::class, 'show']);
+        Route::put('/my/chat-e2ee/public-key', [ChatE2eeIdentityController::class, 'update'])
+            ->middleware('throttle:20,1');
+
         // Individual message operations
         Route::delete('/messages/{uuid}', [MessageController::class, 'destroy']);
+        Route::post('/messages/{uuid}/reactions', [MessageController::class, 'addReaction'])
+            ->middleware('throttle:60,1');
+        Route::delete('/messages/{uuid}/reactions', [MessageController::class, 'removeReaction'])
+            ->middleware('throttle:60,1');
 
         // FCM tokens
         Route::post('/fcm/token', [FcmTokenController::class, 'store']);

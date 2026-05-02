@@ -18,11 +18,12 @@ use InvalidArgumentException;
  */
 final readonly class AttachmentService
 {
-    /** Real MIME types allowed for images. */
+    /** Real MIME types allowed for images (GIF is enabled for modern UX parity). */
     private const array IMAGE_MIMES = [
         'image/jpeg',
         'image/png',
         'image/webp',
+        'image/gif',
     ];
 
     /** Real MIME types allowed for documents. */
@@ -31,6 +32,48 @@ final readonly class AttachmentService
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     ];
+
+    /** Real MIME types allowed for voice notes. */
+    private const array AUDIO_MIMES = [
+        'audio/webm',
+        'audio/mp4',
+        'audio/mpeg',
+        'audio/mp3',
+        'audio/x-m4a',
+        'audio/m4a',
+        'audio/ogg',
+        'audio/wav',
+        // Safari MediaRecorder stores AAC in an MPEG-4 container — PHP often reports video/mp4.
+        'video/mp4',
+    ];
+
+    /**
+     * Refresh signed URLs for every attachment row (R2 paths stay stable; URLs expire).
+     *
+     * @param  array<int, array<string, mixed>>|null  $attachments
+     * @return array<int, array<string, mixed>>|null
+     */
+    public function refreshSignedUrlsInAttachments(?array $attachments): ?array
+    {
+        if ($attachments === null) {
+            return null;
+        }
+
+        return array_map(function (array $row): array {
+            $path = $row['url'] ?? null;
+            if (!is_string($path) || $path === '') {
+                return $row;
+            }
+
+            try {
+                $row['signed_url'] = $this->getSignedUrl($path);
+            } catch (\Throwable) {
+                // keep existing signed_url
+            }
+
+            return $row;
+        }, $attachments);
+    }
 
     /**
      * Upload a file to R2 and return the attachment descriptor array.
@@ -80,7 +123,24 @@ final readonly class AttachmentService
     }
 
     /**
-     * Resolve whether a file is an image or a document, and validate size.
+     * Verify that an attachment storage path belongs to the given conversation.
+     * Stops a malicious sender from referencing attachments uploaded under
+     * another conversation prefix (e.g. someone else's chat folder on R2).
+     *
+     * The expected layout is `{prefix}/{conversation_uuid}/{file_uuid}.{ext}`.
+     * We refuse anything that doesn't start with the conversation's prefix.
+     */
+    public function belongsToConversation(string $url, string $conversationId): bool
+    {
+        $prefix = (string) config('chat.attachment_prefix', 'chats');
+        $expected = "{$prefix}/{$conversationId}/";
+
+        return str_starts_with($url, $expected);
+    }
+
+    /**
+     * Resolve whether a file is an image, a document, or an audio voice note,
+     * and validate size for the resolved type.
      *
      * @throws InvalidArgumentException on invalid MIME type or excessive file size
      */
@@ -88,6 +148,7 @@ final readonly class AttachmentService
     {
         $imageLimitBytes = (int) config('chat.uploads.image_max_mb', 10) * 1024 * 1024;
         $fileLimitBytes = (int) config('chat.uploads.file_max_mb', 20) * 1024 * 1024;
+        $audioLimitBytes = (int) config('chat.uploads.audio_max_mb', 5) * 1024 * 1024;
 
         if (in_array($mime, self::IMAGE_MIMES, true)) {
             if ($sizeBytes > $imageLimitBytes) {
@@ -95,6 +156,14 @@ final readonly class AttachmentService
             }
 
             return 'image';
+        }
+
+        if (in_array($mime, self::AUDIO_MIMES, true)) {
+            if ($sizeBytes > $audioLimitBytes) {
+                throw new InvalidArgumentException('Voice note too large (max 5 MB).');
+            }
+
+            return 'audio';
         }
 
         if (in_array($mime, self::DOCUMENT_MIMES, true)) {
