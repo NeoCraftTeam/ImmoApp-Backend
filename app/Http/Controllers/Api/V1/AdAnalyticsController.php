@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Models\Ad;
 use App\Models\AdInteraction;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -82,10 +83,7 @@ final class AdAnalyticsController
         $period = $request->query('period', '30d');
         $days = $this->parsePeriod($period);
 
-        // Get all ad IDs owned by the user
-        $adIds = Ad::where('user_id', $user->id)->pluck('id');
-
-        if ($adIds->isEmpty()) {
+        if (!Ad::query()->where('user_id', $user->id)->exists()) {
             return response()->json([
                 'data' => [
                     'period' => $period,
@@ -97,14 +95,14 @@ final class AdAnalyticsController
         }
 
         $cacheKey = "analytics:overview:{$user->id}:{$period}";
-        $data = Cache::remember($cacheKey, now()->addMinutes(5), function () use ($adIds, $days, $period) {
+        $data = Cache::remember($cacheKey, now()->addMinutes(5), function () use ($user, $days, $period) {
             $since = now()->subDays($days);
 
             return [
                 'period' => $period,
-                'totals' => $this->computeTotals($adIds, $since),
-                'trends' => $this->computeTrends($adIds, $since),
-                'top_ads' => $this->computeTopAds($adIds, $since, 5),
+                'totals' => $this->computeTotalsForOwner($user->id, $since),
+                'trends' => $this->computeTrendsForOwner($user->id, $since),
+                'top_ads' => $this->computeTopAdsForOwner($user->id, $since, 5),
             ];
         });
 
@@ -253,6 +251,18 @@ final class AdAnalyticsController
     }
 
     /**
+     * Compute total counts per interaction type for an owner's ads.
+     *
+     * @return array<string, int|float>
+     */
+    private function computeTotalsForOwner(string $userId, $since): array
+    {
+        $adIds = $this->ownedAdIdsSubquery($userId)->pluck('id');
+
+        return $this->computeTotals($adIds, $since);
+    }
+
+    /**
      * @return array<string, int|float>
      */
     private function emptyTotals(): array
@@ -298,6 +308,18 @@ final class AdAnalyticsController
         }
 
         return $trends;
+    }
+
+    /**
+     * Compute daily trends per metric type for an owner overview.
+     *
+     * @return array<string, array<int, array{date: string, count: int}>>
+     */
+    private function computeTrendsForOwner(string $userId, $since): array
+    {
+        $adIds = $this->ownedAdIdsSubquery($userId)->pluck('id');
+
+        return $this->computeTrends($adIds, $since);
     }
 
     /**
@@ -417,6 +439,28 @@ final class AdAnalyticsController
         }
 
         return $result;
+    }
+
+    /**
+     * Compute top performing ads for an owner overview.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function computeTopAdsForOwner(string $userId, $since, int $limit): array
+    {
+        $adIds = $this->ownedAdIdsSubquery($userId)->pluck('id');
+
+        return $this->computeTopAds($adIds, $since, $limit);
+    }
+
+    /**
+     * @return Builder<Ad>
+     */
+    private function ownedAdIdsSubquery(string $userId)
+    {
+        return Ad::query()
+            ->select('id')
+            ->where('user_id', $userId);
     }
 
     /**
