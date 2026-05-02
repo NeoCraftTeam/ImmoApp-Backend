@@ -131,19 +131,23 @@ class AiSearchService implements AiSearchServiceInterface
         $model = config('services.gemini.model', 'gemini-2.0-flash');
         $systemPrompt = $this->systemPrompt($this->buildContext());
         $userText = 'Analyse cette photo de bien immobilier et extrais les critères de recherche. Réponds UNIQUEMENT avec un objet JSON valide, sans markdown ni texte autour.';
-        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+        // Use the `x-goog-api-key` header instead of the `?key=` query param so the API key is never
+        // logged by reverse proxies / CDN edges / access logs.
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent";
 
         try {
-            $response = Http::timeout(15)->post($url, [
-                'contents' => [[
-                    'role' => 'user',
-                    'parts' => [
-                        ['text' => "{$systemPrompt}\n\n{$userText}"],
-                        ['inline_data' => ['mime_type' => $mimeType, 'data' => $base64Image]],
-                    ],
-                ]],
-                'generationConfig' => ['maxOutputTokens' => 400, 'temperature' => 0.1],
-            ]);
+            $response = Http::timeout(15)
+                ->withHeaders(['x-goog-api-key' => $apiKey])
+                ->post($url, [
+                    'contents' => [[
+                        'role' => 'user',
+                        'parts' => [
+                            ['text' => "{$systemPrompt}\n\n{$userText}"],
+                            ['inline_data' => ['mime_type' => $mimeType, 'data' => $base64Image]],
+                        ],
+                    ]],
+                    'generationConfig' => ['maxOutputTokens' => 400, 'temperature' => 0.1],
+                ]);
 
             if ($response->failed()) {
                 Log::warning('AiSearchService: [gemini-vision] HTTP '.$response->status());
@@ -315,15 +319,19 @@ class AiSearchService implements AiSearchServiceInterface
         $model = config('services.gemini.model', 'gemini-2.0-flash');
         $systemPrompt = $this->systemPrompt($this->buildContext());
         $userPrompt = "Requête de l'utilisateur : \"{$query}\"\n\nRéponds UNIQUEMENT avec un objet JSON valide, sans markdown ni texte autour.";
-        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+        // Use the `x-goog-api-key` header instead of the `?key=` query param so the API key is never
+        // logged by reverse proxies / CDN edges / access logs.
+        $url = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent";
 
         try {
-            $response = Http::timeout(8)->post($url, [
-                'contents' => [
-                    ['role' => 'user', 'parts' => [['text' => "{$systemPrompt}\n\n{$userPrompt}"]]],
-                ],
-                'generationConfig' => ['maxOutputTokens' => 400, 'temperature' => 0.1],
-            ]);
+            $response = Http::timeout(8)
+                ->withHeaders(['x-goog-api-key' => $apiKey])
+                ->post($url, [
+                    'contents' => [
+                        ['role' => 'user', 'parts' => [['text' => "{$systemPrompt}\n\n{$userPrompt}"]]],
+                    ],
+                    'generationConfig' => ['maxOutputTokens' => 400, 'temperature' => 0.1],
+                ]);
 
             if ($response->failed()) {
                 Log::warning('AiSearchService: [gemini] HTTP '.$response->status(), ['body' => substr($response->body(), 0, 200)]);
@@ -579,13 +587,73 @@ PROMPT;
         ];
     }
 
+    /**
+     * Robust JSON object extraction from LLM output.
+     *
+     *  - Strips ```json fences and ``` fences.
+     *  - Locates the first `{` and finds its matching `}` by tracking brace
+     *    depth, ignoring braces inside strings (handles escaped quotes).
+     *  - Falls back to direct json_decode of the trimmed content.
+     */
     private function extractJson(string $content): ?array
     {
         $content = trim($content);
-        if (preg_match('/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/s', $content, $m)) {
-            $decoded = json_decode($m[0], true);
 
-            return is_array($decoded) ? $decoded : null;
+        $content = (string) preg_replace('/^```(?:json)?\s*/i', '', $content);
+        $content = (string) preg_replace('/```$/', '', $content);
+        $content = trim($content);
+
+        if ($content === '') {
+            return null;
+        }
+
+        $start = strpos($content, '{');
+        if ($start !== false) {
+            $depth = 0;
+            $inString = false;
+            $escape = false;
+            $length = strlen($content);
+
+            for ($i = $start; $i < $length; $i++) {
+                $char = $content[$i];
+
+                if ($escape) {
+                    $escape = false;
+
+                    continue;
+                }
+
+                if ($inString) {
+                    if ($char === '\\') {
+                        $escape = true;
+                    } elseif ($char === '"') {
+                        $inString = false;
+                    }
+
+                    continue;
+                }
+
+                if ($char === '"') {
+                    $inString = true;
+
+                    continue;
+                }
+
+                if ($char === '{') {
+                    $depth++;
+                } elseif ($char === '}') {
+                    $depth--;
+                    if ($depth === 0) {
+                        $candidate = substr($content, $start, $i - $start + 1);
+                        $decoded = json_decode($candidate, true);
+
+                        if (is_array($decoded)) {
+                            return $decoded;
+                        }
+                        break;
+                    }
+                }
+            }
         }
 
         $decoded = json_decode($content, true);

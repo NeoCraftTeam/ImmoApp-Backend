@@ -231,7 +231,7 @@ final readonly class RetentionPushService
                     'title' => 'Rappel de visite ',
                     'body' => "Votre visite de « {$title} » est prévue demain à {$time}.",
                     'tag' => "viewing-{$reservation->id}",
-                    'url' => '/owner/reservations',
+                    'url' => '/my/reservations',
                     'actions' => [['action' => 'view', 'title' => 'Voir les détails']],
                 ]);
 

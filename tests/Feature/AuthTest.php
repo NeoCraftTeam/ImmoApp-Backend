@@ -37,7 +37,10 @@ test('login fails with invalid credentials', function (): void {
     $response->assertStatus(401);
 });
 
-use App\Models\City;     // Ajout import
+use App\Models\City;
+use Illuminate\Support\Facades\Hash;
+
+// Ajout import
 
 test('customer can register', function (): void {
     Notification::fake();
@@ -64,4 +67,12 @@ test('customer can register', function (): void {
         'email' => 'john@new.com',
         'role' => 'customer',
     ]);
+
+    // Regression guard: the password must actually be hashed and stored, so
+    // the freshly-registered user can authenticate. This catches accidental
+    // removal of `password` from `User::$fillable` (which silently drops the
+    // value via `fill()` and creates a NULL-password account).
+    $created = User::where('email', 'john@new.com')->firstOrFail();
+    expect($created->password)->not->toBeNull();
+    expect(Hash::check('Password123@', $created->password))->toBeTrue();
 });

@@ -10,6 +10,7 @@ use App\Mail\CreditPurchaseConfirmationMail;
 use App\Models\Agency;
 use App\Models\Payment;
 use App\Models\PointPackage;
+use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\PointService;
@@ -52,6 +53,17 @@ final readonly class HandlePostPaymentActions
      */
     private function activateSubscription(Payment $payment, array $metadata): void
     {
+        // Idempotency guard: a subscription already linked to this payment means
+        // a previous job/webhook already handled it. Prevents duplicate subscriptions
+        // when webhook retries or jobs are re-processed.
+        if (Subscription::where('payment_id', $payment->id)->exists()) {
+            Log::info('Abonnement déjà activé pour ce paiement, skip', [
+                'payment_id' => $payment->id,
+            ]);
+
+            return;
+        }
+
         $agencyId = $payment->agency_id ?? ($metadata['agency_id'] ?? null);
         $planId = $payment->plan_id ?? ($metadata['plan_id'] ?? null);
         $period = $payment->period ?? ($metadata['period'] ?? 'monthly');

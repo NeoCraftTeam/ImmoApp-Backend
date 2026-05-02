@@ -23,6 +23,7 @@ final readonly class RegistrationService
         private LoggerInterface $log,
         private UtmAttributionService $utmAttribution,
         private TokenService $tokenService,
+        private TurnstileService $turnstile,
     ) {}
 
     /**
@@ -52,6 +53,24 @@ final readonly class RegistrationService
         }
 
         $data = array_merge($request->validated(), $data);
+
+        // Cloudflare Turnstile — verify only when configured.
+        if (
+            $this->turnstile->isConfigured()
+            && !$this->turnstile->verify(
+                $request->input('turnstile_token'),
+                $request->ip(),
+            )
+        ) {
+            RateLimiter::hit($key, 600);
+            $this->log->info('Registration rejected: Turnstile verification failed', [
+                'ip' => $request->ip(),
+                'email' => $data['email'] ?? null,
+            ]);
+            throw ValidationException::withMessages([
+                'turnstile_token' => ['Vérification anti-robot échouée. Veuillez recharger la page.'],
+            ]);
+        }
 
         $existingUser = User::query()->where('email', $data['email'])->first();
         if ($existingUser !== null) {

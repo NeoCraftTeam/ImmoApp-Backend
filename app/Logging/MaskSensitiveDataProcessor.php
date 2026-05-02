@@ -29,6 +29,15 @@ class MaskSensitiveDataProcessor implements ProcessorInterface
         'api_key',
         'secret',
         'key',
+        'email',
+        'phone',
+        'phone_number',
+        'authorization',
+        'cookie',
+        'session_id',
+        'webhook_secret',
+        'verif_hash',
+        'x-webauthn-token',
     ];
 
     /**

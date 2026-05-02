@@ -68,12 +68,12 @@ final class ConversationResource extends JsonResource
         /** @var User|null $user */
         $user = $request->user();
         $other = $user ? $conv->otherParticipant($user) : null;
-        $last = $conv->latestMessage;
+        $last = $conv->previewMessage;
 
         return [
             'uuid' => $conv->id,
             'status' => $conv->status->value,
-            'last_message_at' => $this->toIso8601OrNull($conv->last_message_at),
+            'last_message_at' => $this->toIso8601OrNull($last?->created_at ?? $conv->last_message_at),
             'unread_count' => $conv->computed_unread_count ?? ($user ? $conv->unreadCountFor($user) : 0),
             'ad' => $conv->ad ? [
                 'id' => $conv->ad->id,

@@ -80,10 +80,10 @@ final readonly class ConversationController
             $conv = $this->conversations->findOrCreate($ad->id, $user->id, $landlordId);
             $conv->load([
                 'ad:id,title,slug',
-                'latestMessage',
                 ChatE2eeSchema::userParticipantEagerLoadSpec('tenant'),
                 ChatE2eeSchema::userParticipantEagerLoadSpec('landlord'),
             ]);
+            $this->conversations->attachPreviewMessage($conv);
 
             $status = $existed ? 200 : 201;
 
@@ -104,10 +104,10 @@ final readonly class ConversationController
         $conv = $this->findConversationForUser($uuid, (string) $request->user()?->id);
         $conv->load([
             'ad:id,title,slug',
-            'latestMessage',
             ChatE2eeSchema::userParticipantEagerLoadSpec('tenant'),
             ChatE2eeSchema::userParticipantEagerLoadSpec('landlord'),
         ]);
+        $this->conversations->attachPreviewMessage($conv);
 
         return new ConversationResource($conv)->response();
     }

@@ -70,6 +70,9 @@ final class RegisterRequest extends FormRequest
             'utm_campaign' => 'nullable|string|max:255',
             'utm_content' => 'nullable|string|max:255',
             'utm_term' => 'nullable|string|max:255',
+            // Cloudflare Turnstile token. Optional: server-side verified only
+            // when the service is configured (see TurnstileService).
+            'turnstile_token' => 'nullable|string|max:2048',
         ];
     }
 

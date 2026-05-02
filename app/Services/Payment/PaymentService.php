@@ -230,78 +230,103 @@ final readonly class PaymentService
         $data = $gateway->handleWebhook($payload, $headers);
 
         $txRef = $data['tx_ref'];
-        $payment = Payment::where('transaction_id', $txRef)
-            ->where('gateway', $gatewayName)
-            ->lockForUpdate()
-            ->first();
 
-        if (!$payment) {
-            Log::warning('Webhook: payment not found', ['tx_ref' => $txRef, 'gateway' => $gatewayName]);
+        // CRITICAL: lockForUpdate must run inside a DB::transaction() so the row
+        // lock is held until commit. Without this, two concurrent webhooks can both
+        // observe a non-terminal payment and trigger duplicate side-effects.
+        $eventToDispatch = DB::transaction(function () use ($txRef, $gatewayName, $data): array {
+            /** @var Payment|null $payment */
+            $payment = Payment::where('transaction_id', $txRef)
+                ->where('gateway', $gatewayName)
+                ->lockForUpdate()
+                ->first();
 
-            return $data;
-        }
+            if (!$payment) {
+                Log::warning('Webhook: payment not found', ['tx_ref' => $txRef, 'gateway' => $gatewayName]);
 
-        if ($payment->isTerminal()) {
-            Log::info('Webhook ignoré: Paiement #'.$payment->id.' déjà traité (status: '.$payment->status->value.').');
+                return ['event' => null];
+            }
 
-            return $data;
-        }
+            if ($payment->isTerminal()) {
+                Log::info('Webhook ignoré: Paiement #'.$payment->id.' déjà traité (status: '.$payment->status->value.').');
 
-        $expectedCurrency = config('payment.default_currency', 'XAF');
+                return ['event' => null];
+            }
 
-        if ($data['status'] === 'success') {
-            $paidAmount = (float) $data['amount'];
-            $paidCurrency = (string) $data['currency'];
+            $expectedCurrency = config('payment.default_currency', 'XAF');
 
-            if (abs($paidAmount - (float) $payment->amount) > 0.01 || strcasecmp($paidCurrency, (string) $expectedCurrency) !== 0) {
-                Log::critical('Webhook: amount/currency mismatch', [
-                    'payment_id' => $payment->id,
-                    'expected_amount' => $payment->amount,
-                    'received_amount' => $paidAmount,
-                    'expected_currency' => $expectedCurrency,
-                    'received_currency' => $paidCurrency,
-                ]);
+            if ($data['status'] === 'success') {
+                $paidAmount = (float) $data['amount'];
+                $paidCurrency = (string) $data['currency'];
 
+                if (abs($paidAmount - (float) $payment->amount) > 0.01 || strcasecmp($paidCurrency, (string) $expectedCurrency) !== 0) {
+                    Log::critical('Webhook: amount/currency mismatch', [
+                        'payment_id' => $payment->id,
+                        'expected_amount' => $payment->amount,
+                        'received_amount' => $paidAmount,
+                        'expected_currency' => $expectedCurrency,
+                        'received_currency' => $paidCurrency,
+                    ]);
+
+                    $payment->forceFill([
+                        'status' => PaymentStatus::FAILED,
+                        'gateway_response' => $data['raw'],
+                    ])->save();
+
+                    return ['event' => 'failed', 'payment_id' => $payment->id];
+                }
+
+                $webhookUpdate = [
+                    'status' => PaymentStatus::SUCCESS,
+                    'gateway_response' => $data['raw'],
+                ];
+
+                if (!empty($data['payment_method'])) {
+                    $webhookUpdate['payment_method'] = PaymentMethod::tryFrom($data['payment_method']);
+                }
+
+                $payment->forceFill($webhookUpdate)->save();
+
+                Log::info('Webhook: payment succeeded', ['payment_id' => $payment->id]);
+
+                return ['event' => 'succeeded', 'payment_id' => $payment->id];
+            }
+
+            if ($data['status'] === 'cancelled') {
+                $payment->forceFill([
+                    'status' => PaymentStatus::CANCELLED,
+                    'gateway_response' => $data['raw'],
+                ])->save();
+
+                Log::info('Webhook: payment cancelled', ['payment_id' => $payment->id]);
+
+                return ['event' => 'failed', 'payment_id' => $payment->id];
+            }
+
+            if ($data['status'] === 'failed') {
                 $payment->forceFill([
                     'status' => PaymentStatus::FAILED,
                     'gateway_response' => $data['raw'],
                 ])->save();
 
-                PaymentFailed::dispatch($payment->fresh() ?? $payment);
+                Log::info('Webhook: payment failed', ['payment_id' => $payment->id]);
 
-                return $data;
+                return ['event' => 'failed', 'payment_id' => $payment->id];
             }
 
-            $webhookUpdate = [
-                'status' => PaymentStatus::SUCCESS,
-                'gateway_response' => $data['raw'],
-            ];
+            return ['event' => null];
+        });
 
-            // Update payment_method from gateway resolution (e.g. orange_money, mobile_money, card)
-            if (!empty($data['payment_method'])) {
-                $webhookUpdate['payment_method'] = PaymentMethod::tryFrom($data['payment_method']);
+        // Dispatch events AFTER commit so listeners see the final state.
+        if ($eventToDispatch['event'] !== null) {
+            $payment = Payment::find($eventToDispatch['payment_id']);
+            if ($payment) {
+                if ($eventToDispatch['event'] === 'succeeded') {
+                    PaymentSucceeded::dispatch($payment);
+                } else {
+                    PaymentFailed::dispatch($payment);
+                }
             }
-
-            $payment->forceFill($webhookUpdate)->save();
-
-            Log::info('Webhook: payment succeeded', ['payment_id' => $payment->id]);
-            PaymentSucceeded::dispatch($payment->fresh() ?? $payment);
-        } elseif ($data['status'] === 'cancelled') {
-            $payment->forceFill([
-                'status' => PaymentStatus::CANCELLED,
-                'gateway_response' => $data['raw'],
-            ])->save();
-
-            Log::info('Webhook: payment cancelled', ['payment_id' => $payment->id]);
-            PaymentFailed::dispatch($payment->fresh() ?? $payment);
-        } elseif ($data['status'] === 'failed') {
-            $payment->forceFill([
-                'status' => PaymentStatus::FAILED,
-                'gateway_response' => $data['raw'],
-            ])->save();
-
-            Log::info('Webhook: payment failed', ['payment_id' => $payment->id]);
-            PaymentFailed::dispatch($payment->fresh() ?? $payment);
         }
 
         return $data;

@@ -53,6 +53,10 @@ class WebPushService
      */
     public function sendToSubscription(PushSubscription $subscription, array $payload): bool
     {
+        if (!$this->isConfigured()) {
+            return false;
+        }
+
         $payload = array_merge([
             'title' => 'KeyHome',
             'icon' => '/icons/icon-192x192.png',
@@ -134,6 +138,32 @@ class WebPushService
             })
             ->where('created_at', '<', now()->subDays($daysInactive))
             ->delete();
+    }
+
+    /**
+     * Returns true when both VAPID public + private keys are configured.
+     *
+     * Without this guard, `new WebPush([...])` throws on any send call when
+     * the env vars are missing — silently breaking push delivery in prod
+     * with no actionable signal.
+     */
+    public function isConfigured(): bool
+    {
+        $public = (string) config('webpush.vapid.public_key', '');
+        $private = (string) config('webpush.vapid.private_key', '');
+
+        if ($public === '' || $private === '') {
+            // Log once per request lifecycle so we never spam.
+            static $warned = false;
+            if (!$warned) {
+                Log::warning('[WebPush] VAPID keys missing — push delivery disabled. Set VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY in .env.');
+                $warned = true;
+            }
+
+            return false;
+        }
+
+        return true;
     }
 
     /**

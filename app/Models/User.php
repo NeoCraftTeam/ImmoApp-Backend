@@ -6,13 +6,11 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 
-use App\Enums\PointTransactionType;
 use App\Enums\UserRole;
 use App\Enums\UserType;
 use App\Mail\ForgotPasswordMail;
 use App\Mail\VerificationCodeMail;
 use App\Mail\VerifyEmailMail;
-use App\Services\PointService;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\UserFactory;
 use Eloquent;
@@ -169,6 +167,14 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'username',
         'bio',
         'email',
+        // `password` MUST stay fillable — `RegistrationService::register()`,
+        // `UserController::store()`, `ForcePasswordChange::submit()` and the
+        // Filament `UserResource` form all rely on `$user->fill(['password' => …])`
+        // / `$user->update(['password' => …])`. Removing it silently dropped the
+        // value (Eloquent ignores non-fillable keys in `fill()`) and created
+        // accounts with `NULL` passwords — total breakage of new signups.
+        // The `'password' => 'hashed'` cast in `casts()` ensures any assigned
+        // value is automatically bcrypted by the model on save.
         'password',
         'phone_number',
         'phone_is_whatsapp',
@@ -237,17 +243,8 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             }
         });
 
-        static::created(function (User $user): void {
-            $bonus = (int) Setting::get('welcome_bonus_points', 5);
-            if ($bonus > 0) {
-                app(PointService::class)->credit(
-                    $user,
-                    $bonus,
-                    PointTransactionType::BONUS,
-                    'Bonus de bienvenue'
-                );
-            }
-        });
+        // NOTE: Welcome-bonus crediting moved to `UserObserver::created()` for
+        // SOLID compliance — the User model no longer knows about PointService.
     }
 
     private function validateAgentType(): void

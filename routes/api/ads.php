@@ -110,9 +110,10 @@ Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner'])->prefix('m
 Route::get('/ads/{ad}/keyscore', [KeyScoreController::class, 'show'])
     ->middleware('throttle:60,1');
 
-// Neighborhood scorecard (OSM Overpass — cached 7 days)
+// Neighborhood scorecard (OSM Overpass — cached 7d server-side, also CDN-cached
+// 1h at the edge for guests so concurrent visits don't hit Overpass at all).
 Route::get('/ads/{ad}/neighborhood-scorecard', NeighborhoodScorecardController::class)
-    ->middleware(['optional.auth', 'throttle:30,1']);
+    ->middleware(['optional.auth', 'throttle:30,1', 'cdn.cache:3600']);
 
 // PDF export — public for available ads, owner/admin for others
 Route::get('/ads/{ad}/pdf', [AdPdfController::class, 'download'])

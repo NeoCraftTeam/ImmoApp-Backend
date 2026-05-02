@@ -12,12 +12,14 @@ use App\Http\Middleware\EnsureOwnerRole;
 use App\Http\Middleware\EnsureTokenMatchesRole;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\LivewireLongRunningRequest;
+use App\Http\Middleware\LocaleResolver;
 use App\Http\Middleware\OptionalAuth;
 use App\Http\Middleware\RequireApiMfa;
 use App\Http\Middleware\ResolveSanctumBearerUser;
 use App\Http\Middleware\RoleScopedSession;
 use App\Http\Middleware\SanitizeInput;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\TouchLastSeen;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -76,11 +78,14 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->replaceInGroup('api', Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class, EnsureFrontendRequestsAreStateful::class);
         // Append is_active check, email verification, and input sanitization to all API routes
         $middleware->appendToGroup('api', [
+            LocaleResolver::class,
             EnsureUserIsActive::class,
             EnsureEmailIsVerified::class,
             SanitizeInput::class,
             CacheHeaders::class,
+            TouchLastSeen::class,
         ]);
+        $middleware->prependToGroup('web', LocaleResolver::class);
         $middleware->throttleApi();
     })
     ->withExceptions(function (Exceptions $exceptions): void {

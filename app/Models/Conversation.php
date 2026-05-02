@@ -34,6 +34,7 @@ use Illuminate\Support\Carbon;
  * @property-read User|null $landlord
  * @property-read Collection<int,Message> $messages
  * @property-read Message|null $latestMessage
+ * @property-read Message|null $previewMessage Dynamic relation set by {@see ConversationService}
  */
 class Conversation extends Model
 {

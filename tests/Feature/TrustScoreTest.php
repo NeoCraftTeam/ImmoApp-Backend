@@ -26,6 +26,18 @@ function createAgent(array $attrs = []): User
     return User::factory()->create(array_merge([
         'role' => UserRole::AGENT,
         'type' => UserType::INDIVIDUAL,
+        // Default to consented for service-exercising tests; individual tests
+        // explicitly override (see "non-consented" tests below).
+        'trust_score_consent' => true,
+    ], $attrs));
+}
+
+/** Helper to create a consented customer for service tests. */
+function createConsentedCustomer(array $attrs = []): User
+{
+    return User::factory()->create(array_merge([
+        'role' => UserRole::CUSTOMER,
+        'trust_score_consent' => true,
     ], $attrs));
 }
 
@@ -35,6 +47,7 @@ test('trust score service computes tenant score for customer', function (): void
     $user = User::factory()->create([
         'role' => UserRole::CUSTOMER,
         'email_verified_at' => now(),
+        'trust_score_consent' => true,
     ]);
 
     /** @var TrustScoreService $service */
@@ -78,7 +91,7 @@ test('trust score service computes landlord score for agent', function (): void 
 });
 
 test('trust score persists to database after compute', function (): void {
-    $user = User::factory()->create(['role' => UserRole::CUSTOMER]);
+    $user = createConsentedCustomer();
 
     /** @var TrustScoreService $service */
     $service = app(TrustScoreService::class);
@@ -91,7 +104,7 @@ test('trust score persists to database after compute', function (): void {
 });
 
 test('trust score is cached after compute', function (): void {
-    $user = User::factory()->create(['role' => UserRole::CUSTOMER]);
+    $user = createConsentedCustomer();
 
     /** @var TrustScoreService $service */
     $service = app(TrustScoreService::class);
@@ -103,7 +116,7 @@ test('trust score is cached after compute', function (): void {
 });
 
 test('trust score invalidate clears cache', function (): void {
-    $user = User::factory()->create(['role' => UserRole::CUSTOMER]);
+    $user = createConsentedCustomer();
 
     /** @var TrustScoreService $service */
     $service = app(TrustScoreService::class);
@@ -117,7 +130,7 @@ test('trust score invalidate clears cache', function (): void {
 });
 
 test('trust score getOrCompute uses cache', function (): void {
-    $user = User::factory()->create(['role' => UserRole::CUSTOMER]);
+    $user = createConsentedCustomer();
 
     /** @var TrustScoreService $service */
     $service = app(TrustScoreService::class);
@@ -136,6 +149,7 @@ test('new customer with nothing gets low score', function (): void {
         'bio' => null,
         'avatar' => null,
         'created_at' => now(),
+        'trust_score_consent' => true,
     ]);
 
     /** @var TrustScoreService $service */
@@ -154,6 +168,7 @@ test('verified customer with rich profile gets higher score', function (): void 
         'bio' => 'Locataire sérieux et ponctuel',
         'avatar' => 'https://example.com/avatar.jpg',
         'created_at' => now()->subYear(),
+        'trust_score_consent' => true,
     ]);
 
     // Add documents
@@ -318,7 +333,7 @@ test('recompute command processes consented users', function (): void {
 // ── Breakdown Signal Tests ────────────────────────────────────────────────────
 
 test('payment reliability signal awards points for successful payments', function (): void {
-    $user = User::factory()->create(['role' => UserRole::CUSTOMER]);
+    $user = createConsentedCustomer();
 
     // Create successful payments
     for ($i = 0; $i < 5; $i++) {
@@ -338,7 +353,7 @@ test('payment reliability signal awards points for successful payments', functio
 });
 
 test('viewing attendance signal rewards kept appointments', function (): void {
-    $user = User::factory()->create(['role' => UserRole::CUSTOMER]);
+    $user = createConsentedCustomer();
 
     // Create confirmed reservations with different slot dates to avoid unique constraint
     for ($i = 0; $i < 5; $i++) {
@@ -364,12 +379,14 @@ test('verification signal awards points for email and phone', function (): void 
         'role' => UserRole::CUSTOMER,
         'email_verified_at' => now(),
         'phone_number' => '+237612345678',
+        'trust_score_consent' => true,
     ]);
 
     $userUnverified = User::factory()->create([
         'role' => UserRole::CUSTOMER,
         'email_verified_at' => null,
         'phone_number' => null,
+        'trust_score_consent' => true,
     ]);
 
     /** @var TrustScoreService $service */
@@ -390,6 +407,7 @@ test('score never exceeds 100', function (): void {
         'bio' => 'Lorem ipsum dolor sit amet',
         'avatar' => 'https://example.com/avatar.jpg',
         'created_at' => now()->subYears(3),
+        'trust_score_consent' => true,
     ]);
 
     /** @var TrustScoreService $service */

@@ -134,14 +134,23 @@ final readonly class FlutterwavePaymentService implements PaymentGatewayInterfac
     /**
      * Validate the Flutterwave webhook using the verif-hash header.
      *
+     * Accepts both `verif-hash` (current) and `flutterwave-signature` (forward-compat
+     * for Flutterwave's signing-scheme migration). Falls back to either when present.
+     *
      * {@inheritDoc}
      */
     public function handleWebhook(array $payload, array $headers): array
     {
-        $verifHash = (string) ($headers['verif-hash'] ?? $headers['HTTP_VERIF_HASH'] ?? '');
+        $verifHash = (string) (
+            $headers['verif-hash']
+            ?? $headers['HTTP_VERIF_HASH']
+            ?? $headers['flutterwave-signature']
+            ?? $headers['HTTP_FLUTTERWAVE_SIGNATURE']
+            ?? ''
+        );
 
         if ($this->webhookSecret === '' || $verifHash === '' || !hash_equals($this->webhookSecret, $verifHash)) {
-            Log::warning('Flutterwave webhook: invalid verif-hash', [
+            Log::warning('Flutterwave webhook: invalid signature', [
                 'ip' => request()->ip(),
             ]);
 

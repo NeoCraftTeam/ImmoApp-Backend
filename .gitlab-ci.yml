@@ -88,6 +88,21 @@ composer_security:
   rules:
     - if: $CI_COMMIT_BRANCH
 
+# Rector — automated refactor checks. Runs in --dry-run so it never modifies CI;
+# fails the job if there are unapplied automatic upgrades / fixes that should be
+# committed before merge.
+rector:
+  stage: quality
+  needs: [prepare_ci_image]
+  allow_failure: true # advisory in CI: do not block the pipeline (yet) — see AGENTS.md
+  script:
+    - docker run --rm $CI_IMAGE ./vendor/bin/rector process --dry-run --no-progress-bar
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        - '**/*.php'
+        - rector.php
+
 # --- ETAPE 2 : BUILD & PUSH (en parallèle avec tests) ---
 build_image:
   stage: build_and_test
@@ -283,8 +298,11 @@ test_suite:
     - echo "✅ Deployment complete, bringing app back up..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan up
     # ── Non-blocking post-deploy tasks (run after app is live) ─────────────────
-    - echo "🔄 Re-indexing ads into Meilisearch (non-blocking)..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan scout:import "App\Models\Ad" || true
+    # NOTE: Full `scout:import` is intentionally NOT run here — it scans every Ad
+    # row and degrades deploy time linearly with catalog size. Reindex is now
+    # triggered by Eloquent observers (HasMedia / Searchable) on writes, plus a
+    # nightly `php artisan scout:import App\\Models\\Ad` cron for drift recovery
+    # (see AGENTS.md scaling section). This is also safer for blue/green deploys.
     - echo "📄 Generating Swagger docs (non-blocking)..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate || true
   after_script:

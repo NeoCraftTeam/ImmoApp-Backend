@@ -14,6 +14,12 @@ final readonly class DirectionsService
 
     private const int CACHE_TTL = 86_400; // 24 h — road routes change very rarely
 
+    /** Negative cache TTL — when ORS fails/times out, suppress retries for 5 min
+     *  so a single ORS outage doesn't translate into N retries × every cold request. */
+    private const int NEGATIVE_CACHE_TTL = 300;
+
+    private const string NEGATIVE_CACHE_SENTINEL = '__directions_unavailable__';
+
     /** Supported ORS profiles */
     public const array PROFILES = [
         'foot-walking',
@@ -67,7 +73,12 @@ final readonly class DirectionsService
 
         $cached = Cache::get($cacheKey);
 
-        if ($cached !== null) {
+        if ($cached === self::NEGATIVE_CACHE_SENTINEL) {
+            // ORS recently failed / timed out for this route → short-circuit
+            return null;
+        }
+
+        if (is_array($cached)) {
             $cached['cached'] = true;
 
             return $cached;
@@ -77,6 +88,8 @@ final readonly class DirectionsService
 
         if ($payload !== null) {
             Cache::put($cacheKey, $payload, self::CACHE_TTL);
+        } else {
+            Cache::put($cacheKey, self::NEGATIVE_CACHE_SENTINEL, self::NEGATIVE_CACHE_TTL);
         }
 
         return $payload;
@@ -105,7 +118,7 @@ final readonly class DirectionsService
                 ]);
 
             if (!$response->successful()) {
-                Log::info('DirectionsService: ORS error', ['status' => $response->status()]);
+                Log::warning('DirectionsService: ORS error', ['status' => $response->status()]);
 
                 return null;
             }
@@ -133,7 +146,7 @@ final readonly class DirectionsService
                 'cached' => false,
             ];
         } catch (\Throwable $e) {
-            Log::info('DirectionsService: request failed', ['error' => $e->getMessage()]);
+            Log::warning('DirectionsService: request failed', ['error' => $e->getMessage()]);
 
             return null;
         }

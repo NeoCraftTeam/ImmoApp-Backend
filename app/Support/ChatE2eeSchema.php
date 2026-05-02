@@ -16,6 +16,8 @@ final class ChatE2eeSchema
 
     private static ?bool $messageClientSealedColumn = null;
 
+    private static ?bool $conversationWrappedKeys = null;
+
     public static function userPublicKeyColumnExists(): bool
     {
         return self::$userPublicKeyColumn ??= Schema::hasColumn('users', 'chat_e2ee_public_key_pem');
@@ -24,6 +26,22 @@ final class ChatE2eeSchema
     public static function messageClientSealedColumnExists(): bool
     {
         return self::$messageClientSealedColumn ??= Schema::hasColumn('messages', 'is_client_sealed');
+    }
+
+    public static function conversationWrappedKeyColumnsExist(): bool
+    {
+        return self::$conversationWrappedKeys ??= Schema::hasColumn('conversations', 'e2ee_wrapped_key_tenant')
+            && Schema::hasColumn('conversations', 'e2ee_wrapped_key_landlord');
+    }
+
+    /**
+     * All E2EE-related columns from migration `2026_05_01_212719_add_chat_e2ee_*` are present.
+     */
+    public static function e2eeFullyMigrated(): bool
+    {
+        return self::userPublicKeyColumnExists()
+            && self::messageClientSealedColumnExists()
+            && self::conversationWrappedKeyColumnsExist();
     }
 
     /**

@@ -51,9 +51,22 @@ return [
     |--------------------------------------------------------------------------
     | Supported Currencies
     |--------------------------------------------------------------------------
+    | KeyHome is launching in francophone sub-Saharan Africa (XAF/XOF) but is
+    | being engineered for global expansion. The list below documents every
+    | currency the application is allowed to accept; minor-unit info lives in
+    | `config('currencies.locale_map')` for formatting.
     */
 
-    'supported_currencies' => ['XAF', 'XOF', 'GHS', 'NGN'],
+    'supported_currencies' => [
+        // Africa (launch markets)
+        'XAF', 'XOF', 'GHS', 'NGN', 'KES', 'TZS', 'UGX', 'ZAR', 'MAD', 'EGP',
+        // Europe
+        'EUR', 'GBP', 'CHF', 'SEK', 'NOK', 'DKK', 'PLN',
+        // Americas
+        'USD', 'CAD', 'BRL', 'MXN',
+        // Asia / Pacific
+        'AED', 'SAR', 'INR', 'CNY', 'JPY', 'AUD', 'NZD', 'SGD', 'HKD',
+    ],
 
     'default_currency' => env('PAYMENT_DEFAULT_CURRENCY', 'XAF'),
 

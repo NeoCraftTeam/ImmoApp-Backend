@@ -14,8 +14,10 @@ use App\Jobs\SendOfflineEmailNotificationJob;
 use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\User;
+use App\Support\ApiResponse;
 use App\Support\ChatE2eeSchema;
 use Illuminate\Contracts\Pagination\CursorPaginator;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -73,7 +75,29 @@ final readonly class MessageService
         $message = DB::transaction(function () use (
             $conv, $sender, $body, $type, $attachments, $replyToId, $e2ee
         ): Message {
+            // Acquire a row-level lock on the conversation so two concurrent
+            // sends cannot interleave the {Message::create -> conv->update}
+            // pair and leave `last_message_id` / `last_message_at` pointing at
+            // the older message.
+            $locked = Conversation::query()
+                ->whereKey($conv->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($locked !== null) {
+                $conv->setRawAttributes($locked->getAttributes(), true);
+            }
+
             if ($e2ee !== null) {
+                if (!ChatE2eeSchema::e2eeFullyMigrated()) {
+                    throw new HttpResponseException(
+                        ApiResponse::error(
+                            'La base de données doit être migrée pour le chiffrement E2EE des messages. Exécutez : php artisan migrate',
+                            503,
+                        ),
+                    );
+                }
+
                 $conv->load(['tenant', 'landlord']);
 
                 abort_if(
@@ -109,7 +133,7 @@ final readonly class MessageService
                     abort(422, 'This conversation already has E2EE session keys; omit e2ee_wrapped_keys.');
                 }
 
-                $msg = Message::create([
+                $attrs = [
                     'conversation_id' => $conv->id,
                     'sender_id' => $sender->id,
                     'type' => MessageType::Text,
@@ -118,8 +142,11 @@ final readonly class MessageService
                     'attachments' => null,
                     'reply_to_id' => $replyToId,
                     'status' => MessageStatus::Sent,
-                    'is_client_sealed' => true,
-                ]);
+                ];
+                if (ChatE2eeSchema::messageClientSealedColumnExists()) {
+                    $attrs['is_client_sealed'] = true;
+                }
+                $msg = Message::create($attrs);
             } else {
                 $encrypted = null;
                 $iv = null;
@@ -130,7 +157,7 @@ final readonly class MessageService
                     $iv = $result['iv'];
                 }
 
-                $msg = Message::create([
+                $attrs = [
                     'conversation_id' => $conv->id,
                     'sender_id' => $sender->id,
                     'type' => MessageType::from($type),
@@ -139,8 +166,11 @@ final readonly class MessageService
                     'attachments' => $attachments,
                     'reply_to_id' => $replyToId,
                     'status' => MessageStatus::Sent,
-                    'is_client_sealed' => false,
-                ]);
+                ];
+                if (ChatE2eeSchema::messageClientSealedColumnExists()) {
+                    $attrs['is_client_sealed'] = false;
+                }
+                $msg = Message::create($attrs);
             }
 
             $conv->update([
@@ -249,6 +279,7 @@ final readonly class MessageService
                 'reactions:id,message_id,user_id,emoji',
             ])
             ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->cursorPaginate($perPage, ['*'], 'cursor', $cursor);
     }
 }

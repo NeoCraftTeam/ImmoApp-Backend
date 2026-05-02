@@ -37,6 +37,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Cloudflare Turnstile (CAPTCHA)
+    |--------------------------------------------------------------------------
+    | Free, privacy-respecting alternative to reCAPTCHA. Used on /login and
+    | /register to mitigate credential-stuffing and bulk signup bots.
+    | When `secret_key` is empty, `TurnstileService` fails open (dev mode).
+    */
+    'turnstile' => [
+        'site_key' => env('TURNSTILE_SITE_KEY', ''),
+        'secret_key' => env('TURNSTILE_SECRET_KEY', ''),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | OAuth Providers (Laravel Socialite)
     |--------------------------------------------------------------------------
     */

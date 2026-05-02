@@ -24,7 +24,7 @@ Route::prefix('auth')->group(function (): void {
     // Admin registration — auth:sanctum MUST come before can:admin-access so the
     // gate receives an authenticated user; unauthenticated requests get 401, not 403.
     Route::post('registerAdmin', [RegistrationController::class, 'registerAdmin'])
-        ->middleware(['auth:sanctum', 'can:admin-access', 'throttle:auth.register']);
+        ->middleware(['auth:sanctum', 'mfa.admin', 'can:admin-access', 'throttle:auth.register']);
     // Lowered to 5/min — email enumeration mitigation (W15)
     Route::post('check-email', [RegistrationController::class, 'checkEmail'])
         ->middleware('throttle:5,1');

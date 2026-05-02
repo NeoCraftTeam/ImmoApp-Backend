@@ -74,7 +74,8 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/ad-types', 'index');
         Route::get('/ad-types/{adType}', 'show');
     });
-    Route::middleware('auth:sanctum')->controller(AdTypeController::class)->group(function (): void {
+    // Admin write actions: enforce MFA when admin has TOTP/email MFA configured.
+    Route::middleware(['auth:sanctum', 'mfa.admin'])->controller(AdTypeController::class)->group(function (): void {
         Route::post('/ad-types', 'store')->can('create', AdType::class);
         Route::put('/ad-types/{adType}', 'update')->can('update', 'adType');
         Route::delete('/ad-types/{adType}', 'destroy')->can('delete', 'adType');
@@ -84,18 +85,18 @@ Route::prefix('v1')->group(function (): void {
     Route::controller(CityController::class)->group(function (): void {
         Route::get('/cities', 'index');
         Route::get('/cities/{id}', 'show');
-        Route::post('/cities', 'store')->middleware('auth:sanctum')->can('create', City::class);
-        Route::put('/cities/{city}', 'update')->middleware('auth:sanctum')->can('update', 'city');
-        Route::delete('/cities/{city}', 'destroy')->middleware('auth:sanctum')->can('delete', 'city');
+        Route::post('/cities', 'store')->middleware(['auth:sanctum', 'mfa.admin'])->can('create', City::class);
+        Route::put('/cities/{city}', 'update')->middleware(['auth:sanctum', 'mfa.admin'])->can('update', 'city');
+        Route::delete('/cities/{city}', 'destroy')->middleware(['auth:sanctum', 'mfa.admin'])->can('delete', 'city');
     });
 
     // --- QUARTERS ---
     Route::controller(QuarterController::class)->group(function (): void {
         Route::get('/quarters', 'index');
         Route::get('/quarters/{id}', 'show');
-        Route::post('/quarters', 'store')->middleware('auth:sanctum')->can('create', Quarter::class);
-        Route::put('/quarters/{quarter}', 'update')->middleware('auth:sanctum')->can('update', 'quarter');
-        Route::delete('/quarters/{quarter}', 'destroy')->middleware('auth:sanctum')->can('delete', 'quarter');
+        Route::post('/quarters', 'store')->middleware(['auth:sanctum', 'mfa.admin'])->can('create', Quarter::class);
+        Route::put('/quarters/{quarter}', 'update')->middleware(['auth:sanctum', 'mfa.admin'])->can('update', 'quarter');
+        Route::delete('/quarters/{quarter}', 'destroy')->middleware(['auth:sanctum', 'mfa.admin'])->can('delete', 'quarter');
     });
 
     // --- AGENCIES ---
@@ -111,11 +112,13 @@ Route::prefix('v1')->group(function (): void {
     Route::get('/users/{identifier}/public-profile', [UserController::class, 'publicProfile'])
         ->middleware('throttle:60,1');
     Route::middleware('auth:sanctum')->controller(UserController::class)->group(function (): void {
-        Route::get('/users', 'index')->can('viewAny', User::class);
+        // Read endpoints — admin listing + show — also gated by MFA when admin has it set up.
+        Route::get('/users', 'index')->middleware('mfa.admin')->can('viewAny', User::class);
         Route::get('/users/{id}', 'show');
-        Route::post('/users', 'store')->can('create', User::class);
+        // Mutating endpoints — gated for admin (and harmless for non-admin since `mfa.admin` is a no-op there).
+        Route::post('/users', 'store')->middleware('mfa.admin')->can('create', User::class);
         Route::put('/users/{user}', 'update');
-        Route::delete('/users/{user}', 'destroy');
+        Route::delete('/users/{user}', 'destroy')->middleware('mfa.admin');
     });
 
     // --- BAILLEUR FOLLOW ---
@@ -127,7 +130,9 @@ Route::prefix('v1')->group(function (): void {
         ->middleware(['auth:sanctum', 'throttle:30,1']);
 
     // --- RECOMMENDATIONS ---
-    Route::middleware('optional.auth')->get('/recommendations', [RecommendationController::class, 'index']);
+    // Server caches per-user/guest results 10 min (RecommendationEngine::CACHE_TTL_MINUTES).
+    // CDN cache only kicks in for guests (CdnCache short-circuits when $request->user() is set).
+    Route::middleware(['optional.auth', 'cdn.cache:600'])->get('/recommendations', [RecommendationController::class, 'index']);
 
     // --- MY UNLOCKED ADS ---
     Route::middleware('auth:sanctum')->get('/my/unlocked-ads', [UserController::class, 'unlockedAds']);
@@ -217,11 +222,11 @@ Route::prefix('v1')->group(function (): void {
 
     // --- RENT ESTIMATOR (public) ---
     Route::get('/rent-estimate', [RentEstimatorController::class, 'estimate'])
-        ->middleware('throttle:30,1');
+        ->middleware(['throttle:30,1', 'cdn.cache:600']);
 
     // --- PRICE HEATMAP (public) ---
     Route::get('/price-heatmap', [PriceHeatmapController::class, 'index'])
-        ->middleware('throttle:30,1');
+        ->middleware(['throttle:30,1', 'cdn.cache:1800']);
 
     // --- NATURAL LANGUAGE SEARCH ---
     Route::post('/search/parse', [NaturalSearchController::class, 'parse'])
@@ -307,34 +312,43 @@ Route::prefix('v1')->group(function (): void {
 
     // ─── CHAT ────────────────────────────────────────────────────────────────
     Route::middleware('auth:sanctum')->group(function (): void {
+        // Per-route rate limits driven by config('chat.rate_limits') so ops
+        // can tune them without a code change. Defaults match the historical
+        // hard-coded values: 60/min send, 10/min upload, 30/min typing.
+        $sendRpm = (int) config('chat.rate_limits.send_message', 60);
+        $uploadRpm = (int) config('chat.rate_limits.upload_attachment', 10);
+        $typingRpm = (int) config('chat.rate_limits.set_typing', 30);
+        $reactionRpm = (int) config('chat.rate_limits.reaction', 60);
+        $e2eePutRpm = (int) config('chat.rate_limits.e2ee_identity_update', 20);
+
         // Conversations
-        Route::prefix('conversations')->group(function (): void {
+        Route::prefix('conversations')->group(function () use ($sendRpm, $uploadRpm, $typingRpm): void {
             Route::get('/', [ConversationController::class, 'index']);
             Route::post('/', [ConversationController::class, 'store']);
             Route::get('/unread-count', [ConversationController::class, 'unreadCount']);
             Route::get('/{uuid}', [ConversationController::class, 'show']);
             Route::get('/{uuid}/messages', [ConversationController::class, 'messages']);
             Route::post('/{uuid}/messages', [ConversationController::class, 'sendMessage'])
-                ->middleware('throttle:60,1');
+                ->middleware("throttle:{$sendRpm},1");
             Route::post('/{uuid}/attachments', [ConversationController::class, 'uploadAttachment'])
-                ->middleware('throttle:10,1');
+                ->middleware("throttle:{$uploadRpm},1");
             Route::patch('/{uuid}/read', [ConversationController::class, 'markAsRead']);
             Route::post('/{uuid}/typing', [ConversationController::class, 'setTyping'])
-                ->middleware('throttle:30,1');
+                ->middleware("throttle:{$typingRpm},1");
             Route::patch('/{uuid}/archive', [ConversationController::class, 'archive']);
         });
 
         // Chat E2EE identity (RSA public key registration — private key stays on device)
         Route::get('/my/chat-e2ee/public-key', [ChatE2eeIdentityController::class, 'show']);
         Route::put('/my/chat-e2ee/public-key', [ChatE2eeIdentityController::class, 'update'])
-            ->middleware('throttle:20,1');
+            ->middleware("throttle:{$e2eePutRpm},1");
 
         // Individual message operations
         Route::delete('/messages/{uuid}', [MessageController::class, 'destroy']);
         Route::post('/messages/{uuid}/reactions', [MessageController::class, 'addReaction'])
-            ->middleware('throttle:60,1');
+            ->middleware("throttle:{$reactionRpm},1");
         Route::delete('/messages/{uuid}/reactions', [MessageController::class, 'removeReaction'])
-            ->middleware('throttle:60,1');
+            ->middleware("throttle:{$reactionRpm},1");
 
         // FCM tokens
         Route::post('/fcm/token', [FcmTokenController::class, 'store']);

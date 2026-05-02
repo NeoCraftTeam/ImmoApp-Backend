@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Exceptions\TrustScoreConsentMissingException;
 use App\Models\User;
 use App\Services\TrustScoreService;
 use Illuminate\Console\Command;
@@ -28,7 +29,14 @@ final class RecomputeTrustScores extends Command
                 return self::FAILURE;
             }
 
-            $service->compute($user);
+            try {
+                $service->compute($user);
+            } catch (TrustScoreConsentMissingException $e) {
+                $this->error("User {$userId} has not consented to TrustScore computation.");
+
+                return self::FAILURE;
+            }
+
             $this->info("Recomputed TrustScore for {$user->email}: score={$service->getOrCompute($user)['score']}");
 
             return self::SUCCESS;

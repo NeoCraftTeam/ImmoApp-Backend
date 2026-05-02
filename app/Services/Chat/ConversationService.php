@@ -10,10 +10,13 @@ use App\Events\Chat\ConversationArchived;
 use App\Events\Chat\MessageRead;
 use App\Exceptions\Chat\ConversationNotAllowedException;
 use App\Models\Conversation;
+use App\Models\Message;
 use App\Models\UnlockedAd;
 use App\Models\User;
 use App\Support\ChatE2eeSchema;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -42,6 +45,13 @@ final readonly class ConversationService
      */
     public function findOrCreate(string $adId, string $tenantId, string $landlordId): Conversation
     {
+        // Refuse self-conversation: a landlord browsing his own ad must not
+        // be able to start a chat with himself (no business purpose, would
+        // produce broken UI states everywhere).
+        if ($tenantId === $landlordId) {
+            throw new ConversationNotAllowedException;
+        }
+
         $existing = Conversation::query()
             ->where('ad_id', $adId)
             ->where('tenant_id', $tenantId)
@@ -66,12 +76,33 @@ final readonly class ConversationService
             throw new ConversationNotAllowedException;
         }
 
-        return Conversation::create([
-            'ad_id' => $adId,
-            'tenant_id' => $tenantId,
-            'landlord_id' => $landlordId,
-            'status' => ConversationStatus::Active,
-        ]);
+        // Race-safe creation: a concurrent POST /conversations from the same
+        // tenant for the same ad may sneak between our SELECT and INSERT.
+        // The unique index on (ad_id, tenant_id) is the source of truth — on
+        // collision, fall back to returning the row that just won the race.
+        try {
+            return Conversation::create([
+                'ad_id' => $adId,
+                'tenant_id' => $tenantId,
+                'landlord_id' => $landlordId,
+                'status' => ConversationStatus::Active,
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            $winner = Conversation::query()
+                ->where('ad_id', $adId)
+                ->where('tenant_id', $tenantId)
+                ->first();
+
+            if ($winner === null) {
+                throw new ConversationNotAllowedException;
+            }
+
+            if ($winner->status === ConversationStatus::Archived) {
+                $winner->update(['status' => ConversationStatus::Active]);
+            }
+
+            return $winner;
+        }
     }
 
     /**
@@ -89,9 +120,8 @@ final readonly class ConversationService
             "CASE WHEN conversations.tenant_id = '{$userId}' THEN conversations.tenant_last_read_at ELSE conversations.landlord_last_read_at END"
         );
 
-        return Conversation::forUser($userId)
+        $paginator = Conversation::forUser($userId)
             ->with([
-                'latestMessage',
                 'ad' => function ($query): void {
                     $query->select('id', 'title', 'slug')
                         ->with(['media' => function ($mediaQuery): void {
@@ -123,6 +153,10 @@ final readonly class ConversationService
             }])
             ->orderByDesc('last_message_at')
             ->paginate($perPage);
+
+        $this->attachPreviewMessagesToConversations($paginator->getCollection());
+
+        return $paginator;
     }
 
     /**
@@ -229,6 +263,84 @@ final readonly class ConversationService
         Cache::put($cacheKey, $result, 30);
 
         return $result;
+    }
+
+    /**
+     * Load the true latest non-deleted row for ConversationResource previews (dynamic relation `previewMessage`).
+     * Laravel `latestOfMany` is not used — PostgreSQL has no aggregate MAX(uuid).
+     */
+    public function attachPreviewMessage(Conversation $conv): void
+    {
+        $msg = Message::query()
+            ->where('conversation_id', $conv->id)
+            ->whereNull('deleted_at')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->first();
+
+        $conv->setRelation('previewMessage', $msg);
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Collection<int, Conversation>  $conversations
+     */
+    private function attachPreviewMessagesToConversations(\Illuminate\Database\Eloquent\Collection $conversations): void
+    {
+        if ($conversations->isEmpty()) {
+            return;
+        }
+
+        /** @var Collection<int, string> $ids */
+        $ids = $conversations->pluck('id')->values();
+        $byConv = $this->loadPreviewMessagesKeyedByConversation($ids);
+
+        $conversations->each(function (Conversation $c) use ($byConv): void {
+            $c->setRelation('previewMessage', $byConv->get($c->id));
+        });
+    }
+
+    /**
+     * @param  Collection<int, string>  $conversationIds
+     * @return Collection<string, Message>
+     */
+    private function loadPreviewMessagesKeyedByConversation(Collection $conversationIds): Collection
+    {
+        if ($conversationIds->isEmpty()) {
+            return collect();
+        }
+
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            $latestIds = DB::table('messages')
+                ->selectRaw('DISTINCT ON (conversation_id) id')
+                ->whereIn('conversation_id', $conversationIds)
+                ->whereNull('deleted_at')
+                ->orderBy('conversation_id')
+                ->orderByDesc('created_at')
+                ->orderByDesc('id')
+                ->pluck('id');
+
+            if ($latestIds->isEmpty()) {
+                return collect();
+            }
+
+            return Message::query()->whereIn('id', $latestIds)->get()->keyBy('conversation_id');
+        }
+
+        /** @var Collection<string, Message> $out */
+        $out = collect();
+        foreach ($conversationIds as $cid) {
+            $m = Message::query()
+                ->where('conversation_id', $cid)
+                ->whereNull('deleted_at')
+                ->orderByDesc('created_at')
+                ->orderByDesc('id')
+                ->first();
+            if ($m !== null) {
+                $out->put((string) $cid, $m);
+            }
+        }
+
+        return $out;
     }
 
     /** Invalidate the unread count cache for a user. */

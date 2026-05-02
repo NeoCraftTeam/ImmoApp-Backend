@@ -9,6 +9,7 @@ use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\UnlockedAd;
 use App\Models\User;
+use App\Services\Chat\MessageService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
@@ -54,6 +55,27 @@ it('returns conversations for the authenticated user', function (): void {
         ->getJson('/api/v1/conversations')
         ->assertOk()
         ->assertJsonPath('data.0.uuid', $conv->id);
+});
+
+it('conversation list previews the latest thread message even when last_message_id is stale', function (): void {
+    ['tenant' => $tenant, 'conversation' => $conv] = makeConversationParticipants();
+    /** @var MessageService $messages */
+    $messages = app(MessageService::class);
+
+    $first = $messages->send($conv->fresh(), $tenant, 'hmm');
+    $second = $messages->send($conv->fresh(), $tenant, 'newest body');
+
+    Conversation::query()->where('id', $conv->id)->update([
+        'last_message_id' => $first->id,
+    ]);
+
+    expect($conv->fresh()->last_message_id)->toBe($first->id);
+
+    $this->actingAs($tenant)
+        ->getJson('/api/v1/conversations')
+        ->assertOk()
+        ->assertJsonPath('data.0.last_message.uuid', $second->id)
+        ->assertJsonPath('data.0.last_message.body', 'newest body');
 });
 
 it('does not return conversations belonging to other users', function (): void {

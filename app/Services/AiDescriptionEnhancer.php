@@ -6,6 +6,8 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
+use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
 
 /**
  * Multi-provider AI description enhancer.
@@ -75,15 +77,63 @@ class AiDescriptionEnhancer
 
     /**
      * Enhance a newsletter campaign body to be engaging and professional.
-     * Preserves HTML formatting. Returns the enhanced text, or the original if the call fails.
+     *
+     * Preserves a SAFE subset of HTML formatting and sanitises the LLM output via
+     * symfony/html-sanitizer so it can never inject scripts, event handlers, or
+     * iframes — even if the model is prompt-injected. Returns the original text
+     * if the call fails.
      */
     public function enhanceNewsletter(string $rawBody): string
     {
-        return $this->callWithPrompt($rawBody, $this->newsletterPrompt());
+        $enhanced = $this->callWithPrompt($rawBody, $this->newsletterPrompt());
+
+        if ($enhanced === $rawBody) {
+            return $rawBody;
+        }
+
+        return $this->sanitiseNewsletterHtml($enhanced);
     }
 
     /**
-     * Resolve the active provider config with fallback, then call the appropriate API.
+     * Strict allowlist HTML sanitiser for newsletter content.
+     *
+     * Allows only the inline tags the marketing team actually uses; everything
+     * else is stripped. Forces `rel="noopener noreferrer"` and `target="_blank"`
+     * on every link.
+     */
+    private function sanitiseNewsletterHtml(string $html): string
+    {
+        $config = (new HtmlSanitizerConfig)
+            ->allowSafeElements()
+            ->allowElement('a', ['href', 'title'])
+            ->allowElement('p')
+            ->allowElement('br')
+            ->allowElement('strong')
+            ->allowElement('em')
+            ->allowElement('ul')
+            ->allowElement('ol')
+            ->allowElement('li')
+            ->allowElement('h1')
+            ->allowElement('h2')
+            ->allowElement('h3')
+            ->allowElement('h4')
+            ->allowElement('blockquote')
+            ->allowLinkSchemes(['https', 'mailto'])
+            ->allowRelativeLinks(false)
+            ->forceAttribute('a', 'rel', 'noopener noreferrer')
+            ->forceAttribute('a', 'target', '_blank');
+
+        return (new HtmlSanitizer($config))->sanitize($html);
+    }
+
+    /**
+     * Resolve providers in order (active first, then the rest with valid keys),
+     * try each one. If a call returns a transient error (HTTP 429 / 5xx) or an
+     * empty body, fall through to the next provider. Returns original text only
+     * when ALL providers fail.
+     *
+     * Per-call provider state is local — never mutates `$this->activeProvider`
+     * (race-safe under singleton concurrency).
      */
     private function callWithPrompt(string $text, string $systemPrompt): string
     {
@@ -91,35 +141,46 @@ class AiDescriptionEnhancer
             return $text;
         }
 
-        $config = $this->providers[$this->activeProvider] ?? null;
+        $order = array_values(array_unique(array_filter([
+            $this->activeProvider,
+            ...array_keys($this->providers),
+        ])));
 
-        if ($config === null || !$this->isValidKey($config['api_key'])) {
-            foreach ($this->providers as $name => $cfg) {
-                if ($this->isValidKey($cfg['api_key'])) {
-                    $this->activeProvider = $name;
-                    $config = $cfg;
-                    break;
-                }
+        $eligible = [];
+        foreach ($order as $name) {
+            $cfg = $this->providers[$name] ?? null;
+            if ($cfg !== null && $this->isValidKey($cfg['api_key'])) {
+                $eligible[$name] = $cfg;
             }
         }
 
-        if ($config === null || !$this->isValidKey($config['api_key'])) {
+        if ($eligible === []) {
             Log::warning('AiDescriptionEnhancer: no AI provider is configured.');
 
             return $text;
         }
 
-        return $this->activeProvider === 'gemini'
-            ? $this->callGemini($text, $config, $systemPrompt)
-            : $this->callOpenAiCompatible($text, $config, $systemPrompt);
+        foreach ($eligible as $name => $config) {
+            $result = $name === 'gemini'
+                ? $this->callGemini($text, $config, $systemPrompt, $name)
+                : $this->callOpenAiCompatible($text, $config, $systemPrompt, $name);
+
+            // `null` signals a transient failure (429/5xx/network) — try the next provider.
+            if ($result !== null) {
+                return $result;
+            }
+        }
+
+        return $text;
     }
 
     /**
      * Call an OpenAI-compatible endpoint (OpenAI & Groq share the same payload format).
      *
      * @param  array{api_key: string, model: string, base_url: string}  $config
+     * @return string|null Returns null on transient failure so the caller can fail over.
      */
-    private function callOpenAiCompatible(string $text, array $config, string $systemPrompt): string
+    private function callOpenAiCompatible(string $text, array $config, string $systemPrompt, string $providerName): ?string
     {
         try {
             $response = Http::withToken($config['api_key'])
@@ -130,24 +191,37 @@ class AiDescriptionEnhancer
                         ['role' => 'system', 'content' => $systemPrompt],
                         ['role' => 'user',   'content' => $text],
                     ],
-                    'max_tokens' => 400,
+                    // Up to ~700 tokens ≈ 320 French words, enough for the
+                    // 2–3 paragraph description format and the 2-paragraph
+                    // rejection reason format. Newsletter HTML can use this
+                    // budget too.
+                    'max_tokens' => 700,
                     'temperature' => 0.7,
                 ]);
 
             if ($response->failed()) {
-                Log::warning('AI ('.$this->activeProvider.') enhancement failed', [
-                    'status' => $response->status(),
-                    'body' => $response->body(),
+                $status = $response->status();
+                Log::warning('AI ('.$providerName.') enhancement failed', [
+                    'status' => $status,
+                    'body' => substr($response->body(), 0, 200),
                 ]);
 
+                // Transient: 429 (rate limit) or 5xx (server side) → caller should fail over.
+                if ($status === 429 || $status >= 500) {
+                    return null;
+                }
+
+                // 4xx other than 429: configuration / quota error — no point retrying.
                 return $text;
             }
 
-            return trim((string) ($response->json('choices.0.message.content') ?? $text));
-        } catch (\Throwable $e) {
-            Log::error('AI ('.$this->activeProvider.') enhancement exception: '.$e->getMessage());
+            $content = trim((string) ($response->json('choices.0.message.content') ?? ''));
 
-            return $text;
+            return $content !== '' ? $content : null;
+        } catch (\Throwable $e) {
+            Log::error('AI ('.$providerName.') enhancement exception: '.$e->getMessage());
+
+            return null;
         }
     }
 
@@ -155,13 +229,17 @@ class AiDescriptionEnhancer
      * Call the Google Gemini API (different endpoint & payload structure).
      *
      * @param  array{api_key: string, model: string, base_url: string}  $config
+     * @return string|null Returns null on transient failure so the caller can fail over.
      */
-    private function callGemini(string $text, array $config, string $systemPrompt): string
+    private function callGemini(string $text, array $config, string $systemPrompt, string $providerName): ?string
     {
-        $url = $config['base_url'].'/'.$config['model'].':generateContent?key='.$config['api_key'];
+        // `x-goog-api-key` header instead of `?key=` query param so the key isn't logged
+        // by reverse proxies / CDN edges / access logs.
+        $url = $config['base_url'].'/'.$config['model'].':generateContent';
 
         try {
             $response = Http::timeout(25)
+                ->withHeaders(['x-goog-api-key' => $config['api_key']])
                 ->post($url, [
                     'system_instruction' => [
                         'parts' => [['text' => $systemPrompt]],
@@ -170,25 +248,33 @@ class AiDescriptionEnhancer
                         ['parts' => [['text' => $text]]],
                     ],
                     'generationConfig' => [
-                        'maxOutputTokens' => 400,
+                        // See OpenAI-compat call above for rationale.
+                        'maxOutputTokens' => 700,
                         'temperature' => 0.7,
                     ],
                 ]);
 
             if ($response->failed()) {
-                Log::warning('AI (gemini) enhancement failed', [
-                    'status' => $response->status(),
-                    'body' => $response->body(),
+                $status = $response->status();
+                Log::warning('AI ('.$providerName.') enhancement failed', [
+                    'status' => $status,
+                    'body' => substr($response->body(), 0, 200),
                 ]);
+
+                if ($status === 429 || $status >= 500) {
+                    return null;
+                }
 
                 return $text;
             }
 
-            return trim((string) ($response->json('candidates.0.content.parts.0.text') ?? $text));
-        } catch (\Throwable $e) {
-            Log::error('AI (gemini) enhancement exception: '.$e->getMessage());
+            $content = trim((string) ($response->json('candidates.0.content.parts.0.text') ?? ''));
 
-            return $text;
+            return $content !== '' ? $content : null;
+        } catch (\Throwable $e) {
+            Log::error('AI ('.$providerName.') enhancement exception: '.$e->getMessage());
+
+            return null;
         }
     }
 
@@ -216,31 +302,45 @@ Tu es un rédacteur spécialisé UNIQUEMENT en annonces immobilières pour la pl
 
 TON UNIQUE RÔLE : améliorer la description d'une annonce immobilière fournie par un propriétaire. Tu ne fais RIEN d'autre.
 
+STRUCTURE ATTENDUE (très important) :
+- Produis 2 à 3 PARAGRAPHES distincts, séparés par UNE ligne vide.
+- 1er paragraphe — VUE D'ENSEMBLE : le bien, sa nature, sa localisation telle que mentionnée, en 2 à 4 phrases.
+- 2e paragraphe — INTÉRIEUR & ESPACES : pièces, surface, agencement, finitions, équipements REELS, en 3 à 5 phrases.
+- 3e paragraphe (facultatif si suffisamment d'éléments) — ENVIRONNEMENT & ATOUTS : sécurité, accès, voisinage, commodités proches, public cible, en 2 à 4 phrases.
+
 RÈGLES STRICTES :
-- Rédige UNIQUEMENT en français, de façon professionnelle, claire et attrayante.
-- Tu ne dois JAMAIS inventer, ajouter ou supposer des informations qui ne sont PAS présentes dans le texte original (pas de nombre de pièces inventé, pas d'équipements fictifs, pas de quartier deviné, pas de prix inventé).
-- Conserve TOUTES les informations factuelles fournies par le propriétaire, sans en omettre ni en modifier aucune.
-- Mets en valeur les atouts réels du bien mentionnés dans le texte : espace, luminosité, accès, sécurité, commodités, etc.
-- Tu peux reformuler, réorganiser et embellir le style d'écriture, mais le contenu factuel doit rester identique.
-- Longueur optimale : 80 à 200 mots maximum.
-- Renvoie UNIQUEMENT la description améliorée, sans titre, sans introduction, sans explication, sans commentaire.
+- Rédige UNIQUEMENT en français, de façon naturelle, humaine et engageante (comme un agent immobilier expérimenté qui parle à un client sérieux).
+- N'INVENTE JAMAIS de fait : nombre de pièces, équipements, quartier, prix, distances, surfaces. Si une information manque, ne la mentionne tout simplement pas.
+- Conserve 100 % des informations factuelles fournies par le propriétaire, sans rien omettre.
+- Style : phrases fluides, vocabulaire varié, ton chaleureux et professionnel. Évite les superlatifs creux ("incroyable", "exceptionnel", "rêve") et les formules marketing trompeuses.
+- Longueur cible : 180 à 320 mots au total (≈ 60 à 110 mots par paragraphe).
+- Renvoie UNIQUEMENT le texte amélioré, sans titres de paragraphes ("VUE D'ENSEMBLE :" interdit), sans introduction, sans explication, sans commentaire après.
 - Si le texte fourni n'est manifestement PAS une description immobilière (hors sujet, spam, contenu inapproprié), renvoie le texte original tel quel sans modification.
-- N'ajoute PAS de formules marketing exagérées ou trompeuses.
-- N'utilise PAS de hashtags, d'emojis ou de mise en forme spéciale.
+- N'utilise PAS de hashtags, d'emojis, de listes à puces ni de balisage HTML/Markdown — texte brut uniquement.
 PROMPT;
     }
 
     private function rejectionReasonPrompt(): string
     {
-        return "Tu es un modérateur professionnel pour la plateforme immobilière KeyHome (Afrique centrale).\n"
-            ."Ton rôle est de reformuler un motif de refus d'annonce pour qu'il soit clair, professionnel et respectueux envers le propriétaire.\n"
-            ."Règles :\n"
-            ."- Rédige en français, de façon polie et constructive.\n"
-            ."- Explique clairement pourquoi l'annonce est refusée.\n"
-            ."- Indique quelles corrections le propriétaire doit apporter pour soumettre à nouveau.\n"
-            ."- Conserve toutes les raisons mentionnées, sans en inventer.\n"
-            ."- Longueur optimale : 30 à 100 mots.\n"
-            .'- Renvoie uniquement le motif reformulé, sans introduction ni explication.';
+        return <<<'PROMPT'
+Tu es un modérateur professionnel pour la plateforme immobilière KeyHome (Afrique centrale, principalement Cameroun).
+
+TON RÔLE : transformer un motif de refus brut (rédigé par un admin pressé) en un message structuré, clair et constructif destiné au propriétaire qui a publié l'annonce.
+
+STRUCTURE ATTENDUE (très important) :
+- Produis 2 paragraphes courts, séparés par UNE ligne vide.
+- 1er paragraphe — DIAGNOSTIC : explique poliment pourquoi l'annonce a été refusée, en reprenant fidèlement les raisons fournies (2 à 4 phrases).
+- 2e paragraphe — ACTIONS : liste précisément ce que le propriétaire doit corriger (photos manquantes, description trop courte, prix incohérent, document à fournir, etc.) puis comment soumettre à nouveau (2 à 4 phrases).
+
+RÈGLES STRICTES :
+- Rédige UNIQUEMENT en français, sur un ton respectueux, factuel et bienveillant (jamais accusatoire ni condescendant).
+- N'invente JAMAIS de motif ou d'exigence non mentionnés dans le texte fourni.
+- Conserve TOUTES les raisons mentionnées par l'admin, sans en omettre aucune.
+- Termine sur une note constructive ("Nous restons à votre disposition…", "N'hésitez pas à…") MAIS sans formule de politesse longue.
+- Longueur cible : 80 à 180 mots au total.
+- Renvoie UNIQUEMENT le motif reformulé, sans titre de paragraphe, sans intro, sans signature, sans commentaire.
+- N'utilise PAS de hashtags, d'emojis, de listes à puces ni de balisage HTML/Markdown — texte brut uniquement.
+PROMPT;
     }
 
     private function newsletterPrompt(): string

@@ -9,6 +9,7 @@ use App\Enums\PaymentStatus;
 use App\Enums\ReservationStatus;
 use App\Enums\TrustScoreTier;
 use App\Enums\UserRole;
+use App\Exceptions\TrustScoreConsentMissingException;
 use App\Models\Review;
 use App\Models\TentativeReservation;
 use App\Models\TrustScore;
@@ -40,6 +41,17 @@ final readonly class TrustScoreService implements TrustScoreServiceInterface
 {
     private const int CACHE_TTL = 3600; // 1 hour
 
+    /**
+     * Maximum number of ads sampled per landlord when computing the avg KeyScore.
+     * Sampling the top-N most recently updated ads keeps trust-score recompute
+     * bounded for landlords with thousands of ads (and the ranked sample is
+     * representative of the landlord's current quality).
+     */
+    private const int LANDLORD_AD_QUALITY_SAMPLE = 25;
+
+    /** TTL for the per-ad KeyScore cache used by the landlord trust score. */
+    private const int LANDLORD_AD_QUALITY_CACHE_TTL = 3600;
+
     public function __construct(
         private KeyScoreService $keyScoreService,
     ) {}
@@ -47,10 +59,24 @@ final readonly class TrustScoreService implements TrustScoreServiceInterface
     /**
      * Compute and persist the trust score for a user.
      *
+     * Service-layer consent enforcement: refuses to compute when the user
+     * has not explicitly opted in (`trust_score_consent !== true`). This
+     * means CLI commands like `php artisan app:recompute-trust-scores --user=X`
+     * cannot bypass the GDPR opt-in either.
+     *
+     *
      * @return array{score: int, tier: TrustScoreTier, breakdown: array<string, mixed>, label: string}
+     *
+     * @throws TrustScoreConsentMissingException
      */
     public function compute(User $user): array
     {
+        if ($user->trust_score_consent !== true) {
+            throw new TrustScoreConsentMissingException(
+                'Le calcul du score de confiance nécessite le consentement explicite de l\'utilisateur.',
+            );
+        }
+
         $roleContext = $this->resolveRoleContext($user);
 
         $breakdown = $roleContext === 'landlord'
@@ -288,7 +314,16 @@ final readonly class TrustScoreService implements TrustScoreServiceInterface
 
     private function scoreLandlordAdQuality(User $user): array
     {
-        $ads = $user->ads()->where('status', 'available')->get();
+        // Only fetch the columns KeyScoreService needs (instead of full models)
+        // and cap the candidate set so trust-score recompute stays bounded even
+        // for very large landlords. KeyScore per ad is cached for 1h via
+        // `KeyScoreService::compute()` (Cache::remember inside the service),
+        // so the worst case is a 1h-spread cold compute pass.
+        $ads = $user->ads()
+            ->where('status', 'available')
+            ->latest('updated_at')
+            ->limit(self::LANDLORD_AD_QUALITY_SAMPLE)
+            ->get();
 
         if ($ads->isEmpty()) {
             return ['score' => 0, 'max' => 15, 'label' => 'Qualité annonces', 'value' => 'Aucune annonce', 'tip' => 'Publiez des annonces de qualité avec photos et descriptions détaillées.'];
@@ -296,8 +331,13 @@ final readonly class TrustScoreService implements TrustScoreServiceInterface
 
         $totalKeyScore = 0;
         foreach ($ads as $ad) {
-            $keyScore = $this->keyScoreService->compute($ad);
-            $totalKeyScore += $keyScore['score'];
+            $cacheKey = 'key_score:'.$ad->id.':'.$ad->updated_at?->timestamp;
+            $score = Cache::remember(
+                $cacheKey,
+                self::LANDLORD_AD_QUALITY_CACHE_TTL,
+                fn (): int => (int) ($this->keyScoreService->compute($ad)['score'] ?? 0),
+            );
+            $totalKeyScore += $score;
         }
 
         $avgKeyScore = $totalKeyScore / $ads->count();

@@ -28,6 +28,10 @@ final class LoginRequest extends FormRequest
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
             'login_context' => ['sometimes', 'string', 'in:owner,client'],
+            // Cloudflare Turnstile token. Optional: validated only when the
+            // service is configured (TURNSTILE_SECRET_KEY set). Server-side
+            // verification happens in LoginService.
+            'turnstile_token' => ['nullable', 'string', 'max:2048'],
         ];
     }
 

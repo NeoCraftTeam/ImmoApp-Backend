@@ -21,6 +21,8 @@ return [
         'send_message' => 60,
         'upload_attachment' => 10,
         'set_typing' => 30,
+        'reaction' => 60,
+        'e2ee_identity_update' => 20,
     ],
 
     /*

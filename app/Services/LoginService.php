@@ -23,7 +23,10 @@ use Laravel\Sanctum\NewAccessToken;
 
 final readonly class LoginService
 {
-    public function __construct(private TokenService $tokenService) {}
+    public function __construct(
+        private TokenService $tokenService,
+        private TurnstileService $turnstile,
+    ) {}
 
     /**
      * Authenticate a user from a login request.
@@ -43,6 +46,24 @@ final readonly class LoginService
         $key = 'login-attempts:'.$request->ip().'|'.mb_strtolower((string) $email);
 
         $this->checkRateLimit($key, $request, $email);
+
+        // Cloudflare Turnstile — verify only when configured. Wrong/missing
+        // token rejects the login with the same generic message as bad creds
+        // so attackers can't probe whether CAPTCHA is enabled.
+        if (
+            $this->turnstile->isConfigured()
+            && !$this->turnstile->verify(
+                $request->input('turnstile_token'),
+                $request->ip(),
+            )
+        ) {
+            RateLimiter::hit($key, 300);
+            Log::info('Login rejected: Turnstile verification failed', [
+                'ip' => $request->ip(),
+                'email' => $email,
+            ]);
+            throw new AuthenticationException('Identifiants invalides.');
+        }
 
         $user = User::where('email', $email)->first();
 
