@@ -32,6 +32,8 @@ Frontend → origin  = GitLab (neocraft/keyhome-next)
 
 ## Build & Run
 
+**Convention équipe : ne pas utiliser Laravel Sail** pour les commandes locales — exécuter `php`, `composer`, `npm` et les binaires `vendor/bin/*` directement (voir `.cursor/rules/no-sail.mdc`).
+
 ```bash
 # Install dependencies
 composer install
@@ -243,7 +245,7 @@ vendor/bin/rector process --dry-run
   - **Required env var**: `NEXT_PUBLIC_GOOGLE_CLIENT_ID` — same Google Client ID configured in Clerk dashboard for Google OAuth provider.
   - **E2E tests**: `e2e/google-one-tap.spec.ts` — 9 tests (3 skipped without `NEXT_PUBLIC_GOOGLE_CLIENT_ID`). Covers: GSI script presence/absence on `/login` and `/owner/login`, mocked credential callback, mobile layout regression, social buttons coexistence.
   - **Known gotcha**: `/se connecter/i` regex in Playwright tests matches both "Se connecter" (submit) and "Se connecter avec une Passkey" — always use `{ name: 'Se connecter', exact: true }` in E2E button locators.
-  - **CSP requirements** (all in `src/proxy.ts` `buildCsp()`): `script-src`, `style-src`, `connect-src`, `frame-src`, and `img-src` must all include `https://accounts.google.com`. `img-src` also needs `https://lh3.googleusercontent.com` for user avatars. Missing any of these produces a CSP violation for the respective GSI resource.
+  - **CSP requirements** — allowlists are centralized in `keyhome-frontend-next/src/lib/csp-allowlist.ts` and applied in `src/proxy.ts` `buildCsp()` (per-request nonce). `connect-src` must include `https://*.googleapis.com` / `wss://*.googleapis.com` (Firebase Installations, FCM, etc.), `https://www.gstatic.com`, Vercel Speed Insights (`vitals.vercel-insights.com`), Sentry (`*.sentry.io`), R2 `https://*.r2.cloudflarestorage.com`, dev Reverb `ws://localhost:8080`, and app hosts (`*.keyhome.app`, `*.keyhome.cm`, `*.neocraft.dev`). Keep `https://accounts.google.com` + `lh3.googleusercontent.com` for GSI/avatars. When adding a third-party SDK, extend `csp-allowlist.ts`—avoid duplicating origins only in `proxy.ts`.
   - **DuckDuckGo / privacy browsers**: content blockers block `play.google.com/log` and the One Tap iframe. This is browser-level and cannot be fixed in code. Always test One Tap in Chrome or Firefox with an active Google session.
   - **`unregistered_origin`**: if One Tap shows `[GoogleOneTap] Not displayed: unregistered_origin`, add `http://localhost` and `http://localhost:3000` to **Authorized JavaScript origins** in [Google Cloud Console](https://console.cloud.google.com/apis/credentials) for the OAuth Client ID.
   - **FedCM migration**: GSI emits a warning that `isNotDisplayed()` / `isSkippedMoment()` prompt notification methods will stop working when FedCM becomes mandatory. Non-blocking for now; revisit when Google announces enforcement date.
@@ -888,7 +890,9 @@ All other code (`usePresence`, `useChat`, `useConversations`, `ChatNotificationL
 
 **Broadcasting auth routes:**
 - `POST /broadcasting/auth` — web middleware (session auth, used by Filament panels)
-- `POST /api/v1/broadcasting/auth` — api middleware + `auth:sanctum` (Bearer token, used by Next.js PWA)
+- `POST /api/v1/broadcasting/auth` — api middleware + `auth:sanctum` (Bearer when Sanctum PAT is in memory, **or** session cookie via `credentials: 'include'`, used by Next.js PWA)
+
+**Echo private-channel auth (May 2026)** — Real-time broke for users authenticated **only** via Laravel session cookie (no in-memory Sanctum token): the old `customHandler` skipped `/broadcasting/auth` when `getAuthToken()` was null, so no private subscriptions. Fix: always `fetch` `/api/v1/broadcasting/auth` with `credentials: 'include'`; add `Authorization: Bearer` only for PAT-shaped tokens (`shouldUseBearerForBroadcastAuth` in `echo.ts` — omits Clerk-like JWTs so Sanctum does not treat them as PATs). Dev `console.warn` if `NEXT_PUBLIC_REVERB_APP_KEY` or `NEXT_PUBLIC_REVERB_HOST` is unset.
 
 **Test results:** 776 passed, 0 failed. PHPStan [OK]. Pint [OK]. TypeScript `tsc --noEmit` clean.
 
@@ -1139,3 +1143,98 @@ Both tunings are documented in `docs/REVERB_DEPLOY.md` under "Kernel & runtime t
 - **Vercel build**: runs `tsc --noEmit` as part of Next.js production build. TypeScript errors fail the build even if ESLint passes. Always check that interface changes don't break downstream callers.
 - **`test_unit` job (coverage)**: Coverage thresholds have been **removed** from `vitest.config.ts`. The job passes/fails based on test results only. Coverage is still collected and reported (reporters: text, json, html, lcov, cobertura) as CI artifacts — do NOT re-add `thresholds` until the test suite has meaningful coverage.
 - **`build:preprod` + `deploy:preprod` removed**: Vercel handles `cedrickdev` preview deployments automatically. `build:check` (`npm run build`) runs on all non-`main` branches including `cedrickdev` as the quality gate. The `VERCEL_TOKEN`/`VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` variables are only needed for `main` (production deploy).
+
+### Session — Chat Parity Modernization (May 2026)
+
+Full-parity sweep aligning the chat UX with WhatsApp / Messenger while keeping the KeyHome accent split (pink client `#F6475F`, teal owner `#0D9488`). Touches every layer (DB, services, events, routes, hooks, components).
+
+**`POST /api/v1/conversations` serialization** — `ConversationResource` formats `last_message_at`, `other_participant.last_seen_at`, and `last_message.sent_at` via `toIso8601OrNull()` (accepts `DateTimeInterface`, parses ISO strings, never calls `->toIso8601String()` on a bare string). Prevents intermittent HTTP 500 when building the find-or-create response if a timestamp bypasses Eloquent casts (e.g. partial relation loads or legacy rows).
+
+**Owner panel symmetry** — `OwnerLayoutClient.tsx` now mounts `GlobalPresenceChannel` + `ChatNotificationListener` (with teal `accentColor="#0D9488"`) and switches to a `100dvh` + `position: absolute, inset: 0` shell on `/owner/messages*` so the chat fills the viewport on mobile (matching the dashboard layout treatment). The owner navbar / bottom nav are hidden on the conversation detail screen for an immersive view. Without this, owner users had no global presence, no toast on incoming messages, no live unread badge, and a broken mobile message list.
+
+**Real-time hardening (backend)** —
+- `MessageRead` switched from `ShouldBroadcast` (queued) to `ShouldBroadcastNow` for parity with `MessageSent` / `MessageDeleted`.
+- `MessageRead`, `MessageDeleted`, `MessageReactionAdded/Removed`, `ConversationArchived` all broadcast with `->toOthers()` so the sender no longer receives their own events.
+- `MessageService::delete` now realigns `conversations.last_message_id` to the most recent non-deleted message in the same transaction (with `lockForUpdate`) — fixes the dangling pointer that left `last_message=null` on the conversation list.
+- `SendChatPushNotificationJob` treats `UserRole::ADMIN` like `AGENT` for the deep-link base path (`/owner/messages/`) — admins were silently routed to the client panel.
+
+**Real-time hardening (frontend)** —
+- `src/lib/api.ts` — synchronous request interceptor attaches `X-Socket-Id` from `getEchoSocketId()` so Laravel `->toOthers()` can correctly exclude the sender on every chat write. Also adds `/auth/refresh` and `/broadcasting/auth` to `AUTH_ROUTES` so a 401 there does NOT fire the global `kh:auth-expired` event.
+- `useChat.ts` — `handleSendMessage` deps reduced to `[conversationUuid, user, updateCache, queryClient]`; the latest values for `connectionState` and `stopTyping` are read via `connectionStateRef` / `stopTypingRef`. Avoids re-creating the callback on every state change.
+- `useChat.ts` — auto mark-as-read now listens to both `window.focus` AND `document.visibilitychange` (Page Visibility API), so PWAs returning from background mark-read without needing a fresh focus event.
+- `ChatNotificationListener.tsx` — bind loop wrapped in a race-safe `tryBindOne(uuid, attempts)` retry (50 ms × 20) mirroring the pattern in `useChat`/`useConversations`. The previous synchronous read of `(echoChannel as any).subscription` could silently miss `message.sent` events on the first render.
+- `useTypingIndicator.ts` — `STOP_AFTER_MS` raised from `1000` to `3000` (matches WhatsApp / iMessage). Documentation aligned with the code.
+- Bounce easings `cubic-bezier(0.34, 1.36, 0.64, 1)` removed from `MessageBubble.tsx` and `ChatWindow.tsx` (banned by repo design rules) — both now use the standard out-quint `(0.22, 1, 0.36, 1)`.
+
+**Attachment ownership validation** — `AttachmentService::belongsToConversation($url, $conversationId)` returns true only when the `url` starts with `chats/{conversationId}/`. `MessageService::send` calls it for every attachment and `abort(422)` if any URL belongs to another conversation. Defence in depth: the form request validates the structure, this check enforces the ownership contract.
+
+**GIF & audio policy** — `AttachmentService::IMAGE_MIMES` now includes `image/gif` (modern UX). New `AttachmentService::AUDIO_MIMES` constant covers `audio/{webm,mp4,mpeg,mp3,ogg,wav}`. `UploadAttachmentRequest` accepts `gif` + audio extensions. `SendMessageRequest` adds `audio` to `attachments.*.type` and `attachments.*.mime_type`, plus optional `audio_duration_ms` (100–120000) and `audio_waveform_peaks` (array of 0..1 floats, max 120) for voice notes.
+
+**ConversationArchived event** — new event class `app/Events/Chat/ConversationArchived.php` (`ShouldBroadcastNow` + `toOthers()`) on `private-conversation.{id}` with alias `conversation.archived`. `ConversationService::archive` is now idempotent and broadcasts only when the status transitions to `Archived`.
+
+**Reactions** — full feature pass:
+- Migration `2026_05_01_183513_create_message_reactions_table.php` — UUID PK, FKs cascade-delete on `messages` / `users`, unique `(message_id, user_id, emoji)`, indexes on both FKs.
+- Model `App\Models\MessageReaction` (HasUuids, no timestamps trait — single `created_at` only).
+- Service `App\Services\Chat\ReactionService` — `add` (idempotent: same emoji from same user is a no-op) / `remove` (returns true if a row was deleted). Both broadcast `MessageReactionAdded` / `MessageReactionRemoved` with `toOthers()` after the DB write succeeds.
+- Routes (under `auth:sanctum` + `throttle:60,1`):
+  - `POST /api/v1/messages/{uuid}/reactions` body `{emoji}`
+  - `DELETE /api/v1/messages/{uuid}/reactions` body `{emoji}`
+- `MessageController` got `addReaction` / `removeReaction` actions, both wired through `App\Http\Requests\Chat\ReactionRequest` (`emoji`: required string max 16).
+- `MessageResource` exposes `reactions: Array<{emoji, count, user_ids[]}>` when the relation is eager-loaded. `MessageService::getHistory` eager-loads `reactions:id,message_id,user_id,emoji`.
+- Frontend: `useChat.toggleReaction(uuid, emoji)` performs an optimistic mutation (add or remove on the cached `Message.reactions`), then POSTs/DELETEs and rolls back on failure. WebSocket subscriptions to `message.reaction.added` / `message.reaction.removed` apply remote changes (deduped on user_id).
+- UI: `ReactionPicker` (long-press picker + 6 default emojis: ❤️ 👍 😂 😮 😢 🙏) + reaction pills under each bubble (mine highlighted with accent ring). New `Smile` button in the desktop hover toolbar opens the same picker. Long-press now opens the picker (replaces the prior "long-press = reply"); reply is still accessible via the swipe-to-reply gesture below.
+
+**Read receipts visual** — `MessageBubble.StatusIcon` already mapped statuses to `Clock` / `Check` / `CheckCheck` / accent-coloured `CheckCheck`. The `useChat` `messages.read` listener marks the sender's bubbles as `read` + sets `read_at` so the tick turns accent-colored on the same Reverb tick as the recipient's mark-read.
+
+**Sticky day separator** — `ChatWindow.tsx` derives a `stickyDate` from the first virtualized item that's at or below `scrollTop`, walks back to the most recent `'separator'` item, and renders a glass-pill ("Aujourd'hui" / "Hier" / "12 mars 2026") above the message list. The pill fades in only while scrolling (`isScrolling` toggled by an 800 ms idle timer) — WhatsApp / iMessage behaviour without needing a real CSS-sticky inside the virtualizer.
+
+**Swipe-to-reply** — `MessageBubble` `onTouchStart/Move/End` handlers track horizontal drag distance vs vertical (axis lock at 10 px). When the user swipes ≥ 60 px in the WhatsApp direction (right on others' messages, left on own), the `onReply(message)` callback fires. A reply icon hint fades in proportionally to the swipe progress. Long-press on the same bubble still opens the reaction picker — both gestures coexist.
+
+**Multi-attachment compose** — `MessageInput` was rewritten around a `pending: PendingItem[]` state (max 5). Each item carries its own `previewUrl`, `attachment` (server-confirmed), and `uploadProgress` so multiple files upload in parallel with independent progress bars. Removed the single-file flag (`pendingFile` etc.) entirely. The "+" tile inside the preview row offers another file picker as long as `pending.length < 5`. The send button is gated on `stillUploading === false`.
+
+**Voice notes (WhatsApp-style)** — new `MessageInput` mic button (visible when there's nothing to send) opens `VoiceRecorder`:
+- MediaRecorder API with feature-detected MIME (priority `audio/webm;codecs=opus` → fallbacks). 2-min hard cap with periodic ticker.
+- On stop, decodes the blob via `AudioContext.decodeAudioData` and reduces the channel data to 40 normalised peaks (0..1) for the waveform.
+- Uploads as a regular attachment, then enriches the descriptor with `type: 'audio'`, `audio_duration_ms`, `audio_waveform_peaks` and feeds it to the existing pending-attachment row, ready to send.
+- `VoicePlayer` (`MessageBubble` → `AttachmentPreview`): circular play/pause button + bar waveform with played-vs-remaining colouring + drag-to-scrub on the track + tabular `mm:ss` countdown. Falls back to a plain progress bar when no peaks are available.
+
+**Mobile keyboard handling (iOS)** — new hook `useVisualViewportInset()` reads `window.visualViewport` and returns the bottom-inset in CSS pixels. `MessageInput` applies `transform: translateY(-${inset}px)` so the bar sits above the on-screen keyboard. When the keyboard hides, the bar restores its safe-area inset.
+
+**Cleanup** — `ChatPageWrapper.tsx` deleted (no consumers left). `chat-api.ts::setTyping` REST helper removed (typing flows through Pusher whispers in `useTypingIndicator`).
+
+**New events alias map (cumulative):** `message.sent`, `messages.read`, `message.deleted`, `message.reaction.added`, `message.reaction.removed`, `conversation.archived`, `client-typing` (whisper).
+
+**New tests:**
+- `tests/Feature/Chat/ChatRealtimeBroadcastTest.php` (9) — `MessageRead` is `ShouldBroadcastNow`, `MessageDeleted` broadcasts on delete, `last_message_id` realign (with previous + null fallback), `ConversationArchived` broadcast + idempotency, attachment ownership validation (rejects foreign URL, accepts scoped one), `MessageSent` regression.
+- `tests/Feature/Chat/MessageReactionTest.php` (7) — add / dedup / outsider 404 / remove (toggle off) / no-op on absent / empty emoji 422 / >16 chars 422.
+- `keyhome-frontend-next/src/tests/hooks/useTypingIndicator.test.ts` (3) — 100 ms debounce, 3 s stop, `stopTyping()` cancels.
+- `keyhome-frontend-next/src/tests/components/OnlineStatus.test.tsx` (6) — `formatLastSeenShort` helper for all 6 time windows.
+
+**Files changed (backend):**
+`app/Events/Chat/{ConversationArchived,MessageRead,MessageReactionAdded,MessageReactionRemoved}.php` (new), `app/Events/Chat/MessageRead.php` (broadcast type), `app/Http/Controllers/Api/V1/MessageController.php`, `app/Http/Requests/Chat/{ReactionRequest,SendMessageRequest,UploadAttachmentRequest}.php`, `app/Http/Resources/Chat/{ConversationResource,MessageResource}.php`, `app/Jobs/SendChatPushNotificationJob.php`, `app/Models/{Message,MessageReaction}.php`, `app/Services/Chat/{AttachmentService,ConversationService,MessageService,ReactionService}.php`, `database/migrations/2026_05_01_183513_create_message_reactions_table.php`, `routes/api.php`, plus the two new test files.
+
+**Files changed (frontend):**
+`src/components/owner/OwnerLayoutClient.tsx` (presence + chat notif + mobile messages layout), `src/lib/api.ts` (X-Socket-Id interceptor + AUTH_ROUTES), `src/proxy.ts` (CSP: Firebase connect-src, R2 `cloudflarestorage`, dev Reverb `ws://localhost:8080` + matching `wss`/`ws` for `NEXT_PUBLIC_REVERB_HOST`), `src/lib/chat-api.ts` (reactions endpoints + setTyping removed), `src/types/chat.ts` (audio + reactions), `src/hooks/{useChat,useTypingIndicator,useVisualViewportInset}.ts`, `src/components/chat/{ChatNotificationListener,ChatWindow,MessageBubble,MessageInput,ReactionPicker,VoiceRecorder,VoicePlayer,OnlineStatus,AttachmentPreview}.tsx`, removed `src/components/chat/ChatPageWrapper.tsx`, plus the two new vitest files.
+
+**Test results:**
+- Backend: chat suite (`tests/Feature/Chat/*`) — 50 passed (94 assertions). Pint clean.
+- Frontend: `npx tsc --noEmit` clean. New vitest specs: 9 passed (9 assertions). `npm run build` succeeds (Turbopack, 91 routes generated).
+
+### Chat audit hardening (May 2026)
+
+- **`reply_to_id`** — `SendMessageRequest` scopes `exists(messages.id)` to `conversation_id` = route `uuid` so replies cannot point at another thread.
+- **Archived conversations** — `MessageService::send` and `ConversationController::uploadAttachment` return **422** if `status === archived` (find-or-create from an ad still reopens archived threads for new contact).
+- **`MarkConversationReadJob`** — dispatched only when `GET …/messages` has no `cursor` (first page); pagination no longer spawns duplicate jobs / broadcasts.
+- **FCM** — `SendChatPushNotificationJob` skips soft-deleted messages.
+- **Frontend** — `src/lib/chat-subscriptions.ts`: at most **40** private channels for global listeners; **unread** threads prioritized. Used by `ChatNotificationListener` and `useConversations` (prefetch top 3 uses same ordering). `useChat`: `CHAT_MESSAGES_STALE_MS` (23 h) + `refetchOnWindowFocus` + refetch **merges** loaded older pages and preserves optimistic rows; renews R2 `signed_url` before default 24 h TTL. `VoicePlayer` doc aligned with server TTL.
+- **Tests** — `ConversationControllerTest`: reply cross-conversation 422, archived send/upload 422, mark-read job not duplicated on cursor page.
+
+### Chat E2EE (text, May 2026)
+
+- **Model** — Hybrid: default messages still use server `CHAT_ENCRYPTION_KEY` (`EncryptionService`). Optional **client-sealed** messages (`is_client_sealed`): AES-GCM plaintext on the client, opaque `body` / `body_iv` on the server (no server decrypt). Attachments/voice remain **server-encrypted** only (sealed branch rejects attachments in `SendMessageRequest`).
+- **Identity** — `users.chat_e2ee_public_key_pem`; `GET`/`PUT` `/api/v1/my/chat-e2ee/public-key` (`ChatE2eeIdentityController`). `UserResource` exposes PEM to the owning user only.
+- **Session keys** — `conversations.e2ee_wrapped_key_tenant` / `e2ee_wrapped_key_landlord` (RSA-OAEP--wrapped AES-256). First sealed message in a thread **must** send `e2ee_wrapped_keys`; later messages omit. `ConversationResource` includes `e2ee.tenant_public_key_pem`, `landlord_public_key_pem`, `wrapped_conversation_key_b64` (recipient-specific), `both_keys_registered`, `session_ready`.
+- **Realtime & pushes** — `MessageSent` / `MessageResource`: no plaintext `body` when sealed; `e2ee` carries ciphertext + iv. `NewMessageNotification` + FCM use a generic “message sécurisé” preview for sealed rows.
+- **Frontend** — `src/lib/chat-e2ee-crypto.ts` (WebCrypto RSA-OAEP-256 + AES-GCM), `chat-e2ee-identity.ts` + `AuthProvider` bootstrap; `useChat` accepts `conversation`, seals text when both participants have registered keys, decrypts into `decrypted_body`; offline queue replays with **server** encryption (`skipE2ee`). **Risk:** E2EE private key in `localStorage` (XSS); cross-device requires new identity / lost history for that thread.
+
+**Tests:** `tests/Feature/Chat/ChatE2eeTest.php` (identity API, first/follow-up sealed send, missing key 422, broadcast payload, conversation resource PEMs).
