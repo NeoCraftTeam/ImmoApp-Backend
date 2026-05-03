@@ -134,6 +134,7 @@ final class SendChatPushNotificationJob implements ShouldQueue
                     'TTL' => '86400',
                 ],
                 'notification' => [
+                    'title' => $title,
                     'icon' => '/icons/icon-192x192.png',
                     'badge' => '/icons/icon-192x192.png',
                     'tag' => 'chat-'.$message->conversation_id,

@@ -292,7 +292,9 @@ class Ad extends Model implements HasMedia
             return true;
         }
 
-        return (bool) preg_match('/meubl/i', (string) ($this->ad_type?->name ?? ''));
+        $typeName = $this->ad_type !== null ? $this->ad_type->name : '';
+
+        return (bool) preg_match('/meubl/i', (string) $typeName);
     }
 
     public function toSearchableArray(): array

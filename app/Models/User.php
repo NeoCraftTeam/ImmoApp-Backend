@@ -539,7 +539,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         $mediaUrl = $this->getFirstMediaUrl('avatars');
         $raw = ($mediaUrl !== '' && $mediaUrl !== '0') ? $mediaUrl : $this->avatar;
 
-        return ChatAvatarUrl::resolve($raw !== null && $raw !== '' ? (string) $raw : null);
+        return ChatAvatarUrl::resolve($raw !== '' && $raw !== '0' ? $raw : null);
     }
 
     public function getAppAuthenticationSecret(): ?string
