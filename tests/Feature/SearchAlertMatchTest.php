@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 use App\Enums\AdStatus;
 use App\Jobs\MatchSearchAlertsForAdJob;
+use App\Jobs\SendSearchAlertInstantNotificationJob;
 use App\Models\Ad;
 use App\Models\AdType;
 use App\Models\Quarter;
 use App\Models\SearchAlert;
+use App\Models\SearchAlertMatch;
 use App\Models\User;
+use App\Notifications\SearchAlertMatchNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
@@ -33,7 +36,7 @@ it('does not dispatch job for non-available status changes', function (): void {
     Queue::assertNotPushed(MatchSearchAlertsForAdJob::class);
 });
 
-it('buffers a match into search_alert_matches when criteria match', function (): void {
+it('buffers a match and sends an instant notification when criteria match', function (): void {
     Notification::fake();
 
     $quarter = Quarter::factory()->create();
@@ -46,6 +49,8 @@ it('buffers a match into search_alert_matches when criteria match', function ():
         'city_id' => $quarter->city_id,
         'type_id' => $adType->id,
         'is_active' => true,
+        'notify_email' => true,
+        'notify_push' => true,
     ]);
 
     $ad = Ad::factory()->create([
@@ -58,15 +63,15 @@ it('buffers a match into search_alert_matches when criteria match', function ():
 
     new MatchSearchAlertsForAdJob($ad)->handle();
 
-    // No immediate notification — match is buffered for digest.
-    Notification::assertNothingSent();
+    Notification::assertSentTo($client, SearchAlertMatchNotification::class);
 
     $this->assertDatabaseHas('search_alert_matches', [
         'search_alert_id' => $alert->id,
         'user_id' => $client->id,
         'ad_id' => $ad->id,
-        'digest_sent_at' => null,
     ]);
+
+    expect(SearchAlertMatch::query()->where('search_alert_id', $alert->id)->whereNotNull('digest_sent_at')->exists())->toBeTrue();
 });
 
 it('does not buffer a match for the ad owner', function (): void {
@@ -117,6 +122,8 @@ it('does not buffer when alert criteria do not match', function (): void {
 });
 
 it('does not create duplicate match records for the same ad and alert', function (): void {
+    Notification::fake();
+
     $quarter = Quarter::factory()->create();
     $adType = AdType::factory()->create();
     $client = User::factory()->create();
@@ -135,10 +142,38 @@ it('does not create duplicate match records for the same ad and alert', function
         'price' => 120_000,
     ]);
 
-    // Run the job twice (e.g. retry scenario).
     new MatchSearchAlertsForAdJob($ad)->handle();
     new MatchSearchAlertsForAdJob($ad)->handle();
 
-    // Still only one row thanks to the unique constraint + insertOrIgnore.
     $this->assertDatabaseCount('search_alert_matches', 1);
+
+    Notification::assertSentToTimes($client, SearchAlertMatchNotification::class, 1);
+});
+
+it('dispatches instant notification job only once per new match', function (): void {
+    Queue::fake();
+
+    $quarter = Quarter::factory()->create();
+    $adType = AdType::factory()->create();
+    $landlord = User::factory()->create();
+    $client = User::factory()->create();
+
+    SearchAlert::create([
+        'user_id' => $client->id,
+        'city_id' => $quarter->city_id,
+        'type_id' => $adType->id,
+        'is_active' => true,
+    ]);
+
+    $ad = Ad::factory()->create([
+        'user_id' => $landlord->id,
+        'quarter_id' => $quarter->id,
+        'type_id' => $adType->id,
+        'status' => AdStatus::AVAILABLE,
+    ]);
+
+    new MatchSearchAlertsForAdJob($ad)->handle();
+    new MatchSearchAlertsForAdJob($ad)->handle();
+
+    Queue::assertPushed(SendSearchAlertInstantNotificationJob::class, 1);
 });

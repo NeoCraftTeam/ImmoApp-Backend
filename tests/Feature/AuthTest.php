@@ -21,6 +21,9 @@ test('customer can login with valid credentials', function (): void {
     // On vérifie juste qu'on a un token
     $response->assertStatus(200)
         ->assertJsonStructure(['access_token']);
+
+    expect($response->headers->get('CDN-Cache-Control'))->toBe('private, no-store')
+        ->and($response->headers->get('Cache-Control'))->toContain('no-store');
 });
 
 test('login fails with invalid credentials', function (): void {
@@ -55,10 +58,6 @@ test('customer can register', function (): void {
         'phone_number' => '+237699999999',
         'city_id' => $city->id,
     ]);
-
-    if ($response->status() !== 201) {
-        dump($response->json());
-    }
 
     $response->assertStatus(201)
         ->assertJsonStructure(['user', 'access_token']);

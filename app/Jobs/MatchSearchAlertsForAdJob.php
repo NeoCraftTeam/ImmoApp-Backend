@@ -54,10 +54,9 @@ class MatchSearchAlertsForAdJob implements ShouldQueue
                     }
 
                     try {
-                        // Buffer the match for the next digest run.
-                        // The unique constraint on (search_alert_id, ad_id) prevents duplicates.
-                        DB::table('search_alert_matches')->insertOrIgnore([
-                            'id' => (string) Str::uuid(),
+                        $matchId = (string) Str::uuid();
+                        $inserted = DB::table('search_alert_matches')->insertOrIgnore([
+                            'id' => $matchId,
                             'search_alert_id' => $alert->id,
                             'user_id' => $user->id,
                             'ad_id' => $ad->id,
@@ -66,7 +65,11 @@ class MatchSearchAlertsForAdJob implements ShouldQueue
                             'created_at' => $now,
                             'updated_at' => $now,
                         ]);
-                        $bufferedCount++;
+
+                        if ($inserted > 0) {
+                            $bufferedCount++;
+                            SendSearchAlertInstantNotificationJob::dispatch($matchId);
+                        }
                     } catch (Throwable $e) {
                         Log::error("SearchAlert buffer failed for alert {$alert->id}: {$e->getMessage()}");
                     }
@@ -74,7 +77,7 @@ class MatchSearchAlertsForAdJob implements ShouldQueue
             });
 
         if ($bufferedCount > 0) {
-            Log::info("SearchAlert: buffered ad {$ad->id} for {$bufferedCount} alert(s) — digest pending.");
+            Log::info("SearchAlert: ad {$ad->id} matched {$bufferedCount} new alert row(s); instant notifications queued.");
         }
     }
 

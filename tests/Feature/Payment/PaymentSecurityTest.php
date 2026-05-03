@@ -8,6 +8,7 @@ use App\Models\PointPackage;
 use App\Models\User;
 use App\Services\Payment\PaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 
@@ -280,4 +281,44 @@ it('cancelled payment cannot be overwritten by webhook', function (): void {
     ]);
 
     Event::assertNotDispatched(PaymentSucceeded::class);
+});
+
+it('passes allowed callback_url to flutterwave for credit purchase', function (): void {
+    config()->set('app.frontend_url', 'http://localhost:3000');
+    Event::fake();
+    Http::fake([
+        'api.flutterwave.com/*' => Http::response([
+            'status' => 'success',
+            'data' => ['link' => 'https://checkout.flutterwave.com/pay/test'],
+        ], 200),
+    ]);
+
+    $package = PointPackage::factory()->create(['price' => 3000, 'is_active' => true]);
+    $user = User::factory()->create();
+
+    $callback = 'http://localhost:3000/credits/callback?ad_id=abc';
+
+    $this->actingAs($user)->postJson("/api/v1/credits/purchase/{$package->id}", [
+        'callback_url' => $callback,
+    ])->assertSuccessful();
+
+    Http::assertSent(function (Request $request) use ($callback): bool {
+        if (!str_contains($request->url(), 'api.flutterwave.com')) {
+            return false;
+        }
+        $data = $request->data();
+
+        return ($data['redirect_url'] ?? null) === $callback;
+    });
+});
+
+it('rejects credit purchase with disallowed callback_url host', function (): void {
+    config()->set('app.frontend_url', 'http://localhost:3000');
+    $package = PointPackage::factory()->create(['price' => 3000, 'is_active' => true]);
+    $user = User::factory()->create();
+
+    $this->actingAs($user)->postJson("/api/v1/credits/purchase/{$package->id}", [
+        'callback_url' => 'https://evil.example/phish',
+    ])->assertStatus(422)
+        ->assertJsonFragment(['message' => 'URL de retour non autorisée.']);
 });

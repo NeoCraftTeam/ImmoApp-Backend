@@ -29,6 +29,8 @@ final class StoreSearchAlertRequest extends FormRequest
             'surface_min' => ['nullable', 'integer', 'min:0'],
             'has_parking' => ['nullable', 'boolean'],
             'query' => ['nullable', 'string', 'max:200'],
+            'notify_email' => ['nullable', 'boolean'],
+            'notify_push' => ['nullable', 'boolean'],
         ];
     }
 }

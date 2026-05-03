@@ -6,14 +6,19 @@ namespace App\Notifications;
 
 use App\Mail\SearchAlertMatchMail;
 use App\Models\Ad;
+use App\Models\EmailPreference;
+use App\Models\FcmToken;
 use App\Models\SearchAlert;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
 use NotificationChannels\WebPush\WebPushChannel;
 use NotificationChannels\WebPush\WebPushMessage;
 
-class SearchAlertMatchNotification extends Notification implements ShouldQueue
+/**
+ * Synchronous notification (runs inside {@see SendSearchAlertInstantNotificationJob}) so
+ * digest buffers can be marked only after delivery is initiated successfully.
+ */
+class SearchAlertMatchNotification extends Notification
 {
     use Queueable;
 
@@ -23,14 +28,23 @@ class SearchAlertMatchNotification extends Notification implements ShouldQueue
     ) {}
 
     /**
-     * @return array<int, string>
+     * @return array<int, string|class-string>
      */
     public function via(object $notifiable): array
     {
-        $channels = ['database', 'mail'];
+        $channels = ['database'];
 
-        if ($notifiable->pushSubscriptions()->exists()) {
-            $channels[] = WebPushChannel::class;
+        if ($this->alert->notify_email) {
+            $preference = EmailPreference::getOrCreateForUser($notifiable);
+            if ($preference->isEnabled('search_alerts')) {
+                $channels[] = 'mail';
+            }
+        }
+
+        if ($this->alert->notify_push && FcmToken::where('user_id', $notifiable->id)->doesntExist()) {
+            if ($notifiable->pushSubscriptions()->exists()) {
+                $channels[] = WebPushChannel::class;
+            }
         }
 
         return $channels;
@@ -44,13 +58,14 @@ class SearchAlertMatchNotification extends Notification implements ShouldQueue
 
     public function toWebPush(object $notifiable, Notification $notification): WebPushMessage
     {
-        $adUrl = config('app.frontend_url').'/ads/'.urlencode((string) $this->ad->id).'/'.urlencode($this->ad->slug);
+        $base = rtrim((string) config('app.frontend_url'), '/');
+        $adUrl = $base.'/ads/'.rawurlencode((string) $this->ad->slug);
 
         return (new WebPushMessage)
             ->title('Nouvelle annonce pour vous !')
             ->icon('/icons/icon-192x192.png')
             ->badge('/icons/icon-72x72.png')
-            ->body($this->ad->title.' — '.number_format($this->ad->price ?? 0, 0, ',', ' ').' FCFA')
+            ->body($this->ad->title.' — '.number_format((float) ($this->ad->price ?? 0), 0, ',', ' ').' FCFA')
             ->tag('alert-match-'.$this->ad->id)
             ->data(['url' => $adUrl]);
     }

@@ -10,7 +10,6 @@ use DateTimeInterface;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * API resource for a conversation item in the list or detail view.
@@ -42,22 +41,6 @@ final class ConversationResource extends JsonResource
         return null;
     }
 
-    private function resolveAvatarUrl(?string $avatar): ?string
-    {
-        if (!$avatar) {
-            return null;
-        }
-        if (str_starts_with($avatar, 'http')) {
-            return $avatar;
-        }
-        $disk = config('filesystems.app_media_disk');
-        if (Storage::disk($disk)->exists($avatar)) {
-            return Storage::disk($disk)->url($avatar);
-        }
-
-        return null;
-    }
-
     /** @return array<string, mixed> */
     #[\Override]
     public function toArray(Request $request): array
@@ -84,7 +67,7 @@ final class ConversationResource extends JsonResource
             'other_participant' => $other ? [
                 'id' => $other->id,
                 'name' => trim("{$other->firstname} {$other->lastname}"),
-                'avatar' => $this->resolveAvatarUrl($other->getFirstMediaUrl('avatars') ?: $other->avatar),
+                'avatar' => $other->resolveChatAvatarUrl(),
                 // ISO-8601 timestamp of last authenticated activity. Frontend
                 // pairs this with the Pusher presence channel to render
                 // "Vu il y a X" when the user is offline.

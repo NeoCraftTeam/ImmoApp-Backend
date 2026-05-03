@@ -9,7 +9,6 @@ use App\Enums\ReservationStatus;
 use App\Models\Ad;
 use App\Models\AdInteraction;
 use App\Models\LeaseContract;
-use App\Models\SearchAlert;
 use App\Models\TentativeReservation;
 use App\Models\User;
 use Illuminate\Support\Collection;
@@ -19,14 +18,15 @@ use Illuminate\Support\Facades\Log;
 /**
  * Sends behavioral retention push notifications.
  *
- * All 5 triggers are frequency-capped via Redis to avoid notification fatigue.
+ * All triggers are frequency-capped via Redis to avoid notification fatigue.
  *
  * Triggers:
  *  1. win_back           — user has not logged in for 3+ days (has push subscription)
- *  2. search_alert_match — newly published ad matches an active search alert
- *  3. price_drop         — a favorited ad's price dropped by ≥ 5 000 FCFA
- *  4. viewing_reminder   — confirmed viewing appointment is scheduled for tomorrow
- *  5. lease_expiry       — lease contract ends in 30 or 7 days (notify landlord)
+ *  2. price_drop         — a favorited ad's price dropped by ≥ 5 000 FCFA
+ *  3. viewing_reminder   — confirmed viewing appointment is scheduled for tomorrow
+ *  4. lease_expiry       — lease contract ends in 30 or 7 days (notify landlord)
+ *
+ * Search-alert matches use SendSearchAlertInstantNotificationJob (not this service).
  */
 final readonly class RetentionPushService
 {
@@ -76,71 +76,7 @@ final readonly class RetentionPushService
         return $sent;
     }
 
-    // ─── 2. Search alert match ───────────────────────────────────────────────
-
-    public function notifySearchAlertMatches(): int
-    {
-        $sent = 0;
-
-        $newAds = Ad::query()
-            ->where('status', AdStatus::AVAILABLE)
-            ->where('updated_at', '>=', now()->subHours(13))
-            ->with(['quarter.city'])
-            ->get();
-
-        if ($newAds->isEmpty()) {
-            return 0;
-        }
-
-        SearchAlert::query()
-            ->where('is_active', true)
-            ->whereHas('user', fn ($q) => $q->has('pushSubscriptions'))
-            ->with('user.pushSubscriptions')
-            ->chunk(500, function ($alerts) use ($newAds, &$sent): void {
-                foreach ($alerts as $alert) {
-                    $capKey = "retention_push:search_alert:{$alert->id}";
-                    if ($this->isCapped($capKey)) {
-                        continue;
-                    }
-
-                    /** @var Ad|null $matching */
-                    $matching = $newAds->first(fn ($ad) => $alert->matchesAd($ad));
-                    if ($matching === null) {
-                        continue;
-                    }
-
-                    $cityLabel = $matching->quarter?->city->name ?? $alert->city_name ?? '';
-                    $price = $matching->price !== null
-                        ? ' — '.number_format((float) $matching->price, 0, ',', ' ').' FCFA'
-                        : '';
-                    $body = "Nouvelle annonce à {$cityLabel}{$price}.";
-
-                    /** @var User $alertUser */
-                    $alertUser = $alert->user;
-                    $result = $this->webPush->sendToUser($alertUser, [
-                        'title' => 'Nouvelle annonce pour vous 🔔',
-                        'body' => $body,
-                        'tag' => "search-alert-{$alert->id}",
-                        'url' => "/ads/{$matching->slug}",
-                        'actions' => [['action' => 'view', 'title' => "Voir l'annonce"]],
-                    ]);
-
-                    if ($result > 0) {
-                        $this->setCap($capKey, 86400);
-                        $alert->update(['last_notified_at' => now()]);
-                        $sent++;
-                        Log::info('[RetentionPush] search_alert_match', [
-                            'alert_id' => $alert->id,
-                            'ad_id' => $matching->id,
-                        ]);
-                    }
-                }
-            });
-
-        return $sent;
-    }
-
-    // ─── 3. Price drop on favorites ──────────────────────────────────────────
+    // ─── 2. Price drop on favorites ──────────────────────────────────────────
 
     public function notifyPriceDropOnFavorites(): int
     {
@@ -206,7 +142,7 @@ final readonly class RetentionPushService
         return $sent;
     }
 
-    // ─── 4. Viewing reminder ─────────────────────────────────────────────────
+    // ─── 3. Viewing reminder ─────────────────────────────────────────────────
 
     public function notifyViewingReminders(): int
     {
@@ -245,7 +181,7 @@ final readonly class RetentionPushService
         return $sent;
     }
 
-    // ─── 5. Lease expiry ─────────────────────────────────────────────────────
+    // ─── 4. Lease expiry ─────────────────────────────────────────────────────
 
     public function notifyLeaseExpiries(): int
     {

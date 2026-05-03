@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Support\OpenRouteServiceAuth;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -306,8 +307,13 @@ OSM;
 
         try {
             $response = $this->http
-                ->timeout(8)
-                ->withHeaders(['Authorization' => $apiKey])
+                ->timeout(15)
+                ->connectTimeout(5)
+                ->withHeaders([
+                    'Authorization' => OpenRouteServiceAuth::authorizationHeader($apiKey),
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                ])
                 ->post(self::ORS_URL, [
                     'locations' => $locations,
                     'metrics' => ['distance'],

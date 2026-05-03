@@ -49,7 +49,7 @@ class NewAdListingReportNotification extends Notification implements ShouldQueue
     public function toDatabase(object $notifiable): array
     {
         $url = $this->resolveReviewUrl();
-        $body = "Annonce \"{$this->report->ad->title}\" signalee par {$this->report->reporter->fullname}.";
+        $body = "Annonce « {$this->report->ad->title} » signalée par {$this->report->reporter->fullname}.";
         if (filled($this->report->description)) {
             $body .= "\n\nMessage du client: {$this->report->description}";
         }
@@ -86,7 +86,7 @@ class NewAdListingReportNotification extends Notification implements ShouldQueue
             ->title('Nouveau signalement - KeyHome')
             ->icon('/icons/icon-192x192.png')
             ->badge('/icons/icon-72x72.png')
-            ->body("Annonce \"{$this->report->ad->title}\" signalee. Action admin requise.")
+            ->body("Annonce « {$this->report->ad->title} » signalée. Action admin requise.")
             ->tag('ad-report-'.$this->report->id)
             ->data(['url' => $this->resolveReviewUrl()]);
     }

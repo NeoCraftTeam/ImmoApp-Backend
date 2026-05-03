@@ -40,6 +40,11 @@ function fakeIsoHttpFactory(array $urlMap): HttpFactory
             return $this;
         }
 
+        public function connectTimeout(int $s): static
+        {
+            return $this;
+        }
+
         public function withHeaders(array $h): static
         {
             return $this;

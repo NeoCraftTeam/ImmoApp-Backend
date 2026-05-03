@@ -19,19 +19,41 @@ class AdReportReceivedNotification extends Notification implements ShouldQueue
         public AdReport $report,
     ) {}
 
+    /**
+     * @return list<string>
+     */
     public function via(object $notifiable): array
     {
-        if (!$this->hasValidEmail($notifiable)) {
-            return [];
+        $channels = ['database'];
+
+        if ($this->hasValidEmail($notifiable)) {
+            $channels[] = 'mail';
         }
 
-        return ['mail'];
+        return $channels;
     }
 
     public function toMail(object $notifiable): Mailable
     {
         return new AdReportReceivedMail($this->report)
             ->to($notifiable->email);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toDatabase(object $notifiable): array
+    {
+        $this->report->loadMissing(['ad']);
+
+        $title = $this->report->ad->title;
+
+        return [
+            'type' => 'ad_report_received',
+            'report_id' => $this->report->id,
+            'ad_id' => $this->report->ad_id,
+            'message' => "Votre signalement concernant l'annonce « {$title} » a bien été reçu. Nos équipes l'examinent.",
+        ];
     }
 
     private function hasValidEmail(object $notifiable): bool

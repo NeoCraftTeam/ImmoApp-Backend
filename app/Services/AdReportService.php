@@ -38,7 +38,7 @@ class AdReportService
 
         if ($openReportExists) {
             throw ValidationException::withMessages([
-                'reason' => 'Vous avez deja un signalement en cours pour cette annonce.',
+                'reason' => 'Vous avez déjà un signalement en cours pour cette annonce.',
             ]);
         }
 
@@ -107,16 +107,14 @@ class AdReportService
             }
         }
 
-        if ($this->isDeliverableEmail($reporter->email)) {
-            try {
-                $reporter->notify(new AdReportReceivedNotification($report));
-            } catch (Throwable $exception) {
-                Log::warning('Ad report reporter notification failed.', [
-                    'report_id' => $report->id,
-                    'reporter_id' => $reporter->id,
-                    'error' => $exception->getMessage(),
-                ]);
-            }
+        try {
+            $reporter->notify(new AdReportReceivedNotification($report));
+        } catch (Throwable $exception) {
+            Log::warning('Ad report reporter notification failed.', [
+                'report_id' => $report->id,
+                'reporter_id' => $reporter->id,
+                'error' => $exception->getMessage(),
+            ]);
         }
     }
 

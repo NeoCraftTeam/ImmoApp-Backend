@@ -36,6 +36,8 @@ final readonly class AttachmentService
     /** Real MIME types allowed for voice notes. */
     private const array AUDIO_MIMES = [
         'audio/webm',
+        // WebM is often classified as video for browser MediaRecorder output.
+        'video/webm',
         'audio/mp4',
         'audio/mpeg',
         'audio/mp3',
@@ -84,7 +86,7 @@ final readonly class AttachmentService
      */
     public function upload(UploadedFile $file, Conversation $conversation): array
     {
-        $mime = $file->getMimeType() ?: '';
+        $mime = $this->normalizeDetectedMime($file);
         $type = $this->resolveType($mime, (int) $file->getSize());
 
         $uuid = (string) Str::uuid();
@@ -175,5 +177,32 @@ final readonly class AttachmentService
         }
 
         throw new InvalidArgumentException("Unsupported file type: {$mime}");
+    }
+
+    /**
+     * PHP finfo + browsers often label WebM voice notes as {@see video/webm},
+     * or as octet-stream. Normalize so validation matches what we store and return.
+     */
+    private function normalizeDetectedMime(UploadedFile $file): string
+    {
+        $mime = strtolower(trim((string) ($file->getMimeType() ?: '')));
+        $ext = strtolower($file->getClientOriginalExtension());
+
+        if ($mime === 'video/webm') {
+            return 'audio/webm';
+        }
+
+        if ($mime === '' || $mime === 'application/octet-stream') {
+            return match ($ext) {
+                'webm' => 'audio/webm',
+                'mp4', 'm4a' => 'audio/mp4',
+                'mp3', 'mpga' => 'audio/mpeg',
+                'ogg' => 'audio/ogg',
+                'wav' => 'audio/wav',
+                default => $mime,
+            };
+        }
+
+        return $mime;
     }
 }

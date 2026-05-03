@@ -1,5 +1,24 @@
 <?php
 
+$turnstileUsesProductionKeysInLocal = filter_var(
+    env('TURNSTILE_USE_PRODUCTION_KEYS', false),
+    FILTER_VALIDATE_BOOLEAN
+);
+
+$isTurnstileAppLocal = env('APP_ENV') === 'local';
+
+if ($isTurnstileAppLocal && !$turnstileUsesProductionKeysInLocal) {
+    $turnstileSiteKey = '1x00000000000000000000AA';
+    $turnstileSecretKey = '1x0000000000000000000000000000000AA';
+} else {
+    $turnstileSiteKey = filled(env('TURNSTILE_SITE_KEY'))
+        ? (string) env('TURNSTILE_SITE_KEY')
+        : '';
+    $turnstileSecretKey = filled(env('TURNSTILE_SECRET_KEY'))
+        ? (string) env('TURNSTILE_SECRET_KEY')
+        : '';
+}
+
 return [
 
     /*
@@ -39,13 +58,17 @@ return [
     |--------------------------------------------------------------------------
     | Cloudflare Turnstile (CAPTCHA)
     |--------------------------------------------------------------------------
-    | Free, privacy-respecting alternative to reCAPTCHA. Used on /login and
-    | /register to mitigate credential-stuffing and bulk signup bots.
-    | When `secret_key` is empty, `TurnstileService` fails open (dev mode).
+    | Free, privacy-respecting bot mitigation. Used on /login and /register.
+    | When `secret_key` is empty (non-local), `TurnstileService` fails open.
+    |
+    | When `APP_ENV` is `local`, dummy Cloudflare keys are used **even if**
+    | `TURNSTILE_*` is set in `.env`, so http://localhost works without widget error 110200.
+    | Set `TURNSTILE_USE_PRODUCTION_KEYS=true` to test real keys on local (hostnames must include localhost).
+    | @see https://developers.cloudflare.com/turnstile/troubleshooting/testing/
     */
     'turnstile' => [
-        'site_key' => env('TURNSTILE_SITE_KEY', ''),
-        'secret_key' => env('TURNSTILE_SECRET_KEY', ''),
+        'site_key' => $turnstileSiteKey,
+        'secret_key' => $turnstileSecretKey,
     ],
 
     /*
@@ -117,6 +140,8 @@ return [
 
     'ors' => [
         'key' => env('ORS_API_KEY'),
+        /** When true, send the API key as {@code Authorization} value without Bearer prefix (self-hosted ORS). */
+        'authorization_raw' => filter_var(env('ORS_AUTHORIZATION_RAW', false), FILTER_VALIDATE_BOOL),
     ],
 
     'health' => [

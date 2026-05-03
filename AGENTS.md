@@ -123,7 +123,8 @@ vendor/bin/rector process --dry-run
 - `LeaseContractService` — lease management.
 - `TourService` / `PanoramaProcessor` — 360° virtual tours.
 - `AiDescriptionEnhancer`, `AiDigestService`, `AiSearchService` — AI-powered features.
-  - `AiSearchService::parse()` — multi-provider NLP text search (Groq/Llama-3.3-70B → OpenAI GPT-4o-mini → Gemini 2.0 Flash → Together → Mistral) with circuit breakers + 24h cache.
+  - `AiSearchService::parse()` — multi-provider NLP text search (Groq/Llama-3.3-70B → OpenAI GPT-4o-mini → Gemini 2.0 Flash → Together → Mistral) with circuit breakers + 24h cache. **Type disambiguation** : `AdType::resolveFromNaturalSearchHint()` choisit la bonne ligne catalogue (ex. *appartement meublé* vs *appartement simple*) à partir du texte « meublé/meuble » et du hint LLM ; fusion de `furnished` si le mot apparaît dans la requête même si le modèle l’omet.
+  - Ads index (`toSearchableArray`) expose **`is_furnished`** (attribut `furnished` et/ou nom de type contenant *meubl*). Le filtre recherche « amenity » **meublé** côté API applique `(attributes = furnished OR is_furnished = true)` (Meilisearch + fallback Eloquent) pour ne pas exclure les annonces classées uniquement par type.
   - `AiSearchService::parseFromImage()` — vision search: GPT-4o-vision → Gemini Vision fallback. Accepts base64 + MIME type, returns same JSON structure as `parse()`. Not cached (each image is unique).
 - `NaturalSearchRegexParser` — plain-language ad search (regex fallback when all LLM providers fail).
 - `RecommendationEngine` — personalised ad recommendations.
@@ -135,7 +136,7 @@ vendor/bin/rector process --dry-run
 - `AdminMetricsService` — dashboard analytics.
 - `AcquisitionChannelClassifier`, `UtmAttributionService` — marketing attribution.
 - `UserWelcomeService`, `WebPushService`, `NativeAppService` — notifications & mobile.
-- `RetentionPushService` — behavioral retention push notifications (5 triggers: win-back after 3d inactivity, search-alert match, price-drop on favorites ≥5 000 FCFA, viewing reminder day-before, lease expiry at 30/7 days). All frequency-capped via Redis. Command: `app:send-retention-pushes` (scheduled twiceDaily 09:00/18:00). `--dry-run` flag available.
+- `RetentionPushService` — behavioral retention Web Push (4 triggers: win-back after 3d inactivity, price-drop on favorites ≥5 000 FCFA, viewing reminder day-before, lease expiry at 30/7 days). Search-alert matches are handled separately by `SendSearchAlertInstantNotificationJob` + `SendSearchAlertFcmJob` (instant, per `SearchAlert.notify_email` / `notify_push`). Retention command: `app:send-retention-pushes` (scheduled twiceDaily 09:00/18:00). `--dry-run` flag available.
 - `Chat/EncryptionService` — AES-256-CBC with HMAC-SHA256 MAC (authenticated encryption). Key from `CHAT_ENCRYPTION_KEY` env (32-byte hex). `encrypt()` returns `{ciphertext, iv}`; `decrypt()` verifies MAC before decrypting.
 - `Chat/AttachmentService` — upload files to Cloudflare R2 (`chat-attachments/` prefix). MIME/size validated (images: JPEG/PNG/WEBP/GIF ≤5 MB; files: PDF/doc ≤20 MB). Returns descriptor with `signed_url` (1-hour TTL). `getSignedUrl()` refreshes URLs.
 - `Chat/ConversationService` — find-or-create (gated on `UnlockedAd`), list (paginated), mark-as-read (broadcasts `MessageRead`), archive, unread count (Cache 30s TTL).
@@ -161,6 +162,7 @@ vendor/bin/rector process --dry-run
 - Amounts resolved server-side from `PointPackage`/`SubscriptionPlan` — never trust client amounts.
 - DB locks (`lockForUpdate`) prevent double-spending on verification.
 - Events: `PaymentInitiated`, `PaymentSucceeded`, `PaymentFailed`.
+- **Crédits (`POST /credits/purchase/{package}`)** — accepte `callback_url` optionnelle ; validée par `App\Support\FrontendRedirectGuard` (même politique d’hôte que OAuth / `FRONTEND_URL` + `OAUTH_ALLOWED_REDIRECT_HOSTS`). Passée à `PaymentService::createPayment` comme `redirect_url` vers Flutterwave.
 
 ### TrustScore System
 - **Bidirectional trust scoring** (0–100) for both tenants and landlords, modelled after `KeyScoreService`.
@@ -245,7 +247,7 @@ vendor/bin/rector process --dry-run
   - **Required env var**: `NEXT_PUBLIC_GOOGLE_CLIENT_ID` — same Google Client ID configured in Clerk dashboard for Google OAuth provider.
   - **E2E tests**: `e2e/google-one-tap.spec.ts` — 9 tests (3 skipped without `NEXT_PUBLIC_GOOGLE_CLIENT_ID`). Covers: GSI script presence/absence on `/login` and `/owner/login`, mocked credential callback, mobile layout regression, social buttons coexistence.
   - **Known gotcha**: `/se connecter/i` regex in Playwright tests matches both "Se connecter" (submit) and "Se connecter avec une Passkey" — always use `{ name: 'Se connecter', exact: true }` in E2E button locators.
-  - **CSP requirements** — allowlists are centralized in `keyhome-frontend-next/src/lib/csp-allowlist.ts` and applied in `src/proxy.ts` `buildCsp()` (per-request nonce). `connect-src` must include `https://*.googleapis.com` / `wss://*.googleapis.com` (Firebase Installations, FCM, etc.), `https://www.gstatic.com`, Vercel Speed Insights (`vitals.vercel-insights.com`), Sentry (`*.sentry.io`), R2 `https://*.r2.cloudflarestorage.com`, dev Reverb `ws://localhost:8080`, and app hosts (`*.keyhome.app`, `*.keyhome.cm`, `*.neocraft.dev`). Keep `https://accounts.google.com` + `lh3.googleusercontent.com` for GSI/avatars. When adding a third-party SDK, extend `csp-allowlist.ts`—avoid duplicating origins only in `proxy.ts`.
+  - **CSP requirements** — allowlists are centralized in `keyhome-frontend-next/src/lib/csp-allowlist.ts` and applied in `src/proxy.ts` `buildCsp()` (per-request nonce). `media-src` mirrors `img-src` hosts (R2 signed URLs for voice/video) so `<audio>`/`<video>` are not blocked by `default-src 'self'`. `connect-src` must include `https://*.googleapis.com` / `wss://*.googleapis.com` (Firebase Installations, FCM, etc.), `https://www.gstatic.com`, Vercel Speed Insights (`vitals.vercel-insights.com`), Sentry (`*.sentry.io`), R2 `https://*.r2.cloudflarestorage.com`, dev Reverb `ws://localhost:8080`, and app hosts (`*.keyhome.app`, `*.keyhome.cm`, `*.neocraft.dev`). Keep `https://accounts.google.com` + `lh3.googleusercontent.com` for GSI/avatars. `next.config.ts` `images.remotePatterns` must include `img.clerk.com` and `*.googleusercontent.com` so chat avatars load via `next/image`. When adding a third-party SDK, extend `csp-allowlist.ts`—avoid duplicating origins only in `proxy.ts`.
   - **DuckDuckGo / privacy browsers**: content blockers block `play.google.com/log` and the One Tap iframe. This is browser-level and cannot be fixed in code. Always test One Tap in Chrome or Firefox with an active Google session.
   - **`unregistered_origin`**: if One Tap shows `[GoogleOneTap] Not displayed: unregistered_origin`, add `http://localhost` and `http://localhost:3000` to **Authorized JavaScript origins** in [Google Cloud Console](https://console.cloud.google.com/apis/credentials) for the OAuth Client ID.
   - **FedCM migration**: GSI emits a warning that `isNotDisplayed()` / `isSkippedMoment()` prompt notification methods will stop working when FedCM becomes mandatory. Non-blocking for now; revisit when Google announces enforcement date.
@@ -339,7 +341,8 @@ All prefixed `/api/v1/`: `auth.php`, `ads.php`, `payments.php`, `viewings.php`, 
 
 ### Jobs (`app/Jobs/`)
 `ExpireStaleReservationsJob`, `MatchSearchAlertsForAdJob`, `ProcessTourSceneJob`,
-`SendNewsletterCampaignJob`, `SendNewsletterEmailJob`, `SendSearchAlertDigestJob`.
+`SendNewsletterCampaignJob`, `SendNewsletterEmailJob`, `SendSearchAlertDigestJob`,
+`SendSearchAlertInstantNotificationJob`, `SendSearchAlertFcmJob`.
 
 ### Observers (`app/Observers/`)
 `ActivityObserver`, `AdObserver`, `PaymentObserver`, `TentativeReservationObserver`, `UserObserver`.
@@ -445,6 +448,7 @@ Storybook, Vitest, Playwright.
   - `(owner)/owner/` — landlord dashboard (ads, expenses, leases, viewings).
   - `credits/callback/` — Flutterwave payment return page with retry/polling logic.
   - `payment-success/` — ad unlock payment return page with extended polling.
+  - `confidentialite/`, `conditions/` — politique de confidentialité et CGU ; styles partagés via `confidentialite/legal.module.css` ; libellé « dernière mise à jour » dans `src/lib/legal-documents.ts`.
 - `src/components/` — shared UI components.
   - `ui/` — base primitives (shadcn-style + MUI hybrids).
   - `owner/` — landlord-specific components (`AdForm`, `AdFormPhotos`, `AdFormTour`, etc.).
@@ -459,6 +463,10 @@ Storybook, Vitest, Playwright.
 - `src/tests/` — Vitest unit tests.
 - `e2e/` — Playwright end-to-end tests.
 - `.storybook/` — Storybook config. Uses `register-next-config.cjs` (CJS, `require()` intentional).
+
+### Thème & retours paiement (May 2026)
+- **`ThemeProvider`** — préférence persistée `localStorage` `kh_theme_choice` : `system` \| `light` \| `dark` ; `useThemeMode()` expose `choice` et `setChoice`. Pages **Paramètres** client et bailleur : `ToggleButtonGroup` Clair / Sombre / Système.
+- **Retour après paiement** — `src/lib/payment-return.ts` : `rememberPaymentOriginPath()` avant redirection Flutterwave (`creditsService.purchase`, `paymentsService.flutterwaveInitiate`) ; `consumePaymentReturnPath(fallback)` sur les pages callback pour retrouver la page d’origine (`sessionStorage` `kh_payment_return_path`).
 
 ### Environment Variables
 | Variable | Purpose |
@@ -501,6 +509,8 @@ Storybook, Vitest, Playwright.
 - **`src/app/credits/callback/page.tsx`** and **`src/app/payment-success/page.tsx`**: Recursive `useCallback` patterns that assign `retryTimerRef.current = setTimeout(() => self(attempt+1), ...)` use `/* eslint-disable react-hooks/immutability */ ... /* eslint-enable */` block pairs (single-line `eslint-disable-next-line` only covers the first line of a multi-line statement).
 
 - **`VoiceSearchButton` click not working (fixed)**: Root cause: (1) `onClick` was `disabled ? undefined : toggle` — inside MUI `InputAdornment`, clicks bubbled up and focused the input instead. Fix: always attach `onClick` with `e.stopPropagation()`. (2) `onTranscript` was in `toggle`'s dependency array causing stale closures; switched to ref pattern (`onTranscriptRef`). (3) `rec.start()` had no try-catch — mic permission errors were uncaught.
+- **Chat iOS keyboard + audio URL (May 2026)**: `app/(owner)/layout.tsx` mirrors root viewport with `interactiveWidget: 'resizes-content'` and `viewportFit: 'cover'` so Safari/PWA resize the layout when the keyboard opens. The mobile chat `html/body` scroll lock (`DashboardLayout` + `OwnerLayoutClient`) is **skipped on iOS** via `isLikelyIosWebKit()` — locking `position: fixed` on `html/body` fought that viewport mode and made the whole page jump. Voice playback: `resolveChatAudioUrl()` (`src/lib/chat-attachment-audio.ts`) only returns `http(s)` URLs; bare R2 paths (`chats/...`) are rejected so `VoicePlayer` surfaces an error instead of a silent no-op.
+- **Owner panel MUI teal (May 2026)**: `OwnerLayoutShell` wraps `OwnerLayoutClient` and `OwnerPWAInstallPrompt` with `OwnerThemeProvider`. The provider existed but was **never mounted**, so the root theme (customer pink) leaked into `/owner/login`, dashboard `primary.main`, contained buttons, and links. All routes under `(owner)` now resolve `palette.primary` to teal via `ownerTheme`.
 - **Image search removed from frontend**: `ImageSearchButton` component still exists but is no longer rendered in `HeroSearch` or `NaturalSearchBar`. Both only import the `ParsedSearchParams` type from it.
 - **`useUserLocation` geolocation ask-once (fixed)**: Was using `watchPosition` (continuous tracking) with 10-minute cache — re-prompted on every visit. Fixed: `getCurrentPosition` (one-shot), 24-hour localStorage cache (`user-location`), denial persisted in `user-location-denied` key so user is never re-prompted after refusing. `refresh()` method bypasses both caches for explicit re-requests.
 - **Breadcrumb "Accueil" must link to `/home`**: Dashboard pages (bailleurs profile, agences) were linking Accueil breadcrumb to `/` (landing page) instead of `/home`. Public/marketing pages (blog, conditions, etc.) correctly use `/`.
@@ -541,6 +551,7 @@ The frontend exposes **two distinct PWA identities** that install as separate ap
 - `OwnerManifestSwitch` (`src/components/owner/OwnerManifestSwitch.tsx`) — client component mounted in the `(owner)` layout. On mount it swaps the `<link rel="manifest">` href, `theme-color` meta, `apple-mobile-web-app-title`, and `apple-touch-icon` to the teal owner values. Restores originals on unmount so navigating back to the customer side is seamless.
 - `OwnerPWAInstallPrompt` — owner-specific install banner (separate dismiss key `kh_owner_pwa_dismissed` from the customer banner).
 - Because the owner manifest `scope` is `/owner/`, navigating outside `/owner/*` from within the installed owner PWA opens a new browser tab — keeping the two apps naturally isolated at the OS level.
+- **Safe-area first paint (standalone)** — Inline script in `app/layout.tsx` (`src/lib/safe-area-init-inline.ts`) runs in `<head>` before body paint and sets `--kh-safe-area-top` / `--kh-safe-area-bottom` on `<html>` when WebKit/Android delay `env(safe-area-inset-*)` on cold load. `globals.css` and `Navbar` / `OwnerNavbar` / `bottomNavigationPwaShellSx` use `max(env(...), var(--kh-safe-area-*))` from `src/lib/safe-area-insets.ts`. `SafeAreaInsetBridge` in `providers.tsx` re-syncs after hydration (resize, rotation, visual viewport).
 
 **Registration role-locking (prevent cross-role signup):**
 - `src/lib/register-intent.ts` exports `registerUrlHasRoleLock`, `readStoredRegisterLock`, `writeStoredRegisterLock`, `clearStoredRegisterLock` — all backed by `sessionStorage` key `kh_register_role_locked`.
@@ -550,6 +561,8 @@ The frontend exposes **two distinct PWA identities** that install as separate ap
 - Lock is cleared in `handleSubmit` alongside `clearStoredRegisterAccountRole()`.
 
 **Customer side nav:** "Devenir hôte" menu item permanently removed from `NavDrawer.tsx`.
+
+**PWA / drawer alignment (May 2026):** `keyhome-frontend-next/src/lib/navVisualMetrics.ts` unifies **24px** icon glyphs and list icon columns for client `NavDrawer` (invité + compte + quick nav), `bottomNavigationPwaShellSx` (SVG + `<img>`), standalone `BottomNav` / `OwnerBottomNav` (brand marks resized to 24px; removed owner tab override that forced **1.75rem** on Annonces), and desktop `OwnerSidebar` (no more `fontSize="small"` mix).
 
 **Production-readiness fixes – round 2 (session persistence audit):**
 - `config/sanctum.php`: `expiration` `1440` → `43200` (30 days). At 24 h, users who leave the PWA open in the background for a day triggered `kh:auth-expired` and were force-logged out. Tokens must outlive the typical PWA usage window.
@@ -1355,7 +1368,6 @@ Audit multi-agents exhaustif réalisé le 2 mai 2026. 7 agents parallèles ont c
 - Dérive token : `globals.css --kh-text-secondary: #555555` vs `tokens.ts light.textSecondary: '#5A5A5A'`.
 - Hex `ROSE = '#ec4899'` hardcodé dans `owner/dashboard/page.tsx` — à migrer dans `tokens`.
 - `IconButton` sur l'historique de recherche en dessous de 44×44px (`p: 0.25`, icon 12px).
-- `VoicePlayer` bouton play : environ 32px — borderline 44px.
 
 **DevOps**
 - Rector absent du stage `quality` CI — seuls Pint et PHPStan y figurent.
@@ -1512,14 +1524,18 @@ Round de fixes ciblés sur les bugs visibles signalés par l'utilisateur (chat c
 ### Chat — UX
 
 - **iOS PWA standalone — clavier qui pousse la nav hors écran** : ajouté `interactiveWidget: 'resizes-content'` dans `viewport` (`src/app/layout.tsx`). Sans ça, iOS Safari laisse la layout-viewport intacte et auto-scroll la page pour faire apparaître le `<input>` focus → header de chat repoussé hors-écran. Avec, la layout-viewport rétrécit comme sur Android Chrome, donc `100dvh` s'adapte naturellement et le header reste en place.
-- **`Vu hier à`** : déjà correct — `OnlineStatus.formatLastSeenShort` parse l'ISO-8601 du backend (`2026-05-02T18:46:00+00:00`) puis utilise `date-fns/format` qui rend en timezone locale du device. Aucune modification nécessaire.
+- **`Vu hier à` / last seen header** : `OnlineStatus.formatLastSeenShort` — après « Vu », libellés : `auj. à HH:mm`, `hier à HH:mm`, `il y a N jours à HH:mm`, `le dd/MM/yyyy à HH:mm` (fuseau local) ; `<` 1 min et `<` 60 min inchangés.
 
 ### Layout mobile
 
 - **`StickyPropertyBar` sur `AdDetailClient`** : nouveau prop `onMessage` câblé. Au scroll d'une ad detail mobile, le bouton "Message" apparaît en plus de WhatsApp + Appeler ; tap → trouve/crée une conversation et navigue vers `/messages/[uuid]?draft=…` avec un message pré-rempli. Tombe en fallback sur scroll-to-contact-section en cas d'erreur.
 - **Bouton "Messages" dupliqué retiré** : la `Navbar` (top) le cachait sur desktop seulement — désormais hidden aussi sur mobile (`!isMobile` ajouté), puisque la `BottomNav` propose déjà un Messages plus accessible.
+- **Invités `/home`** : le CTA **Se connecter** dans `Navbar.tsx` est `contained` `primary` (desktop) ; sur mobile, l'`IconButton` profil invité utilise le fond `primary.main` au lieu du contour gris — aligné avec le tiroir (`NavDrawer`).
 - **Espace excessif sous BottomNav** (capture utilisateur iPhone) : la `Paper` ajoutait `pb: env(safe-area-inset-bottom)` PUIS la `BottomNavigation` avait un `height` fixe → empty gap visible entre les icônes et le bord du device. Refactor : la safe-area est maintenant ABSORBÉE dans la `BottomNavigation` elle-même (`height: calc(64px + env(safe-area-inset-bottom)); paddingBottom: env(safe-area-inset-bottom); alignItems: flex-start`) → icônes flush au-dessus du home indicator, comme `UITabBar` natif iOS. Même fix sur `OwnerBottomNav.tsx`.
 - **Ad detail page perçu lente** : ajouté `src/app/ads/[slug]/loading.tsx` avec un skeleton complet (hero + titre + chips + sidebar) qui s'affiche **instantanément** au tap, pendant que le server-side fetch de `generateMetadata` + JSON-LD finit. Combiné avec `router.prefetch('/ads/{slug}')` posé sur `onMouseEnter` / `onTouchStart` de l'`AdCard` → le chunk + le data sont chauds avant même le tap.
+- **Ad detail — impression** : `openAdDetailPrintPdf()` (`html2canvas` + `jspdf`). Avant capture : `document.fonts.ready`, fenêtre `windowWidth`/`windowHeight` = dimensions du root, `onclone` (`prepareAdPrintClone`) — `overflow` hidden/clip → visible, zones scrollables dépliées, `img` dimensionnées ; hero mobile `.kh-ad-print-hero-mobile` — hauteur dérivée du ratio image pour une capture non rognée. Classe sur le hero : `AdDetailClient.tsx`.
+- **Ad detail — contact** : libellés du type « Échanger avec {prénom} », « Message WhatsApp », « Appeler {prénom} » ; `ViewingBookingPanel` « Proposer une visite avec {prénom} » ; brouillon chat via `buildDraftMessage(..., hostFirstName)`.
+- **Signalement annonce** : `AdReportReceivedNotification` → canal `database` toujours, + `mail` si e-mail valide ; copy API / modale / notifications admin harmonisés en français. Test : accusé réception database seul si e-mail invalide (`AdReportFeatureTest`).
 
 ### UX cross-panel
 
@@ -1532,10 +1548,10 @@ Round de fixes ciblés sur les bugs visibles signalés par l'utilisateur (chat c
   - `LoginService::authenticate()` — token vérifié AVANT le check de mot de passe ; échec → `AuthenticationException` (même message générique que mauvais creds, donc on ne peut pas probe l'activation du CAPTCHA).
   - `RegistrationService::register()` — token vérifié AVANT toute création ; échec → `ValidationException` ciblée sur `turnstile_token`.
 - **Form Requests** : `LoginRequest` et `RegisterRequest` acceptent désormais `turnstile_token: nullable|string|max:2048`.
-- **Config** : `services.turnstile.{site_key,secret_key}` lus depuis `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY`. La site key est exposée au frontend via `NEXT_PUBLIC_TURNSTILE_SITE_KEY`.
-- **Frontend** : `src/components/auth/TurnstileWidget.tsx` — wrapper léger sans dépendance externe, charge le script Cloudflare via `next/script`, render explicit avec `size="flexible"`. Renvoie `null` si la site key est absente (zero-cost no-op).
+- **Config** : `services.turnstile.{site_key,secret_key}` lus depuis `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY`. La site key est exposée au frontend via `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (optionnel) et/ou `GET /api/v1/config/turnstile` (`TurnstilePublicConfigController`, throttle 120/min).
+- **Frontend** : `src/components/auth/TurnstileWidget.tsx` — rendu **explicit** (`api.js?render=explicit`), **`render()` après `Script.onLoad` uniquement** (pas `turnstile.ready()` : incompatible avec le `defer` imposé par `next/script` afterInteractive — erreur Cloudflare sinon), préconnexion `challenges.cloudflare.com`, `size="flexible"`. `src/hooks/useTurnstileSiteKey.ts` : sur hôtes de dev (`localhost`, `127.0.0.1`, `*.test`, etc.) on **ignore** `NEXT_PUBLIC_TURNSTILE_SITE_KEY` si défini et on lit `GET /config/turnstile` — aligne le widget sur les clés factices Laravel (`APP_ENV=local` + clés vides) et évite l’erreur **110200** quand seule l’API autorise localhost. Sur hôtes « prod-like », `NEXT_PUBLIC_*` prime ; sinon fetch `/config/turnstile` comme repli Vercel. `TurnstileConfigAlert` + `onErrorCode` sur `/login`, `/owner/login`, `/register` guident la config Cloudflare si le widget échoue.
 - **Câblage login** : page `/login` pose `turnstileToken` dans le state, le passe à `login(email, password, token)` ; le bouton submit est désactivé tant que le token n'est pas obtenu (uniquement si Turnstile est configuré). `useAuthActions.login`/`loginOwner` et `authService.login` étendus pour accepter le 4ᵉ argument optionnel.
-- **Intégration UI complète** : Turnstile rendu sur `/login` (action=`login`), `/owner/login` (action=`login-owner`) et `/register` (action=`register-customer` ou `register-agent` selon le rôle). Le bouton submit est gated tant que le token n'est pas obtenu (uniquement quand `NEXT_PUBLIC_TURNSTILE_SITE_KEY` est défini). `authService.registerCustomer` / `registerAgent` propagent `turnstile_token` (champ optionnel) vers le backend. `RegistrationService::register` l'extrait via `$request->input('turnstile_token')` — vérification via `TurnstileService::verify()` avant rate-limit hit, échec → `ValidationException` ciblée sur `turnstile_token`. `.env.example` (backend + frontend) documente `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` / `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. **Fail-open en dev** : si `TURNSTILE_SECRET_KEY` est vide, `TurnstileService::isConfigured()` retourne `false` et la vérification est sautée — l'environnement de test reste fonctionnel sans compte Cloudflare.
+- **Intégration UI complète** : Turnstile rendu sur `/login` (action=`login`), `/owner/login` (action=`login-owner`) et `/register` (action=`register-customer` ou `register-agent` selon le rôle). Sur les pages login, l’ordre du formulaire est : mot de passe → Turnstile (`minHeight`) → lien mot de passe oublié → « Se connecter ». Le submit reste désactivé tant que la config Turnstile n’est pas résolue ; si un widget est affiché, jusqu’à token Cloudflare. `authService.registerCustomer` / `registerAgent` propagent `turnstile_token` (champ optionnel) vers le backend. `RegistrationService::register` l'extrait via `$request->input('turnstile_token')` — vérification via `TurnstileService::verify()` avant rate-limit hit, échec → `ValidationException` ciblée sur `turnstile_token`. `.env.example` (backend + frontend) documente `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` / `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. **Fail-open en dev** : si `TURNSTILE_SECRET_KEY` est vide, `TurnstileService::isConfigured()` retourne `false` et la vérification est sautée — l'environnement de test reste fonctionnel sans compte Cloudflare.
 
 ### IA — qualité enhancer
 
@@ -1601,7 +1617,7 @@ Round de fixes ciblés sur les bugs visibles signalés par l'utilisateur (chat c
 - **`AiSearchService::extractJson` robuste** : parser à profondeur de braces qui gère JSON imbriqué, code fences ` ```json `, escapes dans les strings. Tests unitaires (`tests/Unit/AiSearchExtractJsonTest.php`).
 - **`DirectionsService` negative cache** : `NEGATIVE_CACHE_TTL=300s` sentinel sur échec ORS → suppression des retries inutiles pendant les outages.
 - **Indexes DB perf** (`2026_05_02_080000_add_perf_indexes_for_global_scale.php`) : composite indexes sur `ad`, `ad_interactions`, `payments`, `tentative_reservations`, `lease_contracts`, `login_histories`. Migration **idempotente** (`Schema::hasTable` + `pg_indexes` introspection).
-- **Endpoints publics avec `cdn.cache`** : `recommendations` (10 min), `price-heatmap` (30 min), `rent-estimate` (10 min). Réduit la charge backend en s'appuyant sur Cloudflare edge.
+- **Endpoints publics avec `cdn.cache`** : `recommendations` (10 min), `price-heatmap` (30 min), `rent-estimate` (600 s) — réduit la charge backend en s'appuyant sur Cloudflare edge. **`RentEstimatorController`** : annonces `is_visible` + statuts publics, loyers uniquement (`transaction_type = location` ou `null`, jamais `vente`), échantillon `/m²` borné pour limiter les valeurs aberrantes ; si aucune location pour le `type_id` demandé, repli sur toute la ville avec `type_scope_matched: false` dans le JSON (widget `/prix-marche` affiche un avertissement).
 - **`scout:import` retiré du deploy CI** — full reindex bloquait à plat sur catalogue large. Reindex incremental via observers Searchable, full reindex en cron nocturne.
 
 ### Architecture / SOLID

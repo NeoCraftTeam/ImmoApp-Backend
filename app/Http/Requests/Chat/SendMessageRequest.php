@@ -52,7 +52,7 @@ final class SendMessageRequest extends FormRequest
             'attachments.*.url' => ['required_with:attachments', 'string', 'max:500'],
             'attachments.*.signed_url' => ['required_with:attachments', 'string', 'url', 'max:2048'],
             'attachments.*.original_name' => ['required_with:attachments', 'string', 'max:255'],
-            'attachments.*.mime_type' => ['required_with:attachments', 'string', 'in:image/jpeg,image/png,image/webp,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,audio/webm,audio/mp4,audio/mpeg,audio/mp3,audio/x-m4a,audio/m4a,audio/ogg,audio/wav,video/mp4'],
+            'attachments.*.mime_type' => ['required_with:attachments', 'string', 'in:image/jpeg,image/png,image/webp,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,audio/webm,video/webm,audio/mp4,audio/mpeg,audio/mp3,audio/x-m4a,audio/m4a,audio/ogg,audio/wav,video/mp4'],
             'attachments.*.size' => ['required_with:attachments', 'integer', 'min:1', 'max:20971520'],
             'attachments.*.type' => ['required_with:attachments', 'string', 'in:image,file,audio'],
             'attachments.*.audio_duration_ms' => ['nullable', 'integer', 'min:100', 'max:120000'],

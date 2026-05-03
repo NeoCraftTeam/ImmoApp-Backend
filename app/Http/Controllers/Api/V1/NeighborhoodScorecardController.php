@@ -13,7 +13,7 @@ use OpenApi\Attributes as OA;
 #[OA\Get(
     path: '/api/v1/ads/{ad}/neighborhood-scorecard',
     summary: 'Scorecard de quartier',
-    description: 'Retourne les scores basés sur des nœuds OpenStreetMap réels. Distances : orthodromiques par défaut (status=ok), ou piéton via OpenRouteService si ORS_API_KEY est défini. status=degraded si ORS est configuré mais indisponible. status=unavailable si Overpass échoue.',
+    description: 'Retourne les scores basés sur des nœuds OpenStreetMap réels. Distances piétonnes via OpenRouteService lorsque ORS_API_KEY est défini (en-tête Authorization Bearer). Sans clé : distances orthodromiques (ligne droite, status=ok). status=degraded si ORS est configuré mais indisponible. status=unavailable si Overpass échoue.',
     tags: ['🏠 Annonces'],
     parameters: [
         new OA\Parameter(name: 'ad', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid')),

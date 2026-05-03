@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\AdStatus;
+use App\Enums\PropertyAttribute;
 use App\Enums\TransactionType;
 use App\Enums\UserType;
 use App\Enums\VerificationStatus;
@@ -281,6 +282,19 @@ class Ad extends Model implements HasMedia
         return $slug;
     }
 
+    /**
+     * True when the listing is furnished (explicit attribute and/or type name typical of meublé listings).
+     */
+    public function isFurnishedForSearch(): bool
+    {
+        $attrs = $this->getAttribute('attributes');
+        if (is_array($attrs) && in_array(PropertyAttribute::Furnished->value, $attrs, true)) {
+            return true;
+        }
+
+        return (bool) preg_match('/meubl/i', (string) ($this->ad_type?->name ?? ''));
+    }
+
     public function toSearchableArray(): array
     {
         return [
@@ -295,6 +309,7 @@ class Ad extends Model implements HasMedia
             'has_parking' => (bool) $this->has_parking,
             'has_3d_tour' => (bool) $this->has_3d_tour,
             'is_verified' => (bool) $this->is_verified,
+            'is_furnished' => $this->isFurnishedForSearch(),
             'status' => $this->status,
             'is_visible' => (bool) $this->is_visible,
 

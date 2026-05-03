@@ -26,6 +26,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property bool|null $has_parking
  * @property string|null $query
  * @property bool $is_active
+ * @property bool $notify_email
+ * @property bool $notify_push
  * @property Carbon|null $last_notified_at
  * @property Carbon $created_at
  * @property Carbon $updated_at
@@ -49,6 +51,8 @@ final class SearchAlert extends Model
         'has_parking',
         'query',
         'is_active',
+        'notify_email',
+        'notify_push',
         'last_notified_at',
     ];
 
@@ -57,6 +61,8 @@ final class SearchAlert extends Model
     {
         return [
             'is_active' => 'boolean',
+            'notify_email' => 'boolean',
+            'notify_push' => 'boolean',
             'has_parking' => 'boolean',
             'price_min' => 'integer',
             'price_max' => 'integer',

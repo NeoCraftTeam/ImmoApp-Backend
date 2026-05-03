@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Support\OpenRouteServiceAuth;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -79,7 +80,11 @@ final readonly class IsochroneService
         try {
             $response = $this->http
                 ->timeout(10)
-                ->withHeaders(['Authorization' => $apiKey])
+                ->withHeaders([
+                    'Authorization' => OpenRouteServiceAuth::authorizationHeader($apiKey),
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                ])
                 ->post(self::ORS_URL.'/'.$profile, [
                     'locations' => [[$lng, $lat]],
                     'range' => [$rangeMinutes * 60],

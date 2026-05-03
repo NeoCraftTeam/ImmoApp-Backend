@@ -12,7 +12,6 @@ use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * Broadcast when a new message is sent.
@@ -52,7 +51,7 @@ final class MessageSent implements ShouldBroadcastNow
             'sender' => $sender ? [
                 'id' => $sender->id,
                 'name' => trim("{$sender->firstname} {$sender->lastname}"),
-                'avatar' => $this->resolveAvatarUrl($sender->getFirstMediaUrl('avatars') ?: $sender->avatar),
+                'avatar' => $sender->resolveChatAvatarUrl(),
             ] : null,
             'type' => $this->message->type->value,
             'body' => $isSealed ? null : $this->message->decrypted_body,
@@ -68,22 +67,6 @@ final class MessageSent implements ShouldBroadcastNow
             'deleted_at' => $this->message->deleted_at?->toIso8601String(),
             'created_at' => $this->message->created_at?->toIso8601String(),
         ];
-    }
-
-    private function resolveAvatarUrl(?string $avatar): ?string
-    {
-        if (!$avatar) {
-            return null;
-        }
-        if (str_starts_with($avatar, 'http')) {
-            return $avatar;
-        }
-        $disk = config('filesystems.app_media_disk');
-        if (Storage::disk($disk)->exists($avatar)) {
-            return Storage::disk($disk)->url($avatar);
-        }
-
-        return null;
     }
 
     /** @return array<string, mixed>|null */

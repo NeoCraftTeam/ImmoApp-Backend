@@ -14,6 +14,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Storage;
 
 uses(RefreshDatabase::class);
 
@@ -305,6 +306,23 @@ it('rejects attachment upload to an archived conversation', function (): void {
             'Accept' => 'application/json',
         ])
         ->assertUnprocessable();
+});
+
+it('accepts voice upload when finfo reports video_webm (MediaRecorder WebM)', function (): void {
+    ['tenant' => $tenant, 'conversation' => $conv] = makeConversationParticipants();
+    Storage::fake('r2');
+
+    $file = UploadedFile::fake()->create('voice.webm', 8, 'video/webm');
+
+    $this->actingAs($tenant)
+        ->post("/api/v1/conversations/{$conv->id}/attachments", [
+            'file' => $file,
+        ], [
+            'Accept' => 'application/json',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.mime_type', 'audio/webm')
+        ->assertJsonPath('data.type', 'audio');
 });
 
 // ─── DELETE /messages/{uuid} ──────────────────────────────────────────────────

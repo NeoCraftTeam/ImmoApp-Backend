@@ -156,6 +156,7 @@ return [
                     'has_parking',
                     'has_3d_tour',
                     'is_verified',
+                    'is_furnished',
                     'is_boosted',
                     '_geo',
                     'attributes',

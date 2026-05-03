@@ -14,6 +14,7 @@ use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\LivewireLongRunningRequest;
 use App\Http\Middleware\LocaleResolver;
 use App\Http\Middleware\OptionalAuth;
+use App\Http\Middleware\PreventAuthEndpointEdgeCaching;
 use App\Http\Middleware\RequireApiMfa;
 use App\Http\Middleware\ResolveSanctumBearerUser;
 use App\Http\Middleware\RoleScopedSession;
@@ -83,6 +84,7 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureEmailIsVerified::class,
             SanitizeInput::class,
             CacheHeaders::class,
+            PreventAuthEndpointEdgeCaching::class,
             TouchLastSeen::class,
         ]);
         $middleware->prependToGroup('web', LocaleResolver::class);

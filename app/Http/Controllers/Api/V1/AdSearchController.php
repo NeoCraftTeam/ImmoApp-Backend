@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\AdStatus;
+use App\Enums\PropertyAttribute;
 use App\Http\Requests\AdRequest;
 use App\Http\Resources\AdResource as AdApiResource;
 use App\Models\Ad;
@@ -137,7 +138,11 @@ final readonly class AdSearchController
                 $filters[] = sprintf('is_verified = %s', $isVerified ? 'true' : 'false');
             }
             foreach ($amenities as $amenity) {
-                $filters[] = sprintf("attributes = '%s'", str_replace("'", "\\'", $amenity));
+                if ($amenity === PropertyAttribute::Furnished->value) {
+                    $filters[] = "(attributes = 'furnished' OR is_furnished = true)";
+                } else {
+                    $filters[] = sprintf("attributes = '%s'", str_replace("'", "\\'", $amenity));
+                }
             }
 
             $filters[] = "status = 'available'";
@@ -287,7 +292,14 @@ final readonly class AdSearchController
         }
 
         foreach ($amenities as $amenity) {
-            $query->whereJsonContains('attributes', $amenity);
+            if ($amenity === PropertyAttribute::Furnished->value) {
+                $query->where(function ($qb): void {
+                    $qb->whereJsonContains('attributes', PropertyAttribute::Furnished->value)
+                        ->orWhereHas('ad_type', fn ($q) => $q->where('name', 'ilike', '%meubl%'));
+                });
+            } else {
+                $query->whereJsonContains('attributes', $amenity);
+            }
         }
 
         $allowedSorts = ['price', 'surface_area', 'created_at'];

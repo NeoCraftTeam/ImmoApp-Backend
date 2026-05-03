@@ -29,7 +29,7 @@ class SearchAlertMatchMail extends Mailable implements ShouldQueue
         public SearchAlert $alert,
         public User $recipient
     ) {
-        $this->adUrl = config('app.frontend_url').'/ads/'.urlencode((string) $ad->id).'/'.urlencode($ad->slug);
+        $this->adUrl = rtrim((string) config('app.frontend_url'), '/').'/ads/'.rawurlencode((string) $ad->slug);
         $this->formattedPrice = number_format((float) ($ad->price ?? 0), 0, ',', ' ').' FCFA';
         $this->applyRecipientLocale();
     }

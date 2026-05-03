@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Support\OpenRouteServiceAuth;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -106,9 +107,13 @@ final readonly class DirectionsService
     ): ?array {
         try {
             $response = $this->http
-                ->connectTimeout(3)
-                ->timeout(5)
-                ->withHeaders(['Authorization' => $apiKey])
+                ->connectTimeout(5)
+                ->timeout(12)
+                ->withHeaders([
+                    'Authorization' => OpenRouteServiceAuth::authorizationHeader($apiKey),
+                    'Accept' => 'application/json',
+                    'Content-Type' => 'application/json',
+                ])
                 ->post(self::ORS_URL.'/'.$profile.'/geojson', [
                     'coordinates' => [
                         [$fromLng, $fromLat],

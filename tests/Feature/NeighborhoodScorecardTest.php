@@ -77,6 +77,11 @@ function fakeHttpFactory(array $urlMap): Factory
             return $this;
         }
 
+        public function connectTimeout(int $seconds): static
+        {
+            return $this;
+        }
+
         public function retry(int $times, int $sleep = 0): static
         {
             return $this;

@@ -22,6 +22,8 @@ class SearchAlertFactory extends Factory
             'city_name' => fake()->city(),
             'query' => fake()->word(),
             'is_active' => true,
+            'notify_email' => true,
+            'notify_push' => true,
         ];
     }
 }

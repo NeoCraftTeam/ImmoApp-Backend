@@ -424,10 +424,13 @@ Retourne exactement ces 11 clés. Utilise null si un critère n'est pas mentionn
 - "haut de gamme"/"luxe"/"standing" → price_min: 300000 si location, 50000000 si vente, 300000 si null.
 
 ### TYPE DE BIEN
-- Utilise UNIQUEMENT les noms exacts de la liste fournie dans le référentiel.
+- Utilise UNIQUEMENT les noms **exactement tels qu'ils figurent** dans la liste du référentiel.
+- Si la liste distingue "simple" et "meublé" (ex. "appartement simple" vs "appartement meublé", "studio meublé"),
+  mets **type_name** sur l'entrée exacte correspondant à la requête. Ex. "appartement meublé à Douala" → type_name: "appartement meublé", pas un libellé générique "Appartement" seul.
+- mets **furnished: true** dès que la requête contient "meublé", "meublée" ou "meuble", même si type_name est déjà une variante meublée.
 - Synonymes courants :
-  "appart"/"appartement"/"flat" → cherche "Appartement" dans la liste
-  "studio" → cherche "Studio" dans la liste (jamais "Appartement")
+  "appart"/"appartement"/"flat" → choisis dans la liste la ligne la plus précise (simple vs meublé selon les mots de la requête) ; si la requête ne précise pas, utilise le nom générique le plus proche **présent dans la liste**.
+  "studio" → choisis "studio simple", "studio meublé" ou "Studio" selon la liste et la requête (jamais un type "Appartement").
   "villa"/"duplex"/"bungalow"/"maison"/"domicile" → cherche "Maison" ou "Villa" dans la liste
   "boutique"/"commerce"/"bureau"/"local commercial"/"magasin" → cherche "Commerce" dans la liste
   "terrain"/"parcelle"/"lot" → cherche "Terrain" dans la liste
@@ -452,8 +455,11 @@ Retourne exactement ces 11 clés. Utilise null si un critère n'est pas mentionn
 Requête : "je cherche un studio meublé à louer à Yaoundé moins de 80 000 fcfa"
 Réponse : {"transaction_type":"location","type_name":"Studio","city_name":"Yaoundé","quarter_name":null,"bedrooms":null,"price_min":null,"price_max":80000,"surface_min":null,"has_parking":null,"furnished":true,"q":null}
 
+Requête : "appartement meublé à Douala à 150000 fcfa"
+Réponse : {"transaction_type":null,"type_name":"appartement meublé","city_name":"Douala","quarter_name":null,"bedrooms":null,"price_min":null,"price_max":150000,"surface_min":null,"has_parking":null,"furnished":true,"q":null}
+
 Requête : "appartement F3 avec parking à Bonapriso Douala"
-Réponse : {"transaction_type":null,"type_name":"Appartement","city_name":"Douala","quarter_name":"Bonapriso","bedrooms":3,"price_min":null,"price_max":null,"surface_min":null,"has_parking":true,"furnished":null,"q":null}
+Réponse : {"transaction_type":null,"type_name":"appartement simple","city_name":"Douala","quarter_name":"Bonapriso","bedrooms":3,"price_min":null,"price_max":null,"surface_min":null,"has_parking":true,"furnished":null,"q":null}
 
 Requête : "villa à vendre luxueuse avec piscine à Bastos Yaoundé"
 Réponse : {"transaction_type":"vente","type_name":"Maison","city_name":"Yaoundé","quarter_name":"Bastos","bedrooms":null,"price_min":50000000,"price_max":null,"surface_min":null,"has_parking":null,"furnished":null,"q":"piscine luxe"}
@@ -532,12 +538,25 @@ PROMPT;
         ];
 
         if (!empty($parsed['type_name'])) {
-            $type = AdType::where('name', 'ilike', '%'.$parsed['type_name'].'%')->first();
-            if ($type) {
+            $furnPref = array_key_exists('furnished', $parsed) && $parsed['furnished'] !== null
+                ? (bool) $parsed['furnished']
+                : null;
+            $type = AdType::resolveFromNaturalSearchHint(
+                $parsed['type_name'],
+                $originalQuery,
+                $furnPref,
+            );
+            if ($type instanceof AdType) {
                 $result['type_id'] = $type->id;
                 $result['type_name'] = $type->name;
             }
         }
+
+        $fromQueryFurnished = (bool) preg_match('/meublée?|meuble\b/ui', $originalQuery);
+        $parsedFurn = $parsed['furnished'] ?? null;
+        $result['furnished'] = $fromQueryFurnished || $parsedFurn === true
+            ? true
+            : ($parsedFurn === false ? false : null);
 
         if (!empty($parsed['city_name'])) {
             $city = City::where('name', 'ilike', $parsed['city_name'])->first();

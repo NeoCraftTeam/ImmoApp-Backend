@@ -10,6 +10,30 @@ use App\Notifications\AdReportReceivedNotification;
 use App\Notifications\NewAdListingReportNotification;
 use Illuminate\Support\Facades\Notification;
 
+it('records a database notification for the reporter even without mail channel when email is invalid', function (): void {
+    Notification::fake();
+
+    $owner = User::factory()->agents()->create();
+    User::factory()->admin()->create();
+    $reporter = User::factory()->customers()->create([
+        'email' => 'not-a-valid-email',
+    ]);
+
+    $ad = Ad::factory()->create(['user_id' => $owner->id]);
+
+    $response = $this
+        ->actingAs($reporter, 'sanctum')
+        ->postJson("/api/v1/ads/{$ad->id}/reports", [
+            'reason' => 'inaccurate',
+        ]);
+
+    $response->assertCreated();
+
+    Notification::assertSentTo($reporter, AdReportReceivedNotification::class, function (AdReportReceivedNotification $notification, array $channels): bool {
+        return $channels === ['database'];
+    });
+});
+
 it('allows an authenticated customer to report an ad and notifies admins', function (): void {
     Notification::fake();
 

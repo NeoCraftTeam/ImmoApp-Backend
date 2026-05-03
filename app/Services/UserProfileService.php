@@ -13,7 +13,6 @@ use App\Models\UnlockedAd;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 /**
@@ -107,18 +106,7 @@ final readonly class UserProfileService
      */
     public function resolveAvatarUrl(User $user): ?string
     {
-        $mediaUrl = $user->getFirstMediaUrl('avatars');
-        if ($mediaUrl !== '' && $mediaUrl !== '0') {
-            return $mediaUrl;
-        }
-
-        if ($user->avatar) {
-            return str_starts_with((string) $user->avatar, 'http')
-                ? $user->avatar
-                : Storage::disk(config('filesystems.app_media_disk'))->url($user->avatar);
-        }
-
-        return null;
+        return $user->resolveChatAvatarUrl();
     }
 
     /**

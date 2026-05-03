@@ -8,7 +8,6 @@ use App\Models\Message;
 use App\Services\Chat\AttachmentService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * API resource for a single message.
@@ -21,22 +20,6 @@ use Illuminate\Support\Facades\Storage;
  */
 final class MessageResource extends JsonResource
 {
-    private function resolveAvatarUrl(?string $avatar): ?string
-    {
-        if (!$avatar) {
-            return null;
-        }
-        if (str_starts_with($avatar, 'http')) {
-            return $avatar;
-        }
-        $disk = config('filesystems.app_media_disk');
-        if (Storage::disk($disk)->exists($avatar)) {
-            return Storage::disk($disk)->url($avatar);
-        }
-
-        return null;
-    }
-
     /** @return array<string, mixed> */
     #[\Override]
     public function toArray(Request $request): array
@@ -54,7 +37,7 @@ final class MessageResource extends JsonResource
             'sender' => $sender ? [
                 'id' => $sender->id,
                 'name' => trim("{$sender->firstname} {$sender->lastname}"),
-                'avatar' => $this->resolveAvatarUrl($sender->getFirstMediaUrl('avatars') ?: $sender->avatar),
+                'avatar' => $sender->resolveChatAvatarUrl(),
             ] : null,
             'type' => $msg->type->value,
             'is_client_sealed' => $isSealed,

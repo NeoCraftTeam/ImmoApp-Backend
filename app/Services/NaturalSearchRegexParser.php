@@ -51,16 +51,17 @@ class NaturalSearchRegexParser
             'commerce' => ['commerce', 'boutique', 'local commercial', 'bureau'],
         ];
 
-        $adTypes = Cache::remember('regex_parser:ad_types', 21600, fn () => AdType::all());
+        $furnishedPref = str_contains($query, 'meublé') || str_contains($query, 'meuble') ? true : null;
 
-        foreach ($typeMap as $typeName => $keywords) {
+        foreach ($typeMap as $typeBaseHint => $keywords) {
             foreach ($keywords as $kw) {
                 if (str_contains($query, $kw)) {
-                    $type = $adTypes->first(fn ($t) => mb_stripos((string) $t->name, $typeName) !== false);
-                    if ($type) {
+                    $type = AdType::resolveFromNaturalSearchHint($typeBaseHint, $query, $furnishedPref);
+                    if ($type instanceof AdType) {
                         $result['type_id'] = $type->id;
                         $result['type_name'] = $type->name;
                     }
+
                     break 2;
                 }
             }

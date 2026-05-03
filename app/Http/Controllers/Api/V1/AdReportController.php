@@ -87,7 +87,7 @@ final readonly class AdReportController
         );
 
         return response()->json([
-            'message' => 'Signalement envoye. Merci de nous aider a proteger la communaute.',
+            'message' => 'Signalement envoyé. Merci d\'aider à protéger la communauté.',
             'data' => [
                 'id' => $report->id,
                 'status' => $report->status->value,

@@ -15,6 +15,7 @@ use App\Models\Payment;
 use App\Models\PointPackage;
 use App\Models\Setting;
 use App\Services\Payment\PaymentService;
+use App\Support\FrontendRedirectGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -139,6 +140,20 @@ final class CreditController
             ], 422);
         }
 
+        $validated = $request->validate([
+            'callback_url' => ['nullable', 'string', 'url', 'max:2048'],
+        ]);
+
+        $redirectUrl = null;
+        if (!empty($validated['callback_url'])) {
+            if (!FrontendRedirectGuard::isAllowedAbsoluteUrl($validated['callback_url'])) {
+                return response()->json([
+                    'message' => 'URL de retour non autorisée.',
+                ], 422);
+            }
+            $redirectUrl = $validated['callback_url'];
+        }
+
         $user = $request->user();
 
         try {
@@ -148,6 +163,7 @@ final class CreditController
                 'payment_method' => 'flutterwave',
                 'plan_id' => $package->id,
                 'description' => "Achat pack: {$package->name}",
+                'redirect_url' => $redirectUrl,
                 'meta' => [
                     'package_id' => $package->id,
                 ],

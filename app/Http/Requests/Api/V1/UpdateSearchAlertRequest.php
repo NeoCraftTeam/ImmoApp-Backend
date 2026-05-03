@@ -30,6 +30,8 @@ final class UpdateSearchAlertRequest extends FormRequest
             'has_parking' => ['nullable', 'boolean'],
             'query' => ['nullable', 'string', 'max:200'],
             'is_active' => ['nullable', 'boolean'],
+            'notify_email' => ['nullable', 'boolean'],
+            'notify_push' => ['nullable', 'boolean'],
         ];
     }
 }

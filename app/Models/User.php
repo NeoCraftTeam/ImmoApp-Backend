@@ -11,6 +11,7 @@ use App\Enums\UserType;
 use App\Mail\ForgotPasswordMail;
 use App\Mail\VerificationCodeMail;
 use App\Mail\VerifyEmailMail;
+use App\Support\ChatAvatarUrl;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\UserFactory;
 use Eloquent;
@@ -528,6 +529,17 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
         // Privacy: Return null to let Filament/Frontend handle the default placeholder
         return null;
+    }
+
+    /**
+     * Avatar URL for chat APIs and realtime payloads (Spatie avatars → avatar column → null).
+     */
+    public function resolveChatAvatarUrl(): ?string
+    {
+        $mediaUrl = $this->getFirstMediaUrl('avatars');
+        $raw = ($mediaUrl !== '' && $mediaUrl !== '0') ? $mediaUrl : $this->avatar;
+
+        return ChatAvatarUrl::resolve($raw !== null && $raw !== '' ? (string) $raw : null);
     }
 
     public function getAppAuthenticationSecret(): ?string

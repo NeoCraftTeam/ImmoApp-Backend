@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
-use App\Enums\UserRole;
+use App\Models\Ad;
 use App\Models\FcmToken;
-use App\Models\Message;
-use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -23,11 +21,10 @@ use Kreait\Firebase\Messaging\Notification;
 use Kreait\Firebase\Messaging\WebPushConfig;
 
 /**
- * Send a Firebase FCM push notification to the message recipient.
- * Runs on the 'notifications' queue for priority delivery.
- * Invalid FCM tokens are automatically removed from the database.
+ * FCM push for search-alert matches (mobile / web tokens). Web Push browser path is handled
+ * by {@see SearchAlertMatchNotification} when the user has no FCM registration.
  */
-final class SendChatPushNotificationJob implements ShouldQueue
+final class SendSearchAlertFcmJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -36,48 +33,30 @@ final class SendChatPushNotificationJob implements ShouldQueue
     public int $backoff = 30;
 
     public function __construct(
-        public readonly string $recipientId,
-        public readonly string $messageId,
+        public readonly string $recipientUserId,
+        public readonly string $adId,
     ) {
         $this->onQueue('notifications');
     }
 
     public function handle(): void
     {
-        $message = Message::withTrashed()->find($this->messageId);
+        $ad = Ad::query()->find($this->adId);
 
-        if ($message === null) {
+        if ($ad === null) {
             return;
         }
 
-        if ($message->trashed()) {
-            return;
-        }
-
-        $tokens = FcmToken::where('user_id', $this->recipientId)
+        $tokens = FcmToken::where('user_id', $this->recipientUserId)
             ->pluck('token', 'id');
 
         if ($tokens->isEmpty()) {
             return;
         }
 
-        $sender = $message->sender;
-        $title = $sender ? trim("{$sender->firstname} {$sender->lastname}") : 'KeyHome';
-
-        $body = $message->is_client_sealed
-            ? '🔐 Message sécurisé'
-            : ($message->decrypted_body !== null
-                ? mb_substr($message->decrypted_body, 0, 100)
-                : '📎 Pièce jointe');
-
-        // Build the deep-link URL for the conversation so notification taps
-        // go directly to the right chat panel (owner vs client).
-        // ADMIN users use the owner panel as well — only CUSTOMER goes client-side.
-        $recipient = User::find($this->recipientId);
-        $isOwnerPanel = $recipient !== null
-            && in_array($recipient->role, [UserRole::AGENT, UserRole::ADMIN], true);
-        $basePath = $isOwnerPanel ? '/owner/messages' : '/messages';
-        $conversationUrl = $basePath.'/'.$message->conversation_id;
+        $title = 'Nouvelle annonce pour vous !';
+        $body = $ad->title.' — '.number_format((float) ($ad->price ?? 0), 0, ',', ' ').' FCFA';
+        $adUrl = rtrim((string) config('app.frontend_url'), '/').'/ads/'.rawurlencode((string) $ad->slug);
 
         $credentialsPath = (string) config('chat.firebase.credentials');
         if (!file_exists(storage_path('../'.ltrim($credentialsPath, '/')))) {
@@ -85,7 +64,7 @@ final class SendChatPushNotificationJob implements ShouldQueue
         }
 
         if (!file_exists($credentialsPath)) {
-            Log::warning('[FCM] Firebase credentials not found. Skipping push notification.', [
+            Log::warning('[FCM] Firebase credentials not found. Skipping search-alert push.', [
                 'path' => $credentialsPath,
             ]);
 
@@ -98,19 +77,12 @@ final class SendChatPushNotificationJob implements ShouldQueue
 
             $invalidTokenIds = [];
 
-            // Per-platform priority + lifecycle config:
-            //   - Android: priority=high so the device wakes from doze even with the
-            //     screen off (default 'normal' is heavily throttled in deep sleep).
-            //   - iOS (APNs): apns-priority=10 + alert content so PWA push is
-            //     delivered in real time even when the user has the screen locked.
-            //   - WebPush: Urgency: high so browsers (Chromium / Firefox) prioritise
-            //     delivery over best-effort batching.
             $androidConfig = AndroidConfig::fromArray([
                 'priority' => 'high',
                 'ttl' => '86400s',
                 'notification' => [
                     'sound' => 'default',
-                    'click_action' => $conversationUrl,
+                    'click_action' => $adUrl,
                 ],
             ]);
 
@@ -123,7 +95,6 @@ final class SendChatPushNotificationJob implements ShouldQueue
                     'aps' => [
                         'alert' => ['title' => $title, 'body' => $body],
                         'sound' => 'default',
-                        'mutable-content' => 1,
                     ],
                 ],
             ]);
@@ -136,12 +107,11 @@ final class SendChatPushNotificationJob implements ShouldQueue
                 'notification' => [
                     'icon' => '/icons/icon-192x192.png',
                     'badge' => '/icons/icon-192x192.png',
-                    'tag' => 'chat-'.$message->conversation_id,
+                    'tag' => 'search-alert-'.$ad->id,
                     'renotify' => true,
-                    'requireInteraction' => false,
                 ],
                 'fcm_options' => [
-                    'link' => $conversationUrl,
+                    'link' => $adUrl,
                 ],
             ]);
 
@@ -151,10 +121,9 @@ final class SendChatPushNotificationJob implements ShouldQueue
                         ->withToken($token)
                         ->withNotification(Notification::create($title, $body))
                         ->withData([
-                            'type' => 'chat_message',
-                            'conversation_uuid' => $message->conversation_id,
-                            'sender_id' => $message->sender_id,
-                            'url' => $conversationUrl,
+                            'type' => 'search_alert_match',
+                            'ad_id' => $ad->id,
+                            'url' => $adUrl,
                         ])
                         ->withAndroidConfig($androidConfig)
                         ->withApnsConfig($apnsConfig)
@@ -166,18 +135,20 @@ final class SendChatPushNotificationJob implements ShouldQueue
                 } catch (NotFound) {
                     $invalidTokenIds[] = $tokenId;
                 } catch (\Throwable $e) {
-                    Log::error('[FCM] Failed to send push notification', [
+                    Log::error('[FCM] Search-alert push failed', [
                         'token_id' => $tokenId,
                         'error' => $e->getMessage(),
                     ]);
                 }
             }
 
-            if (!empty($invalidTokenIds)) {
+            if ($invalidTokenIds !== []) {
                 FcmToken::whereIn('id', $invalidTokenIds)->delete();
             }
         } catch (\Throwable $e) {
-            Log::error('[FCM] Firebase initialization failed', ['error' => $e->getMessage()]);
+            Log::error('[FCM] Firebase init failed (search alert)', [
+                'error' => $e->getMessage(),
+            ]);
         }
     }
 }

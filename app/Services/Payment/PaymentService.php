@@ -44,6 +44,7 @@ final readonly class PaymentService
      *     plan_id?: string|null,
      *     period?: string|null,
      *     description?: string,
+     *     redirect_url?: string|null,
      *     meta?: array<string, mixed>
      * } $data
      * @return array{payment: Payment, link: string, tx_ref: string, gateway: string}
@@ -61,8 +62,13 @@ final readonly class PaymentService
             'period' => $data['period'] ?? null,
         ]);
 
-        $redirectUrl = config('payment.gateways.flutterwave.redirect_url')
-            ?: config('app.frontend_url', config('app.url')).'/payment/callback';
+        $redirectUrl = $data['redirect_url'] ?? null;
+        $redirectUrl = is_string($redirectUrl) && $redirectUrl !== '' ? $redirectUrl : null;
+
+        if ($redirectUrl === null) {
+            $redirectUrl = config('payment.gateways.flutterwave.redirect_url')
+                ?: config('app.frontend_url', config('app.url')).'/payment/callback';
+        }
 
         $gatewayPayload = [
             'amount' => $data['amount'],

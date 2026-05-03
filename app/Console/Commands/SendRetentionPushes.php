@@ -12,7 +12,6 @@ use Illuminate\Console\Command;
  *
  * Triggers (all frequency-capped via Redis):
  *   win_back             — dormant users (no login ≥ 3 days) with push subscription
- *   search_alert_match   — new published ad matches an active search alert
  *   price_drop           — a favorited ad's price dropped by ≥ 5 000 FCFA
  *   viewing_reminder     — confirmed viewing slot is tomorrow
  *   lease_expiry         — lease contract ends in 30 or 7 days
@@ -24,7 +23,7 @@ final class SendRetentionPushes extends Command
 {
     protected $signature = 'app:send-retention-pushes {--dry-run : Show trigger targets without actually sending}';
 
-    protected $description = 'Send behavioral retention push notifications (win-back, price drop, viewing reminders, search alerts, lease expiry)';
+    protected $description = 'Send behavioral retention push notifications (win-back, price drop, viewing reminders, lease expiry)';
 
     public function handle(RetentionPushService $service): int
     {
@@ -36,7 +35,6 @@ final class SendRetentionPushes extends Command
 
         $triggers = [
             'win_back' => $service->winBackDormantUsers(...),
-            'search_alert_matches' => $service->notifySearchAlertMatches(...),
             'price_drops' => $service->notifyPriceDropOnFavorites(...),
             'viewing_reminders' => $service->notifyViewingReminders(...),
             'lease_expiries' => $service->notifyLeaseExpiries(...),

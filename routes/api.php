@@ -38,6 +38,7 @@ use App\Http\Controllers\Api\V1\StatsController;
 use App\Http\Controllers\Api\V1\TeamController;
 use App\Http\Controllers\Api\V1\TenantController;
 use App\Http\Controllers\Api\V1\TrustScoreController;
+use App\Http\Controllers\Api\V1\TurnstilePublicConfigController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\VisitTrackingController;
 use App\Models\AdType;
@@ -60,6 +61,9 @@ Route::get('/health', HealthCheckController::class)
 
 // Prefix routes
 Route::prefix('v1')->group(function (): void {
+
+    Route::get('/config/turnstile', TurnstilePublicConfigController::class)
+        ->middleware('throttle:120,1');
 
     // Domain route files
     require __DIR__.'/api/auth.php';

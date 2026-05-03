@@ -69,11 +69,11 @@ class ReportAdListingRequest extends FormRequest
         return [
             'reason.required' => 'Veuillez choisir le motif principal du signalement.',
             'scam_reason.required' => 'Veuillez choisir la raison de l\'arnaque.',
-            'payment_methods.required' => 'Veuillez preciser au moins une methode de paiement.',
-            'payment_methods.min' => 'Veuillez choisir au moins une methode de paiement.',
-            'payment_methods.max' => 'Le nombre de methodes de paiement selectionnees est trop eleve.',
-            'description.required' => 'Veuillez decrire le probleme.',
-            'description.min' => 'Veuillez decrire le probleme avec au moins 10 caracteres.',
+            'payment_methods.required' => 'Veuillez préciser au moins une méthode de paiement.',
+            'payment_methods.min' => 'Veuillez choisir au moins une méthode de paiement.',
+            'payment_methods.max' => 'Le nombre de méthodes de paiement sélectionnées est trop élevé.',
+            'description.required' => 'Veuillez décrire le problème.',
+            'description.min' => 'Veuillez décrire le problème avec au moins 10 caractères.',
         ];
     }
 }
