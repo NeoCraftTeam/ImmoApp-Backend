@@ -46,6 +46,10 @@ services:
       - DB_SSLMODE=prefer
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+      # PHP broadcaster must reach Reverb over the Docker network (public REVERB_HOST may not resolve in-container)
+      - REVERB_BROADCAST_HOST=reverb
+      - REVERB_BROADCAST_PORT=8080
+      - REVERB_BROADCAST_SCHEME=http
     # FIX: healthcheck manquant — web et worker ne peuvent pas dépendre de app proprement sans ça
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f 'php-fpm' || exit 1"]
@@ -89,6 +93,9 @@ services:
       - DB_SSLMODE=prefer
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+      - REVERB_BROADCAST_HOST=reverb
+      - REVERB_BROADCAST_PORT=8080
+      - REVERB_BROADCAST_SCHEME=http
     deploy:
       resources:
         limits:

@@ -31,10 +31,28 @@ falls back to "refresh to see new messages".
 | `REVERB_SERVER_HOST` | `0.0.0.0` | `0.0.0.0` | `0.0.0.0` |
 | `REVERB_SERVER_PORT` | `8080` | `8080` | `8080` |
 | `REVERB_DOMAIN` | (n/a) | `reverb.keyhome.neocraft.dev` | `reverb.keyhome.app` |
+| `REVERB_BROADCAST_HOST` | (unset) | `reverb` (compose on app/worker) | `reverb` (compose on app/worker) |
+| `REVERB_BROADCAST_PORT` | (unset) | `8080` | `8080` |
+| `REVERB_BROADCAST_SCHEME` | (unset) | `http` | `http` |
 
 `REVERB_DOMAIN` is consumed only by the docker-compose Traefik label.
-`REVERB_HOST`/`REVERB_PORT`/`REVERB_SCHEME` are consumed by Laravel's broadcaster
-auth signatures **and** the Pusher SDK on the frontend.
+`REVERB_HOST`/`REVERB_PORT`/`REVERB_SCHEME` stay **public** (browsers, Echo,
+`config/reverb.php` app hostname). **`config/broadcasting.php`** uses
+`REVERB_BROADCAST_*` when set so PHP publishes events to `http://reverb:8080`
+inside Docker instead of failing DNS on the public Traefik hostname.
+
+### Troubleshooting: `config:show` still shows public `REVERB_HOST`
+
+1. **Process env:** `docker compose exec app env | grep REVERB_BROADCAST` — expect
+   `reverb`, `8080`, `http`. If empty, add the three vars to server `.env` (see
+   `.env.preprod.example`), update compose, and **`docker compose up -d --force-recreate app worker`**.
+2. **Config cache:** stale `bootstrap/cache/config.php` ignores new env until rebuild.
+   Run **`php artisan config:clear`** (or redeploy with `optimize:clear`) then
+   re-check `config:show`. If you use **`config:cache`** in prod, run it again
+   after env is correct.
+3. **Code:** `grep REVERB_BROADCAST /var/www/config/broadcasting.php` inside
+   `app` — if missing, pull a newer image / code-sync so `broadcasting.php` includes
+   the override keys.
 
 ## Frontend (Vercel) env vars
 

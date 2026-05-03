@@ -48,6 +48,9 @@ services:
       - APP_ENV=${APP_ENV:-production}
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+      - REVERB_BROADCAST_HOST=reverb
+      - REVERB_BROADCAST_PORT=8080
+      - REVERB_BROADCAST_SCHEME=http
     # FIX: healthcheck sur le process PHP-FPM pour que le web puisse dépendre de app proprement
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f 'php-fpm' || exit 1"]
@@ -100,6 +103,9 @@ services:
       - DB_SSLMODE=disable
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+      - REVERB_BROADCAST_HOST=reverb
+      - REVERB_BROADCAST_PORT=8080
+      - REVERB_BROADCAST_SCHEME=http
     deploy:
       resources:
         limits:

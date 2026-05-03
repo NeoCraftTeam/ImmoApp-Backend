@@ -1171,6 +1171,15 @@ Reverb (`php artisan reverb:start`) was completely missing from the deployed sta
 
 **Files changed:** `docker-compose.yml`, `docker-compose.preprod.yml`, `.env.example`, `.env.preprod.example`, `docs/REVERB_DEPLOY.md` (new).
 
+**Preprod/prod chat silent failure (May 2026):** Laravel’s Reverb broadcaster
+connects with Guzzle to `REVERB_HOST`. Inside Docker, that value is often a
+public hostname (`reverb.*`) that **does not resolve** on the internal bridge →
+broadcasts never reach the Reverb container. **Fix:** optional env vars
+`REVERB_BROADCAST_HOST` / `REVERB_BROADCAST_PORT` / `REVERB_BROADCAST_SCHEME`
+in `config/broadcasting.php` (defaults unchanged when unset). **Compose:**
+`app` + `worker` on prod and preprod set `reverb` + `8080` + `http`. Browsers
+unchanged (`NEXT_PUBLIC_REVERB_*` + public `REVERB_HOST`).
+
 ### Session — Reverb perf tuning (Apr 2026)
 
 Follow-up to the deployment session: the initial `reverb` service shipped with default container limits, which would have capped a single instance at ~1 k concurrent WebSocket connections regardless of CPU/memory headroom.

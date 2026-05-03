@@ -35,11 +35,18 @@ return [
             'key' => env('REVERB_APP_KEY'),
             'secret' => env('REVERB_APP_SECRET'),
             'app_id' => env('REVERB_APP_ID'),
+            /*
+            | Optional overrides for the HTTP client that publishes events to Reverb.
+            | In Docker, REVERB_HOST often points at a public Traefik hostname that does not
+            | resolve inside the app network — set REVERB_BROADCAST_HOST=reverb,
+            | REVERB_BROADCAST_PORT=8080, REVERB_BROADCAST_SCHEME=http on app/worker.
+            | Browsers still use REVERB_HOST / NEXT_PUBLIC_REVERB_* for WSS.
+            */
             'options' => [
-                'host' => env('REVERB_HOST'),
-                'port' => env('REVERB_PORT', 443),
-                'scheme' => env('REVERB_SCHEME', 'https'),
-                'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
+                'host' => env('REVERB_BROADCAST_HOST', env('REVERB_HOST')),
+                'port' => env('REVERB_BROADCAST_PORT', env('REVERB_PORT', 443)),
+                'scheme' => env('REVERB_BROADCAST_SCHEME', env('REVERB_SCHEME', 'https')),
+                'useTLS' => env('REVERB_BROADCAST_SCHEME', env('REVERB_SCHEME', 'https')) === 'https',
             ],
             'client_options' => [
                 // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
