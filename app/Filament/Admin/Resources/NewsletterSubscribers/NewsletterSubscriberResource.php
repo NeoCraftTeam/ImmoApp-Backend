@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\NewsletterSubscribers;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\NewsletterSubscribers\Pages\ManageNewsletterSubscribers;
 use App\Models\NewsletterSubscriber;
 use BackedEnum;
@@ -47,6 +48,33 @@ final class NewsletterSubscriberResource extends Resource
     protected static ?string $recordTitleAttribute = 'email';
 
     protected static bool $isScopedToTenant = false;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAnyAdminPermission([
+            AdminPermission::NewsletterView,
+            AdminPermission::NewsletterSubscribersManage,
+        ]) ?? false;
+    }
+
+    #[\Override]
+    public static function canCreate(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::NewsletterSubscribersManage) ?? false;
+    }
+
+    #[\Override]
+    public static function canEdit($record): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::NewsletterSubscribersManage) ?? false;
+    }
+
+    #[\Override]
+    public static function canDelete($record): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::NewsletterSubscribersManage) ?? false;
+    }
 
     #[\Override]
     public static function form(Schema $schema): Schema

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\AdReports;
 
+use App\Enums\AdminPermission;
 use App\Enums\AdReportStatus;
 use App\Filament\Admin\Resources\AdReports\Pages\EditAdReport;
 use App\Filament\Admin\Resources\AdReports\Pages\ListAdReports;
@@ -31,6 +32,12 @@ class AdReportResource extends Resource
     protected static ?string $pluralModelLabel = 'Signalements';
 
     protected static ?int $navigationSort = 3;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::AdReportsManage) ?? false;
+    }
 
     #[\Override]
     public static function form(Schema $schema): Schema

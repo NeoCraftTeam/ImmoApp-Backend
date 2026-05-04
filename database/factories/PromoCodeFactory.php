@@ -16,7 +16,7 @@ final class PromoCodeFactory extends Factory
     public function definition(): array
     {
         return [
-            'code' => strtoupper(fake()->unique()->bothify('PROMO-????##')),
+            'code' => PromoCode::CODE_PREFIX.mb_strtoupper(fake()->unique()->bothify('????####')),
             'description' => fake()->sentence(),
             'discount_type' => fake()->randomElement(['percentage', 'fixed']),
             'discount_value' => fake()->randomFloat(2, 5, 50),

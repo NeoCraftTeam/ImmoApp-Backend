@@ -36,8 +36,11 @@ class AdminActionNotifyMail extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
+        $isActor = $this->actor->id === $this->recipient->id;
+        $prefix = $isActor ? 'Confirmation' : 'Alerte';
+
         return new Envelope(
-            subject: 'KeyHome — Action admin : '.$this->details['description'],
+            subject: "KeyHome — {$prefix} : ".$this->details['description'],
         );
     }
 
@@ -49,6 +52,7 @@ class AdminActionNotifyMail extends Mailable implements ShouldQueue
                 'recipientName' => $this->recipient->firstname,
                 'actorName' => $this->actor->firstname.' '.$this->actor->lastname,
                 'actorEmail' => $this->actor->email,
+                'isActor' => $this->actor->id === $this->recipient->id,
                 'event' => $this->details['event'],
                 'entity' => $this->details['entity'],
                 'entityName' => $this->details['entity_name'],

@@ -31,16 +31,16 @@ class AdReportForm
                         ->content(fn ($record) => self::adLinks($record))
                         ->columnSpanFull(),
                     Placeholder::make('reporter_name')
-                        ->label('Signale par')
+                        ->label('Signalé par')
                         ->content(fn ($record) => $record->reporter->fullname ?? '—'),
                     Placeholder::make('reporter_contact')
-                        ->label('Email / Telephone reporter')
+                        ->label('Email / Téléphone signalant')
                         ->content(fn ($record) => self::userContactLine($record?->reporter?->email, $record?->reporter?->phone_number)),
                     Placeholder::make('owner_name')
-                        ->label('Proprietaire annonce')
+                        ->label('Propriétaire annonce')
                         ->content(fn ($record) => $record->owner->fullname ?? $record->ad->user->fullname ?? '—'),
                     Placeholder::make('owner_contact')
-                        ->label('Email / Telephone proprietaire')
+                        ->label('Email / Téléphone propriétaire')
                         ->content(fn ($record) => self::userContactLine(
                             $record->owner->email ?? $record->ad->user->email,
                             $record->owner->phone_number ?? $record->ad->user->phone_number,
@@ -49,9 +49,9 @@ class AdReportForm
                         ->label('Motif')
                         ->content(fn ($record) => $record?->reason?->getLabel() ?? '—'),
                     Placeholder::make('scam_reason_label')
-                        ->label('Detail arnaque')
+                        ->label('Détail arnaque')
                         ->content(fn ($record) => $record->reason === AdReportReason::SCAM
-                            ? ($record->scam_reason?->getLabel() ?? 'Non precise')
+                            ? ($record->scam_reason?->getLabel() ?? 'Non précisé')
                             : 'Non applicable'),
                     Placeholder::make('payment_methods')
                         ->label('Moyens de paiement cites')
@@ -69,7 +69,7 @@ class AdReportForm
                         ->label('Adresse IP')
                         ->content(fn ($record) => $record?->ip_address ?: '—'),
                     Placeholder::make('user_agent')
-                        ->label('User agent')
+                        ->label('Agent navigateur')
                         ->content(fn ($record) => $record?->user_agent ?: '—')
                         ->columnSpanFull(),
                 ]),
@@ -91,10 +91,10 @@ class AdReportForm
                         ->placeholder('Analyse interne, actions prises, conclusion...')
                         ->columnSpanFull(),
                     Placeholder::make('resolved_at')
-                        ->label('Cloture le')
+                        ->label('Clôturé le')
                         ->content(fn ($record) => $record?->resolved_at?->format('d/m/Y H:i:s') ?? '—'),
                     Placeholder::make('resolved_by')
-                        ->label('Cloture par')
+                        ->label('Clôturé par')
                         ->content(fn ($record) => $record->resolver->fullname ?? '—'),
                 ]),
         ]);

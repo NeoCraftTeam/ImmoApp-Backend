@@ -10,6 +10,7 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
 class PointPackagesTable
@@ -67,6 +68,18 @@ class PointPackagesTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('sort_order')
+            ->filters([
+                TernaryFilter::make('is_active')
+                    ->label('Statut')
+                    ->trueLabel('Actifs')
+                    ->falseLabel('Inactifs')
+                    ->native(false),
+                TernaryFilter::make('is_popular')
+                    ->label('Populaire')
+                    ->trueLabel('Populaires uniquement')
+                    ->falseLabel('Non populaires')
+                    ->native(false),
+            ])
             ->recordActions([
                 EditAction::make()
                     ->successNotificationTitle('Pack de crédits mis à jour'),

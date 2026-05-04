@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\Users;
 
+use App\Enums\AdminPermission;
 use App\Enums\TrustScoreTier;
 use App\Enums\UserRole;
 use App\Enums\UserType;
@@ -43,6 +44,7 @@ use Filament\Infolists\Components\ImageEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -125,7 +127,32 @@ class UserResource extends Resource
                             ->options(UserRole::class)
                             ->native(false)
                             ->required()
+                            ->live()
                             ->helperText('Définit les permissions de l\'utilisateur'),
+                    ]),
+
+                Section::make('Permissions administrateur')
+                    ->icon(Heroicon::ShieldCheck)
+                    ->iconColor('warning')
+                    ->description('Détermine les fonctionnalités du panel admin accessibles à cet utilisateur. Le statut « super-admin » donne tous les accès.')
+                    ->visible(fn (Get $get): bool => $get('role') === UserRole::ADMIN->value || $get('role') === UserRole::ADMIN)
+                    ->columns(2)
+                    ->schema([
+                        Toggle::make('is_super_admin')
+                            ->label('Super-administrateur')
+                            ->helperText('Accès total à toutes les ressources sans restriction.')
+                            ->live()
+                            ->onColor('success')
+                            ->columnSpanFull(),
+                        Select::make('admin_permissions')
+                            ->label('Permissions ciblées')
+                            ->helperText('Sélectionnez précisément les fonctionnalités auxquelles cet administrateur peut accéder. Ignoré si le statut « super-admin » est activé.')
+                            ->multiple()
+                            ->searchable()
+                            ->preload()
+                            ->disabled(fn (Get $get): bool => (bool) $get('is_super_admin'))
+                            ->options(self::buildAdminPermissionOptions())
+                            ->columnSpanFull(),
                     ]),
 
                 Section::make('Contact')
@@ -351,6 +378,44 @@ class UserResource extends Resource
                             ->copyable()
                             ->copyMessage('Slug copié !'),
                     ]),
+
+                // ── Permissions admin ───────────────────────────────────────────
+                Section::make('Permissions administrateur')
+                    ->icon(Heroicon::ShieldCheck)
+                    ->iconColor('warning')
+                    ->visible(fn (User $record): bool => $record->isAdmin())
+                    ->columns(2)
+                    ->schema([
+                        IconEntry::make('is_super_admin')
+                            ->label('Super-administrateur')
+                            ->boolean()
+                            ->trueIcon(Heroicon::ShieldCheck)
+                            ->falseIcon(Heroicon::ShieldExclamation)
+                            ->trueColor('success')
+                            ->falseColor('gray'),
+                        TextEntry::make('admin_permissions')
+                            ->label('Permissions accordées')
+                            ->columnSpanFull()
+                            ->badge()
+                            ->separator(',')
+                            ->color('warning')
+                            ->getStateUsing(function (User $record): array {
+                                if ($record->isSuperAdmin()) {
+                                    return ['Accès total (super-admin)'];
+                                }
+
+                                $values = (array) ($record->admin_permissions ?? []);
+                                if ($values === []) {
+                                    return [];
+                                }
+
+                                return array_values(array_filter(array_map(
+                                    fn (string $value): ?string => AdminPermission::tryFrom($value)?->getLabel(),
+                                    $values
+                                )));
+                            })
+                            ->placeholder('Aucune permission accordée'),
+                    ]),
             ]);
     }
 
@@ -418,7 +483,11 @@ class UserResource extends Resource
                 ->label('TrustScore')
                 ->badge()
                 ->getStateUsing(function ($record): ?string {
-                    $trustScore = $record->trustScores->first();
+                    /** @var User $record */
+                    $isAgent = $record->role?->value === 'agent' || $record->type?->value === 'agency';
+                    $context = $isAgent ? 'landlord' : 'tenant';
+                    $trustScore = $record->trustScores->firstWhere('role_context', $context)
+                        ?? $record->trustScores->sortByDesc('score')->first();
                     if (!$trustScore) {
                         return null;
                     }
@@ -426,13 +495,18 @@ class UserResource extends Resource
                     return $trustScore->tier->label().' ('.$trustScore->score.')';
                 })
                 ->color(function ($record): string {
-                    $trustScore = $record->trustScores->first();
+                    /** @var User $record */
+                    $isAgent = $record->role?->value === 'agent' || $record->type?->value === 'agency';
+                    $context = $isAgent ? 'landlord' : 'tenant';
+                    $trustScore = $record->trustScores->firstWhere('role_context', $context)
+                        ?? $record->trustScores->sortByDesc('score')->first();
 
                     return $trustScore?->tier->color() ?? 'gray';
                 })
                 ->sortable(query: fn ($query, string $direction) => $query->orderBy(
                     TrustScore::select('score')
                         ->whereColumn('trust_scores.user_id', 'users.id')
+                        ->orderByDesc('score')
                         ->limit(1),
                     $direction
                 ))
@@ -614,5 +688,25 @@ class UserResource extends Resource
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
+    }
+
+    /**
+     * Build the grouped option list for the `admin_permissions` multi-select.
+     *
+     * Returned format mirrors Filament's grouped Select API: `[group => [value => label]]`.
+     *
+     * @return array<string, array<string, string>>
+     */
+    protected static function buildAdminPermissionOptions(): array
+    {
+        $options = [];
+
+        foreach (AdminPermission::grouped() as $group => $permissions) {
+            foreach ($permissions as $permission) {
+                $options[$group][$permission->value] = $permission->getLabel();
+            }
+        }
+
+        return $options;
     }
 }

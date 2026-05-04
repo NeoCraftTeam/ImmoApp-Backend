@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\SiteVisits;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\SiteVisits\Pages\ManageSiteVisits;
 use App\Models\SiteVisit;
 use BackedEnum;
@@ -37,6 +38,12 @@ class SiteVisitResource extends Resource
     protected static ?int $navigationSort = 1;
 
     protected static ?string $recordTitleAttribute = 'session_id';
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::AcquisitionView) ?? false;
+    }
 
     #[\Override]
     public static function getEloquentQuery(): Builder

@@ -185,7 +185,7 @@ final readonly class AttachmentService
      */
     private function normalizeDetectedMime(UploadedFile $file): string
     {
-        $mime = strtolower(trim((string) ($file->getMimeType() ?: '')));
+        $mime = strtolower(trim($file->getMimeType() ?: ''));
         $ext = strtolower($file->getClientOriginalExtension());
 
         if ($mime === 'video/webm') {

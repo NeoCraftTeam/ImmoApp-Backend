@@ -1,9 +1,11 @@
 <x-filament-panels::page>
     <div class="mb-6 grid gap-4 md:grid-cols-4">
         @php
-            $pending = \Illuminate\Support\Facades\DB::table('jobs')->count();
+            $totalJobs = \Illuminate\Support\Facades\DB::table('jobs')->count();
+            $processing = \Illuminate\Support\Facades\DB::table('jobs')->whereNotNull('reserved_at')->count();
+            $pending = max(0, $totalJobs - $processing);
             $failed = \Illuminate\Support\Facades\DB::table('failed_jobs')->count();
-            $processed = \Illuminate\Support\Facades\DB::table('jobs')->where('reserved_at', '!=', null)->count();
+            $driver = config('queue.default');
         @endphp
 
         <x-filament::section>
@@ -15,8 +17,8 @@
 
         <x-filament::section>
             <div class="text-center">
-                <p class="text-2xl font-bold text-warning-600 dark:text-warning-400">{{ $processed }}</p>
-                <p class="text-sm text-gray-500 dark:text-gray-400">En cours</p>
+                <p class="text-2xl font-bold text-warning-600 dark:text-warning-400">{{ $processing }}</p>
+                <p class="text-sm text-gray-500 dark:text-gray-400">En cours d'exécution</p>
             </div>
         </x-filament::section>
 
@@ -29,8 +31,8 @@
 
         <x-filament::section>
             <div class="text-center">
-                <p class="text-2xl font-bold text-success-600 dark:text-success-400">
-                    {{ config('queue.default') }}
+                <p class="text-2xl font-bold text-success-600 dark:text-success-400 capitalize">
+                    {{ $driver }}
                 </p>
                 <p class="text-sm text-gray-500 dark:text-gray-400">Pilote de file</p>
             </div>

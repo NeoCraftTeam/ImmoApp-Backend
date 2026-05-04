@@ -4,22 +4,11 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\ActivityLogs;
 
+use App\Enums\AdminPermission;
 use App\Enums\UserRole;
 use App\Filament\Admin\Resources\ActivityLogs\Pages\ManageActivityLogs;
-use App\Models\Ad;
-use App\Models\AdType;
-use App\Models\Agency;
-use App\Models\City;
-use App\Models\Payment;
-use App\Models\PointPackage;
-use App\Models\PropertyAttribute;
-use App\Models\Quarter;
-use App\Models\Review;
-use App\Models\Setting;
-use App\Models\Subscription;
-use App\Models\SubscriptionPlan;
-use App\Models\UnlockedAd;
 use App\Models\User;
+use App\Support\AuditDescription;
 use BackedEnum;
 use Filament\Actions\ViewAction;
 use Filament\Infolists\Components\TextEntry;
@@ -49,30 +38,16 @@ class ActivityLogResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
-    /**
-     * @var array<string, string>
-     */
-    private const array ENTITY_LABELS = [
-        Ad::class => 'Annonce',
-        User::class => 'Utilisateur',
-        Agency::class => 'Agence',
-        City::class => 'Ville',
-        Quarter::class => 'Quartier',
-        AdType::class => "Type d'annonce",
-        Review::class => 'Avis',
-        Payment::class => 'Paiement',
-        Subscription::class => 'Abonnement',
-        SubscriptionPlan::class => "Plan d'abonnement",
-        PointPackage::class => 'Pack de crédits',
-        UnlockedAd::class => 'Déblocage',
-        PropertyAttribute::class => 'Attribut',
-        Setting::class => 'Paramètre',
-    ];
-
     #[\Override]
     public static function canCreate(): bool
     {
         return false;
+    }
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::ActivityLogsView) ?? false;
     }
 
     /**
@@ -107,24 +82,10 @@ class ActivityLogResource extends Resource
 
                         $adminName = $causer ? "{$causer->firstname} {$causer->lastname}" : 'Système';
                         $adminEmail = $causer?->email ?? ''; // @phpstan-ignore nullsafe.neverNull
-                        $entity = self::ENTITY_LABELS[$record->subject_type] ?? ($record->subject_type ? class_basename($record->subject_type) : '—');
+                        $entity = AuditDescription::entityLabel($record);
 
                         $action = $props['action'] ?? $record->event ?? 'unknown';
-                        $event = $isSecurityLog
-                            ? match ($action) {
-                                'login' => 'Connexion',
-                                'logout' => 'Déconnexion',
-                                'login_failed' => 'Échec connexion',
-                                'password_reset' => 'Réinit. mot de passe',
-                                'lockout' => 'Compte verrouillé',
-                                default => ucfirst($action),
-                            }
-                        : match ($record->event) {
-                            'created' => 'Création',
-                            'updated' => 'Modification',
-                            'deleted' => 'Suppression',
-                            default => ucfirst($record->event ?? '—'),
-                        };
+                        $event = AuditDescription::actionLabel($record);
 
                         [$eventColor, $eventBg] = $isSecurityLog
                             ? match ($action) {
@@ -154,7 +115,7 @@ class ActivityLogResource extends Resource
                         $logBadgeBorder = $isSecurityLog ? '#fecdd3' : '#bfdbfe';
 
                         $date = $record->created_at->format('d/m/Y à H:i:s');
-                        $description = $record->description ?? '—';
+                        $description = AuditDescription::forActivity($record);
 
                         $ip = $props['ip'] ?? null;
                         $ua = $props['user_agent'] ?? null;
@@ -272,75 +233,25 @@ class ActivityLogResource extends Resource
                     ->sortable()
                     ->icon('heroicon-o-clock')
                     ->size('sm'),
-                TextColumn::make('description')
-                    ->label('Description')
-                    ->limit(65)
-                    ->searchable()
-                    ->tooltip(fn ($record) => $record->description),
-                TextColumn::make('event')
+                TextColumn::make('action_summary')
                     ->label('Action')
-                    ->badge()
-                    ->formatStateUsing(function ($record): string {
-                        if ($record->log_name === 'security') {
-                            return match ($record->properties->get('action')) {
-                                'login' => 'Connexion',
-                                'logout' => 'Déconnexion',
-                                'login_failed' => 'Échec connexion',
-                                'password_reset' => 'Réinit. MDP',
-                                'lockout' => 'Verrouillage',
-                                default => ucfirst((string) ($record->properties->get('action') ?? $record->event ?? '?')),
-                            };
-                        }
-
-                        return match ($record->event) {
-                            'created' => 'Création',
-                            'updated' => 'Modification',
-                            'deleted' => 'Suppression',
-                            default => ucfirst($record->event ?? '?'),
-                        };
-                    })
-                    ->color(function ($record): string {
-                        if ($record->log_name === 'security') {
-                            return match ($record->properties->get('action')) {
-                                'login' => 'info',
-                                'logout' => 'gray',
-                                'login_failed', 'lockout' => 'danger',
-                                'password_reset' => 'warning',
-                                default => 'gray',
-                            };
-                        }
-
-                        return match ($record->event) {
-                            'created' => 'success',
-                            'updated' => 'warning',
-                            'deleted' => 'danger',
-                            default => 'gray',
-                        };
-                    }),
+                    ->wrap()
+                    ->getStateUsing(fn ($record): string => AuditDescription::forActivity($record))
+                    ->searchable(query: fn ($query, string $search) => $query->where('description', 'ilike', "%{$search}%"))
+                    ->tooltip(fn ($record): string => AuditDescription::forActivity($record)),
                 TextColumn::make('subject_type')
                     ->label('Entité')
                     ->badge()
                     ->color('info')
-                    ->formatStateUsing(fn (?string $state): string => self::ENTITY_LABELS[$state] ?? ($state ? class_basename($state) : '—'))
+                    ->formatStateUsing(fn ($record): string => AuditDescription::entityLabel($record))
                     ->sortable(),
-                TextColumn::make('causer.firstname')
-                    ->label('Admin')
-                    ->icon('heroicon-o-user-circle')
-                    ->formatStateUsing(function ($record): string {
-                        $causer = $record->causer;
-                        if (!$causer) {
-                            return 'Système';
-                        }
-
-                        return "{$causer->firstname} {$causer->lastname}";
-                    })
-                    ->searchable(),
                 TextColumn::make('ip_address')
                     ->label('IP')
                     ->icon('heroicon-o-globe-alt')
                     ->size('sm')
                     ->getStateUsing(fn ($record): string => (string) ($record->properties->get('ip') ?? '—'))
-                    ->color('gray'),
+                    ->color('gray')
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 SelectFilter::make('log_name')
@@ -348,10 +259,11 @@ class ActivityLogResource extends Resource
                     ->options([
                         'security' => 'Sécurité',
                         'default' => 'Actions Admin',
+                        'settings' => 'Paramètres',
                     ])
                     ->native(false),
                 SelectFilter::make('event')
-                    ->label('Action')
+                    ->label('Type')
                     ->options([
                         'created' => 'Création',
                         'updated' => 'Modification',
@@ -360,7 +272,7 @@ class ActivityLogResource extends Resource
                     ->native(false),
                 SelectFilter::make('subject_type')
                     ->label('Entité')
-                    ->options(self::ENTITY_LABELS)
+                    ->options(AuditDescription::ENTITY_LABELS)
                     ->native(false)
                     ->searchable(),
             ])

@@ -43,7 +43,7 @@ final class FrontendRedirectGuard
             return false;
         }
 
-        $scheme = mb_strtolower((string) $parts['scheme']);
+        $scheme = mb_strtolower($parts['scheme']);
         if ($scheme !== 'http' && $scheme !== 'https') {
             return false;
         }
@@ -52,13 +52,8 @@ final class FrontendRedirectGuard
             return false;
         }
 
-        $host = mb_strtolower((string) $parts['host']);
-        foreach (self::allowedHosts() as $allowed) {
-            if ($host === $allowed || str_ends_with($host, '.'.$allowed)) {
-                return true;
-            }
-        }
+        $host = mb_strtolower($parts['host']);
 
-        return false;
+        return array_any(self::allowedHosts(), fn ($allowed) => $host === $allowed || str_ends_with($host, '.'.$allowed));
     }
 }

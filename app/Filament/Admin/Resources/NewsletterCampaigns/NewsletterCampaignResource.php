@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\NewsletterCampaigns;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\NewsletterCampaigns\Pages\ManageNewsletterCampaigns;
 use App\Jobs\SendNewsletterCampaignJob;
 use App\Models\NewsletterCampaign;
@@ -49,6 +50,33 @@ final class NewsletterCampaignResource extends Resource
     protected static ?string $recordTitleAttribute = 'subject';
 
     protected static bool $isScopedToTenant = false;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAnyAdminPermission([
+            AdminPermission::NewsletterView,
+            AdminPermission::NewsletterSend,
+        ]) ?? false;
+    }
+
+    #[\Override]
+    public static function canCreate(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::NewsletterSend) ?? false;
+    }
+
+    #[\Override]
+    public static function canEdit($record): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::NewsletterSend) ?? false;
+    }
+
+    #[\Override]
+    public static function canDelete($record): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::NewsletterSend) ?? false;
+    }
 
     #[\Override]
     public static function form(Schema $schema): Schema

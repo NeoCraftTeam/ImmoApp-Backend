@@ -8,6 +8,9 @@ use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * @property string $id
@@ -25,7 +28,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 final class PromoCode extends Model
 {
-    use HasUuids;
+    use HasUuids, LogsActivity;
+
+    public const string CODE_PREFIX = 'KY-';
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['code', 'description', 'discount_type', 'discount_value', 'max_uses', 'expires_at', 'is_active', 'applicable_to'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
+    }
 
     protected $fillable = [
         'code',
@@ -49,6 +62,29 @@ final class PromoCode extends Model
             'expires_at' => 'datetime',
             'is_active' => 'boolean',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        self::creating(function (self $promo): void {
+            if (blank($promo->code)) {
+                $promo->code = self::generateUniqueCode();
+            } else {
+                $promo->code = mb_strtoupper(trim($promo->code));
+            }
+        });
+    }
+
+    /**
+     * Generate a unique promo code prefixed with KY- (e.g. KY-A8K2X9P0).
+     */
+    public static function generateUniqueCode(int $length = 8): string
+    {
+        do {
+            $candidate = self::CODE_PREFIX.mb_strtoupper(Str::random($length));
+        } while (self::query()->where('code', $candidate)->exists());
+
+        return $candidate;
     }
 
     public function usages(): HasMany

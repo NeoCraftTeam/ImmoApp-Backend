@@ -16,7 +16,7 @@ class AdReportsTable
     {
         return $table
             ->heading('Signalements annonces')
-            ->description('Suivi des annonces signalees par les clients')
+            ->description('Suivi des annonces signalées par les clients')
             ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('created_at')
@@ -31,7 +31,7 @@ class AdReportsTable
                     ->weight('bold'),
 
                 TextColumn::make('reporter.fullname')
-                    ->label('Signale par')
+                    ->label('Signalé par')
                     ->searchable(['firstname', 'lastname']),
 
                 TextColumn::make('reason')

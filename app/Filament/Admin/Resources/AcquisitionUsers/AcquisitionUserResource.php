@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\AcquisitionUsers;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\AcquisitionUsers\Pages\ManageAcquisitionUsers;
 use App\Filament\Admin\Resources\Users\UserResource;
 use App\Models\User;
@@ -39,6 +40,12 @@ class AcquisitionUserResource extends Resource
     protected static ?int $navigationSort = 2;
 
     protected static ?string $recordTitleAttribute = 'email';
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::AcquisitionView) ?? false;
+    }
 
     #[\Override]
     public static function getEloquentQuery(): Builder

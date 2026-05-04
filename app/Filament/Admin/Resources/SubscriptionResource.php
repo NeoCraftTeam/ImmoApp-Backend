@@ -8,10 +8,13 @@ use App\Filament\Admin\Resources\SubscriptionResource\Pages\ManageSubscriptions;
 use App\Models\Subscription;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -70,9 +73,80 @@ class SubscriptionResource extends Resource
     }
 
     #[\Override]
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema
+            ->columns(2)
+            ->components([
+                Section::make('Abonnement')
+                    ->icon(Heroicon::OutlinedCreditCard)
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('agency.name')
+                            ->label('Agence')
+                            ->icon(Heroicon::BuildingOffice2)
+                            ->weight('semibold'),
+                        TextEntry::make('plan.name')
+                            ->label('Plan souscrit')
+                            ->icon(Heroicon::OutlinedRectangleStack)
+                            ->badge()
+                            ->color('primary'),
+                        TextEntry::make('status')
+                            ->label('Statut')
+                            ->badge()
+                            ->formatStateUsing(fn (string $state): string => match ($state) {
+                                'pending' => 'En attente',
+                                'active' => 'Actif',
+                                'expired' => 'Expiré',
+                                'cancelled' => 'Annulé',
+                                default => $state,
+                            })
+                            ->color(fn (string $state): string => match ($state) {
+                                'pending' => 'primary',
+                                'active' => 'success',
+                                'expired' => 'danger',
+                                'cancelled' => 'warning',
+                                default => 'gray',
+                            }),
+                        TextEntry::make('billing_period')
+                            ->label('Période de facturation')
+                            ->badge()
+                            ->color('gray')
+                            ->formatStateUsing(fn (string $state): string => $state === 'yearly' ? 'Annuel' : 'Mensuel'),
+                        TextEntry::make('amount_paid')
+                            ->label('Montant payé')
+                            ->money('XAF')
+                            ->icon(Heroicon::BankNotes),
+                    ]),
+
+                Section::make('Période de validité')
+                    ->icon(Heroicon::CalendarDays)
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('starts_at')
+                            ->label('Début')
+                            ->dateTime('d/m/Y à H:i')
+                            ->placeholder('—'),
+                        TextEntry::make('ends_at')
+                            ->label('Fin')
+                            ->dateTime('d/m/Y à H:i')
+                            ->placeholder('—'),
+                        TextEntry::make('created_at')
+                            ->label('Créé le')
+                            ->dateTime('d/m/Y à H:i')
+                            ->placeholder('—'),
+                    ]),
+            ]);
+    }
+
+    #[\Override]
     public static function table(Table $table): Table
     {
         return $table
+            ->heading('Abonnements agences')
+            ->description('Suivi des abonnements actifs, expirés et annulés')
+            ->striped()
+            ->defaultSort('created_at', 'desc')
             ->columns([
                 TextColumn::make('agency.name')
                     ->label('Agence')
@@ -117,6 +191,9 @@ class SubscriptionResource extends Resource
                     ]),
             ])
             ->recordActions([
+                ViewAction::make()
+                    ->slideOver()
+                    ->modalWidth('2xl'),
                 EditAction::make()
                     ->successNotificationTitle('Abonnement mis à jour'),
                 DeleteAction::make()

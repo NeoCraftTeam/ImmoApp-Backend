@@ -6,6 +6,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 
+use App\Enums\AdminPermission;
 use App\Enums\UserRole;
 use App\Enums\UserType;
 use App\Mail\ForgotPasswordMail;
@@ -206,6 +207,8 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'pending_oauth_token',
         'pending_oauth_expires_at',
         'chat_e2ee_public_key_pem',
+        'is_super_admin',
+        'admin_permissions',
     ];
 
     /**
@@ -506,6 +509,58 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return $this->role === UserRole::ADMIN;
     }
 
+    /**
+     * Super-admin status. A super-admin bypasses every granular admin permission check.
+     *
+     * Backward compatibility: if `admin_permissions` is `null`, the user is treated as
+     * super-admin (this preserves access for every existing administrator).
+     */
+    public function isSuperAdmin(): bool
+    {
+        if (!$this->isAdmin()) {
+            return false;
+        }
+
+        return (bool) $this->is_super_admin || $this->admin_permissions === null;
+    }
+
+    /**
+     * Check whether the admin has a given granular permission.
+     *
+     * Non-admins always return `false`.
+     * Super-admins always return `true`.
+     */
+    public function hasAdminPermission(AdminPermission|string $permission): bool
+    {
+        if (!$this->isAdmin()) {
+            return false;
+        }
+
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
+        $value = $permission instanceof AdminPermission ? $permission->value : $permission;
+
+        return in_array($value, (array) ($this->admin_permissions ?? []), true);
+    }
+
+    /**
+     * Check whether the admin has at least one of the supplied permissions.
+     *
+     * @param  iterable<AdminPermission|string>  $permissions
+     */
+    public function hasAnyAdminPermission(iterable $permissions): bool
+    {
+        foreach ($permissions as $permission) {
+            if ($this->hasAdminPermission($permission)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function webAuthnData(): WebAuthnData
     {
         return WebAuthnData::make($this->email, trim("{$this->firstname} {$this->lastname}"));
@@ -628,6 +683,8 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             'last_seen_at' => 'datetime',
             'preferences' => 'array',
             'must_change_password_at' => 'datetime',
+            'is_super_admin' => 'boolean',
+            'admin_permissions' => 'array',
         ];
     }
 

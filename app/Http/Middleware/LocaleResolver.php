@@ -82,7 +82,7 @@ final class LocaleResolver
 
         $entries = [];
         foreach (explode(',', $header) as $segment) {
-            $parts = array_map('trim', explode(';', $segment));
+            $parts = array_map(trim(...), explode(';', $segment));
             $tag = array_shift($parts);
             if ($tag === '') {
                 continue;

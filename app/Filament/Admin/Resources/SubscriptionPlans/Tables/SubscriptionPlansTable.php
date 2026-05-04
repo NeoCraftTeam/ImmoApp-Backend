@@ -11,6 +11,7 @@ use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
 class SubscriptionPlansTable
@@ -78,6 +79,13 @@ class SubscriptionPlansTable
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('sort_order')
+            ->filters([
+                TernaryFilter::make('is_active')
+                    ->label('Statut')
+                    ->trueLabel('Actifs')
+                    ->falseLabel('Inactifs')
+                    ->native(false),
+            ])
             ->recordActions([
                 ViewAction::make(),
                 EditAction::make()

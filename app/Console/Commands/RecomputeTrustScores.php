@@ -31,7 +31,7 @@ final class RecomputeTrustScores extends Command
 
             try {
                 $service->compute($user);
-            } catch (TrustScoreConsentMissingException $e) {
+            } catch (TrustScoreConsentMissingException) {
                 $this->error("User {$userId} has not consented to TrustScore computation.");
 
                 return self::FAILURE;

@@ -22,7 +22,7 @@ class AiDescriptionEnhancer
     /** @var array<string, array{api_key: string, model: string, base_url: string}> */
     private array $providers;
 
-    private string $activeProvider;
+    private readonly string $activeProvider;
 
     public function __construct()
     {
@@ -123,7 +123,7 @@ class AiDescriptionEnhancer
             ->forceAttribute('a', 'rel', 'noopener noreferrer')
             ->forceAttribute('a', 'target', '_blank');
 
-        return (new HtmlSanitizer($config))->sanitize($html);
+        return new HtmlSanitizer($config)->sanitize($html);
     }
 
     /**

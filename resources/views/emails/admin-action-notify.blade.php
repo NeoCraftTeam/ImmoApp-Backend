@@ -1,32 +1,36 @@
 @extends('emails.layout')
 
-@section('title', 'Alerte action admin')
+@section('title', $isActor ? 'Confirmation d\'action' : 'Alerte action admin')
 
 @section('content')
 
-    <h1>Alerte — Action administrateur</h1>
+    <h1>{{ $isActor ? 'Confirmation — Action effectuée' : 'Alerte — Action administrateur' }}</h1>
 
     <p class="text">
         Bonjour <strong>{{ $recipientName }}</strong>,
     </p>
 
     <p class="text">
-        Un administrateur a effectué une action sur la plateforme KeyHome. Voici les détails :
+        @if ($isActor)
+            Vous venez d'effectuer une action sur la plateforme KeyHome. Cet email confirme que l'opération a bien été enregistrée dans le journal d'audit.
+        @else
+            Un administrateur a effectué une action sur la plateforme KeyHome. Voici les détails&nbsp;:
+        @endif
     </p>
 
     {{-- Actor info --}}
     <table width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 24px;
         border-collapse: collapse;
-        background-color: #eff6ff;
-        border: 1px solid #93c5fd;
+        background-color: {{ $isActor ? '#fef2f2' : '#eff6ff' }};
+        border: 1px solid {{ $isActor ? '#fecdd3' : '#93c5fd' }};
         border-radius: 8px;
     ">
         <tr>
             <td style="padding: 14px 20px;">
                 <p style="margin: 0; font-size: 11px; font-weight: 700;
-                    text-transform: uppercase; letter-spacing: 1px; color: #1d4ed8;">
-                    Administrateur
+                    text-transform: uppercase; letter-spacing: 1px; color: {{ $isActor ? '#F6475F' : '#1d4ed8' }};">
+                    {{ $isActor ? 'Vous (administrateur)' : 'Administrateur' }}
                 </p>
                 <p style="margin: 6px 0 0 0; font-size: 15px; font-weight: 600; color: #0f172a;">
                     {{ $actorName }}
@@ -150,8 +154,12 @@
     @endif
 
     <p class="text" style="margin-top: 24px; font-size: 13px; color: #94a3b8;">
-        Cette notification est envoyée automatiquement à tous les administrateurs de la plateforme.
-        Si cette action vous semble suspecte, prenez contact avec l'équipe technique immédiatement.
+        @if ($isActor)
+            Cette notification de confirmation est envoyée automatiquement à chaque action administrateur, dans un souci de traçabilité.
+        @else
+            Cette notification est envoyée automatiquement à tous les administrateurs de la plateforme.
+            Si cette action vous semble suspecte, prenez contact avec l'équipe technique immédiatement.
+        @endif
     </p>
 
 @endsection

@@ -10,9 +10,8 @@ use App\Services\AiSearchService;
  * LLM providers).
  */
 beforeEach(function (): void {
-    $this->extractJson = (new ReflectionClass(AiSearchService::class))
+    $this->extractJson = new ReflectionClass(AiSearchService::class)
         ->getMethod('extractJson');
-    $this->extractJson->setAccessible(true);
     $this->service = app(AiSearchService::class);
 });
 

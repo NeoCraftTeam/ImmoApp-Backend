@@ -29,9 +29,7 @@ it('records a database notification for the reporter even without mail channel w
 
     $response->assertCreated();
 
-    Notification::assertSentTo($reporter, AdReportReceivedNotification::class, function (AdReportReceivedNotification $notification, array $channels): bool {
-        return $channels === ['database'];
-    });
+    Notification::assertSentTo($reporter, AdReportReceivedNotification::class, fn (AdReportReceivedNotification $notification, array $channels): bool => $channels === ['database']);
 });
 
 it('allows an authenticated customer to report an ad and notifies admins', function (): void {

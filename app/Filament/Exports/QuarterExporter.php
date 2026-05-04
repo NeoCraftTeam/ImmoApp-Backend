@@ -4,36 +4,31 @@ declare(strict_types=1);
 
 namespace App\Filament\Exports;
 
+use App\Filament\Exports\Concerns\LogsExportActivity;
 use App\Models\Quarter;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Exporter;
-use Filament\Actions\Exports\Models\Export;
-use Illuminate\Support\Number;
 
 class QuarterExporter extends Exporter
 {
+    use LogsExportActivity;
+
     protected static ?string $model = Quarter::class;
+
+    protected static function humanModelLabel(): string
+    {
+        return 'quartiers';
+    }
 
     public static function getColumns(): array
     {
         return [
             ExportColumn::make('id')->label('ID'),
-            ExportColumn::make('name'),
-            ExportColumn::make('city.name'),
-            ExportColumn::make('created_at'),
-            ExportColumn::make('updated_at'),
-            ExportColumn::make('deleted_at'),
+            ExportColumn::make('name')->label('Nom'),
+            ExportColumn::make('city.name')->label('Ville'),
+            ExportColumn::make('created_at')->label('Créé le'),
+            ExportColumn::make('updated_at')->label('Modifié le'),
+            ExportColumn::make('deleted_at')->label('Supprimé le'),
         ];
-    }
-
-    public static function getCompletedNotificationBody(Export $export): string
-    {
-        $body = 'Your quarter export has completed and '.Number::format($export->successful_rows).' '.str('row')->plural($export->successful_rows).' exported.';
-
-        if ($failedRowsCount = $export->getFailedRowsCount()) {
-            $body .= ' '.Number::format($failedRowsCount).' '.str('row')->plural($failedRowsCount).' failed to export.';
-        }
-
-        return $body;
     }
 }

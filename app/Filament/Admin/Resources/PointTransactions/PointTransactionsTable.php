@@ -7,7 +7,12 @@ namespace App\Filament\Admin\Resources\PointTransactions;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\PointTransactionType;
+use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DatePicker;
+use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\Summarizers\Sum;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
@@ -19,7 +24,7 @@ class PointTransactionsTable
     {
         return $table
             ->heading('Transactions de crédits')
-            ->description('Historique des achats, déblocages et bonus')
+            ->description('Historique des achats, déblocages, bonus et remboursements')
             ->striped()
             ->collapsedGroupsByDefault()
             ->modifyQueryUsing(fn ($query) => $query->with(['user.agency', 'ad', 'payment']))
@@ -80,7 +85,12 @@ class PointTransactionsTable
                     ->color(fn (int $state): string => $state >= 0 ? 'success' : 'danger')
                     ->formatStateUsing(fn (int $state): string => $state >= 0 ? "+{$state}" : (string) $state)
                     ->weight('bold')
-                    ->sortable(),
+                    ->sortable()
+                    ->summarize(
+                        Sum::make()
+                            ->label('Solde net')
+                            ->numeric()
+                    ),
 
                 TextColumn::make('description')
                     ->label('Description')
@@ -121,11 +131,13 @@ class PointTransactionsTable
                     ->copyable()
                     ->limit(20)
                     ->tooltip(fn ($record): ?string => $record->payment?->transaction_id)
-                    ->placeholder('—'),
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('payment.phone_number')
                     ->label('Téléphone')
-                    ->placeholder('—'),
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 TextColumn::make('payment.status')
                     ->label('Statut paiement')
@@ -169,6 +181,35 @@ class PointTransactionsTable
                         $data['value'],
                         fn (Builder $query, string $value): Builder => $query->whereHas('payment', fn (Builder $q) => $q->where('payment_method', $value))
                     )),
+
+                Filter::make('date_range')
+                    ->label('Période')
+                    ->form([
+                        DatePicker::make('from')->label('Du')->native(false),
+                        DatePicker::make('until')->label('Au')->native(false),
+                    ])
+                    ->query(fn (Builder $query, array $data): Builder => $query
+                        ->when($data['from'], fn ($q) => $q->whereDate('created_at', '>=', $data['from']))
+                        ->when($data['until'], fn ($q) => $q->whereDate('created_at', '<=', $data['until']))
+                    )
+                    ->indicateUsing(function (array $data): array {
+                        $labels = [];
+                        if (!empty($data['from'])) {
+                            $labels[] = 'Du '.$data['from'];
+                        }
+                        if (!empty($data['until'])) {
+                            $labels[] = "Jusqu'au ".$data['until'];
+                        }
+
+                        return $labels;
+                    }),
+            ])
+            ->recordActions([
+                ViewAction::make()
+                    ->slideOver()
+                    ->modalHeading(fn ($record): string => 'Transaction du '.$record->created_at?->format('d/m/Y H:i'))
+                    ->modalIcon(Heroicon::ArrowsRightLeft)
+                    ->modalIconColor(fn ($record): string => $record->points >= 0 ? 'success' : 'danger'),
             ])
             ->paginated([25, 50, 100]);
     }

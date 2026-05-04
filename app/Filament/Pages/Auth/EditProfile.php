@@ -53,15 +53,15 @@ class EditProfile extends BaseEditProfile
                         FileUpload::make('avatar')
                             ->label('')
                             ->disk(config('filesystems.app_media_disk'))
-                            ->fetchFileInformation(false)
+                            ->visibility('public')
                             ->directory('avatars')
                             ->avatar()
                             ->image()
-                            ->optimize('webp', 85)
                             ->imageEditor()
                             ->circleCropper()
                             ->maxSize(2048)
                             ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                            ->fetchFileInformation(false)
                             ->extraAttributes([
                                 'data-native-input' => 'image',
                                 'data-native-type' => 'avatar',

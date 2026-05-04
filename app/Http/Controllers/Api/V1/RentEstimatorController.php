@@ -55,9 +55,7 @@ final class RentEstimatorController
 
         $cacheKey = 'rent_estimate_'.self::CACHE_VERSION.'_'.md5(serialize($data));
 
-        $result = Cache::remember($cacheKey, 3600, function () use ($data): array {
-            return $this->computeEstimate($data);
-        });
+        $result = Cache::remember($cacheKey, 3600, fn (): array => $this->computeEstimate($data));
 
         return response()->json($result);
     }

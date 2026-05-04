@@ -4,15 +4,20 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\PromoCodes;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\PromoCodes\Pages\ManagePromoCodes;
 use App\Models\PromoCode;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
@@ -40,18 +45,104 @@ final class PromoCodeResource extends Resource
     protected static ?string $navigationLabel = 'Codes promo';
 
     #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::PromoCodesManage) ?? false;
+    }
+
+    #[\Override]
+    public static function infolist(Schema $schema): Schema
+    {
+        return $schema
+            ->columns(2)
+            ->components([
+                Section::make('Code promo')
+                    ->icon(Heroicon::Ticket)
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('code')
+                            ->label('Code')
+                            ->copyable()
+                            ->copyMessage('Code copié !')
+                            ->weight('bold')
+                            ->size('lg'),
+                        TextEntry::make('description')
+                            ->label('Description')
+                            ->placeholder('Aucune description')
+                            ->columnSpanFull(),
+                        TextEntry::make('discount_type')
+                            ->label('Type de réduction')
+                            ->badge()
+                            ->formatStateUsing(fn (string $state): string => match ($state) {
+                                'percentage' => 'Pourcentage',
+                                'fixed' => 'Montant fixe',
+                                default => $state,
+                            })
+                            ->color(fn (string $state): string => match ($state) {
+                                'percentage' => 'info',
+                                'fixed' => 'success',
+                                default => 'gray',
+                            }),
+                        TextEntry::make('discount_value')
+                            ->label('Valeur de réduction')
+                            ->formatStateUsing(fn (PromoCode $record): string => $record->discount_type === 'percentage'
+                                ? "{$record->discount_value}%"
+                                : number_format((float) $record->discount_value, 0, ',', ' ').' XAF'),
+                        TextEntry::make('applicable_to')
+                            ->label('Applicable à')
+                            ->badge()
+                            ->formatStateUsing(fn (string $state): string => match ($state) {
+                                'all' => 'Tout',
+                                'subscription' => 'Abonnements',
+                                'credit' => 'Crédits',
+                                'ad_unlock' => 'Déblocage annonce',
+                                default => $state,
+                            }),
+                        TextEntry::make('used_count')
+                            ->label('Utilisations')
+                            ->formatStateUsing(fn (PromoCode $record): string => $record->max_uses !== null
+                                ? "{$record->used_count} / {$record->max_uses}"
+                                : (string) $record->used_count)
+                            ->badge()
+                            ->color('info'),
+                    ]),
+
+                Section::make('Validité')
+                    ->icon(Heroicon::Clock)
+                    ->columns(2)
+                    ->schema([
+                        IconEntry::make('is_active')
+                            ->label('Actif')
+                            ->boolean(),
+                        TextEntry::make('expires_at')
+                            ->label('Expire le')
+                            ->dateTime('d/m/Y à H:i')
+                            ->placeholder('Jamais')
+                            ->color(fn (?string $state): string => $state !== null && now()->gt($state) ? 'danger' : 'success'),
+                        TextEntry::make('created_at')
+                            ->label('Créé le')
+                            ->dateTime('d/m/Y à H:i')
+                            ->placeholder('—'),
+                        TextEntry::make('updated_at')
+                            ->label('Modifié le')
+                            ->dateTime('d/m/Y à H:i')
+                            ->placeholder('—'),
+                    ]),
+            ]);
+    }
+
+    #[\Override]
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
             TextInput::make('code')
                 ->label('Code')
-                ->required()
-                ->unique(ignoreRecord: true)
-                ->maxLength(50)
-                ->alphaNum()
-                ->default(fn (): string => strtoupper(substr(str_shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 8)))
-                ->disabled(fn (string $operation): bool => $operation === 'edit')
-                ->dehydrated()
+                ->disabled()
+                ->dehydrated(false)
+                ->placeholder(fn (string $operation): string => $operation === 'create'
+                    ? 'Généré automatiquement (ex. KY-A8K2X9P0)'
+                    : '')
+                ->helperText('Ce code est généré automatiquement et ne peut pas être modifié.')
                 ->columnSpan(1),
             TextInput::make('description')
                 ->label('Description')
@@ -192,6 +283,9 @@ final class PromoCodeResource extends Resource
                     ]),
             ])
             ->recordActions([
+                ViewAction::make()
+                    ->slideOver()
+                    ->modalWidth('2xl'),
                 EditAction::make()
                     ->successNotificationTitle('Code promo mis à jour'),
                 DeleteAction::make()
