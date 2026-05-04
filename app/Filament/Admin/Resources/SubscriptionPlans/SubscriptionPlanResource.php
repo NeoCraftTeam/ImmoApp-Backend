@@ -68,11 +68,11 @@ class SubscriptionPlanResource extends Resource
                         TextEntry::make('price')
                             ->label('Prix mensuel')
                             ->money('XAF')
-                            ->icon(Heroicon::BankNotes),
+                            ->icon(Heroicon::Banknotes),
                         TextEntry::make('price_yearly')
                             ->label('Prix annuel')
                             ->money('XAF')
-                            ->icon(Heroicon::BankNotes)
+                            ->icon(Heroicon::Banknotes)
                             ->placeholder('Non disponible'),
                         TextEntry::make('duration_days')
                             ->label('Durée')

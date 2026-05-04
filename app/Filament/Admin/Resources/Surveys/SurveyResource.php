@@ -269,7 +269,7 @@ class SurveyResource extends Resource
                         $copy->is_public = false;
                         $copy->save();
 
-                        foreach ($record->questions()->get() as $question) {
+                        foreach ($record->questions as $question) {
                             $newQuestion = $question->replicate();
                             $newQuestion->survey_id = $copy->id;
                             $newQuestion->save();
@@ -319,10 +319,10 @@ class SurveyResource extends Resource
                         fputcsv($handle, [
                             $row->id,
                             'client',
-                            trim((string) ($row->user?->fullname ?? '—')),
-                            (string) ($row->user?->email ?? ''),
-                            (string) ($row->user?->locale ?? ''),
-                            (string) ($row->question?->text ?? '—'),
+                            trim((string) ($row->user->fullname ?: '—')),
+                            $row->user->email,
+                            (string) ($row->user->locale ?? ''),
+                            $row->question->text ?: '—',
                             (string) $row->answer,
                             optional($row->created_at)->format('Y-m-d H:i:s'),
                         ]);
@@ -342,8 +342,8 @@ class SurveyResource extends Resource
                                 'anonyme',
                                 'session#'.mb_substr((string) $response->session_token_hash, 0, 8),
                                 '',
-                                (string) ($response->respondent_audience?->value ?? ''),
-                                (string) ($answer->question?->text ?? '—'),
+                                $response->respondent_audience->value,
+                                $answer->question->text ?: '—',
                                 (string) $answer->answer,
                                 optional($answer->created_at)->format('Y-m-d H:i:s'),
                             ]);

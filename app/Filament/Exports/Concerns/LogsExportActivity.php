@@ -63,7 +63,7 @@ trait LogsExportActivity
                 'export_id' => $export->id,
                 'file_name' => $export->file_name,
                 'file_disk' => $export->file_disk,
-                'format' => $export->format?->value ?? null,
+                'format' => self::exportFormatForAudit($export),
                 'successful_rows' => $successful,
                 'failed_rows' => $failed,
                 'exporter' => static::class,
@@ -71,5 +71,23 @@ trait LogsExportActivity
             ])
             ->event('exported')
             ->log("Export des {$modelLabel} terminé ({$successful} ligne(s))");
+    }
+
+    private static function exportFormatForAudit(Export $export): ?string
+    {
+        if (!array_key_exists('format', $export->getAttributes())) {
+            return null;
+        }
+
+        $format = $export->getAttribute('format');
+        if ($format instanceof \BackedEnum) {
+            return (string) $format->value;
+        }
+
+        if (is_scalar($format)) {
+            return (string) $format;
+        }
+
+        return null;
     }
 }

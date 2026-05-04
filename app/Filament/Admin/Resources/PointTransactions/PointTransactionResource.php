@@ -54,7 +54,7 @@ class PointTransactionResource extends Resource
                         TextEntry::make('type')
                             ->label('Type')
                             ->badge()
-                            ->icon(fn (PointTransactionType $state): string => match ($state) {
+                            ->icon(fn (PointTransactionType $state) => match ($state) {
                                 PointTransactionType::PURCHASE => Heroicon::ShoppingCart,
                                 PointTransactionType::UNLOCK => Heroicon::LockOpen,
                                 PointTransactionType::BONUS => Heroicon::Gift,

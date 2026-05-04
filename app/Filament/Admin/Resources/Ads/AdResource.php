@@ -13,7 +13,6 @@ use App\Filament\Admin\Resources\Ads\RelationManagers\PaymentsRelationManager;
 use App\Filament\Exports\AdExporter;
 use App\Filament\Imports\AdImporter;
 use App\Filament\Resources\Ads\Concerns\SharedAdResource;
-use App\Mail\AdApprovedMail;
 use App\Mail\AdDeclinedMail;
 use App\Models\Ad;
 use BackedEnum;
@@ -200,17 +199,11 @@ class AdResource extends Resource
                         ->action(function (Collection $records): void {
                             /** @var Collection<int, Ad> $records */
                             $records->load('user');
-                            Ad::query()->whereKey($records->modelKeys())->update([
-                                'status' => AdStatus::AVAILABLE->value,
-                            ]);
                             foreach ($records as $ad) {
-                                if ($ad->user) {
-                                    try {
-                                        Mail::to($ad->user)->send(new AdApprovedMail($ad));
-                                    } catch (\Throwable $e) {
-                                        Log::error('Bulk approve email failed: '.$e->getMessage());
-                                    }
+                                if ($ad->status !== AdStatus::PENDING) {
+                                    continue;
                                 }
+                                $ad->forceFill(['status' => AdStatus::AVAILABLE])->save();
                             }
                         }),
                     BulkAction::make('reject')

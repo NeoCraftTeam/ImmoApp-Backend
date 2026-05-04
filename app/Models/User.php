@@ -123,6 +123,8 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
  * @property string|null $last_login_country
  * @property string|null $last_login_city
  * @property bool $is_active
+ * @property bool $is_super_admin
+ * @property list<string>|null $admin_permissions
  * @property Carbon|null $onboarding_completed_at
  * @property Carbon|null $last_home_visit_at
  * @property array<string, mixed>|null $preferences

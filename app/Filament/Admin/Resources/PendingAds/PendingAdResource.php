@@ -7,7 +7,6 @@ namespace App\Filament\Admin\Resources\PendingAds;
 use App\Enums\AdStatus;
 use App\Filament\Admin\Resources\PendingAds\Pages\ManagePendingAds;
 use App\Filament\Resources\Ads\Concerns\SharedAdResource;
-use App\Mail\AdApprovedMail;
 use App\Mail\AdDeclinedMail;
 use App\Models\Ad;
 use App\Services\AiDescriptionEnhancer;
@@ -136,19 +135,10 @@ class PendingAdResource extends Resource
                     ->action(function (Ad $record): void {
                         $record->forceFill(['status' => AdStatus::AVAILABLE])->save();
 
-                        // Send approval email to author
-                        if ($record->user) {
-                            try {
-                                Mail::to($record->user)->send(new AdApprovedMail($record));
-                            } catch (\Throwable $e) {
-                                Log::error('Failed to send ad approval email: '.$e->getMessage());
-                            }
-                        }
-
                         Notification::make()
                             ->success()
                             ->title('Annonce approuvée ✅')
-                            ->body("\"{$record->title}\" est maintenant visible. Un email a été envoyé à l'auteur.")
+                            ->body("\"{$record->title}\" est maintenant visible. Un email de félicitations a été envoyé à l'auteur.")
                             ->send();
                     }),
 

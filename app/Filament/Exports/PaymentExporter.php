@@ -27,12 +27,12 @@ class PaymentExporter extends Exporter
                 ->label('ID'),
             ExportColumn::make('type')
                 ->label('Type')
-                ->state(fn (Payment $record): ?string => $record->type?->value),
+                ->state(fn (Payment $record): string => $record->type->value),
             ExportColumn::make('amount')
                 ->label('Montant (XAF)'),
             ExportColumn::make('status')
                 ->label('Statut')
-                ->state(fn (Payment $record): ?string => $record->status?->value),
+                ->state(fn (Payment $record): string => $record->status->value),
             ExportColumn::make('payment_method')
                 ->label('Moyen de paiement')
                 ->state(fn (Payment $record): ?string => $record->payment_method?->value),

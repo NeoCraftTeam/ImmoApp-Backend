@@ -116,7 +116,7 @@ class SubscriptionResource extends Resource
                         TextEntry::make('amount_paid')
                             ->label('Montant payé')
                             ->money('XAF')
-                            ->icon(Heroicon::BankNotes),
+                            ->icon(Heroicon::Banknotes),
                     ]),
 
                 Section::make('Période de validité')

@@ -46,7 +46,7 @@ class AdExporter extends Exporter
                 ->state(fn (Ad $record): string => $record->has_parking ? 'Oui' : 'Non'),
             ExportColumn::make('status')
                 ->label('Statut')
-                ->state(fn (Ad $record): ?string => $record->status?->value),
+                ->state(fn (Ad $record): string => $record->status->value),
             ExportColumn::make('is_visible')
                 ->label('Visible')
                 ->state(fn (Ad $record): string => $record->is_visible ? 'Oui' : 'Non'),

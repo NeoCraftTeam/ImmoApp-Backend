@@ -111,6 +111,9 @@ class Survey extends Model
         ];
     }
 
+    /**
+     * @return HasMany<SurveyQuestion, $this>
+     */
     public function questions(): HasMany
     {
         return $this->hasMany(SurveyQuestion::class)->orderBy('order');

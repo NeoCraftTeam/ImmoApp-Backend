@@ -56,6 +56,7 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Storage;
 
 class UserResource extends Resource
 {
@@ -93,13 +94,33 @@ class UserResource extends Resource
                         FileUpload::make('avatar')
                             ->label('Avatar')
                             ->disk(config('filesystems.app_media_disk'))
-                            ->fetchFileInformation(false)
+                            ->visibility('public')
                             ->directory('avatars')
                             ->avatar()
                             ->image()
-                            ->optimize('webp', 85)
+                            ->imagePreviewHeight('160')
                             ->maxSize(2048)
                             ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                            ->fetchFileInformation(false)
+                            ->downloadable(false)
+                            ->openable(false)
+                            ->previewable(true)
+                            ->afterStateHydrated(function (FileUpload $component, ?string $state): void {
+                                if (!is_string($state) || $state === '') {
+                                    $component->state(null);
+
+                                    return;
+                                }
+                                if (str_starts_with($state, 'http://') || str_starts_with($state, 'https://')) {
+                                    $component->state(null);
+
+                                    return;
+                                }
+                                $disk = config('filesystems.app_media_disk');
+                                if (!Storage::disk($disk)->exists($state)) {
+                                    $component->state(null);
+                                }
+                            })
                             ->uploadingMessage('Envoi en cours...')
                             ->helperText('Formats acceptés : JPEG, PNG, WebP (max 2 Mo)'),
                     ]),
@@ -409,10 +430,11 @@ class UserResource extends Resource
                                     return [];
                                 }
 
-                                return array_values(array_filter(array_map(
-                                    fn (string $value): ?string => AdminPermission::tryFrom($value)?->getLabel(),
-                                    $values
-                                )));
+                                return collect($values)
+                                    ->map(fn (string $value): ?string => AdminPermission::tryFrom($value)?->getLabel())
+                                    ->filter()
+                                    ->values()
+                                    ->all();
                             })
                             ->placeholder('Aucune permission accordée'),
                     ]),
@@ -484,7 +506,7 @@ class UserResource extends Resource
                 ->badge()
                 ->getStateUsing(function ($record): ?string {
                     /** @var User $record */
-                    $isAgent = $record->role?->value === 'agent' || $record->type?->value === 'agency';
+                    $isAgent = $record->role->value === 'agent' || $record->type?->value === 'agency';
                     $context = $isAgent ? 'landlord' : 'tenant';
                     $trustScore = $record->trustScores->firstWhere('role_context', $context)
                         ?? $record->trustScores->sortByDesc('score')->first();
@@ -496,7 +518,7 @@ class UserResource extends Resource
                 })
                 ->color(function ($record): string {
                     /** @var User $record */
-                    $isAgent = $record->role?->value === 'agent' || $record->type?->value === 'agency';
+                    $isAgent = $record->role->value === 'agent' || $record->type?->value === 'agency';
                     $context = $isAgent ? 'landlord' : 'tenant';
                     $trustScore = $record->trustScores->firstWhere('role_context', $context)
                         ?? $record->trustScores->sortByDesc('score')->first();

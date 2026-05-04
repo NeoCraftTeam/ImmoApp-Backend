@@ -39,7 +39,7 @@ class UserExporter extends Exporter
                 ->state(fn (User $record): ?string => $record->type?->value),
             ExportColumn::make('role')
                 ->label('Rôle')
-                ->state(fn (User $record): ?string => $record->role?->value),
+                ->state(fn (User $record): string => $record->role->value),
             ExportColumn::make('is_active')
                 ->label('Actif')
                 ->state(fn (User $record): string => $record->is_active ? 'Oui' : 'Non'),
