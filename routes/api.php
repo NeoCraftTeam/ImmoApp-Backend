@@ -340,6 +340,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/{uuid}/typing', [ConversationController::class, 'setTyping'])
                 ->middleware("throttle:{$typingRpm},1");
             Route::patch('/{uuid}/archive', [ConversationController::class, 'archive']);
+            Route::patch('/{uuid}/unarchive', [ConversationController::class, 'unarchive']);
         });
 
         // Chat E2EE identity (RSA public key registration — private key stays on device)

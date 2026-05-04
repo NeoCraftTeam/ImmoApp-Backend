@@ -377,6 +377,38 @@ it('archives a conversation', function (): void {
         ->assertJsonPath('status', 'archived');
 });
 
+// ─── PATCH /conversations/{uuid}/unarchive ─────────────────────────────────────
+
+it('unarchives a conversation', function (): void {
+    ['tenant' => $tenant, 'conversation' => $conv] = makeConversationParticipants();
+    $conv->update(['status' => ConversationStatus::Archived]);
+
+    $this->actingAs($tenant)
+        ->patchJson("/api/v1/conversations/{$conv->id}/unarchive")
+        ->assertOk()
+        ->assertJsonPath('data.status', 'active');
+
+    expect($conv->fresh()->status)->toBe(ConversationStatus::Active);
+});
+
+it('unarchive is idempotent when already active', function (): void {
+    ['tenant' => $tenant, 'conversation' => $conv] = makeConversationParticipants();
+
+    $this->actingAs($tenant)
+        ->patchJson("/api/v1/conversations/{$conv->id}/unarchive")
+        ->assertOk()
+        ->assertJsonPath('data.status', 'active');
+});
+
+it('rejects unarchive when conversation is blocked', function (): void {
+    ['tenant' => $tenant, 'conversation' => $conv] = makeConversationParticipants();
+    $conv->update(['status' => ConversationStatus::Blocked]);
+
+    $this->actingAs($tenant)
+        ->patchJson("/api/v1/conversations/{$conv->id}/unarchive")
+        ->assertStatus(422);
+});
+
 // ─── GET /conversations/unread-count ──────────────────────────────────────────
 
 it('returns unread count for authenticated user', function (): void {

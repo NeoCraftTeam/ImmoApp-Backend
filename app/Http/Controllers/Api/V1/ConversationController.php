@@ -269,6 +269,28 @@ final readonly class ConversationController
     }
 
     /**
+     * PATCH /api/v1/conversations/{uuid}/unarchive
+     * Restore an archived conversation. Only participants.
+     */
+    public function unarchive(Request $request, string $uuid): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        $conv = $this->findConversationForUser($uuid, $user->id);
+
+        $this->conversations->unarchive($conv, $user);
+        $conv->refresh();
+        $conv->load([
+            'ad:id,title,slug',
+            ChatE2eeSchema::userParticipantEagerLoadSpec('tenant'),
+            ChatE2eeSchema::userParticipantEagerLoadSpec('landlord'),
+        ]);
+        $this->conversations->attachPreviewMessage($conv);
+
+        return new ConversationResource($conv)->response();
+    }
+
+    /**
      * GET /api/v1/conversations/unread-count
      * Return total unread count and per-conversation breakdown (Redis-cached 30s).
      */

@@ -7,6 +7,7 @@ namespace App\Services\Chat;
 use App\Enums\ConversationStatus;
 use App\Enums\MessageStatus;
 use App\Events\Chat\ConversationArchived;
+use App\Events\Chat\ConversationUnarchived;
 use App\Events\Chat\MessageRead;
 use App\Exceptions\Chat\ConversationNotAllowedException;
 use App\Models\Conversation;
@@ -209,6 +210,31 @@ final readonly class ConversationService
 
         try {
             broadcast(new ConversationArchived($conv->id, $user->id))->toOthers();
+        } catch (\Throwable) {
+            // Reverb may be unavailable in local dev — do not fail the HTTP response
+        }
+    }
+
+    /**
+     * Restore an archived conversation to active. Participants only.
+     * Idempotent: no-op if already active. Broadcasts to the other participant.
+     */
+    public function unarchive(Conversation $conv, User $user): void
+    {
+        abort_unless($user->id === $conv->tenant_id || $user->id === $conv->landlord_id, 404);
+
+        if ($conv->status === ConversationStatus::Active) {
+            return;
+        }
+
+        if ($conv->status !== ConversationStatus::Archived) {
+            abort(422, 'Only archived conversations can be restored.');
+        }
+
+        $conv->update(['status' => ConversationStatus::Active]);
+
+        try {
+            broadcast(new ConversationUnarchived($conv->id, $user->id))->toOthers();
         } catch (\Throwable) {
             // Reverb may be unavailable in local dev — do not fail the HTTP response
         }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\ConversationStatus;
 use App\Events\Chat\ConversationArchived;
+use App\Events\Chat\ConversationUnarchived;
 use App\Events\Chat\MessageDeleted;
 use App\Events\Chat\MessageRead;
 use App\Events\Chat\MessageSent;
@@ -152,6 +153,32 @@ it('does not broadcast ConversationArchived when conversation is already archive
         ->assertOk();
 
     Event::assertNotDispatched(ConversationArchived::class);
+});
+
+it('broadcasts ConversationUnarchived when an archived conversation is restored', function (): void {
+    Event::fake([ConversationUnarchived::class]);
+
+    ['tenant' => $tenant, 'conversation' => $conv] = setupChatTrio();
+    $conv->update(['status' => ConversationStatus::Archived]);
+
+    $this->actingAs($tenant)
+        ->patchJson("/api/v1/conversations/{$conv->id}/unarchive")
+        ->assertOk();
+
+    Event::assertDispatched(ConversationUnarchived::class, fn (ConversationUnarchived $event): bool => $event->conversationId === $conv->id
+        && $event->unarchivedById === $tenant->id);
+});
+
+it('does not broadcast ConversationUnarchived when conversation is already active', function (): void {
+    Event::fake([ConversationUnarchived::class]);
+
+    ['tenant' => $tenant, 'conversation' => $conv] = setupChatTrio();
+
+    $this->actingAs($tenant)
+        ->patchJson("/api/v1/conversations/{$conv->id}/unarchive")
+        ->assertOk();
+
+    Event::assertNotDispatched(ConversationUnarchived::class);
 });
 
 // ── Attachment ownership validation ─────────────────────────────────────────
