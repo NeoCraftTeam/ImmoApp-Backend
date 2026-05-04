@@ -18,18 +18,38 @@ use Illuminate\Support\Facades\Log;
  * Ops:
  *  - `TURNSTILE_SITE_KEY`  — public, safe to expose in frontend env.
  *  - `TURNSTILE_SECRET_KEY` — server-only.
- * When either is empty, the service silently returns `true` so non-prod
- * environments don't require a Cloudflare account to test the auth flow.
+ * When the secret is empty, the service fails open (`verify` → true) so auth
+ * works without a widget. When `APP_ENV` is `local`, `config/services.php`
+ * injects Cloudflare's **dummy** siteverify secret so the widget can load on
+ * localhost; that dummy secret must **not** force verification or every API
+ * login without `turnstile_token` (Postman, mobile apps during dev) returns
+ * 401 "Identifiants invalides." See Cloudflare Turnstile testing keys.
+ *
+ * @see https://developers.cloudflare.com/turnstile/troubleshooting/testing/
  */
 final readonly class TurnstileService
 {
     private const string VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 
+    /**
+     * Official "always passes" secret for visible-mode testing (matches
+     * `config/services.php` when `APP_ENV=local` and production keys are off).
+     */
+    private const string DUMMY_VISIBLE_SECRET = '1x0000000000000000000000000000000AA';
+
     public function isConfigured(): bool
     {
-        $secret = (string) config('services.turnstile.secret_key', '');
+        $secret = trim((string) config('services.turnstile.secret_key', ''));
 
-        return $secret !== '';
+        if ($secret === '') {
+            return false;
+        }
+
+        if (hash_equals(self::DUMMY_VISIBLE_SECRET, $secret)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

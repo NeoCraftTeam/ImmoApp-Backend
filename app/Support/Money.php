@@ -35,6 +35,12 @@ final readonly class Money
             return number_format((float) $amount, 0, '.', ' ').' '.$currency;
         }
 
+        // CFA francs (XAF / XOF): avoid NumberFormatter::formatCurrency — ICU often
+        // emits the ISO code (XAF/XOF) whereas the product copy must stay "FCFA".
+        if ($currency === 'XAF' || $currency === 'XOF') {
+            return number_format((float) $amount, $meta['decimals'], ',', ' ').' '.$meta['symbol'];
+        }
+
         $resolvedLocale = $locale !== null
             ? self::resolveLocale($locale, $meta['locale'])
             : $meta['locale'];
