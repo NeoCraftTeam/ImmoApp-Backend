@@ -137,6 +137,7 @@ vendor/bin/rector process --dry-run
 - `AcquisitionChannelClassifier`, `UtmAttributionService` — marketing attribution.
 - `UserWelcomeService`, `WebPushService`, `NativeAppService` — notifications & mobile.
 - `RetentionPushService` — behavioral retention Web Push (4 triggers: win-back after 3d inactivity, price-drop on favorites ≥5 000 FCFA, viewing reminder day-before, lease expiry at 30/7 days). Search-alert matches are handled separately by `SendSearchAlertInstantNotificationJob` + `SendSearchAlertFcmJob` (instant, per `SearchAlert.notify_email` / `notify_push`). Retention command: `app:send-retention-pushes` (scheduled twiceDaily 09:00/18:00). `--dry-run` flag available.
+- **E-mails jalons** — `SendWelcomeNotification` / `UserWelcomeService` après vérification (`Verified`) et flux Clerk. **Client** : premier déblocage contact par crédits → `FirstAdUnlockCongratulationsMail` depuis `UnlockAd` (une seule fois par compte, e-mails `@clerk.local` ignorés). **Bailleur** : passage modération `PENDING` → `AVAILABLE` → listener `SendAdApprovedEmail` → `AdApprovedMail` (layout teal `emails.owner-layout`), via `AdStatusTransitioned` / `AdObserver` (y compris approbation unitaire ou bulk Filament).
 - `Chat/EncryptionService` — AES-256-CBC with HMAC-SHA256 MAC (authenticated encryption). Key from `CHAT_ENCRYPTION_KEY` env (32-byte hex). `encrypt()` returns `{ciphertext, iv}`; `decrypt()` verifies MAC before decrypting.
 - `Chat/AttachmentService` — upload files to Cloudflare R2 (`chat-attachments/` prefix). MIME/size validated (images: JPEG/PNG/WEBP/GIF ≤5 MB; files: PDF/doc ≤20 MB). Returns descriptor with `signed_url` (1-hour TTL). `getSignedUrl()` refreshes URLs.
 - `Chat/ConversationService` — find-or-create (gated on `UnlockedAd`), list (paginated), mark-as-read (broadcasts `MessageRead`), archive, unread count (Cache 30s TTL).
@@ -253,7 +254,7 @@ vendor/bin/rector process --dry-run
   - **FedCM migration**: GSI emits a warning that `isNotDisplayed()` / `isSkippedMoment()` prompt notification methods will stop working when FedCM becomes mandatory. Non-blocking for now; revisit when Google announces enforcement date.
 - **API rate limits**: CUSTOMER 300 req/min, AGENT with subscription 500 req/min, AGENT without subscription 300 req/min, ADMIN unlimited, guest 60 req/min.
 - **Token refresh**: `POST /api/v1/auth/refresh` — rotates the current Sanctum token (delete old → create new), preserves login-context prefix (owner/client). `AuthController::refresh()`.
-- **Session idle timeout** (frontend): `SessionTimeoutGuard` component (`src/components/session/`) monitors user activity via `useIdleTimeout` hook. After **15 min idle** → warning modal with **60 s countdown**. Two buttons: "Prolonger la session" (calls `/auth/refresh` to rotate token) or "Se déconnecter". Auto-logout if countdown reaches 0. Integrated in `providers.tsx` inside `AuthProvider`. Only active when `isAuthenticated`.
+- **Session idle timeout** (frontend): `SessionTimeoutGuard` (`src/components/session/`) uses `useIdleTimeout`. After **15 min idle** → modal (**60 s** countdown); « Prolonger la session » appelle `/auth/refresh`; « Se déconnecter » appelle `logout()`. Monté **par panneau** sous le bon thème MUI — `(dashboard)/layout.tsx` (rose) et **`OwnerLayoutClient`** sous `OwnerThemeProvider` (teal) ; **pas** dans `providers.tsx`, pour que la modale reprenne `primary.main` du panneau.
 
 ### Architecture Decisions
 - **No repository pattern** — Eloquent is used directly in Services and Actions. At this scale (~70 models), the repository pattern adds indirection without meaningful testability gain (Eloquent itself is well-tested). Services are the business-logic boundary; if we outgrow this, we extract repositories per-domain rather than globally. Documented decision — not a TODO.
@@ -266,9 +267,11 @@ vendor/bin/rector process --dry-run
 - `useAuthActions` — login, loginOwner, loginWithOAuth, logout, refreshUser, setUser, finalizeAuth, getClerkToken. Extracted from `AuthProvider.tsx`.
 - `useIdleTimeout` — tracks user inactivity and triggers session timeout warning.
 - `useSearchHistory` — manages recent search history in localStorage.
+- `useNetworkStatus` — online/offline via `navigator.onLine` + events; défaut SSR `true`; consommé par `SectionState` pour copy hors-ligne.
 
 ### Frontend Shared Components (`keyhome-frontend-next/src/components/ui/`)
 - `CityAutocomplete` — reusable city autocomplete with debounced search, shared visual config. Props: `value`, `onChange`, `label`, `placeholder`, `size`, `sx`, `required`, `error`, `helperText`, `disabled`. Available for progressive adoption across 13+ consumers.
+- `SectionBoundary` / `SectionErrorFallback` — périmètre d’erreur React par section (réessai, FR). `SectionState` — loading / erreur / vide avec prise en compte hors-ligne.
 
 ### Animation System (SKILL.md compliant)
 - **Easing:** All CSS/Framer Motion use out-quint `cubic-bezier(0.22, 1, 0.36, 1)`. Bounce easing `(0.34, 1.56, 0.64, 1)` is banned (SKILL.md: "feels dated and tacky"). Fixed globally in `globals.css` (`--spring`), `theme.ts` (MuiButton, MuiCard, MuiIconButton, MuiFab, MuiSwitch, MuiTabs, MuiAccordion), and per-component in `login/page.tsx`, `HeroSearch.tsx`, `AdCard.tsx`, `PackageCard.tsx`, `SplashTransition.tsx`. Zero bounce easings remain in the codebase.
@@ -457,7 +460,7 @@ Storybook, Vitest, Playwright.
   - `payment/` — payment history, checkout components.
   - `trust/` — TrustScore components (`TrustScoreBadge`, `TrustScoreSection`, `TrustScoreConsentModal`).
 - `src/services/` — 23 service files calling `/api/v1/` endpoints.
-- `src/hooks/` — 16 custom hooks.
+- `src/hooks/` — hooks partagés (`useSearchFilters`, `useAuthActions`, `useNetworkStatus`, etc.).
 - `src/theme/` — `tokens.ts` (design tokens), `theme.ts` (MUI theme), `ownerTheme.ts` (bailleur).
 - `src/types/` — TypeScript interfaces mirroring backend models.
 - `src/tests/` — Vitest unit tests.
@@ -467,6 +470,18 @@ Storybook, Vitest, Playwright.
 ### Thème & retours paiement (May 2026)
 - **`ThemeProvider`** — préférence persistée `localStorage` `kh_theme_choice` : `system` \| `light` \| `dark` ; `useThemeMode()` expose `choice` et `setChoice`. Pages **Paramètres** client et bailleur : `ToggleButtonGroup` Clair / Sombre / Système.
 - **Retour après paiement** — `src/lib/payment-return.ts` : `rememberPaymentOriginPath()` avant redirection Flutterwave (`creditsService.purchase`, `paymentsService.flutterwaveInitiate`) ; `consumePaymentReturnPath(fallback)` sur les pages callback pour retrouver la page d’origine (`sessionStorage` `kh_payment_return_path`).
+
+### Landing polish & résilience UI (May 2026)
+- **Landing publique** (`src/components/landing/*`, `/`) — repasse UX/a11y : hiérarchie, espacements, tokens (`tokens.ts`), CTAs qui pointent vers des routes joignables (ex. bailleur → `/owner/login`), FAQ (`aria-expanded` / `aria-controls`), nav mobile (`role="dialog"`), pied de page et newsletter (validation email, états d’erreur), `.hero-section` min-heights responsives dans `globals.css`. Tests Vitest : `src/tests/components/NewsletterSection.test.tsx`.
+- **Sections isolées** — `SectionBoundary` + `SectionState` + `useNetworkStatus` pour états chargement / erreur / hors-ligne par bloc (pattern appliqué sur `AdDetailClient` pour cartographie, quartier, avis, etc.).
+- **`/nearby`** — même stratégie que `/search` : import **dynamique** de `mapbox-gl` au montage de la carte (bundle initial plus léger sans mode liste).
+- **`useServerAutoSave`** — après échec API, remplit `lastError` avec `getLaravelApiErrorMessage()` (`src/lib/api-errors.ts` : `message`, champs `errors` Laravel, `debug.message` si présent) ; `AdFormWizard` affiche le détail sous le bouton brouillon + tooltip ; effacement au prochain succès ou via `clearSavedAt()`.
+- **Erreurs API owner (annonces)** — mutations sur `(owner)/owner/ads/*` et liste `owner/ads/page` utilisent `getLaravelApiErrorMessage` pour snackbars (plus de messages génériques seuls).
+- **`bootstrap/app.php`** — handler JSON 500 API : si `APP_DEBUG=true`, ajoute `debug` (`exception`, `message`, `file`, `line`) en plus du message public ; le front peut afficher `debug.message` via l’helper ci-dessus.
+- **`public/sw.js`** — entrée **cache-first réseau** pour les GET `CACHEABLE_OWNER_PATHS` traitée **avant** le filtre same-origin → cache offline utile lorsque l’API est **cross-origin** (nécessite CORS permissif pour GET depuis l’origine du PWA). Version incrémentée (`VERSION`) après changement comportement SW.
+- **Favoris invité** — `FavoritesProvider` : à la transition `authenticated → guest`, réhydrate depuis `localStorage` (`readLocal()`) au lieu de laisser `[]` désynchronisé.
+- **Navigation bailleur** — libellé **« Tableau de bord »** dans `OWNER_NAV_ITEMS` / `OWNER_SIDEBAR_NAV_ITEMS` / `OwnerSidebar` ; **`aria-current="page"`** sur l’entrée active ; **`OwnerNavbar`** : bouton « Nouvelle annonce » visible lorsque la barre mobile est affichée (branche `{!isMobile && …}` supprimée).
+- **Owner shell** — `handleSurveyPostponed` mémoïsé (`useCallback`) pour limiter les re-renders de `SurveyPromptOrBanner`.
 
 ### Environment Variables
 | Variable | Purpose |
@@ -584,6 +599,7 @@ The frontend exposes **two distinct PWA identities** that install as separate ap
 
 **Architecture:**
 - `AdFormWizard` — 6-step wizard (Type → Infos → Détails → Conditions → Médias → Résumé) using `AuthFlowStepper`.
+- **`AdFormLivePreview`** — aperçu **temps réel** : colonne sticky desktop **large** (`flex: 1 1 0%`, `minWidth` 420–520px) à côté du formulaire (colonne formulaire ~480–540px) ; **FAB + `Drawer` mobile** ; galerie principale + bandeau de miniatures (ordre = formulaire), prix / transaction / type / méublé (attribut) / chips boost & visite 360°, titre, adresse + ville/quartier, description (placeholder tant que vide), bloc **Conditions & charges** (caution texte ou montant formaté, durée, forfait / eau / élec / autres), équipements (jusqu’à 12 + décompte), **carte uniquement si le pin a été déplacé** (pas les coordonnées par défaut — constantes `AD_FORM_MAP_DEFAULT_LAT/LNG` dans `ad-form/types.ts`, alignées sur `AdFormMapLocation` / `initialValues`), proximité, encart annonceur. Framer : easing out-quint `cubic-bezier(0.22, 1, 0.36, 1)`.
 - `useServerAutoSave` hook — debounced (5 s) server-side auto-save; creates draft on first dirty save, patches via `PATCH /ads/{id}/autosave` on subsequent saves.
 - `AdStatusController::autosave` — lightweight text-field-only PATCH, no image processing, no status transitions.
 - `AdStatusController::publish` — pessimistic-lock transition `DRAFT → PENDING` after all required fields verified.
@@ -595,6 +611,56 @@ The frontend exposes **two distinct PWA identities** that install as separate ap
 2. On edit page: wizard has `draftId = ad.id`; auto-save patches via `PATCH /ads/{id}/autosave`.
 3. Manual "Enregistrer le brouillon" button → `PUT /ads/{id}` with full FormData including images.
 4. "Publier" on review step → `PUT /ads/{id}` update + `POST /ads/{id}/publish` → `DRAFT → PENDING`.
+
+**Owner panel — enterprise pass (Mai 2026)** — refonte transverse de 8 chantiers (bio, avis, abonnements, boost, contrats, finances, profil, paiements).
+
+**Boost — recherche, expiration, exposition publique :**
+- **`AdSearchController` (Meilisearch + fallback Eloquent)** : `boost_score:desc` est désormais **toujours** injecté **avant** le tri demandé (sauf `_geoPoint` où la proximité prime). Avant, un `sort=created_at` (défaut) plaçait les annonces boostées au même rang que les non boostées → les annonces sponsorisées **ne remontaient pas**. Idem dans le fallback Eloquent (`orderByDesc('boost_score')` puis le tri demandé).
+- Nouvelle commande `app:expire-boosted-ads` (`ExpireBoostedAds.php`) planifiée **toutes les heures** dans `routes/console.php`. Sweep `is_boosted/boost_score` quand `boost_expires_at` est passé — sans cette tâche, la BDD restait incohérente avec `Ad::isBoosted()` qui repassait `false` à l'exécution mais laissait les colonnes intactes (impact index Meilisearch + filtres admin).
+- **`AdResource`** expose désormais `is_boosted`, `boost_expires_at`, `boost_score` (via `Ad::isBoosted()` qui re-vérifie l'expiration). Permet le badge **"★ Sponsorisé"** sur `AdCard.tsx` (top-left, sous la pastille comparator).
+- Tests : `tests/Feature/AdSearchBoostOrderingTest.php` (boost devant created_at + boost devant price asc), `tests/Unit/ExpireBoostedAdsCommandTest.php` (cron sweep).
+
+**Bio publique — éditeur léger Markdown + compteur :**
+- Migration `2026_05_04_195013_extend_user_bio_to_2000_chars.php` passe `users.bio` de **VARCHAR(500) → VARCHAR(2000)**. `UserRequest` validation `max:500 → max:2000`.
+- `src/components/owner/PublicBioEditor.tsx` : éditeur **TipTap** (gras, italique, titres, listes, liens) avec persistance **Markdown** via `markdownLightToHtml` / `htmlToMarkdownLight` ; **compteur** avec alerte visuelle proche de la limite.
+- Renderer Markdown : `src/lib/markdown-light.ts` (`markdownLightToHtml`) — dépendance zéro, échappe tout ce qui n'est pas dans la whitelist (gras / italique / `<h3>` / listes / liens `https`/`mailto` avec `rel="noopener noreferrer nofollow"`). Aucune dépendance npm ajoutée. Tests Vitest (`src/tests/lib/markdown-light.test.ts`, 8 cas dont sécurité XSS).
+- Page `/owner/profile` : remplace `TextField` brut par `PublicBioEditor` en mode édition + rendu HTML sanitisé via `markdownLightToHtml(user.bio)` en mode lecture.
+
+**Subscriptions — refonte complète frontend :**
+- **Bug parsing** : la page lisait `data?.data` alors que l'API renvoie `{has_subscription, subscription, stats}` → l'abonnement actif n'apparaissait **jamais** côté Next ; les prix étaient affichés à 0 FCFA car `plan.price` n'existe pas (`price_monthly` / `price_yearly`). **Refonte** : `subscriptions.service.ts` aligné sur `SubscriptionResource` / `SubscriptionPlanResource` ; `subscribe()` / `cancel()` / `toggleAutoRenew()` ajoutés.
+- Page `/owner/subscriptions` : toggle **Mensuel / Annuel**, carte "abonnement actuel" avec switch `auto_renew`, bouton **Annuler** (avec dialog de confirmation + raison facultative — l'abonnement reste actif jusqu'à `ends_at`), bouton **Souscrire** branché → POST `/subscriptions/subscribe` → `window.location.assign(payment_url)` (Flutterwave) après `rememberPaymentOriginPath()` pour retomber sur `/owner/subscriptions` au callback.
+
+**Avis owner — réponse + KPI + filtres :**
+- `ReviewResource` expose `is_verified`, `owner_response`, `owner_responded_at` (3 champs étaient en BDD via `2026_03_23_173944_add_trust_fields_to_reviews_table` mais pas sérialisés).
+- Page `/owner/reviews` rebâtie : **KPI block** (note moyenne large, distribution étoiles 1-5 avec `LinearProgress`), filtres **Tous / Sans réponse / Répondus** + filtre par note (5 niveaux), **bouton Répondre** par avis (dialog avec compteur 1000 chars), affichage de la réponse propriétaire dans un encart accentué teal sous le commentaire.
+- Service : `ownerService.respondToReview(reviewId, response)` → `POST /reviews/{id}/respond`.
+
+**Lease contracts — régénération PDF + signature JSON fix :**
+- **`SignatureController::show`** envoyait `{data, contract}` plat alors que `/sign/[token]/page.tsx` lisait `data.request.contract` → **page "Lien invalide ou expiré" systématique** dès qu'un locataire cliquait sur le lien email. Fix : envelop `request.contract` (canonique) + conserve les anciennes clés `data` / `contract` pour les clients mobiles.
+- **`LeaseContractController::update`** régénère désormais le PDF après chaque modification (rent / dates / parties / conditions) via `LeaseContractService::regeneratePdf()` qui re-render avec les données courantes du contrat + relations ad/quartier/ville, swap `pdf_path`, supprime l'ancien fichier (best-effort). Avant, le PDF téléchargé restait désynchronisé du texte affiché.
+
+**Finances — pagination expenses :**
+- `ExpenseController::index` envoie maintenant `{data, meta, links}` (paginator brut Laravel exposait `current_page`/`last_page` à la racine, jamais `meta` → la page `<Pagination>` ne s'affichait pas même avec >20 lignes).
+
+**À faire (chantier reporté) :**
+- Income réel : pas de modèle `Payment` de type loyer encaissé ; `profitLoss` sum sur `lease_contracts.monthly_rent` est **trompeur** (multiples contrats, contrats historiques). Décision produit requise (créer un type `RENT` + workflow encaissement, ou un journal manuel).
+- Lease lifecycle complet : `status` enum (`draft / active / expired / terminated / archived`), endpoints `renew`, `terminate`, `archive`. Hors scope cette session.
+- E-signature légalement contraignante : `signature_hash`, IP + device, audit log dédié (pour l'instant `LeaseSignatureRequest::sign` met juste `status=signed`).
+
+### Owner draft mode — completion pass (Mai 2026)
+
+La fonctionnalité est complète et fonctionnelle.
+
+- **Bug critique base de données** : la migration `2026_03_08_154604_update_ad_status_check_constraint` listait `available, reserved, rent, pending, sold, declined` **sans `'draft'`**, alors que tout le pipeline draft (`AdController::store(is_draft=1)`, `CreateAd::execute(isDraft: true)`, `AdStatusController::publish/autosave`, `AdFormWizard.useServerAutoSave`) repose sur `AdStatus::DRAFT`. Sur toute base où la check constraint était réellement appliquée (CI, fresh DB), **chaque écriture de brouillon retournait `SQLSTATE[23514] ad_status_check`** — silencieusement transformé en 500 ou en rollback côté API. **Fix** : nouvelle migration `2026_05_04_193135_update_ad_status_check_constraint_add_draft.php` qui rétablit le bon set de valeurs (`up()` ajoute `'draft'`, `down()` revient à l'ancien set).
+- **Parité auto-save** : `AdFormWizard.autoSaveData` ne sérialisait qu'un sous-ensemble des `AdFormValues` ; tout ce qui n'était pas envoyé restait uniquement en mémoire navigateur tant que l'utilisateur n'avait pas cliqué « Enregistrer le brouillon ». Désormais la snapshot inclut **tous** les champs supportés par `AdStatusController::autosave` : `charges_montant_forfait`, `charges_eau`, `charges_electricite`, `charges_autres`, `distance_main_road_m`, `distance_shops_m`, `distance_transport_m`, `distance_school_m`, `distance_hospital_m`, et **`attributes`** (équipements). Médias (photos / panoramas / PDF) restent volontairement hors auto-save — communiqué via un helperText dédié sous le bouton.
+- **Backend `AdStatusController::autosave`** :
+  - Validation alignée avec `AdRequest` (PUT) : `charges_eau` / `charges_electricite` passent de `boolean` à `numeric|min:0` (montants en CFA, conformes au cast `integer` du modèle), `deposit_amount` / `minimum_lease_duration` redeviennent `string|max:50` (conforme à l'usage `'2 mois de caution'`), `transaction_type` accepte uniquement `location|vente`, distances bornées à `max:99999`.
+  - **`attributes`** : `array|max:50` avec `Rule::exists('property_attributes', 'slug')` filtré sur `is_active=true` (mêmes règles que création/PUT) ; persistance via `array_unique(array_filter)`. `[]` envoyé volontairement vide la liste (cas « toutes les chips désélectionnées »).
+  - **`latitude`/`longitude`** : convertis en PostGIS `Point` via `GeoLocation::fromArray()` ; un seul des deux → `location` non écrasé (préserve la coordonnée précédente sur autosave partiel).
+  - `is_boost_requested` reste **frontend-only** comme documenté dans `CreateAd` — non persisté.
+- **Service `adsService.autosaveDraft`** : signature étendue à `string | number | boolean | string[] | null` ; le hook `useServerAutoSave` envoie les arrays en JSON natif. `onCreateDraftCb` (premier save = POST `is_draft=1` multipart) sérialise désormais les arrays en `attributes[0]=…&attributes[1]=…` et **skip** les arrays vides pour éviter d'écraser des valeurs serveur tant que l'utilisateur n'a pas touché les chips.
+- **UX wizard** : helperText permanent sous le bouton brouillon (« Texte et infos enregistrés automatiquement. Photos, visite 360° et PDF : utilisez « Enregistrer le brouillon ». ») + libellé orange existant `Brouillon · Sauvegarde auto indisponible (connexion ?)` lorsque `useServerAutoSave.lastError` est posé.
+- **Tests** : `tests/Feature/AdDraftAutosaveTest.php` (8 cas, 31 assertions) couvre champs étendus, `location` complet vs partiel, `attributes` valides / inactifs / vides, ad non-draft → 422, accès non-propriétaire → 403.
 
 **Bugs fixed in ad stepper audit (6 bugs):**
 - `AdFormWizard.tsx` `onCreateDraftCb`: Booleans (`has_parking=false`) were serialized as JS `String(false)='false'`, which PHP Eloquent's boolean cast treats as truthy → always stored `has_parking=true`. Fixed: `typeof v === 'boolean' ? (v ? '1' : '0') : String(v)`.
@@ -1139,7 +1205,7 @@ Root cause (3 independent issues stacked):
     - `ChatHeader` now passes `lastSeenAt={participant?.last_seen_at}` to both branches of `OnlineStatus`. Offline users now display "Vu il y a 3 min" / "Vu hier" via `date-fns/formatDistanceToNow` with French locale, instead of just "Hors ligne".
 
 **Theme / session:**
-9. **`SessionTimeoutGuard` mounted per panel** — moved out of `app/providers.tsx` (global root) into `(dashboard)/layout.tsx` and `(owner)/layout.tsx`. Modal now correctly inherits panel-specific `primary.main` color: pink for client, teal for owner. Previously the guard rendered above `OwnerThemeProvider` and always showed pink.
+9. **`SessionTimeoutGuard` mounted per panel** — `(dashboard)/layout.tsx` (rose) and `OwnerLayoutClient.tsx` under `OwnerThemeProvider` (teal) — pas dans `providers.tsx` racine. Précédemment sous le thème client uniquement ou au-dessus du thème bailleur → modale rose incohérente.
 10. **Theme policy clarified** — `OwnerThemeProvider` now uses the resolved `mode` (was `choice === 'dark' ? 'dark' : 'light'`, ignoring `system`). Owner panel now follows OS preference like the client panel. `LandingThemeProvider` now uses `choice !== 'light'` so the public marketing landing defaults to dark unless the user explicitly picks light. Authenticated panels (client + owner) follow system; landing forces dark by default.
 
 **Files changed (frontend):** `src/components/chat/{ChatBadgeIcon,ChatNotificationListener,ChatToast,ConversationList,AttachmentPreview}.tsx`, `src/components/owner/OwnerSidebar.tsx`, `src/components/owner/OwnerLayoutClient.tsx`, `src/providers/{ToastProvider,OwnerThemeProvider}.tsx`, `src/components/landing/LandingThemeContext.tsx`, `src/app/providers.tsx`, `src/app/(dashboard)/layout.tsx`, `src/app/(dashboard)/messages/{page,[uuid]/page}.tsx`, `src/app/(owner)/layout.tsx`, `src/app/(owner)/owner/ads/[id]/page.tsx`, `src/hooks/useFcmToken.ts`, `src/lib/smart-back.ts` (new), `public/sw.js`, `public/firebase-messaging-sw.js`.
@@ -1479,6 +1545,21 @@ Audit multi-agents exhaustif réalisé le 2 mai 2026. 7 agents parallèles ont c
 - **Concurrence** : entrée d'un acteur global (Jumia House, Meqasa) avec budget marketing supérieur — différenciation par IA + TrustScore doit être accélérée.
 - **Dette technique** : si les HIGH ci-dessus ne sont pas résolus avant scaling, le coût de correction augmente exponentiellement.
 
+### Audit sécurité — owner panel (Mai 2026, post-pass)
+
+Issues résiduelles identifiées **après** le pass enterprise. À traiter en session dédiée.
+
+| Sévérité | Sujet | Détail |
+|---|---|---|
+| 🔴 HIGH | E-signature contrats | `SignatureController::sign()` accepte un POST sans authentification ni signature cryptographique. Pas de `signature_hash`, pas de log IP / device, pas de version PDF figée à la signature. Un attaquant qui intercepte le `token` peut signer en se faisant passer pour le locataire. **Fix proposé** : exiger une vérification (OTP email / SMS) avant `sign()`, calculer un hash SHA-256 du PDF + horodatage RFC-3161, stocker IP + user-agent + nonce. |
+| 🔴 HIGH | Bio rendering | `markdownLightToHtml` est sûr (whitelist, échappement HTML) ; cependant la page **publique** `/proprietaires/[id]` n'a pas été auditée pour s'assurer qu'elle utilise bien `markdownLightToHtml` au lieu d'injecter `bio` brute. À vérifier si la page existe (introuvable dans ce dépôt). |
+| 🟠 MEDIUM | Reviews response abuse | Pas de rate limit explicite sur `POST /reviews/{review}/respond` au-delà du `throttle:10,1` de la route. Un propriétaire pourrait flooder les réponses (un seul `respond` autorisé par avis, mais la garde se fait par `owner_response IS NOT NULL` après update — race condition possible avec deux requêtes simultanées). **Fix** : `lockForUpdate()` sur le `Review` dans `respond()`. |
+| 🟠 MEDIUM | Bio max 2000 chars | Validation `max:2000` côté backend OK, mais `PublicBioEditor` tronque à 2000 sans alerter l'utilisateur ; mieux vaut un `helperText` explicite quand on touche la limite. Le compteur visible et la couleur d'erreur à 100% l'avertissent — accepté. |
+| 🟠 MEDIUM | Boost equity | Tri `boost_score:desc` est primary sort sur tous les résultats : un boost très ancien `score=10` peut passer devant un boost récent `score=5` — comportement attendu (le score est défini par le plan). **Effet de bord** : un score à 0 sur boost expiré non sweepé pollue le ranking jusqu'à la prochaine exécution `app:expire-boosted-ads`. Tâche horaire mitige le risque. |
+| 🟡 LOW | Subscription cancel UX | `Subscription::cancel()` met `status = cancelled` immédiatement et `Agency::hasActiveSubscription()` exige `ACTIVE` → l'agence perd l'accès aux fonctionnalités premium dès l'annulation, contredit la promesse "valable jusqu'à `ends_at`". Voir audit subscriptions sous-agent. |
+| 🟡 LOW | Profil bio in `UserResource` | La bio est exposée publiquement via `/users/{id}/public-profile`. Le rendu côté front public doit utiliser `markdownLightToHtml` ; sinon le bailleur peut écrire `## ` qui s'affichera comme texte brut. |
+| 🟡 LOW | Expense pagination defaults | `paginate(20)` codé en dur dans `ExpenseController::index`, pas de `per_page` query param. |
+
 ### Roadmap de mise à niveau enterprise (ordre de priorité)
 
 | # | Priorité | Action | Impact |
@@ -1544,6 +1625,7 @@ Round de fixes ciblés sur les bugs visibles signalés par l'utilisateur (chat c
 - **Ad detail page perçu lente** : ajouté `src/app/ads/[slug]/loading.tsx` avec un skeleton complet (hero + titre + chips + sidebar) qui s'affiche **instantanément** au tap, pendant que le server-side fetch de `generateMetadata` + JSON-LD finit. Combiné avec `router.prefetch('/ads/{slug}')` posé sur `onMouseEnter` / `onTouchStart` de l'`AdCard` → le chunk + le data sont chauds avant même le tap.
 - **Ad detail — impression** : `openAdDetailPrintPdf()` (`html2canvas` + `jspdf`). Avant capture : `document.fonts.ready`, fenêtre `windowWidth`/`windowHeight` = dimensions du root, `onclone` (`prepareAdPrintClone`) — `overflow` hidden/clip → visible, zones scrollables dépliées, `img` dimensionnées ; hero mobile `.kh-ad-print-hero-mobile` — hauteur dérivée du ratio image pour une capture non rognée. Classe sur le hero : `AdDetailClient.tsx`.
 - **Ad detail — contact** : libellés du type « Échanger avec {prénom} », « Message WhatsApp », « Appeler {prénom} » ; `ViewingBookingPanel` « Proposer une visite avec {prénom} » ; brouillon chat via `buildDraftMessage(..., hostFirstName)`.
+- **Ad detail — équipements & charges (alignement)** : `PropertyAttributes.tsx` utilise une cellule d’icône fixe 40×40 (`LIST_ICON_CELL_SX`) en liste et dans le dialogue ; texte en `flex: 1; minWidth: 0`. `AdDetailClient.tsx` — bloc Charges : pictogrammes dans une colonne 22px (`CHARGES_ICON_SLOT_SX`), valeurs à droite `maxWidth: 60%` (répété desktop + mobile).
 - **Signalement annonce** : `AdReportReceivedNotification` → canal `database` toujours, + `mail` si e-mail valide ; copy API / modale / notifications admin harmonisés en français. Test : accusé réception database seul si e-mail invalide (`AdReportFeatureTest`).
 
 ### UX cross-panel
@@ -1560,7 +1642,7 @@ Round de fixes ciblés sur les bugs visibles signalés par l'utilisateur (chat c
 - **Config** : `services.turnstile.{site_key,secret_key}` lus depuis `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY`. La site key est exposée au frontend via `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (optionnel) et/ou `GET /api/v1/config/turnstile` (`TurnstilePublicConfigController`, throttle 120/min).
 - **Frontend** : `src/components/auth/TurnstileWidget.tsx` — rendu **explicit** (`api.js?render=explicit`), **`render()` après `Script.onLoad` uniquement** (pas `turnstile.ready()` : incompatible avec le `defer` imposé par `next/script` afterInteractive — erreur Cloudflare sinon), préconnexion `challenges.cloudflare.com`, `size="flexible"`. `src/hooks/useTurnstileSiteKey.ts` : sur hôtes de dev (`localhost`, `127.0.0.1`, `*.test`, etc.) on **ignore** `NEXT_PUBLIC_TURNSTILE_SITE_KEY` si défini et on lit `GET /config/turnstile` — aligne le widget sur les clés factices Laravel (`APP_ENV=local` + clés vides) et évite l’erreur **110200** quand seule l’API autorise localhost. Sur hôtes « prod-like », `NEXT_PUBLIC_*` prime ; sinon fetch `/config/turnstile` comme repli Vercel. `TurnstileConfigAlert` + `onErrorCode` sur `/login`, `/owner/login`, `/register` guident la config Cloudflare si le widget échoue.
 - **Câblage login** : page `/login` pose `turnstileToken` dans le state, le passe à `login(email, password, token)` ; le bouton submit est désactivé tant que le token n'est pas obtenu (uniquement si Turnstile est configuré). `useAuthActions.login`/`loginOwner` et `authService.login` étendus pour accepter le 4ᵉ argument optionnel.
-- **Intégration UI complète** : Turnstile rendu sur `/login` (action=`login`), `/owner/login` (action=`login-owner`) et `/register` (action=`register-customer` ou `register-agent` selon le rôle). Sur les pages login, l’ordre du formulaire est : mot de passe → Turnstile (`minHeight`) → lien mot de passe oublié → « Se connecter ». Le submit reste désactivé tant que la config Turnstile n’est pas résolue ; si un widget est affiché, jusqu’à token Cloudflare. `authService.registerCustomer` / `registerAgent` propagent `turnstile_token` (champ optionnel) vers le backend. `RegistrationService::register` l'extrait via `$request->input('turnstile_token')` — vérification via `TurnstileService::verify()` avant rate-limit hit, échec → `ValidationException` ciblée sur `turnstile_token`. `.env.example` (backend + frontend) documente `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` / `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. **Fail-open en dev** : si `TURNSTILE_SECRET_KEY` est vide, `TurnstileService::isConfigured()` retourne `false` et la vérification est sautée — l'environnement de test reste fonctionnel sans compte Cloudflare.
+- **Intégration UI complète** : Turnstile rendu sur `/login` (action=`login`), `/owner/login` (action=`login-owner`) et `/register` (action=`register-customer` ou `register-agent` selon le rôle). Sur les pages login, l’ordre du formulaire est : mot de passe → Turnstile (`minHeight`) → lien mot de passe oublié → « Se connecter ». Le submit reste désactivé tant que la config Turnstile n’est pas résolue ; si un widget est affiché, jusqu’à token Cloudflare. `authService.registerCustomer` / `registerAgent` propagent `turnstile_token` (champ optionnel) vers le backend. `RegistrationService::register` l'extrait via `$request->input('turnstile_token')` — vérification via `TurnstileService::verify()` avant rate-limit hit, échec → `ValidationException` ciblée sur `turnstile_token`. `.env.example` (backend + frontend) documente `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` / `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. **Fail-open en dev** : `TurnstileService::isConfigured()` est `false` lorsque le secret est **vide** *ou* lorsqu’il s’agit du **secret de test visible** Cloudflare (`1x0000…AA`, injecté par `config/services.php` quand `APP_ENV=local` sans `TURNSTILE_USE_PRODUCTION_KEYS`). Sinon, sans `turnstile_token`, `POST /auth/login` renvoyait **401 « Identifiants invalides. »** (Postman, `keyhome.test`, etc.). En prod, secret réel → vérification obligatoire comme prévu.
 
 ### IA — qualité enhancer
 
@@ -1638,7 +1720,7 @@ Round de fixes ciblés sur les bugs visibles signalés par l'utilisateur (chat c
 
 - **`config/locale.php`** (nouveau) : source de vérité pour locales supportées (`fr, en, pt, es, ar`), RTL, timezone par locale, métadonnées de currencies (locale ICU, decimals, symbol). Aucune chaîne `fr_FR` ou `XAF` n'est plus codée en dur dans la couche transverse.
 - **`config/payment.php :: supported_currencies`** étendu de 4 (XAF/XOF/GHS/NGN) à **27 currencies** (Africa, Europe, Americas, Asia/Pacific). KeyHome est désormais prêt à accepter EUR, USD, GBP, INR, JPY, etc.
-- **`App\Support\Money::format(amount, currency, locale?)`** : helper centralisé qui utilise `NumberFormatter` (ICU) pour rendre proprement n'importe quelle devise (XAF "150 000 FCFA", EUR "1 499,99 €", USD "$1,499.99"). Fallback gracieux si `ext-intl` absent.
+- **`App\Support\Money::format(amount, currency, locale?)`** : helper centralisé. **XAF / XOF** : rendu explicite `number_format` + `FCFA` (évite qu’ICU affiche les codes ISO). Autres devises : `NumberFormatter` (ICU). Fallback gracieux si `ext-intl` absent.
 - **`App\Http\Middleware\LocaleResolver`** : résout la locale du request dans l'ordre `?lang= → X-Lang header → users.locale → Accept-Language → config('locale.default')`. Mounté en début de groupe `web` et fin de groupe `api` (après auth donc `users.locale` est lisible). Négociation Accept-Language RFC-7231 propre.
 - **Migration `users.timezone` + `users.currency`** (`2026_05_02_080100_add_locale_timezone_currency_to_users.php`) : ajoute les colonnes IANA TZ et ISO-4217 par utilisateur, idempotentes via `Schema::hasColumn`.
 
