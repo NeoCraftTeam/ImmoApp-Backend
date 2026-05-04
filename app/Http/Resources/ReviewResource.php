@@ -32,6 +32,9 @@ final class ReviewResource extends JsonResource
             'id' => $this->id,
             'rating' => $this->rating,
             'comment' => $this->comment,
+            'is_verified' => (bool) ($this->is_verified ?? false),
+            'owner_response' => $this->owner_response,
+            'owner_responded_at' => $this->owner_responded_at?->toIso8601String(),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
 

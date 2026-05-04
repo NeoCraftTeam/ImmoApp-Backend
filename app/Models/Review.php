@@ -33,6 +33,9 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property string|null $comment
  * @property string $ad_id
  * @property string $user_id
+ * @property bool $is_verified
+ * @property string|null $owner_response
+ * @property Carbon|null $owner_responded_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
@@ -78,5 +81,14 @@ class Review extends Model
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
             ->setDescriptionForEvent(fn (string $eventName): string => "Avis #{$this->id} {$eventName}");
+    }
+
+    #[\Override]
+    public function casts(): array
+    {
+        return [
+            'is_verified' => 'boolean',
+            'owner_responded_at' => 'datetime',
+        ];
     }
 }
