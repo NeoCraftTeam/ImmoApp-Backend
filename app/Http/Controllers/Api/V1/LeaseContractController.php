@@ -64,10 +64,22 @@ final class LeaseContractController
         }
 
         $validated = $request->validated();
-
         $leaseContract->update($validated);
 
-        return new LeaseContractResource($leaseContract->load(['ad', 'ad.media', 'ad.ad_type', 'ad.quarter.city']));
+        // Editable fields on the contract (rent / dates / charges / parties)
+        // affect the PDF body; regenerate so the downloadable file matches the
+        // displayed data. Best-effort: failure to render falls back silently
+        // to the previous PDF instead of breaking the API contract.
+        try {
+            $leaseContract->load(['user', 'ad.ad_type', 'ad.quarter.city']);
+            app(LeaseContractService::class)->regeneratePdf($leaseContract);
+        } catch (\Throwable $e) {
+            report($e);
+        }
+
+        return new LeaseContractResource(
+            $leaseContract->fresh(['ad', 'ad.media', 'ad.ad_type', 'ad.quarter.city'])
+        );
     }
 
     /**

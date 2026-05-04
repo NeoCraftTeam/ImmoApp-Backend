@@ -71,15 +71,27 @@ final class SignatureController
 
         $contract = $signatureRequest->leaseContract;
 
+        // Frontend `/sign/[token]` consumes `data.request` with `contract`
+        // nested inside it. Returning a flat `{ data, contract }` shape made
+        // the page show "Lien invalide ou expiré" because `data.request` was
+        // always undefined. Keep the legacy keys in the response for any
+        // pre-existing consumer, but expose the new canonical envelope too.
+        $contractPayload = [
+            'tenant_name' => $contract->tenant_name,
+            'monthly_rent' => $contract->monthly_rent,
+            'lease_start' => $contract->lease_start,
+            'lease_end' => $contract->lease_end,
+            'contract_number' => $contract->contract_number,
+        ];
+
+        $requestPayload = $signatureRequest->toArray();
+        $requestPayload['contract'] = $contractPayload;
+
         return response()->json([
+            'request' => $requestPayload,
+            // Legacy keys (kept for backwards compatibility with mobile clients).
             'data' => $signatureRequest,
-            'contract' => [
-                'tenant_name' => $contract->tenant_name,
-                'monthly_rent' => $contract->monthly_rent,
-                'lease_start' => $contract->lease_start,
-                'lease_end' => $contract->lease_end,
-                'contract_number' => $contract->contract_number,
-            ],
+            'contract' => $contractPayload,
         ]);
     }
 

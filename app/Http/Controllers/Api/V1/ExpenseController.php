@@ -25,7 +25,26 @@ final class ExpenseController
             ->orderByDesc('expense_date')
             ->paginate(20);
 
-        return response()->json($expenses);
+        // Wrap in `{ data, meta, links }` so the owner financials page (which
+        // reads `expensesData?.meta`) shows the MUI `<Pagination>` correctly.
+        // Without this, Laravel's default paginator JSON shape exposes
+        // `current_page` / `last_page` at the root and `meta` is `undefined`,
+        // so the pagination component never renders.
+        return response()->json([
+            'data' => $expenses->items(),
+            'meta' => [
+                'current_page' => $expenses->currentPage(),
+                'last_page' => $expenses->lastPage(),
+                'per_page' => $expenses->perPage(),
+                'total' => $expenses->total(),
+            ],
+            'links' => [
+                'first' => $expenses->url(1),
+                'last' => $expenses->url($expenses->lastPage()),
+                'prev' => $expenses->previousPageUrl(),
+                'next' => $expenses->nextPageUrl(),
+            ],
+        ]);
     }
 
     public function store(StoreExpenseRequest $request, Ad $ad): JsonResponse
