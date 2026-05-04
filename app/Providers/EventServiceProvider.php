@@ -11,6 +11,7 @@ use App\Listeners\LogAuthenticationEvents;
 use App\Listeners\MatchSearchAlertsOnAdAvailable;
 use App\Listeners\NotifyAdminsOfPendingAd;
 use App\Listeners\NotifyOwnerOfStatusChange;
+use App\Listeners\SendAdApprovedEmail;
 use App\Listeners\SendBackupByEmailListener;
 use App\Listeners\SendWelcomeNotification;
 use Illuminate\Auth\Events\Failed;
@@ -56,6 +57,7 @@ class EventServiceProvider extends ServiceProvider
             NotifyOwnerOfStatusChange::class,
             NotifyAdminsOfPendingAd::class,
             MatchSearchAlertsOnAdAvailable::class,
+            SendAdApprovedEmail::class,
         ],
 
         // Security audit trail — log all auth events

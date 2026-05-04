@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions;
 
+use App\Mail\FirstAdUnlockCongratulationsMail;
 use App\Models\Ad;
 use App\Models\AdInteraction;
 use App\Models\UnlockedAd;
@@ -12,6 +13,7 @@ use App\Services\Chat\ConversationService;
 use App\Services\PointService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 
 /**
  * Unlocks an ad for a user by deducting points and recording the interaction.
@@ -38,7 +40,7 @@ final readonly class UnlockAd
 
         // SEC: All state checks MUST be inside the transaction with locks
         // to prevent TOCTOU double-deduction from concurrent requests.
-        return DB::transaction(function () use ($user, $ad, $cost): array {
+        $result = DB::transaction(function () use ($user, $ad, $cost): array {
             // Lock the user row first to prevent concurrent balance reads.
             /** @var User $freshUser */
             $freshUser = User::query()->lockForUpdate()->findOrFail($user->id);
@@ -93,5 +95,25 @@ final readonly class UnlockAd
                 'points_balance' => (int) $freshUser->fresh()->point_balance,
             ];
         });
+
+        if ($result['status'] === 'unlocked' && $user->isCustomer()) {
+            $email = (string) $user->email;
+            if ($email !== '' && !str_ends_with($email, '@clerk.local')
+                && UnlockedAd::where('user_id', $user->id)->count() === 1) {
+                try {
+                    Mail::to($email, $user->firstname)->queue(
+                        new FirstAdUnlockCongratulationsMail($user, $ad)
+                    );
+                } catch (\Throwable $e) {
+                    Log::warning('First unlock congratulations email failed', [
+                        'user_id' => $user->id,
+                        'ad_id' => $ad->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        return $result;
     }
 }

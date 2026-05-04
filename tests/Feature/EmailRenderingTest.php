@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 use App\Enums\UserRole;
 use App\Mail\AccountDeletedMail;
+use App\Mail\AdApprovedMail;
+use App\Mail\FirstAdUnlockCongratulationsMail;
 use App\Mail\ForgotPasswordMail;
 use App\Mail\ResetPasswordMail;
 use App\Mail\VerificationCodeMail;
 use App\Mail\WelcomeDripMail;
+use App\Models\Ad;
 use App\Models\User;
 
 /**
@@ -35,6 +38,17 @@ dataset('mailables', function () {
         'welcome-drip day 1' => [fn () => new WelcomeDripMail(User::factory()->create(), 1)],
         'welcome-drip day 3' => [fn () => new WelcomeDripMail(User::factory()->create(), 3)],
         'welcome-drip day 7' => [fn () => new WelcomeDripMail(User::factory()->create(), 7)],
+        'first-ad-unlock congratulations' => [
+            fn () => new FirstAdUnlockCongratulationsMail(
+                User::factory()->customers()->create(),
+                Ad::factory()->for(User::factory()->agents()->create())->create(['slug' => 'annonce-demo-slug']),
+            ),
+        ],
+        'ad-approved (owner)' => [
+            fn () => new AdApprovedMail(
+                Ad::factory()->for(User::factory()->agents()->create())->create()->load('user'),
+            ),
+        ],
     ];
 });
 

@@ -4,7 +4,7 @@
 
 @section('content')
 
-    <h1>Votre annonce est publiée</h1>
+    <h1>Félicitations, votre annonce est en ligne !</h1>
 
     <p class="text">
         Bonjour <strong>{{ $authorName }}</strong>,
