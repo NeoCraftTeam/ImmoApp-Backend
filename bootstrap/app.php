@@ -195,10 +195,21 @@ return Application::configure(basePath: dirname(__DIR__))
                 && !$e instanceof ThrottleRequestsException
                 && !$e instanceof RegistrationEmailTakenException
             ) {
-                return response()->json([
+                $body = [
                     'message' => 'Une erreur interne est survenue.',
                     'code' => 'SERVER_ERROR',
-                ], 500);
+                ];
+
+                if (config('app.debug')) {
+                    $body['debug'] = [
+                        'exception' => $e::class,
+                        'message' => $e->getMessage(),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                    ];
+                }
+
+                return response()->json($body, 500);
             }
         });
     })->create();
