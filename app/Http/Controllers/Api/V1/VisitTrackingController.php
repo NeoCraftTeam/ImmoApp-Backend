@@ -58,7 +58,7 @@ class VisitTrackingController
         // analytics rows when the SPA fires the tracker on every route change.
         $dedupKey = 'visit:'.hash('sha1', implode('|', [
             $validated['session_id'],
-            $source ?? '',
+            $source,
             $deviceType,
             $referrerDomain ?? '',
             $validated['utm_source'] ?? '',

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Models\Ad;
+use App\Support\AdScoutSync;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -132,14 +133,17 @@ class TourService
      */
     public function saveTourConfig(Ad $ad, array $scenes): void
     {
-        $ad->update([
-            'has_3d_tour' => true,
-            'tour_config' => [
-                'default_scene' => $scenes[0]['id'] ?? null,
-                'scenes' => $scenes,
-            ],
-            'tour_published_at' => now(),
-        ]);
+        Ad::withoutSyncingToSearch(function () use ($ad, $scenes): void {
+            $ad->update([
+                'has_3d_tour' => true,
+                'tour_config' => [
+                    'default_scene' => $scenes[0]['id'] ?? null,
+                    'scenes' => $scenes,
+                ],
+                'tour_published_at' => now(),
+            ]);
+        });
+        AdScoutSync::syncSearchIndexBestEffort($ad->fresh());
     }
 
     /**
@@ -154,11 +158,14 @@ class TourService
         $this->disk()->deleteDirectory("ads/{$ad->id}/tours");
         $this->disk()->deleteDirectory("tours/{$ad->id}");
 
-        $ad->update([
-            'has_3d_tour' => false,
-            'tour_config' => null,
-            'tour_published_at' => null,
-        ]);
+        Ad::withoutSyncingToSearch(function () use ($ad): void {
+            $ad->update([
+                'has_3d_tour' => false,
+                'tour_config' => null,
+                'tour_published_at' => null,
+            ]);
+        });
+        AdScoutSync::syncSearchIndexBestEffort($ad->fresh());
     }
 
     /**
