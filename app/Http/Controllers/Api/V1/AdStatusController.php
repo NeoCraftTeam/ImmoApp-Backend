@@ -7,6 +7,8 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\AdStatus;
 use App\Exceptions\InvalidStatusTransitionException;
 use App\Models\Ad;
+use App\Support\AdScoutSync;
+use App\Support\GeoLocation;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -45,7 +47,10 @@ final class AdStatusController
     {
         $this->authorize('update', $ad);
 
-        $ad->toggleVisibility();
+        Ad::withoutSyncingToSearch(function () use ($ad): void {
+            $ad->toggleVisibility();
+        });
+        AdScoutSync::syncSearchIndexBestEffort($ad->fresh());
 
         return response()->json([
             'success' => true,
@@ -95,7 +100,10 @@ final class AdStatusController
             $oldStatus = $ad->status;
             $newStatus = AdStatus::from($validated['status']);
 
-            $ad->transitionTo($newStatus);
+            Ad::withoutSyncingToSearch(function () use ($ad, $newStatus): void {
+                $ad->transitionTo($newStatus);
+            });
+            AdScoutSync::syncSearchIndexBestEffort($ad->fresh());
 
             return response()->json([
                 'success' => true,
@@ -136,38 +144,43 @@ final class AdStatusController
     {
         $this->authorize('update', $ad);
 
-        return DB::transaction(function () use ($ad): JsonResponse {
-            // Pessimistic lock to prevent concurrent publish attempts
-            $ad = Ad::lockForUpdate()->find($ad->id);
+        $response = DB::transaction(function () use ($ad): JsonResponse {
+            $locked = Ad::lockForUpdate()->find($ad->id);
 
-            if ($ad->status !== AdStatus::DRAFT) {
+            if (!$locked) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Annonce introuvable.',
+                ], 404);
+            }
+
+            if ($locked->status !== AdStatus::DRAFT) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Seuls les brouillons peuvent être publiés.',
                 ], 422);
             }
 
-            // Validate required fields are present before publishing
             $missing = [];
-            if (!$ad->title) {
+            if (!$locked->title) {
                 $missing[] = 'titre';
             }
-            if (!$ad->description) {
+            if (!$locked->description) {
                 $missing[] = 'description';
             }
-            if (!$ad->adresse) {
+            if (!$locked->adresse) {
                 $missing[] = 'adresse';
             }
-            if ($ad->getAttribute('price') === null) {
+            if ($locked->getAttribute('price') === null) {
                 $missing[] = 'prix';
             }
-            if ($ad->getAttribute('surface_area') === null) {
+            if ($locked->getAttribute('surface_area') === null) {
                 $missing[] = 'surface';
             }
-            if (!$ad->quarter_id) {
+            if (!$locked->quarter_id) {
                 $missing[] = 'quartier';
             }
-            if (!$ad->type_id) {
+            if (!$locked->type_id) {
                 $missing[] = 'type';
             }
 
@@ -179,11 +192,13 @@ final class AdStatusController
                 ], 422);
             }
 
-            $ad->transitionTo(AdStatus::PENDING);
+            Ad::withoutSyncingToSearch(function () use ($locked): void {
+                $locked->transitionTo(AdStatus::PENDING);
+            });
 
             activity()
                 ->causedBy(auth()->user())
-                ->performedOn($ad)
+                ->performedOn($locked)
                 ->withProperties(['old_status' => 'draft', 'new_status' => 'pending'])
                 ->log('Ad published from draft');
 
@@ -196,6 +211,12 @@ final class AdStatusController
                 ],
             ]);
         });
+
+        if ($response->isSuccessful()) {
+            AdScoutSync::syncSearchIndexBestEffort($ad->fresh());
+        }
+
+        return $response;
     }
 
     /**
@@ -247,31 +268,64 @@ final class AdStatusController
             'bedrooms' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'bathrooms' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'has_parking' => ['sometimes', 'nullable', 'boolean'],
-            'deposit_amount' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'minimum_lease_duration' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'deposit_amount' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'minimum_lease_duration' => ['sometimes', 'nullable', 'string', 'max:50'],
             'charges_forfaitaires' => ['sometimes', 'nullable', 'boolean'],
             'charges_montant_forfait' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'charges_eau' => ['sometimes', 'nullable', 'boolean'],
-            'charges_electricite' => ['sometimes', 'nullable', 'boolean'],
-            'charges_autres' => ['sometimes', 'nullable', 'string'],
+            'charges_eau' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'charges_electricite' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'charges_autres' => ['sometimes', 'nullable', 'string', 'max:500'],
             'quarter_id' => ['sometimes', 'nullable', 'uuid', 'exists:quarter,id'],
             'type_id' => ['sometimes', 'nullable', 'uuid', 'exists:ad_type,id'],
-            'transaction_type' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'transaction_type' => ['sometimes', 'nullable', 'string', 'in:location,vente'],
             'latitude' => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
-            'distance_main_road_m' => ['sometimes', 'nullable', 'integer', 'min:0'],
-            'distance_shops_m' => ['sometimes', 'nullable', 'integer', 'min:0'],
-            'distance_transport_m' => ['sometimes', 'nullable', 'integer', 'min:0'],
-            'distance_school_m' => ['sometimes', 'nullable', 'integer', 'min:0'],
-            'distance_hospital_m' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'distance_main_road_m' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:99999'],
+            'distance_shops_m' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:99999'],
+            'distance_transport_m' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:99999'],
+            'distance_school_m' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:99999'],
+            'distance_hospital_m' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:99999'],
+            'attributes' => ['sometimes', 'nullable', 'array', 'max:50'],
+            'attributes.*' => [
+                'string',
+                Rule::exists('property_attributes', 'slug')->where(
+                    fn ($query) => $query->where('is_active', true)
+                ),
+            ],
         ]);
 
+        // Latitude/longitude are positioned as a single PostGIS point; let
+        // GeoLocation drop them when both are missing so we don't overwrite
+        // a previously-saved coordinate with NULL on a partial autosave.
+        $point = GeoLocation::fromArray($validated)?->toPoint();
+        unset($validated['latitude'], $validated['longitude']);
+        if ($point !== null) {
+            $validated['location'] = $point;
+        }
+
+        // Empty attribute array is a valid intent: the user just deselected
+        // every chip — keep [] in $toUpdate so the column is cleared.
+        $attributes = $validated['attributes'] ?? null;
+        unset($validated['attributes']);
+
         /** @var array<string, mixed> $toUpdate */
-        $toUpdate = array_filter($validated, static fn (mixed $v): bool => $v !== null);
+        $toUpdate = array_filter(
+            $validated,
+            static fn (mixed $v): bool => $v !== null
+        );
+
+        if (is_array($attributes)) {
+            $toUpdate['attributes'] = array_values(
+                array_unique(array_filter($attributes, 'is_string'))
+            );
+        }
 
         if (!empty($toUpdate)) {
-            $ad->forceFill($toUpdate);
-            $ad->save();
+            Ad::withoutSyncingToSearch(function () use ($ad, $toUpdate): void {
+                $ad->forceFill($toUpdate);
+                $ad->save();
+            });
+            AdScoutSync::syncSearchIndexBestEffort($ad);
         }
 
         return response()->json([
@@ -320,10 +374,13 @@ final class AdStatusController
             'available_to' => ['nullable', 'date', 'after_or_equal:available_from'],
         ]);
 
-        $ad->setAvailability(
-            isset($validated['available_from']) ? new \DateTime($validated['available_from']) : null,
-            isset($validated['available_to']) ? new \DateTime($validated['available_to']) : null
-        );
+        Ad::withoutSyncingToSearch(function () use ($ad, $validated): void {
+            $ad->setAvailability(
+                isset($validated['available_from']) ? new \DateTime($validated['available_from']) : null,
+                isset($validated['available_to']) ? new \DateTime($validated['available_to']) : null
+            );
+        });
+        AdScoutSync::syncSearchIndexBestEffort($ad->fresh());
 
         return response()->json([
             'success' => true,

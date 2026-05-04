@@ -18,6 +18,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use Laragear\WebAuthn\Models\WebAuthnCredential;
 
 class EditProfile extends BaseEditProfile
@@ -57,11 +58,30 @@ class EditProfile extends BaseEditProfile
                             ->directory('avatars')
                             ->avatar()
                             ->image()
-                            ->imageEditor()
-                            ->circleCropper()
+                            ->imagePreviewHeight('160')
                             ->maxSize(2048)
                             ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
                             ->fetchFileInformation(false)
+                            ->downloadable(false)
+                            ->openable(false)
+                            ->previewable(true)
+                            ->afterStateHydrated(function (FileUpload $component, ?string $state): void {
+                                if (!is_string($state) || $state === '') {
+                                    $component->state(null);
+
+                                    return;
+                                }
+                                if (str_starts_with($state, 'http://') || str_starts_with($state, 'https://')) {
+                                    $component->state(null);
+
+                                    return;
+                                }
+                                $disk = config('filesystems.app_media_disk');
+                                if (!Storage::disk($disk)->exists($state)) {
+                                    $component->state(null);
+                                }
+                            })
+                            ->helperText('Formats acceptés : JPEG, PNG, WebP (max 2 Mo). L\'image sera affichée telle quelle.')
                             ->extraAttributes([
                                 'data-native-input' => 'image',
                                 'data-native-type' => 'avatar',

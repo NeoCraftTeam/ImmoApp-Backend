@@ -79,7 +79,10 @@ final class UserRequest extends FormRequest
             return [
                 'firstname' => ['sometimes', 'string', 'max:255'],
                 'lastname' => ['sometimes', 'string', 'max:255'],
-                'bio' => ['sometimes', 'nullable', 'string', 'max:500'],
+                // Owner public bio supports lightweight Markdown (**bold**, *italic*,
+                // headings, lists). Plain-text length cap raised to 2 000 chars; HTML
+                // rendering happens on the read side via a sanitizing markdown pass.
+                'bio' => ['sometimes', 'nullable', 'string', 'max:2000'],
                 'phone_number' => ['sometimes', 'string', 'regex:/^\+?[0-9]{7,20}$/'],
                 'phone_is_whatsapp' => ['sometimes', 'boolean'],
                 'email' => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($this->route('user'))],

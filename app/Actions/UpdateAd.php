@@ -7,6 +7,7 @@ namespace App\Actions;
 use App\Enums\AdStatus;
 use App\Exceptions\InvalidStatusTransitionException;
 use App\Models\Ad;
+use App\Support\AdScoutSync;
 use App\Support\GeoLocation;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -31,49 +32,55 @@ final readonly class UpdateAd
      */
     public function execute(Ad $ad, array $data, array $newImages = [], array $imagesToDelete = [], ?UploadedFile $propertyConditionPdf = null): array
     {
-        return DB::transaction(function () use ($ad, $data, $newImages, $imagesToDelete, $propertyConditionPdf): array {
-            $geo = GeoLocation::fromArray($data);
-            if ($geo) {
-                $data['location'] = $geo->toPoint();
-            }
-
-            $statusChanged = false;
-            $newStatus = null;
-
-            if (isset($data['status'])) {
-                $newStatus = AdStatus::from($data['status']);
-                if ($ad->status !== $newStatus && !$ad->status->canTransitionTo($newStatus)) {
-                    throw new InvalidStatusTransitionException($ad->status, $newStatus);
+        $result = Ad::withoutSyncingToSearch(function () use ($ad, $data, $newImages, $imagesToDelete, $propertyConditionPdf): array {
+            return DB::transaction(function () use ($ad, $data, $newImages, $imagesToDelete, $propertyConditionPdf): array {
+                $geo = GeoLocation::fromArray($data);
+                if ($geo) {
+                    $data['location'] = $geo->toPoint();
                 }
-                unset($data['status']);
-            }
 
-            unset($data['user_id'], $data['agency_id']);
+                $statusChanged = false;
+                $newStatus = null;
 
-            $ad->update($data);
+                if (isset($data['status'])) {
+                    $newStatus = AdStatus::from($data['status']);
+                    if ($ad->status !== $newStatus && !$ad->status->canTransitionTo($newStatus)) {
+                        throw new InvalidStatusTransitionException($ad->status, $newStatus);
+                    }
+                    unset($data['status']);
+                }
 
-            if ($newStatus !== null && $ad->status !== $newStatus) {
-                $ad->forceFill(['status' => $newStatus])->save();
-                $statusChanged = true;
-            }
+                unset($data['user_id'], $data['agency_id']);
 
-            $this->log->info('Ad updated with ID: '.$ad->id);
+                $ad->update($data);
 
-            foreach ($newImages as $image) {
-                $ad->addMedia($image)->toMediaCollection('images');
-            }
+                if ($newStatus !== null && $ad->status !== $newStatus) {
+                    $ad->forceFill(['status' => $newStatus])->save();
+                    $statusChanged = true;
+                }
 
-            foreach ($imagesToDelete as $mediaId) {
-                $media = $ad->media()->find($mediaId);
-                $media?->delete();
-            }
+                $this->log->info('Ad updated with ID: '.$ad->id);
 
-            if ($propertyConditionPdf instanceof UploadedFile) {
-                $ad->clearMediaCollection('property_condition');
-                $ad->addMedia($propertyConditionPdf)->toMediaCollection('property_condition');
-            }
+                foreach ($newImages as $image) {
+                    $ad->addMedia($image)->toMediaCollection('images');
+                }
 
-            return ['ad' => $ad, 'status_changed' => $statusChanged];
+                foreach ($imagesToDelete as $mediaId) {
+                    $media = $ad->media()->find($mediaId);
+                    $media?->delete();
+                }
+
+                if ($propertyConditionPdf instanceof UploadedFile) {
+                    $ad->clearMediaCollection('property_condition');
+                    $ad->addMedia($propertyConditionPdf)->toMediaCollection('property_condition');
+                }
+
+                return ['ad' => $ad, 'status_changed' => $statusChanged];
+            });
         });
+
+        AdScoutSync::syncSearchIndexBestEffort($result['ad']);
+
+        return $result;
     }
 }
