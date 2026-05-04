@@ -5,10 +5,21 @@ declare(strict_types=1);
 use App\Models\AdType;
 use App\Models\City;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
+    config([
+        'services.ai_search.providers' => '',
+        'services.groq.api_key' => '',
+        'services.openai.api_key' => '',
+        'services.gemini.api_key' => '',
+        'services.together.api_key' => '',
+        'services.mistral.api_key' => '',
+    ]);
+    Cache::flush();
+
     AdType::factory()->create(['name' => 'Appartement']);
     AdType::factory()->create(['name' => 'Maison']);
     City::factory()->create(['name' => 'Douala']);

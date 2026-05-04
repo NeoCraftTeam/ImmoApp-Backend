@@ -18,9 +18,21 @@ use Illuminate\Support\Facades\Queue;
 
 uses(RefreshDatabase::class);
 
+function configureAiDigestTemplateOnly(): void
+{
+    config([
+        'services.openai.api_key' => '',
+        'services.groq.api_key' => '',
+        'services.gemini.api_key' => '',
+        'services.mistral.api_key' => '',
+    ]);
+}
+
 // ─── AiDigestService fallback ───────────────────────────────────────────────
 
 it('produces a template summary when no AI provider is configured', function (): void {
+    configureAiDigestTemplateOnly();
+
     $service = new AiDigestService;
 
     $quarter = Quarter::factory()->create(['name' => 'Akwa']);
@@ -56,6 +68,8 @@ it('returns empty string when ads array is empty', function (): void {
 });
 
 it('template summary uses singular noun for one match', function (): void {
+    configureAiDigestTemplateOnly();
+
     $service = new AiDigestService;
 
     $quarter = Quarter::factory()->create();

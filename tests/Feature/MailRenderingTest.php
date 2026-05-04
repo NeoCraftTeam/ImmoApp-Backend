@@ -68,7 +68,7 @@ it('renders AdApprovedMail without errors', function (): void {
     $rendered = $mail->render();
 
     expect($rendered)->toContain($ad->title);
-    expect($mail->envelope()->subject)->toContain('approuvée');
+    expect($mail->envelope()->subject)->toContain('en ligne');
 });
 
 it('renders AdDeclinedMail without errors', function (): void {
