@@ -82,6 +82,14 @@ final class AdResource extends JsonResource
             'views_count_week' => $this->views_count_week ?? 0,
             'is_verified' => (bool) ($this->is_verified ?? false),
 
+            // Boost — public-visible so cards can render a "Sponsorisé" / "Boosté" badge.
+            // Computed via `isBoosted()` which checks both flag + expiration date.
+            'is_boosted' => (bool) $this->isBoosted(),
+            'boost_expires_at' => $this->isBoosted()
+                ? $this->boost_expires_at?->toIso8601String()
+                : null,
+            'boost_score' => $this->isBoosted() ? (int) ($this->boost_score ?? 0) : 0,
+
             // Proximity & accessibility — always visible (helps users decide to unlock)
             'distance_main_road_m' => $this->distance_main_road_m,
             'distance_shops_m' => $this->distance_shops_m,

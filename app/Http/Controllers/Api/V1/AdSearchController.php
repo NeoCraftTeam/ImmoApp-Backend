@@ -157,11 +157,18 @@ final readonly class AdSearchController
                 $options['filter'] = implode(' AND ', $filters);
 
                 if ($sortBy === '_geoPoint' && $latitude !== null && $longitude !== null) {
+                    // Geo-priority queries don't apply the boost premium —
+                    // the user explicitly asked for proximity ordering.
                     $options['sort'] = [sprintf('_geoPoint(%f, %f):%s', $latitude, $longitude, $sortOrder)];
                 } elseif (!in_array($sortBy, $allowedSorts, true)) {
                     $options['sort'] = ['boost_score:desc', 'created_at:desc'];
+                } elseif ($sortBy === 'boost_score') {
+                    // Already a boost-explicit sort — fall through to created_at tie-break.
+                    $options['sort'] = [sprintf('%s:%s', $sortBy, $sortOrder), 'created_at:desc'];
                 } else {
-                    $options['sort'] = [sprintf('%s:%s', $sortBy, $sortOrder)];
+                    // Boost premium: every standard sort lifts active boosted ads to
+                    // the top first, then secondary sorts within each tier.
+                    $options['sort'] = ['boost_score:desc', sprintf('%s:%s', $sortBy, $sortOrder)];
                 }
 
                 return $index->search($query, $options);
@@ -304,10 +311,14 @@ final readonly class AdSearchController
 
         $allowedSorts = ['price', 'surface_area', 'created_at'];
 
+        // Boost premium (parity with Meilisearch path): active boosted ads always
+        // rise above non-boosted within the requested sort.
+        $query->orderByDesc('boost_score');
+
         if (in_array($sortBy, $allowedSorts, true)) {
             $query->orderBy($sortBy, $sortOrder);
         } else {
-            $query->orderByBoost();
+            $query->orderByDesc('created_at');
         }
 
         $results = $query->paginate($perPage);

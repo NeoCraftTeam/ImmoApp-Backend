@@ -37,5 +37,8 @@ Schedule::command('app:send-search-alert-digests')->twiceDaily(8, 18);
 // — Behavioral retention push notifications —
 Schedule::command('app:send-retention-pushes')->twiceDaily(9, 18);
 
+// — Expire boosted ads (sweep is_boosted/boost_score columns) —
+Schedule::command('app:expire-boosted-ads')->hourly();
+
 // — Trust Score nightly recomputation —
 Schedule::command('trustscore:recompute')->dailyAt('02:30');
