@@ -65,6 +65,10 @@ php artisan test --filter="it can login with valid credentials"
 Tests require a PostgreSQL `testing` database (see `phpunit.xml`). Meilisearch driver is set to `null`
 in tests. Payment gateway uses fake Flutterwave keys.
 
+### When the user asks to « test then commit » (backend)
+
+Agents must run **Pint → PHPStan → Rector (apply + dry-run clean) → Pint/PHPStan again if needed → tests → commit**. See `.cursor/rules/test-then-commit.mdc` for the exact checklist.
+
 ## Linting & Static Analysis
 
 ```bash
