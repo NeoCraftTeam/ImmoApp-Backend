@@ -36,6 +36,7 @@ class FailedJobsMonitor extends Page implements HasTable
 
     protected string $view = 'filament.admin.pages.failed-jobs-monitor';
 
+    #[\Override]
     public static function canAccess(): bool
     {
         return auth()->user()?->hasAdminPermission(AdminPermission::JobsMonitor) ?? false;

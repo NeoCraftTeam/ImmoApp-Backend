@@ -84,7 +84,7 @@ final class AdResource extends JsonResource
 
             // Boost — public-visible so cards can render a "Sponsorisé" / "Boosté" badge.
             // Computed via `isBoosted()` which checks both flag + expiration date.
-            'is_boosted' => (bool) $this->isBoosted(),
+            'is_boosted' => $this->isBoosted(),
             'boost_expires_at' => $this->isBoosted()
                 ? $this->boost_expires_at?->toIso8601String()
                 : null,

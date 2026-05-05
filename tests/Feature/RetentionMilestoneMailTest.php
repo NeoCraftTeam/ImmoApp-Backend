@@ -22,9 +22,7 @@ it('queues owner congratulations email when ad is approved', function (): void {
 
     $ad->transitionTo(AdStatus::AVAILABLE);
 
-    Mail::assertQueued(AdApprovedMail::class, function (AdApprovedMail $mail) use ($ad): bool {
-        return $mail->ad->id === $ad->id;
-    });
+    Mail::assertQueued(AdApprovedMail::class, fn (AdApprovedMail $mail): bool => $mail->ad->id === $ad->id);
 });
 
 it('queues first unlock congratulations email only once for customer', function (): void {

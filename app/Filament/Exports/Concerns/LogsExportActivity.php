@@ -39,7 +39,7 @@ trait LogsExportActivity
 
         // Best-effort audit log entry. Failures must never break the notification.
         try {
-            self::writeAuditLog($export, $modelLabel, (int) $export->successful_rows, (int) $failed);
+            self::writeAuditLog($export, $modelLabel, (int) $export->successful_rows, $failed);
         } catch (\Throwable $e) {
             Log::warning('Export activity log failed', [
                 'export_id' => $export->id,

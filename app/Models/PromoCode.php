@@ -64,6 +64,7 @@ final class PromoCode extends Model
         ];
     }
 
+    #[\Override]
     protected static function booted(): void
     {
         self::creating(function (self $promo): void {

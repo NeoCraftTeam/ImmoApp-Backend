@@ -32,52 +32,50 @@ final readonly class UpdateAd
      */
     public function execute(Ad $ad, array $data, array $newImages = [], array $imagesToDelete = [], ?UploadedFile $propertyConditionPdf = null): array
     {
-        $result = Ad::withoutSyncingToSearch(function () use ($ad, $data, $newImages, $imagesToDelete, $propertyConditionPdf): array {
-            return DB::transaction(function () use ($ad, $data, $newImages, $imagesToDelete, $propertyConditionPdf): array {
-                $geo = GeoLocation::fromArray($data);
-                if ($geo) {
-                    $data['location'] = $geo->toPoint();
+        $result = Ad::withoutSyncingToSearch(fn (): array => DB::transaction(function () use ($ad, $data, $newImages, $imagesToDelete, $propertyConditionPdf): array {
+            $geo = GeoLocation::fromArray($data);
+            if ($geo) {
+                $data['location'] = $geo->toPoint();
+            }
+
+            $statusChanged = false;
+            $newStatus = null;
+
+            if (isset($data['status'])) {
+                $newStatus = AdStatus::from($data['status']);
+                if ($ad->status !== $newStatus && !$ad->status->canTransitionTo($newStatus)) {
+                    throw new InvalidStatusTransitionException($ad->status, $newStatus);
                 }
+                unset($data['status']);
+            }
 
-                $statusChanged = false;
-                $newStatus = null;
+            unset($data['user_id'], $data['agency_id']);
 
-                if (isset($data['status'])) {
-                    $newStatus = AdStatus::from($data['status']);
-                    if ($ad->status !== $newStatus && !$ad->status->canTransitionTo($newStatus)) {
-                        throw new InvalidStatusTransitionException($ad->status, $newStatus);
-                    }
-                    unset($data['status']);
-                }
+            $ad->update($data);
 
-                unset($data['user_id'], $data['agency_id']);
+            if ($newStatus !== null && $ad->status !== $newStatus) {
+                $ad->forceFill(['status' => $newStatus])->save();
+                $statusChanged = true;
+            }
 
-                $ad->update($data);
+            $this->log->info('Ad updated with ID: '.$ad->id);
 
-                if ($newStatus !== null && $ad->status !== $newStatus) {
-                    $ad->forceFill(['status' => $newStatus])->save();
-                    $statusChanged = true;
-                }
+            foreach ($newImages as $image) {
+                $ad->addMedia($image)->toMediaCollection('images');
+            }
 
-                $this->log->info('Ad updated with ID: '.$ad->id);
+            foreach ($imagesToDelete as $mediaId) {
+                $media = $ad->media()->find($mediaId);
+                $media?->delete();
+            }
 
-                foreach ($newImages as $image) {
-                    $ad->addMedia($image)->toMediaCollection('images');
-                }
+            if ($propertyConditionPdf instanceof UploadedFile) {
+                $ad->clearMediaCollection('property_condition');
+                $ad->addMedia($propertyConditionPdf)->toMediaCollection('property_condition');
+            }
 
-                foreach ($imagesToDelete as $mediaId) {
-                    $media = $ad->media()->find($mediaId);
-                    $media?->delete();
-                }
-
-                if ($propertyConditionPdf instanceof UploadedFile) {
-                    $ad->clearMediaCollection('property_condition');
-                    $ad->addMedia($propertyConditionPdf)->toMediaCollection('property_condition');
-                }
-
-                return ['ad' => $ad, 'status_changed' => $statusChanged];
-            });
-        });
+            return ['ad' => $ad, 'status_changed' => $statusChanged];
+        }));
 
         AdScoutSync::syncSearchIndexBestEffort($result['ad']);
 

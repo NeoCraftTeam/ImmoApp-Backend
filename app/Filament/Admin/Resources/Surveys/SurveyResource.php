@@ -307,7 +307,8 @@ class SurveyResource extends Resource
                 'Question',
                 'Réponse',
                 'Soumis le',
-            ]);
+            ],
+                escape: '\\');
 
             // Authenticated responses
             SurveyResponse::query()
@@ -325,7 +326,8 @@ class SurveyResource extends Resource
                             $row->question->text ?: '—',
                             (string) $row->answer,
                             optional($row->created_at)->format('Y-m-d H:i:s'),
-                        ]);
+                        ],
+                            escape: '\\');
                     }
                 });
 
@@ -346,7 +348,8 @@ class SurveyResource extends Resource
                                 $answer->question->text ?: '—',
                                 (string) $answer->answer,
                                 optional($answer->created_at)->format('Y-m-d H:i:s'),
-                            ]);
+                            ],
+                                escape: '\\');
                         }
                     }
                 });

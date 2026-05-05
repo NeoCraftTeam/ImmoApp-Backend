@@ -41,12 +41,14 @@ class ManagePermissions extends Page implements HasTable
 
     protected string $view = 'filament.admin.pages.manage-permissions';
 
+    #[\Override]
     public function getSubheading(): ?string
     {
         return "Pilotez l'accès de chaque administrateur. Les super-administrateurs disposent d'un accès total ; "
             .'les autres bénéficient uniquement des permissions explicitement accordées.';
     }
 
+    #[\Override]
     public static function canAccess(): bool
     {
         $user = auth()->user();

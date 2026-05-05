@@ -316,7 +316,7 @@ final class AdStatusController
 
         if (is_array($attributes)) {
             $toUpdate['attributes'] = array_values(
-                array_unique(array_filter($attributes, 'is_string'))
+                array_unique(array_filter($attributes, is_string(...)))
             );
         }
 
