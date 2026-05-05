@@ -44,13 +44,18 @@ it('creates an owner-prefixed token for an admin', function (): void {
     expect($token->accessToken->abilities)->toContain('role:admin', 'api:access');
 });
 
-it('sets token expiry to one day from now', function (): void {
+it('sets token expiry aligned with sanctum.expiration', function (): void {
     $user = User::factory()->customers()->create();
     $service = app(TokenService::class);
 
     $token = $service->createForUser($user, 'test');
 
-    expect(now()->diffInHours($token->accessToken->expires_at))->toBeBetween(23, 25);
+    $expectedMinutes = (int) config('sanctum.expiration');
+    expect($token->accessToken->expires_at)->not->toBeNull();
+    expect(now()->diffInMinutes($token->accessToken->expires_at))->toBeBetween(
+        $expectedMinutes - 2,
+        $expectedMinutes + 2
+    );
 });
 
 // ---------------------------------------------------------------------------

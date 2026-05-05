@@ -68,6 +68,7 @@ final class ConversationResource extends JsonResource
             ] : null,
             'other_participant' => $other ? [
                 'id' => $other->id,
+                'username' => $other->username,
                 'name' => trim("{$other->firstname} {$other->lastname}"),
                 'avatar' => $other->resolveChatAvatarUrl(),
                 // ISO-8601 timestamp of last authenticated activity. Frontend
@@ -103,7 +104,18 @@ final class ConversationResource extends JsonResource
                         ? mb_substr($last->decrypted_body, 0, 80)
                         : null),
                 'is_client_sealed' => $last->is_client_sealed,
+                /**
+                 * Client-sealed inbox preview: same shape as {@see MessageSent} — the
+                 * list UI decrypts locally when the session key is available.
+                 */
+                'e2ee' => $last->is_client_sealed && $last->body !== null && $last->body_iv !== null
+                    ? [
+                        'ciphertext_b64' => $last->body,
+                        'iv_b64' => $last->body_iv,
+                    ]
+                    : null,
                 'type' => $last->type->value,
+                'created_at' => $this->toIso8601OrNull($last->created_at),
                 'sent_at' => $this->toIso8601OrNull($last->created_at),
             ] : null,
         ];

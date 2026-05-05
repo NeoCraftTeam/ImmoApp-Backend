@@ -30,10 +30,13 @@ final class TokenService
         $prefix = $prefixOverride ?? ($user->isAgent() || $user->isAdmin() ? 'owner' : 'client');
         $roleAbility = 'role:'.$user->role->value;
 
+        $expirationMinutes = (int) config('sanctum.expiration', 43200);
+        $expiresAt = $expirationMinutes > 0 ? now()->addMinutes($expirationMinutes) : null;
+
         return $user->createToken(
             "{$prefix}_{$suffix}_".now()->timestamp,
             [$roleAbility, 'api:access'],
-            now()->addDay()
+            $expiresAt,
         );
     }
 

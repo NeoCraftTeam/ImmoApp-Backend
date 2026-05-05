@@ -228,3 +228,29 @@ it('includes tenant and landlord E2EE public keys on conversation resource', fun
         ->assertJsonPath('data.e2ee.tenant_public_key_pem', $tenant->chat_e2ee_public_key_pem)
         ->assertJsonPath('data.e2ee.landlord_public_key_pem', $landlord->chat_e2ee_public_key_pem);
 });
+
+it('includes e2ee ciphertext on conversation list last_message when sealed', function (): void {
+    ['tenant' => $tenant, 'conversation' => $conv] = chatTrioWithE2eeKeys();
+    $cipher = base64_encode('opaque-inbox');
+    $iv = base64_encode(random_bytes(12));
+
+    $this->actingAs($tenant)
+        ->postJson("/api/v1/conversations/{$conv->id}/messages", [
+            'is_client_sealed' => true,
+            'e2ee_ciphertext_b64' => $cipher,
+            'e2ee_iv_b64' => $iv,
+            'e2ee_wrapped_keys' => [
+                'tenant' => 'wk-t',
+                'landlord' => 'wk-l',
+            ],
+        ])
+        ->assertCreated();
+
+    $this->actingAs($tenant)
+        ->getJson('/api/v1/conversations')
+        ->assertOk()
+        ->assertJsonPath('data.0.last_message.is_client_sealed', true)
+        ->assertJsonPath('data.0.last_message.body', null)
+        ->assertJsonPath('data.0.last_message.e2ee.ciphertext_b64', $cipher)
+        ->assertJsonPath('data.0.last_message.e2ee.iv_b64', $iv);
+});

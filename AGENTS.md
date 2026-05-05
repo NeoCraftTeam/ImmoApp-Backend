@@ -1168,7 +1168,7 @@ Root cause (3 independent issues stacked):
 #### 6. Ad context in conversation list (previous session)
 `ConversationResource.php` — added `slug` to the ad array.  
 `types/chat.ts` — added `slug` to `ConversationAd` interface.  
-`ChatHeader.tsx` — redesigned with a clickable "Annonce liée" card (cover thumbnail + title + `ExternalLink` → `/ads/[slug]`); participant avatar/name links to `/proprietaires/[id]`.
+`ChatHeader.tsx` — desktop (`md+`): full-width "Annonce liée" row (cover + title + `ExternalLink`). **Mobile:** compact **`Building2`** button in the nav bar opens a **bottom sheet** (title, thumbnail, « Ouvrir l'annonce ») so message list gets more height — app-like shell. **Viewport (client + owner layouts):** `maximumScale: 1` + `userScalable: false` so the PWA/chat shell does not invite pinch-zoom like a website (Safari may still allow minimal zoom in edge cases).
 
 #### 7. Cross-panel security guard & panel-aware chat links
 **Bug:** Owner/agent clicking "Voir l'annonce" in chat navigated to `/ads/[slug]` (client panel), loading the client layout with owner session — cross-panel access.
@@ -1270,6 +1270,13 @@ Both tunings are documented in `docs/REVERB_DEPLOY.md` under "Kernel & runtime t
 - **`test_unit` job (coverage)**: Coverage thresholds have been **removed** from `vitest.config.ts`. The job passes/fails based on test results only. Coverage is still collected and reported (reporters: text, json, html, lcov, cobertura) as CI artifacts — do NOT re-add `thresholds` until the test suite has meaningful coverage.
 - **`build:preprod` + `deploy:preprod` removed**: Vercel handles `cedrickdev` preview deployments automatically. `build:check` (`npm run build`) runs on all non-`main` branches including `cedrickdev` as the quality gate. The `VERCEL_TOKEN`/`VERCEL_ORG_ID`/`VERCEL_PROJECT_ID` variables are only needed for `main` (production deploy).
 
+### Chat / PWA fixes (May 2026, pass 2)
+
+- **`ChatHeader` mobile « Annonce liée »** — bottom sheet rendu via `createPortal` sur `document.body` avec `z-index: 14000` (au-dessus des AppBar ~1200) ; backdrop `cursor-pointer` ; verrou `overflow: hidden` sur `body` à l’ouverture. Corrige les taps ignorés (navbar recouvrant un pseudo `z-200` Tailwind invalide).
+- **Persistance session SPA/PWA** — `TokenService::createForUser` utilise `config('sanctum.expiration')` (43200 min) au lieu de `now()->addDay()` ; défaut `SESSION_LIFETIME` porté à **43200** dans `config/session.php` ; cookie `kh_role` **30 j** (`auth-session.ts`) aligné sur la session Laravel.
+- **FCM** — dernier jeton en **localStorage** (`src/lib/fcm-token-key.ts`) pour survivre au cold start PWA ; `getRegistration()` puis fallback `ready` ; reset d’enregistrement au changement de `user.id` ; **logout** : `DELETE /fcm/token` **avant** `POST /auth/logout` pendant que le Bearer est encore valide ; `public/sw.js` **v11** (bump cache).
+- **Chat client — profil bailleur** : `ConversationResource` expose `other_participant.username` ; `ChatHeader` (panneau client uniquement) : bouton **Profil public du bailleur** (`UserRound`) → `/bailleurs/{username|id}` en **nouvel onglet** (à côté de l’annonce liée).
+
 ### Session — Chat Parity Modernization (May 2026)
 
 Full-parity sweep aligning the chat UX with WhatsApp / Messenger while keeping the KeyHome accent split (pink client `#F6475F`, teal owner `#0D9488`). Touches every layer (DB, services, events, routes, hooks, components).
@@ -1361,9 +1368,10 @@ Full-parity sweep aligning the chat UX with WhatsApp / Messenger while keeping t
 - **Identity** — `users.chat_e2ee_public_key_pem`; `GET`/`PUT` `/api/v1/my/chat-e2ee/public-key` (`ChatE2eeIdentityController`). `UserResource` exposes PEM to the owning user only.
 - **Session keys** — `conversations.e2ee_wrapped_key_tenant` / `e2ee_wrapped_key_landlord` (RSA-OAEP--wrapped AES-256). First sealed message in a thread **must** send `e2ee_wrapped_keys`; later messages omit. `ConversationResource` includes `e2ee.tenant_public_key_pem`, `landlord_public_key_pem`, `wrapped_conversation_key_b64` (recipient-specific), `both_keys_registered`, `session_ready`.
 - **Realtime & pushes** — `MessageSent` / `MessageResource`: no plaintext `body` when sealed; `e2ee` carries ciphertext + iv. `NewMessageNotification` + FCM use a generic “message sécurisé” preview for sealed rows.
+- **Inbox list (May 2026)** — `GET /conversations` `last_message` includes `e2ee` for sealed rows (same shape as WS). `ConversationItem` merges TanStack message cache (`useChatMessagesCacheEntry`) + decrypts locally when `session_ready`, so the thread row shows real text instead of a permanent “Message sécurisé” placeholder when the device can open the session key. **`useSyncExternalStore` must use the same `getSnapshot` for the server snapshot** (`getServerSnapshot === getSnapshot`); a third argument that always returns `undefined` while the client reads dehydrated `chat-messages` causes a Next.js hydration mismatch and **breaks row clicks / interactivity**.
 - **Frontend** — `src/lib/chat-e2ee-crypto.ts` (WebCrypto RSA-OAEP-256 + AES-GCM), `chat-e2ee-identity.ts` + `AuthProvider` bootstrap; `useChat` accepts `conversation`, seals text when both participants have registered keys, decrypts into `decrypted_body`; offline queue replays with **server** encryption (`skipE2ee`). **Risk:** E2EE private key in `localStorage` (XSS); cross-device requires new identity / lost history for that thread.
 
-**Tests:** `tests/Feature/Chat/ChatE2eeTest.php` (identity API, first/follow-up sealed send, missing key 422, broadcast payload, conversation resource PEMs).
+**Tests:** `tests/Feature/Chat/ChatE2eeTest.php` (identity API, first/follow-up sealed send, missing key 422, broadcast payload, conversation resource PEMs, **conversation list `last_message.e2ee`**).
 
 ---
 
