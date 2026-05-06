@@ -21,6 +21,8 @@ KeyHome — multi-tenant real estate marketplace SaaS for francophone sub-Sahara
 
 **Brand color:** `#F6475F` (crimson/pink). UI language: French only (`fr_FR` hardcoded).
 
+**Brand tagline (devise):** « Votre patrimoine immobilier en poche » — single source of truth in `keyhome-frontend-next/src/lib/brand.ts` (`BRAND_TAGLINE`, `BRAND_TITLE_WITH_TAGLINE` for default titles and OG alt text).
+
 ## Remotes
 
 ```
@@ -227,7 +229,7 @@ vendor/bin/rector process --dry-run
   - **Frontend (Next.js) passkey integration**:
     - Service: `src/services/webauthn.service.ts` — base64url encoding, `navigator.credentials` calls, API wrappers.
     - Hooks: `src/hooks/usePasskey.ts` — `usePasskeyManager()` (list/register/rename/delete via TanStack Query), `usePasskeyLogin()` (login flow).
-    - Components: `src/components/auth/PasskeyLoginButton.tsx` (login pages), `src/components/security/PasskeyManager.tsx` (settings pages). Both are **theme-aware**: `variant='client'` (default, crimson #F6475F) or `variant='owner'` (teal #0D9488).
+    - Components: `src/components/auth/PasskeyLoginButton.tsx` (login pages), `src/components/security/PasskeyManager.tsx` (settings pages). **Couleurs** via `useTheme().palette.primary` (rose client / teal bailleur selon le `ThemeProvider`). **WebAuthn indisponible** : message FR via `explainPasskeyUnsupported()` (`src/lib/passkey-support.ts`); erreurs biométrie via `formatWebAuthnClientError`. Gestion erreur liste passkeys + bouton « Réessayer » dans `PasskeyManager`. Tests Vitest : `src/tests/lib/passkey-support.test.ts`.
     - Integrated in: client login (`/login`), owner login (`/owner/login`), **client profile `/profile` → "Sécurité" tab (index 4)**, **owner profile `/owner/profile` → "Sécurité" tab (index 2)**. Removed from `/parametres` and `/owner/security` (single source of truth in profile).
     - **`WebAuthnApiController` tokens**: `final readonly`, `LoginService` injected via constructor. Token issuance delegates to `LoginService::issueApiTokenForLoginContext(User, string): NewAccessToken` — same `TokenService::rotateForUser()` naming as password login (`owner_token_*` / `client_token_*`), same Sanctum abilities (`role:<enum>`, `api:access`), automatic rotation (old tokens revoked). Login response now includes `expires_at`. Invalid `login_context` values return 422. `RoleContextMismatchException` (e.g. CUSTOMER trying `owner` context) returns 403 `ROLE_CONTEXT_MISMATCH`. Covered by `tests/Unit/LoginServiceIssueApiTokenTest.php` (7 tests: scoping, rejection, rotation).
     - **Critical bug fix — `role` missing from passkey login response**: `UserResource` gates `role` and `type` behind `$request->user()?->id === $this->id`. The passkey login endpoint has no `auth:sanctum` middleware → `$request->user()` = null → `role` absent from JSON → frontend received `user.role = undefined` → role guard in `PasskeyLoginButton` failed → redirected back to `/login`. **Fix**: call `auth()->guard('web')->setUser($user)` in `WebAuthnApiController::login()` after credential verification, before building `UserResource`. This populates `$request->user()` without opening a session.
@@ -498,6 +500,17 @@ Storybook, Vitest, Playwright.
 | `NEXT_PUBLIC_OWNER_PANEL` | `next`=integrated UI, `laravel`=Filament panel |
 | `NEXT_PUBLIC_MEILISEARCH_HOST` | MeiliSearch for client-side search |
 | `NEXT_PUBLIC_MEILISEARCH_KEY` | MeiliSearch search-only API key |
+| `NEXT_PUBLIC_SITE_URL` | **SEO / Open Graph**: public site origin (canonical, `metadataBase`, sitemap, `robots.ts`). Priority over `NEXT_PUBLIC_APP_URL`; on Vercel, `VERCEL_URL` is used if unset. Fallback `https://keyhome.app`. Helpers: `src/lib/site-url.ts` (`getSiteOrigin`, `absoluteUrl`, `absoluteAssetUrl`). Tests: `src/tests/lib/site-url.test.ts`. |
+| `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` | Optional. Google Search Console → HTML tag: paste **only** the `content` value. Injected in root `layout.tsx` via `src/lib/seo-verification.ts`. |
+| `NEXT_PUBLIC_BING_SITE_VERIFICATION` | Optional. Bing Webmaster Tools → Meta tag (`msvalidate.01`): paste **only** the `content` value. |
+
+### SEO, canonicals & GEO (frontend, May 2026)
+- **Centralisation** — `metadataBase`, canonicals, JSON-LD (`JsonLd`, annonces, villes, recherche, blog, comparaison), OG/Twitter images via `absoluteUrl` / `absoluteAssetUrl` pour éviter les URL relatives incorrectes sur crawl / partage. **Devise** : `BRAND_TAGLINE` / `BRAND_TITLE_WITH_TAGLINE` dans `src/lib/brand.ts` (métadonnées globales, JSON-LD Organization/WebSite, image OG dynamique, manifests PWA).
+- **Search Console / Bing** — Après déploiement sur l’URL canonique (`NEXT_PUBLIC_SITE_URL`), définir les env de vérification, redéployer, puis GSC → **Sitemaps** : `https://<domaine>/sitemap.xml` ; suivre couverture, requêtes et CWV. Opérationnel, pas une garantie de classement.
+- **Maillage interne** — Footer landing : colonne « Guides & villes » (`/immobilier/*`, `/type-bien/*`, `/comparaison`, `/nearby`) en complément des liens recherche.
+- **Sitemap** — `src/app/sitemap.ts` inclut notamment `/search`, `/login`, `/register` (entrées marketing indexables).
+- **GEO** — Pages annonce (`ads/[slug]`), hub ville (`immobilier/[ville]`) et recherche : coordonnées WGS84 quand disponibles ; métadonnées `geo.position` / `ICBM` et schémas `GeoCoordinates` / local business où pertinent.
+- **`robots.ts`** — Sitemap absolu ; disallow des zones privées owner/messages/my/credits ; `/home` et `/nearby` indexables pour invités.
 
 ### Frontend ESLint Rules (notable)
 - `@typescript-eslint/no-explicit-any` — **error**. Never use `any`; use proper union types or `unknown`.
@@ -817,9 +830,9 @@ All 14 items from `COMPREHENSIVE_ASSESSMENT_REPORT.md` have been addressed:
 - **Owner panel**: `PaymentHistoryTable.tsx` — period chips (Tout/30j/90j/1an) + red PDF button above table.
 - **Client PWA**: `PaymentHistoryTableModern.tsx` — same period chips already present, "Télécharger CSV" button replaced with "Télécharger PDF" (real backend call, not client-side CSV).
 
-#### Admin Report PDF
+#### Admin Report PDF / CSV (dashboard & rapports)
 - Template `resources/views/pdf/admin-monthly-report.blade.php` rebranded: teal (#0d9488) → brand #F6475F throughout (header gradient, section titles, highlights).
-- Entry point: `ExportActionsWidget::exportPdf()` (Livewire, Filament admin dashboard).
+- **Async queue (Mai 2026)** : les exports lourds du tableau de bord admin ne bloquent plus la requête HTTP. `ExportActionsWidget` (CSV + PDF métriques), la page **Rapports** (`ScheduledReports` : utilisateurs, annonces, paiements) et **Export CSV des réponses** sur `SurveyResource` dispatchent `ProcessAdminAsyncExportJob` ; le fichier est écrit sur le disque `local` (`admin-queued-exports/{user_id}/`), une ligne `admin_queued_exports` est créée, et une **notification Filament** (base de données) contient un lien signé vers `GET /downloads/admin-asynchronous-export/{export}` (auth + signature, TTL 24 h). Nettoyage : modèle `AdminQueuedExport` **Prunable** via `model:prune` (déjà planifié quotidiennement). Les **ExportAction / ImportAction** Filament sur les ressources restent sur les jobs natifs `filament/actions`.
 
 ## Chat System — Bug Fixes & UI Redesign (Session 3)
 

@@ -13,8 +13,7 @@
     <x-filament::section icon="heroicon-o-information-circle" icon-color="info">
         <x-slot name="heading">Exports disponibles</x-slot>
         <x-slot name="description">
-            Utilisez les boutons ci-dessus pour exporter les données au format CSV.
-            Les exports sont générés en temps réel avec les données actuelles.
+            Lancez un export CSV depuis les boutons du bandeau. Chaque export est traité en file d’attente : ouvrez le centre de notifications Filament pour télécharger le fichier (lien valable 24 h).
         </x-slot>
     </x-filament::section>
 </x-filament-panels::page>

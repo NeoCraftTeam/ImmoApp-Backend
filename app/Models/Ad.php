@@ -142,11 +142,8 @@ class Ad extends Model implements HasMedia
         'has_3d_tour',
         'tour_config',
         'tour_published_at',
-        'is_verified',
-        'verified_at',
-        'verification_status',
-        'verification_notes',
-        'verification_requested_at',
+        // SEC-007: is_verified, verified_at, verification_status, verification_notes,
+        // verification_requested_at excluded — use forceFill() in admin/verification flows only.
         'distance_main_road_m',
         'distance_shops_m',
         'distance_transport_m',

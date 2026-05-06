@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Pages;
 
+use App\Enums\AdminAsyncExportType;
+use App\Jobs\Admin\ProcessAdminAsyncExportJob;
 use App\Models\Ad;
 use App\Models\Payment;
 use App\Models\Review;
 use App\Models\User;
 use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Support\Facades\Response;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 use UnitEnum;
 
 class ScheduledReports extends Page
@@ -76,95 +77,42 @@ class ScheduledReports extends Page
             Action::make('exportUsers')
                 ->label('Exporter les utilisateurs')
                 ->icon(Heroicon::ArrowDownTray)
-                ->action(fn () => $this->exportUsers()),
+                ->action(function (): void {
+                    /** @var User $user */
+                    $user = auth()->user();
+                    ProcessAdminAsyncExportJob::dispatch($user->id, AdminAsyncExportType::UsersCsv);
+                    Notification::make()
+                        ->title('Export en file d\'attente')
+                        ->body('Le CSV utilisateurs sera disponible dans vos notifications une fois généré.')
+                        ->info()
+                        ->send();
+                }),
             Action::make('exportAds')
                 ->label('Exporter les annonces')
                 ->icon(Heroicon::ArrowDownTray)
-                ->action(fn () => $this->exportAds()),
+                ->action(function (): void {
+                    /** @var User $user */
+                    $user = auth()->user();
+                    ProcessAdminAsyncExportJob::dispatch($user->id, AdminAsyncExportType::AdsCsv);
+                    Notification::make()
+                        ->title('Export en file d\'attente')
+                        ->body('Le CSV annonces sera disponible dans vos notifications une fois généré.')
+                        ->info()
+                        ->send();
+                }),
             Action::make('exportPayments')
                 ->label('Exporter les paiements')
                 ->icon(Heroicon::ArrowDownTray)
-                ->action(fn () => $this->exportPayments()),
+                ->action(function (): void {
+                    /** @var User $user */
+                    $user = auth()->user();
+                    ProcessAdminAsyncExportJob::dispatch($user->id, AdminAsyncExportType::PaymentsCsv);
+                    Notification::make()
+                        ->title('Export en file d\'attente')
+                        ->body('Le CSV paiements sera disponible dans vos notifications une fois généré.')
+                        ->info()
+                        ->send();
+                }),
         ];
-    }
-
-    public function exportUsers(): StreamedResponse
-    {
-        return Response::streamDownload(function (): void {
-            $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['ID', 'Prénom', 'Nom', 'Email', 'Rôle', 'Actif', 'Inscrit le'], escape: '\\');
-
-            User::query()->orderByDesc('created_at')->chunk(500, function ($users) use ($handle): void {
-                foreach ($users as $user) {
-                    fputcsv($handle, [
-                        (string) $user->id,
-                        (string) $user->firstname,
-                        (string) $user->lastname,
-                        (string) $user->email,
-                        $user->role->value,
-                        $user->is_active ? 'Oui' : 'Non',
-                        $user->created_at?->toDateString() ?? '',
-                    ],
-                        escape: '\\');
-                }
-            });
-
-            fclose($handle);
-        }, 'users-'.now()->format('Y-m-d').'.csv', [
-            'Content-Type' => 'text/csv',
-        ]);
-    }
-
-    public function exportAds(): StreamedResponse
-    {
-        return Response::streamDownload(function (): void {
-            $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['ID', 'Titre', 'Statut', 'Prix', 'Ville', 'Quartier', 'Créé le'], escape: '\\');
-
-            Ad::query()->with(['quarter.city'])->orderByDesc('created_at')->chunk(500, function ($ads) use ($handle): void {
-                foreach ($ads as $ad) {
-                    fputcsv($handle, [
-                        (string) $ad->id,
-                        (string) $ad->title,
-                        (string) $ad->status->value,
-                        (string) $ad->price,
-                        (string) ($ad->quarter?->city->name ?? ''),
-                        $ad->quarter === null ? '' : (string) $ad->quarter->name,
-                        $ad->created_at?->toDateString() ?? '',
-                    ],
-                        escape: '\\');
-                }
-            });
-
-            fclose($handle);
-        }, 'ads-'.now()->format('Y-m-d').'.csv', [
-            'Content-Type' => 'text/csv',
-        ]);
-    }
-
-    public function exportPayments(): StreamedResponse
-    {
-        return Response::streamDownload(function (): void {
-            $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['ID', 'Montant', 'Statut', 'Passerelle', 'Utilisateur', 'Créé le'], escape: '\\');
-
-            Payment::query()->with('user')->orderByDesc('created_at')->chunk(500, function ($payments) use ($handle): void {
-                foreach ($payments as $payment) {
-                    fputcsv($handle, [
-                        (string) $payment->id,
-                        (string) $payment->amount,
-                        (string) $payment->status->value,
-                        (string) ($payment->gateway ?? ''),
-                        (string) $payment->user->email,
-                        $payment->created_at?->toDateString() ?? '',
-                    ],
-                        escape: '\\');
-                }
-            });
-
-            fclose($handle);
-        }, 'payments-'.now()->format('Y-m-d').'.csv', [
-            'Content-Type' => 'text/csv',
-        ]);
     }
 }

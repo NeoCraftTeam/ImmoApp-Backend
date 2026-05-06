@@ -1,7 +1,7 @@
 <x-filament-widgets::widget>
     <x-filament::section
         heading="Export et rapports"
-        description="Téléchargez toutes les métriques du tableau de bord au format CSV (pour Excel / Google Sheets) ou PDF (pour vos présentations et rapports investisseurs)."
+        description="Demandez un export CSV ou PDF des métriques du tableau de bord. La génération s’exécute en file d’attente : une notification Filament avec lien sécurisé apparaît lorsque le fichier est prêt."
     >
         <div class="flex flex-wrap gap-3">
             <x-filament::button

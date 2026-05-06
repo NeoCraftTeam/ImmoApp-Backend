@@ -46,7 +46,7 @@ return [
     // preview(-[a-z0-9-]+)? matches both bare 'preview' and 'preview-abc123'.
     'allowed_origins_patterns' => [
         '/^https:\/\/(staging|preprod|preview(-[a-z0-9-]+)?)\.keyhome\.neocraft\.dev$/',
-        '/^https:\/\/(staging|preprod|preview(-[a-z0-9-]+)?)\.keyhome\.neocraft\.dev$/',
+        '/^https:\/\/(staging|preprod|preview(-[a-z0-9-]+)?)\.keyhome\.neocraft\.de$/',
     ],
 
     'allowed_headers' => ['Accept', 'Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token', 'X-Inertia', 'X-WebAuthn-Token', 'X-Socket-Id'],

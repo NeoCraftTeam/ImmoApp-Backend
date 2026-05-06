@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\Surveys;
 
+use App\Enums\AdminAsyncExportType;
 use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\Surveys\Pages\ListSurveys;
 use App\Filament\Admin\Resources\Surveys\Pages\ViewSurvey;
-use App\Models\AnonymousSurveyResponse;
+use App\Jobs\Admin\ProcessAdminAsyncExportJob;
 use App\Models\Survey;
 use App\Models\SurveyResponse;
+use App\Models\User;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\EditAction;
@@ -30,7 +32,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SurveyResource extends Resource
 {
@@ -252,8 +253,17 @@ class SurveyResource extends Resource
                     ->label('Export CSV')
                     ->icon(Heroicon::ArrowDownTray)
                     ->color('success')
-                    ->tooltip('Télécharger toutes les réponses (clients + anonymes) au format CSV')
-                    ->action(fn (Survey $record): StreamedResponse => self::exportSurveyResponsesCsv($record)),
+                    ->tooltip('Générer un CSV de toutes les réponses (clients + anonymes) — notification quand prêt')
+                    ->action(function (Survey $record): void {
+                        /** @var User $user */
+                        $user = auth()->user();
+                        ProcessAdminAsyncExportJob::dispatch($user->id, AdminAsyncExportType::SurveyResponsesCsv, $record->id);
+                        Notification::make()
+                            ->title('Export en file d\'attente')
+                            ->body('Le CSV des réponses sera disponible dans vos notifications une fois généré.')
+                            ->info()
+                            ->send();
+                    }),
                 Action::make('duplicate')
                     ->label('Dupliquer')
                     ->icon(Heroicon::DocumentDuplicate)
@@ -282,83 +292,6 @@ class SurveyResource extends Resource
                             ->send();
                     }),
             ]);
-    }
-
-    /**
-     * Export every response (authenticated + anonymous) to a CSV stream.
-     *
-     * Columns: response_id, type (client/anonymous), respondent (name+email or fingerprint),
-     * locale, question, answer, submitted_at.
-     */
-    protected static function exportSurveyResponsesCsv(Survey $survey): StreamedResponse
-    {
-        $filename = sprintf('survey-%s-responses-%s.csv', $survey->slug, now()->format('Ymd-His'));
-
-        return new StreamedResponse(function () use ($survey): void {
-            $handle = fopen('php://output', 'w');
-            // BOM for Excel UTF-8 friendliness
-            fwrite($handle, "\xEF\xBB\xBF");
-            fputcsv($handle, [
-                'ID réponse',
-                'Type',
-                'Répondant',
-                'Email',
-                'Locale',
-                'Question',
-                'Réponse',
-                'Soumis le',
-            ],
-                escape: '\\');
-
-            // Authenticated responses
-            SurveyResponse::query()
-                ->where('survey_id', $survey->id)
-                ->with(['user', 'question'])
-                ->orderBy('created_at')
-                ->chunk(500, function ($rows) use ($handle): void {
-                    foreach ($rows as $row) {
-                        fputcsv($handle, [
-                            $row->id,
-                            'client',
-                            trim((string) ($row->user->fullname ?: '—')),
-                            $row->user->email,
-                            (string) ($row->user->locale ?? ''),
-                            $row->question->text ?: '—',
-                            (string) $row->answer,
-                            optional($row->created_at)->format('Y-m-d H:i:s'),
-                        ],
-                            escape: '\\');
-                    }
-                });
-
-            // Anonymous responses
-            AnonymousSurveyResponse::query()
-                ->where('survey_id', $survey->id)
-                ->with('answers.question')
-                ->orderBy('created_at')
-                ->chunk(500, function ($responses) use ($handle): void {
-                    foreach ($responses as $response) {
-                        foreach ($response->answers as $answer) {
-                            fputcsv($handle, [
-                                $answer->id,
-                                'anonyme',
-                                'session#'.mb_substr((string) $response->session_token_hash, 0, 8),
-                                '',
-                                $response->respondent_audience->value,
-                                $answer->question->text ?: '—',
-                                (string) $answer->answer,
-                                optional($answer->created_at)->format('Y-m-d H:i:s'),
-                            ],
-                                escape: '\\');
-                        }
-                    }
-                });
-
-            fclose($handle);
-        }, 200, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ]);
     }
 
     #[\Override]

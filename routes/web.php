@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Admin\DownloadAdminQueuedExportController;
 use App\Http\Controllers\Api\V1\Auth\EmailVerificationController;
 use App\Http\Controllers\Api\V1\TourController;
 use App\Http\Controllers\Auth\VerifyEmailController;
@@ -139,6 +140,10 @@ Route::middleware(['auth'])->delete('/webauthn/credentials/{credential}', functi
 
     return response()->noContent();
 })->name('webauthn.credentials.destroy');
+
+Route::middleware(['auth', 'signed'])
+    ->get('/downloads/admin-asynchronous-export/{export}', DownloadAdminQueuedExportController::class)
+    ->name('admin.queued-exports.download');
 
 // ── Dev-only: Email template previews (local env only) ──
 if (app()->environment('local')) {
