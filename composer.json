@@ -41,6 +41,7 @@
         "livewire/livewire": "^3.0",
         "meilisearch/meilisearch-php": "^1.16",
         "owenvoke/blade-fontawesome": "^3.1",
+        "phpseclib/phpseclib": "^3.0.52",
         "sentry/sentry-laravel": "^4.20",
         "socialiteproviders/apple": "^5.9",
         "spatie/laravel-activitylog": "^4.11",
