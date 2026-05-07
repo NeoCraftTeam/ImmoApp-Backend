@@ -152,6 +152,26 @@ vendor/bin/rector process --dry-run
 - `PropertyAttributeImportService` — bulk attribute import.
 - `UserAgentParser` — browser/device detection.
 - `Media/MediaPathGenerator` — Spatie media paths.
+- `QrCodeService` (`final readonly`) — Apple-style branded scannable QR generator + UTM URL helpers (`appendUtm`, `absoluteFrontendUrl`, `adListingUrl`, `landlordProfileUrl`). Public render API: `pngDataUriForUrl(url, size=800)` returns `data:image/png;base64,...`, `renderRichPng(url, size)` returns binary PNG, `renderRichSvg(url)` returns the branded SVG. Implementation: chillerlan/php-qrcode v5, ECC level **H**, **#000000** modules, `quietzoneSize: 4`, circular modules with `circleRadius: 0.5`, finder + alignment patterns kept square. Branded SVG layout: matrix at **62 % of canvas** (room for rings), 5 decorative dashed rings (2 inner halos + 3 outer signature rings, brand crimson on the outer one) anchored to the matrix half-DIAGONAL so they NEVER overlap data → 100 % scannable. Centre punch-out at 10 % of `qrSize` with the embedded official KeyHome PNG logo (`keyhome-frontend-next/public/icons/icon-512x512.png`). Rasterisation chain: **Imagick → rsvg-convert → plain chillerlan PNG** fallback (DomPDF can't render the branded SVG reliably).
+
+### QR Code & Printable Assets (`app/Http/Controllers/Api/V1/QrCodeController.php`)
+- All routes in `routes/api.php` are gated by `auth:sanctum` + `owner.role` + `panel.role:owner` + `token.role:agent` (so customers get **403** on profile + ad endpoints).
+- **Ad endpoints** (prefix `my/ads/{ad}`, `throttle:60,1` for QR / `20,1` for PDF):
+  - `GET /api/v1/my/ads/{ad}/qr-code` → JSON `{data: {ad_url, profile_url, qr_data_uri}}`. Authorised via `AdPolicy::update`.
+  - `GET /api/v1/my/ads/{ad}/qr-code/image` → `image/png` (rich branded QR).
+  - `GET /api/v1/my/ads/{ad}/placarde` → A5 portrait pancarte PDF (`pdf.ad-placarde` blade — hero photo, status pill, title, price, 3 features, branded QR + CTA).
+- **Profile endpoints** (prefix `my/profile`):
+  - `GET /api/v1/my/profile/qr-code` → JSON `{data: {profile_url, qr_data_uri}}`.
+  - `GET /api/v1/my/profile/qr-code/image` → `image/png`.
+  - `GET /api/v1/my/profile/business-card` → 90 × 55 mm landscape PDF (`pdf.business-card` blade, paper `[0,0,255.118,155.906]` landscape, rounded corners via `border-radius: 3mm` + thin `#CBD5E1` border so DomPDF actually paints them, avatar / role / KeyHome stat line / contact list / KeyHome key+keyring badge / 22 mm branded QR + `Scannez · mes annonces`).
+  - `GET /api/v1/my/profile/business-card/preview` → returns **HTML** (not PDF, `Content-Type: text/html`) rendered through `pdf.business-card-preview` blade — same DOM as the PDF blade, transparent background, JS auto-fits the card to the iframe via `min(scaleX, scaleY)`. Used as `srcDoc` of the iframe inside `QrCodeDialog`.
+- UTM scheme: `utm_source=keyhome`, `utm_medium=qr|placard|visitcard|visitcard_preview`, `utm_campaign=owner_share`, `utm_content=ad_<id>` or `profile_<id>`.
+- Controller is `final` with DI on `QrCodeService` (readonly). All view data centralised in `buildBusinessCardPayload(User, utmMedium)` so the PDF and HTML preview stay perfectly in sync. Helpers `loadAdCoverAsBase64`, `loadUserAvatarAsBase64` resolve Spatie media → storage path → absolute URL → null, returning `data:<mime>;base64,...` URIs (DomPDF runs with `isRemoteEnabled: false`).
+- **Frontend integration**:
+  - `QrCodeDialog.tsx` (`variant: 'ad' | 'profile'`, optional `ad: {id, title}`) — fetches the meta JSON via React Query. Profile variant additionally fetches the HTML preview and renders it inside an `<iframe srcDoc>` above the QR PNG so users see the printable card before downloading. Buttons: copy link, download PNG, ad → "Pancarte A5", profile → "Carte de visite" (teal `#0D9488` / hover `#0F766E`).
+  - `ownerService` methods: `getAdQrCodeMeta`, `downloadAdQrPng`, `downloadAdPlacarde`, `getProfileQrMeta`, `downloadProfileQrPng`, `downloadBusinessCard`, `fetchBusinessCardPreviewHtml`.
+  - Owner pages: **Mes annonces** action menu → "QR code & pancarte" opens the dialog with `variant="ad"`. **Profil bailleur** → "QR code & carte de visite" Paper card with an "Ouvrir" button opens `variant="profile"`.
+- **Tests**: `tests/Feature/QrCodeTest.php` (6 assertions × meta + image + PDF + ownership/role guards). Smoke script `tests/qr-pdf-smoke.php` regenerates `/tmp/qr-rich.png`, `/tmp/placarde-sample.pdf`, `/tmp/business-card-sample.pdf` for visual review.
 
 ### Actions (`app/Actions/`)
 - `CreateAd`, `UpdateAd`, `UnlockAd`, `HandlePostPaymentActions`, `SubmitAnonymousSurveyAction`.
@@ -487,6 +507,7 @@ Storybook, Vitest, Playwright.
 - **`public/sw.js`** — entrée **cache-first réseau** pour les GET `CACHEABLE_OWNER_PATHS` traitée **avant** le filtre same-origin → cache offline utile lorsque l’API est **cross-origin** (nécessite CORS permissif pour GET depuis l’origine du PWA). Version incrémentée (`VERSION`) après changement comportement SW.
 - **Favoris invité** — `FavoritesProvider` : à la transition `authenticated → guest`, réhydrate depuis `localStorage` (`readLocal()`) au lieu de laisser `[]` désynchronisé.
 - **Navigation bailleur** — libellé **« Tableau de bord »** dans `OWNER_NAV_ITEMS` / `OWNER_SIDEBAR_NAV_ITEMS` / `OwnerSidebar` ; **`aria-current="page"`** sur l’entrée active ; **`OwnerNavbar`** : bouton « Nouvelle annonce » visible lorsque la barre mobile est affichée (branche `{!isMobile && …}` supprimée).
+- **Shell owner (Mai 2026, correctifs audit)** — FAB « nouvelle annonce » : `shouldShowOwnerQuickCreateFab` vrai **uniquement** sur `/owner/ads` (regression corrigée). **`OWNER_NAV_ITEMS`** aligné sur la sidebar (Messages, Mon équipe, Sécurité, ordre métier) ; **`OWNER_SIDEBAR_NAV_ITEMS`** = alias de la même liste. **`OwnerManifestSwitch`** respecte les `meta theme-color` clair/sombre (teal / teal foncé). **Profil bailleur** : clés TanStack `active-survey-owner` / `survey-has-answered-owner` alignées sur `OwnerLayoutClient`. **`ShareAdButtons`** : URL absolue passée telle quelle (pas de double origine).
 - **Owner shell** — `handleSurveyPostponed` mémoïsé (`useCallback`) pour limiter les re-renders de `SurveyPromptOrBanner`.
 
 ### Environment Variables
@@ -829,6 +850,13 @@ All 14 items from `COMPREHENSIVE_ASSESSMENT_REPORT.md` have been addressed:
 - **Frontend service**: `paymentsService.exportPdf(period?)` in `src/services/payments.service.ts` — fetches blob, triggers browser download.
 - **Owner panel**: `PaymentHistoryTable.tsx` — period chips (Tout/30j/90j/1an) + red PDF button above table.
 - **Client PWA**: `PaymentHistoryTableModern.tsx` — same period chips already present, "Télécharger CSV" button replaced with "Télécharger PDF" (real backend call, not client-side CSV).
+
+#### Owner QR & printables (Mai 2026 — restauré après rollback accidentel)
+- **Backend**: `App\Services\QrCodeService`, `App\Http\Controllers\Api\V1\QrCodeController`, dépendance directe `chillerlan/php-qrcode`. URLs publiques = `config('app.frontend_url')` + chemins `/ads/{slug}` et `/bailleurs/{username}` avec paramètres UTM (`utm_source=keyhome`, `utm_medium` = `qr` | `placard` | `visitcard` | `visitcard_preview`, `utm_campaign=owner_share`).
+- **Routes** (middleware `auth:sanctum`, `owner.role`, `panel.role:owner`, `token.role:agent`) : `GET /api/v1/my/ads/{ad}/qr-code` (JSON), `GET …/qr-code/image` (PNG), `GET …/placarde` (PDF A5) ; `GET /api/v1/my/profile/qr-code`, `…/qr-code/image`, `…/business-card`, `…/business-card/preview` (PDF carte + aperçu filigrané).
+- **Vues PDF** : `resources/views/pdf/ad-placarde.blade.php`, `business-card.blade.php`, `business-card-preview.blade.php`.
+- **Frontend** : `src/components/owner/QrCodeDialog.tsx`, méthodes dans `owner.service.ts`, helpers `src/lib/qr-public-links.ts` ; entrées **Mes annonces** (menu actions) et **Profil bailleur** (encart « QR code & carte de visite »).
+- **Tests** : `tests/Feature/QrCodeTest.php`, `keyhome-frontend-next/src/tests/lib/qr-public-links.test.ts`.
 
 #### Admin Report PDF / CSV (dashboard & rapports)
 - Template `resources/views/pdf/admin-monthly-report.blade.php` rebranded: teal (#0d9488) → brand #F6475F throughout (header gradient, section titles, highlights).

@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\V1\NotificationPreferenceController;
 use App\Http\Controllers\Api\V1\PriceHeatmapController;
 use App\Http\Controllers\Api\V1\PropertyAttributeController;
 use App\Http\Controllers\Api\V1\PwaController;
+use App\Http\Controllers\Api\V1\QrCodeController;
 use App\Http\Controllers\Api\V1\QuarterController;
 use App\Http\Controllers\Api\V1\RecommendationController;
 use App\Http\Controllers\Api\V1\RentEstimatorController;
@@ -200,6 +201,26 @@ Route::prefix('v1')->group(function (): void {
 
     // --- MY REVIEWS (landlord — reviews on my ads) ---
     Route::middleware('auth:sanctum')->get('/my/reviews', [MyReviewsController::class, 'index']);
+
+    // --- QR & printables (landlord profile + per-ad assets) ---
+    Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner', 'token.role:agent'])
+        ->prefix('my/profile')
+        ->controller(QrCodeController::class)
+        ->group(function (): void {
+            Route::get('/qr-code', 'profileMeta')->middleware('throttle:60,1');
+            Route::get('/qr-code/image', 'profileQrImage')->middleware('throttle:60,1');
+            Route::get('/business-card', 'businessCard')->middleware('throttle:20,1');
+            Route::get('/business-card/preview', 'businessCardPreview')->middleware('throttle:20,1');
+        });
+
+    Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner', 'token.role:agent'])
+        ->prefix('my/ads/{ad}')
+        ->controller(QrCodeController::class)
+        ->group(function (): void {
+            Route::get('/qr-code', 'adMeta')->middleware('throttle:60,1');
+            Route::get('/qr-code/image', 'adQrImage')->middleware('throttle:60,1');
+            Route::get('/placarde', 'adPlacarde')->middleware('throttle:20,1');
+        });
 
     // --- PWA (Push Subscriptions & Session Validation) ---
     Route::prefix('pwa')->middleware('web')->group(function (): void {

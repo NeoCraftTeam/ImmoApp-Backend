@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\AdStatusController;
 use App\Http\Controllers\Api\V1\KeyScoreController;
 use App\Http\Controllers\Api\V1\MyAdsController;
 use App\Http\Controllers\Api\V1\NeighborhoodScorecardController;
+use App\Http\Controllers\Api\V1\QrCodeController;
 use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\TourController;
 use App\Models\Review;
@@ -100,9 +101,12 @@ Route::middleware('auth:sanctum')->group(function (): void {
 });
 
 // Analytics (landlord/agency dashboard)
-Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner'])->prefix('my/ads')->group(function (): void {
+Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner', 'token.role:agent'])->prefix('my/ads')->group(function (): void {
     Route::get('/', [MyAdsController::class, 'index']);
     Route::get('/analytics', [AdAnalyticsController::class, 'overview']);
+    Route::get('/{ad}/qr-code', [QrCodeController::class, 'adMeta'])->middleware('throttle:60,1');
+    Route::get('/{ad}/qr-code/image', [QrCodeController::class, 'adQrImage'])->middleware('throttle:60,1');
+    Route::get('/{ad}/placarde', [QrCodeController::class, 'adPlacarde'])->middleware('throttle:20,1');
     Route::get('/{ad}/analytics', [AdAnalyticsController::class, 'show']);
 });
 
