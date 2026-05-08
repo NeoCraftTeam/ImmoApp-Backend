@@ -22,6 +22,17 @@ default:
   tags:
     - self-hosted-shell
   interruptible: true
+  # Hook exécuté AVANT `git fetch/checkout` (GitLab 15.10+). On nettoie les
+  # reliquats root-owned (ex: ancien .trivycache) que le runner shell ne peut
+  # pas supprimer lui-même. Docker tourne en root → peut tout effacer.
+  # No-op une fois le workspace propre.
+  hooks:
+    pre_get_sources_script:
+      - |
+        if [ -d "$CI_PROJECT_DIR/.trivycache" ]; then
+          echo "🧹 Cleaning stale root-owned .trivycache/ from previous runs..."
+          docker run --rm -v "$CI_PROJECT_DIR:/w" alpine:3 rm -rf /w/.trivycache || true
+        fi
   before_script:
     # Centralisation de l'authentification Docker
     - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER"
