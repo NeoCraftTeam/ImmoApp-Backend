@@ -389,6 +389,95 @@ services:
         reservations:
           memory: 512m
 
+  # ── Postgres backups : LOCAL (rotation 7d/4w/6m) ─────────────────────────────
+  # Dumps planifiés via la cron interne du container (BACKUP_KEEP_*).
+  # Stockés dans /backups → volume `keyhome-db-backups` (mountable host-side
+  # via : `docker volume inspect keyhome_keyhome-db-backups` pour récupérer
+  # le path absolu si besoin). Restore manuel :
+  #   docker exec -i <db> pg_restore -U $DB_USERNAME -d $DB_DATABASE \
+  #     < /var/lib/docker/volumes/.../latest.sql
+  db-backup-local:
+    image: prodrigestivill/postgres-backup-local:15
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-db-backup-local
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${DB_DATABASE:-keyhome}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_EXTRA_OPTS: "-Z6 --schema=public --blobs"
+      # Cron: 03h00 UTC chaque jour. Évite la fenêtre métier (jour Afrique CEMAC).
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: "7"
+      BACKUP_KEEP_WEEKS: "4"
+      BACKUP_KEEP_MONTHS: "6"
+      HEALTHCHECK_PORT: "8080"
+    volumes:
+      - keyhome-db-backups:/backups
+    networks:
+      - keyhome-network
+    healthcheck:
+      test: ["CMD-SHELL", "/healthcheck.sh || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.50"
+
+  # ── Postgres backups : CLOUDFLARE R2 (push quotidien, retention 30j) ─────────
+  # R2 est S3-compatible — l'image `eeshugerman/postgres-backup-s3` accepte un
+  # endpoint custom via S3_ENDPOINT. Variables requises (.env) :
+  #   R2_ACCOUNT_ID            (ton ID Cloudflare)
+  #   R2_BACKUP_ACCESS_KEY_ID  (créé dans R2 dashboard, scope "Object Read/Write")
+  #   R2_BACKUP_SECRET_KEY
+  #   R2_BACKUP_BUCKET         (ex. keyhome-db-backups)
+  # Setup R2 (one-time) :
+  #   1. Cloudflare dashboard → R2 → Create bucket "keyhome-db-backups"
+  #   2. R2 → Manage R2 API tokens → Create token "keyhome-backup"
+  #      Permissions: Object Read & Write, scope au bucket
+  #   3. Copier les credentials dans .env (NE PAS commiter)
+  #   4. Activer la lifecycle rule (R2 dashboard) : delete objects > 30 days
+  db-backup-s3:
+    image: eeshugerman/postgres-backup-s3:15
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-db-backup-s3
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Postgres source
+      POSTGRES_HOST: db
+      POSTGRES_DATABASE: ${DB_DATABASE:-keyhome}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      # R2 destination
+      S3_ACCESS_KEY_ID: ${R2_BACKUP_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${R2_BACKUP_SECRET_KEY}
+      S3_BUCKET: ${R2_BACKUP_BUCKET:-keyhome-db-backups}
+      S3_PREFIX: ${COMPOSE_PREFIX:-keyhome-prod}/postgres
+      S3_REGION: auto
+      S3_ENDPOINT: https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com
+      S3_S3V4: "yes"
+      # Schedule : 03h30 UTC quotidien (30min après le local pour ne pas saturer Postgres).
+      SCHEDULE: "30 3 * * *"
+      BACKUP_KEEP_DAYS: "30"
+      # Compression gzip (-Z9 = max). Les dumps Postgres compressent très bien (~15× ratio).
+      PASSPHRASE: ${R2_BACKUP_PASSPHRASE:-}
+    networks:
+      - keyhome-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.50"
+
   # Cache (Redis) — enable AOF for persistence when used for cache/queue/session
   redis:
     image: redis:alpine
@@ -556,6 +645,8 @@ volumes:
   keyhome-db-data:
     driver: local
   keyhome-db-replica-data:
+    driver: local
+  keyhome-db-backups:
     driver: local
   keyhome-app-code:
     driver: local
