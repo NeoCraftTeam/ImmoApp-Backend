@@ -224,7 +224,7 @@ test_suite:
   rules:
     - if: $CI_COMMIT_BRANCH
 
-# ── ETAPE 2.5 : SECURITE IMAGE (Trivy + SBOM) ──────────────────────────────────
+# ── ETAPE 2.5 : SECURITE IMAGE (Trivy) ─────────────────────────────────────────
 #
 # Trivy scanne l'image Docker construite pour :
 #   - CVE OS (Alpine packages)
@@ -263,37 +263,6 @@ trivy_scan:
           "$IMAGE_REF"
   after_script:
     - rm -rf "/tmp/trivy-cache-${CI_PROJECT_ID}-${CI_JOB_ID}" 2>/dev/null || true
-  rules:
-    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
-
-# ── SBOM : Software Bill of Materials (SPDX-JSON via Syft) ───────────────────
-# Liste exhaustive de chaque paquet OS + composer + node compilé dans l'image.
-# Indispensable pour audit SOC2/ISO 27001 et traçabilité supply-chain.
-# Stocké comme artifact GitLab (rétention 90 jours).
-sbom_syft:
-  stage: build_and_test
-  needs: [ build_image ]
-  allow_failure: true
-  script:
-    - |
-      IMAGE_REF="$APP_IMAGE:$CI_COMMIT_SHA"
-      echo "📦 Generating SBOM for $IMAGE_REF..."
-      docker run --rm \
-        --user "$(id -u):$(id -g)" \
-        -v /var/run/docker.sock:/var/run/docker.sock \
-        -v "$PWD:/work" -w /work \
-        anchore/syft:latest \
-          "$IMAGE_REF" \
-          -o spdx-json=sbom-${CI_COMMIT_SHORT_SHA}.spdx.json \
-          -o cyclonedx-json=sbom-${CI_COMMIT_SHORT_SHA}.cdx.json
-      ls -la sbom-*.json
-  artifacts:
-    name: "sbom-${CI_COMMIT_SHORT_SHA}"
-    paths:
-      - sbom-*.spdx.json
-      - sbom-*.cdx.json
-    expire_in: 90 days
-    when: on_success
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
 
