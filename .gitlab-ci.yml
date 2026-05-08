@@ -249,9 +249,15 @@ trivy_scan:
       IMAGE_REF="$APP_IMAGE:$CI_COMMIT_SHA"
       TRIVY_CACHE_HOST="/tmp/trivy-cache-${CI_PROJECT_ID}-${CI_JOB_ID}"
       mkdir -p "$TRIVY_CACHE_HOST"
+      # Pull local d'abord (le `before_script` a déjà fait docker login).
+      # Évite que Trivy tente un fallback registry sans credentials.
+      echo "📥 Pulling $IMAGE_REF..."
+      docker pull "$IMAGE_REF"
       echo "🔍 Scanning $IMAGE_REF for CRITICAL/HIGH CVEs..."
+      # Trivy doit accéder au socket Docker → tourne en root dans le conteneur
+      # (le socket est root:docker, l'option --user le bloquerait).
+      # Le cache est en /tmp donc les fichiers root-owned ne polluent pas le workspace.
       docker run --rm \
-        --user "$(id -u):$(id -g)" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v "$TRIVY_CACHE_HOST:/.cache" \
         -e TRIVY_CACHE_DIR=/.cache/trivy \
@@ -262,7 +268,10 @@ trivy_scan:
           --format table \
           "$IMAGE_REF"
   after_script:
-    - rm -rf "/tmp/trivy-cache-${CI_PROJECT_ID}-${CI_JOB_ID}" 2>/dev/null || true
+    # Cleanup via conteneur root (les fichiers du cache appartiennent à root).
+    - |
+      docker run --rm -v /tmp:/host-tmp alpine:3 \
+        sh -c "rm -rf /host-tmp/trivy-cache-${CI_PROJECT_ID}-${CI_JOB_ID}" 2>/dev/null || true
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
 
