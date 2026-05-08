@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Models\Ad;
+use App\Models\User;
 use App\Support\ProxyCorsHeaders;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Storage;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -21,9 +24,13 @@ class MediaProxyController
      */
     public function show(Request $request, string $uuid): StreamedResponse|Response
     {
-        // Only allow valid UUID characters.
         if (!preg_match('/^[0-9a-f\-]+$/i', $uuid)) {
             return response('Bad Request', 400);
+        }
+
+        $user = $request->user();
+        if (!$user instanceof User) {
+            return response('Forbidden', 403, ProxyCorsHeaders::for($request));
         }
 
         $media = Media::where('uuid', $uuid)->first();
@@ -32,8 +39,15 @@ class MediaProxyController
             return response('Not Found', 404);
         }
 
-        $disk = $media->disk ?? config('media-library.disk_name', 'r2');
-        $path = $media->getPath();
+        $model = $media->model;
+        if ($model instanceof Ad) {
+            Gate::forUser($user)->authorize('update', $model);
+        } else {
+            return response('Forbidden', 403, ProxyCorsHeaders::for($request));
+        }
+
+        $disk = $media->disk ?? config('media-library.disk_name', 'public');
+        $path = $media->getPathRelativeToRoot();
 
         if (!Storage::disk($disk)->exists($path)) {
             return response('Not Found', 404);
@@ -50,7 +64,7 @@ class MediaProxyController
             }
         }, 200, array_merge([
             'Content-Type' => $mime,
-            'Content-Length' => $size,
+            'Content-Length' => (string) $size,
             'Cache-Control' => 'private, max-age=3600',
         ], ProxyCorsHeaders::for($request)));
     }

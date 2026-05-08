@@ -35,7 +35,7 @@ final class LeaseContractFactory extends Factory
             'monthly_rent' => fake()->numberBetween(30000, 500000),
             'deposit_amount' => fake()->numberBetween(50000, 1000000),
             'special_conditions' => fake()->optional(0.3)->sentence(),
-            'pdf_path' => null,
+            'pdf_path' => 'lease-contracts/test-'.fake()->uuid().'.pdf',
         ];
     }
 }

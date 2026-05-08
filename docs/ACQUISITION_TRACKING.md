@@ -20,7 +20,7 @@ This document describes how **visitor sources** and **registration attribution**
 
 ## Frontend (Next.js)
 
-- `UtmCaptureProvider` (in `src/app/providers.tsx`) runs on the client: reads UTM query params into `sessionStorage`, ensures a `session_id`, then calls `POST /track/visit` once per tab session after a successful response.
+- `UtmCaptureProvider` (in `src/app/providers.tsx`) runs on the client inside `Suspense`: on each route / query change it merges UTM query params into `sessionStorage`, ensures a stable `session_id` per tab, then best-effort `POST /api/v1/track/visit` (Laravel dedupes identical payloads ~60s; distinct `utm_content` e.g. two bailleur QR codes both record).
 - `auth.service.ts` merges `getAttributionBodyForApi()` into email registration and Clerk complete-profile requests, then clears stored UTM keys (not the session id) after success.
 
 ## Classification

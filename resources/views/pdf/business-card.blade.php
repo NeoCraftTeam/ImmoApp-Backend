@@ -82,13 +82,22 @@
         .kh-badge {
             position: absolute;
             top: 0; right: 0;
-            width: 12mm; height: 12mm;
-            border-radius: 50%;
-            background: #FFE9EC;
-            text-align: center;
-            border: 0.5pt solid rgba(246,71,95,0.25);
+            border: none;
+            background: transparent;
+            padding: 0;
+            margin: 0;
+            line-height: 0;
         }
-        .kh-badge img { width: 8mm; height: 8mm; margin-top: 1.7mm; }
+        .kh-badge img {
+            width: 8mm;
+            height: 8mm;
+            margin: 0;
+            display: block;
+            border: 0;
+            outline: none;
+            box-shadow: none;
+            object-fit: contain;
+        }
 
         /* === Bottom-left: contact list === */
         .contact {
@@ -148,8 +157,14 @@
         </div>
 
         <div class="kh-badge">
-            @if(file_exists(base_path('keyhome-frontend-next/public/icons/icon-128x128.png')))
-                <img src="data:image/png;base64,{{ base64_encode((string) file_get_contents(base_path('keyhome-frontend-next/public/icons/icon-128x128.png'))) }}" alt="KeyHome">
+            @php
+                $businessCardLogoPath = public_path('images/keyhomelogo_transparent.png');
+                if (! is_file($businessCardLogoPath)) {
+                    $businessCardLogoPath = public_path('images/keyhomelogo.png');
+                }
+            @endphp
+            @if(is_file($businessCardLogoPath))
+                <img src="data:image/png;base64,{{ base64_encode((string) file_get_contents($businessCardLogoPath)) }}" alt="KeyHome">
             @endif
         </div>
     </div>
@@ -166,7 +181,6 @@
 
     <div class="qr-wrap">
         <img src="{{ $qrDataUri }}" alt="QR Code">
-        <div class="qr-cta">Scannez · <strong>mes annonces</strong></div>
     </div>
 </div>
 </body>

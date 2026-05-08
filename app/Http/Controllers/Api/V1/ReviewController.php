@@ -169,30 +169,40 @@ final class ReviewController
     {
         $user = $request->user();
 
-        // Only the ad owner can respond
-        $ad = $review->ad;
-        if (!$ad || $ad->user_id !== $user->id) {
-            return response()->json([
-                'message' => 'Seul le propriétaire de l\'annonce peut répondre.',
-            ], 403);
-        }
-
-        if ($review->owner_response !== null) {
-            return response()->json([
-                'message' => 'Vous avez déjà répondu à cet avis.',
-            ], 422);
-        }
-
         $validated = $request->validated();
 
-        $review->update([
-            'owner_response' => $validated['response'],
-            'owner_responded_at' => now(),
-        ]);
+        return DB::transaction(function () use ($user, $review, $validated): JsonResponse {
+            /** @var Review|null $locked */
+            $locked = Review::query()->whereKey($review->getKey())->lockForUpdate()->first();
 
-        return response()->json([
-            'message' => 'Réponse ajoutée avec succès.',
-            'data' => new ReviewResource($review->fresh('user')),
-        ]);
+            if ($locked === null) {
+                return response()->json([
+                    'message' => 'Avis introuvable.',
+                ], 404);
+            }
+
+            $ad = $locked->ad;
+            if (!$ad || $ad->user_id !== $user->id) {
+                return response()->json([
+                    'message' => 'Seul le propriétaire de l\'annonce peut répondre.',
+                ], 403);
+            }
+
+            if ($locked->owner_response !== null) {
+                return response()->json([
+                    'message' => 'Vous avez déjà répondu à cet avis.',
+                ], 422);
+            }
+
+            $locked->update([
+                'owner_response' => $validated['response'],
+                'owner_responded_at' => now(),
+            ]);
+
+            return response()->json([
+                'message' => 'Réponse ajoutée avec succès.',
+                'data' => new ReviewResource($locked->fresh('user')),
+            ]);
+        });
     }
 }

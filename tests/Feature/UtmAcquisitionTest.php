@@ -34,6 +34,35 @@ test('visit tracking accepts utm_content and utm_term', function (): void {
     ]);
 });
 
+test('visit tracking inserts two rows when only utm_content differs', function (): void {
+    $base = [
+        'session_id' => 'sess-content-split',
+        'utm_source' => 'keyhome',
+        'utm_medium' => 'qr',
+        'utm_campaign' => 'owner_share',
+    ];
+
+    $this->postJson('/api/v1/track/visit', [...$base, 'utm_content' => 'profile_a'])->assertCreated();
+    $this->postJson('/api/v1/track/visit', [...$base, 'utm_content' => 'profile_b'])->assertCreated();
+
+    expect(SiteVisit::query()->where('session_id', 'sess-content-split')->count())->toBe(2);
+});
+
+test('visit tracking dedupes identical payload within cooldown window', function (): void {
+    $payload = [
+        'session_id' => 'sess-dedupe-identical',
+        'utm_source' => 'keyhome',
+        'utm_medium' => 'qr',
+        'utm_campaign' => 'owner_share',
+        'utm_content' => 'profile_one',
+    ];
+
+    $this->postJson('/api/v1/track/visit', $payload)->assertCreated();
+    $this->postJson('/api/v1/track/visit', $payload)->assertCreated();
+
+    expect(SiteVisit::query()->where('session_id', 'sess-dedupe-identical')->count())->toBe(1);
+});
+
 test('registration copies acquisition from matching session visit', function (): void {
     $city = City::factory()->create();
 

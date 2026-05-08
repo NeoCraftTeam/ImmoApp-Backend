@@ -99,8 +99,9 @@ Route::get('/tour-image/{adId}/{path}', [TourImageProxyController::class, 'show'
     ->middleware(['throttle:120,1', 'resolve.sanctum.bearer'])
     ->name('tour.image.proxy');
 
-// ── Media proxy — serves Spatie Media Library files from R2 for Filament FilePond previews ──
+// ── Media proxy — Filament FilePond previews (session auth + ad ownership via policy) ──
 Route::get('/media-proxy/{uuid}', [MediaProxyController::class, 'show'])
+    ->middleware('auth')
     ->where('uuid', '[0-9a-f\-]+')
     ->name('media.proxy');
 

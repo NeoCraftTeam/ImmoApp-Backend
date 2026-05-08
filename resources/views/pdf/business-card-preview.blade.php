@@ -16,17 +16,32 @@
     --}}
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        html, body {
+        html {
+            height: 100%;
+            width: 100%;
+        }
+        body {
             background: transparent;
             font-family: -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             color: #0F172A;
+            margin: 0;
             width: 100%;
             height: 100%;
-            min-height: 100vh;
+            min-height: 100%;
             display: flex;
             align-items: center;
             justify-content: center;
+            padding: 10px;
+            box-sizing: border-box;
             overflow: hidden;
+        }
+
+        .scale-wrap {
+            display: block;
+            width: max-content;
+            height: max-content;
+            transform-origin: center center;
+            flex: 0 0 auto;
         }
 
         .card {
@@ -37,8 +52,6 @@
             border-radius: 3mm;
             border: 0.5pt solid #E2E8F0;
             box-shadow: 0 16px 40px -16px rgba(15, 23, 42, 0.18);
-            transform-origin: center center;
-            transform: scale(1);
         }
 
         .accent-bar {
@@ -90,13 +103,22 @@
         .kh-badge {
             position: absolute;
             top: 0; right: 0;
-            width: 12mm; height: 12mm;
-            border-radius: 50%;
-            background: #FFE9EC;
-            text-align: center;
-            border: 0.5pt solid rgba(246,71,95,0.25);
+            border: none;
+            background: transparent;
+            padding: 0;
+            margin: 0;
+            line-height: 0;
         }
-        .kh-badge img { width: 8mm; height: 8mm; margin-top: 1.7mm; }
+        .kh-badge img {
+            width: 8mm;
+            height: 8mm;
+            margin: 0;
+            display: block;
+            border: 0;
+            outline: none;
+            box-shadow: none;
+            object-fit: contain;
+        }
 
         .contact {
             position: absolute;
@@ -132,6 +154,7 @@
     </style>
 </head>
 <body>
+<div class="scale-wrap">
 <div class="card">
     <div class="accent-bar"></div>
 
@@ -151,8 +174,14 @@
         </div>
 
         <div class="kh-badge">
-            @if(file_exists(base_path('keyhome-frontend-next/public/icons/icon-128x128.png')))
-                <img src="data:image/png;base64,{{ base64_encode((string) file_get_contents(base_path('keyhome-frontend-next/public/icons/icon-128x128.png'))) }}" alt="KeyHome">
+            @php
+                $businessCardLogoPath = public_path('images/keyhomelogo_transparent.png');
+                if (! is_file($businessCardLogoPath)) {
+                    $businessCardLogoPath = public_path('images/keyhomelogo.png');
+                }
+            @endphp
+            @if(is_file($businessCardLogoPath))
+                <img src="data:image/png;base64,{{ base64_encode((string) file_get_contents($businessCardLogoPath)) }}" alt="KeyHome">
             @endif
         </div>
     </div>
@@ -169,29 +198,60 @@
 
     <div class="qr-wrap">
         <img src="{{ $qrDataUri }}" alt="QR Code">
-        <div class="qr-cta">Scannez · <strong>mes annonces</strong></div>
     </div>
+</div>
 </div>
 
 <script>
     // Auto-fit the card inside the iframe viewport (both axes) while
     // keeping the physical mm dimensions intact, so the preview is a
     // faithful 1:1 representation of the printable PDF.
+    //
+    // srcDoc iframes often report window.innerWidth/Height ≈ 300×150 on the
+    // first synchronous run — use clientWidth/Height on documentElement plus
+    // ResizeObserver + rAF so the scale matches the real host box.
     (function () {
-        const card = document.querySelector('.card');
-        if (!card) return;
+        const wrap = document.querySelector('.scale-wrap');
+        if (!wrap) return;
         const pxPerMm = 96 / 25.4;
         const cardW = 90 * pxPerMm;
         const cardH = 55 * pxPerMm;
         const margin = 12;
-        function fit() {
-            const availW = Math.max(50, window.innerWidth  - margin * 2);
-            const availH = Math.max(50, window.innerHeight - margin * 2);
-            const scale = Math.min(availW / cardW, availH / cardH, 4);
-            card.style.transform = 'scale(' + scale.toFixed(3) + ')';
+        function viewportBox() {
+            const docEl = document.documentElement;
+            const w = Math.max(
+                window.innerWidth || 0,
+                docEl.clientWidth || 0,
+                docEl.getBoundingClientRect().width || 0
+            );
+            const h = Math.max(
+                window.innerHeight || 0,
+                docEl.clientHeight || 0,
+                docEl.getBoundingClientRect().height || 0
+            );
+            return { w, h };
         }
-        fit();
+        function fit() {
+            const box = viewportBox();
+            const availW = Math.max(50, box.w - margin * 2);
+            const availH = Math.max(50, box.h - margin * 2);
+            const scale = Math.min(availW / cardW, availH / cardH);
+            wrap.style.transform = 'scale(' + scale.toFixed(3) + ')';
+        }
+        function fitSoon() {
+            requestAnimationFrame(function () {
+                requestAnimationFrame(fit);
+            });
+        }
+        fitSoon();
         window.addEventListener('resize', fit);
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver(function () {
+                fit();
+            });
+            ro.observe(document.documentElement);
+        }
+        window.__khBusinessCardPreviewRefit = fit;
     })();
 </script>
 </body>

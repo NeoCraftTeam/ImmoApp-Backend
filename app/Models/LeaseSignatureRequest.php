@@ -31,7 +31,17 @@ class LeaseSignatureRequest extends Model
         'declined_at',
         'decline_reason',
         'signature_hash',
+        'sign_otp_hash',
+        'sign_otp_expires_at',
+        'sign_otp_sent_at',
         'expires_at',
+    ];
+
+    /**
+     * @var list<string>
+     */
+    protected $hidden = [
+        'sign_otp_hash',
     ];
 
     #[\Override]
@@ -42,6 +52,8 @@ class LeaseSignatureRequest extends Model
             'signed_at' => 'datetime',
             'declined_at' => 'datetime',
             'expires_at' => 'datetime',
+            'sign_otp_expires_at' => 'datetime',
+            'sign_otp_sent_at' => 'datetime',
         ];
     }
 
