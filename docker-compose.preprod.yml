@@ -68,7 +68,7 @@ services:
     container_name: ${COMPOSE_PREFIX:-keyhome-preprod}-worker
     restart: unless-stopped
     working_dir: /var/www
-    command: php artisan queue:work --queue=emails,default --tries=3 --timeout=90
+    command: php artisan queue:work --queue=notifications,emails,default --tries=3 --timeout=90
     # FIX: depends_on sans condition → le worker pouvait démarrer avant que app et code-sync soient prêts
     depends_on:
       code-sync:

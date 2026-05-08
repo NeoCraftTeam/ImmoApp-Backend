@@ -72,7 +72,7 @@ services:
     container_name: ${COMPOSE_PREFIX:-keyhome-prod}-worker
     restart: unless-stopped
     working_dir: /var/www
-    command: php artisan queue:work redis --queue=critical,payments,emails,default --tries=3 --timeout=90 --sleep=3
+    command: php artisan queue:work redis --queue=critical,payments,notifications,emails,default --tries=3 --timeout=90 --sleep=3
     # FIX: dépend de code-sync (condition completed) + db/redis healthy
     # Sans ça, le worker peut démarrer sur un volume partiellement peuplé
     depends_on:
