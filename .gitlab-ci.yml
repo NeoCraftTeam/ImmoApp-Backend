@@ -228,28 +228,30 @@ trivy_scan:
   needs: [ build_image ]
   allow_failure: true
   variables:
-    TRIVY_CACHE_DIR: .trivycache/
+    # IMPORTANT : cache HORS du workspace pour éviter les conflits de permission
+    # avec git checkout (les fichiers créés par le conteneur appartiennent à root,
+    # le runner shell n'arrive pas à les nettoyer au prochain run).
+    # La DB Trivy (~50 MB) sera re-téléchargée à chaque run (~5s, négligeable).
     TRIVY_NO_PROGRESS: "true"
   script:
     - |
-      # Trivy via Docker (pas besoin d'installer le binaire sur le runner).
-      # On scanne le tag IMMUTABLE pour audit reproductible.
       IMAGE_REF="$APP_IMAGE:$CI_COMMIT_SHA"
+      TRIVY_CACHE_HOST="/tmp/trivy-cache-${CI_PROJECT_ID}-${CI_JOB_ID}"
+      mkdir -p "$TRIVY_CACHE_HOST"
       echo "🔍 Scanning $IMAGE_REF for CRITICAL/HIGH CVEs..."
-      mkdir -p $TRIVY_CACHE_DIR
       docker run --rm \
+        --user "$(id -u):$(id -g)" \
         -v /var/run/docker.sock:/var/run/docker.sock \
-        -v "$PWD/$TRIVY_CACHE_DIR:/root/.cache/" \
+        -v "$TRIVY_CACHE_HOST:/.cache" \
+        -e TRIVY_CACHE_DIR=/.cache/trivy \
         aquasec/trivy:latest image \
           --severity CRITICAL,HIGH \
           --ignore-unfixed \
           --exit-code 1 \
           --format table \
           "$IMAGE_REF"
-  cache:
-    key: trivy-db-cache
-    paths:
-      - .trivycache/
+  after_script:
+    - rm -rf "/tmp/trivy-cache-${CI_PROJECT_ID}-${CI_JOB_ID}" 2>/dev/null || true
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
 
@@ -266,6 +268,7 @@ sbom_syft:
       IMAGE_REF="$APP_IMAGE:$CI_COMMIT_SHA"
       echo "📦 Generating SBOM for $IMAGE_REF..."
       docker run --rm \
+        --user "$(id -u):$(id -g)" \
         -v /var/run/docker.sock:/var/run/docker.sock \
         -v "$PWD:/work" -w /work \
         anchore/syft:latest \
