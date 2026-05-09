@@ -49,9 +49,9 @@ return [
         '/^https:\/\/(staging|preprod|preview(-[a-z0-9-]+)?)\.keyhome\.neocraft\.de$/',
     ],
 
-    'allowed_headers' => ['Accept', 'Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token', 'X-Inertia', 'X-WebAuthn-Token', 'X-Socket-Id'],
+    'allowed_headers' => ['Accept', 'Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token', 'X-Inertia', 'X-WebAuthn-Token', 'X-Socket-Id', 'X-Request-ID', 'X-Correlation-ID'],
 
-    'exposed_headers' => ['X-WebAuthn-Token'],
+    'exposed_headers' => ['X-WebAuthn-Token', 'X-Request-ID', 'X-Correlation-ID'],
 
     'max_age' => 86400,  // 24 heures (améliore les performances)
 
