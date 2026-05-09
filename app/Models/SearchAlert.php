@@ -80,8 +80,23 @@ final class SearchAlert extends Model
     /** Check if a given Ad matches this alert's criteria. */
     public function matchesAd(Ad $ad): bool
     {
-        if ($this->city_id && $ad->quarter?->city_id !== $this->city_id) {
+        if ($this->city_id !== null && $this->city_id !== '' && $ad->quarter?->city_id !== $this->city_id) {
             return false;
+        }
+
+        if (
+            ($this->city_id === null || $this->city_id === '')
+            && $this->city_name !== null
+            && trim($this->city_name) !== ''
+        ) {
+            $adCityName = $ad->quarter?->city?->name;
+            if ($adCityName === null) {
+                return false;
+            }
+
+            if (mb_strtolower(trim($adCityName)) !== mb_strtolower(trim($this->city_name))) {
+                return false;
+            }
         }
 
         if ($this->type_id && $ad->type_id !== $this->type_id) {

@@ -7,6 +7,7 @@ use App\Jobs\MatchSearchAlertsForAdJob;
 use App\Jobs\SendSearchAlertInstantNotificationJob;
 use App\Models\Ad;
 use App\Models\AdType;
+use App\Models\City;
 use App\Models\Quarter;
 use App\Models\SearchAlert;
 use App\Models\SearchAlertMatch;
@@ -72,6 +73,36 @@ it('buffers a match and sends an instant notification when criteria match', func
     ]);
 
     expect(SearchAlertMatch::query()->where('search_alert_id', $alert->id)->whereNotNull('digest_sent_at')->exists())->toBeTrue();
+});
+
+it('matches alert by city_name when city_id is absent (case-insensitive)', function (): void {
+    Notification::fake();
+
+    $city = City::factory()->create(['name' => 'Douala Centre']);
+    $quarter = Quarter::factory()->create(['city_id' => $city->id]);
+    $adType = AdType::factory()->create();
+    $landlord = User::factory()->create();
+    $client = User::factory()->create();
+
+    SearchAlert::create([
+        'user_id' => $client->id,
+        'city_id' => null,
+        'city_name' => 'douala centre',
+        'type_id' => $adType->id,
+        'is_active' => true,
+        'notify_email' => true,
+    ]);
+
+    $ad = Ad::factory()->create([
+        'user_id' => $landlord->id,
+        'quarter_id' => $quarter->id,
+        'type_id' => $adType->id,
+        'status' => AdStatus::AVAILABLE,
+    ]);
+
+    new MatchSearchAlertsForAdJob($ad)->handle();
+
+    Notification::assertSentTo($client, SearchAlertMatchNotification::class);
 });
 
 it('does not buffer a match for the ad owner', function (): void {
