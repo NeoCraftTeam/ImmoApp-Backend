@@ -15,6 +15,7 @@ use App\Models\City;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 final class CityController
 {
@@ -114,6 +115,8 @@ final class CityController
                 'data' => new CityResource($city),
             ], 201); // 201 = Created
 
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
         } catch (Exception $e) {
             return response()->json([
                 'message' => 'Erreur lors de la création',
@@ -215,6 +218,8 @@ final class CityController
                 'message' => 'Ville mise à jour avec succès',
                 'data' => new CityResource($city),
             ], 200);
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
         } catch (Exception $e) {
             return response()->json([
                 'message' => 'Erreur lors de la mise à jour',
@@ -260,6 +265,8 @@ final class CityController
             return response()->json([
                 'message' => 'Ville supprimée avec succès',
             ], 200); // 200 = OK
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
         } catch (Exception $e) {
             return response()->json([
                 'message' => 'Erreur lors de la suppression de la ville',

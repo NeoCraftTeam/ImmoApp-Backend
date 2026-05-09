@@ -171,17 +171,23 @@ class AiSearchService implements AiSearchServiceInterface
      *
      * @return array<string, mixed>
      */
-    public function parse(string $query): array
+    public function parse(string $query, ?string $displayCurrency = null): array
     {
         $normalized = $this->preNormalizeQuery(mb_strtolower(trim($query)));
         if ($normalized === '') {
             return $this->emptyResult($query);
         }
 
-        $cacheKey = self::CACHE_PREFIX.md5($normalized);
+        // Cache key includes the display currency: a French visitor typing
+        // "200 EUR" produces a different XAF amount than a Cameroonian typing
+        // the same literal — so the cache must segregate them.
+        $currencyKey = !in_array($displayCurrency, [null, 'XAF', 'XOF'], true)
+            ? '_'.strtolower($displayCurrency)
+            : '';
+        $cacheKey = self::CACHE_PREFIX.md5($normalized).$currencyKey;
 
-        return Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($normalized, $query) {
-            $result = $this->tryAllProviders($normalized);
+        return Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($normalized, $query, $displayCurrency) {
+            $result = $this->tryAllProviders($normalized, $displayCurrency);
             if ($result !== null) {
                 return $this->enrichWithIds($result, $query);
             }
@@ -219,7 +225,7 @@ class AiSearchService implements AiSearchServiceInterface
      *
      * @return array<string, mixed>|null
      */
-    private function tryAllProviders(string $query): ?array
+    private function tryAllProviders(string $query, ?string $displayCurrency = null): ?array
     {
         $providers = array_filter(
             array_map(trim(...), explode(',', (string) config('services.ai_search.providers', 'groq,openai,gemini')))
@@ -233,8 +239,8 @@ class AiSearchService implements AiSearchServiceInterface
             }
 
             $result = isset(self::OPENAI_COMPATIBLE[$name])
-                ? $this->parseWithOpenAiCompatible($name, $query)
-                : ($name === 'gemini' ? $this->parseWithGemini($query) : null);
+                ? $this->parseWithOpenAiCompatible($name, $query, $displayCurrency)
+                : ($name === 'gemini' ? $this->parseWithGemini($query, $displayCurrency) : null);
 
             if ($result !== null) {
                 $this->resetCircuit($name);
@@ -254,7 +260,7 @@ class AiSearchService implements AiSearchServiceInterface
      *
      * @return array<string, mixed>|null
      */
-    private function parseWithOpenAiCompatible(string $name, string $query): ?array
+    private function parseWithOpenAiCompatible(string $name, string $query, ?string $displayCurrency = null): ?array
     {
         $cfg = self::OPENAI_COMPATIBLE[$name];
         $apiKey = config("{$cfg['config_key']}.api_key");
@@ -263,7 +269,7 @@ class AiSearchService implements AiSearchServiceInterface
         }
 
         $model = config("{$cfg['config_key']}.model", $cfg['default_model']);
-        $systemPrompt = $this->systemPrompt($this->buildContext());
+        $systemPrompt = $this->systemPrompt($this->buildContext(), $displayCurrency);
         $userPrompt = "Requête de l'utilisateur : \"{$query}\"\n\nRéponds UNIQUEMENT avec un objet JSON valide, sans markdown ni texte autour.";
 
         try {
@@ -309,7 +315,7 @@ class AiSearchService implements AiSearchServiceInterface
      *
      * @return array<string, mixed>|null
      */
-    private function parseWithGemini(string $query): ?array
+    private function parseWithGemini(string $query, ?string $displayCurrency = null): ?array
     {
         $apiKey = config('services.gemini.api_key');
         if (empty($apiKey)) {
@@ -317,7 +323,7 @@ class AiSearchService implements AiSearchServiceInterface
         }
 
         $model = config('services.gemini.model', 'gemini-2.0-flash');
-        $systemPrompt = $this->systemPrompt($this->buildContext());
+        $systemPrompt = $this->systemPrompt($this->buildContext(), $displayCurrency);
         $userPrompt = "Requête de l'utilisateur : \"{$query}\"\n\nRéponds UNIQUEMENT avec un objet JSON valide, sans markdown ni texte autour.";
         // Use the `x-goog-api-key` header instead of the `?key=` query param so the API key is never
         // logged by reverse proxies / CDN edges / access logs.
@@ -386,13 +392,33 @@ class AiSearchService implements AiSearchServiceInterface
         Cache::forget($this->circuitKey($provider));
     }
 
-    private function systemPrompt(string $context): string
+    /**
+     * Build a prompt block telling the LLM how to handle non-XAF amounts in
+     * the user's natural-language query. We rely on the model's world knowledge
+     * of approximate exchange rates (±2 % accuracy is plenty for filtering,
+     * and the user already sees prices converted in their currency on the UI).
+     *
+     * Returns an empty string for XAF / XOF / null — the default flow that
+     * always assumed FCFA inputs.
+     */
+    private function buildCurrencyHint(?string $displayCurrency): string
     {
+        if (in_array($displayCurrency, [null, 'XAF', 'XOF'], true)) {
+            return '';
+        }
+
+        return "\n\n## CONVERSION DE DEVISES (IMPORTANT)\nL'utilisateur navigue avec la devise **{$displayCurrency}** affichée. Si la requête mentionne un montant dans cette devise (ou dans une autre devise étrangère explicitement nommée — €, \$, £, ¥, R\$, etc.), tu DOIS le convertir en FCFA avant de remplir price_min/price_max, en utilisant les taux de change approximatifs courants (1 EUR ≈ 655 XAF, 1 USD ≈ 600 XAF, 1 GBP ≈ 760 XAF, 1 CHF ≈ 680 XAF, 1 CAD ≈ 440 XAF).\nExemple : « appartement à Douala max 200 EUR » → price_max: 131000.\nExemple : « villa à Yaoundé entre 500 et 1500 USD » → price_min: 300000, price_max: 900000.\nLes montants sans devise explicite suivent toujours la règle FCFA standard.";
+    }
+
+    private function systemPrompt(string $context, ?string $displayCurrency = null): string
+    {
+        $currencyHint = $this->buildCurrencyHint($displayCurrency);
+
         return <<<PROMPT
 Tu es le moteur d'extraction de critères immobiliers de KeyHome (marketplace immobilière, Cameroun / Afrique centrale, prix en FCFA).
 
 Ta SEULE tâche : analyser la requête et retourner un objet JSON valide.
-IMPORTANT : commence DIRECTEMENT par { — aucun texte, markdown, ou commentaire avant ou après le JSON.
+IMPORTANT : commence DIRECTEMENT par { — aucun texte, markdown, ou commentaire avant ou après le JSON.{$currencyHint}
 
 ## SCHÉMA DE SORTIE
 Retourne exactement ces 11 clés. Utilise null si un critère n'est pas mentionné.

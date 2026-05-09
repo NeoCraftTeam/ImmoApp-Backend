@@ -49,10 +49,17 @@ final readonly class NaturalSearchController
     {
         $data = $request->validate([
             'q' => ['required', 'string', 'max:300'],
+            // ISO-4217 code from the visitor's CurrencyProvider. Used by the
+            // LLM to interpret non-XAF amounts in the query (e.g. "200 EUR").
+            'display_currency' => ['nullable', 'string', 'regex:/^[A-Z]{3}$/'],
         ]);
 
         $query = trim((string) $data['q']);
-        $result = $this->aiSearchService->parse($query);
+        $displayCurrency = isset($data['display_currency'])
+            ? strtoupper((string) $data['display_currency'])
+            : null;
+
+        $result = $this->aiSearchService->parse($query, $displayCurrency);
 
         return response()->json($result);
     }
