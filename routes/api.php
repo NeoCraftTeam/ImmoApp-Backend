@@ -36,6 +36,7 @@ use App\Http\Controllers\Api\V1\RentEstimatorController;
 use App\Http\Controllers\Api\V1\SearchAlertController;
 use App\Http\Controllers\Api\V1\SignatureController;
 use App\Http\Controllers\Api\V1\StatsController;
+use App\Http\Controllers\Api\V1\SupportController;
 use App\Http\Controllers\Api\V1\TeamController;
 use App\Http\Controllers\Api\V1\TenantController;
 use App\Http\Controllers\Api\V1\TrustScoreController;
@@ -261,6 +262,10 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])
         ->middleware('throttle:5,10');
     Route::get('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'unsubscribe']);
+
+    // --- SUPPORT (contact form public) ---
+    Route::post('/support/contact', [SupportController::class, 'contact'])
+        ->middleware('throttle:5,10');
 
     // --- BOOST (owner) ---
     Route::middleware('auth:sanctum')->group(function (): void {
