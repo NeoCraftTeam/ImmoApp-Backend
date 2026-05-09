@@ -25,8 +25,10 @@ it('authenticated user can create a city', function (): void {
     $admin = User::factory()->admin()->create();
     Sanctum::actingAs($admin);
 
+    $name = 'Crud Testville '.uniqid();
+
     $response = $this->postJson('/api/v1/cities', [
-        'name' => 'Paris',
+        'name' => $name,
     ]);
 
     $response->assertSuccessful();
@@ -34,7 +36,7 @@ it('authenticated user can create a city', function (): void {
 
 it('unauthenticated user cannot create a city', function (): void {
     $response = $this->postJson('/api/v1/cities', [
-        'name' => 'Paris',
+        'name' => 'Crud Testville '.uniqid(),
     ]);
 
     $response->assertUnauthorized();
