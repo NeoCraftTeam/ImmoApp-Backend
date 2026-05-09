@@ -66,7 +66,10 @@ final class AdRequest extends FormRequest
                 'order' => ['nullable', 'string', 'in:asc,desc'],
 
                 // Pagination
-                'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
+                'page' => ['nullable', 'integer', 'min:1'],
+                // Controllers clamp per_page (index ≤100, feed ≤50); cap prevents abuse.
+                'per_page' => ['nullable', 'integer', 'min:1', 'max:1000'],
+                'cursor' => ['nullable', 'string', 'max:2048'],
 
                 // Exclude specific ads (DoS guard: cap at 50 UUIDs)
                 'exclude_ids' => ['sometimes', 'array', 'max:50'],

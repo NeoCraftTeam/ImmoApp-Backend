@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Route;
 // Ad CRUD & public search
 Route::prefix('ads')->middleware('optional.auth')->group(function (): void {
     Route::get('/', [AdController::class, 'index']);
+    Route::get('/feed', [AdController::class, 'feed']);
 
     // Geo proximity (public)
     Route::get('/nearby', [AdGeoController::class, 'ads_nearby_public'])->middleware('throttle:60,1');

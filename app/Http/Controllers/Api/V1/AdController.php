@@ -20,6 +20,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use JsonException;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
@@ -59,15 +60,15 @@ final class AdController
      *     @OA\Response(response=403, description="Interdit")
      * )
      *
-     * @return AnonymousResourceCollection Collection paginée des ressources d'annonces
-     *
      * @throws AuthorizationException
+     * @throws JsonException
      */
-    public function index(AdRequest $request): AnonymousResourceCollection
+    public function index(AdRequest $request): AnonymousResourceCollection|JsonResponse
     {
         $this->authorize('viewAny', Ad::class);
 
         $perPage = min(max((int) $request->integer('per_page', config('pagination.per_page', 15)), 1), 100);
+        $page = max((int) $request->integer('page', 1), 1);
         $type = $request->input('type');
 
         $query = Ad::query()
@@ -88,7 +89,58 @@ final class AdController
             }
         }
 
-        $ads = $query->orderByBoost()->paginate($perPage);
+        $useCache = !$request->has('exclude_ids') && $page <= 3;
+
+        if ($useCache) {
+            $typeKey = (string) ($type ?? '');
+            $cacheKey = sprintf('api:v1:ads:index:p%d:pp%d:t%s', $page, $perPage, sha1($typeKey));
+            $ttl = (int) config('cache.ads_public_index_ttl', 60);
+
+            $json = Cache::remember($cacheKey, $ttl, function () use ($query, $perPage, $page, $request): string {
+                $ads = (clone $query)->orderByBoost()->paginate($perPage, ['*'], 'page', $page);
+
+                return AdApiResource::collection($ads)->toResponse($request)->getContent();
+            });
+
+            /** @var array<string, mixed> $payload */
+            $payload = json_decode((string) $json, true, 512, JSON_THROW_ON_ERROR);
+
+            return response()->json($payload);
+        }
+
+        $ads = $query->orderByBoost()->paginate($perPage, ['*'], 'page', $page);
+
+        return AdApiResource::collection($ads);
+    }
+
+    /**
+     * Cursor-paginated public feed (infinite scroll / recommendations).
+     */
+    public function feed(AdRequest $request): AnonymousResourceCollection
+    {
+        $this->authorize('viewAny', Ad::class);
+
+        $perPage = min(max((int) $request->integer('per_page', config('pagination.per_page', 15)), 1), 50);
+
+        $query = Ad::query()
+            ->with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')
+            ->withAvg('reviews', 'rating')
+            ->withCount('reviews')
+            ->visible()
+            ->publiclyListed();
+
+        if ($excludeIds = $request->input('exclude_ids')) {
+            $ids = array_values(array_filter(array_map(strval(...), (array) $excludeIds)));
+            if ($ids !== []) {
+                $query->whereNotIn('id', $ids);
+            }
+        }
+
+        $ads = $query
+            ->orderByDesc('boost_score')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->cursorPaginate($perPage);
 
         return AdApiResource::collection($ads);
     }
