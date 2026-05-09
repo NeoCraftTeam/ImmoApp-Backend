@@ -149,25 +149,79 @@ Après avoir interagi avec un bailleur ou visité un logement grâce à KeyHome,
 
 ---
 
-### 15. Signaler une annonce suspecte
+### 15. Discuter directement avec le bailleur — Une messagerie intégrée et chiffrée
+
+Une fois une annonce débloquée, le locataire n'a plus besoin de jongler entre le téléphone, WhatsApp et les SMS pour échanger avec le bailleur. KeyHome intègre une **messagerie en temps réel** directement dans l'application, conçue pour des échanges immobiliers sérieux et structurés.
+
+Le locataire peut envoyer un message texte, **partager une photo** (par exemple une capture d'un document, une question sur un détail du logement) ou même **transmettre un fichier PDF** (justificatif d'emploi, garant, attestation bancaire). Tous les messages sont **chiffrés de bout en bout** avec un standard cryptographique de niveau bancaire (AES-256 + HMAC-SHA256) — ni KeyHome, ni un tiers, ni un éventuel attaquant qui intercepterait le trafic ne peut lire le contenu de la conversation. Seuls les deux participants peuvent en lire le contenu.
+
+Les messages arrivent **instantanément** (notifications push sur le téléphone, alerte dans l'application). Si le bailleur ne lit pas son message dans les 5 minutes, le locataire reçoit en plus une copie par email pour s'assurer que l'information ne soit jamais perdue. Les conversations s'archivent automatiquement, restent consultables à tout moment, et les fichiers partagés sont stockés de manière sécurisée pendant toute la durée des échanges.
+
+C'est la fin des numéros de téléphone qui changent, des messages WhatsApp qui se perdent, des conversations qu'on ne retrouve plus quand on en a besoin. **Tout est centralisé, traçable, et protégé** — au bénéfice du locataire comme du bailleur.
+
+---
+
+### 16. Voir les prix dans sa propre devise — Pour la diaspora et les investisseurs internationaux
+
+KeyHome ne s'adresse pas qu'aux résidents du Cameroun. Une part importante des chercheurs de logement — pour soi-même, pour un proche, ou pour un investissement — sont des **Camerounais de la diaspora** (à Paris, Bruxelles, Montréal, Londres, New York, Dubaï, Johannesburg…) ou des **investisseurs internationaux** intéressés par le marché immobilier africain.
+
+Pour eux, KeyHome détecte automatiquement le pays du visiteur et **convertit tous les prix dans sa devise locale** : Euro pour la France, Dollar canadien pour le Canada, Livre sterling pour le Royaume-Uni, Dollar US pour les États-Unis, Dirham pour les Émirats… au total **27 devises** prises en charge couvrant l'Afrique, l'Europe, les Amériques, le Moyen-Orient et l'Asie-Océanie.
+
+Mieux : un **sélecteur de devise élégant** dans la barre de navigation permet à n'importe quel utilisateur de basculer en un clic vers la devise de son choix — pour comparer plus facilement, ou pour montrer un prix à un proche dans sa devise habituelle. Le choix est mémorisé pour 30 jours.
+
+Les taux de change sont mis à jour automatiquement toutes les heures, et le prix de référence en FCFA reste toujours visible en petit en-dessous, par souci de transparence. Pour la diaspora qui envoie de l'argent au pays ou qui prépare son retour, c'est un confort inestimable. Pour les investisseurs étrangers, c'est la garantie de comprendre instantanément à quoi correspond un loyer ou un prix d'achat dans leur référentiel financier.
+
+Et même la **recherche en langage naturel comprend les devises étrangères** : un visiteur français peut écrire « *appartement à Douala maximum 200 EUR* » et l'IA convertira automatiquement ce budget en FCFA pour filtrer les résultats appropriés.
+
+---
+
+### 17. Recherche par photo — Trouver un bien à partir d'une simple image
+
+C'est l'une des fonctionnalités les plus innovantes et magiques de la plateforme. Le locataire a vu sur Instagram, sur Facebook ou ailleurs une photo d'un appartement qui lui plaît visuellement — un certain style, une certaine ambiance, une décoration particulière ? Il peut **uploader cette photo directement sur KeyHome**, et l'intelligence artificielle de vision (basée sur les mêmes technologies que GPT-4 Vision et Gemini Vision) **analyse l'image** pour en extraire les caractéristiques pertinentes : type de bien, style architectural probable, gamme de prix, équipements visibles. KeyHome propose alors les annonces actives qui s'en rapprochent le plus.
+
+Plus besoin de savoir comment décrire ce qu'on veut. Une image vaut mille mots — KeyHome se charge de comprendre.
+
+---
+
+### 18. Recherche vocale — Pour ceux qui préfèrent parler
+
+Pour les utilisateurs qui ne sont pas à l'aise avec le clavier, ou qui sont en déplacement et n'ont pas les mains libres, KeyHome propose la **recherche vocale**. Un simple appui sur le micro, et le locataire dicte sa recherche à voix haute en français : *« Je cherche un studio meublé à Yaoundé Bastos pour moins de 80 mille francs ».* L'IA transcrit, comprend, et lance la recherche exactement comme s'il avait tapé sa requête. Une fonctionnalité particulièrement appréciée des seniors et de ceux qui utilisent KeyHome dans les transports en commun.
+
+---
+
+### 19. Découvrir le quartier — Une fiche qualité de vie pour chaque adresse
+
+Quand le locataire consulte une annonce qui l'intéresse, KeyHome lui propose une **fiche de qualité de vie du quartier** automatiquement générée. Cette fiche analyse, dans un rayon précis autour du logement, la présence de **commerces** (supermarchés, marchés, boutiques), **transports** (arrêts de bus, taxis-motos), **services essentiels** (pharmacies, banques, hôpitaux, écoles), **lieux de loisirs** (restaurants, cafés, salles de sport), et calcule un score global de praticité de la zone.
+
+C'est un atout précieux pour les locataires qui découvrent un quartier qu'ils ne connaissent pas — et particulièrement pour les nouveaux arrivants à Douala ou Yaoundé qui ne savent pas forcément quels coins sont bien desservis ou quels quartiers proposent quoi à proximité.
+
+---
+
+### 20. Recommandations personnalisées — KeyHome apprend de vos préférences
+
+Plus le locataire utilise KeyHome (consultation d'annonces, mise en favoris, déblocages, recherches), plus la plateforme **apprend ses goûts et ses critères implicites**. Sur la page d'accueil personnalisée, KeyHome lui suggère des **annonces sur mesure** qu'il n'aurait peut-être pas trouvées autrement — basées sur le type de biens qu'il consulte, les zones qu'il privilégie, et la fourchette de prix qu'il considère habituellement. C'est une découverte continue, sans effort.
+
+---
+
+### 21. Signaler une annonce suspecte
 
 Si une annonce semble suspecte — photos manifestement volées sur internet, prix anormalement bas par rapport au marché, description incohérente ou trop vague, coordonnées douteuses — le locataire peut **la signaler en quelques clics** en précisant le motif de son signalement. Chaque alerte remonte immédiatement à l'équipe de modération de KeyHome, qui analyse la situation et prend les mesures nécessaires : vérification, suspension ou suppression de l'annonce, et dans les cas graves, bannissement du bailleur. La communauté se protège elle-même.
 
 ---
 
-### 16. Consulter le profil public du bailleur — La transparence comme principe
+### 22. Consulter le profil public du bailleur — La transparence comme principe
 
 Chaque bailleur inscrit sur KeyHome dispose d'une **page de profil publique et vérifiable**. Le locataire peut y consulter : toutes les annonces actives du bailleur, les avis laissés par les locataires précédents, la note moyenne obtenue, le badge de vérification d'identité (KYC), l'ancienneté sur la plateforme, et son historique de réactivité. La transparence est un principe fondateur de KeyHome — plus de bailleurs anonymes, plus de zones d'ombre, plus d'inégalité d'information entre locataires et propriétaires.
 
 ---
 
-### 17. Répondre aux sondages — Contribuer à l'évolution de la plateforme
+### 23. Répondre aux sondages — Contribuer à l'évolution de la plateforme
 
 KeyHome améliore continuellement son service en écoutant activement ses utilisateurs. Des **sondages courts et ciblés** apparaissent occasionnellement dans l'application — jamais de manière intrusive — pour recueillir l'avis des locataires sur leurs expériences, leurs besoins non satisfaits, et leurs suggestions d'amélioration. Chaque réponse est analysée par l'équipe KeyHome et contribue directement aux décisions de développement de la plateforme.
 
 ---
 
-### 18. Confidentialité et contrôle des données personnelles
+### 24. Confidentialité et contrôle des données personnelles
 
 KeyHome respecte scrupuleusement la vie privée de ses utilisateurs. Depuis son profil, le locataire peut à tout moment **consulter l'ensemble des données personnelles** que KeyHome détient sur lui, **demander leur correction** si une information est inexacte, ou **demander leur suppression complète** de la plateforme. Conformément aux meilleures pratiques internationales en matière de protection des données (RGPD), KeyHome donne à chaque utilisateur un contrôle total sur son identité numérique.
 
@@ -213,7 +267,35 @@ En moins d'une heure, son annonce dispose d'une visite virtuelle 3D complète et
 
 ---
 
-### 5. Fixer ses créneaux de disponibilité pour les visites
+### 5. La prévisualisation en direct — Voir son annonce comme la verront les locataires
+
+Pendant que le bailleur remplit le formulaire de publication, **un aperçu en temps réel** de son annonce s'affiche en parallèle, exactement comme la verront les futurs locataires. Chaque modification (ajout d'une photo, changement de prix, nouvelle description, ajustement des équipements cochés) se reflète instantanément dans cet aperçu. Plus aucune mauvaise surprise une fois l'annonce publiée — le bailleur sait précisément ce qu'il met en ligne, à quoi cela ressemble, et peut peaufiner son annonce avant de cliquer sur « publier ». C'est l'équivalent professionnel du *« what you see is what you get »*, mais appliqué à l'immobilier.
+
+---
+
+### 6. Le conseiller de prix IA — Fixer un loyer qui se loue
+
+Fixer le bon prix de location est l'une des décisions les plus stratégiques pour un bailleur. Trop élevé, l'annonce ne génère pas de contacts. Trop bas, il perd de l'argent. KeyHome propose un **conseiller de prix intelligent** qui analyse en temps réel les annonces actives du même type de bien, dans la même ville, dans le même quartier — et propose au bailleur une **fourchette de prix recommandée** ainsi qu'un prix médian basé sur le marché réel.
+
+Au moment où le bailleur saisit son loyer, le système l'évalue automatiquement et lui indique si son prix est **compétitif, dans la moyenne, ou risque d'être perçu comme trop élevé**. Une indication précieuse pour calibrer son annonce de manière à maximiser ses chances de la louer rapidement, tout en obtenant le juste prix de son bien.
+
+---
+
+### 7. La description boostée par l'IA — Rédiger comme un pro en un clic
+
+Beaucoup de bailleurs sont des particuliers et n'ont pas l'habitude de rédiger des descriptions immobilières percutantes. KeyHome propose une **assistance IA de rédaction** : à partir des informations basiques de l'annonce (type, localisation, surface, équipements), un clic suffit pour générer ou enrichir automatiquement une **description professionnelle, fluide et attractive** — qui met en valeur les points forts du logement, utilise un vocabulaire immobilier adapté, et évite les fautes ou les phrases maladroites. Le bailleur garde évidemment le dernier mot et peut éditer le texte généré comme il le souhaite. Mais le travail le plus difficile — celui de la page blanche — est résolu en quelques secondes.
+
+---
+
+### 8. Détailler les charges — Une transparence totale sur le coût réel
+
+Au-delà du loyer principal, KeyHome permet au bailleur de **détailler précisément toutes les charges** associées au logement : forfait mensuel global, charges d'eau, charges d'électricité, charges autres (gardiennage, ordures, internet, etc.). Le bailleur peut aussi indiquer si les charges sont incluses dans le loyer affiché ou en supplément, et joindre un **document d'état des lieux** au format PDF pour formaliser les choses dès le départ.
+
+Cette transparence sur le « coût total de location » rassure les locataires sérieux, évite les malentendus, et différencie immédiatement le bailleur des annonceurs qui restent flous volontairement.
+
+---
+
+### 9. Fixer ses créneaux de disponibilité pour les visites
 
 Le bailleur peut **gérer son agenda de visites** directement depuis son dashboard. Il définit ses jours et horaires de disponibilité pour accueillir des visiteurs — par exemple, le samedi de 9h à 17h, ou les soirs de semaine à partir de 18h. Il peut configurer des **créneaux récurrents hebdomadaires** ou des disponibilités ponctuelles selon son emploi du temps.
 
@@ -221,13 +303,13 @@ Les locataires intéressés voient ces disponibilités et réservent un créneau
 
 ---
 
-### 6. Mettre une annonce en avant — Le système de boost
+### 10. Mettre une annonce en avant — Le système de boost
 
 Pour maximiser la visibilité de ses annonces, le bailleur peut activer le **système de boost**. Une annonce boostée remonte en tête des résultats de recherche, est mise en avant dans les recommandations et bénéficie d'une visibilité accrue auprès des locataires correspondant à ses critères. Le boost est activable directement depuis le dashboard pour une durée déterminée, et son impact sur les statistiques de l'annonce est visible en temps réel.
 
 ---
 
-### 7. Un tableau de bord analytique complet
+### 11. Un tableau de bord analytique complet
 
 Le bailleur dispose d'un **tableau de bord de pilotage professionnel** qui lui donne une vision claire, précise et en temps réel de la performance de toutes ses annonces :
 
@@ -243,7 +325,7 @@ Ces métriques permettent au bailleur de comprendre précisément quelles annonc
 
 ---
 
-### 8. Générer des contrats de bail professionnels en PDF
+### 12. Générer des contrats de bail professionnels en PDF
 
 Quand un locataire et un bailleur trouvent un accord, KeyHome permet de **générer automatiquement un contrat de bail professionnel en PDF**. Le bailleur renseigne les conditions convenues — durée du bail, montant du loyer mensuel, montant de la caution, date d'entrée dans les lieux, clauses spéciales éventuelles — et KeyHome produit instantanément un **document légalement structuré**, mis en page aux couleurs de la plateforme, prêt à être imprimé et signé par les deux parties.
 
@@ -251,21 +333,67 @@ Plus besoin de chercher un modèle approximatif sur internet, de payer un jurist
 
 ---
 
-### 9. Gérer sa réputation — Les avis comme actif
+### 13. Gérer sa réputation — Les avis comme actif
 
 Les avis laissés par les locataires s'affichent directement sur son profil et sous chacune de ses annonces. Le bailleur peut **lire et répondre publiquement à chaque avis**, montrant ainsi qu'il est attentif aux retours, réactif, et sérieux dans sa démarche. Une bonne gestion de sa réputation sur KeyHome est l'un des meilleurs investissements qu'un bailleur puisse faire pour attirer davantage de locataires sérieux et augmenter son taux de déblocage.
 
 ---
 
-### 10. Les plans d'abonnement — Passer au niveau supérieur
+### 14. Les plans d'abonnement — Passer au niveau supérieur
 
 Pour les bailleurs qui souhaitent maximiser leur présence sur la plateforme, KeyHome propose des **plans d'abonnement** qui donnent accès à des avantages exclusifs : nombre d'annonces actives augmenté, crédits de boost mensuels inclus, badge prioritaire dans les résultats, accès à des statistiques avancées, et support client prioritaire. Chaque plan est calibré pour correspondre aux besoins des bailleurs individuels comme des agences immobilières.
 
 ---
 
-### 11. Notifications et suivi en temps réel
+### 15. Notifications et suivi en temps réel
 
 Le bailleur est informé en temps réel de toute activité sur ses annonces : nouveau déblocage, nouveau rendez-vous planifié, nouvel avis reçu, nouveau signalement, mise à jour du statut de vérification. Ces **notifications intelligentes** lui permettent de réagir rapidement et de ne jamais rater une opportunité de conclure avec un locataire sérieux.
+
+---
+
+### 16. Imprimer des affiches QR pour les pancartes physiques — Le pont entre digital et terrain
+
+Malgré toute la puissance du digital, beaucoup de bailleurs au Cameroun continuent (à juste titre) de poser des **pancartes physiques** « À LOUER » sur leurs immeubles, leurs murs ou leurs portails. Le passant qui les voit doit alors appeler un numéro — ce qui pose tous les problèmes habituels (numéro mal noté, plus en service, bailleur qui ne répond pas, perte des photos…).
+
+KeyHome révolutionne cette pratique avec un **générateur d'affiches QR brandées**. En un clic depuis son dashboard, le bailleur génère une **affiche A4 professionnelle, prête à imprimer**, qui contient le titre du bien, le prix, l'adresse, et surtout un **QR code Apple-style élégant** (anneaux décoratifs, logo KeyHome intégré au centre, bord en couleur signature crimson). Quand un passant scanne ce QR avec son téléphone, il **ouvre directement la fiche complète de l'annonce sur KeyHome** — photos haute définition, visite 3D, prix exact, KeyScore, profil vérifié du bailleur, possibilité de prendre rendez-vous.
+
+Mieux : le bailleur dispose aussi d'un **QR personnel pour son profil bailleur**, qu'il peut imprimer sur ses cartes de visite ou sur la signature de ses emails. Toute personne qui le scanne arrive sur son profil public KeyHome vérifié — avec ses annonces, ses avis, son badge d'identité vérifiée, son ancienneté. **Sa crédibilité professionnelle est immédiatement palpable**.
+
+C'est un pont concret entre le terrain physique (pancartes, affiches dans les commerces, cartes de visite) et la qualité du suivi digital. Plus aucune annonce papier n'est perdue dans la nature — chacune est pleinement traçable et professionnelle.
+
+---
+
+### 17. Discuter avec les locataires intéressés — La messagerie professionnelle intégrée
+
+Les locataires qui ont débloqué une annonce peuvent contacter le bailleur directement via la **messagerie intégrée KeyHome** — sans avoir besoin de son numéro WhatsApp personnel ni de son email privé. Le bailleur reçoit les messages instantanément, peut répondre depuis l'application ou par email, et tous les échanges sont **chiffrés de bout en bout** (AES-256) et **archivés automatiquement**.
+
+C'est une protection puissante de sa vie privée (son numéro personnel n'est plus exposé publiquement), un gain de temps (plus besoin de jongler entre 5 conversations WhatsApp), et une traçabilité totale (un dossier locataire complet est conservé, ce qui est utile en cas de litige). Les locataires peuvent envoyer photos et documents (justificatifs, contrats signés…) directement dans la conversation, ce qui simplifie radicalement la pré-sélection des candidats.
+
+---
+
+### 18. Codes promo et programmes de fidélité — Créer ses propres campagnes
+
+Les bailleurs et agences les plus actifs peuvent **créer leurs propres codes promo** depuis leur dashboard, pour offrir des réductions sur les déblocages d'annonces à leurs candidats locataires (par exemple lors d'opérations spéciales, de partenariats, ou pour fidéliser une clientèle). Chaque code peut être paramétré (pourcentage de réduction, durée de validité, nombre d'utilisations maximum), et l'usage de chaque code est tracé dans le dashboard — ce qui permet de mesurer précisément l'efficacité de chaque campagne.
+
+---
+
+### 19. Gérer une équipe et travailler en agence — La dimension professionnelle
+
+KeyHome n'est pas qu'une plateforme pour particuliers — il est aussi conçu pour les **agences immobilières professionnelles**. Une agence peut créer son **profil agence vérifié** (avec son logo, son adresse, ses agents), inviter plusieurs collaborateurs à gérer les annonces sous le même compte, et répartir les responsabilités : un agent gère la prospection, un autre gère les visites, le directeur consulte les statistiques globales. Chaque membre de l'équipe a son propre compte personnel mais opère sous l'identité de l'agence — avec une journalisation complète de qui fait quoi.
+
+Pour les bailleurs particuliers comme pour les agences, **la facturation est centralisée** : un historique complet des paiements, des reçus automatiques par email, et la possibilité de télécharger à tout moment ses factures pour la comptabilité.
+
+---
+
+### 20. Sécurité du compte — Un journal de connexion et un contrôle total
+
+Le bailleur dispose d'un **journal de connexion détaillé** : chaque connexion à son compte est tracée (date, heure, ville approximative, type d'appareil, navigateur). Si une connexion suspecte est détectée (par exemple depuis un pays étranger ou un appareil inhabituel), il peut **fermer cette session à distance** ou **déconnecter tous ses appareils en un clic** depuis son tableau de bord sécurité. Cette transparence et ce contrôle sont essentiels pour un bailleur qui gère un patrimoine qui peut représenter des dizaines de millions de FCFA d'actifs.
+
+---
+
+### 21. Application mobile native — KeyHome partout, même hors ligne
+
+KeyHome est disponible en **application web installable** (PWA) directement depuis n'importe quel navigateur, sans passer par un store — et bientôt en applications natives Android et iOS dédiées. Une fois installée, l'application fonctionne **même hors ligne** pour consulter les annonces déjà chargées, et envoie de véritables **notifications push système** comme une app native. Pour un bailleur qui se déplace beaucoup, qui a parfois une connexion instable, ou qui veut juste l'avoir à portée d'un tap depuis son écran d'accueil, c'est un confort essentiel.
 
 ---
 
@@ -279,15 +407,26 @@ KeyHome n'est pas juste une énième plateforme d'annonces immobilières en lign
 | Opacité des prix du marché | Carte des prix + outil d'estimation |
 | Perte de temps en visites inutiles | Visite virtuelle 3D disponible 24h/24 |
 | Bonnes annonces qui partent trop vite | Alertes de recherche en temps réel |
-| Recherche manuelle fastidieuse | IA en langage naturel |
+| Recherche manuelle fastidieuse | IA en langage naturel + recherche par photo + recherche vocale |
 | Arnaques et faux profils | Modération + signalement communautaire |
 | Gestion désorganisée des visites | Calendrier de réservation intégré |
 | Contrats de bail approximatifs | Génération PDF automatisée |
 | Manque de visibilité pour les bailleurs | Dashboard analytique + système de boost |
+| Communications dispersées (WhatsApp, SMS, appels) | Messagerie chiffrée intégrée (AES-256) |
+| Diaspora et investisseurs internationaux exclus | 27 devises avec conversion automatique |
+| Pancartes physiques peu professionnelles | Affiches A4 imprimables avec QR brandé |
+| Numéros de téléphone exposés | Numéro masqué par défaut + chat intégré |
+| Bailleurs novices qui rédigent mal | Conseiller de prix IA + description boostée par IA |
+| Quartier inconnu pour le locataire | Fiche qualité de vie automatique |
+| Frais cachés à l'arrivée | Détail des charges (eau, électricité, forfait) |
+| Connexion suspecte sur le compte | Journal de connexion + déconnexion à distance |
+| Pas d'app native disponible | PWA installable + mode hors ligne |
 
-Pour les **locataires**, KeyHome garantit une recherche rapide, intelligente et sécurisée. L'IA, la carte interactive, la visite 3D, les alertes de recherche et le KeyScore transforment une expérience de recherche normalement épuisante en un processus fluide, agréable et fiable.
+Pour les **locataires**, KeyHome garantit une recherche rapide, intelligente et sécurisée. L'IA en langage naturel (texte, photo et voix), la carte interactive, la visite 3D, la messagerie chiffrée, les alertes de recherche, la conversion automatique en devise locale et le KeyScore transforment une expérience de recherche normalement épuisante en un processus fluide, agréable et fiable — que l'utilisateur soit à Bonamoussadi, à Bafoussam, ou à Bruxelles.
 
-Pour les **bailleurs**, KeyHome offre une vitrine professionnelle, des outils de gestion modernes, et une exposition ciblée auprès de milliers de locataires sérieux — avec la tranquillité d'esprit d'une plateforme qui protège leur identité, filtre les curieux des vrais candidats, et leur donne les clés pour comprendre et optimiser leurs performances.
+Pour les **bailleurs**, KeyHome offre une vitrine professionnelle, des outils de gestion modernes (conseiller IA de prix, description IA, dashboard analytique, contrats PDF, affiches QR pour les pancartes physiques, messagerie chiffrée), et une exposition ciblée auprès de milliers de locataires sérieux — avec la tranquillité d'esprit d'une plateforme qui protège leur identité (numéro de téléphone masqué), filtre les curieux des vrais candidats grâce au modèle de crédits, et leur donne les clés pour comprendre et optimiser leurs performances.
+
+Pour la **diaspora camerounaise et les investisseurs internationaux**, KeyHome est la première plateforme immobilière africaine pensée pour eux : prix automatiquement convertis dans 27 devises, recherche IA qui comprend les budgets en euros ou en dollars, messagerie sécurisée pour préparer un retour au pays ou un investissement à distance, et la même qualité d'expérience qu'ils utilisent sur Airbnb ou Zillow — appliquée enfin au marché camerounais.
 
 ---
 

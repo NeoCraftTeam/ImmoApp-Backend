@@ -290,9 +290,6 @@ vendor/bin/rector process --dry-run
 ### Frontend Hooks (`keyhome-frontend-next/src/hooks/`)
 - `useSearchFilters` — all search filter state, URL sync, remote data (cities, adTypes, facets, propertyAttributes), derived state (activeFilterCount, sortLabel, clearFilters, buildParams). Extracted from `search/page.tsx`.
 - `useSearchResults` — TanStack Query calls for search results and map-all data, derived `ads`, `mapAds`, `totalPages`, `total`. Extracted from `search/page.tsx`.
-- **Copilote recherche (`/search`)** — guidance **sans LLM** : `src/lib/search-guidance.ts` (messages + suggestions) et `src/components/search/SearchCopilotAssist.tsx`. Zéro résultat → encart « Affiner vos critères » + puces ; beaucoup de résultats avec peu de filtres actifs → encart **Affiner votre recherche** (lien / bouton filtres uniquement, **sans** dupliquer les annonces déjà listées). Tests Vitest : `src/tests/lib/search-guidance.test.ts`.
-- **Carte résultats `/search`** — le style Mapbox (plan / satellite / sombre) recrée la carte en async ; `mapStyleReadyTick` (incrémenté au `load`) déclenche l’installation des couches ; mises à jour des points via `GeoJSONSource#setData` ; `pickClusterLabelFont` aligne les polices des labels de cluster sur le style actif.
-- **Alertes depuis `/search`** — `searchAlertPrefill` côté page (ville, type, quartier, prix min/max, surface min, chambres, parking, requête). Backend : `SearchAlert::matchesAd` utilise `city_name` si `city_id` est absent (insensible à la casse vs `quarter.city.name`). Instantané : `SendSearchAlertInstantNotificationJob` file `notifications` — exiger `php artisan queue:work` sur cette file si les jobs ne sont pas `sync`.
 - `useAuthActions` — login, loginOwner, loginWithOAuth, logout, refreshUser, setUser, finalizeAuth, getClerkToken. Extracted from `AuthProvider.tsx`.
 - `useIdleTimeout` — tracks user inactivity and triggers session timeout warning.
 - `useSearchHistory` — manages recent search history in localStorage.
@@ -346,7 +343,7 @@ vendor/bin/rector process --dry-run
 `SubscriptionController`, `SurveyController`, `TeamController`, `TenantController`, `TourController`,
 `TrustScoreController`, `UserController`, `UserPreferenceController`, `ViewingAvailabilityController`,
 `ViewingReservationController`, `VisitTrackingController`.
-Non-API controllers: `AnonymousSurveyController`, `EmailPreferenceController`, `MediaProxyController` (**auth** `web` + `Gate::authorize('update', $ad)` sur le parent Spatie `Ad` — streaming via `getPathRelativeToRoot()`),
+Non-API controllers: `AnonymousSurveyController`, `EmailPreferenceController`, `MediaProxyController`,
 `PanelSsoController`, `PwaManifestController`, `TourImageProxyController`.
 
 ### API Routes (`routes/api/`)
@@ -527,13 +524,6 @@ Storybook, Vitest, Playwright.
 | `NEXT_PUBLIC_SITE_URL` | **SEO / Open Graph**: public site origin (canonical, `metadataBase`, sitemap, `robots.ts`). Priority over `NEXT_PUBLIC_APP_URL`; on Vercel, `VERCEL_URL` is used if unset. Fallback `https://keyhome.app`. Helpers: `src/lib/site-url.ts` (`getSiteOrigin`, `absoluteUrl`, `absoluteAssetUrl`). Tests: `src/tests/lib/site-url.test.ts`. |
 | `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` | Optional. Google Search Console → HTML tag: paste **only** the `content` value. Injected in root `layout.tsx` via `src/lib/seo-verification.ts`. |
 | `NEXT_PUBLIC_BING_SITE_VERIFICATION` | Optional. Bing Webmaster Tools → Meta tag (`msvalidate.01`): paste **only** the `content` value. |
-| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | Optional. Google Analytics 4 measurement ID (`G-…`). Loads `gtag.js` with Consent Mode v2 (denied until cookie banner grants “Analytiques”). SPA `page_view` + Web Vitals to GA when enabled. See `src/components/analytics/GoogleMarketing.tsx`. |
-| `NEXT_PUBLIC_GTM_ID` | Optional. Google Tag Manager container (`GTM-…`). If set, **takes precedence** over `NEXT_PUBLIC_GA_MEASUREMENT_ID` (configure GA4 inside GTM). Same consent + `dataLayer` behaviour. |
-
-### Analytics (GA4 / GTM, cookie consent)
-- **Head** — `layout.tsx` injects `GOOGLE_CONSENT_MODE_DEFAULT_SCRIPT` only when either public id is set (`isGoogleMarketingConfigured()`).
-- **Runtime** — `GoogleMarketing` in `providers.tsx` (inside `UtmCaptureProvider`) loads GTM or GA4, applies `consent` **update** from `CookieBanner` (`saveCookieConsentPreferences` → `kh:cookie-consent`), sends `page_view` on pathname/query changes when analytics is granted, pushes `kh_attribution` + UTM fields to `dataLayer` for GTM triggers.
-- **CSP** — `frame-src` includes `https://www.googletagmanager.com` (GTM `noscript` iframe).
 
 ### SEO, canonicals & GEO (frontend, May 2026)
 - **Centralisation** — `metadataBase`, canonicals, JSON-LD (`JsonLd`, annonces, villes, recherche, blog, comparaison), OG/Twitter images via `absoluteUrl` / `absoluteAssetUrl` pour éviter les URL relatives incorrectes sur crawl / partage. **Devise** : `BRAND_TAGLINE` / `BRAND_TITLE_WITH_TAGLINE` dans `src/lib/brand.ts` (métadonnées globales, JSON-LD Organization/WebSite, image OG dynamique, manifests PWA).
@@ -686,7 +676,6 @@ The frontend exposes **two distinct PWA identities** that install as separate ap
 **Lease contracts — régénération PDF + signature JSON fix :**
 - **`SignatureController::show`** envoyait `{data, contract}` plat alors que `/sign/[token]/page.tsx` lisait `data.request.contract` → **page "Lien invalide ou expiré" systématique** dès qu'un locataire cliquait sur le lien email. Fix : envelop `request.contract` (canonique) + conserve les anciennes clés `data` / `contract` pour les clients mobiles.
 - **`LeaseContractController::update`** régénère désormais le PDF après chaque modification (rent / dates / parties / conditions) via `LeaseContractService::regeneratePdf()` qui re-render avec les données courantes du contrat + relations ad/quartier/ville, swap `pdf_path`, supprime l'ancien fichier (best-effort). Avant, le PDF téléchargé restait désynchronisé du texte affiché.
-- **OTP e-signature (Mai 2026)** : `POST /api/v1/signatures/{token}/send-otp` envoie un code 6 chiffres par e-mail (`LeaseSignatureOtpNotification`). `sign` et `decline` exigent `otp` + fenêtre active (cache `lease-sig-otp-active:{token}`, 15 min) en plus du lien signé. Colonnes `sign_otp_*` sur `lease_signature_requests`.
 
 **Finances — pagination expenses :**
 - `ExpenseController::index` envoie maintenant `{data, meta, links}` (paginator brut Laravel exposait `current_page`/`last_page` à la racine, jamais `meta` → la page `<Pagination>` ne s'affichait pas même avec >20 lignes).
@@ -694,7 +683,7 @@ The frontend exposes **two distinct PWA identities** that install as separate ap
 **À faire (chantier reporté) :**
 - Income réel : pas de modèle `Payment` de type loyer encaissé ; `profitLoss` sum sur `lease_contracts.monthly_rent` est **trompeur** (multiples contrats, contrats historiques). Décision produit requise (créer un type `RENT` + workflow encaissement, ou un journal manuel).
 - Lease lifecycle complet : `status` enum (`draft / active / expired / terminated / archived`), endpoints `renew`, `terminate`, `archive`. Hors scope cette session.
-- E-signature légalement contraignante : OTP e-mail en place ; reste à traiter côté produit/juridique : `signature_hash`, preuve IP / device, audit log dédié, PDF figé à T0 signature.
+- E-signature légalement contraignante : `signature_hash`, IP + device, audit log dédié (pour l'instant `LeaseSignatureRequest::sign` met juste `status=signed`).
 
 ### Owner draft mode — completion pass (Mai 2026)
 
@@ -1615,9 +1604,9 @@ Issues résiduelles identifiées **après** le pass enterprise. À traiter en se
 
 | Sévérité | Sujet | Détail |
 |---|---|---|
-| 🟠 MEDIUM | E-signature contrats | **OTP e-mail** requis avant `sign`/`decline` (mai 2026). Il reste un écart « preuve forte » : pas encore de `signature_hash`, journal IP/device, PDF figé — à cadrer juridiquement. |
+| 🔴 HIGH | E-signature contrats | `SignatureController::sign()` accepte un POST sans authentification ni signature cryptographique. Pas de `signature_hash`, pas de log IP / device, pas de version PDF figée à la signature. Un attaquant qui intercepte le `token` peut signer en se faisant passer pour le locataire. **Fix proposé** : exiger une vérification (OTP email / SMS) avant `sign()`, calculer un hash SHA-256 du PDF + horodatage RFC-3161, stocker IP + user-agent + nonce. |
 | 🔴 HIGH | Bio rendering | `markdownLightToHtml` est sûr (whitelist, échappement HTML) ; cependant la page **publique** `/proprietaires/[id]` n'a pas été auditée pour s'assurer qu'elle utilise bien `markdownLightToHtml` au lieu d'injecter `bio` brute. À vérifier si la page existe (introuvable dans ce dépôt). |
-| 🟡 LOW | Reviews response abuse | **Corrigé (mai 2026)** : `ReviewController::respond()` utilise une transaction + `lockForUpdate()` sur la ligne `Review`. Rate limit global de route inchangé. |
+| 🟠 MEDIUM | Reviews response abuse | Pas de rate limit explicite sur `POST /reviews/{review}/respond` au-delà du `throttle:10,1` de la route. Un propriétaire pourrait flooder les réponses (un seul `respond` autorisé par avis, mais la garde se fait par `owner_response IS NOT NULL` après update — race condition possible avec deux requêtes simultanées). **Fix** : `lockForUpdate()` sur le `Review` dans `respond()`. |
 | 🟠 MEDIUM | Bio max 2000 chars | Validation `max:2000` côté backend OK, mais `PublicBioEditor` tronque à 2000 sans alerter l'utilisateur ; mieux vaut un `helperText` explicite quand on touche la limite. Le compteur visible et la couleur d'erreur à 100% l'avertissent — accepté. |
 | 🟠 MEDIUM | Boost equity | Tri `boost_score:desc` est primary sort sur tous les résultats : un boost très ancien `score=10` peut passer devant un boost récent `score=5` — comportement attendu (le score est défini par le plan). **Effet de bord** : un score à 0 sur boost expiré non sweepé pollue le ranking jusqu'à la prochaine exécution `app:expire-boosted-ads`. Tâche horaire mitige le risque. |
 | 🟡 LOW | Subscription cancel UX | `Subscription::cancel()` met `status = cancelled` immédiatement et `Agency::hasActiveSubscription()` exige `ACTIVE` → l'agence perd l'accès aux fonctionnalités premium dès l'annulation, contredit la promesse "valable jusqu'à `ends_at`". Voir audit subscriptions sous-agent. |
