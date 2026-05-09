@@ -300,6 +300,8 @@ final class PaymentController
                 $txRef,
                 $gateway,
                 (array) ($data['raw'] ?? []),
+                $request->header('X-Request-ID'),
+                $request->header('X-Correlation-ID'),
             );
         }
 

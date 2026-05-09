@@ -35,27 +35,40 @@ final class ProcessFlutterwaveWebhookJob implements ShouldQueue
         public readonly string $txRef,
         public readonly string $gateway,
         public readonly array $rawPayload,
+        public readonly ?string $ingestRequestId = null,
+        public readonly ?string $ingestCorrelationId = null,
     ) {}
 
     public function handle(HandlePostPaymentActions $postPaymentActions): void
     {
-        DB::transaction(function () use ($postPaymentActions): void {
-            $payment = Payment::where('transaction_id', $this->txRef)
-                ->where('gateway', $this->gateway)
-                ->lockForUpdate()
-                ->first();
+        $previousSharedContext = Log::sharedContext();
+        $this->applyIngestLogContext();
+        try {
+            DB::transaction(function () use ($postPaymentActions): void {
+                $payment = Payment::where('transaction_id', $this->txRef)
+                    ->where('gateway', $this->gateway)
+                    ->lockForUpdate()
+                    ->first();
 
-            if (!$payment || !$payment->isPaid()) {
-                return;
+                if (!$payment || !$payment->isPaid()) {
+                    return;
+                }
+
+                Log::info('[Webhook] Processing post-payment actions', [
+                    'payment_id' => $payment->id,
+                    'user_id' => $payment->user_id,
+                    'tx_ref' => $this->txRef,
+                    'gateway' => $this->gateway,
+                ]);
+
+                $postPaymentActions->execute($payment, $this->rawPayload);
+            });
+        } finally {
+            Log::flushSharedContext();
+            if ($previousSharedContext !== []) {
+                Log::withContext($previousSharedContext);
             }
-
-            Log::info('[Webhook] Processing post-payment actions', [
-                'tx_ref' => $this->txRef,
-                'gateway' => $this->gateway,
-            ]);
-
-            $postPaymentActions->execute($payment, $this->rawPayload);
-        });
+        }
     }
 
     public function failed(\Throwable $exception): void
@@ -63,7 +76,26 @@ final class ProcessFlutterwaveWebhookJob implements ShouldQueue
         Log::error('[Webhook] ProcessFlutterwaveWebhookJob failed', [
             'tx_ref' => $this->txRef,
             'gateway' => $this->gateway,
+            'request_id' => $this->ingestRequestId,
+            'correlation_id' => $this->ingestCorrelationId ?? $this->ingestRequestId,
             'error' => $exception->getMessage(),
         ]);
+    }
+
+    private function applyIngestLogContext(): void
+    {
+        $requestId = $this->ingestRequestId !== null && $this->ingestRequestId !== ''
+            ? $this->ingestRequestId
+            : null;
+        $correlationId = $this->ingestCorrelationId !== null && $this->ingestCorrelationId !== ''
+            ? $this->ingestCorrelationId
+            : $requestId;
+
+        if ($requestId !== null) {
+            Log::withContext([
+                'request_id' => $requestId,
+                'correlation_id' => $correlationId ?? $requestId,
+            ]);
+        }
     }
 }
