@@ -114,7 +114,7 @@ it('allows media proxy only for authenticated user who can update the parent ad'
     expect($media)->not->toBeNull();
 
     $this->get(route('media.proxy', ['uuid' => $media->uuid]))
-        ->assertRedirect();
+        ->assertForbidden();
 
     $this->actingAs($owner)->get(route('media.proxy', ['uuid' => $media->uuid]))
         ->assertOk();

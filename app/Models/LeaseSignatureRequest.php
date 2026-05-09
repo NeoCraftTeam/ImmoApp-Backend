@@ -14,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property Carbon|null $viewed_at
  * @property Carbon|null $signed_at
  * @property Carbon|null $declined_at
+ * @property Carbon|null $sign_otp_expires_at
+ * @property int|null $sign_otp_expires_unix
  */
 class LeaseSignatureRequest extends Model
 {
@@ -33,6 +35,7 @@ class LeaseSignatureRequest extends Model
         'signature_hash',
         'sign_otp_hash',
         'sign_otp_expires_at',
+        'sign_otp_expires_unix',
         'sign_otp_sent_at',
         'expires_at',
     ];
@@ -53,6 +56,7 @@ class LeaseSignatureRequest extends Model
             'declined_at' => 'datetime',
             'expires_at' => 'datetime',
             'sign_otp_expires_at' => 'datetime',
+            'sign_otp_expires_unix' => 'integer',
             'sign_otp_sent_at' => 'datetime',
         ];
     }

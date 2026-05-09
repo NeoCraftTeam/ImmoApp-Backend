@@ -36,7 +36,6 @@ use App\Http\Controllers\Api\V1\RentEstimatorController;
 use App\Http\Controllers\Api\V1\SearchAlertController;
 use App\Http\Controllers\Api\V1\SignatureController;
 use App\Http\Controllers\Api\V1\StatsController;
-use App\Http\Controllers\Api\V1\SupportController;
 use App\Http\Controllers\Api\V1\TeamController;
 use App\Http\Controllers\Api\V1\TenantController;
 use App\Http\Controllers\Api\V1\TrustScoreController;
@@ -263,10 +262,6 @@ Route::prefix('v1')->group(function (): void {
         ->middleware('throttle:5,10');
     Route::get('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'unsubscribe']);
 
-    // --- SUPPORT (contact form public) ---
-    Route::post('/support/contact', [SupportController::class, 'contact'])
-        ->middleware('throttle:5,10');
-
     // --- BOOST (owner) ---
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/my/boost-plans', [BoostController::class, 'plans']);
@@ -330,7 +325,7 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/my/lease-contracts/{leaseContract}/signatures', [SignatureController::class, 'store'])->middleware('throttle:10,1');
     });
 
-    // --- E-SIGNATURE (public — bearer link + email OTP for sign/decline) ---
+    // --- E-SIGNATURE (public — no auth required) ---
     Route::get('/signatures/{token}', [SignatureController::class, 'show']);
     Route::post('/signatures/{token}/send-otp', [SignatureController::class, 'sendSignOtp'])->middleware('throttle:10,1');
     Route::post('/signatures/{token}/sign', [SignatureController::class, 'sign'])->middleware('throttle:10,1');
