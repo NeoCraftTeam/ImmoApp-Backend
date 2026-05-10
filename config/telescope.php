@@ -20,6 +20,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Telescope Allowed Emails
+    |--------------------------------------------------------------------------
+    |
+    | Comma-separated list of admin emails allowed to access Telescope.
+    | Used by the gate() method in TelescopeServiceProvider.
+    |
+    */
+
+    'allowed_emails' => env('TELESCOPE_ALLOWED_EMAILS', ''),
+
+    /*
+    |--------------------------------------------------------------------------
     | Telescope Domain
     |--------------------------------------------------------------------------
     |

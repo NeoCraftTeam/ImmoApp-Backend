@@ -16,10 +16,25 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property Carbon|null $declined_at
  * @property Carbon|null $sign_otp_expires_at
  * @property int|null $sign_otp_expires_unix
+ * @property 'pending'|'viewed'|'signed'|'declined'|'expired'|'locked' $status
  */
 class LeaseSignatureRequest extends Model
 {
     use HasUuids;
+
+    /**
+     * Lockout threshold for failed OTP attempts on `sign` / `decline`.
+     * Reaching this count flips the request to `status = locked` and
+     * forces the landlord to re-issue a new signature request.
+     */
+    public const int OTP_MAX_ATTEMPTS = 5;
+
+    /**
+     * Hard cap on `sendSignOtp` calls per request (independent of IP
+     * throttle). Prevents an attacker who learned the public token from
+     * flooding the signer's mailbox.
+     */
+    public const int OTP_MAX_ISSUES = 10;
 
     protected $fillable = [
         'lease_contract_id',
@@ -33,10 +48,14 @@ class LeaseSignatureRequest extends Model
         'declined_at',
         'decline_reason',
         'signature_hash',
+        'pdf_hash_at_request',
         'sign_otp_hash',
         'sign_otp_expires_at',
         'sign_otp_expires_unix',
         'sign_otp_sent_at',
+        'sign_otp_attempts',
+        'signer_ip',
+        'signer_user_agent',
         'expires_at',
     ];
 
@@ -58,7 +77,13 @@ class LeaseSignatureRequest extends Model
             'sign_otp_expires_at' => 'datetime',
             'sign_otp_expires_unix' => 'integer',
             'sign_otp_sent_at' => 'datetime',
+            'sign_otp_attempts' => 'integer',
         ];
+    }
+
+    public function isLocked(): bool
+    {
+        return $this->status === 'locked';
     }
 
     public function isPending(): bool
