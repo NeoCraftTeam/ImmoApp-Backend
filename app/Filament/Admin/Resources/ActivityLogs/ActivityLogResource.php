@@ -64,7 +64,7 @@ class ActivityLogResource extends Resource
                     ->whereColumn('users.id', 'activity_log.causer_id')
                     ->where('users.role', UserRole::ADMIN);
             })
-            ->with('causer');
+            ->with(['causer', 'subject']);
     }
 
     #[\Override]
