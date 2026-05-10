@@ -742,17 +742,17 @@
                 ]
             }
         },
-        "/api/v1/my/favorites": {
+        "/api/v1/my/recently-viewed": {
             "get": {
                 "tags": [
                     "📊 Interactions"
                 ],
-                "summary": "List my favorite ads",
-                "description": "List the authenticated user's favorite ads.\n\nAn ad is favorited if the number of favorite interactions\nexceeds the number of unfavorite interactions for that ad.",
-                "operationId": "fc38fa60e0ddf2437c9a1dd03943bc1c",
+                "summary": "Get recently viewed ads",
+                "description": "Get the authenticated user's recently viewed ads.",
+                "operationId": "401a3789edbec4b07c0e67c57fe20719",
                 "responses": {
                     "200": {
-                        "description": "List of favorite ads",
+                        "description": "List of recently viewed ads",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1115,6 +1115,108 @@
                     },
                     "404": {
                         "description": "Ad not found"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/publish": {
+            "post": {
+                "tags": [
+                    "🏠 Annonces"
+                ],
+                "summary": "Publish a draft ad",
+                "description": "Transition a draft ad to pending status for admin review. Validates that all required fields are filled.",
+                "operationId": "publishDraftAd",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Draft published"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "description": "Ad not found"
+                    },
+                    "422": {
+                        "description": "Missing required fields or not a draft"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/autosave": {
+            "patch": {
+                "tags": [
+                    "🏠 Annonces"
+                ],
+                "summary": "Autosave draft ad text fields",
+                "description": "Partially updates a draft ad with any subset of allowed text fields. No image processing, no status transition.",
+                "operationId": "autosaveDraftAd",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "title": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "price": {
+                                        "type": "number",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Autosaved"
+                    },
+                    "403": {
+                        "description": "Forbidden"
+                    },
+                    "404": {
+                        "description": "Ad not found"
+                    },
+                    "422": {
+                        "description": "Not a draft or validation error"
                     }
                 },
                 "security": [
@@ -1740,6 +1842,74 @@
                 ]
             }
         },
+        "/api/v1/bailleurs/{username}/follow": {
+            "get": {
+                "tags": [
+                    "👤 Bailleurs"
+                ],
+                "summary": "Vérifier si l'utilisateur suit un bailleur",
+                "operationId": "checkFollowBailleur",
+                "parameters": [
+                    {
+                        "name": "username",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "État du suivi"
+                    },
+                    "404": {
+                        "description": "Bailleur introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "👤 Bailleurs"
+                ],
+                "summary": "Mettre en favoris / retirer des favoris un bailleur",
+                "operationId": "toggleFollowBailleur",
+                "parameters": [
+                    {
+                        "name": "username",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "État du suivi mis à jour"
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "403": {
+                        "description": "Impossible de se suivre soi-même"
+                    },
+                    "404": {
+                        "description": "Bailleur introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/api/v1/cities": {
             "get": {
                 "tags": [
@@ -2287,6 +2457,76 @@
                 ]
             }
         },
+        "/api/v1/directions": {
+            "get": {
+                "tags": [
+                    "🗺️ Géo"
+                ],
+                "summary": "Calcul d'itinéraire entre deux points",
+                "description": "Retourne un itinéraire GeoJSON avec résumé (distance, durée) entre deux coordonnées GPS. Profiles : voiture, pied, vélo, fauteuil roulant. Nécessite ORS_API_KEY. Mis en cache 1 h.",
+                "operationId": "791ff845edcf091d4011ccd65c65026f",
+                "parameters": [
+                    {
+                        "name": "from_lat",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "from_lng",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "to_lat",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "to_lng",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "profile",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "driving-car",
+                            "enum": [
+                                "foot-walking",
+                                "driving-car",
+                                "cycling-regular",
+                                "wheelchair"
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Itinéraire GeoJSON + résumé"
+                    },
+                    "422": {
+                        "description": "Paramètres invalides"
+                    },
+                    "503": {
+                        "description": "ORS non configuré ou indisponible"
+                    }
+                }
+            }
+        },
         "/api/v1/auth/verifyEmail": {
             "post": {
                 "tags": [
@@ -2597,6 +2837,71 @@
                 ]
             }
         },
+        "/api/v1/isochrones": {
+            "get": {
+                "tags": [
+                    "🗺️ Géo"
+                ],
+                "summary": "Zone accessible depuis un point",
+                "description": "Retourne un polygone GeoJSON (isochrone) représentant la zone atteignable en X minutes depuis les coordonnées données. Nécessite ORS_API_KEY. Mis en cache 24 h.",
+                "operationId": "13d2111b037c8c433b5c5020bb4fc818",
+                "parameters": [
+                    {
+                        "name": "lat",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "lng",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "number"
+                        }
+                    },
+                    {
+                        "name": "profile",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "default": "foot-walking",
+                            "enum": [
+                                "foot-walking",
+                                "driving-car",
+                                "cycling-regular",
+                                "wheelchair"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "range",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 15,
+                            "maximum": 60,
+                            "minimum": 5
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Isochrone GeoJSON"
+                    },
+                    "422": {
+                        "description": "Paramètres invalides"
+                    },
+                    "503": {
+                        "description": "ORS non configuré ou indisponible"
+                    }
+                }
+            }
+        },
         "/api/v1/ads/{ad}/keyscore": {
             "get": {
                 "tags": [
@@ -2759,6 +3064,38 @@
                     },
                     "422": {
                         "description": "Validation échouée"
+                    }
+                }
+            }
+        },
+        "/api/v1/ads/{ad}/neighborhood-scorecard": {
+            "get": {
+                "tags": [
+                    "🏠 Annonces"
+                ],
+                "summary": "Scorecard de quartier",
+                "description": "Retourne les scores basés sur des nœuds OpenStreetMap réels. Distances piétonnes via OpenRouteService lorsque ORS_API_KEY est défini (en-tête Authorization Bearer). Sans clé : distances orthodromiques (ligne droite, status=ok). status=degraded si ORS est configuré mais indisponible. status=unavailable si Overpass échoue.",
+                "operationId": "522c0f0565a95307b499688baf558384",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Scorecard calculé"
+                    },
+                    "404": {
+                        "description": "Annonce introuvable"
+                    },
+                    "422": {
+                        "description": "Annonce sans coordonnées GPS"
                     }
                 }
             }
@@ -3100,31 +3437,20 @@
                 ]
             }
         },
-        "/api/v1/webhooks/{gateway}": {
+        "/api/v1/webhooks/stripe": {
             "post": {
                 "tags": [
                     "💰 Paiements"
                 ],
-                "summary": "Webhook passerelle de paiement",
-                "description": "Handle a webhook from any supported payment gateway.\nThe {gateway} route parameter is validated by the route constraint.",
-                "operationId": "40fdc691d305771ee2b7fc3320c1b9c1",
-                "parameters": [
-                    {
-                        "name": "gateway",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "enum": [
-                                "flutterwave",
-                                "fedapay"
-                            ]
-                        }
-                    }
-                ],
+                "summary": "Webhook Stripe",
+                "description": "Stripe webhook handler.\n\nStripe requires the RAW body for signature verification — we feed\n`getContent()` directly into the gateway, not `$request->all()`.\nOtherwise verification would always fail because Laravel's parsed\npayload doesn't byte-match what Stripe signed.",
+                "operationId": "d6cd8120de985339c03c976d11efbdf4",
                 "responses": {
                     "200": {
                         "description": "Webhook traité"
+                    },
+                    "400": {
+                        "description": "Payload invalide"
                     },
                     "401": {
                         "description": "Signature invalide"
@@ -3150,6 +3476,96 @@
                         "sanctum": []
                     }
                 ]
+            }
+        },
+        "/api/v1/payments/export": {
+            "get": {
+                "tags": [
+                    "💰 Paiements"
+                ],
+                "summary": "Exporter l'historique des paiements en PDF",
+                "description": "Export the authenticated user's full payment history as a branded PDF.",
+                "operationId": "8ffd0c17e8a76d1c1e216b52300963c8",
+                "parameters": [
+                    {
+                        "name": "period",
+                        "in": "query",
+                        "required": false,
+                        "schema": {
+                            "description": "Nb de jours à inclure. Omis = tout l'historique.",
+                            "type": "integer",
+                            "enum": [
+                                30,
+                                90,
+                                365
+                            ]
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Fichier PDF téléchargeable",
+                        "content": {
+                            "application/pdf": {}
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/payments/methods": {
+            "get": {
+                "tags": [
+                    "💰 Paiements"
+                ],
+                "summary": "Liste des moyens de paiement actifs",
+                "description": "Public list of currently available payment methods.\n\nAdmin-controlled : flipping a toggle from Filament removes a method\nfrom this response within the 5 min `Setting` cache TTL. The frontend\n`<PaymentModal>` consumes this endpoint to render a dynamic selector\ninstead of hard-coding the four methods.",
+                "operationId": "f10e48cf2256eaf7fc6f91817cb2ac61",
+                "responses": {
+                    "200": {
+                        "description": "Catalogue des moyens disponibles",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "value": {
+                                                        "type": "string",
+                                                        "example": "card"
+                                                    },
+                                                    "label": {
+                                                        "type": "string",
+                                                        "example": "Carte bancaire"
+                                                    },
+                                                    "gateway": {
+                                                        "type": "string",
+                                                        "example": "stripe"
+                                                    },
+                                                    "enabled": {
+                                                        "type": "boolean",
+                                                        "example": true
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/v1/ads/price-heatmap": {
@@ -4441,6 +4857,42 @@
                 }
             }
         },
+        "/api/v1/auth/check-email": {
+            "post": {
+                "tags": [
+                    "🔐 Authentification"
+                ],
+                "summary": "Vérifier la disponibilité d'une adresse email",
+                "operationId": "checkEmail",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Résultat de disponibilité"
+                    },
+                    "422": {
+                        "description": "Email invalide"
+                    },
+                    "429": {
+                        "description": "Trop de tentatives"
+                    }
+                }
+            }
+        },
         "/api/v1/ads/rent-estimate": {
             "post": {
                 "tags": [
@@ -4967,6 +5419,34 @@
                         "sanctum": []
                     }
                 ]
+            }
+        },
+        "/api/v1/stats/landing": {
+            "get": {
+                "tags": [
+                    "📊 Statistics"
+                ],
+                "summary": "Landing-page aggregate stats",
+                "operationId": "4f3731f5c906b3b998246cb22c579157",
+                "responses": {
+                    "200": {
+                        "description": "Counts for ads, cities, and users"
+                    }
+                }
+            }
+        },
+        "/api/v1/stats/testimonials": {
+            "get": {
+                "tags": [
+                    "📊 Statistics"
+                ],
+                "summary": "Top testimonials for landing page",
+                "operationId": "d6d3b2b0748c57c9aac9b54e645cfbfa",
+                "responses": {
+                    "200": {
+                        "description": "Recent high-rating reviews + aggregate rating"
+                    }
+                }
             }
         },
         "/api/v1/subscriptions/plans": {
@@ -5584,6 +6064,27 @@
                         "sanctum": []
                     }
                 ]
+            }
+        },
+        "/api/v1/support/contact": {
+            "post": {
+                "tags": [
+                    "📩 Support"
+                ],
+                "summary": "Soumettre le formulaire de contact public",
+                "description": "Receive a public contact form submission and forward it to the support inbox.",
+                "operationId": "b4af525c187ab7d2eae1eaa305d24c7b",
+                "responses": {
+                    "202": {
+                        "description": "Message reçu et en cours d'envoi"
+                    },
+                    "422": {
+                        "description": "Données invalides"
+                    },
+                    "429": {
+                        "description": "Trop de tentatives"
+                    }
+                }
             }
         },
         "/api/v1/surveys/active": {
@@ -8341,6 +8842,14 @@
             "description": "🏢 Agence"
         },
         {
+            "name": "👤 Bailleurs",
+            "description": "👤 Bailleurs"
+        },
+        {
+            "name": "🗺️ Géo",
+            "description": "🗺️ Géo"
+        },
+        {
             "name": "System",
             "description": "System"
         },
@@ -8359,6 +8868,14 @@
         {
             "name": "🔔 Alertes",
             "description": "🔔 Alertes"
+        },
+        {
+            "name": "📊 Statistics",
+            "description": "📊 Statistics"
+        },
+        {
+            "name": "📩 Support",
+            "description": "📩 Support"
         }
     ]
 }

@@ -108,7 +108,7 @@ vendor/bin/rector process --dry-run
 - Scopes: `LandlordScope`.
 
 ### Contracts (`app/Contracts/`)
-- `PaymentGatewayInterface` — payment gateway abstraction (Flutterwave impl).
+- `PaymentGatewayInterface` — payment gateway abstraction. Two implementations: `FlutterwavePaymentService` (mobile money + orange money) and `StripePaymentService` (carte, EUR billing). Routed per-method via `PaymentMethod::gateway()` and the registry built in `AppServiceProvider`.
 - `AiSearchServiceInterface` — NLP/image search parsing contract (`parse`, `parseFromImage`).
 - `RecommendationEngineInterface` — ad recommendation contract (`recommend`).
 - `TrustScoreServiceInterface` — trust score computation contract (`compute`, `getOrCompute`, `invalidate`).
@@ -117,9 +117,11 @@ vendor/bin/rector process --dry-run
 ### Services (`app/Services/`)
 - `UserProfileService` — public profile assembly, response-time computation, trust-score resolution, unlocked-ads retrieval. Extracted from `UserController` (SRP).
 - `LoginService`, `RegistrationService`, `TokenService`, `ClerkJwtService` — auth flows.
-- `Payment/PaymentService` — orchestrator (Flutterwave gateway via `PaymentGatewayInterface`).
-- `Payment/FlutterwavePaymentService` — Flutterwave implementation.
-- `Payment/RefundService` — refund processing.
+- `Payment/PaymentService` — multi-gateway orchestrator. Accepts a primary gateway, optional cross-gateway fallback (mobile money only) and a `array<gateway-name, PaymentGatewayInterface>` registry built by `AppServiceProvider`. Routes each `createPayment()` call via `PaymentMethod::gateway()` lookup; webhook + verify dispatched to `$payment->gateway` for the right impl.
+- `Payment/FlutterwavePaymentService` — Flutterwave implementation (mobile money / orange money). Hosted-checkout redirect flow.
+- `Payment/StripePaymentService` — Stripe via Cashier `\Laravel\Cashier\Cashier::stripe()`. PaymentIntent (no redirect, returns `clientSecret`), signed webhook (`Stripe-Signature` against raw body, `__raw` injected by controller), refund. Conversion XAF→EUR cents at the BEAC peg `1 EUR = 655.957 XAF` (config `services.stripe.xaf_to_eur_rate`). Idempotency keys: `kh_initiate:{tx_ref}` / `kh_refund:{intent}:{amount}`.
+- `Payment/PaymentMethodGateService` — admin-controlled per-method gating. Persisted in `Setting` (`payment_method:{value}:enabled`), cached 5 min, same pattern as `FeatureFlagService`. Methods: `isEnabled / enable / disable / reset / available / describeAvailable / describeAll`. Defaults via `match` (compile-time exhaustive). Consumed by `GET /api/v1/payments/methods` (public catalogue) and `FlutterwaveInitiateRequest::withValidator()` (rejects disabled methods at validation time with French error label).
+- `Payment/RefundService` — refund processing (gateway-agnostic via the registry).
 - `SubscriptionService` — plan management & renewals.
 - `PointService` — credit wallet operations.
 - `AdBoostService` — ad promotion logic.
@@ -180,16 +182,21 @@ vendor/bin/rector process --dry-run
 - `Reservation/`: `ConfirmReservationAction`.
 
 ### Payment System
-- **Only gateway: Flutterwave** (FedaPay was removed). `PaymentGateway` enum has a single case `Flutterwave = 'flutterwave'`.
-- Strategy pattern: `PaymentGatewayInterface` (`app/Contracts/`) implemented by `FlutterwavePaymentService`.
-- `PaymentService` is the central orchestrator — injected via DI in `AppServiceProvider`. Accepts primary/fallback constructor injection for future extensibility.
-- `Payment::gateway` column stored as **plain string** (not enum cast) — future gateways (Wave, Stripe, etc.) can be added without a migration.
-- `Payment::isFlutterwave()` compares `$this->gateway === PaymentGateway::Flutterwave->value`.
-- Webhook route: `POST /api/v1/webhooks/{gateway}` — gateway param constrained to `flutterwave` only.
+- **Two gateways live: Flutterwave + Stripe.** `PaymentGateway` enum: `Flutterwave = 'flutterwave'`, `Stripe = 'stripe'` (each with `label()` for invoices/admin). Stripe was added in May 2026 alongside Laravel Cashier `^16.0`.
+- **Strategy pattern + registry.** `PaymentGatewayInterface` (`app/Contracts/`) implemented by `FlutterwavePaymentService` and `StripePaymentService`. `PaymentService` ctor accepts `(primary, ?fallback, registry)` — `AppServiceProvider` builds the registry indexed by `getName()` so `createPayment()` can route per-method without if/else.
+- **Routing.** `PaymentMethod::gateway()` is the single source of truth: `MOBILE_MONEY` + `ORANGE_MONEY` + `FLUTTERWAVE` (legacy umbrella) → Flutterwave ; `CARD` → Stripe. Adding a new method only requires a case + match arm in the enum.
+- **Admin gating.** `PaymentMethodGateService` lets admins flip any of the four methods on/off at runtime (persisted in `Setting`, cached 5 min). Public consumer: `GET /api/v1/payments/methods`. Backend guard: `FlutterwaveInitiateRequest::withValidator()` rejects disabled methods with a localised French message before any gateway call.
+- **`Payment::gateway` column** stored as plain string (not enum cast) — Stripe rows coexist with legacy Flutterwave rows in the same table.
+- **Webhooks.** Flutterwave: `POST /api/v1/webhooks/{gateway}` (constraint `flutterwave`). Stripe: dedicated `POST /api/v1/webhooks/stripe` — Stripe requires the **raw body** for signature verification, controller passes `getContent()` and injects it as `__raw` so `StripePaymentService::handleWebhook()` can call `\Stripe\Webhook::constructEvent()`. `Cashier::ignoreRoutes()` is set in `AppServiceProvider::boot()` so Cashier's default `/stripe/webhook` does not collide.
+- **Stripe currency: EUR pegged.** Stripe does not support XAF/XOF. `payments.amount` stays in XAF (canonical), Stripe is invoiced in EUR using `1 EUR = 655.957 XAF` (BEAC peg, config `services.stripe.xaf_to_eur_rate`). Both directions (XAF→cents and cents→XAF for refunds) use the same peg so receipts always reconcile. PaymentIntent metadata carries `xaf_amount` + `xaf_to_eur_rate` for audit. Visitor multi-currency display (`<Price>` / `CurrencySelector`) is unrelated to Stripe billing currency.
+- **Cashier scope.** `Laravel\Cashier\Billable` trait on `User`. Tables renamed to **`cashier_subscriptions`** + **`cashier_subscription_items`** to avoid collision with the existing business `subscriptions` table (`App\Models\Subscription`, agency plans). Custom models `App\Models\CashierSubscription` and `CashierSubscriptionItem` pin the table names; wired via `Cashier::useSubscriptionModel(...)` and `useSubscriptionItemModel(...)` in `AppServiceProvider::boot()`. UUID-safe migrations (`foreignUuid` because `users.id` is UUID via `HasUuids`).
+- **Single Stripe webhook secret** for both test and live (`STRIPE_WEBHOOK_SECRET`). Rotate the value in `.env` when switching environments — no `_TEST`/`_LIVE` split.
+- **Stripe env vars** : `STRIPE_KEY` (`pk_test_*` / `pk_live_*`), `STRIPE_SECRET` (`sk_*`), `STRIPE_WEBHOOK_SECRET` (`whsec_*`), optional `STRIPE_CURRENCY=eur`, `STRIPE_WEBHOOK_TOLERANCE=300`. All in `.env.example`.
 - Amounts resolved server-side from `PointPackage`/`SubscriptionPlan` — never trust client amounts.
 - DB locks (`lockForUpdate`) prevent double-spending on verification.
 - Events: `PaymentInitiated`, `PaymentSucceeded`, `PaymentFailed`.
 - **Crédits (`POST /credits/purchase/{package}`)** — accepte `callback_url` optionnelle ; validée par `App\Support\FrontendRedirectGuard` (même politique d’hôte que OAuth / `FRONTEND_URL` + `OAUTH_ALLOWED_REDIRECT_HOSTS`). Passée à `PaymentService::createPayment` comme `redirect_url` vers Flutterwave.
+- **Frontend integration** (Phase 3, à venir) : `pnpm add @stripe/stripe-js @stripe/react-stripe-js` ; `PaymentModal.tsx` détecte `gateway === 'stripe'` dans la réponse de `/payments/initiate_payment` et utilise le `payment_link` retourné comme `clientSecret` pour `<Elements>` + `<PaymentElement>` ; pour Flutterwave (mobile money), comportement actuel inchangé (redirect hosted checkout).
 
 ### TrustScore System
 - **Bidirectional trust scoring** (0–100) for both tenants and landlords, modelled after `KeyScoreService`.
@@ -1532,7 +1539,7 @@ Audit multi-agents exhaustif réalisé le 2 mai 2026. 7 agents parallèles ont c
 
 **Technique / Architecture**
 - Laravel 12 + Filament 4 avec séparation claire services/actions/DTOs/contrats dans les zones bien couvertes.
-- Gateway paiement abstrait (`PaymentGatewayInterface`) — swap Flutterwave/Wave/Stripe sans refactor.
+- Gateway paiement abstrait (`PaymentGatewayInterface`) — Flutterwave (mobile money) + Stripe (carte, via Laravel Cashier 16) coexistent ; routing per-méthode via `PaymentMethod::gateway()` et registry dans `AppServiceProvider`.
 - `preventLazyLoading()` en dev — détection N+1 systématique.
 - Multi-worker Docker (critical/payments/emails/tours) avec resource limits.
 - PostGIS pour les requêtes géospatiales avancées.
