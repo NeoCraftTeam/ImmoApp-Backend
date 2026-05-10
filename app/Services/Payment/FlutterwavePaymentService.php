@@ -41,10 +41,32 @@ final readonly class FlutterwavePaymentService implements PaymentGatewayInterfac
      */
     public function initiate(array $payload): array
     {
+        $paymentMethod = (string) ($payload['payment_method'] ?? 'flutterwave');
+
         $paymentOptions = config(
-            'payment.flutterwave_payment_options.'.(string) ($payload['payment_method'] ?? 'flutterwave'),
+            'payment.flutterwave_payment_options.'.$paymentMethod,
             'mobilemoneycameroon,card'
         );
+
+        /**
+         * Pre-select the mobile money operator on the Flutterwave hosted checkout.
+         * Only Orange Money forces a specific network ("ORANGE") since it maps to a
+         * single operator. The generic `mobile_money` method leaves the network choice
+         * to the user on the Flutterwave checkout (MTN, Orange, etc.).
+         */
+        $network = match ($paymentMethod) {
+            'orange_money' => 'ORANGE',
+            default => null,
+        };
+
+        $meta = $payload['meta'] ?? [];
+
+        // Pre-fill the phone field on the Flutterwave checkout for any mobile money variant.
+        $isMobileMoney = in_array($paymentMethod, ['mobile_money', 'orange_money'], true);
+        $phone = (string) $payload['phone'];
+        if ($isMobileMoney && $phone !== '') {
+            $meta['mobile_number'] = $phone;
+        }
 
         $body = [
             'tx_ref' => $payload['tx_ref'],
@@ -54,7 +76,7 @@ final readonly class FlutterwavePaymentService implements PaymentGatewayInterfac
             'redirect_url' => $payload['redirect_url'],
             'customer' => [
                 'email' => $payload['email'],
-                'phonenumber' => $payload['phone'],
+                'phonenumber' => $phone,
                 'name' => $payload['name'],
             ],
             'customizations' => [
@@ -62,8 +84,12 @@ final readonly class FlutterwavePaymentService implements PaymentGatewayInterfac
                 'description' => $payload['description'] ?? 'Paiement KeyHome',
                 'logo' => config('payment.gateways.flutterwave.logo', ''),
             ],
-            'meta' => $payload['meta'] ?? [],
+            'meta' => $meta,
         ];
+
+        if ($network !== null) {
+            $body['network'] = $network;
+        }
 
         $response = $this->client()->post('/payments', $body);
 

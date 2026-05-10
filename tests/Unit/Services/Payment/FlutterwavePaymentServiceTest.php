@@ -154,3 +154,98 @@ it('should ignore non charge completed webhook events', function (): void {
         ->toHaveKey('status', 'ignored')
         ->and($result['tx_ref'] ?? null)->toBeEmpty();
 });
+
+// ─── PRÉ-SÉLECTION OPÉRATEUR ─────────────────────────────────────────────
+
+it('does not send network field when payment_method is mobile_money (generic)', function (): void {
+    Http::fake([
+        'api.flutterwave.com/v3/payments' => Http::response([
+            'status' => 'success',
+            'data' => ['link' => 'https://checkout.flutterwave.com/pay/mtn123'],
+        ], 200),
+    ]);
+
+    config()->set('payment.flutterwave_payment_options.mobile_money', 'mobilemoneycameroon');
+
+    $this->service->initiate(validInitiatePayload(['payment_method' => 'mobile_money']));
+
+    Http::assertSent(function (Request $request): bool {
+        $body = $request->data();
+
+        return !array_key_exists('network', $body)
+            && $body['payment_options'] === 'mobilemoneycameroon';
+    });
+});
+
+it('sends network=ORANGE and mobilemoneycameroon when payment_method is orange_money', function (): void {
+    Http::fake([
+        'api.flutterwave.com/v3/payments' => Http::response([
+            'status' => 'success',
+            'data' => ['link' => 'https://checkout.flutterwave.com/pay/orange123'],
+        ], 200),
+    ]);
+
+    config()->set('payment.flutterwave_payment_options.orange_money', 'mobilemoneycameroon');
+
+    $this->service->initiate(validInitiatePayload(['payment_method' => 'orange_money']));
+
+    Http::assertSent(function (Request $request): bool {
+        $body = $request->data();
+
+        return $body['network'] === 'ORANGE'
+            && $body['payment_options'] === 'mobilemoneycameroon';
+    });
+});
+
+it('does not send network field when payment_method is generic flutterwave', function (): void {
+    Http::fake([
+        'api.flutterwave.com/v3/payments' => Http::response([
+            'status' => 'success',
+            'data' => ['link' => 'https://checkout.flutterwave.com/pay/generic'],
+        ], 200),
+    ]);
+
+    $this->service->initiate(validInitiatePayload());
+
+    Http::assertSent(fn (Request $request): bool => !array_key_exists('network', $request->data()));
+});
+
+it('places mobile_number in meta when phone is provided for mobile money', function (): void {
+    Http::fake([
+        'api.flutterwave.com/v3/payments' => Http::response([
+            'status' => 'success',
+            'data' => ['link' => 'https://checkout.flutterwave.com/pay/meta123'],
+        ], 200),
+    ]);
+
+    $this->service->initiate(validInitiatePayload([
+        'payment_method' => 'mobile_money',
+        'phone' => '+237650123456',
+    ]));
+
+    Http::assertSent(function (Request $request): bool {
+        $meta = $request->data()['meta'] ?? [];
+
+        return ($meta['mobile_number'] ?? null) === '+237650123456';
+    });
+});
+
+it('does not set mobile_number in meta when phone is empty', function (): void {
+    Http::fake([
+        'api.flutterwave.com/v3/payments' => Http::response([
+            'status' => 'success',
+            'data' => ['link' => 'https://checkout.flutterwave.com/pay/empty'],
+        ], 200),
+    ]);
+
+    $this->service->initiate(validInitiatePayload([
+        'payment_method' => 'mobile_money',
+        'phone' => '',
+    ]));
+
+    Http::assertSent(function (Request $request): bool {
+        $meta = $request->data()['meta'] ?? [];
+
+        return !array_key_exists('mobile_number', $meta);
+    });
+});
