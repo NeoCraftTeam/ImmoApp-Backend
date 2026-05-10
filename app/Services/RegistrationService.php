@@ -117,10 +117,17 @@ final readonly class RegistrationService
             ]);
             // SEC-001: Only allow 'admin' role when an authenticated admin is creating the user.
             // Public registrations are restricted to 'customer' or 'agent'.
-            $allowedRoles = ['customer', 'agent'];
-            $role = in_array($data['role'] ?? null, $allowedRoles, true)
-                ? $data['role']
-                : 'customer';
+            $currentUser = $request->user();
+            $isAdminCreatingAdmin = $currentUser && $currentUser->isAdmin() && ($data['role'] ?? null) === 'admin';
+
+            if ($isAdminCreatingAdmin) {
+                $role = 'admin';
+            } else {
+                $allowedRoles = ['customer', 'agent'];
+                $role = in_array($data['role'] ?? null, $allowedRoles, true)
+                    ? $data['role']
+                    : 'customer';
+            }
 
             $user->forceFill([
                 'role' => $role,
