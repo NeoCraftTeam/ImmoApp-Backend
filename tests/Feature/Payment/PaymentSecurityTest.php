@@ -11,6 +11,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 uses(RefreshDatabase::class);
 
@@ -248,8 +249,16 @@ it('verify sets CANCELLED when gateway returns cancelled status', function (): v
 
 // ─── IDEMPOTENCY / TERMINAL STATE ───────────────────────────────────────
 
-it('cancelled payment cannot be overwritten by webhook', function (): void {
+it('reopens a CANCELLED payment when a signed webhook confirms a real charge (orphan-debit guard)', function (): void {
+    // Behaviour change (Stripe + Flutterwave): silently ignoring a signed
+    // success webhook on a locally-CANCELLED row caused orphan debits in
+    // multi-tab scenarios — the gateway took the money but our row said
+    // « cancelled » so credits were never delivered. We now log critical
+    // and reopen the row so post-payment actions run, while support is
+    // alerted via the Log::critical entry. Spoofed webhooks remain
+    // blocked upstream by signature verification.
     Event::fake();
+    Log::spy();
     $secret = config('payment.gateways.flutterwave.webhook_secret');
 
     $user = User::factory()->create();
@@ -277,10 +286,13 @@ it('cancelled payment cannot be overwritten by webhook', function (): void {
 
     $this->assertDatabaseHas('payments', [
         'id' => $payment->id,
-        'status' => PaymentStatus::CANCELLED->value,
+        'status' => PaymentStatus::SUCCESS->value,
     ]);
 
-    Event::assertNotDispatched(PaymentSucceeded::class);
+    Event::assertDispatched(PaymentSucceeded::class);
+    Log::shouldHaveReceived('critical')
+        ->withArgs(fn ($message) => str_contains((string) $message, 'orphan debit'))
+        ->once();
 });
 
 it('passes allowed callback_url to flutterwave for credit purchase', function (): void {

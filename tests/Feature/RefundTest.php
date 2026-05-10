@@ -1,5 +1,6 @@
 <?php
 
+use App\Contracts\PaymentGatewayInterface;
 use App\Enums\PaymentStatus;
 use App\Enums\PointTransactionType;
 use App\Enums\RefundStatus;
@@ -9,6 +10,7 @@ use App\Models\PointTransaction;
 use App\Models\Refund;
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\Payment\StripePaymentService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 
@@ -230,4 +232,109 @@ it('creates refund model with correct relationships', function (): void {
     expect($refund->payment)->toBeInstanceOf(Payment::class);
     expect($refund->user)->toBeInstanceOf(User::class);
     expect($refund->status)->toBe(RefundStatus::Completed);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Stripe gateway routing — regression guard
+|--------------------------------------------------------------------------
+|
+| Before the fix, `RefundService::resolveGateway()` only mapped
+| `flutterwave` → `FlutterwavePaymentService` and threw
+| « Gateway non supporté: stripe » for every card payment, blocking
+| admin refunds in production. These tests lock in the new behaviour:
+|   1. card payments resolve to a Stripe gateway implementation
+|   2. the canonical gateway transaction id is the Stripe PaymentIntent id
+|   3. the refund lifecycle (DB row + side-effects + email) runs to
+|      completion when the Stripe SDK call succeeds
+|
+| We bind a fake `PaymentGatewayInterface` over `StripePaymentService` in
+| the container so we never hit the real Stripe API in tests.
+*/
+it('routes Stripe payment refunds via StripePaymentService', function (): void {
+    $admin = User::factory()->admin()->create();
+    $customer = User::factory()->create();
+
+    $payment = Payment::factory()->success()->create([
+        'type' => 'credit',
+        'amount' => 1000,
+        'gateway' => 'stripe',
+        'payment_method' => 'card',
+        'transaction_id' => 'KH-STRIPE-001',
+        'user_id' => $customer->id,
+        // Mirrors what `StripePaymentService::normaliseIntent()` persists:
+        // the `id` key is the Stripe PaymentIntent id (`pi_…`).
+        'gateway_response' => [
+            'id' => 'pi_3OabcdEFGHijkl1234567890',
+            'status' => 'succeeded',
+            'amount' => 152, // 1000 XAF → 152 EUR cents at peg
+            'currency' => 'eur',
+        ],
+    ]);
+
+    // Spy that captures arguments and returns a successful refund payload
+    // matching `PaymentGatewayInterface::refund()` contract.
+    $spy = Mockery::mock(PaymentGatewayInterface::class);
+    $spy->shouldReceive('refund')
+        ->once()
+        ->with('pi_3OabcdEFGHijkl1234567890', 1000.0)
+        ->andReturn([
+            'refund_id' => 're_3OabcdEFGH001',
+            'status' => 'succeeded',
+            'amount_refunded' => 1000.0,
+            'raw' => ['id' => 're_3OabcdEFGH001', 'status' => 'succeeded'],
+        ]);
+
+    $this->app->instance(StripePaymentService::class, $spy);
+
+    $response = $this->actingAs($admin, 'sanctum')
+        ->postJson("/api/v1/admin/payments/{$payment->id}/refund", [
+            'reason' => 'Carte refusée par le client après livraison',
+        ]);
+
+    $response->assertSuccessful();
+    $response->assertJsonPath('refund.status', 'completed');
+
+    $payment->refresh();
+    expect($payment->status)->toBe(PaymentStatus::REFUNDED);
+
+    $refund = Refund::where('payment_id', $payment->id)->first();
+    expect($refund)->not->toBeNull();
+    expect($refund->gateway_refund_id)->toBe('re_3OabcdEFGH001');
+});
+
+it('falls back to Payment.transaction_id when Stripe gateway_response lacks id', function (): void {
+    // Legacy edge case: an old Stripe payment row may have an empty
+    // `gateway_response` (e.g. failed first sync). The refund flow must
+    // still succeed by passing the local `tx_ref` to the gateway, which
+    // `StripePaymentService::resolveStripeIntentId()` accepts natively.
+    $admin = User::factory()->admin()->create();
+
+    $payment = Payment::factory()->success()->create([
+        'type' => 'credit',
+        'amount' => 5000,
+        'gateway' => 'stripe',
+        'payment_method' => 'card',
+        'transaction_id' => 'KH-LEGACY-FALLBACK',
+        'gateway_response' => [], // intentionally empty
+    ]);
+
+    $spy = Mockery::mock(PaymentGatewayInterface::class);
+    $spy->shouldReceive('refund')
+        ->once()
+        ->with('KH-LEGACY-FALLBACK', 5000.0)
+        ->andReturn([
+            'refund_id' => 're_legacy_001',
+            'status' => 'succeeded',
+            'amount_refunded' => 5000.0,
+            'raw' => ['id' => 're_legacy_001'],
+        ]);
+
+    $this->app->instance(StripePaymentService::class, $spy);
+
+    $this->actingAs($admin, 'sanctum')
+        ->postJson("/api/v1/admin/payments/{$payment->id}/refund", [
+            'reason' => 'Test fallback tx_ref',
+        ])
+        ->assertSuccessful();
 });
