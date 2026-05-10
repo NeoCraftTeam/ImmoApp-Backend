@@ -55,7 +55,7 @@ final readonly class Money
 
         $formatted = $formatter->formatCurrency((float) $amount, $currency);
 
-        return $formatted === false ? (string) $amount.' '.$currency : $formatted;
+        return $formatted;
     }
 
     /**
