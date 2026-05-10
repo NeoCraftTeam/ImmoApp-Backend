@@ -7,4 +7,16 @@ namespace App\Enums;
 enum PaymentGateway: string
 {
     case Flutterwave = 'flutterwave';
+    case Stripe = 'stripe';
+
+    /**
+     * Human-readable label (French) used in invoices, emails and admin UIs.
+     */
+    public function label(): string
+    {
+        return match ($this) {
+            self::Flutterwave => 'Flutterwave',
+            self::Stripe => 'Stripe',
+        };
+    }
 }

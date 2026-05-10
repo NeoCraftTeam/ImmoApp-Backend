@@ -202,11 +202,29 @@ final readonly class RefundService
         }
     }
 
+    /**
+     * Locate the canonical gateway transaction id we need to pass to the
+     * gateway's `refund()` call. Both Flutterwave and Stripe persist the
+     * raw provider response under `gateway_response`; the top-level `id`
+     * is the canonical identifier for a successful charge — Flutterwave
+     * `transaction_id` (numeric) and Stripe `pi_…` PaymentIntent id.
+     *
+     * For Stripe we additionally fall back to the local `tx_ref` (stored
+     * on `Payment.transaction_id`) — `StripePaymentService::refund()`
+     * accepts both forms via `resolveStripeIntentId()`. This guarantees
+     * we can refund even if the legacy raw payload omitted the `id` key.
+     */
     private function extractGatewayTransactionId(Payment $payment): string
     {
         $gatewayResponse = $payment->gateway_response ?? [];
 
         $id = $gatewayResponse['id'] ?? $gatewayResponse['transaction_id'] ?? null;
+
+        // Stripe-specific safety net: PaymentIntent search by tx_ref is
+        // implemented in StripePaymentService::resolveStripeIntentId().
+        if (!$id && $payment->gateway === 'stripe' && !empty($payment->transaction_id)) {
+            $id = (string) $payment->transaction_id;
+        }
 
         if (!$id) {
             throw new \InvalidArgumentException(
@@ -217,10 +235,23 @@ final readonly class RefundService
         return (string) $id;
     }
 
+    /**
+     * Map `Payment.gateway` (`stripe` | `flutterwave`) to its concrete
+     * `PaymentGatewayInterface` implementation. Routing is symmetric with
+     * the registry built in `AppServiceProvider::register()` for the main
+     * `PaymentService` orchestrator — we resolve via the container so the
+     * Stripe client can be swapped in tests via `$this->app->bind()`.
+     *
+     * Adding `'stripe'` here unblocks card refunds in production: without
+     * this branch, `Filament/RefundResource` admin actions would throw
+     * « Gateway non supporté » even though `StripePaymentService::refund()`
+     * is fully implemented.
+     */
     private function resolveGateway(Payment $payment): PaymentGatewayInterface
     {
         return match ($payment->gateway) {
-            'flutterwave' => new FlutterwavePaymentService,
+            'flutterwave' => app(FlutterwavePaymentService::class),
+            'stripe' => app(StripePaymentService::class),
             default => throw new \InvalidArgumentException("Gateway non supporté: {$payment->gateway}"),
         };
     }

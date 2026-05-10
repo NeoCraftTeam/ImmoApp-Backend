@@ -270,6 +270,83 @@ final class PaymentController
      *     @OA\Response(response=401, description="Signature invalide")
      * )
      */
+    /**
+     * Stripe webhook handler.
+     *
+     * Stripe requires the RAW body for signature verification — we feed
+     * `getContent()` directly into the gateway, not `$request->all()`.
+     * Otherwise verification would always fail because Laravel's parsed
+     * payload doesn't byte-match what Stripe signed.
+     *
+     * @OA\Post(
+     *     path="/api/v1/webhooks/stripe",
+     *     summary="Webhook Stripe",
+     *     tags={"💰 Paiements"},
+     *
+     *     @OA\Response(response=200, description="Webhook traité"),
+     *     @OA\Response(response=400, description="Payload invalide"),
+     *     @OA\Response(response=401, description="Signature invalide")
+     * )
+     */
+    public function handleStripeWebhook(Request $request): JsonResponse
+    {
+        // Stripe sends ~10 event types per PaymentIntent lifecycle (created,
+        // requires_action, processing, succeeded, …). Logging at info level
+        // floods the production log; debug keeps the trace available locally
+        // while letting `Log::warning/error` surface real incidents.
+        Log::debug('--- WEBHOOK stripe START ---');
+
+        $rawPayload = (string) $request->getContent();
+        $signature = (string) $request->header('Stripe-Signature', '');
+
+        if ($rawPayload === '' || $signature === '') {
+            return response()->json(['status' => 'error', 'message' => 'Missing payload or signature'], 400);
+        }
+
+        /** @var array<string, mixed>|null $decoded */
+        $decoded = json_decode($rawPayload, true);
+        if (!is_array($decoded)) {
+            return response()->json(['status' => 'error', 'message' => 'Invalid JSON'], 400);
+        }
+
+        // `__raw` is consumed by `StripePaymentService::handleWebhook` for
+        // signature verification — Laravel's parsed payload would fail.
+        $decoded['__raw'] = $rawPayload;
+
+        try {
+            $data = $this->paymentService->processWebhook(
+                $decoded,
+                ['stripe-signature' => $signature],
+                'stripe',
+            );
+        } catch (InvalidWebhookSignatureException) {
+            return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
+        } catch (PaymentGatewayException|\Exception $e) {
+            Log::error('Stripe webhook signature/parse error: '.$e->getMessage());
+
+            return response()->json(['status' => 'error'], 500);
+        }
+
+        $txRef = (string) ($data['tx_ref'] ?? '');
+        $event = (string) ($data['event'] ?? '');
+
+        // Only push to the queue when the event is one we actually act on.
+        // Stripe sends many event types (`payment_intent.created`, etc.); we
+        // only want post-payment side-effects on terminal success events so
+        // we don't redundantly schedule jobs that early-return.
+        if ($txRef !== '' && $event === 'payment_intent.succeeded') {
+            ProcessFlutterwaveWebhookJob::dispatch(
+                $txRef,
+                'stripe',
+                (array) ($data['raw'] ?? []),
+                $request->header('X-Request-ID'),
+                $request->header('X-Correlation-ID'),
+            );
+        }
+
+        return response()->json(['status' => 'ok']);
+    }
+
     public function handleWebhook(Request $request, string $gateway): JsonResponse
     {
         Log::info("--- WEBHOOK {$gateway} START ---");
@@ -368,6 +445,30 @@ final class PaymentController
 
         $period = $request->integer('period', 0);
 
+        // Visitor's locale currency (CHF / EUR / USD…) and the per-XAF rate
+        // — both come from the frontend's `useCurrency()` so the PDF can
+        // render the local converted amount as primary with the canonical
+        // FCFA as a reference subtitle. We accept only ISO codes from a
+        // fixed allow-list and a positive finite rate; anything else falls
+        // back to FCFA-only display (no conversion).
+        $allowedCurrencies = ['EUR', 'USD', 'GBP', 'CHF', 'CAD', 'JPY', 'MXN', 'BRL', 'CNY', 'AUD', 'KRW'];
+        $rawCurrency = strtoupper((string) $request->query('currency', ''));
+        $rawRate = (float) $request->query('rate', 0);
+        $useLocale = in_array($rawCurrency, $allowedCurrencies, true)
+            && is_finite($rawRate)
+            && $rawRate > 0;
+        $localeCurrency = $useLocale ? $rawCurrency : null;
+        $localeRate = $useLocale ? $rawRate : null;
+        $localeSymbol = $useLocale ? match ($rawCurrency) {
+            'EUR' => '€',
+            'USD', 'CAD', 'AUD', 'MXN', 'BRL' => '$',
+            'GBP' => '£',
+            'CHF' => 'CHF',
+            'JPY', 'CNY' => '¥',
+            'KRW' => '₩',
+            default => $rawCurrency,
+        } : null;
+
         $query = Payment::where('user_id', $user->id)
             ->with('pointPackage', 'ad')
             ->orderByDesc('created_at');
@@ -407,6 +508,9 @@ final class PaymentController
             'periodLabel' => $periodLabel,
             'generatedAt' => now()->format('d/m/Y à H:i'),
             'logoBase64' => $logoBase64,
+            'localeCurrency' => $localeCurrency,
+            'localeRate' => $localeRate,
+            'localeSymbol' => $localeSymbol,
         ])
             ->setPaper('a4', 'portrait')
             ->setOptions([

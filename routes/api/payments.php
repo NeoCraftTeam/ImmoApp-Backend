@@ -5,14 +5,29 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\V1\CreditController;
 use App\Http\Controllers\Api\V1\InvoiceController;
 use App\Http\Controllers\Api\V1\PaymentController;
+use App\Http\Controllers\Api\V1\PaymentMethodController;
 use App\Http\Controllers\Api\V1\PromoCodeController;
 use App\Http\Controllers\Api\V1\RefundController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
 use Illuminate\Support\Facades\Route;
 
-// --- PAYMENTS (Flutterwave — extensible to additional gateways) ---
+// --- PAYMENT METHODS CATALOGUE (public) ---
+// Returns the list of methods currently enabled by the admin gate.
+// Consumed by `<PaymentModal>` to render a dynamic selector instead of
+// hard-coding the four PaymentMethod cases.
+Route::get('/payments/methods', [PaymentMethodController::class, 'index'])
+    ->middleware('throttle:60,1');
+
+// --- PAYMENTS — multi-gateway webhooks ---
+// Flutterwave: legacy `{gateway}` placeholder (constraint = flutterwave).
 Route::post('/webhooks/{gateway}', [PaymentController::class, 'handleWebhook'])
     ->where('gateway', 'flutterwave')
+    ->middleware('throttle:payments.webhook');
+
+// Stripe: dedicated endpoint — verifies `Stripe-Signature` against the
+// raw body. Cashier's default `/stripe/webhook` is disabled in
+// AppServiceProvider via `Cashier::ignoreRoutes()` so we own the URL.
+Route::post('/webhooks/stripe', [PaymentController::class, 'handleStripeWebhook'])
     ->middleware('throttle:payments.webhook');
 
 Route::middleware('auth:sanctum')->group(function (): void {

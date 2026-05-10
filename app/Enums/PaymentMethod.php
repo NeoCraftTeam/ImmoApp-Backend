@@ -23,4 +23,21 @@ enum PaymentMethod: string
             self::FLUTTERWAVE => 'Flutterwave',
         };
     }
+
+    /**
+     * Routing rule: which gateway processes this method.
+     *
+     * Mobile Money & Orange Money → Flutterwave (CEMAC/UEMOA mobile rails).
+     * Carte bancaire → Stripe (PCI-compliant card processor, EUR billing).
+     * `flutterwave` (legacy umbrella) stays on Flutterwave.
+     */
+    public function gateway(): PaymentGateway
+    {
+        return match ($this) {
+            self::ORANGE_MONEY,
+            self::MOBILE_MONEY,
+            self::FLUTTERWAVE => PaymentGateway::Flutterwave,
+            self::CARD => PaymentGateway::Stripe,
+        };
+    }
 }

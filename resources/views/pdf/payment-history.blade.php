@@ -280,7 +280,6 @@
                 <td class="user-info-right">
                     <div class="info-label">Généré le</div>
                     <div class="info-value">{{ $generatedAt }}</div>
-                    <div class="info-sub">keyhome.cm</div>
                 </td>
             </tr>
         </table>
@@ -297,13 +296,23 @@
                 </td>
                 <td class="stat-card stat-card-amount">
                     <div class="stat-label">Montant total dépensé</div>
-                    <div class="stat-value stat-value-pink">{{ number_format($totalAmount, 0, ',', ' ') }}</div>
-                    <div class="stat-sub">XOF (FCFA)</div>
+                    @if($localeCurrency && $localeRate)
+                        {{-- Visitor sees their LOCAL currency (CHF/EUR/USD…) as the
+                             primary big number; the FCFA canonical value is rendered
+                             smaller below as a reference. Two decimals for fiat (CHF
+                             1.40), zero for the no-decimal currencies the controller
+                             handles by collapsing localeRate display logic. --}}
+                        <div class="stat-value stat-value-pink">{{ number_format($totalAmount * $localeRate, 2, ',', ' ') }} {{ $localeSymbol }}</div>
+                        <div class="stat-sub">≈ {{ number_format($totalAmount, 0, ',', ' ') }} FCFA</div>
+                    @else
+                        <div class="stat-value stat-value-pink">{{ number_format($totalAmount, 0, ',', ' ') }}</div>
+                        <div class="stat-sub">XOF (FCFA)</div>
+                    @endif
                 </td>
                 <td class="stat-card stat-card-credits">
-                    <div class="stat-label">Crédits obtenus</div>
+                    <div class="stat-label">Crédits achetés</div>
                     <div class="stat-value stat-value-green">{{ number_format($creditsEarned) }}</div>
-                    <div class="stat-sub">points cumulés</div>
+                    <div class="stat-sub">via paiements réussis · solde actuel : {{ number_format((int) $user->point_balance) }}</div>
                 </td>
             </tr>
         </table>
@@ -402,8 +411,16 @@
                                 </span>
                             </td>
                             <td class="right {{ $isPaid ? 'amount-paid' : 'amount-other' }}">
-                                {{ number_format((float)$payment->amount, 0, ',', ' ') }}
-                                <span style="font-size:7.5pt; font-weight:400; color:#94a3b8;">XOF</span>
+                                @if($localeCurrency && $localeRate)
+                                    {{ number_format((float)$payment->amount * $localeRate, 2, ',', ' ') }}
+                                    <span style="font-size:7.5pt; font-weight:400; color:#94a3b8;">{{ $localeSymbol }}</span>
+                                    <div style="font-size:7pt; font-weight:400; color:#cbd5e1; margin-top:1px;">
+                                        ≈ {{ number_format((float)$payment->amount, 0, ',', ' ') }} FCFA
+                                    </div>
+                                @else
+                                    {{ number_format((float)$payment->amount, 0, ',', ' ') }}
+                                    <span style="font-size:7.5pt; font-weight:400; color:#94a3b8;">XOF</span>
+                                @endif
                             </td>
                         </tr>
                     @endforeach
@@ -415,8 +432,16 @@
                                 Total encaissé ({{ $paidCount }} transaction{{ $paidCount > 1 ? 's' : '' }} réussie{{ $paidCount > 1 ? 's' : '' }})
                             </td>
                             <td class="value-cell" style="white-space:nowrap;">
-                                {{ number_format($totalAmount, 0, ',', ' ') }}
-                                <span style="font-size:7.5pt; font-weight:400;">XOF</span>
+                                @if($localeCurrency && $localeRate)
+                                    {{ number_format($totalAmount * $localeRate, 2, ',', ' ') }}
+                                    <span style="font-size:7.5pt; font-weight:400;">{{ $localeSymbol }}</span>
+                                    <div style="font-size:7pt; font-weight:400; color:#94a3b8; margin-top:1px;">
+                                        ≈ {{ number_format($totalAmount, 0, ',', ' ') }} FCFA
+                                    </div>
+                                @else
+                                    {{ number_format($totalAmount, 0, ',', ' ') }}
+                                    <span style="font-size:7.5pt; font-weight:400;">XOF</span>
+                                @endif
                             </td>
                         </tr>
                     @endif
@@ -437,7 +462,7 @@
         <table class="footer-table">
             <tr>
                 <td class="footer-left">
-                    KeyHome · keyhome.cm · support@keyhome.cm
+                    KeyHome · keyhome.app · support@keyhome.app
                 </td>
                 <td class="footer-right">
                     Généré le {{ $generatedAt }} · Page&nbsp;<span class="page-number"></span>

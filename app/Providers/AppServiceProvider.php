@@ -12,6 +12,8 @@ use App\Enums\UserRole;
 use App\Enums\UserType;
 use App\Models\Ad;
 use App\Models\Agency;
+use App\Models\CashierSubscription;
+use App\Models\CashierSubscriptionItem;
 use App\Models\Payment;
 use App\Models\PersonalAccessToken;
 use App\Models\PointPackage;
@@ -29,7 +31,9 @@ use App\Services\AiSearchService;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
 use App\Services\Payment\FlutterwavePaymentService;
+use App\Services\Payment\PaymentMethodGateService;
 use App\Services\Payment\PaymentService;
+use App\Services\Payment\StripePaymentService;
 use App\Services\RecommendationEngine;
 use App\Services\ReservationService;
 use App\Services\TrustScoreService;
@@ -47,6 +51,7 @@ use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Laragear\WebAuthn\Contracts\WebAuthnChallengeRepository;
+use Laravel\Cashier\Cashier;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Activitylog\Models\Activity;
 
@@ -69,6 +74,11 @@ class AppServiceProvider extends ServiceProvider
         // because the challenge data exceeds the 4 KB browser cookie size limit.
         $this->app->bind(WebAuthnChallengeRepository::class, CacheChallengeRepository::class);
 
+        // Admin-controlled gating of every payment method. Singleton because
+        // the runtime overrides are cached per-method and we want a single
+        // source of truth across the whole request lifecycle.
+        $this->app->singleton(PaymentMethodGateService::class);
+
         $this->app->singleton(PaymentService::class, function ($app): PaymentService {
             $defaultName = (string) config('payment.default', 'flutterwave');
             $fallbackName = config('payment.fallback');
@@ -76,7 +86,22 @@ class AppServiceProvider extends ServiceProvider
             $gateway = $this->resolvePaymentGateway($app, $defaultName);
             $fallback = $fallbackName ? $this->resolvePaymentGateway($app, (string) $fallbackName) : null;
 
-            return new PaymentService($gateway, $fallback);
+            // Registry of every gateway available at runtime, keyed by the
+            // value returned by `getName()` (matches PaymentGateway enum).
+            // PaymentService routes a request via
+            // `PaymentMethod::gateway()->value` lookup.
+            $registry = [
+                $gateway->getName() => $gateway,
+            ];
+            if ($fallback !== null) {
+                $registry[$fallback->getName()] = $fallback;
+            }
+            // Always register Stripe so card payments work even when the
+            // default gateway is Flutterwave.
+            $stripe = $app->make(StripePaymentService::class);
+            $registry[$stripe->getName()] = $stripe;
+
+            return new PaymentService($gateway, $fallback, $registry);
         });
     }
 
@@ -87,6 +112,23 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureRateLimiting();
         $this->ensureLivewireTmpDirectoryExists();
+
+        // Cashier model overrides — `subscriptions` was renamed to
+        // `cashier_subscriptions` in `database/migrations/..._create_subscriptions_table.php`
+        // to avoid collision with the existing business `subscriptions`
+        // (App\Models\Subscription, agency plans). The custom subclasses
+        // pin the table name; nothing else changes in the Cashier API.
+        Cashier::useSubscriptionModel(CashierSubscription::class);
+        Cashier::useSubscriptionItemModel(CashierSubscriptionItem::class);
+
+        // KeyHome ships its own webhook controller (`PaymentController::handleStripeWebhook`)
+        // so the metadata-driven `Payment` lookup keeps working. Disable
+        // Cashier's default webhook + UI routes to avoid double handling.
+        // Cashier's migrations are *published* (taken over) rather than
+        // ignored — the package detects published migrations and will not
+        // re-load them, which is why we don't call `ignoreMigrations()`
+        // (it doesn't exist in Cashier 16 anyway).
+        Cashier::ignoreRoutes();
 
         // Prevent N+1 queries in dev/testing — throws exception on lazy loading
         Model::preventLazyLoading(!app()->isProduction());
@@ -233,6 +275,7 @@ class AppServiceProvider extends ServiceProvider
     {
         return match ($name) {
             'flutterwave' => $app->make(FlutterwavePaymentService::class),
+            'stripe' => $app->make(StripePaymentService::class),
             default => throw new \InvalidArgumentException("Payment gateway [{$name}] not supported."),
         };
     }

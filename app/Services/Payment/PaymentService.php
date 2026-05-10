@@ -28,7 +28,29 @@ use Illuminate\Support\Str;
  */
 final readonly class PaymentService
 {
-    public function __construct(private PaymentGatewayInterface $gateway, private ?PaymentGatewayInterface $fallbackGateway = null) {}
+    /** @var array<string, PaymentGatewayInterface> */
+    private array $registry;
+
+    /**
+     * @param  array<string, PaymentGatewayInterface>  $registry  Map of gateway name (lower-case, matches enum value) to instance.
+     *                                                            Empty by default; populated by `AppServiceProvider` so the service
+     *                                                            can route any `PaymentMethod` to its `gateway()` without N if/else branches.
+     *                                                            `readonly` forbids in-place mutation so we agregate locally first.
+     */
+    public function __construct(
+        private PaymentGatewayInterface $gateway,
+        private ?PaymentGatewayInterface $fallbackGateway = null,
+        array $registry = [],
+    ) {
+        // Make sure the primary + fallback are always reachable through
+        // the registry so `processWebhook()` and `syncPaymentStatus()` can
+        // delegate to the gateway that originally handled the payment.
+        $registry[$this->gateway->getName()] ??= $this->gateway;
+        if ($this->fallbackGateway !== null) {
+            $registry[$this->fallbackGateway->getName()] ??= $this->fallbackGateway;
+        }
+        $this->registry = $registry;
+    }
 
     /**
      * Create a pending payment record and obtain the checkout link.
@@ -83,7 +105,13 @@ final readonly class PaymentService
             'meta' => $meta,
         ];
 
-        [$result, $usedGateway] = $this->initiateWithFallback($gatewayPayload);
+        // Route to the gateway implied by the chosen `payment_method`. If
+        // the method is unknown or its gateway isn't registered, we fall
+        // back to the legacy default (Flutterwave). Mobile money +
+        // Orange Money → Flutterwave; Card → Stripe.
+        $primaryGateway = $this->resolveGatewayForMethod($data['payment_method'] ?? null);
+
+        [$result, $usedGateway] = $this->initiateWithFallback($gatewayPayload, $primaryGateway);
 
         $payment = DB::transaction(function () use ($data, $txRef, $result, $user, $usedGateway): Payment {
             $payment = new Payment;
@@ -128,9 +156,10 @@ final readonly class PaymentService
      */
     public function verifyByTxRef(string $txRef): Payment
     {
-        $payment = Payment::where('transaction_id', $txRef)
-            ->where('gateway', $this->gateway->getName())
-            ->firstOrFail();
+        // No gateway constraint here — a tx_ref is unique per Payment, and
+        // restricting by `$this->gateway->getName()` would break verification
+        // for Stripe-issued payments when Flutterwave is the default gateway.
+        $payment = Payment::where('transaction_id', $txRef)->firstOrFail();
 
         return $this->syncPaymentStatus($payment);
     }
@@ -150,7 +179,22 @@ final readonly class PaymentService
             return $payment;
         }
 
-        $result = $this->gateway->verify($payment->transaction_id);
+        // Verify with the gateway that originally handled the payment, not
+        // the default one. This is critical now that we run multiple
+        // gateways simultaneously (Flutterwave + Stripe).
+        $gatewayName = (string) ($payment->gateway ?? $this->gateway->getName());
+        $verifyingGateway = $this->resolveGateway($gatewayName);
+
+        // For Stripe, prefer the stored `payment_link` (clientSecret of the
+        // form `pi_xxx_secret_yyy`) over `transaction_id` so the gateway
+        // can call `paymentIntents.retrieve()` directly. Falling back to
+        // tx_ref forces a metadata search which has a ~1 min indexing lag
+        // on Stripe's side and would race the immediate post-confirm verify.
+        $reference = $gatewayName === 'stripe' && !empty($payment->payment_link)
+            ? (string) $payment->payment_link
+            : (string) $payment->transaction_id;
+
+        $result = $verifyingGateway->verify($reference);
 
         $expectedCurrency = config('payment.default_currency', 'XAF');
 
@@ -166,7 +210,14 @@ final readonly class PaymentService
                 $paidAmount = (float) $result['amount'];
                 $paidCurrency = (string) $result['currency'];
 
-                if (abs($paidAmount - (float) $locked->amount) > 0.01 || strcasecmp($paidCurrency, (string) $expectedCurrency) !== 0) {
+                // Tolerance for round-trip XAF→EUR→XAF conversion: Stripe rounds to
+                // whole cents, so converting back can lose up to ~7 XAF (one EUR cent
+                // ≈ 6.56 XAF at the BEAC peg). The current Stripe path pins the
+                // original XAF amount in PaymentIntent.metadata.xaf_amount and we
+                // read it back precisely, so this tolerance is purely defensive
+                // (legacy rows / future gateways with similar precision quirks).
+                $allowedDelta = 10.0;
+                if (abs($paidAmount - (float) $locked->amount) > $allowedDelta || strcasecmp($paidCurrency, (string) $expectedCurrency) !== 0) {
                     Log::critical('Payment amount/currency mismatch', [
                         'payment_id' => $locked->id,
                         'expected_amount' => $locked->amount,
@@ -253,10 +304,39 @@ final readonly class PaymentService
                 return ['event' => null];
             }
 
+            // Orphan-debit guard: a payment may already be terminal (legitimately
+            // SUCCESS, or marked CANCELLED/FAILED locally after a UI cancel /
+            // multi-tab race) when the gateway later confirms a real charge.
+            //
+            //   - terminal SUCCESS + incoming success  → genuine duplicate, ignore
+            //   - terminal SUCCESS + incoming failure  → ignore (we already
+            //     fulfilled, gateway can't retroactively retract without refund)
+            //   - terminal CANCELLED/FAILED + success  → MONEY MOVED but our row
+            //     says no fulfilment: log critical, flip to SUCCESS, let
+            //     post-payment actions run so the customer actually gets what
+            //     they paid for. Support is alerted via the critical log.
             if ($payment->isTerminal()) {
-                Log::info('Webhook ignoré: Paiement #'.$payment->id.' déjà traité (status: '.$payment->status->value.').');
+                $isOrphanDebit = $data['status'] === 'success'
+                    && in_array($payment->status, [PaymentStatus::CANCELLED, PaymentStatus::FAILED], true);
 
-                return ['event' => null];
+                if (!$isOrphanDebit) {
+                    Log::info('Webhook ignoré: Paiement #'.$payment->id.' déjà traité (status: '.$payment->status->value.').');
+
+                    return ['event' => null];
+                }
+
+                Log::critical('Webhook: orphan debit detected — gateway succeeded after local terminal state', [
+                    'payment_id' => $payment->id,
+                    'tx_ref' => $payment->transaction_id,
+                    'gateway' => $gatewayName,
+                    'previous_status' => $payment->status->value,
+                    'gateway_event' => $data['event'],
+                    'gateway_amount' => $data['amount'],
+                    'gateway_currency' => $data['currency'],
+                ]);
+                // Fall through to the success branch below — `isTerminal()` is
+                // re-evaluated only at the start of the closure, so the rest
+                // of the success path will run normally.
             }
 
             $expectedCurrency = config('payment.default_currency', 'XAF');
@@ -265,7 +345,11 @@ final readonly class PaymentService
                 $paidAmount = (float) $data['amount'];
                 $paidCurrency = (string) $data['currency'];
 
-                if (abs($paidAmount - (float) $payment->amount) > 0.01 || strcasecmp($paidCurrency, (string) $expectedCurrency) !== 0) {
+                // Same tolerance rationale as `syncPaymentStatus` — see the
+                // comment there. Stripe round-trip XAF↔EUR cents loses up to
+                // ~7 XAF per transaction; we accept a 10 XAF window to keep
+                // legitimate charges from being marked FAILED.
+                if (abs($paidAmount - (float) $payment->amount) > 10.0 || strcasecmp($paidCurrency, (string) $expectedCurrency) !== 0) {
                     Log::critical('Webhook: amount/currency mismatch', [
                         'payment_id' => $payment->id,
                         'expected_amount' => $payment->amount,
@@ -389,17 +473,24 @@ final readonly class PaymentService
      * @param  array<string, mixed>  $payload
      * @return array{0: array{link: string, tx_ref: string, status: string, gateway: string}, 1: PaymentGatewayInterface}
      */
-    private function initiateWithFallback(array $payload): array
+    private function initiateWithFallback(array $payload, ?PaymentGatewayInterface $primary = null): array
     {
+        $primary ??= $this->gateway;
+
         try {
-            return [$this->gateway->initiate($payload), $this->gateway];
+            return [$primary->initiate($payload), $primary];
         } catch (PaymentGatewayException $e) {
-            if ($this->fallbackGateway === null) {
+            // Cross-gateway fallback only kicks in when the chosen primary
+            // matches the orchestrator's primary (mobile money flow). For
+            // Stripe card payments we propagate the error so the frontend
+            // can offer a retry / alternative method instead of silently
+            // switching to Flutterwave.
+            if ($this->fallbackGateway === null || $primary->getName() !== $this->gateway->getName()) {
                 throw $e;
             }
 
             Log::warning('Primary payment gateway failed, trying fallback', [
-                'primary' => $this->gateway->getName(),
+                'primary' => $primary->getName(),
                 'fallback' => $this->fallbackGateway->getName(),
                 'error' => $e->getMessage(),
             ]);
@@ -408,10 +499,38 @@ final readonly class PaymentService
         }
     }
 
+    /**
+     * Resolve the gateway implied by a `PaymentMethod` value (string).
+     *
+     * Routing rules live in {@see PaymentMethod::gateway()}. When the rule
+     * resolves to a gateway that hasn't been wired into the registry (e.g.
+     * Stripe disabled in container), we fall back to the orchestrator's
+     * default so existing flows keep working.
+     */
+    private function resolveGatewayForMethod(?string $methodValue): PaymentGatewayInterface
+    {
+        if ($methodValue === null || $methodValue === '') {
+            return $this->gateway;
+        }
+
+        $method = PaymentMethod::tryFrom($methodValue);
+        if ($method === null) {
+            return $this->gateway;
+        }
+
+        $gatewayName = $method->gateway()->value;
+
+        return $this->registry[$gatewayName] ?? $this->gateway;
+    }
+
     private function resolveGateway(string $name): PaymentGatewayInterface
     {
-        return match ($name) {
+        // Final-resort container resolution — keeps the legacy Flutterwave
+        // path working when a webhook arrives before the registry was wired
+        // (rare, but possible during deploys / artisan commands).
+        return $this->registry[$name] ?? match ($name) {
             'flutterwave' => app(FlutterwavePaymentService::class),
+            'stripe' => app(StripePaymentService::class),
             default => throw new \InvalidArgumentException("Gateway [{$name}] not supported."),
         };
     }

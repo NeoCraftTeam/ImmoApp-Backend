@@ -152,4 +152,35 @@ return [
         'token' => env('MAPBOX_TOKEN', ''),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Stripe (card payments via Laravel Cashier)
+    |--------------------------------------------------------------------------
+    | Stripe handles every PaymentMethod whose `gateway()` returns
+    | PaymentGateway::Stripe — currently `card` only. Mobile money methods
+    | continue to flow through Flutterwave.
+    |
+    | Stripe does NOT support XAF/XOF as a settlement currency, so KeyHome
+    | bills Stripe in EUR using the official CFA peg : 1 EUR = 655.957 XAF.
+    | The original XAF amount is kept canonical inside `payments.amount`,
+    | the EUR equivalent is stored in `payments.gateway_response.eur_amount`
+    | for audit. See `App\Services\Payment\StripePaymentService::convertXafToEurCents`.
+    |
+    | A single `STRIPE_WEBHOOK_SECRET` is used for both test and live —
+    | rotate the value in `.env` when switching environments.
+    */
+    'stripe' => [
+        'key' => env('STRIPE_KEY'),
+        'secret' => env('STRIPE_SECRET'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        'webhook_tolerance' => env('STRIPE_WEBHOOK_TOLERANCE', 300),
+        // Settlement currency for every Stripe charge. Override only if you
+        // know what you're doing — XAF/XOF are NOT supported by Stripe.
+        'currency' => env('STRIPE_CURRENCY', 'eur'),
+        // Pinned XAF→EUR conversion rate (CFA franc BEAC official peg).
+        // Hard-coded, NOT fetched from /api/exchange-rates, so receipts and
+        // refunds always reconcile to the same euro amount.
+        'xaf_to_eur_rate' => 655.957,
+    ],
+
 ];

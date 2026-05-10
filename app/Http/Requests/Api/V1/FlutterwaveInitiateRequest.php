@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Enums\PaymentMethod;
+use App\Services\Payment\PaymentMethodGateService;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
 class FlutterwaveInitiateRequest extends FormRequest
@@ -30,6 +33,33 @@ class FlutterwaveInitiateRequest extends FormRequest
             'period' => ['required_if:type,subscription', 'nullable', 'string', 'in:monthly,yearly'],
             'promo_code' => ['nullable', 'string', 'max:50'],
         ];
+    }
+
+    /**
+     * Reject payment methods that an admin has disabled via Filament.
+     * Runs after the basic `in:` rule so we know the value is one of the
+     * known cases before we hit the gate service.
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $v): void {
+            $method = $this->input('payment_method');
+            if (!is_string($method) || $method === '') {
+                return;
+            }
+            $enum = PaymentMethod::tryFrom($method);
+            if ($enum === null) {
+                return;
+            }
+            /** @var PaymentMethodGateService $gate */
+            $gate = app(PaymentMethodGateService::class);
+            if (!$gate->isEnabled($enum)) {
+                $v->errors()->add(
+                    'payment_method',
+                    sprintf('Le moyen de paiement « %s » est temporairement indisponible.', $enum->label()),
+                );
+            }
+        });
     }
 
     /** @return array<string, string> */
