@@ -21,8 +21,8 @@ class VisitTrackingController
      * Record an anonymous site visit. Designed to be best-effort:
      * - never returns 5xx (failures are logged + a 202 is returned),
      * - throttled per session_id to avoid hammering the DB on noisy clients
-     *   (a single insert per (session_id, device_type, source, referrer, utm_*) combo
-     *   per minute is enough for attribution analytics; utm_content / utm_term included in the key).
+     *   (a single insert per (session_id, device_type, source, utm_*) combo
+     *   per minute is enough for attribution analytics).
      */
     public function store(Request $request): JsonResponse
     {
@@ -64,8 +64,6 @@ class VisitTrackingController
             $validated['utm_source'] ?? '',
             $validated['utm_medium'] ?? '',
             $validated['utm_campaign'] ?? '',
-            $validated['utm_content'] ?? '',
-            $validated['utm_term'] ?? '',
         ]));
 
         if (Cache::add($dedupKey, 1, 60)) {
