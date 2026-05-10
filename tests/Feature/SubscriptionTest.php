@@ -29,12 +29,14 @@ beforeEach(function (): void {
         'sort_order' => 1,
     ]);
 
-    $this->agency = Agency::factory()->create();
     $this->agentUser = User::factory()->create([
         'role' => UserRole::AGENT,
         'type' => UserType::AGENCY,
-        'agency_id' => $this->agency->id,
     ]);
+    $this->agency = Agency::factory()->create([
+        'owner_id' => $this->agentUser->id,
+    ]);
+    $this->agentUser->update(['agency_id' => $this->agency->id]);
 });
 
 test('anyone can list active subscription plans', function (): void {
