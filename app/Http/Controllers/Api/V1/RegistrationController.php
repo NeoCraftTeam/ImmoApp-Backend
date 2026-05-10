@@ -66,6 +66,43 @@ final readonly class RegistrationController
     }
 
     /**
+     * Bootstrap a new administrator account. Reachable ONLY by an existing
+     * authenticated admin (route guarded by `auth:sanctum` + `mfa.admin` +
+     * `can:admin-access`). The controller itself stays role-agnostic — the
+     * three-middleware stack is the authority; we just forward to the
+     * shared registration handler with `role = admin`.
+     *
+     * @OA\Post(
+     *     path="/api/v1/auth/registerAdmin",
+     *     tags={"🔐 Authentification"},
+     *     summary="Inscription d'un nouvel administrateur (admin uniquement)",
+     *     operationId="registerAdmin",
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Response(response=201, description="Admin créé"),
+     *     @OA\Response(response=401, description="Non authentifié"),
+     *     @OA\Response(response=403, description="Accès admin requis (ou MFA manquant)"),
+     *     @OA\Response(response=409, description="Email déjà utilisé"),
+     *     @OA\Response(response=422, description="Erreur de validation"),
+     *     @OA\Response(response=429, description="Trop de tentatives")
+     * )
+     */
+    public function registerAdmin(RegisterRequest $request): JsonResponse
+    {
+        $data = $request->validated();
+        $data['role'] = 'admin';
+        $data['type'] = 'individual';
+
+        Log::info('admin.registration.initiated', [
+            'created_by_user_id' => $request->user()?->id,
+            'new_admin_email' => $data['email'] ?? null,
+            'ip' => $request->ip(),
+        ]);
+
+        return $this->handleRegistration($data, $request);
+    }
+
+    /**
      * @OA\Post(
      *     path="/api/v1/auth/check-email",
      *     tags={"🔐 Authentification"},

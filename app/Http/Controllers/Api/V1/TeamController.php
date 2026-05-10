@@ -48,6 +48,16 @@ final class TeamController
             return response()->json(['message' => 'Vous n\'avez pas d\'agence.'], 403);
         }
 
+        // OWASP A01 — only the agency owner may invite new members. This
+        // mirrors the auth posture of `destroy()` and `removeMember()`
+        // which already enforce `agency.owner_id === auth()->id()`. A
+        // viewer/manager bound to the agency must not be able to grow
+        // the membership of an agency they don't control.
+        $agency = Agency::query()->find($user->agency_id);
+        if (!$agency || $agency->owner_id !== auth()->id()) {
+            return response()->json(['message' => 'Seul le propriétaire de l\'agence peut inviter de nouveaux membres.'], 403);
+        }
+
         $validated = $request->validate([
             'email' => ['required', 'email', 'max:255'],
             'role' => ['required', 'in:manager,viewer'],

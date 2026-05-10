@@ -127,7 +127,11 @@ Route::get('/ads/{ad}/pdf', [AdPdfController::class, 'download'])
 
 // 3D Tour (public read, protected write)
 Route::get('/ads/{ad}/tour', [TourController::class, 'show'])->middleware('optional.auth');
-Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner'])->group(function (): void {
+// OWASP A05 — align with the ads CRUD stack which adds `token.role:agent`
+// for defense-in-depth (PAT carries the agent ability). Without this, a
+// customer-context PAT bypassed the role check on tour mutation endpoints,
+// even though `TourPolicy` still enforces ownership at the controller layer.
+Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner', 'token.role:agent'])->group(function (): void {
     Route::post('/ads/{ad}/tour/scenes', [TourController::class, 'uploadScenes'])
         ->middleware('throttle:10,1');
     Route::match(['patch', 'post'], '/ads/{ad}/tour/scenes/{sceneId}/hotspots', [TourController::class, 'updateHotspots']);

@@ -122,7 +122,11 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/users/{id}', 'show');
         // Mutating endpoints — gated for admin (and harmless for non-admin since `mfa.admin` is a no-op there).
         Route::post('/users', 'store')->middleware('mfa.admin')->can('create', User::class);
-        Route::put('/users/{user}', 'update');
+        // OWASP A05 — align with POST /users and DELETE /users/{user} which
+        // already enforce `mfa.admin`. An admin update can change a user's
+        // role or email, so it carries the same impact as create/destroy
+        // and must gate behind the same MFA bar.
+        Route::put('/users/{user}', 'update')->middleware('mfa.admin');
         Route::delete('/users/{user}', 'destroy')->middleware('mfa.admin');
     });
 
@@ -189,8 +193,13 @@ Route::prefix('v1')->group(function (): void {
         ->middleware('throttle:60,1');
 
     // --- LEASE CONTRACTS (landlord) ---
-    Route::middleware('auth:sanctum')->prefix('my/lease-contracts')->controller(LeaseContractController::class)->group(function (): void {
+    Route::middleware(['auth:sanctum', 'owner.role'])->prefix('my/lease-contracts')->controller(LeaseContractController::class)->group(function (): void {
         Route::get('/', 'index');
+        // OWASP A01 / LLM10 — gate the AI lease-conditions enhancer to
+        // landlords (AGENT/ADMIN). The endpoint has no per-record context
+        // (only a free-text payload), so customer accounts have no
+        // legitimate reason to call it. Throttle keeps abuse + cost
+        // bounded even for legitimate agents.
         Route::post('/ai/enhance-conditions', 'enhanceConditions')
             ->middleware('throttle:10,1');
         Route::get('/{leaseContract}', 'show')->name('lease-contracts.show');

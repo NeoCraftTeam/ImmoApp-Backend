@@ -16,7 +16,7 @@ final class SearchAlertController
 {
     /**
      * @OA\Get(
-     *     path="/api/v1/my/search-alerts",
+     *     path="/api/v1/search-alerts",
      *     summary="Lister mes alertes de recherche",
      *     tags={"🔔 Alertes"},
      *     security={{"sanctum":{}}},

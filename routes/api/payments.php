@@ -46,7 +46,13 @@ Route::middleware('auth:sanctum')->group(function (): void {
 });
 
 // --- REFUNDS (admin) ---
-Route::middleware(['auth:sanctum', 'can:admin-access'])->prefix('admin/payments/{payment}')->group(function (): void {
+// OWASP A05 — align with the rest of the admin surface (registerAdmin,
+// users create/destroy, ad-types, cities, quarters) which all require
+// `mfa.admin` when an admin has MFA enrolled. Refunds move money, so
+// skipping MFA here was a consistency gap: a stolen admin token/session
+// would suffice. `mfa.admin` is a no-op for non-admin (never reached
+// here thanks to `can:admin-access`, kept for defense in depth).
+Route::middleware(['auth:sanctum', 'can:admin-access', 'mfa.admin'])->prefix('admin/payments/{payment}')->group(function (): void {
     Route::post('/refund', [RefundController::class, 'store'])
         ->middleware('throttle:10,1');
     Route::get('/refunds', [RefundController::class, 'index'])

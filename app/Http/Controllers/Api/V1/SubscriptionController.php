@@ -240,6 +240,17 @@ final class SubscriptionController
             ], 403);
         }
 
+        // OWASP A01 — only the agency owner may engage agency funds via a
+        // subscription payment. A viewer/manager attached to the agency
+        // must not be allowed to launch a paid flow on the company's
+        // behalf. `cancel()` does not enforce this for legacy UX reasons,
+        // but `subscribe()` carries financial commitment so we gate it.
+        if ($agency->owner_id !== $user->id) {
+            return response()->json([
+                'message' => 'Seul le propriétaire de l\'agence peut souscrire un abonnement.',
+            ], 403);
+        }
+
         $plan = SubscriptionPlan::findOrFail($request->validated('plan_id'));
         $period = $request->validated('billing_period');
 
