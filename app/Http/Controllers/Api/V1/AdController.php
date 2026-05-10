@@ -115,6 +115,17 @@ final class AdController
 
     /**
      * Cursor-paginated public feed (infinite scroll / recommendations).
+     *
+     * Performance: the canonical query is served by the partial index
+     * `ad_feed_boost_idx (boost_score DESC, created_at DESC, id DESC)
+     *   WHERE is_visible = true AND status IN ('available', 'reserved')`.
+     *
+     * On top of the index, the *first page* (no cursor, no exclude_ids,
+     * default per_page) is hit by every guest landing on the home and is
+     * shared across users — we cache the resolved Eloquent collection for
+     * 60 s so a cold load never exceeds the 1 s Nightwatch SLA. Authenticated
+     * users and subsequent pages bypass the cache to keep personalised
+     * recommendations fresh.
      */
     public function feed(AdRequest $request): AnonymousResourceCollection
     {
@@ -122,25 +133,35 @@ final class AdController
 
         $perPage = min(max((int) $request->integer('per_page', config('pagination.per_page', 15)), 1), 50);
 
-        $query = Ad::query()
-            ->with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')
-            ->withAvg('reviews', 'rating')
-            ->withCount('reviews')
-            ->visible()
-            ->publiclyListed();
+        $isFirstPageGuest = !auth()->check()
+            && !$request->filled('cursor')
+            && !$request->filled('exclude_ids');
 
-        if ($excludeIds = $request->input('exclude_ids')) {
-            $ids = array_values(array_filter(array_map(strval(...), (array) $excludeIds)));
-            if ($ids !== []) {
-                $query->whereNotIn('id', $ids);
+        $build = function () use ($request, $perPage) {
+            $query = Ad::query()
+                ->with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')
+                ->withAvg('reviews', 'rating')
+                ->withCount('reviews')
+                ->visible()
+                ->publiclyListed();
+
+            if ($excludeIds = $request->input('exclude_ids')) {
+                $ids = array_values(array_filter(array_map(strval(...), (array) $excludeIds)));
+                if ($ids !== []) {
+                    $query->whereNotIn('id', $ids);
+                }
             }
-        }
 
-        $ads = $query
-            ->orderByDesc('boost_score')
-            ->orderByDesc('created_at')
-            ->orderByDesc('id')
-            ->cursorPaginate($perPage);
+            return $query
+                ->orderByDesc('boost_score')
+                ->orderByDesc('created_at')
+                ->orderByDesc('id')
+                ->cursorPaginate($perPage);
+        };
+
+        $ads = $isFirstPageGuest
+            ? Cache::remember("ads:feed:guest:first:pp={$perPage}", 60, $build)
+            : $build();
 
         return AdApiResource::collection($ads);
     }
