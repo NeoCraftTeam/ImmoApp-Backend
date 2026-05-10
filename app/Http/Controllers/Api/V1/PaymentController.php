@@ -193,6 +193,57 @@ final class PaymentController
     }
 
     /**
+     * Public payment status — minimal payload, no authentication required.
+     *
+     * Returns ONLY the status (`pending` | `success` | `failed` | `cancelled`)
+     * for a given `tx_ref`. Designed for the post-checkout callback page
+     * (`/credits/callback`, `/payment-success`) where the user's session
+     * cookie may have been lost during the cross-origin Flutterwave redirect.
+     *
+     * Security:
+     *  - The `tx_ref` is opaque (`KH-XXXXXXXXXXXX`, ~62-bit entropy) and acts
+     *    as a one-time capability — knowing it grants ONLY the right to read
+     *    the payment status, never to modify it or read PII.
+     *  - No user info, amount, payment method, gateway response, or any
+     *    other detail is returned. Defense-in-depth against ID-enumeration.
+     *  - Rate-limited (60/min per IP) to prevent brute-force of `tx_ref` space.
+     *  - Always returns 200 with `status: 'unknown'` on miss to avoid
+     *    distinguishing "exists" from "not exists" via HTTP status codes.
+     *
+     * @OA\Get(
+     *     path="/api/v1/payments/{txRef}/public-status",
+     *     summary="Statut public d'un paiement (sans auth)",
+     *     tags={"💰 Paiements"},
+     *
+     *     @OA\Parameter(name="txRef", in="path", required=true, @OA\Schema(type="string", example="KH-ABCDEF123456")),
+     *
+     *     @OA\Response(response=200, description="Statut du paiement (jamais de PII)")
+     * )
+     */
+    public function publicStatus(string $txRef): JsonResponse
+    {
+        // Hard-validate the format BEFORE hitting the DB so a flood of
+        // malformed requests can't produce a SQL injection attempt against
+        // the UUID-shaped column.
+        if (!preg_match('/^KH-[A-Z0-9]{6,32}$/i', $txRef)) {
+            return response()->json(['status' => 'unknown']);
+        }
+
+        /** @var Payment|null $payment */
+        $payment = Payment::query()
+            ->where('transaction_id', $txRef)
+            ->first();
+
+        if ($payment === null) {
+            return response()->json(['status' => 'unknown']);
+        }
+
+        return response()->json([
+            'status' => $payment->status->value,
+        ]);
+    }
+
+    /**
      * Cancel a pending Flutterwave payment on user request.
      *
      * @OA\Post(

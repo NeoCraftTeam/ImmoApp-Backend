@@ -18,6 +18,20 @@ use Illuminate\Support\Facades\Route;
 Route::get('/payments/methods', [PaymentMethodController::class, 'index'])
     ->middleware('throttle:60,1');
 
+// --- PUBLIC PAYMENT STATUS (auth-less, status-only) ---
+// Allows the post-checkout callback page (`/credits/callback`,
+// `/payment-success`) to poll a payment's status WITHOUT requiring a
+// session — critical when the user's session cookie was lost during the
+// cross-origin Flutterwave redirect (Safari / Firefox SameSite=Lax + cross-domain).
+// Returns ONLY `{ status: 'pending'|'success'|'failed'|'cancelled'|'unknown' }`,
+// no PII, no amount, no payment method. Knowing the `tx_ref` only grants
+// the right to read the status, never to modify or read details.
+// Throttled to 60 req/min/IP — enough for an aggressive callback poll
+// (1 req/s for 60 s) but not enough to brute-force `tx_ref` space.
+Route::get('/payments/{txRef}/public-status', [PaymentController::class, 'publicStatus'])
+    ->where('txRef', 'KH-[A-Za-z0-9]+')
+    ->middleware('throttle:60,1');
+
 // --- PAYMENTS — multi-gateway webhooks ---
 // Flutterwave: legacy `{gateway}` placeholder (constraint = flutterwave).
 Route::post('/webhooks/{gateway}', [PaymentController::class, 'handleWebhook'])

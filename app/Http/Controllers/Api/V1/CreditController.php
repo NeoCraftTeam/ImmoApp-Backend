@@ -179,6 +179,11 @@ final class CreditController
 
         return response()->json([
             'payment_url' => $result['link'],
+            // Returned so the frontend can target the exact payment in the
+            // post-checkout callback (rather than relying on "latest credit
+            // purchase" which races with concurrent purchases).
+            'tx_ref' => $result['tx_ref'],
+            'gateway' => $result['gateway'],
             'message' => 'Redirigez l\'utilisateur vers cette URL pour payer.',
         ]);
     }
@@ -214,12 +219,24 @@ final class CreditController
      */
     public function verifyPurchase(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'tx_ref' => ['nullable', 'string', 'max:255'],
+        ]);
+
         $user = $request->user();
 
-        $payment = Payment::where('user_id', $user->id)
-            ->where('type', PaymentType::CREDIT)
-            ->latest()
-            ->first();
+        // When a `tx_ref` is provided, target the exact payment created by
+        // the current checkout session. Falls back to "latest credit
+        // purchase" only when the frontend cannot supply it (legacy flow).
+        // Targeting prevents the polling page from accidentally reporting
+        // the status of an unrelated past purchase.
+        $query = Payment::query()
+            ->where('user_id', $user->id)
+            ->where('type', PaymentType::CREDIT);
+
+        $payment = !empty($validated['tx_ref'])
+            ? $query->where('transaction_id', $validated['tx_ref'])->first()
+            : $query->latest()->first();
 
         if (!$payment) {
             return response()->json([
