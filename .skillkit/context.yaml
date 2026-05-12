@@ -1,0 +1,43 @@
+version: 1
+project:
+  name: ImmoApp-Backend
+  type: unknown
+  path: /Users/feze/Developer/Laravel/ImmoApp-Backend
+stack:
+  languages:
+    - name: javascript
+      confidence: 90
+      source: package.json
+  frameworks: []
+  libraries: []
+  styling:
+    - name: tailwindcss
+      version: 4.2.1
+      confidence: 100
+      source: package.json
+  testing: []
+  databases: []
+  tools:
+    - name: docker
+      confidence: 100
+      source: Dockerfile
+  runtime:
+    - name: nodejs
+      confidence: 100
+      source: package.json
+patterns:
+  apiStyle: rest
+  styling: tailwind
+skills:
+  installed: []
+  recommended: []
+  excluded: []
+  autoSync: true
+  securityLevel: medium
+  testingRequired: false
+agents:
+  detected: []
+  synced: []
+  disabled: []
+createdAt: 2026-05-12T12:03:31.797Z
+updatedAt: 2026-05-12T12:03:31.797Z

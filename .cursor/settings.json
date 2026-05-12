@@ -6,5 +6,10 @@
     "slack": {
       "enabled": true
     }
+  },
+  "mcpServers": {
+    "stripe": {
+      "url": "https://mcp.stripe.com"
+    }
   }
 }
