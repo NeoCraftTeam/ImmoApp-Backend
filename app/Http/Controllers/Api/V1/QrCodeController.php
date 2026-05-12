@@ -34,9 +34,9 @@ final readonly class QrCodeController
     {
         $this->authorize('update', $ad);
 
-        $adUrl = $this->qrCodeService->adListingUrl($ad, 'qr');
+        $adUrl = $this->qrCodeService->adListingUrl($ad, 'qr', true);
         $user = $request->user();
-        $profileUrl = $user ? $this->qrCodeService->landlordProfileUrl($user, 'qr') : null;
+        $profileUrl = $user ? $this->qrCodeService->landlordProfileUrl($user, 'qr', true) : null;
 
         return response()->json([
             'data' => [
@@ -51,7 +51,7 @@ final readonly class QrCodeController
     {
         $this->authorize('update', $ad);
 
-        $adUrl = $this->qrCodeService->adListingUrl($ad, 'qr');
+        $adUrl = $this->qrCodeService->adListingUrl($ad, 'qr', true);
         $binary = $this->qrCodeService->renderRichPng($adUrl);
 
         return response($binary, 200, [
@@ -66,7 +66,7 @@ final readonly class QrCodeController
 
         $ad->loadMissing(['quarter.city', 'ad_type', 'user', 'media']);
 
-        $adUrl = $this->qrCodeService->adListingUrl($ad, 'placard');
+        $adUrl = $this->qrCodeService->adListingUrl($ad, 'qr', true);
 
         $pdf = Pdf::loadView('pdf.ad-placarde', [
             'ad' => $ad,
@@ -94,7 +94,7 @@ final readonly class QrCodeController
         $user = $request->user();
         abort_unless($user !== null, 403);
 
-        $profileUrl = $this->qrCodeService->landlordProfileUrl($user, 'qr');
+        $profileUrl = $this->qrCodeService->landlordProfileUrl($user, 'qr', true);
 
         return response()->json([
             'data' => [
@@ -109,7 +109,7 @@ final readonly class QrCodeController
         $user = $request->user();
         abort_unless($user !== null, 403);
 
-        $profileUrl = $this->qrCodeService->landlordProfileUrl($user, 'qr');
+        $profileUrl = $this->qrCodeService->landlordProfileUrl($user, 'qr', true);
         $binary = $this->qrCodeService->renderRichPng($profileUrl);
 
         return response($binary, 200, [
@@ -126,7 +126,7 @@ final readonly class QrCodeController
         $user = $request->user();
         abort_unless($user !== null, 403);
 
-        $payload = $this->buildBusinessCardPayload($user, 'visitcard');
+        $payload = $this->buildBusinessCardPayload($user);
 
         // 90 mm × 55 mm in PostScript points (1 mm = 2.83465 pt)
         $pdf = Pdf::loadView('pdf.business-card', $payload)
@@ -151,7 +151,7 @@ final readonly class QrCodeController
         $user = $request->user();
         abort_unless($user !== null, 403);
 
-        $payload = $this->buildBusinessCardPayload($user, 'visitcard_preview');
+        $payload = $this->buildBusinessCardPayload($user);
 
         $html = view('pdf.business-card-preview', $payload)->render();
 
@@ -168,11 +168,11 @@ final readonly class QrCodeController
      *
      * @return array<string, mixed>
      */
-    private function buildBusinessCardPayload(User $user, string $utmMedium): array
+    private function buildBusinessCardPayload(User $user): array
     {
         $user->loadCount(['ads' => fn ($q) => $q->where('status', 'available')]);
 
-        $profileUrl = $this->qrCodeService->landlordProfileUrl($user, $utmMedium);
+        $profileUrl = $this->qrCodeService->landlordProfileUrl($user, 'qr', true);
 
         $roleLabel = match ($user->role->value ?? 'agent') {
             'admin' => 'Administrateur',

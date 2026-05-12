@@ -14,17 +14,17 @@ use chillerlan\QRCode\QROptions;
 use Throwable;
 
 /**
- * Builds UTM-tracked public URLs and Apple-style branded scannable QR PNGs
- * for owner marketing assets (ad placardes, landlord business cards).
+ * Builds public listing/profile URLs (`appendUtm`; `$includeUtm` defaults **off**
+ * — pass `true` from owner QR/placarde/card controllers for scan + attribution).
+ * TikTok/Snap-inspired circular-framed scannable QR PNGs for owner assets.
  *
  * Visual design:
- *   • Standard ISO QR matrix (square — never clipped) with ECC-H (30% damage tolerance)
- *   • Pure black modules on white for maximum scanner contrast
- *   • 4-module quiet zone (ISO required) so any phone camera locks instantly
- *   • Decorative dashed rings hugging the matrix corners → circular silhouette
- *     without ever overlapping the data → 100% scannable
- *   • Embedded KeyHome key+keyring logo in the centre (≤ 5% of matrix area,
- *     well within ECC-H tolerance budget)
+ *   • Standard ISO QR matrix with ECC-H — data + quiet zone stay intact
+ *   • Pure black modules on white inside the clip; finders stay square
+ *   • Concentric dashed rings in black / grey sit **outside** the inscribed data
+ *     circle (different radii + dash phases seeded by URL crc32) → 100% scannable
+ *   • Centre white plate: subtle monochrome camera glyph under the KeyHome logo
+ *     (≤ ~10% matrix width, within ECC-H budget)
  *
  * Rasterisation chain (SVG → PNG): Imagick → rsvg-convert → plain chillerlan PNG.
  * DomPDF gets a clean PNG (it can't render our complex SVG with transforms +
@@ -62,10 +62,14 @@ final readonly class QrCodeService
         return $base.$path;
     }
 
-    public function adListingUrl(Ad $ad, string $utmMedium = 'qr'): string
+    public function adListingUrl(Ad $ad, string $utmMedium = 'qr', bool $includeUtm = false): string
     {
         $slug = $ad->slug ?: $ad->id;
         $url = $this->absoluteFrontendUrl('/ads/'.$slug);
+
+        if (!$includeUtm) {
+            return $url;
+        }
 
         return $this->appendUtm($url, [
             'utm_source' => 'keyhome',
@@ -75,10 +79,14 @@ final readonly class QrCodeService
         ]);
     }
 
-    public function landlordProfileUrl(User $user, string $utmMedium = 'qr'): string
+    public function landlordProfileUrl(User $user, string $utmMedium = 'qr', bool $includeUtm = false): string
     {
         $username = $user->username ?: $user->id;
         $url = $this->absoluteFrontendUrl('/bailleurs/'.$username);
+
+        if (!$includeUtm) {
+            return $url;
+        }
 
         return $this->appendUtm($url, [
             'utm_source' => 'keyhome',
@@ -143,7 +151,7 @@ final readonly class QrCodeService
         $inner = preg_replace('#<\?xml[^>]+\?>\s*#', '', (string) $rawQrSvg) ?? $rawQrSvg;
         $inner = preg_replace('#</?svg[^>]*>#i', '', (string) $inner) ?? '';
 
-        $rings = $this->renderDecorativeRings($cx, $cy, $qrSize);
+        $rings = $this->renderDecorativeRings($cx, $cy, $qrSize, $targetUrl);
         $logo = $this->renderCenterLogo($cx, $cy, $qrSize * 0.10);
 
         // Smart circular clip-path that:
@@ -249,53 +257,78 @@ final readonly class QrCodeService
     }
 
     /**
-     * 2 clean dashed rings frame the circular-clipped matrix:
-     *   • inner dark ring — just outside the inscribed circle clip
-     *   • outer crimson ring — the brand signature
-     * Both anchor to the inscribed-circle radius so they never overlap data.
+     * Five concentric dashed circles **outside** the inscribed data circle (same
+     * radius as the clip-path circle). Black + cool greys only on the rings so
+     * they never compete with scan contrast. Dash phases vary deterministically
+     * with the target URL string (crc32) for a stable per-link look.
      */
-    private function renderDecorativeRings(float $cx, float $cy, float $qrSize): string
+    private function renderDecorativeRings(float $cx, float $cy, float $qrSize, string $seed): string
     {
-        $brand = self::BRAND;
         $dark = self::DARK;
+        $g1 = '#1F2937';
+        $g2 = '#4B5563';
+        $g3 = '#6B7280';
+        $g4 = '#9CA3AF';
 
-        $clipR = $qrSize * 0.5; // matches the matrix circular clip
+        $clipR = $qrSize * 0.5;
+        $h = crc32($seed);
 
-        $r1 = $clipR + 14;
-        $r2 = $clipR + 38;
+        /** @var list<array{r: float, w: float, dash: string, color: string, offset: float}> $spec */
+        $spec = [
+            ['r' => $clipR + 9, 'w' => 3.2, 'dash' => '4 11', 'color' => $dark, 'offset' => (float) ($h % 13)],
+            ['r' => $clipR + 22, 'w' => 2.6, 'dash' => '3 9', 'color' => $g1, 'offset' => (float) (($h >> 3) % 17)],
+            ['r' => $clipR + 35, 'w' => 3.0, 'dash' => '5 14', 'color' => $g2, 'offset' => (float) (($h >> 6) % 11)],
+            ['r' => $clipR + 48, 'w' => 2.4, 'dash' => '2 10', 'color' => $g3, 'offset' => (float) (($h >> 9) % 19)],
+            ['r' => $clipR + 62, 'w' => 2.8, 'dash' => '6 16', 'color' => $g4, 'offset' => (float) (($h >> 12) % 15)],
+        ];
 
-        return <<<SVG
-  <circle cx="{$cx}" cy="{$cy}" r="{$r1}" fill="none" stroke="{$dark}"  stroke-width="10" stroke-dasharray="3 14" stroke-linecap="round" opacity="0.80"/>
-  <circle cx="{$cx}" cy="{$cy}" r="{$r2}" fill="none" stroke="{$brand}" stroke-width="7"  stroke-dasharray="3 16" stroke-linecap="round" opacity="0.95"/>
-SVG;
+        $out = '';
+        foreach ($spec as $ring) {
+            $out .= sprintf(
+                '<circle cx="%.2f" cy="%.2f" r="%.2f" fill="none" stroke="%s" stroke-width="%.2f" stroke-dasharray="%s" stroke-dashoffset="%.2f" stroke-linecap="round" opacity="0.92"/>',
+                $cx,
+                $cy,
+                $ring['r'],
+                $ring['color'],
+                $ring['w'],
+                $ring['dash'],
+                $ring['offset']
+            );
+        }
+
+        return $out;
     }
 
     /**
-     * White punch-out + embedded KeyHome PNG logo (transparent background)
-     * in the centre. Sized ≤ 5 % of the matrix area → safely covered by ECC-H.
+     * White plate + optional subtle camera-glyph under the brand mark (TikTok-style
+     * cue) + embedded KeyHome PNG when available. Plate radius ~10% of matrix side.
      */
     private function renderCenterLogo(float $cx, float $cy, float $r): string
     {
         $disc = sprintf('<circle cx="%.2f" cy="%.2f" r="%.2f" fill="#FFFFFF"/>', $cx, $cy, $r);
+        $camera = $this->renderCameraGlyphAccent($cx, $cy, $r);
 
         $logoUri = $this->logoDataUri();
         if ($logoUri !== null) {
-            $size = $r * 1.6;
+            $size = $r * 1.55;
 
-            return $disc.sprintf(
-                '<image x="%.2f" y="%.2f" width="%.2f" height="%.2f" href="%s" preserveAspectRatio="xMidYMid meet"/>',
-                $cx - $size / 2, $cy - $size / 2, $size, $size, $logoUri
-            );
+            return $disc
+                .$camera
+                .sprintf(
+                    '<image x="%.2f" y="%.2f" width="%.2f" height="%.2f" href="%s" preserveAspectRatio="xMidYMid meet"/>',
+                    $cx - $size / 2, $cy - $size / 2, $size, $size, $logoUri
+                );
         }
 
-        // Stylised keyhole fallback if logo file unreadable.
+        // Camera + keyhole fallback if logo file unreadable.
         $brand = self::BRAND;
-        $keyR = $r * 0.32;
-        $keyCy = $cy - $r * 0.18;
-        $stemTop = $keyCy + $keyR * 0.6;
-        $stemBot = $cy + $r * 0.55;
+        $keyR = $r * 0.28;
+        $keyCy = $cy - $r * 0.12;
+        $stemTop = $keyCy + $keyR * 0.55;
+        $stemBot = $cy + $r * 0.52;
 
         return $disc
+            .$camera
             .sprintf('<circle cx="%.2f" cy="%.2f" r="%.2f" fill="%s"/>', $cx, $keyCy, $keyR, $brand)
             .sprintf(
                 '<path d="M %.2f %.2f L %.2f %.2f L %.2f %.2f L %.2f %.2f Z" fill="%s"/>',
@@ -305,6 +338,36 @@ SVG;
                 $cx - $r * 0.18, $stemBot,
                 $brand
             );
+    }
+
+    /**
+     * Low-contrast line camera icon (body + lens + viewfinder bump) on the centre plate.
+     */
+    private function renderCameraGlyphAccent(float $cx, float $cy, float $r): string
+    {
+        $sw = max(1.8, $r * 0.14);
+        $bodyW = $r * 1.75;
+        $bodyH = $r * 1.2;
+        $rx = $r * 0.28;
+        $bx = $cx - $bodyW / 2;
+        $by = $cy - $bodyH / 2 - $r * 0.02;
+        $lensR = $r * 0.38;
+        $vfW = $r * 0.42;
+        $vfH = $r * 0.22;
+        $vfx = $cx + $bodyW * 0.22;
+        $vfy = $by - $vfH * 0.35;
+
+        return sprintf(
+            '<g aria-hidden="true" fill="none" stroke="#374151" stroke-width="%.2f" stroke-linecap="round" stroke-linejoin="round" opacity="0.38">'
+                .'<rect x="%.2f" y="%.2f" width="%.2f" height="%.2f" rx="%.2f"/>'
+                .'<circle cx="%.2f" cy="%.2f" r="%.2f" stroke="#111827" opacity="0.55"/>'
+                .'<rect x="%.2f" y="%.2f" width="%.2f" height="%.2f" rx="%.2f" opacity="0.7"/>'
+                .'</g>',
+            $sw,
+            $bx, $by, $bodyW, $bodyH, $rx,
+            $cx - $r * 0.08, $cy + $r * 0.04, $lensR,
+            $vfx, $vfy, $vfW, $vfH, $r * 0.1
+        );
     }
 
     private function logoDataUri(): ?string

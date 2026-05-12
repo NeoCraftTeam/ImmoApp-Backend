@@ -29,7 +29,7 @@ echo 'Rich PNG: '.strlen((string) $png)." bytes -> /tmp/qr-rich.png\n";
 // 2) Placarde PDF — pick first ad in DB if any
 $ad = Ad::with(['quarter.city', 'ad_type'])->first();
 if ($ad !== null) {
-    $url = $svc->adListingUrl($ad, 'placard');
+    $url = $svc->adListingUrl($ad);
     $pdf = Pdf::loadView('pdf.ad-placarde', [
         'ad' => $ad,
         'publicUrl' => $url,
@@ -52,7 +52,7 @@ if ($ad !== null) {
 // 3) Business card PDF — pick first agent
 $user = User::where('role', 'agent')->first();
 if ($user !== null) {
-    $url = $svc->landlordProfileUrl($user, 'visitcard');
+    $url = $svc->landlordProfileUrl($user);
     $pdf = Pdf::loadView('pdf.business-card', [
         'user' => $user,
         'profileUrl' => $url,
