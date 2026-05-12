@@ -14,6 +14,12 @@ use Illuminate\Validation\Validator;
  *
  * End-to-end (client-sealed): server stores AES-GCM ciphertext only; plain `body` and
  * `attachments` are disallowed.
+ *
+ * NOTE (May 2026): `is_client_sealed=true` payloads are accepted by validation for
+ * backward compatibility, but the `chat.client_sealed_enabled` config flag — `false`
+ * by default — makes `MessageService::send()` ignore the E2EE branch and fall back
+ * to server-side encryption. Re-enable the flag if portable cross-device E2EE is
+ * implemented (see `AGENTS.md` — « Chat — désactivation E2EE par défaut »).
  */
 final class SendMessageRequest extends FormRequest
 {
@@ -26,11 +32,25 @@ final class SendMessageRequest extends FormRequest
     public function rules(): array
     {
         $conversationId = (string) $this->route('uuid');
+        $sealedEnabled = (bool) config('chat.client_sealed_enabled', false);
 
         return [
             'is_client_sealed' => ['sometimes', 'boolean'],
-            'e2ee_ciphertext_b64' => ['required_if:is_client_sealed,true', 'string', 'max:65536'],
-            'e2ee_iv_b64' => ['required_if:is_client_sealed,true', 'string', 'max:64'],
+            // E2EE ciphertext is required only when sealed mode is both requested
+            // AND globally enabled. With the feature flag off, MessageService will
+            // ignore the sealed branch and use the plain `body` instead.
+            'e2ee_ciphertext_b64' => [
+                Rule::requiredIf(fn (): bool => $sealedEnabled && $this->boolean('is_client_sealed')),
+                'nullable',
+                'string',
+                'max:65536',
+            ],
+            'e2ee_iv_b64' => [
+                Rule::requiredIf(fn (): bool => $sealedEnabled && $this->boolean('is_client_sealed')),
+                'nullable',
+                'string',
+                'max:64',
+            ],
             'e2ee_wrapped_keys' => ['nullable', 'array'],
             'e2ee_wrapped_keys.tenant' => ['required_with:e2ee_wrapped_keys', 'string', 'max:2048'],
             'e2ee_wrapped_keys.landlord' => ['required_with:e2ee_wrapped_keys', 'string', 'max:2048'],
@@ -38,7 +58,13 @@ final class SendMessageRequest extends FormRequest
                 'nullable',
                 'string',
                 'max:5000',
-                Rule::requiredIf(fn () => !$this->boolean('is_client_sealed') && !$this->filled('attachments')),
+                // Body is required when the request is NOT being treated as sealed.
+                // The request is "treated as sealed" only when sealed is both
+                // requested by the client AND globally enabled by the server.
+                Rule::requiredIf(
+                    fn (): bool => !($sealedEnabled && $this->boolean('is_client_sealed'))
+                        && !$this->filled('attachments')
+                ),
             ],
             'type' => ['nullable', 'string', 'in:text,image,file,audio'],
             'reply_to_id' => [
@@ -48,7 +74,13 @@ final class SendMessageRequest extends FormRequest
                     ->whereNull('deleted_at')
                     ->where('conversation_id', $conversationId),
             ],
-            'attachments' => ['nullable', 'array', 'max:5', Rule::prohibitedIf(fn () => $this->boolean('is_client_sealed'))],
+            // Attachments are only prohibited when sealed mode is effectively active.
+            'attachments' => [
+                'nullable',
+                'array',
+                'max:5',
+                Rule::prohibitedIf(fn (): bool => $sealedEnabled && $this->boolean('is_client_sealed')),
+            ],
             'attachments.*.url' => ['required_with:attachments', 'string', 'max:500'],
             'attachments.*.signed_url' => ['required_with:attachments', 'string', 'url', 'max:2048'],
             'attachments.*.original_name' => ['required_with:attachments', 'string', 'max:255'],
@@ -65,6 +97,12 @@ final class SendMessageRequest extends FormRequest
     {
         $validator->after(function (Validator $v): void {
             if (!$this->boolean('is_client_sealed')) {
+                return;
+            }
+            // When the feature flag is off, MessageService will silently demote
+            // this request to a server-encrypted message. Don't reject the body
+            // or non-text type — the user's content must still go through.
+            if (!config('chat.client_sealed_enabled', false)) {
                 return;
             }
             if ($this->filled('body') && $this->string('body')->toString() !== '') {

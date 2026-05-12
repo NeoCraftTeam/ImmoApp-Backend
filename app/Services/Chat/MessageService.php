@@ -19,6 +19,7 @@ use App\Support\ChatE2eeSchema;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -37,6 +38,12 @@ final readonly class MessageService
      *
      * Default: server-side AES encryption (CHAT_ENCRYPTION_KEY). Optional `$e2ee`:
      * client-sealed AES-GCM ciphertext — the server never decrypts or logs plaintext.
+     *
+     * The client-sealed (E2EE) branch is gated by `config('chat.client_sealed_enabled')`,
+     * which defaults to `false` since May 2026 for cross-device portability. When the
+     * flag is `false`, any `$e2ee` payload is silently ignored and the server falls
+     * back to the standard server-side encryption branch (a debug warning is logged so
+     * that mismatched clients can be tracked).
      *
      * @param  array<int, array<string, mixed>>|null  $attachments
      * @param  array{ciphertext_b64: string, iv_b64: string, wrapped_keys?: array<string, string>|null}|null  $e2ee
@@ -70,6 +77,19 @@ final readonly class MessageService
                     abort(422, 'Invalid attachment for this conversation.');
                 }
             }
+        }
+
+        // Cross-device portability: when client-sealed (E2EE) is disabled, drop
+        // any incoming $e2ee payload and let the server-encrypted branch run.
+        // We log a debug warning so that a frontend still wired for sealed sends
+        // can be spotted, but we never fail the request — the user expects their
+        // message to go through.
+        if ($e2ee !== null && !config('chat.client_sealed_enabled', false)) {
+            Log::warning('chat.send: client-sealed payload received while the feature is disabled; falling back to server-encrypted send.', [
+                'conversation_id' => $conv->id,
+                'sender_id' => $sender->id,
+            ]);
+            $e2ee = null;
         }
 
         $message = DB::transaction(function () use (
