@@ -53,3 +53,11 @@ _ide_helper*.php
 
 .pnpm-store/
 .next
+
+# Playwright Python smoke screenshots (frontend_panel_smoke.py)
+/artifacts/
+
+# Local venv for scripts/frontend_panel_smoke.py
+scripts/.venv-smoke/
+
+**/__pycache__/

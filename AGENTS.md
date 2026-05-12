@@ -67,6 +67,8 @@ php artisan test --filter="it can login with valid credentials"
 Tests require a PostgreSQL `testing` database (see `phpunit.xml`). Meilisearch driver is set to `null`
 in tests. Payment gateway uses fake Flutterwave keys.
 
+**Frontend Python smoke (Playwright):** `scripts/frontend_panel_smoke.py` hits `/`, `/owner/login`, and unauthenticated `/owner/dashboard` (expect redirect to login). **Optional auth** when **both** vars are set: `SMOKE_OWNER_EMAIL` + `SMOKE_OWNER_PASSWORD` (owner dashboard screenshot), `SMOKE_CLIENT_EMAIL` + `SMOKE_CLIENT_PASSWORD` (client `/home` screenshot); emails are masked in logs. See script docstring for `FRONTEND_SMOKE_AUTH_TIMEOUT_MS` and all env vars. Prefer the venv in `scripts/.venv-smoke/` + `scripts/requirements-playwright-smoke.txt`; invoke via `.agents/skills/webapp-testing/scripts/with_server.py` (see script docstring). Next.js allows only one `next dev` per project — stop duplicates before spawning another. Screenshots: `artifacts/` (gitignored).
+
 ### When the user asks to « test then commit » (backend)
 
 Agents must run **Pint → PHPStan → Rector (apply + dry-run clean) → Pint/PHPStan again if needed → tests → commit**. See `.cursor/rules/test-then-commit.mdc` for the exact checklist.
