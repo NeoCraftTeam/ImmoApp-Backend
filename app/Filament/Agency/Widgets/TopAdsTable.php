@@ -16,10 +16,13 @@ class TopAdsTable extends BaseWidget
 {
     protected static ?string $heading = 'Top Annonces';
 
+    protected static ?string $description = 'Vos annonces classées par vues (30 derniers jours)';
+
     protected static ?int $sort = 3;
 
     protected int|string|array $columnSpan = 'full';
 
+    #[\Override]
     public function table(Table $table): Table
     {
         $user = Auth::user();
@@ -53,19 +56,26 @@ class TopAdsTable extends BaseWidget
                     ->color(fn (mixed $state): string => match ($state->value ?? $state) {
                         'available' => 'success',
                         'pending' => 'warning',
+                        'reserved' => 'info',
+                        'rent' => 'primary',
+                        'sold' => 'gray',
+                        'declined' => 'danger',
                         'unavailable' => 'danger',
                         default => 'gray',
                     }),
                 TextColumn::make('views_count')
-                    ->label('👁 Vues')
+                    ->label('Vues')
+                    ->icon('heroicon-o-eye')
                     ->sortable()
                     ->alignCenter(),
                 TextColumn::make('favorites_count')
-                    ->label('❤️ Favoris')
+                    ->label('Favoris')
+                    ->icon('heroicon-o-heart')
                     ->sortable()
                     ->alignCenter(),
                 TextColumn::make('contacts_count')
-                    ->label('📞 Contacts')
+                    ->label('Contacts')
+                    ->icon('heroicon-o-phone')
                     ->sortable()
                     ->alignCenter(),
             ])

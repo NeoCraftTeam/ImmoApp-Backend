@@ -6,8 +6,11 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Models\Ad;
 use App\Models\AdInteraction;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use OpenApi\Annotations as OA;
 
 /**
@@ -77,16 +80,13 @@ final class AdAnalyticsController
     public function overview(Request $request): JsonResponse
     {
         $user = $request->user();
-        $days = $this->parsePeriod($request->query('period', '30d'));
-        $since = now()->subDays($days);
+        $period = $request->query('period', '30d');
+        $days = $this->parsePeriod($period);
 
-        // Get all ad IDs owned by the user
-        $adIds = Ad::where('user_id', $user->id)->pluck('id');
-
-        if ($adIds->isEmpty()) {
+        if (!Ad::query()->where('user_id', $user->id)->exists()) {
             return response()->json([
                 'data' => [
-                    'period' => $request->query('period', '30d'),
+                    'period' => $period,
                     'totals' => $this->emptyTotals(),
                     'trends' => [],
                     'top_ads' => [],
@@ -94,23 +94,19 @@ final class AdAnalyticsController
             ]);
         }
 
-        // ── Totals ────────────────────────────────────────────────────
-        $totals = $this->computeTotals($adIds, $since);
+        $cacheKey = "analytics:overview:{$user->id}:{$period}";
+        $data = Cache::remember($cacheKey, now()->addMinutes(5), function () use ($user, $days, $period) {
+            $since = now()->subDays($days);
 
-        // ── Daily trends ──────────────────────────────────────────────
-        $trends = $this->computeTrends($adIds, $since);
+            return [
+                'period' => $period,
+                'totals' => $this->computeTotalsForOwner($user->id, $since),
+                'trends' => $this->computeTrendsForOwner($user->id, $since),
+                'top_ads' => $this->computeTopAdsForOwner($user->id, $since, 5),
+            ];
+        });
 
-        // ── Top 5 ads by views ────────────────────────────────────────
-        $topAds = $this->computeTopAds($adIds, $since, 5);
-
-        return response()->json([
-            'data' => [
-                'period' => $request->query('period', '30d'),
-                'totals' => $totals,
-                'trends' => $trends,
-                'top_ads' => $topAds,
-            ],
-        ]);
+        return response()->json(['data' => $data]);
     }
 
     /**
@@ -152,39 +148,37 @@ final class AdAnalyticsController
             return response()->json(['message' => 'Cette annonce ne vous appartient pas.'], 403);
         }
 
-        $days = $this->parsePeriod($request->query('period', '30d'));
-        $since = now()->subDays($days);
-        $adIds = collect([$ad->id]);
+        $period = $request->query('period', '30d');
+        $days = $this->parsePeriod($period);
 
-        // ── Totals ────────────────────────────────────────────────────
-        $totals = $this->computeTotals($adIds, $since);
+        $cacheKey = "analytics:ad:{$ad->id}:{$period}";
+        $data = Cache::remember($cacheKey, now()->addMinutes(5), function () use ($ad, $days, $period) {
+            $since = now()->subDays($days);
+            $adIds = collect([$ad->id]);
 
-        // ── Daily breakdown ───────────────────────────────────────────
-        $daily = $this->computeDaily($ad->id, $since);
+            $totals = $this->computeTotals($adIds, $since);
+            $daily = $this->computeDaily($ad->id, $since);
 
-        // ── Conversion funnel ─────────────────────────────────────────
-        $funnel = [
-            'impressions' => $totals['impressions'],
-            'views' => $totals['views'],
-            'contacts' => $totals['contact_clicks'] + $totals['phone_clicks'],
-            'unlocks' => $totals['unlocks'],
-            'impression_to_view_rate' => $totals['impressions'] > 0
-                ? round(($totals['views'] / $totals['impressions']) * 100, 2)
-                : 0,
-            'view_to_contact_rate' => $totals['views'] > 0
-                ? round((($totals['contact_clicks'] + $totals['phone_clicks']) / $totals['views']) * 100, 2)
-                : 0,
-            'view_to_unlock_rate' => $totals['views'] > 0
-                ? round(($totals['unlocks'] / $totals['views']) * 100, 2)
-                : 0,
-        ];
+            $funnel = [
+                'impressions' => $totals['impressions'],
+                'views' => $totals['views'],
+                'contacts' => $totals['contact_clicks'] + $totals['phone_clicks'],
+                'unlocks' => $totals['unlocks'],
+                'impression_to_view_rate' => $totals['impressions'] > 0
+                    ? round(($totals['views'] / $totals['impressions']) * 100, 2)
+                    : 0,
+                'view_to_contact_rate' => $totals['views'] > 0
+                    ? round((($totals['contact_clicks'] + $totals['phone_clicks']) / $totals['views']) * 100, 2)
+                    : 0,
+                'view_to_unlock_rate' => $totals['views'] > 0
+                    ? round(($totals['unlocks'] / $totals['views']) * 100, 2)
+                    : 0,
+            ];
 
-        // ── Audience analysis ─────────────────────────────────────────
-        $audience = $this->computeAudience($ad->id, $since);
+            $audience = $this->computeAudience($ad->id, $since);
 
-        return response()->json([
-            'data' => [
-                'period' => $request->query('period', '30d'),
+            return [
+                'period' => $period,
                 'ad' => [
                     'id' => $ad->id,
                     'title' => $ad->title,
@@ -195,8 +189,10 @@ final class AdAnalyticsController
                 'daily' => $daily,
                 'funnel' => $funnel,
                 'audience' => $audience,
-            ],
-        ]);
+            ];
+        });
+
+        return response()->json(['data' => $data]);
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -218,7 +214,7 @@ final class AdAnalyticsController
     /**
      * Compute total counts per interaction type for a set of ad IDs.
      *
-     * @param  \Illuminate\Support\Collection<int, mixed>  $adIds
+     * @param  Collection<int, mixed>  $adIds
      * @return array<string, int|float>
      */
     private function computeTotals($adIds, $since): array
@@ -255,6 +251,18 @@ final class AdAnalyticsController
     }
 
     /**
+     * Compute total counts per interaction type for an owner's ads.
+     *
+     * @return array<string, int|float>
+     */
+    private function computeTotalsForOwner(string $userId, $since): array
+    {
+        $adIds = $this->ownedAdIdsSubquery($userId)->pluck('id');
+
+        return $this->computeTotals($adIds, $since);
+    }
+
+    /**
      * @return array<string, int|float>
      */
     private function emptyTotals(): array
@@ -275,7 +283,7 @@ final class AdAnalyticsController
     /**
      * Compute daily trends per metric type for overview.
      *
-     * @param  \Illuminate\Support\Collection<int, int|string>  $adIds
+     * @param  Collection<int, int|string>  $adIds
      * @return array<string, array<int, array{date: string, count: int}>>
      */
     private function computeTrends($adIds, $since): array
@@ -300,6 +308,18 @@ final class AdAnalyticsController
         }
 
         return $trends;
+    }
+
+    /**
+     * Compute daily trends per metric type for an owner overview.
+     *
+     * @return array<string, array<int, array{date: string, count: int}>>
+     */
+    private function computeTrendsForOwner(string $userId, $since): array
+    {
+        $adIds = $this->ownedAdIdsSubquery($userId)->pluck('id');
+
+        return $this->computeTrends($adIds, $since);
     }
 
     /**
@@ -357,43 +377,47 @@ final class AdAnalyticsController
     /**
      * Compute top performing ads by total views.
      *
-     * @param  \Illuminate\Support\Collection<int, int|string>  $adIds
+     * @param  Collection<int, int|string>  $adIds
      * @return array<int, array<string, mixed>>
      */
     private function computeTopAds($adIds, $since, int $limit): array
     {
-        // Get view counts per ad
-        $viewCounts = AdInteraction::whereIn('ad_id', $adIds)
+        // Single batched query: views, favorites, unlocks per ad
+        $rows = AdInteraction::whereIn('ad_id', $adIds)
             ->where('created_at', '>=', $since)
-            ->where('type', AdInteraction::TYPE_VIEW)
-            ->selectRaw('ad_id, COUNT(*) as views')
+            ->whereIn('type', [
+                AdInteraction::TYPE_VIEW,
+                AdInteraction::TYPE_FAVORITE,
+                AdInteraction::TYPE_UNLOCK,
+            ])
+            ->selectRaw('
+                ad_id,
+                SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as views,
+                SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as favs,
+                SUM(CASE WHEN type = ? THEN 1 ELSE 0 END) as unlocks
+            ', [
+                AdInteraction::TYPE_VIEW,
+                AdInteraction::TYPE_FAVORITE,
+                AdInteraction::TYPE_UNLOCK,
+            ])
             ->groupBy('ad_id')
             ->orderByDesc('views')
             ->limit($limit)
-            ->pluck('views', 'ad_id');
+            ->get();
 
-        if ($viewCounts->isEmpty()) {
+        if ($rows->isEmpty()) {
             return [];
         }
 
-        // Get favorite counts
-        $favCounts = AdInteraction::whereIn('ad_id', $viewCounts->keys())
-            ->where('created_at', '>=', $since)
-            ->where('type', AdInteraction::TYPE_FAVORITE)
-            ->selectRaw('ad_id, COUNT(*) as favs')
-            ->groupBy('ad_id')
-            ->pluck('favs', 'ad_id');
+        $viewCounts = $rows->pluck('views', 'ad_id');
+        $favCounts = $rows->pluck('favs', 'ad_id');
+        $unlockCounts = $rows->pluck('unlocks', 'ad_id');
 
-        // Get unlock counts
-        $unlockCounts = AdInteraction::whereIn('ad_id', $viewCounts->keys())
-            ->where('created_at', '>=', $since)
-            ->where('type', AdInteraction::TYPE_UNLOCK)
-            ->selectRaw('ad_id, COUNT(*) as unlocks')
-            ->groupBy('ad_id')
-            ->pluck('unlocks', 'ad_id');
-
-        // Load ads
-        $ads = Ad::whereIn('id', $viewCounts->keys())->get()->keyBy('id');
+        // Load ads — only columns used in the response
+        $ads = Ad::whereIn('id', $viewCounts->keys())
+            ->select(['id', 'title', 'status'])
+            ->get()
+            ->keyBy('id');
 
         $result = [];
         foreach ($viewCounts as $adId => $views) {
@@ -415,6 +439,28 @@ final class AdAnalyticsController
         }
 
         return $result;
+    }
+
+    /**
+     * Compute top performing ads for an owner overview.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function computeTopAdsForOwner(string $userId, $since, int $limit): array
+    {
+        $adIds = $this->ownedAdIdsSubquery($userId)->pluck('id');
+
+        return $this->computeTopAds($adIds, $since, $limit);
+    }
+
+    /**
+     * @return Builder<Ad>
+     */
+    private function ownedAdIdsSubquery(string $userId)
+    {
+        return Ad::query()
+            ->select('id')
+            ->where('user_id', $userId);
     }
 
     /**

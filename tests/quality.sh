@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 # ============================================================
-#  🔍 Code Quality Pipeline — PHPStan · Rector · Pint · Tests · Insights
+#  🔍 Code Quality Pipeline — Composer audit · PHPStan · Rector · Pint · Tests · Insights
 # ============================================================
 
 RED='\033[0;31m'
@@ -24,11 +24,12 @@ show_help() {
     echo "  -h, --help   Affiche cette aide"
     echo ""
     echo -e "${BOLD}Ordre d'exécution:${NC}"
-    echo "  1. PHPStan    — Analyse statique"
-    echo "  2. Rector     — Refactoring automatique"
-    echo "  3. Pint       — Code style"
-    echo "  4. Tests      — php artisan test"
-    echo "  5. Insights   — Qualité globale"
+    echo "  1. Composer audit — Vulnérabilités des dépendances"
+    echo "  2. PHPStan        — Analyse statique"
+    echo "  3. Rector         — Refactoring automatique"
+    echo "  4. Pint           — Code style"
+    echo "  5. Tests          — php artisan test"
+    echo "  6. Insights       — Qualité globale"
     echo ""
     echo -e "${BOLD}Exemples:${NC}"
     echo "  ./tests/quality.sh              # Vérification complète (dry-run)"
@@ -66,8 +67,18 @@ echo ""
 PASS=0
 FAIL=0
 
-# ─── 1. PHPStan ────────────────────────────────────────────
-echo -e "${YELLOW}▸ [1/5] PHPStan${NC}"
+# ─── 1. Composer audit ───────────────────────────────────
+echo -e "${YELLOW}▸ [1/6] Composer audit${NC}"
+composer audit --no-interaction --abandoned=ignore 2>&1
+if [[ $? -eq 0 ]]; then
+    echo -e "${GREEN}  ✅ Composer audit — aucune vulnérabilité connue${NC}"; PASS=$((PASS + 1))
+else
+    echo -e "${RED}  ❌ Composer audit — vulnérabilités signalées (mettre à jour les paquets concernés)${NC}"; FAIL=$((FAIL + 1))
+fi
+echo ""
+
+# ─── 2. PHPStan ────────────────────────────────────────────
+echo -e "${YELLOW}▸ [2/6] PHPStan${NC}"
 ./vendor/bin/phpstan analyse 2>&1
 if [[ $? -eq 0 ]]; then
     echo -e "${GREEN}  ✅ PHPStan — aucune erreur${NC}"; PASS=$((PASS + 1))
@@ -76,8 +87,8 @@ else
 fi
 echo ""
 
-# ─── 2. Rector ─────────────────────────────────────────────
-echo -e "${YELLOW}▸ [2/5] Rector${NC}"
+# ─── 3. Rector ─────────────────────────────────────────────
+echo -e "${YELLOW}▸ [3/6] Rector${NC}"
 if $FIX; then
     ./vendor/bin/rector process 2>&1
     if [[ $? -eq 0 ]]; then
@@ -96,7 +107,7 @@ fi
 echo ""
 
 # ─── 3. Pint ──────────────────────────────────────────────
-echo -e "${YELLOW}▸ [3/5] Laravel Pint${NC}"
+echo -e "${YELLOW}▸ [4/6] Laravel Pint${NC}"
 if $FIX; then
     ./vendor/bin/pint 2>&1
     if [[ $? -eq 0 ]]; then
@@ -121,9 +132,9 @@ if $ONLY_FIX; then
     exit 0
 fi
 
-# ─── 4. Tests ──────────────────────────────────────────────
+# ─── 5. Tests ──────────────────────────────────────────────
 if $RUN_TESTS; then
-    echo -e "${YELLOW}▸ [4/5] Tests${NC}"
+    echo -e "${YELLOW}▸ [5/6] Tests${NC}"
     php artisan test 2>&1
     if [[ $? -eq 0 ]]; then
         echo -e "${GREEN}  ✅ Tests — tous passés${NC}"; PASS=$((PASS + 1))
@@ -131,13 +142,13 @@ if $RUN_TESTS; then
         echo -e "${RED}  ❌ Tests — échecs${NC}"; FAIL=$((FAIL + 1))
     fi
 else
-    echo -e "${YELLOW}▸ [4/5] Tests — ignorés (--no-test)${NC}"
+    echo -e "${YELLOW}▸ [5/6] Tests — ignorés (--no-test)${NC}"
 fi
 echo ""
 
-# ─── 5. PHP Insights ──────────────────────────────────────
-echo -e "${YELLOW}▸ [5/5] PHP Insights${NC}"
-./vendor/bin/phpinsights --no-interaction --summary 2>&1
+# ─── 6. PHP Insights ──────────────────────────────────────
+echo -e "${YELLOW}▸ [6/6] PHP Insights${NC}"
+./vendor/bin/phpinsights analyse --no-interaction --summary -c config/phpinsights.php 2>&1
 if [[ $? -eq 0 ]]; then
     echo -e "${GREEN}  ✅ PHP Insights — complet${NC}"; PASS=$((PASS + 1))
 else

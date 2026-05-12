@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -25,7 +29,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  */
 class SubscriptionPlan extends Model
 {
-    use \Illuminate\Database\Eloquent\Concerns\HasUuids, LogsActivity;
+    use HasFactory, HasUuids, LogsActivity;
 
     protected $fillable = [
         'name',
@@ -52,7 +56,7 @@ class SubscriptionPlan extends Model
     /**
      * Get subscriptions using this plan
      */
-    public function subscriptions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function subscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class);
     }
@@ -60,7 +64,7 @@ class SubscriptionPlan extends Model
     /**
      * Scope to get only active plans
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function active($query)
     {
         return $query->where('is_active', true)->orderBy('sort_order');

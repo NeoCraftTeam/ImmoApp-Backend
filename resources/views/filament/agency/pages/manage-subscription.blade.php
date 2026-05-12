@@ -36,27 +36,14 @@
 
         /* ===== ACTIVE SUB BANNER ===== */
         .sub-banner {
-            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            background: #0f172a;
             border-radius: var(--sub-radius);
             padding: 2rem;
             color: white;
             position: relative;
             overflow: hidden;
             margin-bottom: 2.5rem;
-            box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.25);
-        }
-
-        .sub-banner::before {
-            content: '';
-            position: absolute;
-            top: -80px;
-            right: -80px;
-            width: 250px;
-            height: 250px;
-            background: var(--sub-primary);
-            opacity: 0.08;
-            border-radius: 50%;
-            filter: blur(60px);
+            box-shadow: var(--sub-shadow-lg);
         }
 
         .sub-banner-inner {
@@ -91,8 +78,8 @@
 
         .sub-banner-name {
             font-size: 2rem;
-            font-weight: 900;
-            letter-spacing: -1px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
             margin: 0 0 0.5rem;
             line-height: 1;
         }
@@ -195,6 +182,103 @@
             color: var(--sub-text-muted);
             font-size: 1rem;
             margin: 0 0 1.5rem;
+        }
+
+        /* ===== PAYMENT AWAITING SCREEN ===== */
+        .sub-awaiting {
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+            border-radius: var(--sub-radius);
+            padding: 3rem 2rem;
+            color: white;
+            text-align: center;
+            margin-bottom: 2.5rem;
+            border: 1px solid rgba(37, 99, 235, 0.3);
+            box-shadow: 0 20px 50px -12px rgba(37, 99, 235, 0.25);
+        }
+
+        .sub-awaiting-spinner {
+            width: 56px;
+            height: 56px;
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1.5rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .sub-awaiting h2 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin: 0 0 0.75rem;
+            letter-spacing: -0.5px;
+        }
+
+        .sub-awaiting p {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.9rem;
+            margin: 0 0 1.5rem;
+            line-height: 1.6;
+        }
+
+        .sub-awaiting-cancel {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.4);
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .sub-awaiting-cancel:hover {
+            border-color: rgba(255, 255, 255, 0.4);
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .sub-awaiting-dots {
+            display: inline-flex;
+            gap: 6px;
+            margin-bottom: 1rem;
+        }
+
+        .sub-awaiting-dots span {
+            width: 8px;
+            height: 8px;
+            background: #3b82f6;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .sub-awaiting-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .sub-awaiting-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        /* ===== ANNUAL SAVINGS BADGE ===== */
+        .sub-savings {
+            display: inline-block;
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(5, 150, 105, 0.15));
+            color: #059669;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 4px 12px;
+            border-radius: 99px;
+            margin-bottom: 1.5rem;
+        }
+
+        .dark .sub-savings {
+            background: rgba(16, 185, 129, 0.12);
+            color: #34d399;
+            border-color: rgba(52, 211, 153, 0.25);
         }
 
         /* ===== PERIOD SWITCHER ===== */
@@ -575,11 +659,11 @@
         }
     </style>
 
-    <div class="sub-page">
+    <div class="sub-page" role="main" aria-label="Gestion de l'abonnement">
 
         {{-- ===== ACTIVE SUBSCRIPTION BANNER ===== --}}
         @if($subscription && $subscription->isActive())
-            <div class="sub-banner">
+            <section class="sub-banner" aria-label="Abonnement actif">
                 <div class="sub-banner-inner">
                     <div>
                         <div class="sub-banner-tag">
@@ -629,11 +713,29 @@
                         Résilier le forfait
                     </button>
                 </div>
-            </div>
+            </section>
+        @endif
+
+        {{-- ===== PAYMENT AWAITING SCREEN ===== --}}
+        @if($awaitingConfirmation)
+            <section class="sub-awaiting" wire:poll.5000ms="refreshSubscriptionStatus" aria-live="polite" aria-label="En attente de confirmation">
+                <div class="sub-awaiting-spinner" aria-hidden="true"></div>
+                <div class="sub-awaiting-dots" aria-hidden="true">
+                    <span></span><span></span><span></span>
+                </div>
+                <h2>En attente de confirmation du paiement…</h2>
+                <p>
+                    Votre paiement est en cours de traitement par Flutterwave.<br>
+                    Cette page se met à jour automatiquement. Vous pouvez aussi revenir ici après avoir finalisé votre paiement.
+                </p>
+                <button wire:click="cancelWaiting" class="sub-awaiting-cancel">
+                    Annuler
+                </button>
+            </section>
         @endif
 
         {{-- ===== HEADER + PERIOD SWITCHER ===== --}}
-        <div class="sub-header">
+        <section class="sub-header" aria-label="Choix de la période">
             <h1>Boostez votre agence</h1>
             <p>Choisissez le forfait adapté à vos ambitions et propulsez vos annonces en tête de liste.</p>
 
@@ -647,10 +749,10 @@
                     <span class="sub-sw-badge">-20%</span>
                 </button>
             </div>
-        </div>
+        </section>
 
         {{-- ===== PLAN CARDS ===== --}}
-        <div class="sub-grid">
+        <section class="sub-grid" aria-label="Offres disponibles">
             @foreach($plans as $plan)
                 @php
                     $price = $period === 'yearly' && $plan->price_yearly ? $plan->price_yearly : $plan->price;
@@ -671,6 +773,15 @@
                         <span class="sub-currency">FCFA</span>
                     </div>
                     <div class="sub-cycle">par {{ $period === 'monthly' ? 'mois' : 'an' }}</div>
+
+                    @if($period === 'yearly' && $plan->price_yearly && $plan->price)
+                        @php $annualSaving = ($plan->price * 12) - $plan->price_yearly; @endphp
+                        @if($annualSaving > 0)
+                            <div class="sub-savings">
+                                Vous économisez {{ number_format($annualSaving, 0, ',', ' ') }} FCFA/an
+                            </div>
+                        @endif
+                    @endif
 
                     <div class="sub-divider"></div>
 
@@ -725,17 +836,18 @@
                     @endif
                 </div>
             @endforeach
-        </div>
+        </section>
 
         {{-- ===== COMPARISON TABLE ===== --}}
-        <div class="sub-compare">
+        <section class="sub-compare" aria-label="Comparaison des forfaits">
             <div class="sub-compare-title">📊 Comparaison détaillée</div>
             <table>
+                <caption class="sr-only">Comparaison des fonctionnalités par forfait</caption>
                 <thead>
                     <tr>
-                        <th>Fonctionnalité</th>
+                        <th scope="col">Fonctionnalité</th>
                         @foreach($plans as $plan)
-                            <th>{{ $plan->name }}</th>
+                            <th scope="col">{{ $plan->name }}</th>
                         @endforeach
                     </tr>
                 </thead>
@@ -812,10 +924,10 @@
                     </tr>
                 </tbody>
             </table>
-        </div>
+        </section>
 
         {{-- ===== FAQ ===== --}}
-        <div class="sub-faq">
+        <section class="sub-faq" aria-label="Questions fréquentes">
             <div class="sub-faq-title">Questions fréquentes</div>
             <div class="sub-faq-grid">
                 <div class="sub-faq-item">
@@ -831,7 +943,7 @@
                 <div class="sub-faq-item">
                     <div class="sub-faq-q">Quand mon abonnement sera-t-il activé ?</div>
                     <div class="sub-faq-a">Votre abonnement est activé instantanément après confirmation du paiement via
-                        FedaPay. Vous recevrez un email de confirmation avec votre facture.</div>
+                        Flutterwave. Vous recevrez un email de confirmation avec votre facture.</div>
                 </div>
                 <div class="sub-faq-item">
                     <div class="sub-faq-q">Que se passe-t-il à l'expiration ?</div>
@@ -839,6 +951,6 @@
                         pouvez renouveler votre abonnement à tout moment pour retrouver les avantages.</div>
                 </div>
             </div>
-        </div>
+        </section>
     </div>
 </x-filament-panels::page>

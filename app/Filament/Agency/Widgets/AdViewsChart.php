@@ -6,8 +6,10 @@ namespace App\Filament\Agency\Widgets;
 
 use App\Models\Ad;
 use App\Models\AdInteraction;
+use Carbon\Carbon;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class AdViewsChart extends ChartWidget
 {
@@ -22,50 +24,53 @@ class AdViewsChart extends ChartWidget
     #[\Override]
     protected function getData(): array
     {
-        $user = Auth::user();
-        $adIds = Ad::where('user_id', $user->id)->pluck('id');
+        $userId = Auth::id();
 
-        $since = now()->subDays(30);
-        $dates = collect();
-        for ($i = 29; $i >= 0; $i--) {
-            $dates->push(now()->subDays($i)->format('Y-m-d'));
-        }
+        return Cache::remember("agency_ad_views_chart:{$userId}", 300, function () use ($userId): array {
+            $adIds = Ad::where('user_id', $userId)->pluck('id');
 
-        $views = AdInteraction::whereIn('ad_id', $adIds)
-            ->where('type', AdInteraction::TYPE_VIEW)
-            ->where('created_at', '>=', $since)
-            ->selectRaw('DATE(created_at) as date, COUNT(*) as count')
-            ->groupBy('date')
-            ->pluck('count', 'date');
+            $since = now()->subDays(30);
+            $dates = collect();
+            for ($i = 29; $i >= 0; $i--) {
+                $dates->push(now()->subDays($i)->format('Y-m-d'));
+            }
 
-        $favorites = AdInteraction::whereIn('ad_id', $adIds)
-            ->where('type', AdInteraction::TYPE_FAVORITE)
-            ->where('created_at', '>=', $since)
-            ->selectRaw('DATE(created_at) as date, COUNT(*) as count')
-            ->groupBy('date')
-            ->pluck('count', 'date');
+            $views = AdInteraction::whereIn('ad_id', $adIds)
+                ->where('type', AdInteraction::TYPE_VIEW)
+                ->where('created_at', '>=', $since)
+                ->selectRaw('DATE(created_at) as date, COUNT(*) as count')
+                ->groupBy('date')
+                ->pluck('count', 'date');
 
-        return [
-            'datasets' => [
-                [
-                    'label' => 'Vues',
-                    'data' => $dates->map(fn (string $date) => (int) ($views[$date] ?? 0)),
-                    'borderColor' => 'rgb(59, 130, 246)',
-                    'backgroundColor' => 'rgba(59, 130, 246, 0.1)',
-                    'fill' => true,
-                    'tension' => 0.4,
+            $favorites = AdInteraction::whereIn('ad_id', $adIds)
+                ->where('type', AdInteraction::TYPE_FAVORITE)
+                ->where('created_at', '>=', $since)
+                ->selectRaw('DATE(created_at) as date, COUNT(*) as count')
+                ->groupBy('date')
+                ->pluck('count', 'date');
+
+            return [
+                'datasets' => [
+                    [
+                        'label' => 'Vues',
+                        'data' => $dates->map(fn (string $date) => (int) ($views[$date] ?? 0))->values()->all(),
+                        'borderColor' => 'rgb(59, 130, 246)',
+                        'backgroundColor' => 'rgba(59, 130, 246, 0.1)',
+                        'fill' => true,
+                        'tension' => 0.4,
+                    ],
+                    [
+                        'label' => 'Favoris',
+                        'data' => $dates->map(fn (string $date) => (int) ($favorites[$date] ?? 0))->values()->all(),
+                        'borderColor' => 'rgb(239, 68, 68)',
+                        'backgroundColor' => 'rgba(239, 68, 68, 0.1)',
+                        'fill' => true,
+                        'tension' => 0.4,
+                    ],
                 ],
-                [
-                    'label' => 'Favoris',
-                    'data' => $dates->map(fn (string $date) => (int) ($favorites[$date] ?? 0)),
-                    'borderColor' => 'rgb(239, 68, 68)',
-                    'backgroundColor' => 'rgba(239, 68, 68, 0.1)',
-                    'fill' => true,
-                    'tension' => 0.4,
-                ],
-            ],
-            'labels' => $dates->map(fn (string $date) => \Carbon\Carbon::parse($date)->format('d/m')),
-        ];
+                'labels' => $dates->map(fn (string $date) => Carbon::parse($date)->format('d/m'))->values()->all(),
+            ];
+        });
     }
 
     #[\Override]

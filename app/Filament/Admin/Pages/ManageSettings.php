@@ -15,36 +15,38 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use UnitEnum;
 
 /**
- * @property-read \Filament\Schemas\Schema $form
+ * @property-read Schema $form
  */
 class ManageSettings extends Page
 {
-    protected static string|null|UnitEnum $navigationGroup = 'Paiements';
+    protected static string|null|UnitEnum $navigationGroup = 'Configuration';
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::CurrencyDollar;
 
-    protected static ?string $navigationLabel = 'Tarification';
+    protected static ?string $navigationLabel = 'Paramètres';
 
-    protected static ?string $title = 'Tarification & Prix';
+    protected static ?string $title = 'Paramètres de la plateforme';
 
-    protected static ?int $navigationSort = 100;
+    protected static ?int $navigationSort = 2;
 
     protected string $view = 'filament.admin.pages.manage-settings';
 
     /** @var array<string, mixed> */
     public array $data = [];
 
-    public bool $awaitingCode = false;
+    public string $awaitingSection = '';
 
     public string $verificationCode = '';
 
     public function mount(): void
     {
         $this->form->fill([
-            'unlock_price' => Setting::get('unlock_price', 500),
+            'unlock_cost_points' => Setting::get('unlock_cost_points', 2),
+            'welcome_bonus_points' => Setting::get('welcome_bonus_points', 5),
             'ad_lifetime_days' => Setting::get('ad_lifetime_days', 30),
         ]);
     }
@@ -54,18 +56,73 @@ class ManageSettings extends Page
         return $schema
             ->statePath('data')
             ->components([
-                Section::make('Paiements')
-                    ->description('Configuration des tarifs de l\'application')
-                    ->icon(Heroicon::CurrencyDollar)
+                Section::make('Système de crédits')
+                    ->description('Configuration du système de crédits utilisé pour débloquer les annonces')
+                    ->icon(Heroicon::Star)
                     ->schema([
-                        TextInput::make('unlock_price')
-                            ->label('Prix de déblocage d\'une annonce (FCFA)')
-                            ->helperText('Montant facturé pour débloquer une annonce et voir toutes les images et le contact du propriétaire.')
+                        TextInput::make('unlock_cost_points')
+                            ->label('Coût de déblocage (crédits)')
+                            ->helperText('Nombre de crédits nécessaires pour débloquer une annonce.')
+                            ->numeric()
+                            ->required()
+                            ->minValue(1)
+                            ->suffix('crédits')
+                            ->default(2),
+                        TextInput::make('welcome_bonus_points')
+                            ->label('Bonus de bienvenue (crédits)')
+                            ->helperText('Nombre de crédits offerts automatiquement aux nouveaux utilisateurs à l\'inscription.')
                             ->numeric()
                             ->required()
                             ->minValue(0)
-                            ->suffix('FCFA')
-                            ->default(500),
+                            ->suffix('crédits')
+                            ->default(5),
+                    ])
+                    ->columns(2)
+                    ->footerActions([
+                        Action::make('saveCredits')
+                            ->label('Modifier les crédits')
+                            ->icon('heroicon-o-shield-check')
+                            ->color('warning')
+                            ->requiresConfirmation()
+                            ->modalIcon('heroicon-o-shield-exclamation')
+                            ->modalIconColor('warning')
+                            ->modalHeading('Modification sensible')
+                            ->modalDescription('Cette action modifie la configuration des crédits pour tous les utilisateurs. Un code de vérification sera envoyé à votre adresse email.')
+                            ->modalSubmitActionLabel('Envoyer le code de vérification')
+                            ->action(fn () => $this->sendVerificationCode('credits'))
+                            ->visible(fn (): bool => $this->awaitingSection !== 'credits'),
+                        Action::make('verifyCreditsCode')
+                            ->label('Confirmer avec le code')
+                            ->icon('heroicon-o-check-circle')
+                            ->color('success')
+                            ->form([
+                                TextInput::make('code')
+                                    ->label('Code de vérification')
+                                    ->required()
+                                    ->length(6)
+                                    ->placeholder('000000')
+                                    ->autofocus()
+                                    ->extraInputAttributes([
+                                        'class' => 'text-center text-2xl tracking-widest font-mono',
+                                        'inputmode' => 'numeric',
+                                    ]),
+                            ])
+                            ->modalIcon('heroicon-o-envelope')
+                            ->modalIconColor('success')
+                            ->modalHeading('Vérification par email')
+                            ->modalDescription('Saisissez le code à 6 chiffres reçu par email pour confirmer la modification des crédits.')
+                            ->modalSubmitActionLabel('Confirmer la modification')
+                            ->action(function (array $data): void {
+                                $this->verificationCode = (string) $data['code'];
+                                $this->confirmWithCode('credits');
+                            })
+                            ->visible(fn (): bool => $this->awaitingSection === 'credits'),
+                        Action::make('cancelCreditsVerification')
+                            ->label('Annuler la vérification')
+                            ->icon('heroicon-o-x-mark')
+                            ->color('gray')
+                            ->action(fn () => $this->cancelVerification())
+                            ->visible(fn (): bool => $this->awaitingSection === 'credits'),
                     ]),
                 Section::make('Annonces')
                     ->description('Configuration de la durée de vie des annonces')
@@ -79,80 +136,86 @@ class ManageSettings extends Page
                             ->minValue(1)
                             ->suffix('jours')
                             ->default(30),
+                    ])
+                    ->footerActions([
+                        Action::make('saveAds')
+                            ->label('Modifier la durée')
+                            ->icon('heroicon-o-shield-check')
+                            ->color('warning')
+                            ->requiresConfirmation()
+                            ->modalIcon('heroicon-o-shield-exclamation')
+                            ->modalIconColor('warning')
+                            ->modalHeading('Modification sensible')
+                            ->modalDescription('Cette action modifie la durée de vie des annonces pour l\'ensemble de la plateforme. Un code de vérification sera envoyé à votre adresse email.')
+                            ->modalSubmitActionLabel('Envoyer le code de vérification')
+                            ->action(fn () => $this->sendVerificationCode('ads'))
+                            ->visible(fn (): bool => $this->awaitingSection !== 'ads'),
+                        Action::make('verifyAdsCode')
+                            ->label('Confirmer avec le code')
+                            ->icon('heroicon-o-check-circle')
+                            ->color('success')
+                            ->form([
+                                TextInput::make('code')
+                                    ->label('Code de vérification')
+                                    ->required()
+                                    ->length(6)
+                                    ->placeholder('000000')
+                                    ->autofocus()
+                                    ->extraInputAttributes([
+                                        'class' => 'text-center text-2xl tracking-widest font-mono',
+                                        'inputmode' => 'numeric',
+                                    ]),
+                            ])
+                            ->modalIcon('heroicon-o-envelope')
+                            ->modalIconColor('success')
+                            ->modalHeading('Vérification par email')
+                            ->modalDescription('Saisissez le code à 6 chiffres reçu par email pour confirmer la modification de la durée des annonces.')
+                            ->modalSubmitActionLabel('Confirmer la modification')
+                            ->action(function (array $data): void {
+                                $this->verificationCode = (string) $data['code'];
+                                $this->confirmWithCode('ads');
+                            })
+                            ->visible(fn (): bool => $this->awaitingSection === 'ads'),
+                        Action::make('cancelAdsVerification')
+                            ->label('Annuler la vérification')
+                            ->icon('heroicon-o-x-mark')
+                            ->color('gray')
+                            ->action(fn () => $this->cancelVerification())
+                            ->visible(fn (): bool => $this->awaitingSection === 'ads'),
                     ]),
             ]);
     }
 
     /**
-     * @return array<Action>
+     * Send a verification code by email for the given section.
      */
-    protected function getHeaderActions(): array
-    {
-        return [
-            Action::make('save')
-                ->label('Modifier la tarification')
-                ->icon('heroicon-o-shield-check')
-                ->color('warning')
-                ->requiresConfirmation()
-                ->modalIcon('heroicon-o-shield-exclamation')
-                ->modalIconColor('warning')
-                ->modalHeading('Modification sensible')
-                ->modalDescription('Cette action modifie le prix de déblocage pour tous les utilisateurs. Un code de vérification sera envoyé à votre adresse email.')
-                ->modalSubmitActionLabel('Envoyer le code de vérification')
-                ->action(fn () => $this->sendVerificationCode())
-                ->visible(fn (): bool => !$this->awaitingCode),
-
-            Action::make('verifyCode')
-                ->label('Confirmer avec le code')
-                ->icon('heroicon-o-check-circle')
-                ->color('success')
-                ->modalIcon('heroicon-o-envelope')
-                ->modalIconColor('success')
-                ->modalHeading('Vérification par email')
-                ->modalDescription('Saisissez le code à 6 chiffres reçu par email pour confirmer la modification.')
-                ->form([
-                    TextInput::make('code')
-                        ->label('Code de vérification')
-                        ->required()
-                        ->length(6)
-                        ->placeholder('000000')
-                        ->autofocus()
-                        ->extraInputAttributes([
-                            'class' => 'text-center text-2xl tracking-widest font-mono',
-                            'inputmode' => 'numeric',
-                        ]),
-                ])
-                ->modalSubmitActionLabel('Confirmer la modification')
-                ->action(function (array $data): void {
-                    $this->verificationCode = (string) $data['code'];
-                    $this->confirmWithCode();
-                })
-                ->visible(fn (): bool => $this->awaitingCode),
-
-            Action::make('cancelVerification')
-                ->label('Annuler')
-                ->icon('heroicon-o-x-mark')
-                ->color('gray')
-                ->action(fn () => $this->cancelVerification())
-                ->visible(fn (): bool => $this->awaitingCode),
-        ];
-    }
-
-    /**
-     * Step 1: Validate form, generate and send verification code by email.
-     */
-    public function sendVerificationCode(): void
+    public function sendVerificationCode(string $section): void
     {
         $this->form->getState();
 
         $user = auth()->user();
+
+        $rateLimitKey = "settings_otp:{$section}:{$user->id}";
+        if (RateLimiter::tooManyAttempts($rateLimitKey, 3)) {
+            $seconds = RateLimiter::availableIn($rateLimitKey);
+
+            Notification::make()
+                ->title('Trop de tentatives')
+                ->body("Veuillez patienter {$seconds} secondes avant de demander un nouveau code.")
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        RateLimiter::hit($rateLimitKey, 300);
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 
-        Cache::put("pricing_verification_{$user->id}", $code, now()->addMinutes(10));
+        Cache::put("settings_verification_{$section}_{$user->id}", $code, now()->addMinutes(10));
 
         Mail::to($user->email)->send(new PricingVerificationMail($user, $code));
 
-        $this->awaitingCode = true;
+        $this->awaitingSection = $section;
 
         Notification::make()
             ->title('Code envoyé')
@@ -162,12 +225,12 @@ class ManageSettings extends Page
     }
 
     /**
-     * Step 2: Verify code and apply changes.
+     * Verify the code and apply the save for the given section.
      */
-    public function confirmWithCode(): void
+    public function confirmWithCode(string $section): void
     {
         $user = auth()->user();
-        $expectedCode = Cache::get("pricing_verification_{$user->id}");
+        $expectedCode = Cache::get("settings_verification_{$section}_{$user->id}");
 
         if (!$expectedCode || $this->verificationCode !== $expectedCode) {
             Notification::make()
@@ -179,16 +242,71 @@ class ManageSettings extends Page
             return;
         }
 
-        Cache::forget("pricing_verification_{$user->id}");
+        Cache::forget("settings_verification_{$section}_{$user->id}");
 
+        match ($section) {
+            'credits' => $this->saveCreditsSettings(),
+            'ads' => $this->saveAdsSettings(),
+            default => null,
+        };
+
+        $this->awaitingSection = '';
+        $this->verificationCode = '';
+    }
+
+    /**
+     * Save credits settings (unlock_cost_points + welcome_bonus_points).
+     */
+    public function saveCreditsSettings(): void
+    {
         $data = $this->form->getState();
+        $oldUnlockCost = Setting::get('unlock_cost_points', 2);
+        $oldWelcomeBonus = Setting::get('welcome_bonus_points', 5);
 
         Setting::set(
-            'unlock_price',
-            $data['unlock_price'],
-            'Prix de déblocage d\'une annonce (FCFA)',
-            'payments'
+            'unlock_cost_points',
+            $data['unlock_cost_points'],
+            'Coût de déblocage en crédits',
+            'credits'
         );
+
+        Setting::set(
+            'welcome_bonus_points',
+            $data['welcome_bonus_points'],
+            'Bonus de bienvenue (crédits)',
+            'credits'
+        );
+
+        activity('settings')
+            ->causedBy(auth()->user())
+            ->performedOn(Setting::find('unlock_cost_points'))
+            ->withProperties([
+                'old' => [
+                    'unlock_cost_points' => $oldUnlockCost,
+                    'welcome_bonus_points' => $oldWelcomeBonus,
+                ],
+                'attributes' => [
+                    'unlock_cost_points' => $data['unlock_cost_points'],
+                    'welcome_bonus_points' => $data['welcome_bonus_points'],
+                ],
+            ])
+            ->event('updated')
+            ->log('Modification des paramètres de crédits');
+
+        Notification::make()
+            ->title('Crédits mis à jour')
+            ->body("Coût de déblocage : {$data['unlock_cost_points']} crédits. Bonus de bienvenue : {$data['welcome_bonus_points']} crédits.")
+            ->success()
+            ->send();
+    }
+
+    /**
+     * Save ad lifetime setting.
+     */
+    public function saveAdsSettings(): void
+    {
+        $data = $this->form->getState();
+        $oldValue = Setting::get('ad_lifetime_days', 30);
 
         Setting::set(
             'ad_lifetime_days',
@@ -197,21 +315,31 @@ class ManageSettings extends Page
             'ads'
         );
 
-        $this->awaitingCode = false;
-        $this->verificationCode = '';
+        activity('settings')
+            ->causedBy(auth()->user())
+            ->performedOn(Setting::find('ad_lifetime_days'))
+            ->withProperties([
+                'old' => ['ad_lifetime_days' => $oldValue],
+                'attributes' => ['ad_lifetime_days' => $data['ad_lifetime_days']],
+            ])
+            ->event('updated')
+            ->log('Modification de la durée de vie des annonces');
 
         Notification::make()
-            ->title('Tarification mise à jour')
-            ->body("Le prix de déblocage est maintenant de {$data['unlock_price']} FCFA.")
+            ->title('Annonces mis à jour')
+            ->body("Durée de vie des annonces : {$data['ad_lifetime_days']} jours.")
             ->success()
             ->send();
     }
 
     public function cancelVerification(): void
     {
-        $this->awaitingCode = false;
+        $section = $this->awaitingSection;
+        $this->awaitingSection = '';
         $this->verificationCode = '';
 
-        Cache::forget('pricing_verification_'.auth()->id());
+        if ($section) {
+            Cache::forget("settings_verification_{$section}_".auth()->id());
+        }
     }
 }

@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\SubscriptionPlans\Schemas;
 
-use Filament\Forms\Components\KeyValue;
+use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 
 class SubscriptionPlanForm
 {
@@ -18,6 +19,7 @@ class SubscriptionPlanForm
         return $schema
             ->components([
                 Section::make('Informations générales')
+                    ->icon(Heroicon::InformationCircle)
                     ->schema([
                         TextInput::make('name')
                             ->label('Nom du plan')
@@ -58,6 +60,7 @@ class SubscriptionPlanForm
                     ->columns(2),
 
                 Section::make('Configuration du Boost')
+                    ->icon(Heroicon::Bolt)
                     ->schema([
                         TextInput::make('boost_score')
                             ->label('Score de boost')
@@ -86,16 +89,16 @@ class SubscriptionPlanForm
                     ->columns(3),
 
                 Section::make('Fonctionnalités')
+                    ->icon(Heroicon::ListBullet)
                     ->schema([
-                        KeyValue::make('features')
+                        TagsInput::make('features')
                             ->label('Liste des fonctionnalités')
-                            ->keyLabel('Fonctionnalité')
-                            ->valueLabel('Description')
-                            ->reorderable()
-                            ->addActionLabel('Ajouter une fonctionnalité'),
+                            ->placeholder('Ajouter une fonctionnalité...')
+                            ->reorderable(),
                     ]),
 
                 Section::make('Paramètres')
+                    ->icon(Heroicon::Cog6Tooth)
                     ->schema([
                         Toggle::make('is_active')
                             ->label('Plan actif')

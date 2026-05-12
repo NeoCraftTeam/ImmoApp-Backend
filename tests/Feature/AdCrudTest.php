@@ -52,7 +52,7 @@ it('agent can create an ad', function (): void {
         'expires_at' => now()->addDays(30)->toDateTimeString(),
     ];
 
-    Sanctum::actingAs($agent);
+    Sanctum::actingAs($agent, ['*']);
     $response = $this->postJson('/api/v1/ads', $data);
 
     $response->assertCreated()
@@ -112,11 +112,31 @@ it('unauthenticated user cannot create an ad', function (): void {
 it('create ad validation fails with missing fields', function (): void {
     $agent = User::factory()->create(['role' => 'agent', 'type' => 'individual']);
 
-    Sanctum::actingAs($agent);
+    Sanctum::actingAs($agent, ['*']);
     $response = $this->postJson('/api/v1/ads', []);
 
     $response->assertUnprocessable()
         ->assertJsonValidationErrors(['title', 'description', 'adresse', 'price', 'surface_area', 'bedrooms', 'bathrooms', 'has_parking', 'latitude', 'longitude', 'quarter_id', 'type_id']);
+});
+
+it('owner can update an ad when resubmitting the same slug', function (): void {
+    $agent = User::factory()->create(['role' => 'agent', 'type' => 'individual']);
+    $ad = null;
+    Ad::withoutSyncingToSearch(function () use (&$ad, $agent): void {
+        $ad = Ad::factory()->create(['user_id' => $agent->id, 'status' => 'available']);
+    });
+
+    Sanctum::actingAs($agent, ['*']);
+    $response = $this->putJson("/api/v1/ads/{$ad->id}", [
+        'slug' => $ad->slug,
+        'title' => 'Title after slug resubmit',
+        'quarter_id' => $ad->quarter_id,
+        'type_id' => $ad->type_id,
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('success', true);
+    $this->assertDatabaseHas('ad', ['id' => $ad->id, 'title' => 'Title after slug resubmit']);
 });
 
 it('admin can update an ad', function (): void {
@@ -127,7 +147,7 @@ it('admin can update an ad', function (): void {
         $ad = Ad::factory()->create(['user_id' => $owner->id, 'status' => 'available']);
     });
 
-    Sanctum::actingAs($admin);
+    Sanctum::actingAs($admin, ['*']);
     $response = $this->putJson("/api/v1/ads/{$ad->id}", [
         'title' => 'Updated Title',
         'description' => 'Updated description',
@@ -172,7 +192,7 @@ it('admin can delete an ad', function (): void {
         $ad = Ad::factory()->create(['user_id' => $owner->id, 'status' => 'available']);
     });
 
-    Sanctum::actingAs($admin);
+    Sanctum::actingAs($admin, ['*']);
     $response = $this->deleteJson("/api/v1/ads/{$ad->id}");
 
     $response->assertOk()
@@ -187,7 +207,7 @@ it('owner agent can delete their ad', function (): void {
         $ad = Ad::factory()->create(['user_id' => $agent->id, 'status' => 'available']);
     });
 
-    Sanctum::actingAs($agent);
+    Sanctum::actingAs($agent, ['*']);
     $response = $this->deleteJson("/api/v1/ads/{$ad->id}");
 
     $response->assertOk()

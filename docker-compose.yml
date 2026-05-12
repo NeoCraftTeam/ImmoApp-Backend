@@ -3,26 +3,35 @@ services:
   # Cela règle le problème des 404 lors des mises à jour
   code-sync:
     image: ${APP_IMAGE:-keyhome-backend}
-    container_name: ${COMPOSE_PREFIX:-keyhome}-code-sync
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-code-sync
     command: sh -c "rm -rf /shared-code/bootstrap/cache/* && cp -rp /var/www/. /shared-code/ && chmod -R 755 /shared-code && chown -R 1000:1000 /shared-code"
     volumes:
       - keyhome-app-code:/shared-code
     networks:
       - keyhome-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.50"
 
   # L'application Laravel (PHP-FPM)
+  # NOTE: container_name intentionally removed so `docker compose up --scale app=N` works.
+  # Nginx upstream (php_fpm) will round-robin across all replicas via Docker DNS.
   app:
     build:
       context: .
       dockerfile: Dockerfile
     image: ${APP_IMAGE:-keyhome-backend}
-    container_name: ${COMPOSE_PREFIX:-keyhome}-backend
     restart: unless-stopped
     working_dir: /var/www
     depends_on:
       code-sync:
         condition: service_completed_successfully
-    # On utilise le fichier .env du VPS pour configurer le conteneur
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy   # FIX: attendre que Redis soit prêt avant de démarrer
     env_file:
       - .env
     volumes:
@@ -32,23 +41,49 @@ services:
     networks:
       - keyhome-network
     environment:
-      - DB_HOST=db
+      - DB_HOST=pgbouncer
+      - DB_HOST_READ=${DB_HOST_READ:-db-replica}
+      - DB_SSLMODE=disable
       - REDIS_HOST=redis
       - APP_ENV=${APP_ENV:-production}
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+      - REVERB_BROADCAST_HOST=reverb
+      - REVERB_BROADCAST_PORT=8080
+      - REVERB_BROADCAST_SCHEME=http
+    # FIX: healthcheck sur le process PHP-FPM pour que le web puisse dépendre de app proprement
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'php-fpm' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "2.00"
+        reservations:
+          memory: 256m
 
   # Le Worker pour les files d'attente (Mails, notifications, etc.)
   worker:
     image: ${APP_IMAGE:-keyhome-backend}
-    container_name: ${COMPOSE_PREFIX:-keyhome}-worker
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-worker
     restart: unless-stopped
     working_dir: /var/www
-    command: php artisan queue:work --queue=emails,default --tries=3 --timeout=90
+    command: php artisan queue:work redis --queue=critical,payments,notifications,emails,default --tries=3 --timeout=90 --sleep=3
+    # FIX: dépend de code-sync (condition completed) + db/redis healthy
+    # Sans ça, le worker peut démarrer sur un volume partiellement peuplé
     depends_on:
-      - db
-      - redis
-      - app
+      code-sync:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      app:
+        condition: service_healthy
     env_file:
       - .env
     volumes:
@@ -63,13 +98,128 @@ services:
     networks:
       - keyhome-network
     environment:
+      - DB_HOST=pgbouncer
+      - DB_HOST_READ=${DB_HOST_READ:-db-replica}
+      - DB_SSLMODE=disable
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+      - REVERB_BROADCAST_HOST=reverb
+      - REVERB_BROADCAST_PORT=8080
+      - REVERB_BROADCAST_SCHEME=http
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "1.00"
+
+  worker-tours:
+    image: ${APP_IMAGE:-keyhome-backend}
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-worker-tours
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan queue:work --queue=tours --tries=2 --timeout=900 --memory=512
+    depends_on:
+      code-sync:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      app:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - keyhome-app-code:/var/www
+      - keyhome-storage-data:/var/www/storage
+      - ./.env:/var/www/.env
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'queue:work' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - keyhome-network
+    environment:
+      - DB_SSLMODE=prefer
+      - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
+      - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+    deploy:
+      resources:
+        limits:
+          memory: 1g       # elevated for panorama image processing
+          cpus: "2.00"
+
+  # ── Reverb — Laravel WebSocket server (Pusher protocol) ──────────────────
+  # Powers the chat real-time pipeline: message delivery, presence channels
+  # (online users), typing indicators, read receipts, last-seen heartbeat.
+  # Listens on :8080 inside the network. Traefik terminates TLS on
+  # `${REVERB_DOMAIN}` and forwards WSS → :8080. The Pusher protocol upgrades
+  # an HTTP/1.1 connection so no extra Traefik config is required beyond the
+  # standard router (websocket support is on by default).
+  reverb:
+    image: ${APP_IMAGE:-keyhome-backend}
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-reverb
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    depends_on:
+      code-sync:
+        condition: service_completed_successfully
+      app:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - keyhome-app-code:/var/www
+      - keyhome-storage-data:/var/www/storage
+      - ./.env:/var/www/.env
+    networks:
+      - keyhome-network
+      - traefik-public
+    environment:
+      - APP_ENV=${APP_ENV:-production}
+      - DB_HOST=pgbouncer
+      - DB_SSLMODE=disable
+      - REDIS_HOST=redis
+    # Process probe — matches the existing worker healthcheck pattern.
+    # `reverb:start` runs in the foreground; pgrep confirms the daemon is alive.
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'reverb:start' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    # Each WebSocket client consumes ≥1 open file descriptor. The docker daemon
+    # default (typically 1024 soft) is what containers inherit — /etc/security/
+    # limits.conf on the host applies to PAM logins, NOT to containers. Reverb's
+    # docs recommend nofile=10000 to comfortably handle a few thousand concurrent
+    # connections. Set both soft + hard so the daemon never has to escalate.
+    ulimits:
+      nofile:
+        soft: 10000
+        hard: 10000
+    deploy:
+      resources:
+        limits:
+          memory: 384m
+          cpus: "0.75"
+        reservations:
+          memory: 128m
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.keyhome-reverb.rule=Host(`${REVERB_DOMAIN:-reverb.keyhome.app}`)"
+      - "traefik.http.routers.keyhome-reverb.entrypoints=websecure"
+      - "traefik.http.routers.keyhome-reverb.tls.certresolver=letsencrypt"
+      - "traefik.http.services.keyhome-reverb.loadbalancer.server.port=8080"
 
   # Laravel Nightwatch Agent (monitoring)
   nightwatch-agent:
     image: laravelphp/nightwatch-agent:latest
-    container_name: ${COMPOSE_PREFIX:-keyhome}-nightwatch-agent
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-nightwatch-agent
     restart: unless-stopped
     environment:
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
@@ -81,15 +231,21 @@ services:
       start_period: 5s
     networks:
       - keyhome-network
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.25"
 
   # Le serveur Web (Nginx)
   web:
     image: nginx:alpine
-    container_name: ${COMPOSE_PREFIX:-keyhome}-web
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-web
     restart: unless-stopped
+    # FIX: attendre que app soit healthy (PHP-FPM up) avant d'accepter du trafic
     depends_on:
       app:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "${WEB_PORT:-9090}:80"
     volumes:
@@ -99,10 +255,116 @@ services:
     networks:
       - keyhome-network
       - traefik-public
+    # FIX: healthcheck sur le port 80 pour surveiller nginx lui-même
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/up || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.50"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.keyhome-prod.rule=Host(`${APP_DOMAIN:-api.keyhome.app}`)"
+      - "traefik.http.routers.keyhome-prod.entrypoints=websecure"
+      - "traefik.http.routers.keyhome-prod.tls.certresolver=letsencrypt"
+      - "traefik.http.services.keyhome-prod.loadbalancer.server.port=80"
+
+  # ── PgBouncer — connection pooler ──────────────────────────────────────────
+  # Routes app/worker connections through a transaction-mode pool.
+  # max_client_conn=500 with default_pool_size=25 means up to 500 PHP connections
+  # share just 25 backend PostgreSQL connections → avoids connection exhaustion.
+  pgbouncer:
+    image: bitnami/pgbouncer:1
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-pgbouncer
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRESQL_HOST: db
+      POSTGRESQL_PORT: "5432"
+      POSTGRESQL_DATABASE: ${DB_DATABASE:-keyhome}
+      PGBOUNCER_DATABASE: ${DB_DATABASE:-keyhome}
+      POSTGRESQL_USERNAME: ${DB_USERNAME:-postgres}
+      POSTGRESQL_PASSWORD: ${DB_PASSWORD:-password}
+      PGBOUNCER_POOL_MODE: transaction
+      PGBOUNCER_MAX_CLIENT_CONN: "500"
+      PGBOUNCER_DEFAULT_POOL_SIZE: "25"
+      PGBOUNCER_RESERVE_POOL_SIZE: "10"
+      PGBOUNCER_RESERVE_POOL_TIMEOUT: "3"
+      PGBOUNCER_IGNORE_STARTUP_PARAMETERS: extra_float_digits
+      PGBOUNCER_AUTH_TYPE: scram-sha-256
+      PGBOUNCER_SERVER_IDLE_TIMEOUT: "600"
+    networks:
+      - keyhome-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U ${DB_USERNAME:-postgres} || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.25"
+
+  # ── PostgreSQL read-replica ───────────────────────────────────────────────
+  # Receives WAL stream from the primary `db` container.
+  #
+  # SETUP (one-time, after first deploy):
+  #   1. On the primary, set wal_level=replica and create a replication user:
+  #        ALTER SYSTEM SET wal_level = replica;
+  #        SELECT pg_reload_conf();
+  #        CREATE ROLE replicator WITH REPLICATION LOGIN PASSWORD '${DB_REPLICATION_PASSWORD}';
+  #        -- In pg_hba.conf allow: host replication replicator db-replica md5
+  #   2. Bootstrap the replica:
+  #        docker compose exec db-replica sh -c \
+  #          "PGPASSWORD=${DB_REPLICATION_PASSWORD} pg_basebackup -h db -U replicator \
+  #           -D /var/lib/postgresql/data -P -Xs -R"
+  #   3. Restart db-replica — it will start streaming from the primary.
+  #
+  # Until the replica is bootstrapped, set DB_HOST_READ=db in .env to direct
+  # all read queries back to the primary (safe fallback, no degraded behaviour).
+  db-replica:
+    image: postgis/postgis:15-3.3-alpine
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-db-replica
+    restart: unless-stopped
+    profiles:
+      - replica
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-keyhome}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      PGDATA: /var/lib/postgresql/data
+    volumes:
+      - keyhome-db-replica-data:/var/lib/postgresql/data
+    networks:
+      - keyhome-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-keyhome}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.00"
+        reservations:
+          memory: 256m
+
   # La base de données (Postgres + PostGIS)
   db:
     image: postgis/postgis:15-3.3-alpine
-    container_name: ${COMPOSE_PREFIX:-keyhome}-db
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${DB_DATABASE:-keyhome}
@@ -112,19 +374,135 @@ services:
       - keyhome-db-data:/var/lib/postgresql/data
     networks:
       - keyhome-network
+    # FIX: healthcheck manquant — app et worker ne peuvent pas savoir si la DB est prête
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-keyhome}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          cpus: "2.00"
+        reservations:
+          memory: 512m
 
-  # Cache (Redis)
-  redis:
-    image: redis:alpine
-    container_name: ${COMPOSE_PREFIX:-keyhome}-redis
+  # ── Postgres backups : LOCAL (rotation 7d/4w/6m) ─────────────────────────────
+  # Dumps planifiés via la cron interne du container (BACKUP_KEEP_*).
+  # Stockés dans /backups → volume `keyhome-db-backups` (mountable host-side
+  # via : `docker volume inspect keyhome_keyhome-db-backups` pour récupérer
+  # le path absolu si besoin). Restore manuel :
+  #   docker exec -i <db> pg_restore -U $DB_USERNAME -d $DB_DATABASE \
+  #     < /var/lib/docker/volumes/.../latest.sql
+  db-backup-local:
+    image: prodrigestivill/postgres-backup-local:15
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-db-backup-local
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_DB: ${DB_DATABASE:-keyhome}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      POSTGRES_EXTRA_OPTS: "-Z6 --schema=public --blobs"
+      # Cron: 03h00 UTC chaque jour. Évite la fenêtre métier (jour Afrique CEMAC).
+      SCHEDULE: "@daily"
+      BACKUP_KEEP_DAYS: "7"
+      BACKUP_KEEP_WEEKS: "4"
+      BACKUP_KEEP_MONTHS: "6"
+      HEALTHCHECK_PORT: "8080"
+    volumes:
+      - keyhome-db-backups:/backups
     networks:
       - keyhome-network
+    healthcheck:
+      test: ["CMD-SHELL", "/healthcheck.sh || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.50"
+
+  # ── Postgres backups : CLOUDFLARE R2 (push quotidien, retention 30j) ─────────
+  # R2 est S3-compatible — l'image `eeshugerman/postgres-backup-s3` accepte un
+  # endpoint custom via S3_ENDPOINT. Variables requises (.env) :
+  #   R2_ACCOUNT_ID            (ton ID Cloudflare)
+  #   R2_BACKUP_ACCESS_KEY_ID  (créé dans R2 dashboard, scope "Object Read/Write")
+  #   R2_BACKUP_SECRET_KEY
+  #   R2_BACKUP_BUCKET         (ex. keyhome-db-backups)
+  # Setup R2 (one-time) :
+  #   1. Cloudflare dashboard → R2 → Create bucket "keyhome-db-backups"
+  #   2. R2 → Manage R2 API tokens → Create token "keyhome-backup"
+  #      Permissions: Object Read & Write, scope au bucket
+  #   3. Copier les credentials dans .env (NE PAS commiter)
+  #   4. Activer la lifecycle rule (R2 dashboard) : delete objects > 30 days
+  db-backup-s3:
+    image: eeshugerman/postgres-backup-s3:15
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-db-backup-s3
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # Postgres source
+      POSTGRES_HOST: db
+      POSTGRES_DATABASE: ${DB_DATABASE:-keyhome}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+      # R2 destination
+      S3_ACCESS_KEY_ID: ${R2_BACKUP_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${R2_BACKUP_SECRET_KEY}
+      S3_BUCKET: ${R2_BACKUP_BUCKET:-keyhome-db-backups}
+      S3_PREFIX: ${COMPOSE_PREFIX:-keyhome-prod}/postgres
+      S3_REGION: auto
+      S3_ENDPOINT: https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com
+      S3_S3V4: "yes"
+      # Schedule : 03h30 UTC quotidien (30min après le local pour ne pas saturer Postgres).
+      SCHEDULE: "30 3 * * *"
+      BACKUP_KEEP_DAYS: "30"
+      # Compression gzip (-Z9 = max). Les dumps Postgres compressent très bien (~15× ratio).
+      PASSPHRASE: ${R2_BACKUP_PASSPHRASE:-}
+    networks:
+      - keyhome-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.50"
+
+  # Cache (Redis) — enable AOF for persistence when used for cache/queue/session
+  redis:
+    image: redis:alpine
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-redis
+    restart: unless-stopped
+    # --maxmemory caps RAM usage; without it Redis grows unboundedly before evicting.
+    command: redis-server --appendonly yes --maxmemory 384mb --maxmemory-policy allkeys-lru
+    networks:
+      - keyhome-network
+    # FIX: healthcheck manquant — app et worker ne peuvent pas savoir si Redis est prêt
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.50"
 
   # Moteur de recherche (Meilisearch)
   meilisearch:
     image: getmeili/meilisearch:v1.10
-    container_name: ${COMPOSE_PREFIX:-keyhome}-meilisearch
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-meilisearch
     restart: unless-stopped
     environment:
       - MEILI_MASTER_KEY=${MEILISEARCH_KEY:-masterKey}
@@ -133,11 +511,24 @@ services:
       - keyhome-meilisearch-data:/meili_data
     networks:
       - keyhome-network
+    # FIX: healthcheck sur l'API Meilisearch — utilise 127.0.0.1 (IPv4)
+    # car localhost peut se résoudre en ::1 (IPv6) dans certains conteneurs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:7700/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.00"
 
   # Interface de gestion de base de données (debug only — use: docker compose --profile debug up pgadmin)
   pgadmin:
     image: dpage/pgadmin4
-    container_name: ${COMPOSE_PREFIX:-keyhome}-pgadmin
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-pgadmin
     restart: unless-stopped
     profiles:
       - debug
@@ -154,7 +545,7 @@ services:
   # Prometheus : Collecte les métriques
   prometheus:
     image: prom/prometheus:latest
-    container_name: ${COMPOSE_PREFIX:-keyhome}-prometheus
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-prometheus
     restart: unless-stopped
     profiles:
       - monitoring
@@ -172,7 +563,7 @@ services:
   # Grafana : Visualisation des données
   grafana:
     image: grafana/grafana:latest
-    container_name: ${COMPOSE_PREFIX:-keyhome}-grafana
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-grafana
     restart: unless-stopped
     profiles:
       - monitoring
@@ -190,7 +581,7 @@ services:
   # Node Exporter : Métriques du serveur (CPU, RAM, Disque du VPS)
   node-exporter:
     image: prom/node-exporter:latest
-    container_name: ${COMPOSE_PREFIX:-keyhome}-node-exporter
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-node-exporter
     restart: unless-stopped
     profiles:
       - monitoring
@@ -208,7 +599,7 @@ services:
   # cAdvisor : Métriques de chaque conteneur Docker
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
-    container_name: ${COMPOSE_PREFIX:-keyhome}-cadvisor
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-cadvisor
     restart: unless-stopped
     profiles:
       - monitoring
@@ -223,7 +614,7 @@ services:
   # Postgres Exporter : Métriques spécifiques à la DB
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter
-    container_name: ${COMPOSE_PREFIX:-keyhome}-postgres-exporter
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-postgres-exporter
     restart: unless-stopped
     profiles:
       - monitoring
@@ -235,7 +626,7 @@ services:
   # Redis Exporter
   redis-exporter:
     image: oliver006/redis_exporter
-    container_name: ${COMPOSE_PREFIX:-keyhome}-redis-exporter
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-redis-exporter
     restart: unless-stopped
     profiles:
       - monitoring
@@ -252,6 +643,10 @@ networks:
 
 volumes:
   keyhome-db-data:
+    driver: local
+  keyhome-db-replica-data:
+    driver: local
+  keyhome-db-backups:
     driver: local
   keyhome-app-code:
     driver: local

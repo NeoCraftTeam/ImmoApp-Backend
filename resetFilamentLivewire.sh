@@ -1,18 +1,24 @@
 #!/bin/bash
 
-# Script d'optimisation après déploiement Laravel + Livewire + Filament
-# Usage: ./deploy-optimize.sh
+# Script d'optimisation post-déploiement Laravel + Livewire + Filament
+#
+# NOTE: Livewire and Filament static assets (public/livewire/, public/vendor/filament/)
+# are now published during the Docker image build (Dockerfile stage 2).
+# This script is ONLY responsible for rebuilding runtime caches that depend on
+# the live .env (config, routes, views, events) — things that cannot be done
+# at build time.
+#
+# Usage: bash resetFilamentLivewire.sh
 
-set -e  # Arrêt si erreur
+set -e
 
 echo "================================================"
 echo "🚀 OPTIMISATION POST-DÉPLOIEMENT"
 echo "================================================"
 
-# Couleurs pour les logs
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 # ==========================================
 # ÉTAPE 1: NETTOYAGE DES CACHES
@@ -35,25 +41,10 @@ echo "✓ Cache des vues nettoyé"
 php artisan event:clear 2>/dev/null || echo "✓ Events cleared (if exists)"
 
 # ==========================================
-# ÉTAPE 2: PUBLICATION DES ASSETS
+# ÉTAPE 2: OPTIMISATION POUR LA PRODUCTION
 # ==========================================
 echo ""
-echo -e "${YELLOW}📦 ÉTAPE 2: Publication des assets...${NC}"
-
-php artisan vendor:publish --force --tag=livewire:assets --ansi --no-interaction
-echo "✓ Assets Livewire publiés"
-
-php artisan filament:assets
-echo "✓ Assets Filament compilés"
-
-# Note: filament:upgrade is NOT called here — it is handled in the CI deploy stage
-# to avoid running it twice during deployment.
-
-# ==========================================
-# ÉTAPE 3: OPTIMISATION POUR LA PRODUCTION
-# ==========================================
-echo ""
-echo -e "${YELLOW}⚡ ÉTAPE 3: Optimisation pour la production...${NC}"
+echo -e "${YELLOW}⚡ ÉTAPE 2: Optimisation pour la production...${NC}"
 
 php artisan config:cache
 echo "✓ Configuration mise en cache"
@@ -70,30 +61,26 @@ echo "✓ Events mis en cache"
 php artisan filament:cache-components
 echo "✓ Composants Filament mis en cache"
 
-# Note: php artisan optimize is NOT called here — it is handled separately in the CI deploy stage.
-
 # ==========================================
-# ÉTAPE 4: PERMISSIONS
+# ÉTAPE 3: PERMISSIONS
 # ==========================================
 echo ""
-echo -e "${YELLOW}🔒 ÉTAPE 4: Configuration des permissions...${NC}"
+echo -e "${YELLOW}🔒 ÉTAPE 3: Configuration des permissions...${NC}"
 
 chmod -R 775 storage bootstrap/cache
 echo "✓ Permissions configurées"
 
-# Si vous utilisez www-data (Nginx/Apache/Docker)
 if id "www-data" &>/dev/null; then
     chown -R www-data:www-data storage bootstrap/cache
     echo "✓ Propriétaire défini (www-data:www-data)"
 fi
 
 # ==========================================
-# ÉTAPE 5: VÉRIFICATIONS
+# ÉTAPE 4: VÉRIFICATIONS
 # ==========================================
 echo ""
-echo -e "${YELLOW}🔍 ÉTAPE 5: Vérifications...${NC}"
+echo -e "${YELLOW}🔍 ÉTAPE 4: Vérifications...${NC}"
 
-# Vérifier que les caches existent
 if [ -f "bootstrap/cache/config.php" ]; then
     echo "✓ Cache de configuration créé"
 else
@@ -106,18 +93,17 @@ else
     echo "⚠️  Cache des routes manquant"
 fi
 
-# Vérifier les assets Filament
+# Assets are baked into the image — verify they survived code-sync
 if [ -d "public/vendor/filament" ]; then
     echo "✓ Assets Filament présents"
 else
-    echo "⚠️  Assets Filament manquants"
+    echo "⚠️  Assets Filament manquants (check Docker build logs)"
 fi
 
-# Vérifier les assets Livewire
 if [ -f "public/livewire/livewire.js" ]; then
     echo "✓ Assets Livewire présents"
 else
-    echo "⚠️  Assets Livewire manquants"
+    echo "⚠️  Assets Livewire manquants (check Docker build logs)"
 fi
 
 # ==========================================
@@ -129,9 +115,8 @@ echo -e "${GREEN}✅ OPTIMISATION TERMINÉE AVEC SUCCÈS!${NC}"
 echo "================================================"
 echo ""
 echo "📊 Résumé:"
-echo "   - Caches nettoyés et recréés"
-echo "   - Assets Livewire + Filament publiés"
-echo "   - Application optimisée pour la production"
+echo "   - Caches nettoyés et recréés (config/routes/views/events)"
+echo "   - Composants Filament mis en cache"
 echo "   - Permissions configurées"
 echo ""
 echo "🚀 Votre application est prête!"

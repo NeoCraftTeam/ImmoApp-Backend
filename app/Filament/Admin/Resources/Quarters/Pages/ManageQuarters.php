@@ -12,10 +12,12 @@ class ManageQuarters extends ManageRecords
 {
     protected static string $resource = QuarterResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            CreateAction::make()
+                ->successNotificationTitle('Quartier créé avec succès'),
         ];
     }
 }

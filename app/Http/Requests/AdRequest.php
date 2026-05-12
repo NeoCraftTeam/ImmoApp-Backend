@@ -18,6 +18,19 @@ final class AdRequest extends FormRequest
 {
     use TransformsGeojsonGeometry;
 
+    /**
+     * Laravel `max` rule for uploaded files is in kilobytes (binary KiB).
+     * 20 MiB = 20 * 1024 = 20480.
+     */
+    private const int MAX_IMAGE_KILOBYTES = 20480;
+
+    private function imageFileRule(bool $sometimes = false): string
+    {
+        $core = 'image|mimes:jpeg,jpg,png,gif,webp|max:'.self::MAX_IMAGE_KILOBYTES.'|dimensions:max_width=8000,max_height=8000';
+
+        return $sometimes ? 'sometimes|'.$core : $core;
+    }
+
     public function rules(): array
     {
 
@@ -30,6 +43,8 @@ final class AdRequest extends FormRequest
                 // Filtres
                 'city' => ['nullable', 'string', 'max:100'],
                 'type' => ['nullable', 'string', 'max:100'],
+                'quarter' => ['nullable', 'string', 'max:100'],
+                'transaction_type' => ['nullable', 'string', 'in:location,vente'],
                 'bedrooms' => ['nullable', 'integer', 'min:0'],
                 'quarter_id' => ['sometimes', 'exists:quarter,id'],
                 'type_id' => ['sometimes', 'exists:ad_type,id'],
@@ -41,13 +56,24 @@ final class AdRequest extends FormRequest
                 'surface_min' => ['nullable', 'numeric', 'min:0'],
                 'surface_max' => ['nullable', 'numeric', 'min:0'],
                 'has_parking' => ['nullable', 'boolean'],
+                'has_3d_tour' => ['nullable', 'boolean'],
+                'is_verified' => ['nullable', 'boolean'],
+                'attributes' => ['nullable', 'array', 'max:20'],
+                'attributes.*' => ['string', 'max:100'],
 
                 // Tri
-                'sort' => ['nullable', 'string', 'in:price,surface_area,created_at'],
+                'sort' => ['nullable', 'string', 'in:price,surface_area,created_at,boost_score,reviews_avg_rating,views_count,_geoPoint'],
                 'order' => ['nullable', 'string', 'in:asc,desc'],
 
                 // Pagination
-                'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
+                'page' => ['nullable', 'integer', 'min:1'],
+                // Controllers clamp per_page (index ≤100, feed ≤50); cap prevents abuse.
+                'per_page' => ['nullable', 'integer', 'min:1', 'max:1000'],
+                'cursor' => ['nullable', 'string', 'max:2048'],
+
+                // Exclude specific ads (DoS guard: cap at 50 UUIDs)
+                'exclude_ids' => ['sometimes', 'array', 'max:50'],
+                'exclude_ids.*' => ['string', 'uuid'],
 
                 // Autocomplete
                 'field' => ['nullable', 'string', 'in:city,type,quarter'],
@@ -60,51 +86,111 @@ final class AdRequest extends FormRequest
         }
 
         if ($this->isMethod('post')) {
-            return [
+            $isDraft = $this->boolean('is_draft');
+
+            // When saving as draft, only title is required — all other fields become optional.
+            $req = $isDraft ? 'sometimes' : 'required';
+
+            $rules = [
+                'is_draft' => ['sometimes', 'boolean'],
                 'title' => ['required', 'string', 'max:255'],
-                'slug' => ['string', 'max:255', 'unique:ad,slug'], // éviter les doublons
-                'description' => ['required', 'string'],
-                'adresse' => ['required', 'string', 'max:255'],
-                'price' => ['required', 'numeric', 'min:0'],
-                'surface_area' => ['required', 'numeric', 'min:0'],
-                'bedrooms' => ['required', 'integer', 'min:0'],
-                'bathrooms' => ['required', 'integer', 'min:0'],
-                'has_parking' => ['required', 'string'],
+                'transaction_type' => ['nullable', 'string', 'in:location,vente'],
+                'slug' => ['string', 'max:255', 'unique:ad,slug'],
+                'description' => [$req, 'string'],
+                'adresse' => [$req, 'string', 'max:255'],
+                'price' => [$req, 'numeric', 'min:0'],
+                'surface_area' => [$req, 'numeric', 'min:0'],
+                'bedrooms' => [$req, 'integer', 'min:0'],
+                'bathrooms' => [$req, 'integer', 'min:0'],
+                'has_parking' => [$req, 'string'],
                 'location' => [new GeometryGeojsonRule([Point::class])],
-                'latitude' => 'required|numeric|between:-90,90',
-                'longitude' => 'required|numeric|between:-180,180',
+                'latitude' => ($isDraft ? 'sometimes' : 'required').'|numeric|between:-90,90',
+                'longitude' => ($isDraft ? 'sometimes' : 'required').'|numeric|between:-180,180',
                 'radius' => 'nullable|numeric|min:0',
                 'expires_at' => ['nullable', 'date'],
                 // user_id is forced to auth()->id() server-side — not accepted from client
-                'quarter_id' => ['required', 'exists:quarter,id'],
-                'type_id' => ['required', 'exists:ad_type,id'],
+                'quarter_id' => [$req, 'exists:quarter,id'],
+                'type_id' => [$req, 'exists:ad_type,id'],
 
                 // Images,   plusieurs formats possibles
                 'images' => 'sometimes|array|max:10',
-                'images.*' => 'image|mimes:jpeg,jpg,png,gif,webp|max:5120', // 5MB max
+                'images.*' => $this->imageFileRule(false),
 
                 // Alias populaires (acceptation de variations courantes)
-                'image' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'image' => $this->imageFileRule(true),
                 'photos' => 'sometimes|array|max:10',
-                'photos.*' => 'image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'photos.*' => $this->imageFileRule(false),
 
                 // Support pour images[0], images[1], etc.
-                'images.0' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.1' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.2' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.3' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.4' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.5' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.6' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.7' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.8' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.9' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.0' => $this->imageFileRule(true),
+                'images.1' => $this->imageFileRule(true),
+                'images.2' => $this->imageFileRule(true),
+                'images.3' => $this->imageFileRule(true),
+                'images.4' => $this->imageFileRule(true),
+                'images.5' => $this->imageFileRule(true),
+                'images.6' => $this->imageFileRule(true),
+                'images.7' => $this->imageFileRule(true),
+                'images.8' => $this->imageFileRule(true),
+                'images.9' => $this->imageFileRule(true),
+                'attributes' => ['sometimes', 'array'],
+                'attributes.*' => [
+                    'string',
+                    Rule::exists('property_attributes', 'slug')->where(
+                        fn ($query) => $query->where('is_active', true)
+                    ),
+                ],
+
+                // Premium lease conditions
+                'deposit_amount' => ['nullable', 'string', 'max:50'],
+                'minimum_lease_duration' => ['nullable', 'string', 'max:50'],
+
+                // Charges
+                'charges_forfaitaires' => ['nullable', 'boolean'],
+                'charges_montant_forfait' => ['nullable', 'numeric', 'min:0'],
+                'charges_eau' => ['nullable', 'numeric', 'min:0'],
+                'charges_electricite' => ['nullable', 'numeric', 'min:0'],
+                'charges_autres' => ['nullable', 'string', 'max:500'],
+
+                // Proximity distances (metres)
+                'distance_main_road_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
+                'distance_shops_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
+                'distance_transport_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
+                'distance_school_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
+                'distance_hospital_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
+
+                // Property condition PDF
+                'property_condition' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
+
+                // Boost request
+                'is_boost_requested' => ['nullable', 'boolean'],
+
+                // Idempotency (ignored by validated(), handled before)
+                '_idempotency_key' => ['nullable', 'string', 'max:128'],
             ];
+
+            // For drafts, also make nullable the fields that normally require a value
+            if ($isDraft) {
+                $draftNullable = ['description', 'adresse', 'price', 'surface_area', 'bedrooms', 'bathrooms', 'has_parking', 'quarter_id', 'type_id'];
+                foreach ($draftNullable as $field) {
+                    if (!in_array('nullable', $rules[$field], true)) {
+                        $rules[$field][] = 'nullable';
+                    }
+                }
+            }
+
+            return $rules;
         }
         if ($this->isMethod('put') || $this->isMethod('patch')) {
             return [
+                'is_draft' => ['sometimes', 'boolean'],
                 'title' => ['sometimes', 'string', 'max:255'],
-                'slug' => ['string', 'max:255', 'unique:ad,slug'], // éviter les doublons
+                'transaction_type' => ['nullable', 'string', 'in:location,vente'],
+                'slug' => [
+                    'sometimes',
+                    'string',
+                    'max:255',
+                    Rule::unique('ad', 'slug')->ignore($this->route('ad')),
+                ],
                 'description' => ['sometimes', 'string'],
                 'adresse' => ['sometimes', 'string', 'max:255'],
                 'price' => ['sometimes', 'numeric', 'min:0'],
@@ -124,34 +210,63 @@ final class AdRequest extends FormRequest
                 'available_to' => ['nullable', 'date', 'after_or_equal:available_from'],
                 // Task 6: Property attributes
                 'attributes' => ['sometimes', 'array'],
-                'attributes.*' => ['string', Rule::in(array_column(\App\Enums\PropertyAttribute::cases(), 'value'))],
+                'attributes.*' => [
+                    'string',
+                    Rule::exists('property_attributes', 'slug')->where(
+                        fn ($query) => $query->where('is_active', true)
+                    ),
+                ],
                 // user_id cannot be changed via API — ownership is immutable
                 'quarter_id' => ['sometimes', 'exists:quarter,id'],
                 'type_id' => ['sometimes', 'exists:ad_type,id'],
 
+                // Premium lease conditions
+                'deposit_amount' => ['nullable', 'string', 'max:50'],
+                'minimum_lease_duration' => ['nullable', 'string', 'max:50'],
+
+                // Charges
+                'charges_forfaitaires' => ['nullable', 'boolean'],
+                'charges_montant_forfait' => ['nullable', 'numeric', 'min:0'],
+                'charges_eau' => ['nullable', 'numeric', 'min:0'],
+                'charges_electricite' => ['nullable', 'numeric', 'min:0'],
+                'charges_autres' => ['nullable', 'string', 'max:500'],
+
+                // Proximity distances (metres)
+                'distance_main_road_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
+                'distance_shops_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
+                'distance_transport_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
+                'distance_school_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
+                'distance_hospital_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
+
+                // Property condition PDF
+                'property_condition' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
+
+                // Boost request
+                'is_boost_requested' => ['nullable', 'boolean'],
+
                 // Images, plusieurs formats possibles
                 'images' => 'sometimes|array|max:10',
-                'images.*' => 'image|mimes:jpeg,jpg,png,gif,webp|max:5120', // 5MB max
+                'images.*' => $this->imageFileRule(false),
 
                 'images_to_delete' => 'sometimes|array',
                 'images_to_delete.*' => 'exists:media,id',
 
                 // Alias populaires (acceptation de variations courantes)
-                'image' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'image' => $this->imageFileRule(true),
                 'photos' => 'sometimes|array|max:10',
-                'photos.*' => 'image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'photos.*' => $this->imageFileRule(false),
 
                 // Support pour images[0], images[1], etc.
-                'images.0' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.1' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.2' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.3' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.4' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.5' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.6' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.7' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.8' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
-                'images.9' => 'sometimes|image|mimes:jpeg,jpg,png,gif,webp|max:5120',
+                'images.0' => $this->imageFileRule(true),
+                'images.1' => $this->imageFileRule(true),
+                'images.2' => $this->imageFileRule(true),
+                'images.3' => $this->imageFileRule(true),
+                'images.4' => $this->imageFileRule(true),
+                'images.5' => $this->imageFileRule(true),
+                'images.6' => $this->imageFileRule(true),
+                'images.7' => $this->imageFileRule(true),
+                'images.8' => $this->imageFileRule(true),
+                'images.9' => $this->imageFileRule(true),
             ];
         }
 
@@ -166,6 +281,12 @@ final class AdRequest extends FormRequest
     #[\Override]
     public function messages(): array
     {
+        $imageMaxMessage = 'Chaque image ne doit pas dépasser 20 Mo.';
+        $indexedImageMaxMessages = [];
+        foreach (range(0, 9) as $i) {
+            $indexedImageMaxMessages["images.{$i}.max"] = $imageMaxMessage;
+        }
+
         return [
             'title.required' => 'Le titre est obligatoire.',
             'description.required' => 'La description est obligatoire.',
@@ -185,10 +306,17 @@ final class AdRequest extends FormRequest
             'available_to.after_or_equal' => 'La date de fin de disponibilité doit être après ou égale à la date de début.',
             'attributes.*.in' => 'Un ou plusieurs attributs sélectionnés ne sont pas valides.',
 
-            'images.max' => 'You can upload a maximum of 10 images.',
-            'images.*.image' => 'Each file must be an image.',
-            'images.*.mimes' => 'Images must be in JPEG, PNG, GIF, or WebP format.',
-            'images.*.max' => 'Each image must not exceed 5MB.',
+            'images.max' => 'Vous pouvez téléverser au maximum 10 images.',
+            'images.*.image' => 'Chaque fichier doit être une image.',
+            'images.*.mimes' => 'Les images doivent être au format JPEG, PNG, GIF ou WebP.',
+            'images.*.max' => $imageMaxMessage,
+            'photos.*.image' => 'Chaque fichier doit être une image.',
+            'photos.*.mimes' => 'Les images doivent être au format JPEG, PNG, GIF ou WebP.',
+            'photos.*.max' => $imageMaxMessage,
+            'image.image' => 'Le fichier doit être une image.',
+            'image.mimes' => 'L’image doit être au format JPEG, PNG, GIF ou WebP.',
+            'image.max' => $imageMaxMessage,
+            ...$indexedImageMaxMessages,
 
         ];
     }

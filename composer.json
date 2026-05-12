@@ -12,30 +12,42 @@
         "php": "^8.4",
         "ext-gettext": "*",
         "ext-pdo": "*",
+        "barryvdh/laravel-dompdf": "^3.1",
+        "chillerlan/php-qrcode": "^5.0",
         "clickbar/laravel-magellan": "^2.0",
+        "danihidayatx/image-optimizer": "^2.1",
         "darkaonline/l5-swagger": "^9.0",
         "dotswan/filament-map-picker": "^2.1",
         "dutchcodingcompany/filament-socialite": "^3.1",
-        "fedapay/fedapay-php": "^0.4.7",
         "filament/filament": "~4.0",
         "filament/spatie-laravel-media-library-plugin": "^4.3",
-        "flowframe/laravel-trend": "*",
+        "flowframe/laravel-trend": "^0.4",
+        "hammadzafar05/mobile-bottom-nav": "^1.0",
         "http-interop/http-factory-guzzle": "^1.2",
+        "kreait/firebase-php": "^8.2",
+        "laragear/webauthn": "^5.0",
+        "laravel-notification-channels/webpush": "^10.5",
+        "laravel/cashier": "^16.0",
         "laravel/framework": "^12.0",
         "laravel/nightwatch": "^1.21",
-        "laravel/pulse": "*",
+        "laravel/pulse": "^1.4",
+        "laravel/reverb": "^1.10",
         "laravel/sanctum": "^4.0",
         "laravel/scout": "^10.21",
         "laravel/socialite": "^5.24",
         "laravel/telescope": "^5.15",
         "laravel/tinker": "^2.10.1",
+        "laraveljutsu/zap": "^1.14",
         "laravolt/avatar": "^6.3",
+        "league/flysystem-aws-s3-v3": "^3.0",
         "livewire/livewire": "^3.0",
         "meilisearch/meilisearch-php": "^1.16",
         "owenvoke/blade-fontawesome": "^3.1",
+        "phpseclib/phpseclib": "^3.0.52",
         "sentry/sentry-laravel": "^4.20",
         "socialiteproviders/apple": "^5.9",
         "spatie/laravel-activitylog": "^4.11",
+        "spatie/laravel-backup": "^10.0",
         "spatie/laravel-medialibrary": "^11.14"
     },
     "require-dev": {
@@ -70,7 +82,8 @@
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi",
-            "@php artisan filament:upgrade"
+            "@php artisan filament:upgrade",
+            "@php scripts/patch-webpush.php"
         ],
         "post-update-cmd": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
@@ -85,7 +98,7 @@
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"npm run dev\" --names=server,queue,logs,vite"
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fb7185,#fdba74,#a3e635\" \"php artisan serve\" \"php artisan queue:listen --tries=1\" \"php artisan pail --timeout=0\" \"php artisan reverb:start --debug\" \"npm run dev\" --names=server,queue,logs,reverb,vite"
         ],
         "test": [
             "@php artisan config:clear --ansi",

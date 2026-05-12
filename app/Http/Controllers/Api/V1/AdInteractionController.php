@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\AdStatus;
 use App\Http\Resources\AdResource;
 use App\Models\Ad;
 use App\Models\AdInteraction;
@@ -40,6 +39,10 @@ final class AdInteractionController
     public function trackView(Request $request, Ad $ad): JsonResponse
     {
         $user = $request->user();
+
+        if (!$user) {
+            return response()->json(null, 204);
+        }
 
         // Debounce: 1 view per 5 minutes per user per ad
         $recentView = AdInteraction::where('user_id', $user->id)
@@ -81,6 +84,10 @@ final class AdInteractionController
     public function trackImpression(Request $request, Ad $ad): JsonResponse
     {
         $user = $request->user();
+
+        if (!$user) {
+            return response()->json(null, 204);
+        }
 
         $recent = AdInteraction::where('user_id', $user->id)
             ->where('ad_id', $ad->id)
@@ -269,6 +276,56 @@ final class AdInteractionController
      *     )
      * )
      */
+    /**
+     * Get the authenticated user's recently viewed ads.
+     *
+     * @OA\Get(
+     *     path="/api/v1/my/recently-viewed",
+     *     summary="Get recently viewed ads",
+     *     tags={"📊 Interactions"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Response(response=200, description="List of recently viewed ads",
+     *
+     *         @OA\JsonContent(type="object",
+     *
+     *             @OA\Property(property="data", type="array", @OA\Items(ref="#/components/schemas/AdResource"))
+     *         )
+     *     )
+     * )
+     */
+    public function recentlyViewed(Request $request): AnonymousResourceCollection
+    {
+        $user = $request->user();
+
+        $viewedAdIds = AdInteraction::where('user_id', $user->id)
+            ->where('type', AdInteraction::TYPE_VIEW)
+            ->whereNotNull('ad_id')
+            ->selectRaw('ad_id, MAX(created_at) as last_viewed')
+            ->groupBy('ad_id')
+            ->orderByDesc('last_viewed')
+            ->limit(10)
+            ->pluck('ad_id');
+
+        $ads = Ad::with([
+            'quarter:id,name,city_id',
+            'quarter.city:id,name',
+            'ad_type:id,name',
+            'media',
+            'user:id,firstname,lastname,avatar,agency_id,city_id',
+            'user.agency:id,name,slug,logo',
+            'agency:id,name,slug,logo',
+        ])
+            ->whereIn('id', $viewedAdIds)
+            ->visible()
+            ->publiclyListed()
+            ->get()
+            ->sortBy(fn ($ad) => array_search($ad->id, $viewedAdIds->toArray()))
+            ->values();
+
+        return AdResource::collection($ads);
+    }
+
     public function favorites(Request $request): AnonymousResourceCollection
     {
         $user = $request->user();
@@ -287,10 +344,22 @@ final class AdInteractionController
             ])
             ->pluck('ad_id');
 
-        $ads = Ad::with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])
+        if ($favoritedAdIds->isEmpty()) {
+            return AdResource::collection(collect());
+        }
+
+        $ads = Ad::with([
+            'quarter:id,name,city_id',
+            'quarter.city:id,name',
+            'ad_type:id,name',
+            'media',
+            'user:id,firstname,lastname,avatar,agency_id,city_id',
+            'user.agency:id,name,slug,logo',
+            'agency:id,name,slug,logo',
+        ])
             ->whereIn('id', $favoritedAdIds)
             ->visible()
-            ->where('status', AdStatus::AVAILABLE)
+            ->publiclyListed()
             ->latest()
             ->paginate(15);
 

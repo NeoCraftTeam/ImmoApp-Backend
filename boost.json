@@ -1,0 +1,22 @@
+{
+    "agents": [
+        "claude_code",
+        "copilot",
+        "cursor",
+        "gemini",
+        "phpstorm"
+    ],
+    "editors": [
+        "claude_code",
+        "cursor",
+        "gemini",
+        "phpstorm",
+        "vscode"
+    ],
+    "guidelines": [
+        "filament/filament",
+        "spatie/laravel-medialibrary"
+    ],
+    "herd_mcp": true,
+    "sail": true
+}

@@ -1,72 +1,34 @@
-<!DOCTYPE html>
-<html lang="fr">
+@extends('emails.owner-layout')
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Abonnement expire bientôt</title>
+@section('title', 'Votre abonnement expire bientôt — ' . config('app.name'))
+
+@section('content')
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            background-color: #f8fafc;
-            color: #1e293b;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        .wrapper {
-            width: 100%;
-            background-color: #f8fafc;
-            padding: 40px 0;
-        }
-
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background-color: #ffffff;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-        }
-
-        .header {
-            background: linear-gradient(135deg, #F6475F 0%, #D5384E 100%);
-            padding: 32px 20px;
-            text-align: center;
-        }
-
-        .hero {
-            padding: 40px 32px 20px;
-            text-align: center;
-        }
-
-        .hero h1 {
-            margin: 0;
-            font-size: 24px;
-            font-weight: 700;
-            color: #0f172a;
-            letter-spacing: -0.5px;
-        }
-
-        .content {
-            padding: 0 32px 32px;
-            font-size: 16px;
-            line-height: 1.6;
-            color: #475569;
-            text-align: center;
-        }
-
         .countdown-badge {
             display: inline-block;
-            background-color: #fef2f2;
-            color: #991b1b;
             padding: 10px 24px;
             border-radius: 20px;
             font-size: 16px;
             font-weight: 700;
             margin-bottom: 24px;
+        }
+
+        .countdown-badge.urgent {
+            background-color: #fef2f2;
+            color: #991b1b;
             border: 1px solid #fecaca;
+        }
+
+        .countdown-badge.warning {
+            background-color: #fffbeb;
+            color: #92400e;
+            border: 1px solid #fde68a;
+        }
+
+        .countdown-badge.notice {
+            background-color: #eff6ff;
+            color: #1e40af;
+            border: 1px solid #bfdbfe;
         }
 
         .detail-card {
@@ -74,7 +36,6 @@
             border-radius: 10px;
             padding: 20px 24px;
             margin: 24px 0;
-            text-align: left;
             border: 1px solid #e2e8f0;
         }
 
@@ -98,24 +59,13 @@
             color: #0f172a;
         }
 
-        .detail-card tr+tr td {
+        .detail-card tr + tr td {
             border-top: 1px solid #f1f5f9;
         }
 
-        .button-wrapper {
-            margin: 28px 0;
-            text-align: center;
-        }
-
-        .button {
-            background-color: #F6475F;
-            color: #ffffff !important;
-            padding: 14px 32px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 600;
-            display: inline-block;
-            box-shadow: 0 4px 6px -1px rgba(246, 71, 95, 0.2);
+        .price-highlight {
+            color: #2563eb !important;
+            font-size: 16px !important;
         }
 
         .info-box {
@@ -124,75 +74,89 @@
             padding: 16px;
             margin-top: 24px;
             font-size: 14px;
-            text-align: left;
             color: #9a3412;
             border: 1px solid #fed7aa;
+            line-height: 1.6;
         }
 
-        .footer {
-            background-color: #f1f5f9;
-            padding: 24px;
-            text-align: center;
-            font-size: 12px;
-            color: #64748b;
-            border-top: 1px solid #e2e8f0;
+        .benefits-list {
+            list-style: none;
+            padding: 0;
+            margin: 16px 0 0;
         }
 
-        .footer a {
-            color: #F6475F;
-            text-decoration: none;
+        .benefits-list li {
+            padding: 6px 0;
+            font-size: 14px;
+            color: #374151;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .benefits-list li::before {
+            content: '✓';
+            color: #10b981;
+            font-weight: 700;
+            flex-shrink: 0;
         }
     </style>
-</head>
 
-<body>
-    <div class="wrapper">
-        <div class="container">
-            <div class="header">
-                <img src="{{ asset('images/logo.png') }}" alt="KeyHome Logo" style="max-width: 150px; height: auto;">
-            </div>
+    @php
+        $badgeClass = $days <= 1 ? 'urgent' : ($days <= 3 ? 'warning' : 'notice');
+        $headline = $days <= 1
+            ? 'Votre abonnement expire aujourd\'hui !'
+            : 'Votre abonnement expire dans ' . $days . ' jours';
+    @endphp
 
-            <div class="hero">
-                <h1>Votre abonnement expire bientôt ⏰</h1>
-            </div>
+    <h1>{{ $headline }}</h1>
 
-            <div class="content">
-                <span class="countdown-badge">{{ $days }} jour(s) restant(s)</span>
-
-                <p>Bonjour l'équipe <strong>{{ $agencyName }}</strong>,</p>
-                <p>Nous voulions vous informer que votre abonnement arrive bientôt à expiration. Pour éviter toute
-                    interruption de vos services, pensez à le renouveler.</p>
-
-                <div class="detail-card">
-                    <table>
-                        <tr>
-                            <td>Plan actuel</td>
-                            <td>{{ $planName }}</td>
-                        </tr>
-                        <tr>
-                            <td>Date d'expiration</td>
-                            <td style="color: #dc2626 !important;">{{ $endsAt }}</td>
-                        </tr>
-                    </table>
-                </div>
-
-                <div class="button-wrapper">
-                    <a href="{{ config('app.url') . '/agency' }}" class="button">Renouveler mon abonnement</a>
-                </div>
-
-                <div class="info-box">
-                    <strong>⚠️ Que se passe-t-il après expiration ?</strong><br>
-                    Vos annonces ne seront plus boostées et les limites de votre plan ne seront plus actives. Renouvelez
-                    dès maintenant pour maintenir vos avantages.
-                </div>
-            </div>
-
-            <div class="footer">
-                <p>&copy; {{ date('Y') }} KeyHome. Tous droits réservés.</p>
-                <p>Si vous avez des questions, n'hésitez pas à répondre à cet email.</p>
-            </div>
-        </div>
+    <div style="text-align: center; margin-top: 20px;">
+        <span class="countdown-badge {{ $badgeClass }}">
+            {{ $days <= 1 ? 'Dernier jour' : $days . ' jour(s) restant(s)' }}
+        </span>
     </div>
-</body>
 
-</html>
+    <p class="text">Bonjour l'équipe <strong>{{ $agencyName }}</strong>,</p>
+
+    @if($days <= 1)
+        <p class="text">Votre abonnement <strong>{{ $planName }}</strong> expire <strong>aujourd'hui</strong>. À partir de demain, vos annonces ne seront plus boostées et disparaîtront du haut des résultats de recherche. Renouvelez maintenant pour ne pas perdre votre visibilité.</p>
+    @elseif($days <= 3)
+        <p class="text">Votre abonnement <strong>{{ $planName }}</strong> expire le <strong>{{ $endsAt }}</strong>. Il vous reste très peu de temps — renouvelez dès maintenant pour maintenir votre avantage concurrentiel.</p>
+    @else
+        <p class="text">Votre abonnement <strong>{{ $planName }}</strong> expire le <strong>{{ $endsAt }}</strong>. Pensez à le renouveler pour continuer à bénéficier du boost de visibilité sur vos annonces.</p>
+    @endif
+
+    <div class="detail-card">
+        <table>
+            <tr>
+                <td>Plan actuel</td>
+                <td>{{ $planName }}</td>
+            </tr>
+            <tr>
+                <td>Date d'expiration</td>
+                <td style="color: #dc2626 !important; font-weight: 700;">{{ $endsAt }}</td>
+            </tr>
+            <tr>
+                <td>Tarif de renouvellement</td>
+                <td class="price-highlight">{{ $planPrice }} FCFA / mois</td>
+            </tr>
+        </table>
+    </div>
+
+    <p class="text" style="font-size: 14px; color: #64748b;">En renouvelant votre abonnement, vous conservez :</p>
+    <ul class="benefits-list">
+        <li>La priorité d'affichage de vos annonces dans les résultats</li>
+        <li>Les contacts clients sans interruption</li>
+        <li>Votre badge agence et votre score de réputation</li>
+    </ul>
+
+    <div class="btn-wrapper">
+        <a href="{{ $renewalUrl }}" class="btn">Renouveler mon abonnement {{ $planName }}</a>
+    </div>
+
+    <div class="info-box">
+        <strong>Que se passe-t-il après expiration ?</strong><br>
+        Vos annonces restent en ligne mais perdent entièrement leur boost de visibilité. Elles apparaîtront après toutes les annonces des agences abonnées. Renouvelez maintenant pour ne pas perdre votre position.
+    </div>
+@endsection

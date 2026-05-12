@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class LoginRequest extends FormRequest
@@ -19,13 +20,18 @@ final class LoginRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
         return [
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
+            'login_context' => ['sometimes', 'string', 'in:owner,client'],
+            // Cloudflare Turnstile token. Optional: validated only when the
+            // service is configured (TURNSTILE_SECRET_KEY set). Server-side
+            // verification happens in LoginService.
+            'turnstile_token' => ['nullable', 'string', 'max:2048'],
         ];
     }
 

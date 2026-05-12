@@ -4,7 +4,18 @@ declare(strict_types=1);
 
 namespace App\Filament\Agency\Pages;
 
+use App\Enums\PaymentStatus;
+use App\Enums\PaymentType;
+use App\Models\Agency;
+use App\Models\Payment;
+use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
+use App\Services\Payment\PaymentService;
+use App\Services\SubscriptionService;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Support\Facades\Log;
+use Livewire\Attributes\Computed;
 
 class ManageSubscription extends Page
 {
@@ -21,7 +32,7 @@ class ManageSubscription extends Page
     public static function getNavigationBadge(): ?string
     {
         try {
-            /** @var \App\Models\Agency|null $agency */
+            /** @var Agency|null $agency */
             $agency = auth()->user()?->agency;
 
             return $agency && $agency->hasActiveSubscription() ? 'Actif' : null;
@@ -35,7 +46,7 @@ class ManageSubscription extends Page
         return 'success';
     }
 
-    public ?\App\Models\Subscription $subscription = null;
+    public ?Subscription $subscription = null;
 
     public $plans;
 
@@ -43,9 +54,12 @@ class ManageSubscription extends Page
 
     public array $stats = [];
 
+    /** Set to true while awaiting webhook confirmation after payment redirect. */
+    public bool $awaitingConfirmation = false;
+
     public function mount(): void
     {
-        /** @var \App\Models\Agency|null $agency */
+        /** @var Agency|null $agency */
         $agency = auth()->user()->agency;
 
         if (!$agency) {
@@ -58,14 +72,21 @@ class ManageSubscription extends Page
         }
 
         $this->subscription = $agency->getCurrentSubscription();
-        $this->plans = \App\Models\SubscriptionPlan::active()->orderBy('sort_order')->get();
-        $this->stats = app(\App\Services\SubscriptionService::class)->getAgencyStats($agency);
+        $this->plans = SubscriptionPlan::active()->orderBy('sort_order')->get();
+        $this->stats = app(SubscriptionService::class)->getAgencyStats($agency);
+
+        // If there's a pending payment in session and no active subscription, start polling.
+        if (!$this->subscription?->isActive() && session()->has('keyhome_pending_transaction')) {
+            $this->awaitingConfirmation = true;
+        } else {
+            session()->forget('keyhome_pending_transaction');
+        }
     }
 
     /**
      * Progress percentage for the active subscription (0-100).
      */
-    #[\Livewire\Attributes\Computed]
+    #[Computed]
     public function progress(): int
     {
         if (!$this->subscription || !$this->subscription->starts_at || !$this->subscription->ends_at) {
@@ -80,65 +101,93 @@ class ManageSubscription extends Page
 
     protected function verifyPayment(string $transactionId): void
     {
-        /** @var \App\Models\Agency|null $agency */
+        /** @var Agency|null $agency */
         $agency = auth()->user()->agency;
 
         if (!$agency) {
             return;
         }
 
-        $payment = \App\Models\Payment::where('transaction_id', $transactionId)
+        $payment = Payment::where('transaction_id', $transactionId)
             ->where('agency_id', $agency->id)
-            ->where('status', \App\Enums\PaymentStatus::PENDING)
+            ->where('status', PaymentStatus::PENDING)
             ->first();
 
         if (!$payment) {
             return;
         }
 
-        // Verify payment status with FedaPay API before activating
         try {
-            $fedaPayService = app(\App\Services\FedaPayService::class);
-            $transaction = $fedaPayService->retrieveTransaction($transactionId);
+            $paymentService = app(PaymentService::class);
+            $payment = $paymentService->syncPaymentStatus($payment);
 
-            if ($transaction['status'] !== 'approved') {
-                \Illuminate\Support\Facades\Log::warning('FedaPay verification failed for subscription payment', [
+            if ($payment->status !== PaymentStatus::SUCCESS) {
+                Log::warning('Payment verification failed for subscription', [
                     'transaction_id' => $transactionId,
                     'agency_id' => $agency->id,
-                    'fedapay_status' => $transaction['status'],
+                    'status' => $payment->status->value,
                 ]);
 
                 return;
             }
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('FedaPay API verification error: '.$e->getMessage());
 
-            return;
-        }
+            $plan = SubscriptionPlan::find($payment->plan_id);
 
-        \Illuminate\Support\Facades\DB::beginTransaction();
-        try {
-            $payment->update(['status' => \App\Enums\PaymentStatus::SUCCESS]);
-
-            $plan = \App\Models\SubscriptionPlan::find($payment->plan_id);
-
-            if ($plan) {
-                $subscriptionService = new \App\Services\SubscriptionService;
+            if ($plan && !$agency->hasActiveSubscription()) {
+                $subscriptionService = app(SubscriptionService::class);
                 $subscription = $subscriptionService->createSubscription($agency, $plan, $payment->period ?? 'monthly', $payment);
                 $subscriptionService->activateSubscription($subscription);
 
-                \Filament\Notifications\Notification::make()
+                Notification::make()
                     ->title('Paiement réussi !')
                     ->body('Votre abonnement a été activé avec succès. Bienvenue !')
                     ->success()
                     ->send();
             }
-
-            \Illuminate\Support\Facades\DB::commit();
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\DB::rollBack();
-            \Illuminate\Support\Facades\Log::error('Erreur activation manuelle: '.$e->getMessage());
+            Log::error('Payment verification error: '.$e->getMessage());
         }
+    }
+
+    /**
+     * Poll every 5 seconds while awaitingConfirmation is true.
+     * Called by wire:poll in the Blade view.
+     */
+    public function refreshSubscriptionStatus(): void
+    {
+        /** @var Agency|null $agency */
+        $agency = auth()->user()->agency;
+
+        if (!$agency) {
+            return;
+        }
+
+        $transactionId = session('keyhome_pending_transaction');
+
+        // Try to verify via payment gateway if we still have a pending transaction ID.
+        if ($transactionId) {
+            $this->verifyPayment($transactionId);
+        }
+
+        $this->subscription = $agency->getCurrentSubscription();
+        $this->stats = app(SubscriptionService::class)->getAgencyStats($agency);
+
+        if ($this->subscription?->isActive()) {
+            $this->awaitingConfirmation = false;
+            session()->forget('keyhome_pending_transaction');
+
+            Notification::make()
+                ->title('Abonnement activé !')
+                ->body('Votre abonnement '.($this->subscription->plan->name ?? '').' est maintenant actif. Vos annonces vont être boostées.')
+                ->success()
+                ->send();
+        }
+    }
+
+    public function cancelWaiting(): void
+    {
+        $this->awaitingConfirmation = false;
+        session()->forget('keyhome_pending_transaction');
     }
 
     public function setPeriod(string $period)
@@ -148,13 +197,14 @@ class ManageSubscription extends Page
 
     public function subscribe(string $planId)
     {
-        $plan = \App\Models\SubscriptionPlan::findOrFail($planId);
+        $plan = SubscriptionPlan::findOrFail($planId);
+        /** @var Agency $agency */
         $agency = auth()->user()->agency;
 
         $price = $this->period === 'yearly' ? $plan->price_yearly : $plan->price;
 
         if (!$price) {
-            \Filament\Notifications\Notification::make()
+            Notification::make()
                 ->title('Option non disponible')
                 ->body('Ce plan ne propose pas cette fréquence de paiement.')
                 ->danger()
@@ -163,45 +213,30 @@ class ManageSubscription extends Page
             return;
         }
 
-        $fedaPay = new \App\Services\FedaPayService;
+        try {
+            $paymentService = app(PaymentService::class);
 
-        // On génère l'URL de retour correcte pour Filament Multi-tenancy
-        $callbackUrl = \Filament\Facades\Filament::getPanel('agency')->getUrl($agency).'/abonnement';
-
-        $result = $fedaPay->createSubscriptionPayment(
-            (int) $price,
-            $agency,
-            $plan->id,
-            $this->period,
-            $callbackUrl
-        );
-
-        if ($result['success']) {
-            /** @var \App\Models\Agency $agency */
-            $agency = auth()->user()->agency;
-
-            // Créer le paiement en attente dans notre base pour le suivi
-            \App\Models\Payment::create([
-                'user_id' => auth()->id(),
+            $result = $paymentService->createPayment(auth()->user(), [
+                'amount' => (float) $price,
+                'type' => PaymentType::SUBSCRIPTION->value,
                 'agency_id' => $agency->id,
-                'type' => \App\Enums\PaymentType::SUBSCRIPTION,
-                'transaction_id' => $result['transaction_id'],
-                'amount' => $price,
                 'plan_id' => $plan->id,
                 'period' => $this->period,
-                'status' => \App\Enums\PaymentStatus::PENDING,
-                'payment_method' => \App\Enums\PaymentMethod::FEDAPAY,
+                'description' => 'Abonnement '.$plan->name.' ('.$this->period.')',
             ]);
 
-            // Rediriger vers FedaPay
-            return redirect()->away($result['url']);
-        }
+            session(['keyhome_pending_transaction' => $result['tx_ref']]);
 
-        \Filament\Notifications\Notification::make()
-            ->title('Erreur FedaPay')
-            ->body($result['message'])
-            ->danger()
-            ->send();
+            return redirect()->away($result['link']);
+        } catch (\Exception $e) {
+            Log::error('Payment initiation error: '.$e->getMessage());
+
+            Notification::make()
+                ->title('Erreur de paiement')
+                ->body('Impossible d\'initier le paiement. Veuillez réessayer.')
+                ->danger()
+                ->send();
+        }
     }
 
     public function cancelSubscription()
@@ -210,14 +245,14 @@ class ManageSubscription extends Page
             return;
         }
 
-        $service = new \App\Services\SubscriptionService;
-        /** @var \App\Models\Agency $agency */
+        $service = app(SubscriptionService::class);
+        /** @var Agency $agency */
         $agency = auth()->user()->agency;
         $service->cancelActiveSubscriptions($agency, 'Annulation par l\'utilisateur');
 
         $this->subscription = null;
 
-        \Filament\Notifications\Notification::make()
+        Notification::make()
             ->title('Abonnement annulé')
             ->body('Votre abonnement a été annulé.')
             ->success()

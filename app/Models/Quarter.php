@@ -11,8 +11,11 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * @property string $id
@@ -21,7 +24,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
- * @property-read \App\Models\City $city
+ * @property-read City $city
  *
  * @method static QuarterFactory factory($count = null, $state = [])
  * @method static Builder<static>|Quarter newModelQuery()
@@ -41,13 +44,17 @@ use Illuminate\Support\Carbon;
  */
 class Quarter extends Model
 {
-    use HasFactory, HasUuids, softDeletes;
+    use HasFactory, HasUuids, LogsActivity, softDeletes;
 
     protected $table = 'quarter';
 
     protected $fillable = [
         'name',
         'city_id',
+        'avg_price',
+        'avg_price_per_sqm',
+        'active_ads_count',
+        'pricing_updated_at',
     ];
 
     protected $hidden = [
@@ -62,5 +69,30 @@ class Quarter extends Model
     public function city(): BelongsTo
     {
         return $this->belongsTo(City::class);
+    }
+
+    /** @return HasMany<Ad, $this> */
+    public function ads(): HasMany
+    {
+        return $this->hasMany(Ad::class);
+    }
+
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'avg_price' => 'decimal:2',
+            'avg_price_per_sqm' => 'decimal:2',
+            'pricing_updated_at' => 'datetime',
+        ];
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name', 'city_id'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $eventName): string => "Quartier « {$this->name} » {$eventName}");
     }
 }

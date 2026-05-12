@@ -21,6 +21,7 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Facades\Cache;
 use UnitEnum;
 
 class AdResource extends Resource
@@ -33,7 +34,7 @@ class AdResource extends Resource
 
     protected static string|null|UnitEnum $navigationGroup = 'Gestion';
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::InboxArrowDown;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::Home;
 
     protected static ?string $recordTitleAttribute = 'title';
 
@@ -55,6 +56,7 @@ class AdResource extends Resource
             ->components([
                 ...static::getSharedFormFields(),
                 static::getStatusSelect(isAdmin: false),
+                static::getTourSection(),
                 ...static::getRelationSelects(),
             ]);
     }
@@ -74,21 +76,29 @@ class AdResource extends Resource
             ->filters([
                 TrashedFilter::make(),
             ])
-            ->actions([
-                ViewAction::make(),
+            ->recordActions([
+                ViewAction::make()
+                    ->slideOver()
+                    ->modalIcon('heroicon-o-megaphone')
+                    ->modalIconColor('primary')
+                    ->modalHeading(fn (Ad $record): string => $record->title)
+                    ->modalWidth('4xl'),
                 EditAction::make()
                     ->slideOver()
                     ->modalWidth(Width::FourExtraLarge)
+                    ->successNotificationTitle('Annonce mise à jour')
                     ->mutateFormDataUsing(fn (array $data): array => static::mutateLocationMapData($data)),
-                DeleteAction::make(),
+                DeleteAction::make()
+                    ->successNotificationTitle('Annonce supprimée'),
             ])
-            ->bulkActions([
+            ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
             ]);
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [
@@ -96,6 +106,7 @@ class AdResource extends Resource
         ];
     }
 
+    #[\Override]
     public static function getRecordRouteBindingEloquentQuery(): Builder
     {
         return parent::getRecordRouteBindingEloquentQuery()
@@ -106,8 +117,10 @@ class AdResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        return (string) static::getModel()::query()
-            ->where('user_id', auth()->id())
-            ->count();
+        $userId = auth()->id();
+
+        return Cache::remember("badge:agency_ads:{$userId}", 30, fn () => (string) static::getModel()::query()
+            ->where('user_id', $userId)
+            ->count());
     }
 }

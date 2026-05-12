@@ -21,6 +21,9 @@ test('customer can login with valid credentials', function (): void {
     // On vérifie juste qu'on a un token
     $response->assertStatus(200)
         ->assertJsonStructure(['access_token']);
+
+    expect($response->headers->get('CDN-Cache-Control'))->toBe('private, no-store')
+        ->and($response->headers->get('Cache-Control'))->toContain('no-store');
 });
 
 test('login fails with invalid credentials', function (): void {
@@ -37,7 +40,10 @@ test('login fails with invalid credentials', function (): void {
     $response->assertStatus(401);
 });
 
-use App\Models\City;     // Ajout import
+use App\Models\City;
+use Illuminate\Support\Facades\Hash;
+
+// Ajout import
 
 test('customer can register', function (): void {
     Notification::fake();
@@ -53,10 +59,6 @@ test('customer can register', function (): void {
         'city_id' => $city->id,
     ]);
 
-    if ($response->status() !== 201) {
-        dump($response->json());
-    }
-
     $response->assertStatus(201)
         ->assertJsonStructure(['user', 'access_token']);
 
@@ -64,4 +66,12 @@ test('customer can register', function (): void {
         'email' => 'john@new.com',
         'role' => 'customer',
     ]);
+
+    // Regression guard: the password must actually be hashed and stored, so
+    // the freshly-registered user can authenticate. This catches accidental
+    // removal of `password` from `User::$fillable` (which silently drops the
+    // value via `fill()` and creates a NULL-password account).
+    $created = User::where('email', 'john@new.com')->firstOrFail();
+    expect($created->password)->not->toBeNull();
+    expect(Hash::check('Password123@', $created->password))->toBeTrue();
 });

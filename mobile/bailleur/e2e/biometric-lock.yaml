@@ -1,0 +1,11 @@
+# Maestro E2E Test — Biometric lock screen
+appId: cm.neocraft.keyhome.bailleur
+---
+- launchApp
+# If biometric is enabled, lock screen should appear
+- runFlow:
+    when:
+      visible: "Authentification requise"
+    commands:
+      - assertVisible: "Déverrouiller avec"
+      - takeScreenshot: biometric-lock-screen

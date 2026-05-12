@@ -1,15 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Mail;
 
+use App\Filament\Admin\Resources\Ads\AdResource;
 use App\Models\Ad;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Routing\Exceptions\UrlGenerationException;
+use Symfony\Component\Routing\Exception\RouteNotFoundException;
 
 class NewAdSubmissionMail extends Mailable implements ShouldQueue
 {
@@ -71,8 +77,8 @@ class NewAdSubmissionMail extends Mailable implements ShouldQueue
     private static function getAdminUrl(Ad $ad): string
     {
         try {
-            return \App\Filament\Admin\Resources\Ads\AdResource::getUrl('edit', ['record' => $ad]);
-        } catch (\Symfony\Component\Routing\Exception\RouteNotFoundException|\Illuminate\Routing\Exceptions\UrlGenerationException) {
+            return AdResource::getUrl('edit', ['record' => $ad]);
+        } catch (RouteNotFoundException|UrlGenerationException) {
             return '#';
         }
     }
@@ -80,7 +86,7 @@ class NewAdSubmissionMail extends Mailable implements ShouldQueue
     /**
      * Get the attachments for the message.
      *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
+     * @return array<int, Attachment>
      */
     public function attachments(): array
     {

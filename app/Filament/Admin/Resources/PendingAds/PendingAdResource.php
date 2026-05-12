@@ -7,21 +7,23 @@ namespace App\Filament\Admin\Resources\PendingAds;
 use App\Enums\AdStatus;
 use App\Filament\Admin\Resources\PendingAds\Pages\ManagePendingAds;
 use App\Filament\Resources\Ads\Concerns\SharedAdResource;
-use App\Mail\AdApprovedMail;
 use App\Mail\AdDeclinedMail;
 use App\Models\Ad;
+use App\Services\AiDescriptionEnhancer;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
-use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\MarkdownEditor;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
+use Filament\Schemas\Components\Actions as SchemaActions;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use UnitEnum;
@@ -58,6 +60,7 @@ class PendingAdResource extends Resource
             ->latest();
     }
 
+    #[\Override]
     public static function canCreate(): bool
     {
         return false;
@@ -112,7 +115,12 @@ class PendingAdResource extends Resource
                     ->sortable(),
             ])
             ->recordActions([
-                ViewAction::make(),
+                ViewAction::make()
+                    ->slideOver()
+                    ->modalIcon('heroicon-o-clipboard-document-check')
+                    ->modalIconColor('warning')
+                    ->modalHeading(fn (Ad $record): string => $record->title)
+                    ->modalWidth('4xl'),
 
                 // ── Approuver ──
                 Action::make('approve')
@@ -125,21 +133,12 @@ class PendingAdResource extends Resource
                     ->modalHeading('Approuver cette annonce')
                     ->modalDescription(fn (Ad $record) => "L'annonce \"{$record->title}\" sera publiée et un email de confirmation sera envoyé à l'auteur.")
                     ->action(function (Ad $record): void {
-                        $record->update(['status' => AdStatus::AVAILABLE]);
-
-                        // Send approval email to author
-                        if ($record->user) {
-                            try {
-                                Mail::to($record->user)->send(new AdApprovedMail($record));
-                            } catch (\Throwable $e) {
-                                Log::error('Failed to send ad approval email: '.$e->getMessage());
-                            }
-                        }
+                        $record->forceFill(['status' => AdStatus::AVAILABLE])->save();
 
                         Notification::make()
                             ->success()
                             ->title('Annonce approuvée ✅')
-                            ->body("\"{$record->title}\" est maintenant visible. Un email a été envoyé à l'auteur.")
+                            ->body("\"{$record->title}\" est maintenant visible. Un email de félicitations a été envoyé à l'auteur.")
                             ->send();
                     }),
 
@@ -147,17 +146,50 @@ class PendingAdResource extends Resource
                 Action::make('decline')
                     ->label('Décliner')
                     ->icon('heroicon-m-x-circle')
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->modalIcon('heroicon-o-x-circle')
-                    ->modalIconColor('danger')
-                    ->modalHeading('Décliner cette annonce')
-                    ->modalDescription(fn (Ad $record) => "L'annonce \"{$record->title}\" sera supprimée et l'auteur sera notifié par email.")
+                    ->color('warning')
+                    ->requiresConfirmation(false)
+                    ->modalIcon('heroicon-o-exclamation-triangle')
+                    ->modalIconColor('warning')
+                    ->modalHeading('Motif de refus de l\'annonce')
+                    ->modalDescription(fn (Ad $record) => "Rédigez un motif clair et professionnel pour l'auteur de \"".$record->title.'".')
                     ->form([
-                        Textarea::make('reason')
-                            ->label('Motif du refus (optionnel)')
-                            ->placeholder('Ex: Photos floues, description incomplète, prix irréaliste…')
-                            ->rows(3),
+                        MarkdownEditor::make('reason')
+                            ->label('Motif du refus')
+                            ->placeholder('Décrivez les raisons du refus : photos insuffisantes, description incomplète, prix incohérent…')
+                            ->helperText('L\'auteur recevra ce message mis en forme dans son email.')
+                            ->toolbarButtons(['bold', 'italic', 'bulletList', 'orderedList', 'undo', 'redo'])
+                            ->required()
+                            ->minLength(20)
+                            ->columnSpanFull(),
+                        SchemaActions::make([
+                            Action::make('enhance_reason_with_ai')
+                                ->label('Améliorer avec l\'IA')
+                                ->icon(Heroicon::Sparkles)
+                                ->color('info')
+                                ->size('sm')
+                                ->tooltip('Reformule le motif en français professionnel et clair')
+                                ->action(function ($get, $set): void {
+                                    $reason = (string) ($get('reason') ?? '');
+
+                                    if (empty(trim($reason))) {
+                                        Notification::make()
+                                            ->title('Motif vide')
+                                            ->body('Veuillez d\'abord saisir un motif avant de l\'améliorer avec l\'IA.')
+                                            ->warning()
+                                            ->send();
+
+                                        return;
+                                    }
+
+                                    $enhanced = app(AiDescriptionEnhancer::class)->enhanceRejectionReason($reason);
+                                    $set('reason', $enhanced);
+
+                                    Notification::make()
+                                        ->title('Motif amélioré ✨')
+                                        ->success()
+                                        ->send();
+                                }),
+                        ])->columnSpanFull(),
                     ])
                     ->action(function (Ad $record, array $data): void {
                         $reason = $data['reason'] ?? '';
@@ -172,12 +204,12 @@ class PendingAdResource extends Resource
                         }
 
                         $title = $record->title;
-                        $record->delete();
+                        $record->forceFill(['status' => AdStatus::DECLINED])->save();
 
                         Notification::make()
-                            ->danger()
-                            ->title('Annonce déclinée ❌')
-                            ->body("\"{$title}\" a été supprimée. Un email a été envoyé à l'auteur.")
+                            ->warning()
+                            ->title('Annonce déclinée')
+                            ->body("\"{$title}\" a été refusée. L'auteur a été notifié par email.")
                             ->send();
                     }),
             ])
@@ -187,6 +219,7 @@ class PendingAdResource extends Resource
             ->poll('15s');
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [
@@ -196,7 +229,7 @@ class PendingAdResource extends Resource
 
     public static function getNavigationBadge(): ?string
     {
-        $count = Ad::where('status', AdStatus::PENDING)->count();
+        $count = Cache::remember('badge:pending_ads', 30, fn () => Ad::where('status', AdStatus::PENDING)->count());
 
         return $count > 0 ? (string) $count : null;
     }
@@ -206,6 +239,7 @@ class PendingAdResource extends Resource
         return 'danger';
     }
 
+    #[\Override]
     public static function getNavigationBadgeTooltip(): ?string
     {
         return 'Annonces à valider';

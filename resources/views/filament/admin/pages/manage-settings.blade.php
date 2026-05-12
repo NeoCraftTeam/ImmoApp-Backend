@@ -1,15 +1,13 @@
 <x-filament-panels::page>
-    <form wire:submit="sendVerificationCode">
-        {{ $this->form }}
-    </form>
+    {{ $this->form }}
 
-    @if ($awaitingCode)
+    @if ($awaitingSection)
         <x-filament::section icon="heroicon-o-envelope" icon-color="warning">
             <x-slot name="heading">
                 Vérification en attente
             </x-slot>
             <x-slot name="description">
-                Un code de vérification a été envoyé à votre adresse email. Cliquez sur « Confirmer avec le code » dans les actions ci-dessus.
+                Un code de vérification a été envoyé à votre adresse email. Utilisez le bouton « Confirmer avec le code » dans la section correspondante.
             </x-slot>
         </x-filament::section>
     @endif

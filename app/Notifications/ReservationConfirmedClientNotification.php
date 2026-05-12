@@ -1,0 +1,78 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Notifications;
+
+use App\Models\TentativeReservation;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Notifications\Notification;
+use NotificationChannels\WebPush\WebPushChannel;
+use NotificationChannels\WebPush\WebPushMessage;
+
+class ReservationConfirmedClientNotification extends Notification implements ShouldQueue
+{
+    use Queueable;
+
+    public function __construct(
+        private readonly TentativeReservation $reservation,
+    ) {
+        $this->afterCommit();
+    }
+
+    /** @return list<string> */
+    public function via(mixed $notifiable): array
+    {
+        $this->reservation->loadMissing(['ad', 'client']);
+
+        $channels = ['database', 'mail'];
+
+        if ($notifiable->pushSubscriptions()->exists()) {
+            $channels[] = WebPushChannel::class;
+        }
+
+        return $channels;
+    }
+
+    public function toMail(mixed $notifiable): MailMessage
+    {
+        $adTitle = $this->reservation->ad->title;
+
+        return (new MailMessage)
+            ->subject("Visite confirmée ! — {$adTitle}")
+            ->view('emails.reservation.confirmed-client', [
+                'reservation' => $this->reservation,
+                'notifiable' => $notifiable,
+            ]);
+    }
+
+    public function toWebPush(mixed $notifiable, Notification $notification): WebPushMessage
+    {
+        $date = $this->reservation->slot_date->format('d/m/Y');
+
+        return (new WebPushMessage)
+            ->title('Visite confirmée ! 🎉')
+            ->icon('/icons/icon-192x192.png')
+            ->badge('/icons/icon-72x72.png')
+            ->body("Votre visite du {$date} pour « {$this->reservation->ad->title} » est confirmée !")
+            ->tag('viewing-confirmed-'.$this->reservation->id)
+            ->data(['url' => config('app.frontend_url').'/my/reservations']);
+    }
+
+    /** @return array<string, mixed> */
+    public function toDatabase(mixed $notifiable): array
+    {
+        return [
+            'type' => 'viewing_reservation_confirmed',
+            'reservation_id' => $this->reservation->id,
+            'ad_id' => $this->reservation->ad_id,
+            'ad_title' => $this->reservation->ad->title,
+            'slot_date' => $this->reservation->slot_date->toDateString(),
+            'slot_starts_at' => $this->reservation->slot_starts_at,
+            'slot_ends_at' => $this->reservation->slot_ends_at,
+            'message' => "Votre visite pour « {$this->reservation->ad->title} » le {$this->reservation->slot_date->toDateString()} à {$this->reservation->slot_starts_at} est confirmée !",
+        ];
+    }
+}

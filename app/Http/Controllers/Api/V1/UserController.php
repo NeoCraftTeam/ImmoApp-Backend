@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Requests\UserRequest;
+use App\Http\Resources\AdResource;
 use App\Http\Resources\UserResource;
 use App\Mail\EmailUpdatedMail;
 use App\Models\User;
+use App\Services\UserProfileService;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -18,9 +20,13 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Throwable;
 
-final class UserController
+final readonly class UserController
 {
     use AuthorizesRequests;
+
+    public function __construct(
+        private UserProfileService $profileService,
+    ) {}
 
     /**
      * @OA\Get(
@@ -129,6 +135,29 @@ final class UserController
         $users = User::with('city')->paginate(config('pagination.default', 10));
 
         return UserResource::collection($users);
+    }
+
+    /**
+     * Public profile for a landlord/agent — no auth required.
+     * Accepts UUID or username slug as {identifier}.
+     */
+    public function publicProfile(string $identifier): JsonResponse
+    {
+        $isUuid = (bool) preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $identifier);
+        $user = $isUuid
+            ? User::where('id', $identifier)->first()
+            : User::where('username', $identifier)->first();
+
+        if (!$user) {
+            return response()->json(['message' => 'Profil introuvable.'], 404);
+        }
+
+        $profile = $this->profileService->buildPublicProfile($user);
+
+        return response()->json([
+            'success' => true,
+            ...$profile,
+        ]);
     }
 
     /**
@@ -297,20 +326,24 @@ final class UserController
             DB::beginTransaction();
 
             // Création de l'utilisateur
-            $user = User::create([
+            $user = new User;
+            $user->fill([
                 'firstname' => $data['firstname'],
                 'lastname' => $data['lastname'],
                 'email' => $data['email'],
-                'password' => Hash::make($data['password']),
+                'password' => $data['password'],
                 'phone_number' => $data['phone_number'],
-                'role' => $data['role'],
                 'location' => isset($data['latitude'], $data['longitude'])
                     ? Point::makeGeodetic((float) $data['latitude'], (float) $data['longitude'])
                     : null,
                 'type' => $data['type'] ?? null,
                 'city_id' => $data['city_id'],
+            ]);
+            $user->forceFill([
+                'role' => $data['role'],
                 'is_active' => true,
             ]);
+            $user->save();
 
             // Gestion de l'avatar (le modèle gère le default)
             if ($request->hasFile('avatar')) {
@@ -335,15 +368,10 @@ final class UserController
             DB::rollBack();
 
             Log::error('User creation failed', [
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
-                'data' => $data,
+                'exception' => $e->getMessage(),
                 'ip' => $request->ip(),
             ]);
-
-            return response()->json([
-                'message' => 'Impossible de créer l’utilisateur pour le moment.',
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.', // tu peux supprimer si tu ne veux pas exposer l'erreur
-            ], 500);
+            throw $e;
         }
     }
 
@@ -624,23 +652,18 @@ final class UserController
 
             return response()->json([
                 'message' => 'Utilisateur mis à jour avec succès.',
-                'user' => new UserResource($user),
+                'user' => new UserResource($user->load('city')),
             ], 200);
 
         } catch (Throwable $e) {
             DB::rollBack();
 
             Log::error('User update failed', [
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
+                'exception' => $e->getMessage(),
                 'user_id' => $user->id,
-                'data' => $data,
                 'ip' => $request->ip(),
             ]);
-
-            return response()->json([
-                'message' => 'Impossible de mettre à jour l’utilisateur pour le moment.',
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
-            ], 500);
+            throw $e;
         }
     }
 
@@ -754,13 +777,36 @@ final class UserController
         } catch (Throwable $e) {
             Log::error('Failed to delete user', [
                 'user_id' => $user->id,
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
+                'exception' => $e->getMessage(),
             ]);
-
-            return response()->json([
-                'message' => 'Impossible de supprimer l’utilisateur pour le moment.',
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.', // optionnel, à cacher en prod
-            ], 500);
+            throw $e;
         }
+    }
+
+    /**
+     * List the authenticated user's unlocked ads.
+     *
+     * @OA\Get(
+     *     path="/api/v1/my/unlocked-ads",
+     *     summary="Mes annonces débloquées",
+     *     description="Retourne les annonces que l'utilisateur a débloquées via un paiement réussi.",
+     *     tags={"👤 Utilisateur"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste des annonces débloquées",
+     *
+     *         @OA\JsonContent(type="array", @OA\Items(ref="#/components/schemas/AdResource"))
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Non authentifié")
+     * )
+     */
+    public function unlockedAds(): AnonymousResourceCollection
+    {
+        $ads = $this->profileService->unlockedAds(request()->user()->id);
+
+        return AdResource::collection($ads);
     }
 }

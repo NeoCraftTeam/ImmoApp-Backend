@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Models\PropertyAttribute;
+use App\Models\PropertyAttributeCategory;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 /**
- * @extends \Illuminate\Database\Eloquent\Factories\Factory<\App\Models\PropertyAttribute>
+ * @extends Factory<PropertyAttribute>
  */
 class PropertyAttributeFactory extends Factory
 {
@@ -17,9 +20,11 @@ class PropertyAttributeFactory extends Factory
     public function definition(): array
     {
         return [
+            'property_attribute_category_id' => PropertyAttributeCategory::factory(),
             'name' => fake()->unique()->word(),
-            'slug' => fn (array $attributes) => \Illuminate\Support\Str::slug($attributes['name']),
-            'icon' => 'heroicon-o-check-circle',
+            'slug' => fn (array $attributes) => Str::slug($attributes['name']),
+            'icon' => 'CheckCircleOutline',
+            'admin_icon' => 'heroicon-o-check-circle',
             'is_active' => true,
             'sort_order' => fake()->numberBetween(0, 100),
         ];

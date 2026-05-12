@@ -20,6 +20,13 @@ class ClerkExchangeRequest extends FormRequest
         return [
             'phone_number' => ['sometimes', 'nullable', 'string', 'regex:/^[+]?[0-9\s\-\(\)]{8,15}$/'],
             'city_id' => ['sometimes', 'nullable', 'string', 'exists:city,id'],
+            'registration_intent' => ['sometimes', 'nullable', 'string', 'in:customer,agent'],
+            'session_id' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'utm_source' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'utm_medium' => ['sometimes', 'nullable', 'string', 'max:100'],
+            'utm_campaign' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'utm_content' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'utm_term' => ['sometimes', 'nullable', 'string', 'max:255'],
         ];
     }
 
@@ -33,6 +40,7 @@ class ClerkExchangeRequest extends FormRequest
         ];
     }
 
+    #[\Override]
     protected function passedValidation(): void
     {
         if (!$this->bearerToken()) {

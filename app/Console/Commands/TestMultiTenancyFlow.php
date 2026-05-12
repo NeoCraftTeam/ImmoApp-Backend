@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Enums\UserRole;
 use App\Models\User;
 use App\Services\AgencyService;
+use Filament\Facades\Filament;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Hash;
 
 class TestMultiTenancyFlow extends Command
 {
@@ -28,10 +29,12 @@ class TestMultiTenancyFlow extends Command
                 'firstname' => 'Test',
                 'lastname' => ucfirst($type),
                 'email' => $email,
-                'password' => Hash::make('password'),
-                'role' => \App\Enums\UserRole::CUSTOMER,
-                'email_verified_at' => now(),
+                'password' => 'password',
             ]);
+            $user->forceFill([
+                'role' => UserRole::CUSTOMER,
+                'email_verified_at' => now(),
+            ])->save();
         }
 
         $this->info("Current status: Role: {$user->role->value}, Type: ".($user->type !== null ? $user->type->value : 'none'));
@@ -55,7 +58,7 @@ class TestMultiTenancyFlow extends Command
                 ['Role', $user->role->value],
                 ['Type', $user->type->value],
                 ['Agency ID', $user->agency_id],
-                ['Panel Access', $user->canAccessPanel(\Filament\Facades\Filament::getPanel($type)) ? '✅ ALLOWED' : '❌ DENIED'],
+                ['Panel Access', $user->canAccessPanel(Filament::getPanel($type)) ? '✅ ALLOWED' : '❌ DENIED'],
             ]
         );
     }

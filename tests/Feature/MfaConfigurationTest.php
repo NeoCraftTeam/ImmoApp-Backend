@@ -17,11 +17,3 @@ test('agency panel has mfa enabled', function (): void {
     expect($providers)->not->toBeEmpty();
     expect($providers)->toHaveCount(2); // App + Email
 });
-
-test('bailleur panel has mfa enabled', function (): void {
-    $panel = Filament::getPanel('bailleur');
-    $providers = $panel->getMultiFactorAuthenticationProviders();
-
-    expect($providers)->not->toBeEmpty();
-    expect($providers)->toHaveCount(2); // App + Email
-});

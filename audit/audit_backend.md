@@ -1,10 +1,23 @@
-# ImmoApp SaaS — End-to-End Audit Report
+# KeyHome — Legacy Audit Report (February 2026)
 
-## Executive Summary
+> ⚠️ **LEGACY DOCUMENT** — This audit was conducted in February 2026, prior to:
+> - FedaPay removal (replaced by Flutterwave — March 2026)
+> - Bailleur panel removal
+> - Major security refactors (20+ fixes applied — April 2026)
+> - `LoginService`, `TokenService`, `RegistrationResult` DTO extraction
+>
+> **For the current authoritative audit, see:** [`docs/LiveDocs/Enterprise-Full-Audit-2026.md`](../docs/LiveDocs/Enterprise-Full-Audit-2026.md)
+> **For the security checklist reflecting current state, see:** [`docs/security/checklist.md`](../docs/security/checklist.md)
 
-This report is the result of a thorough audit of the **ImmoApp (KeyHome)** SaaS backend. The application is a Laravel 12 real-estate platform with PostgreSQL/PostGIS, FedaPay payment processing, Sanctum API auth, Filament admin panels, and a Next.js frontend.
+---
 
-**5 Critical**, **7 High**, **10 Medium**, and **8 Low** severity findings were identified. The most urgent issues involve **privilege escalation**, **broken authorization policies**, and **information disclosure** that could be exploited immediately in a production environment.
+## Executive Summary (Historical)
+
+This report is the result of a thorough audit of the **KeyHome** SaaS backend. The application is a Laravel 12 real-estate platform with PostgreSQL/PostGIS, Sanctum API auth, Filament admin panels, and a Next.js frontend.
+
+**5 Critical**, **7 High**, **10 Medium**, and **8 Low** severity findings were identified at the time. The most urgent issues involved **privilege escalation**, **broken authorization policies**, and **information disclosure**.
+
+> **Current status (April 2026):** All Critical and High findings from this report have been remediated. See the Enterprise Audit 2026 for current standing.
 
 ---
 

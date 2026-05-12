@@ -14,12 +14,14 @@ class ManageAds extends ManageRecords
 {
     protected static string $resource = AdResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [
             CreateAction::make()
                 ->slideOver()
                 ->modalWidth(Width::FourExtraLarge)
+                ->successNotificationTitle('Annonce créée avec succès')
                 ->mutateFormDataUsing(function (array $data): array {
                     $data = AdResource::mutateLocationMapData($data);
                     $data['status'] ??= AdStatus::PENDING->value;

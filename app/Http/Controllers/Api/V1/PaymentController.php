@@ -4,392 +4,683 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\PaymentMethod;
+use App\Actions\HandlePostPaymentActions;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
-use App\Models\Ad;
+use App\Exceptions\InvalidWebhookSignatureException;
+use App\Exceptions\PaymentGatewayException;
+use App\Http\Requests\Api\V1\FlutterwaveInitiateRequest;
+use App\Http\Requests\Api\V1\FlutterwaveVerifyRequest;
+use App\Http\Requests\Api\V1\PaymentHistoryRequest;
+use App\Http\Requests\Api\V1\PaymentReceiptPdfRequest;
+use App\Http\Resources\PaymentResource;
+use App\Jobs\ProcessFlutterwaveWebhookJob;
 use App\Models\Payment;
-use App\Models\Setting;
-use App\Services\FedaPayService;
+use App\Models\PromoCode;
+use App\Models\PromoCodeUsage;
+use App\Models\User;
+use App\Services\Payment\PaymentService;
+use App\Support\PaymentPresentation;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use OpenApi\Annotations as OA;
 
 /**
- * @OA\Tag(name="Paiements", description="Gestion des paiements FedaPay")
+ * @OA\Tag(name="Paiements", description="Gestion des paiements (multi-gateway)")
  */
 final class PaymentController
 {
-    public function __construct(protected FedaPayService $fedaPay) {}
+    /**
+     * ISO 4217 codes accepted by {@see resolveVisitorLocalePdfHints()} mapped to a display symbol for PDF receipts.
+     *
+     * @var array<string, string>
+     */
+    private const array VISITOR_LOCALE_SYMBOL_BY_CCY = [
+        'EUR' => '€',
+        'USD' => '$',
+        'CAD' => '$',
+        'AUD' => '$',
+        'MXN' => '$',
+        'BRL' => '$',
+        'GBP' => '£',
+        'CHF' => 'CHF',
+        'JPY' => '¥',
+        'CNY' => '¥',
+        'KRW' => '₩',
+    ];
 
-    private function unlockPrice(): int
-    {
-        return (int) Setting::get('unlock_price', 500);
-    }
+    public function __construct(
+        protected HandlePostPaymentActions $postPaymentActions,
+        protected PaymentService $paymentService,
+    ) {}
 
     /**
+     * Initiate a Flutterwave payment.
+     *
+     * Intended for: subscription, credit purchases.
+     * Returns a hosted checkout link to redirect the user.
+     *
      * @OA\Post(
-     *     path="/api/v1/payments/initialize/{ad}",
-     *     summary="1. Initialiser une demande de paiement",
-     *     description="Génère un lien de paiement sécurisé via FedaPay. Le frontend doit rediriger l'utilisateur vers 'payment_url'.",
+     *     path="/api/v1/payments/flutterwave/initiate",
+     *     summary="Initier un paiement Flutterwave",
      *     tags={"💰 Paiements"},
      *     security={{"sanctum":{}}},
      *
-     *     @OA\Parameter(
-     *         name="ad",
-     *         in="path",
+     *     @OA\RequestBody(
      *         required=true,
-     *         description="UUID de l'annonce à débloquer",
-     *
-     *         @OA\Schema(type="string", format="uuid")
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Succès : Lien généré",
      *
      *         @OA\JsonContent(
      *
-     *             @OA\Property(property="payment_url", type="string", description="URL vers l'interface FedaPay"),
-     *             @OA\Property(property="message", type="string", example="Redirigez l'utilisateur vers cette URL pour payer.")
+     *             @OA\Property(property="amount", type="number", example=150000),
+     *             @OA\Property(property="type", type="string", example="credit"),
+     *             @OA\Property(property="payment_method", type="string", example="mobile_money"),
+     *             @OA\Property(property="phone_number", type="string", example="+237699000000")
      *         )
      *     ),
      *
+     *     @OA\Response(response=200, description="Lien de paiement retourné"),
      *     @OA\Response(response=401, description="Non authentifié"),
-     *     @OA\Response(response=404, description="L'annonce demandée n'existe pas")
+     *     @OA\Response(response=422, description="Validation échouée")
      * )
      */
-    public function initialize(Request $request, Ad $ad): JsonResponse
+    public function initiate(FlutterwaveInitiateRequest $request): JsonResponse
     {
+        $validated = $request->validated();
+
+        /** @var User $user */
         $user = $request->user();
 
-        // Sécurité : Le propriétaire n'a pas besoin de payer pour sa propre annonce
-        if ($ad->user_id === $user->id) {
+        $type = $validated['type'];
+        $amount = $this->paymentService->resolveAmountForType($type, $validated);
+
+        if ($amount === null) {
             return response()->json([
-                'message' => 'Vous êtes le propriétaire de cette annonce.',
-                'status' => 'owner',
-            ]);
+                'message' => 'Impossible de déterminer le montant pour ce type de paiement.',
+            ], 422);
         }
 
-        // P0-1 Fix: Atomic check-then-create with lockForUpdate to prevent TOCTOU race
-        return DB::transaction(function () use ($user, $ad) {
-            $existingPayment = Payment::where('user_id', $user->id)
-                ->where('ad_id', $ad->id)
-                ->where('status', PaymentStatus::SUCCESS)
-                ->lockForUpdate()
-                ->first();
+        // Wrap promo code validation + payment creation in a single transaction
+        // to prevent race conditions on single-use promo codes.
+        return DB::transaction(function () use ($validated, $user, $type, $amount): JsonResponse {
+            $appliedPromoCode = null;
+            $finalAmount = $amount;
 
-            if ($existingPayment) {
-                return response()->json([
-                    'message' => 'Annonce déjà débloquée.',
-                    'status' => 'already_paid',
-                ]);
-            }
+            if (!empty($validated['promo_code'])) {
+                $promoCode = PromoCode::where('code', strtoupper((string) $validated['promo_code']))
+                    ->lockForUpdate()
+                    ->first();
 
-            // Also check for an existing PENDING payment to avoid creating duplicates
-            $pendingPayment = Payment::where('user_id', $user->id)
-                ->where('ad_id', $ad->id)
-                ->where('status', PaymentStatus::PENDING)
-                ->lockForUpdate()
-                ->first();
-
-            if ($pendingPayment) {
-                // Reuse: Verify if the existing transaction is still valid
-                $result = $this->fedaPay->retrieveTransaction((int) $pendingPayment->transaction_id);
-                if ($result['success'] && $result['status'] === 'approved') {
-                    $pendingPayment->update(['status' => PaymentStatus::SUCCESS]);
-
-                    return response()->json([
-                        'message' => 'Paiement déjà effectué. Annonce débloquée.',
-                        'status' => 'already_paid',
-                    ]);
+                if ($promoCode && $promoCode->isValidForUser($user, $type)) {
+                    $finalAmount = max(0.0, $finalAmount - $promoCode->calculateDiscount($finalAmount));
+                    $appliedPromoCode = $promoCode;
                 }
             }
 
-            $paymentData = $this->fedaPay->createPayment($this->unlockPrice(), $user, $ad->id);
+            $description = match ($type) {
+                'subscription' => 'Abonnement agence',
+                'credit' => 'Achat de crédits',
+                default => 'Paiement KeyHome',
+            };
 
-            if ($paymentData['success']) {
-                Payment::create([
+            $result = $this->paymentService->createPayment($user, [
+                'amount' => $finalAmount,
+                'type' => $type,
+                'payment_method' => $validated['payment_method'] ?? 'flutterwave',
+                'phone_number' => $validated['phone_number'] ?? null,
+
+                'agency_id' => $validated['agency_id'] ?? null,
+                'plan_id' => $validated['plan_id'] ?? null,
+                'period' => $validated['period'] ?? null,
+                'description' => $description,
+                'save_payment_method' => (bool) ($validated['save_payment_method'] ?? false),
+                'payment_method_id' => isset($validated['payment_method_id']) && is_string($validated['payment_method_id']) && $validated['payment_method_id'] !== ''
+                    ? $validated['payment_method_id']
+                    : null,
+                'meta' => [
+                    'package_id' => ($type === 'credit') ? ($validated['plan_id'] ?? null) : null,
+                ],
+            ]);
+
+            if ($appliedPromoCode !== null) {
+                PromoCodeUsage::create([
+                    'promo_code_id' => $appliedPromoCode->id,
                     'user_id' => $user->id,
-                    'ad_id' => $ad->id,
-                    'amount' => $this->unlockPrice(),
-                    'transaction_id' => (string) $paymentData['transaction_id'],
-                    'status' => PaymentStatus::PENDING,
-                    'payment_method' => PaymentMethod::FEDAPAY,
-                    'type' => PaymentType::UNLOCK,
+                    'payment_id' => $result['payment']->id,
                 ]);
-
-                return response()->json([
-                    'payment_url' => $paymentData['url'],
-                    'message' => 'Redirigez l\'utilisateur vers cette URL pour payer.',
-                ]);
+                $appliedPromoCode->increment('used_count');
             }
 
             return response()->json([
-                'message' => 'Erreur lors de l\'initialisation du paiement.',
-                'error' => config('app.debug') ? ($paymentData['message'] ?? null) : null,
-            ], 500);
+                'reference' => $result['payment']->id,
+                'payment_link' => $result['link'],
+                'tx_ref' => $result['tx_ref'],
+                'gateway' => $result['gateway'],
+                // The orchestrator already mapped the gateway's reply onto
+                // the internal Payment status (PENDING / SUCCESS / FAILED /
+                // CANCELLED) when Stripe could short-circuit the flow
+                // (saved card off-session). Surface the same value here
+                // so the frontend can skip the verify poll on instant
+                // success / failure.
+                'status' => $result['status'],
+            ]);
         });
     }
 
     /**
+     * Verify a Flutterwave payment after the user returns from checkout.
+     *
      * @OA\Post(
-     *     path="/api/v1/payments/webhook",
-     *     summary="2. Webhook de validation (Usage interne FedaPay)",
-     *     description="Cet endpoint est appelé automatiquement par FedaPay dès qu'une transaction change de statut. Ne pas appeler manuellement par le frontend.",
+     *     path="/api/v1/payments/flutterwave/verify",
+     *     summary="Vérifier un paiement Flutterwave",
      *     tags={"💰 Paiements"},
+     *     security={{"sanctum":{}}},
      *
      *     @OA\RequestBody(
-     *         description="Payload envoyé par FedaPay",
-     *
-     *         @OA\JsonContent(
-     *
-     *             @OA\Property(property="event", type="string", example="transaction.approved"),
-     *             @OA\Property(property="entity", type="object")
-     *         )
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Webhook traité avec succès",
-     *
-     *         @OA\JsonContent(@OA\Property(property="status", type="string", example="ok"))
-     *     )
-     * )
-     */
-    public function webhook(Request $request): JsonResponse
-    {
-        Log::info('--- WEBHOOK FEDAPAY START ---');
-
-        $webhookSecret = (string) config('services.fedapay.webhook_secret', '');
-        if ($webhookSecret === '') {
-            Log::error('Webhook FedaPay rejeté: FEDAPAY_WEBHOOK_SECRET manquant.');
-
-            return response()->json(['status' => 'error', 'message' => 'Webhook misconfigured'], 500);
-        }
-
-        if (!$this->hasValidWebhookSignature($request, $webhookSecret)) {
-            Log::warning('Webhook FedaPay rejeté: signature invalide.');
-
-            return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
-        }
-
-        $event = $request->all();
-        Log::info('FedaPay Webhook reçu:', ['event' => $event['event'] ?? 'unknown']);
-
-        $transactionId = $event['entity']['id'] ?? null;
-        if (!$transactionId) {
-            return response()->json(['status' => 'error', 'message' => 'No transaction ID'], 400);
-        }
-
-        // P0-2 Fix: lockForUpdate + idempotency guard to prevent double processing
-        return DB::transaction(function () use ($transactionId, $event) {
-            $payment = Payment::where('transaction_id', (string) $transactionId)
-                ->lockForUpdate()
-                ->first();
-
-            if (!$payment) {
-                return response()->json(['status' => 'not_found'], 404);
-            }
-
-            // Idempotency guard: skip if already in a terminal state
-            if (in_array($payment->status, [PaymentStatus::SUCCESS, PaymentStatus::FAILED], true)) {
-                Log::info("Webhook ignoré: Paiement #{$payment->id} déjà traité (status: {$payment->status->value}).");
-
-                return response()->json(['status' => 'already_processed'], 200);
-            }
-
-            // 1. Gestion du SUCCÈS
-            if (isset($event['event']) && $event['event'] === 'transaction.approved') {
-                $payment->update(['status' => PaymentStatus::SUCCESS]);
-
-                // Create UnlockedAd record for backoffice tracking (unlock payments only)
-                if ($payment->type === PaymentType::UNLOCK && $payment->ad_id && $payment->user_id) {
-                    \App\Models\UnlockedAd::firstOrCreate(
-                        ['ad_id' => $payment->ad_id, 'user_id' => $payment->user_id],
-                        ['payment_id' => $payment->id, 'unlocked_at' => now()]
-                    );
-                }
-
-                Log::info("Paiement #{$payment->id} validé.");
-
-                // Logique spécifique aux abonnements
-                $metadata = $event['entity']['metadata'] ?? [];
-                if (isset($metadata['payment_type']) && $metadata['payment_type'] === 'subscription') {
-                    $agencyId = $metadata['agency_id'] ?? null;
-                    $planId = $metadata['plan_id'] ?? null;
-                    $period = $metadata['period'] ?? 'monthly';
-
-                    if ($agencyId && $planId) {
-                        $agency = \App\Models\Agency::find($agencyId);
-                        $plan = \App\Models\SubscriptionPlan::find($planId);
-
-                        if ($agency && $plan) {
-                            $subscriptionService = new \App\Services\SubscriptionService;
-                            $subscription = $subscriptionService->createSubscription($agency, $plan, $period, $payment);
-                            $subscriptionService->activateSubscription($subscription);
-                            Log::info("Abonnement activé pour l'agence {$agency->id} - Plan {$plan->id} ({$period})");
-                        }
-                    }
-                }
-            }
-
-            // 2. Gestion de l'ÉCHEC ou ANNULATION
-            elseif (isset($event['event']) && in_array($event['event'], ['transaction.canceled', 'transaction.declined'])) {
-                $payment->update(['status' => PaymentStatus::FAILED]);
-                Log::info("Paiement #{$payment->id} marqué comme échoué.");
-            }
-
-            return response()->json(['status' => 'ok']);
-        });
-    }
-
-    /**
-     * @OA\Get(
-     *     path="/api/v1/payments/callback",
-     *     summary="3. Retour utilisateur après paiement",
-     *     description="Page vers laquelle l'utilisateur est redirigé après avoir quitté l'interface de paiement. Le frontend peut intercepter cette URL pour fermer la WebView.",
-     *     tags={"💰 Paiements"},
-     *
-     *     @OA\Parameter(
-     *         name="ad_id",
-     *         in="query",
      *         required=true,
-     *         description="ID de l'annonce d'origine",
-     *
-     *         @OA\Schema(type="string")
-     *     ),
-     *
-     *     @OA\Response(
-     *         response=200,
-     *         description="Succès",
      *
      *         @OA\JsonContent(
      *
-     *             @OA\Property(property="message", type="string"),
-     *             @OA\Property(property="status", type="string")
+     *             @OA\Property(property="tx_ref", type="string", example="KH-ABCDEF123456")
      *         )
-     *     )
+     *     ),
+     *
+     *     @OA\Response(response=200, description="Statut du paiement"),
+     *     @OA\Response(response=404, description="Paiement introuvable")
      * )
      */
-    public function callback(Request $request): JsonResponse
+    public function verify(FlutterwaveVerifyRequest $request): JsonResponse
     {
-        $adId = $request->get('ad_id');
+        $validated = $request->validated();
+
+        /** @var User $user */
+        $user = $request->user();
+
+        $payment = Payment::where('transaction_id', $validated['tx_ref'])
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (!$payment) {
+            return response()->json(['message' => 'Paiement introuvable.'], 404);
+        }
+
+        $payment = $this->paymentService->syncPaymentStatus($payment);
+
+        if ($payment->isPaid()) {
+            $this->postPaymentActions->execute($payment, (array) ($payment->gateway_response ?? []));
+        }
 
         return response()->json([
-            'message' => 'Merci pour votre paiement. Votre annonce est en cours de déblocage.',
-            'ad_id' => $adId,
-            'status' => 'processing',
+            'status' => $payment->status->value,
+            'is_paid' => $payment->isPaid(),
+            'reference' => $payment->id,
+            'ad_id' => $payment->ad_id,
+            'tx_ref' => $payment->transaction_id,
+            'gateway' => $payment->gateway,
+            'payment_method' => $payment->payment_method?->value,
+            'payment_method_label' => $payment->payment_method?->label(),
         ]);
     }
 
     /**
-     * Vérifie le statut d'un paiement auprès de FedaPay et met à jour en base.
+     * Public payment status — minimal payload, no authentication required.
+     *
+     * Returns ONLY the status (`pending` | `success` | `failed` | `cancelled`)
+     * for a given `tx_ref`. Designed for the post-checkout callback page
+     * (`/payment/return`, `/credits/callback`, `/payment-success`) where the user's session
+     * cookie may have been lost during the cross-origin Flutterwave redirect.
+     *
+     * Security:
+     *  - The `tx_ref` is opaque (`KH-XXXXXXXXXXXX`, ~62-bit entropy) and acts
+     *    as a one-time capability — knowing it grants ONLY the right to read
+     *    the payment status, never to modify it or read PII.
+     *  - No user info, amount, payment method, gateway response, or any
+     *    other detail is returned. Defense-in-depth against ID-enumeration.
+     *  - Rate-limited (60/min per IP) to prevent brute-force of `tx_ref` space.
+     *  - Always returns 200 with `status: 'unknown'` on miss to avoid
+     *    distinguishing "exists" from "not exists" via HTTP status codes.
+     *
+     * @OA\Get(
+     *     path="/api/v1/payments/{txRef}/public-status",
+     *     summary="Statut public d'un paiement (sans auth)",
+     *     tags={"💰 Paiements"},
+     *
+     *     @OA\Parameter(name="txRef", in="path", required=true, @OA\Schema(type="string", example="KH-ABCDEF123456")),
+     *
+     *     @OA\Response(response=200, description="Statut du paiement (jamais de PII)")
+     * )
      */
-    public function verify(Request $request, Ad $ad): JsonResponse
+    public function publicStatus(string $txRef): JsonResponse
     {
+        // Hard-validate the format BEFORE hitting the DB so a flood of
+        // malformed requests can't produce a SQL injection attempt against
+        // the UUID-shaped column.
+        if (!preg_match('/^KH-[A-Z0-9]{6,32}$/i', $txRef)) {
+            return response()->json(['status' => 'unknown']);
+        }
+
+        /** @var Payment|null $payment */
+        $payment = Payment::query()
+            ->where('transaction_id', $txRef)
+            ->first();
+
+        if ($payment === null) {
+            return response()->json(['status' => 'unknown']);
+        }
+
+        return response()->json([
+            'status' => $payment->status->value,
+        ]);
+    }
+
+    /**
+     * Cancel a pending Flutterwave payment on user request.
+     *
+     * @OA\Post(
+     *     path="/api/v1/payments/flutterwave/cancel",
+     *     summary="Annuler un paiement Flutterwave en attente",
+     *     tags={"💰 Paiements"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="tx_ref", type="string", example="KH-ABCDEF123456")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=200, description="Paiement annulé"),
+     *     @OA\Response(response=404, description="Paiement introuvable"),
+     *     @OA\Response(response=409, description="Paiement déjà traité")
+     * )
+     */
+    public function cancel(Request $request): JsonResponse
+    {
+        $request->validate([
+            'tx_ref' => ['required', 'string'],
+        ]);
+
+        /** @var User $user */
         $user = $request->user();
 
-        return DB::transaction(function () use ($user, $ad) {
-            $payment = Payment::where('user_id', $user->id)
-                ->where('ad_id', $ad->id)
-                ->where('type', PaymentType::UNLOCK)
-                ->latest()
+        return DB::transaction(function () use ($user, $request): JsonResponse {
+            $payment = Payment::where('transaction_id', $request->input('tx_ref'))
+                ->where('user_id', $user->id)
                 ->lockForUpdate()
                 ->first();
 
             if (!$payment) {
-                return response()->json([
-                    'message' => 'Aucun paiement trouvé pour cette annonce.',
-                    'is_unlocked' => false,
-                ], 404);
+                return response()->json(['message' => 'Paiement introuvable.'], 404);
             }
 
-            if ($payment->status === PaymentStatus::SUCCESS) {
+            if ($payment->isTerminal()) {
                 return response()->json([
-                    'message' => 'Annonce déjà débloquée.',
-                    'is_unlocked' => true,
-                ]);
+                    'message' => 'Ce paiement a déjà été traité.',
+                    'status' => $payment->status->value,
+                ], 409);
             }
 
-            $result = $this->fedaPay->retrieveTransaction((int) $payment->transaction_id);
+            $payment->forceFill(['status' => PaymentStatus::CANCELLED])->save();
 
-            if ($result['success'] && $result['status'] === 'approved') {
-                $payment->update(['status' => PaymentStatus::SUCCESS]);
-
-                \App\Models\UnlockedAd::firstOrCreate(
-                    ['ad_id' => $ad->id, 'user_id' => $user->id],
-                    ['payment_id' => $payment->id, 'unlocked_at' => now()]
-                );
-
-                Log::info("Paiement #{$payment->id} vérifié et validé via API.");
-
-                return response()->json([
-                    'message' => 'Paiement confirmé. Annonce débloquée.',
-                    'is_unlocked' => true,
-                ]);
-            }
+            Log::info('Payment cancelled by user', [
+                'payment_id' => $payment->id,
+                'user_id' => $user->id,
+            ]);
 
             return response()->json([
-                'message' => 'Le paiement est en attente de confirmation.',
-                'is_unlocked' => false,
-                'payment_status' => $result['status'],
+                'message' => 'Paiement annulé avec succès.',
+                'status' => 'cancelled',
             ]);
         });
     }
 
-    private function hasValidWebhookSignature(Request $request, string $secret): bool
+    /**
+     * Handle a webhook from any supported payment gateway.
+     * The {gateway} route parameter is validated by the route constraint.
+     *
+     * @OA\Post(
+     *     path="/api/v1/webhooks/{gateway}",
+     *     summary="Webhook passerelle de paiement",
+     *     tags={"💰 Paiements"},
+     *
+     *     @OA\Parameter(name="gateway", in="path", required=true, @OA\Schema(type="string", enum={"flutterwave"})),
+     *
+     *     @OA\Response(response=200, description="Webhook traité"),
+     *     @OA\Response(response=401, description="Signature invalide")
+     * )
+     */
+    /**
+     * Stripe webhook handler.
+     *
+     * Stripe requires the RAW body for signature verification — we feed
+     * `getContent()` directly into the gateway, not `$request->all()`.
+     * Otherwise verification would always fail because Laravel's parsed
+     * payload doesn't byte-match what Stripe signed.
+     *
+     * @OA\Post(
+     *     path="/api/v1/webhooks/stripe",
+     *     summary="Webhook Stripe",
+     *     tags={"💰 Paiements"},
+     *
+     *     @OA\Response(response=200, description="Webhook traité"),
+     *     @OA\Response(response=400, description="Payload invalide"),
+     *     @OA\Response(response=401, description="Signature invalide")
+     * )
+     */
+    public function handleStripeWebhook(Request $request): JsonResponse
     {
-        $signatureHeader = trim((string) $request->header('X-Fedapay-Signature', ''));
-        if ($signatureHeader === '') {
-            return false;
+        // Stripe sends ~10 event types per PaymentIntent lifecycle (created,
+        // requires_action, processing, succeeded, …). Logging at info level
+        // floods the production log; debug keeps the trace available locally
+        // while letting `Log::warning/error` surface real incidents.
+        Log::debug('--- WEBHOOK stripe START ---');
+
+        $rawPayload = (string) $request->getContent();
+        $signature = (string) $request->header('Stripe-Signature', '');
+
+        if ($rawPayload === '' || $signature === '') {
+            return response()->json(['status' => 'error', 'message' => 'Missing payload or signature'], 400);
         }
 
-        $payload = $request->getContent();
-
-        $timestamp = null;
-        $signatures = [];
-
-        foreach (explode(',', $signatureHeader) as $item) {
-            $segment = trim($item);
-            if ($segment === '') {
-                continue;
-            }
-
-            if (!str_contains($segment, '=')) {
-                $signatures[] = $segment;
-
-                continue;
-            }
-
-            [$key, $value] = array_map(trim(...), explode('=', $segment, 2));
-
-            if ($key === 't') {
-                $timestamp = $value;
-
-                continue;
-            }
-
-            if (in_array($key, ['v1', 'sig', 'signature'], true)) {
-                $signatures[] = $value;
-            }
+        /** @var array<string, mixed>|null $decoded */
+        $decoded = json_decode($rawPayload, true);
+        if (!is_array($decoded)) {
+            return response()->json(['status' => 'error', 'message' => 'Invalid JSON'], 400);
         }
 
-        if ($signatures === [] || $timestamp === null) {
-            return false;
+        // `__raw` is consumed by `StripePaymentService::handleWebhook` for
+        // signature verification — Laravel's parsed payload would fail.
+        $decoded['__raw'] = $rawPayload;
+
+        try {
+            $data = $this->paymentService->processWebhook(
+                $decoded,
+                ['stripe-signature' => $signature],
+                'stripe',
+            );
+        } catch (InvalidWebhookSignatureException) {
+            return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
+        } catch (PaymentGatewayException|\Exception $e) {
+            Log::error('Stripe webhook signature/parse error: '.$e->getMessage());
+
+            return response()->json(['status' => 'error'], 500);
         }
 
-        // Validate timestamp (prevent replay attacks > 5 minutes)
-        if (abs(time() - (int) $timestamp) > 300) {
-            Log::warning("Webhook FedaPay rejeté: Timestamp expiré (t=$timestamp).");
+        $txRef = (string) ($data['tx_ref'] ?? '');
+        $event = (string) ($data['event'] ?? '');
 
-            return false;
+        // Only push to the queue when the event is one we actually act on.
+        // Stripe sends many event types (`payment_intent.created`, etc.); we
+        // only want post-payment side-effects on terminal success events so
+        // we don't redundantly schedule jobs that early-return.
+        if ($txRef !== '' && $event === 'payment_intent.succeeded') {
+            ProcessFlutterwaveWebhookJob::dispatch(
+                $txRef,
+                'stripe',
+                (array) ($data['raw'] ?? []),
+                $request->header('X-Request-ID'),
+                $request->header('X-Correlation-ID'),
+            );
         }
 
-        $expectedTimestampedSignature = hash_hmac('sha256', $timestamp.'.'.$payload, $secret);
+        return response()->json(['status' => 'ok']);
+    }
 
-        return array_any($signatures, fn ($signature) => hash_equals($expectedTimestampedSignature, $signature));
+    public function handleWebhook(Request $request, string $gateway): JsonResponse
+    {
+        Log::info("--- WEBHOOK {$gateway} START ---");
+
+        $payload = $request->all();
+        $headers = [
+            'verif-hash' => (string) $request->header('verif-hash', ''),
+            'HTTP_VERIF_HASH' => (string) $request->header('verif-hash', ''),
+            'flutterwave-signature' => (string) $request->header('flutterwave-signature', ''),
+        ];
+
+        // 1. Verify signature synchronously — fast hash check, must reply to Flutterwave quickly.
+        try {
+            $data = $this->paymentService->processWebhook($payload, $headers, $gateway);
+            $txRef = (string) ($data['tx_ref'] ?? '');
+        } catch (InvalidWebhookSignatureException) {
+            return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
+        } catch (PaymentGatewayException|\Exception $e) {
+            Log::error("{$gateway} webhook signature/parse error: ".$e->getMessage());
+
+            return response()->json(['status' => 'error'], 500);
+        }
+
+        // 2. Dispatch heavy DB work + post-payment actions to the queue.
+        //    PHP-FPM worker is released immediately; Flutterwave gets its 200 in < 200 ms.
+        if ($txRef !== '') {
+            ProcessFlutterwaveWebhookJob::dispatch(
+                $txRef,
+                $gateway,
+                (array) ($data['raw'] ?? []),
+                $request->header('X-Request-ID'),
+                $request->header('X-Correlation-ID'),
+            );
+        }
+
+        return response()->json(['status' => 'ok']);
+    }
+
+    /**
+     * Return the authenticated user's payment history.
+     *
+     * @OA\Get(
+     *     path="/api/v1/payments/history",
+     *     summary="Historique des paiements",
+     *     tags={"💰 Paiements"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Response(response=200, description="Liste paginée des transactions")
+     * )
+     */
+    public function history(PaymentHistoryRequest $request): AnonymousResourceCollection
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        /** @var array{page?: int, per_page?: int} $validated */
+        $validated = $request->validated();
+        $perPage = min(max((int) ($validated['per_page'] ?? 10), 1), 50);
+
+        $payments = Payment::query()
+            ->where('user_id', $user->id)
+            ->with('pointPackage')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->paginate($perPage);
+
+        return PaymentResource::collection($payments);
+    }
+
+    /**
+     * Export the authenticated user's full payment history as a branded PDF.
+     *
+     * @OA\Get(
+     *     path="/api/v1/payments/export",
+     *     summary="Exporter l'historique des paiements en PDF",
+     *     tags={"💰 Paiements"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Parameter(name="period", in="query", required=false,
+     *
+     *         @OA\Schema(type="integer", enum={30, 90, 365}, description="Nb de jours à inclure. Omis = tout l'historique.")),
+     *
+     *     @OA\Response(response=200, description="Fichier PDF téléchargeable",
+     *
+     *         @OA\MediaType(mediaType="application/pdf")),
+     *
+     *     @OA\Response(response=401, description="Non authentifié")
+     * )
+     */
+    public function export(Request $request): Response
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $period = $request->integer('period', 0);
+
+        [
+            'localeCurrency' => $localeCurrency,
+            'localeRate' => $localeRate,
+            'localeSymbol' => $localeSymbol,
+        ] = $this->resolveVisitorLocalePdfHints($request);
+
+        $query = Payment::where('user_id', $user->id)
+            ->with('pointPackage', 'ad')
+            ->orderByDesc('created_at');
+
+        if ($period > 0) {
+            $query->where('created_at', '>=', now()->subDays($period));
+        }
+
+        $payments = $query->get();
+
+        $paidPayments = $payments->filter(fn (Payment $p) => $p->status === PaymentStatus::SUCCESS);
+
+        $totalAmount = $paidPayments->sum(fn (Payment $p) => (float) $p->amount);
+        $creditsEarned = $paidPayments->sum(
+            fn (Payment $p) => $p->pointPackage->points_awarded ?? 0
+        );
+
+        $periodLabel = match ($period) {
+            30 => '30 derniers jours',
+            90 => '90 derniers jours',
+            365 => 'Cette année',
+            default => 'Tout l\'historique',
+        };
+
+        $logoPath = public_path('images/keyhomelogo_transparent.png');
+        $logoBase64 = file_exists($logoPath)
+            ? 'data:image/png;base64,'.base64_encode((string) file_get_contents($logoPath))
+            : null;
+
+        $pdf = Pdf::loadView('pdf.payment-history', [
+            'user' => $user,
+            'payments' => $payments,
+            'totalAmount' => $totalAmount,
+            'totalCount' => $payments->count(),
+            'paidCount' => $paidPayments->count(),
+            'creditsEarned' => $creditsEarned,
+            'periodLabel' => $periodLabel,
+            'generatedAt' => now()->format('d/m/Y à H:i'),
+            'logoBase64' => $logoBase64,
+            'localeCurrency' => $localeCurrency,
+            'localeRate' => $localeRate,
+            'localeSymbol' => $localeSymbol,
+        ])
+            ->setPaper('a4', 'portrait')
+            ->setOptions([
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => false,
+                'defaultFont' => 'DejaVu Sans',
+            ]);
+
+        return $pdf->download('keyhome-paiements-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    /**
+     * Export a single payment as a printable PDF receipt (same auth as history/export).
+     *
+     * @OA\Get(
+     *     path="/api/v1/payments/{payment}/receipt",
+     *     summary="Reçu PDF d'une transaction",
+     *     tags={"💰 Paiements"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Response(response=200, description="PDF"),
+     *     @OA\Response(response=403, description="Interdit"),
+     *     @OA\Response(response=404, description="Introuvable")
+     * )
+     */
+    public function receipt(PaymentReceiptPdfRequest $request, Payment $payment): Response
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        abort_unless($payment->user_id === $user->id, 403);
+
+        [
+            'localeCurrency' => $localeCurrency,
+            'localeRate' => $localeRate,
+            'localeSymbol' => $localeSymbol,
+        ] = $this->resolveVisitorLocalePdfHints($request);
+
+        $payment->loadMissing('pointPackage', 'ad');
+
+        $presentation = PaymentPresentation::forPayment($payment);
+
+        $typeLabel = match ($payment->type) {
+            PaymentType::UNLOCK => 'Déblocage',
+            PaymentType::SUBSCRIPTION => 'Abonnement',
+            PaymentType::BOOST => 'Boost',
+            PaymentType::CREDIT => 'Crédits',
+        };
+
+        $logoPath = public_path('images/keyhomelogo_transparent.png');
+        $logoBase64 = file_exists($logoPath)
+            ? 'data:image/png;base64,'.base64_encode((string) file_get_contents($logoPath))
+            : null;
+
+        $pdf = Pdf::loadView('pdf.payment-receipt', [
+            'user' => $user,
+            'payment' => $payment,
+            'presentation' => $presentation,
+            'typeLabel' => $typeLabel,
+            'generatedAt' => now()->format('d/m/Y à H:i'),
+            'logoBase64' => $logoBase64,
+            'localeCurrency' => $localeCurrency,
+            'localeRate' => $localeRate,
+            'localeSymbol' => $localeSymbol,
+        ])
+            ->setPaper('a4', 'portrait')
+            ->setOptions([
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => false,
+                'defaultFont' => 'DejaVu Sans',
+            ]);
+
+        $safeRef = preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $payment->transaction_id) ?? 'recu';
+
+        return $pdf->stream('keyhome-recu-'.$safeRef.'.pdf');
+    }
+
+    /**
+     * @return array{
+     *     localeCurrency: string|null,
+     *     localeRate: float|null,
+     *     localeSymbol: string|null
+     * }
+     */
+    private function resolveVisitorLocalePdfHints(Request $request): array
+    {
+        $allowedCurrencies = ['EUR', 'USD', 'GBP', 'CHF', 'CAD', 'JPY', 'MXN', 'BRL', 'CNY', 'AUD', 'KRW'];
+        $rawCurrency = strtoupper((string) $request->query('currency', ''));
+        $rawRate = (float) $request->query('rate', 0);
+        $useLocale = in_array($rawCurrency, $allowedCurrencies, true)
+            && is_finite($rawRate)
+            && $rawRate > 0;
+
+        if (!$useLocale) {
+            return [
+                'localeCurrency' => null,
+                'localeRate' => null,
+                'localeSymbol' => null,
+            ];
+        }
+
+        return [
+            'localeCurrency' => $rawCurrency,
+            'localeRate' => $rawRate,
+            'localeSymbol' => self::VISITOR_LOCALE_SYMBOL_BY_CCY[$rawCurrency],
+        ];
     }
 }

@@ -2,6 +2,8 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="color-scheme" content="light dark">
+    <meta name="supported-color-schemes" content="light dark">
     <style>
         body {
             font-family: Arial, Helvetica, sans-serif;
@@ -59,6 +61,28 @@
             color: #999999;
             padding: 20px;
         }
+
+        @media (prefers-color-scheme: dark) {
+            body, .email-wrapper {
+                background-color: #1a1a2e !important;
+            }
+            .email-content {
+                background-color: #16213e !important;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important;
+            }
+            .email-header {
+                border-bottom-color: #2d3748 !important;
+            }
+            .email-header h1 {
+                color: #f1f5f9 !important;
+            }
+            .email-body {
+                color: #cbd5e1 !important;
+            }
+            .email-footer {
+                color: #64748b !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -82,6 +106,14 @@
             &copy; {{ date('Y') }} NeoCraft. Tous droits réservés.
             <br>
             <a href="https://neocraft.dev" style="color:#F6475F; text-decoration:none;">Visitez notre site</a>
+            @isset($unsubscribeUrl)
+                <br>
+                <a href="{{ $unsubscribeUrl }}" style="color:#999999; text-decoration:none;">Se désabonner</a>
+                @isset($preferencesUrl)
+                    &nbsp;|&nbsp;
+                    <a href="{{ $preferencesUrl }}" style="color:#999999; text-decoration:none;">Gérer mes préférences</a>
+                @endisset
+            @endisset
         </div>
 
     </div>

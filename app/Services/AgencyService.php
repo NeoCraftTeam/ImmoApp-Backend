@@ -25,11 +25,11 @@ class AgencyService
                 'owner_id' => $user->id,
             ]);
 
-            $user->update([
+            $user->forceFill([
                 'role' => UserRole::AGENT,
                 'type' => UserType::AGENCY,
                 'agency_id' => $agency->id,
-            ]);
+            ])->save();
 
             return $agency;
         });
@@ -48,11 +48,11 @@ class AgencyService
                 'owner_id' => $user->id,
             ]);
 
-            $user->update([
+            $user->forceFill([
                 'role' => UserRole::AGENT,
                 'type' => UserType::INDIVIDUAL,
                 'agency_id' => $agency->id,
-            ]);
+            ])->save();
 
             return $agency;
         });

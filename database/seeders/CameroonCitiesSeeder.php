@@ -49,7 +49,12 @@ class CameroonCitiesSeeder extends Seeder
 
     private function parseSqlFile(): void
     {
-        $content = file_get_contents(database_path('data/cities.sql'));
+        $path = database_path('data/cities.sql');
+        if (!file_exists($path)) {
+            throw new \RuntimeException('Missing database/data/cities.sql. Download it or create the file before seeding.');
+        }
+
+        $content = file_get_contents($path);
 
         preg_match_all(
             "/\((\d+),\s*'([^']*)',\s*([\d.+-]+),\s*([\d.+-]+),\s*'([^']*)',\s*'([^']*)',\s*'([^']*)',\s*'([^']*)',\s*'([^']*)',\s*(\d+),\s*'([^']*)'\)/u",
@@ -199,14 +204,14 @@ class CameroonCitiesSeeder extends Seeder
             $coordinatesMap[$id] = ['lat' => $entry['latitude'], 'lng' => $entry['longitude']];
         }
 
+        foreach (array_chunk($insertData, 2000) as $chunk) {
+            Quarter::insert($chunk);
+        }
+
         file_put_contents(
             storage_path('app/quarter_coordinates.json'),
             json_encode($coordinatesMap)
         );
-
-        foreach (array_chunk($insertData, 2000) as $chunk) {
-            Quarter::insert($chunk);
-        }
     }
 
     private function findNearestCity(array $entry, array $regionIndex, array $allCities): string

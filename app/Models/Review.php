@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 /**
  * @property-read Ad|null $ad
@@ -31,6 +33,9 @@ use Illuminate\Support\Carbon;
  * @property string|null $comment
  * @property string $ad_id
  * @property string $user_id
+ * @property bool $is_verified
+ * @property string|null $owner_response
+ * @property Carbon|null $owner_responded_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
@@ -48,9 +53,9 @@ use Illuminate\Support\Carbon;
  */
 class Review extends Model
 {
-    use HasFactory, HasUuids, softDeletes;
+    use HasFactory, HasUuids, LogsActivity, softDeletes;
 
-    protected $fillable = ['rating', 'comment', 'ad_id', 'user_id', 'agency_id'];
+    protected $fillable = ['rating', 'comment', 'ad_id', 'user_id', 'agency_id', 'is_verified', 'owner_response', 'owner_responded_at'];
 
     protected $hidden = ['created_at', 'updated_at', 'deleted_at'];
 
@@ -67,5 +72,23 @@ class Review extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['rating', 'comment', 'ad_id', 'user_id'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $eventName): string => "Avis #{$this->id} {$eventName}");
+    }
+
+    #[\Override]
+    public function casts(): array
+    {
+        return [
+            'is_verified' => 'boolean',
+            'owner_responded_at' => 'datetime',
+        ];
     }
 }

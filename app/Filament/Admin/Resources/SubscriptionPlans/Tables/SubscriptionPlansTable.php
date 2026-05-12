@@ -11,6 +11,7 @@ use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
 class SubscriptionPlansTable
@@ -18,6 +19,9 @@ class SubscriptionPlansTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->heading('Plans d\'abonnement')
+            ->description('Gestion des offres d\'abonnement')
+            ->striped()
             ->columns([
                 TextColumn::make('name')
                     ->label('Plan')
@@ -39,7 +43,7 @@ class SubscriptionPlansTable
                     ->label('Boost')
                     ->badge()
                     ->color('success')
-                    ->formatStateUsing(fn ($state) => "+{$state} pts")
+                    ->formatStateUsing(fn ($state) => "Score +{$state}")
                     ->sortable(),
 
                 TextColumn::make('boost_duration_days')
@@ -70,15 +74,24 @@ class SubscriptionPlansTable
 
                 TextColumn::make('created_at')
                     ->label('Créé le')
-                    ->dateTime()
+                    ->dateTime('d/m/Y à H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('sort_order')
+            ->filters([
+                TernaryFilter::make('is_active')
+                    ->label('Statut')
+                    ->trueLabel('Actifs')
+                    ->falseLabel('Inactifs')
+                    ->native(false),
+            ])
             ->recordActions([
                 ViewAction::make(),
-                EditAction::make(),
-                DeleteAction::make(),
+                EditAction::make()
+                    ->successNotificationTitle('Plan d\'abonnement mis à jour'),
+                DeleteAction::make()
+                    ->successNotificationTitle('Plan d\'abonnement supprimé'),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([

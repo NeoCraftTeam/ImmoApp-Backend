@@ -11,14 +11,20 @@ class DatabaseSeeder extends Seeder
 
     /**
      * Seed the application's database.
+     *
+     * Optional seeders (not called by default): UserSeeder, AgencySeeder,
+     * PaymentSeeder, CitySeeder. Call them explicitly if needed.
      */
     public function run(): void
     {
         $this->call([
             AdTypeSeeder::class,
             SubscriptionPlanSeeder::class,
+            PointSystemSeeder::class,
             CameroonCitiesSeeder::class,
+            PropertyAttributeSeeder::class,
             MassiveAdSeeder::class,
+            SurveySeeder::class,
         ]);
     }
 }

@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Resources;
 
 use App\Models\Ad;
+use App\Models\Agency;
+use App\Models\Setting;
+use App\Models\User;
+use App\Support\TourAssetToken;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\Storage;
@@ -24,6 +28,10 @@ final class AdResource extends JsonResource
     public function toArray(Request $request): array
     {
         $user = $request->user();
+        $canAccessTour = $this->canAccessTour($user);
+        $signedTourConfig = $canAccessTour && $this->has_3d_tour
+            ? $this->signTourConfigUrls($this->tour_config)
+            : null;
 
         // Compute rating from eager-loaded aggregate or fallback
         $avgRating = $this->reviews_avg_rating
@@ -33,13 +41,17 @@ final class AdResource extends JsonResource
         $reviewsCount = $this->reviews_count
             ?? ($this->relationLoaded('reviews') ? $this->reviews->count() : 0);
 
+        // Cache media collection to avoid repeated queries
+        $allImages = $this->getMedia('images');
+        $accessibleImages = $this->getAccessibleImages($user);
+
         return [
             'id' => $this->id,
             'title' => $this->title,
             'slug' => $this->slug,
             'description' => $this->description,
             'adresse' => $this->adresse,
-            'price' => $this->price,
+            'price' => $this->price === null ? null : (float) $this->price,
             'surface_area' => $this->surface_area,
             'bedrooms' => $this->bedrooms,
             'bathrooms' => $this->bathrooms,
@@ -49,22 +61,51 @@ final class AdResource extends JsonResource
                 'longitude' => $this->location->getX(),
             ] : null,
             'status' => $this->status,
+            'status_label' => $this->status->getLabel(),
             'is_visible' => $this->is_visible,
             'available_from' => $this->available_from?->format('Y-m-d'),
             'available_to' => $this->available_to?->format('Y-m-d'),
-            'attributes' => $this->attributes ?? [],
+            'attributes' => $this->resource->getAttribute('attributes') ?? [],
             'is_currently_available' => $this->isCurrentlyAvailable(),
             'is_unlocked' => $this->isUnlockedFor($user),
-            'total_images' => $this->getMedia('images')->count(),
+            'unlock_cost' => (int) Setting::get('unlock_cost_points', 2),
+            'has_3d_tour' => (bool) $this->has_3d_tour,
+            'tour_config' => $this->when($this->has_3d_tour && $canAccessTour, $signedTourConfig),
+            'tour_scenes_count' => $this->when($this->has_3d_tour, $this->tour_scenes_count),
+            'tour_published_at' => $this->when($this->has_3d_tour, $this->tour_published_at),
+            'total_images' => $allImages->count(),
             'rating' => $avgRating ? (float) $avgRating : null,
             'reviews_count' => (int) $reviewsCount,
             'is_favorited' => $this->isFavoritedBy($user),
             'view_count' => $this->views_count ?? 0,
+            'views_count_today' => $this->views_count_today ?? 0,
+            'views_count_week' => $this->views_count_week ?? 0,
+            'is_verified' => (bool) ($this->is_verified ?? false),
+
+            // Boost — public-visible so cards can render a "Sponsorisé" / "Boosté" badge.
+            // Computed via `isBoosted()` which checks both flag + expiration date.
+            'is_boosted' => $this->isBoosted(),
+            'boost_expires_at' => $this->isBoosted()
+                ? $this->boost_expires_at?->toIso8601String()
+                : null,
+            'boost_score' => $this->isBoosted() ? (int) ($this->boost_score ?? 0) : 0,
+
+            // Proximity & accessibility — always visible (helps users decide to unlock)
+            'distance_main_road_m' => $this->distance_main_road_m,
+            'distance_shops_m' => $this->distance_shops_m,
+            'distance_transport_m' => $this->distance_transport_m,
+            'distance_school_m' => $this->distance_school_m,
+            'distance_hospital_m' => $this->distance_hospital_m,
 
             // Premium info - only visible when unlocked
             'deposit_amount' => $this->when($this->isUnlockedFor($user), $this->deposit_amount),
             'minimum_lease_duration' => $this->when($this->isUnlockedFor($user), $this->minimum_lease_duration),
             'detailed_charges' => $this->when($this->isUnlockedFor($user), $this->detailed_charges),
+            'charges_forfaitaires' => $this->when($this->isUnlockedFor($user), $this->charges_forfaitaires),
+            'charges_montant_forfait' => $this->when($this->isUnlockedFor($user), $this->charges_montant_forfait),
+            'charges_eau' => $this->when($this->isUnlockedFor($user), $this->charges_eau),
+            'charges_electricite' => $this->when($this->isUnlockedFor($user), $this->charges_electricite),
+            'charges_autres' => $this->when($this->isUnlockedFor($user), $this->charges_autres),
             'property_condition_pdf' => $this->when(
                 $this->isUnlockedFor($user) && $this->hasMedia('property_condition'),
                 fn () => $this->getFirstMediaUrl('property_condition')
@@ -74,6 +115,12 @@ final class AdResource extends JsonResource
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
 
+            // Pending-edit draft payload — visible only to the ad owner
+            'draft_payload' => $this->when(
+                $user?->id === $this->user_id || $user?->isAdmin(),
+                $this->draft_payload
+            ),
+
             'user' => $this->whenLoaded('user', function () use ($user) {
                 $owner = $this->user;
                 $isUnlocked = $this->isUnlockedFor($user);
@@ -81,11 +128,12 @@ final class AdResource extends JsonResource
 
                 return [
                     'id' => $owner->id,
+                    'username' => $owner->username,
                     'firstname' => $owner->firstname,
                     'lastname' => $owner->lastname,
                     'display_name' => $owner->fullname,
                     'avatar' => $owner->getFirstMediaUrl('avatars') ?: $this->getAvatarUrl($owner->avatar),
-                    'agency_name' => $owner->agency instanceof \App\Models\Agency ? $owner->agency->name : null,
+                    'agency_name' => $owner->relationLoaded('agency') && $owner->agency instanceof Agency ? $owner->agency->name : null,
                     // Show contact info only if unlocked or owner/admin
                     'phone_number' => ($isUnlocked || $isOwnerOrAdmin) ? $owner->phone_number : null,
                     'phone_is_whatsapp' => ($isUnlocked || $isOwnerOrAdmin) ? (bool) $owner->phone_is_whatsapp : null,
@@ -96,13 +144,14 @@ final class AdResource extends JsonResource
             'published_by' => $this->getPublisherName(),
             'quarter' => new QuarterResource($this->whenLoaded('quarter')),
             'type' => new AdTypeResource($this->whenLoaded('ad_type')),
-            'images' => $this->getAccessibleImages($user)->map(fn ($media) => [
+            'images' => $accessibleImages->map(fn ($media) => [
                 'id' => $media->id,
                 'url' => $media->getUrl(),
+                'placeholder' => $media->hasGeneratedConversion('placeholder') ? $media->getUrl('placeholder') : null,
                 'thumb' => $media->hasGeneratedConversion('thumb') ? $media->getUrl('thumb') : $media->getUrl(),
-                'medium' => $media->hasGeneratedConversion('medium') ? $media->getUrl('medium') : $media->getUrl(),
+                'large' => $media->hasGeneratedConversion('large') ? $media->getUrl('large') : $media->getUrl(),
                 'mime_type' => $media->mime_type,
-                'is_primary' => $this->getMedia('images')->first()?->id === $media->id,
+                'is_primary' => $allImages->first()?->id === $media->id,
             ]),
             'reviews' => ReviewResource::collection($this->whenLoaded('reviews')),
         ];
@@ -118,10 +167,72 @@ final class AdResource extends JsonResource
             return $avatar;
         }
 
-        if (Storage::disk('public')->exists($avatar)) {
-            return Storage::disk('public')->url($avatar);
+        $disk = config('filesystems.app_media_disk');
+        if (Storage::disk($disk)->exists($avatar)) {
+            return Storage::disk($disk)->url($avatar);
         }
 
         return null;
+    }
+
+    private function canAccessTour(?User $user): bool
+    {
+        if (!$this->has_3d_tour) {
+            return false;
+        }
+
+        if ($this->isUnlockedFor($user)) {
+            return true;
+        }
+
+        return $user instanceof User && $user->isAdmin();
+    }
+
+    private function signTourConfigUrls(?array $tourConfig): ?array
+    {
+        if (!$tourConfig) {
+            return null;
+        }
+
+        $normalized = TourAssetToken::normalizeHotspotsLists($tourConfig);
+        $signed = TourAssetToken::signTourConfig((string) $this->id, $normalized);
+
+        return $this->ensureAbsoluteTourUrls($signed);
+    }
+
+    /**
+     * Ensure tour asset URLs are absolute for cross-origin frontend (e.g. Next.js on different domain).
+     *
+     * @param  array<string, mixed>  $tourConfig
+     * @return array<string, mixed>
+     */
+    private function ensureAbsoluteTourUrls(array $tourConfig): array
+    {
+        $base = rtrim((string) config('app.url'), '/');
+
+        if (!isset($tourConfig['scenes']) || !is_array($tourConfig['scenes'])) {
+            return $tourConfig;
+        }
+
+        $tourConfig['scenes'] = array_map(function (array $scene) use ($base): array {
+            foreach (['image_url', 'tiles_base_url', 'fallback_base_url'] as $key) {
+                if (isset($scene[$key]) && is_string($scene[$key]) && !str_starts_with($scene[$key], 'http')) {
+                    $scene[$key] = $base.($scene[$key][0] === '/' ? '' : '/').$scene[$key];
+                }
+            }
+            if (isset($scene['cube_map']) && is_array($scene['cube_map'])) {
+                $scene['cube_map'] = array_map(function (mixed $url) use ($base): mixed {
+                    if (is_string($url) && !str_starts_with($url, 'http')) {
+                        return $base.($url[0] === '/' ? '' : '/').$url;
+                    }
+
+                    return $url;
+                }, $scene['cube_map']);
+            }
+
+            return $scene;
+        }, $tourConfig['scenes']);
+
+        return $tourConfig;
     }
 }

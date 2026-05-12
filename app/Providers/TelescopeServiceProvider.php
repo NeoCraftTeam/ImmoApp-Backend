@@ -40,7 +40,16 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
             return;
         }
 
-        Telescope::hideRequestParameters(['_token']);
+        Telescope::hideRequestParameters([
+            '_token',
+            'password',
+            'password_confirmation',
+            'current_password',
+            'new_password',
+            'secret_key',
+            'token',
+            'api_key',
+        ]);
 
         Telescope::hideRequestHeaders([
             'cookie',
@@ -53,12 +62,40 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
      * Register the Telescope gate.
      *
      * This gate determines who can access Telescope in non-local environments.
+     *
+     * Allowed principals are sourced from the `TELESCOPE_ALLOWED_EMAILS`
+     * environment variable (comma-separated list) so rotating the admins
+     * who can see production Telescope data does not require a code deploy
+     * and never leaves an identifier committed in the repository. An admin
+     * role on the User model is required in addition to the e-mail match —
+     * defense in depth if the env var is misconfigured to include a
+     * non-admin e-mail.
+     *
+     * Usage — `.env.production`:
+     *     TELESCOPE_ALLOWED_EMAILS=ops@example.com,cto@example.com
      */
     #[\Override]
     protected function gate(): void
     {
-        Gate::define('viewTelescope', fn ($user) => in_array($user->email, [
-            'cedrickfeze24@gmail.com',
-        ]));
+        Gate::define('viewTelescope', function ($user): bool {
+            if (!method_exists($user, 'isAdmin') || !$user->isAdmin()) {
+                return false;
+            }
+
+            if (!isset($user->email)) {
+                return false;
+            }
+
+            $allowed = array_filter(array_map(
+                trim(...),
+                explode(',', (string) config('telescope.allowed_emails', ''))
+            ));
+
+            if ($allowed === []) {
+                return false;
+            }
+
+            return in_array(strtolower((string) $user->email), array_map(strtolower(...), $allowed), true);
+        });
     }
 }

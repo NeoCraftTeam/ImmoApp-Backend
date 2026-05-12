@@ -23,12 +23,15 @@ class SyncMeilisearchSettings extends Command
 
             $this->info('🔧 Mise à jour des attributs filtrables...');
             $index->updateFilterableAttributes([
-                'city', 'bedrooms', 'type', 'price', 'quarter_id', 'type_id', 'status', 'created_at',
+                'status', 'is_visible', 'city', 'type', 'type_id', 'quarter_id',
+                'bedrooms', 'bathrooms', 'price', 'surface_area',
+                'has_parking', 'has_3d_tour', 'is_verified', 'is_boosted',
+                '_geo', 'attributes',
             ]);
 
             $this->info('📊 Mise à jour des attributs triables...');
             $index->updateSortableAttributes([
-                'price', 'surface_area', 'type', 'bedrooms', 'city', 'created_at',
+                'price', 'surface_area', 'created_at', 'boost_score', 'reviews_avg_rating', 'views_count',
             ]);
 
             $this->info('✅ Configuration Meilisearch synchronisée avec succès !');

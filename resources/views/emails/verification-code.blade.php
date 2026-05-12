@@ -1,29 +1,30 @@
-{{-- Converted from Clerk "verification code (OTP)" email template --}}
-@extends('emails.layout')
+{{-- OTP verification code email — adapts layout for owner (teal) vs client (default) --}}
+@extends($emailLayout ?? 'emails.layout')
 
-@section('title', $otpCode . ' est votre code de vérification ' . config('app.name'))
+@section('title', __('emails.verification_code.subject', ['code' => $otpCode, 'app' => config('app.name')]))
 
 @section('content')
 
-    <h1>Code de vérification</h1>
+    <h1>{{ __('emails.verification_code.heading') }}</h1>
+
+    @if(!empty($isOwner))
+        <p class="text" style="margin-top: 16px; color: #0d9488; font-weight: 600;">
+            Espace Bailleur — vérification de votre compte propriétaire.
+        </p>
+    @endif
 
     <p class="text" style="margin-top: 32px;">
-        Entrez le code de vérification suivant lorsqu'il vous est demandé :
+        {{ __('emails.verification_code.enter_code') }}
     </p>
 
-    <p style="font-size: 40px; font-weight: 700; color: #000000; margin: 16px 0 0 0; letter-spacing: 8px;">
-        {{ $otpCode }}
-    </p>
+    <div class="otp-box">
+        <div class="otp-code">{{ $otpCode }}</div>
+        <div class="otp-label">{{ __('emails.verification_code.otp_label') }}</div>
+    </div>
 
-    <p class="text" style="margin-top: 16px;">
-        Pour protéger votre compte, ne partagez pas ce code.
-    </p>
-
-    <p class="text" style="margin-top: 64px;"><strong>Vous n'avez pas fait cette demande ?</strong></p>
+    <p class="text" style="margin-top: 64px;"><strong>{{ __('emails.verification_code.not_requested') }}</strong></p>
     <p class="text" style="margin-top: 4px;">
-        Ce code a été demandé depuis <strong>{{ $requestedFrom }}</strong>
-        le <strong>{{ $requestedAt }}</strong>.
-        Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.
+        {!! __('emails.verification_code.requested_from', ['from' => $requestedFrom, 'at' => $requestedAt]) !!}
     </p>
 
 @endsection

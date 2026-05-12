@@ -14,7 +14,7 @@
 ## Customer Experience
 
 - [ ] **9.** Extra info visibility post-unlock (plus de détails après paiement)
-- [ ] **10.** Custom invoice format (sans template Fedapay)
+- [ ] **10.** Custom invoice format (DomPDF — no payment gateway dependency)
 - [ ] **11.** Update user avatars system (upload/gestion photos profil)
 
 ## Admin Panel
@@ -40,4 +40,7 @@
 
 ---
 
-*Dernière mise à jour: 20 février 2026*
+*Dernière mise à jour: Avril 2026*
+
+> ⚠️ Ce fichier nécessite une mise à jour complète — plusieurs items ont évolué depuis février 2026.
+> Voir [LiveDocs/keyhome_million_dollar_roadmap.md](./LiveDocs/keyhome_million_dollar_roadmap.md) pour la roadmap détaillée.

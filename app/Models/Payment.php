@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\PaymentGateway;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
@@ -14,6 +15,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 use Spatie\Activitylog\LogOptions;
@@ -24,13 +26,15 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property PaymentType $type
  * @property string $amount
  * @property string $transaction_id
- * @property PaymentMethod $payment_method
+ * @property string|null $gateway
+ * @property PaymentMethod|null $payment_method
  * @property string $user_id
  * @property PaymentStatus $status
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
  * @property-read User $user
+ * @property-read PointPackage|null $pointPackage
  *
  * @method static PaymentFactory factory($count = null, $state = [])
  * @method static Builder<static>|Payment newModelQuery()
@@ -51,7 +55,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @method static Builder<static>|Payment withoutTrashed()
  *
  * @property string $ad_id
- * @property-read \App\Models\Ad $ad
+ * @property-read Ad $ad
  *
  * @method static Builder<static>|Payment whereAdId($value)
  *
@@ -61,18 +65,22 @@ class Payment extends Model
 {
     use HasFactory, HasUuids, LogsActivity, SoftDeletes;
 
+    /**
+     * SEC-002: status, amount, transaction_id excluded — set only via PaymentService
+     * or forceFill() to prevent mass-assignment fraud.
+     */
     protected $fillable = [
-
         'type',
-        'amount',
-        'transaction_id',
         'payment_method',
         'user_id',
         'ad_id',
         'agency_id',
         'plan_id',
         'period',
-        'status',
+        'gateway',
+        'payment_link',
+        'gateway_response',
+        'phone_number',
     ];
 
     protected $hidden = [
@@ -86,6 +94,7 @@ class Payment extends Model
         'payment_method' => PaymentMethod::class,
         'status' => PaymentStatus::class,
         'amount' => 'integer',
+        'gateway_response' => 'array',
     ];
 
     public function user(): BelongsTo
@@ -103,9 +112,32 @@ class Payment extends Model
         return $this->belongsTo(Agency::class);
     }
 
+    public function pointPackage(): BelongsTo
+    {
+        return $this->belongsTo(PointPackage::class, 'plan_id');
+    }
+
+    /**
+     * @return HasMany<Refund, $this>
+     */
+    public function refunds(): HasMany
+    {
+        return $this->hasMany(Refund::class);
+    }
+
+    public function isRefunded(): bool
+    {
+        return $this->status === PaymentStatus::REFUNDED;
+    }
+
     public function isPaid(): bool
     {
         return $this->status === PaymentStatus::SUCCESS;
+    }
+
+    public function isTerminal(): bool
+    {
+        return in_array($this->status, [PaymentStatus::SUCCESS, PaymentStatus::FAILED, PaymentStatus::CANCELLED, PaymentStatus::REFUNDED], true);
     }
 
     /**
@@ -125,11 +157,11 @@ class Payment extends Model
     }
 
     /**
-     * Returns true if the payment method is Stripe.
+     * Returns true if the payment method is a card payment.
      */
-    public function isStripe(): bool
+    public function isCard(): bool
     {
-        return $this->payment_method === PaymentMethod::STRIPE;
+        return $this->payment_method === PaymentMethod::CARD;
     }
 
     /**
@@ -178,6 +210,14 @@ class Payment extends Model
     public function isBoosted(): bool
     {
         return $this->type === PaymentType::BOOST;
+    }
+
+    /**
+     * Returns true if the payment was processed via Flutterwave.
+     */
+    public function isFlutterwave(): bool
+    {
+        return $this->gateway === PaymentGateway::Flutterwave->value;
     }
 
     public function getActivitylogOptions(): LogOptions

@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\SubscriptionStatus;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -16,20 +20,20 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property string $subscription_plan_id
  * @property string $billing_period
  * @property SubscriptionStatus $status
- * @property \Illuminate\Support\Carbon|null $starts_at
- * @property \Illuminate\Support\Carbon|null $ends_at
- * @property \Illuminate\Support\Carbon|null $cancelled_at
+ * @property Carbon|null $starts_at
+ * @property Carbon|null $ends_at
+ * @property Carbon|null $cancelled_at
  * @property string|null $payment_id
  * @property string $amount_paid
  * @property bool $auto_renew
  * @property string|null $cancellation_reason
- * @property-read \App\Models\Agency|null $agency
- * @property-read \App\Models\SubscriptionPlan|null $plan
- * @property-read \App\Models\Payment|null $payment
+ * @property-read Agency|null $agency
+ * @property-read SubscriptionPlan|null $plan
+ * @property-read Payment|null $payment
  */
 class Subscription extends Model
 {
-    use \Illuminate\Database\Eloquent\Concerns\HasUuids, LogsActivity;
+    use HasFactory, HasUuids, LogsActivity;
 
     protected $fillable = [
         'agency_id',
@@ -147,7 +151,7 @@ class Subscription extends Model
     /**
      * Scope to get active subscriptions
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function active($query)
     {
         return $query->where('status', SubscriptionStatus::ACTIVE)
@@ -157,7 +161,7 @@ class Subscription extends Model
     /**
      * Scope to get expired subscriptions
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function expired($query)
     {
         return $query->where(function ($q): void {

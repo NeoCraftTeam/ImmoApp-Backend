@@ -12,10 +12,12 @@ class ManageSubscriptions extends ManageRecords
 {
     protected static string $resource = SubscriptionResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make()->label('Créer un abonnement'),
+            CreateAction::make()->label('Créer un abonnement')
+                ->successNotificationTitle('Abonnement créé avec succès'),
         ];
     }
 }

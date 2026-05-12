@@ -42,6 +42,7 @@ storage/framework/views/
 *.md
 audit/
 docs/
+readme/
 skills/
 data.ms/
 dumps/
@@ -50,7 +51,8 @@ dumps/
 public/build/
 public/hot
 
-# Scripts not needed in container
+# Scripts not needed in container (except patch-webpush.php, used by composer post-autoload-dump)
 deploy.sh
 backup-db.sh
-scripts/
+scripts/fix-images-vps.sh
+scripts/laravel-integrity.mjs

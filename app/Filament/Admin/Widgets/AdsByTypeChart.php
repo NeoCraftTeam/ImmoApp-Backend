@@ -6,23 +6,26 @@ namespace App\Filament\Admin\Widgets;
 
 use App\Models\Ad;
 use Filament\Widgets\ChartWidget;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class AdsByTypeChart extends ChartWidget
 {
     protected static ?int $sort = 5;
 
-    // protected static ?string $heading = 'Répartition par Type de Bien';
+    protected ?string $heading = 'Répartition par Type de Bien';
+
+    protected ?string $pollingInterval = '60s';
 
     protected int|string|array $columnSpan = 1;
 
     #[\Override]
     protected function getData(): array
     {
-        $data = Ad::join('ad_type', 'ad.type_id', '=', 'ad_type.id')
+        $data = Cache::remember('admin_ads_by_type_chart', 300, fn () => Ad::join('ad_type', 'ad.type_id', '=', 'ad_type.id')
             ->select(DB::raw('ad_type.name as type_name'), DB::raw('count(*) as total'))
             ->groupBy('ad_type.name')
-            ->pluck('total', 'type_name');
+            ->pluck('total', 'type_name'));
 
         return [
             'datasets' => [

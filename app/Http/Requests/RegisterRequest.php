@@ -8,6 +8,25 @@ use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Password;
 
+/**
+ * @OA\Schema(
+ *     schema="RegisterRequest",
+ *     required={"firstname","lastname","email","phone_number","password","confirm_password"},
+ *
+ *     @OA\Property(property="firstname", type="string", maxLength=50, example="Jean"),
+ *     @OA\Property(property="lastname", type="string", maxLength=50, example="Dupont"),
+ *     @OA\Property(property="email", type="string", format="email", example="jean@example.com"),
+ *     @OA\Property(property="phone_number", type="string", example="+237600000000"),
+ *     @OA\Property(property="password", type="string", format="password", minLength=8, example="Secret@123"),
+ *     @OA\Property(property="confirm_password", type="string", format="password", example="Secret@123"),
+ *     @OA\Property(property="role", type="string", enum={"customer","agent"}, nullable=true),
+ *     @OA\Property(property="type", type="string", enum={"individual","agency"}, nullable=true),
+ *     @OA\Property(property="city_id", type="string", nullable=true),
+ *     @OA\Property(property="latitude", type="number", format="float", nullable=true),
+ *     @OA\Property(property="longitude", type="number", format="float", nullable=true),
+ *     @OA\Property(property="avatar", type="string", format="binary", nullable=true)
+ * )
+ */
 final class RegisterRequest extends FormRequest
 {
     /**
@@ -28,7 +47,7 @@ final class RegisterRequest extends FormRequest
         return [
             'firstname' => 'required|string|max:50|regex:/^[a-zA-ZÀ-ÿ\s]+$/',
             'lastname' => 'required|string|max:50|regex:/^[a-zA-ZÀ-ÿ\s]+$/',
-            'email' => 'required|email:|max:255|unique:users,email',
+            'email' => 'required|email|max:255',
             'phone_number' => 'required|string|regex:/^[+]?[0-9\s\-\(\)]{10,15}$/',
             'password' => [
                 'required',
@@ -45,6 +64,15 @@ final class RegisterRequest extends FormRequest
             'latitude' => 'nullable|numeric|between:-90,90',
             'longitude' => 'nullable|numeric|between:-180,180',
             'avatar' => 'nullable|image|mimes:jpeg,jpg,png,webp|max:2048|dimensions:min_width=100,min_height=100,max_width=2000,max_height=2000',
+            'session_id' => 'nullable|string|max:64',
+            'utm_source' => 'nullable|string|max:100',
+            'utm_medium' => 'nullable|string|max:100',
+            'utm_campaign' => 'nullable|string|max:255',
+            'utm_content' => 'nullable|string|max:255',
+            'utm_term' => 'nullable|string|max:255',
+            // Cloudflare Turnstile token. Optional: server-side verified only
+            // when the service is configured (see TurnstileService).
+            'turnstile_token' => 'nullable|string|max:2048',
         ];
     }
 
@@ -58,7 +86,6 @@ final class RegisterRequest extends FormRequest
             'lastname.regex' => 'Le nom ne peut contenir que des lettres et espaces.',
             'email.required' => 'L\'adresse email est obligatoire.',
             'email.email' => 'L\'adresse email doit être valide.',
-            'email.unique' => 'Cette adresse email est déjà utilisée.',
             'phone_number.required' => 'Le numéro de téléphone est obligatoire.',
             'phone_number.regex' => 'Le numéro de téléphone n\'est pas valide.',
             'password.required' => 'Le mot de passe est obligatoire.',

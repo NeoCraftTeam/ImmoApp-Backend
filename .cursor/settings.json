@@ -1,0 +1,15 @@
+{
+  "plugins": {
+    "gitlab": {
+      "enabled": true
+    },
+    "slack": {
+      "enabled": true
+    }
+  },
+  "mcpServers": {
+    "stripe": {
+      "url": "https://mcp.stripe.com"
+    }
+  }
+}

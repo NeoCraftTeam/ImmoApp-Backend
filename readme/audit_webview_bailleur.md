@@ -1,3 +1,7 @@
+> 🗑️ **OBSOLETE DOCUMENT** — The Bailleur (individual landlord) panel was removed from KeyHome.
+> This audit is retained for historical reference only. **Do not apply any recommendations from this document.**
+> Remaining active panels: Admin (`/admin`) and Agency (`/agency`).
+
 # Audit — `mobile/bailleur` React Native WebView Implementation
 
 > **Date:** 2026-02-23 | **Auditor:** Antigravity  

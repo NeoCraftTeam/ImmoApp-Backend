@@ -19,6 +19,14 @@ final class AgencyResource extends JsonResource
             'name' => $this->name,
             'slug' => $this->slug,
             'logo' => $this->logo,
+            'owner' => $this->whenLoaded('owner', fn () => [
+                'id' => $this->owner->id,
+                'firstname' => $this->owner->firstname,
+                'lastname' => $this->owner->lastname,
+                'avatar' => $this->owner->avatar,
+                'created_at' => $this->owner->created_at,
+            ]),
+            'users_count' => $this->whenCounted('users'),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

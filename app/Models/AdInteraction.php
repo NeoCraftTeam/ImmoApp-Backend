@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * Tracks user interactions with ads (views, favorites, searches, unlocks).
@@ -18,13 +21,24 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $ad_id
  * @property string $type
  * @property array|null $metadata
- * @property \Illuminate\Support\Carbon $created_at
+ * @property Carbon $created_at
  * @property-read User $user
  * @property-read Ad|null $ad
  */
 class AdInteraction extends Model
 {
     use HasUuids;
+    use MassPrunable;
+
+    /**
+     * Prune interactions older than 2 years.
+     *
+     * @return Builder<static>
+     */
+    public function prunable(): Builder
+    {
+        return static::where('created_at', '<', now()->subYears(2));
+    }
 
     public $timestamps = false;
 

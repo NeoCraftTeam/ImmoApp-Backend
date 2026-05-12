@@ -9,7 +9,9 @@ use App\Actions\Agency\DeleteAgencyAction;
 use App\Actions\Agency\ListAgenciesAction;
 use App\Actions\Agency\UpdateAgencyAction;
 use App\Http\Requests\AgencyRequest;
+use App\Http\Resources\AdResource;
 use App\Http\Resources\AgencyResource;
+use App\Models\Ad;
 use App\Models\Agency;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 
@@ -131,7 +133,34 @@ final class AgencyController
     {
         $this->authorize('view', $agency);
 
-        return new AgencyResource($agency);
+        $agency->loadCount(['users']);
+        $agency->load(['owner:id,firstname,lastname,avatar,created_at']);
+
+        $ads = Ad::where('user_id', $agency->owner_id)
+            ->where('status', 'available')
+            ->where('is_visible', true)
+            ->with([
+                'quarter:id,name,city_id',
+                'quarter.city:id,name',
+                'ad_type:id,name',
+                'media',
+            ])
+            ->withAvg('reviews', 'rating')
+            ->withCount('reviews')
+            ->latest()
+            ->paginate(12);
+
+        return response()->json([
+            'success' => true,
+            'data' => new AgencyResource($agency),
+            'ads' => AdResource::collection($ads->items()),
+            'meta' => [
+                'total' => $ads->total(),
+                'current_page' => $ads->currentPage(),
+                'last_page' => $ads->lastPage(),
+                'per_page' => $ads->perPage(),
+            ],
+        ]);
     }
 
     /**

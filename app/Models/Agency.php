@@ -4,12 +4,16 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\SubscriptionStatus;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -19,12 +23,12 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property string $slug
  * @property string|null $logo
  * @property string $owner_id
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property \Illuminate\Support\Carbon|null $deleted_at
- * @property-read \App\Models\User $owner
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\User> $users
- * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Subscription> $subscriptions
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
+ * @property-read User $owner
+ * @property-read Collection<int, User> $users
+ * @property-read Collection<int, Subscription> $subscriptions
  *
  * @OA\Schema(
  *     schema="Agency",
@@ -43,7 +47,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  */
 class Agency extends Model
 {
-    use hasFactory, HasUuids, LogsActivity, SoftDeletes;
+    use HasFactory, HasUuids, LogsActivity, SoftDeletes;
 
     public $incrementing = false;
 
@@ -64,12 +68,12 @@ class Agency extends Model
         'id' => 'string',
     ];
 
-    public function owner(): belongsTo
+    public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_id', 'id');
     }
 
-    public function users(): hasMany
+    public function users(): HasMany
     {
         return $this->hasMany(User::class);
     }
@@ -79,10 +83,10 @@ class Agency extends Model
         return $this->hasMany(Subscription::class);
     }
 
-    public function activeSubscription(): ?\Illuminate\Database\Eloquent\Relations\HasOne
+    public function activeSubscription(): ?HasOne
     {
         return $this->hasOne(Subscription::class)
-            ->where('status', \App\Enums\SubscriptionStatus::ACTIVE)
+            ->where('status', SubscriptionStatus::ACTIVE)
             ->where('ends_at', '>', now())
             ->latest('ends_at');
     }
@@ -93,7 +97,7 @@ class Agency extends Model
     public function hasActiveSubscription(): bool
     {
         return $this->subscriptions()
-            ->where('status', \App\Enums\SubscriptionStatus::ACTIVE)
+            ->where('status', SubscriptionStatus::ACTIVE)
             ->where('ends_at', '>', now())
             ->exists();
     }
@@ -103,14 +107,12 @@ class Agency extends Model
      */
     public function getCurrentSubscription(): ?Subscription
     {
-        /** @var Subscription|null $subscription */
-        $subscription = $this->subscriptions()
-            ->where('status', \App\Enums\SubscriptionStatus::ACTIVE)
+        /** @var Subscription|null */
+        return $this->subscriptions()
+            ->where('status', SubscriptionStatus::ACTIVE)
             ->where('ends_at', '>', now())
             ->latest('ends_at')
             ->first();
-
-        return $subscription;
     }
 
     public function getActivitylogOptions(): LogOptions

@@ -8,6 +8,8 @@ use App\Filament\Admin\Resources\Agencies\Pages\CreateAgency;
 use App\Filament\Admin\Resources\Agencies\Pages\EditAgency;
 use App\Filament\Admin\Resources\Agencies\Pages\ListAgencies;
 use App\Filament\Admin\Resources\Agencies\Pages\ViewAgency;
+use App\Filament\Admin\Resources\Agencies\RelationManagers\MembersRelationManager;
+use App\Filament\Admin\Resources\Agencies\RelationManagers\SubscriptionsRelationManager;
 use App\Filament\Admin\Resources\Agencies\Schemas\AgencyForm;
 use App\Filament\Admin\Resources\Agencies\Schemas\AgencyInfolist;
 use App\Filament\Admin\Resources\Agencies\Tables\AgenciesTable;
@@ -26,15 +28,25 @@ class AgencyResource extends Resource
 
     protected static bool $isScopedToTenant = false;
 
-    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
+    protected static string|null|\UnitEnum $navigationGroup = 'Membres';
 
-    protected static ?string $recordTitleAttribute = 'Agency';
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingOffice2;
+
+    protected static ?string $navigationLabel = 'Agences';
+
+    protected static ?string $modelLabel = 'Agence';
+
+    protected static ?string $pluralModelLabel = 'Agences';
+
+    protected static ?int $navigationSort = 2;
+
+    protected static ?string $recordTitleAttribute = 'name';
 
     #[\Override]
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['owner']);
+            ->with(['owner.agency']);
     }
 
     #[\Override]
@@ -59,10 +71,12 @@ class AgencyResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
+            MembersRelationManager::class,
+            SubscriptionsRelationManager::class,
         ];
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [
@@ -73,6 +87,7 @@ class AgencyResource extends Resource
         ];
     }
 
+    #[\Override]
     public static function getRecordRouteBindingEloquentQuery(): Builder
     {
         return parent::getRecordRouteBindingEloquentQuery()

@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\UserRole;
+use App\Mail\OAuthLinkAttemptMail;
 use App\Models\User;
+use App\Services\UtmAttributionService;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use OpenApi\Attributes as OA;
@@ -94,7 +98,15 @@ final class SocialAuthController
             'token' => 'required|string',
             'id_token' => 'nullable|string',
             'role' => 'nullable|string|in:customer,agent',
+            'session_id' => 'nullable|string|max:64',
+            'utm_source' => 'nullable|string|max:100',
+            'utm_medium' => 'nullable|string|max:100',
+            'utm_campaign' => 'nullable|string|max:255',
+            'utm_content' => 'nullable|string|max:255',
+            'utm_term' => 'nullable|string|max:255',
         ]);
+
+        $utmPayload = $request->only(UtmAttributionService::ATTRIBUTION_REQUEST_KEYS);
 
         try {
             // Get user info from OAuth provider
@@ -107,15 +119,24 @@ final class SocialAuthController
             }
 
             // Find or create user
-            $result = $this->findOrCreateUser($socialUser, $provider, $request->role);
+            $result = $this->findOrCreateUser($socialUser, $provider, $request->role, $request, $utmPayload);
             $user = $result['user'];
             $isNewUser = $result['is_new'];
 
+            // Cross-provider link requires explicit confirmation
+            if ($result['requires_link_confirmation'] ?? false) {
+                return response()->json([
+                    'message' => 'Un compte existe déjà avec cet email. Confirmez la liaison des comptes.',
+                    'requires_link_confirmation' => true,
+                    'linking_token' => $result['linking_token'],
+                ], 200);
+            }
+
             // Update last login info
-            $user->update([
+            $user->forceFill([
                 'last_login_at' => now(),
                 'last_login_ip' => $request->ip(),
-            ]);
+            ])->save();
 
             // Create Sanctum token
             $token = $user->createToken('oauth-'.$provider)->plainTextToken;
@@ -193,6 +214,11 @@ final class SocialAuthController
 
         $redirectUri = $request->query('redirect_uri', config('app.frontend_url').'/auth/callback');
 
+        // Validate redirect_uri against allowed hosts before encoding in state
+        if (!$this->isAllowedRedirectUri((string) $redirectUri)) {
+            $redirectUri = config('app.frontend_url').'/auth/callback';
+        }
+
         // Encode redirect_uri in state parameter (stateless approach for API)
         $stateData = [
             'csrf' => Str::random(40),
@@ -200,9 +226,8 @@ final class SocialAuthController
         ];
         $state = base64_encode(json_encode($stateData) ?: '');
 
-        /** @phpstan-ignore method.notFound */
         $driver = Socialite::driver($provider)
-            ->stateless()
+            ->stateless() // @phpstan-ignore method.notFound
             ->with(['state' => $state]);
 
         // Apple requires additional scopes
@@ -239,33 +264,50 @@ final class SocialAuthController
         }
 
         try {
-            // Decode redirect_uri from state parameter
+            // Decode redirect_uri from state parameter and validate against allowed hosts
             $redirectUri = config('app.frontend_url').'/auth/callback';
             $state = $request->query('state');
 
             if ($state) {
                 $stateData = json_decode(base64_decode($state), true);
                 if (is_array($stateData) && isset($stateData['redirect_uri'])) {
-                    $redirectUri = $stateData['redirect_uri'];
+                    $candidate = (string) $stateData['redirect_uri'];
+                    // Only accept the URI if it matches our allowed hosts whitelist
+                    if ($this->isAllowedRedirectUri($candidate)) {
+                        $redirectUri = $candidate;
+                    } else {
+                        Log::warning('OAuth callback: rejected non-whitelisted redirect_uri', [
+                            'redirect_uri' => $candidate,
+                            'provider' => $provider,
+                            'ip' => $request->ip(),
+                        ]);
+                    }
                 }
             }
 
             /** @phpstan-ignore method.notFound */
             $socialUser = Socialite::driver($provider)->stateless()->user();
 
-            $result = $this->findOrCreateUser($socialUser, $provider);
+            $result = $this->findOrCreateUser($socialUser, $provider, null, $request, []);
             $user = $result['user'];
 
-            $user->update([
+            $user->forceFill([
                 'last_login_at' => now(),
                 'last_login_ip' => $request->ip(),
-            ]);
+            ])->save();
 
             $token = $user->createToken('oauth-'.$provider)->plainTextToken;
 
-            return redirect($redirectUri.'?'.http_build_query([
+            // Store the real token in cache under a short-lived exchange code.
+            // The URL only carries the exchange code — never the raw Sanctum token.
+            $exchangeCode = Str::random(64);
+            Cache::put('oauth_token_exchange_'.$exchangeCode, [
                 'token' => $token,
-                'is_new_user' => $result['is_new'] ? '1' : '0',
+                'is_new_user' => $result['is_new'],
+            ], now()->addMinutes(2));
+
+            return redirect($redirectUri.'?'.http_build_query([
+                'exchange_code' => $exchangeCode,
             ]));
 
         } catch (Exception $e) {
@@ -278,6 +320,35 @@ final class SocialAuthController
 
             return redirect($redirectUri.'?message=oauth_failed');
         }
+    }
+
+    /**
+     * Redeem a short-lived OAuth exchange code for a Sanctum token.
+     *
+     * The frontend receives an exchange_code query param after the OAuth callback
+     * redirect and immediately calls this endpoint (within 2 minutes) to get the
+     * real token without it ever appearing in browser history or server logs.
+     */
+    public function exchangeToken(Request $request): JsonResponse
+    {
+        $request->validate([
+            'exchange_code' => ['required', 'string', 'size:64'],
+        ]);
+
+        $cacheKey = 'oauth_token_exchange_'.$request->input('exchange_code');
+        $data = Cache::pull($cacheKey); // pull = get + delete (single-use)
+
+        if ($data === null) {
+            return response()->json([
+                'message' => 'Code d\'échange invalide ou expiré.',
+                'code' => 'EXCHANGE_CODE_INVALID',
+            ], 422);
+        }
+
+        return response()->json([
+            'token' => $data['token'],
+            'is_new_user' => $data['is_new_user'],
+        ]);
     }
 
     /**
@@ -406,6 +477,48 @@ final class SocialAuthController
     }
 
     /**
+     * Confirm pending cross-provider account link using a short-lived token.
+     */
+    public function confirmOAuthLink(Request $request): JsonResponse
+    {
+        $request->validate([
+            'linking_token' => ['required', 'string'],
+        ]);
+
+        $user = User::where('pending_oauth_token', $request->linking_token)
+            ->where('pending_oauth_expires_at', '>', now())
+            ->first();
+
+        if (!$user) {
+            return response()->json([
+                'message' => 'Token de liaison invalide ou expiré.',
+            ], 422);
+        }
+
+        $providerIdField = $user->pending_oauth_provider.'_id';
+
+        $user->update([
+            $providerIdField => $user->pending_oauth_id,
+            'oauth_provider' => $user->pending_oauth_provider,
+            'oauth_avatar' => $user->pending_oauth_avatar,
+            'email_verified_at' => $user->email_verified_at ?? now(),
+            'pending_oauth_provider' => null,
+            'pending_oauth_id' => null,
+            'pending_oauth_avatar' => null,
+            'pending_oauth_token' => null,
+            'pending_oauth_expires_at' => null,
+        ]);
+
+        $token = $user->createToken('oauth-link-confirmed')->plainTextToken;
+
+        return response()->json([
+            'message' => 'Liaison de compte confirmée avec succès.',
+            'user' => $user->fresh()->load('city'),
+            'token' => $token,
+        ]);
+    }
+
+    /**
      * Get social user data from provider.
      */
     private function getSocialUser(string $provider, string $token, ?string $idToken = null): mixed
@@ -426,11 +539,27 @@ final class SocialAuthController
      *
      * @return array{user: User, is_new: bool}
      */
-    private function findOrCreateUser(mixed $socialUser, string $provider, ?string $role = null): array
-    {
+    /**
+     * @return array{
+     *     user: User,
+     *     is_new: bool,
+     *     requires_link_confirmation?: bool,
+     *     linking_token?: string
+     * }
+     */
+    /**
+     * @param  array<string, mixed>  $utmPayload
+     */
+    private function findOrCreateUser(
+        mixed $socialUser,
+        string $provider,
+        ?string $role,
+        Request $request,
+        array $utmPayload,
+    ): array {
         $providerIdField = $provider.'_id';
 
-        return DB::transaction(function () use ($socialUser, $provider, $providerIdField) {
+        return DB::transaction(function () use ($socialUser, $provider, $providerIdField, $request, $utmPayload) {
             // Try to find by provider ID first
             $user = User::where($providerIdField, $socialUser->getId())->first();
 
@@ -443,19 +572,36 @@ final class SocialAuthController
                 return ['user' => $user, 'is_new' => false];
             }
 
-            // Try to find by email
-            $user = User::where('email', $socialUser->getEmail())->first();
+            // Try to find by email — requires EXPLICIT confirmation before linking
+            $existingUser = User::where('email', $socialUser->getEmail())->first();
 
-            if ($user) {
-                // Link provider to existing account
-                $user->update([
-                    $providerIdField => $socialUser->getId(),
-                    'oauth_provider' => $provider,
-                    'oauth_avatar' => $socialUser->getAvatar(),
-                    'email_verified_at' => $user->email_verified_at ?? now(),
+            if ($existingUser) {
+                $linkingToken = hash('sha256', Str::random(64));
+                $existingUser->update([
+                    'pending_oauth_provider' => $provider,
+                    'pending_oauth_id' => $socialUser->getId(),
+                    'pending_oauth_avatar' => $socialUser->getAvatar(),
+                    'pending_oauth_token' => $linkingToken,
+                    'pending_oauth_expires_at' => now()->addMinutes(5), // Reduced from 15min for security
                 ]);
 
-                return ['user' => $user, 'is_new' => false];
+                // Notify the account owner that someone tried to link a provider to their account
+                Mail::to($existingUser->email, $existingUser->firstname ?? $existingUser->email)
+                    ->queue(new OAuthLinkAttemptMail(
+                        userFirstName: $existingUser->firstname ?? 'Utilisateur',
+                        provider: $provider,
+                        ipAddress: $request->ip() ?? 'inconnu',
+                        attemptedAt: now()->translatedFormat('d F Y à H:i'),
+                        secureAccountUrl: config('app.frontend_url').'/security/sessions',
+                        supportEmail: config('mail.from.address'),
+                    ));
+
+                return [
+                    'user' => $existingUser,
+                    'is_new' => false,
+                    'requires_link_confirmation' => true,
+                    'linking_token' => $linkingToken,
+                ];
             }
 
             // Create new user
@@ -464,22 +610,65 @@ final class SocialAuthController
             // Users can request agent upgrade through the app after completing their profile.
             $names = $this->parseNames($socialUser);
 
-            $user = User::create([
+            $utm = app(UtmAttributionService::class);
+
+            $user = new User;
+            $user->fill([
                 'firstname' => $names['firstname'],
                 'lastname' => $names['lastname'],
                 'email' => $socialUser->getEmail(),
-                'password' => null, // OAuth users don't need password
+                'password' => null,
                 $providerIdField => $socialUser->getId(),
                 'oauth_provider' => $provider,
                 'oauth_avatar' => $socialUser->getAvatar(),
                 'avatar' => $socialUser->getAvatar() ?? 'avatars/default.png',
-                'email_verified_at' => now(), // OAuth emails are pre-verified
-                'role' => UserRole::CUSTOMER, // Always customer - agents need manual setup
-                'is_active' => true,
             ]);
+            $user->forceFill([
+                'email_verified_at' => now(),
+                'role' => UserRole::CUSTOMER,
+                'is_active' => true,
+                'registration_ip' => $request->ip(),
+                'last_login_ip' => $request->ip(),
+            ]);
+            $user->forceFill($utm->attributesForNewUser($request, $utmPayload));
+            $user->save();
+            $utm->linkSessionVisitsToUser(
+                $user,
+                isset($utmPayload['session_id']) && is_string($utmPayload['session_id']) ? $utmPayload['session_id'] : null,
+            );
 
             return ['user' => $user, 'is_new' => true];
         });
+    }
+
+    /**
+     * Check whether a redirect_uri is allowed.
+     *
+     * Validates against the configured frontend URL host and any additional
+     * hosts listed in OAUTH_ALLOWED_REDIRECT_HOSTS (comma-separated).
+     */
+    private function isAllowedRedirectUri(string $uri): bool
+    {
+        $host = parse_url($uri, PHP_URL_HOST);
+
+        if (!is_string($host) || $host === '') {
+            return false;
+        }
+
+        // Always allow the configured frontend host
+        $allowedHosts = [];
+        $frontendHost = parse_url((string) config('app.frontend_url', ''), PHP_URL_HOST);
+        if (is_string($frontendHost) && $frontendHost !== '') {
+            $allowedHosts[] = $frontendHost;
+        }
+
+        // Also allow hosts from OAUTH_ALLOWED_REDIRECT_HOSTS env var
+        $extra = (string) config('app.oauth_allowed_redirect_hosts', '');
+        foreach (array_filter(array_map(trim(...), explode(',', $extra))) as $h) {
+            $allowedHosts[] = $h;
+        }
+
+        return in_array($host, $allowedHosts, true);
     }
 
     /**

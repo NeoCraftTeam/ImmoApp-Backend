@@ -3,106 +3,192 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Email vérifié - KeyHome</title>
+    <title>Email vérifié — KeyHome</title>
+    <link rel="preconnect" href="https://fonts.bunny.net">
+    <link href="https://fonts.bunny.net/css?family=instrument-sans:400,600,700,800" rel="stylesheet" />
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
-            margin: 0;
-            padding: 0;
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            background-color: #f8fafc;
+            font-family: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+            background: #f3f4f6;
             color: #1e293b;
             display: flex;
-            justify-content: center;
             align-items: center;
+            justify-content: center;
             min-height: 100vh;
+            padding: 1.5rem;
         }
 
-        .container {
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: #030712;
+                color: #f1f5f9;
+            }
+
+            .card {
+                background: #111827;
+                border-color: #1f2937;
+            }
+
+            .card h1 { color: #f9fafb; }
+
+            .card p { color: #94a3b8; }
+
+            .icon-circle {
+                background: #064e3b;
+            }
+
+            .icon-circle svg { color: #5eead4; }
+        }
+
+        .card {
             text-align: center;
-            background: white;
-            padding: 40px;
-            border-radius: 12px;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
-            max-width: 450px;
+            background: #ffffff;
+            padding: 3rem 2.25rem;
+            border-radius: 1rem;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.06);
+            max-width: 440px;
             width: 100%;
         }
 
-        .logo {
-            font-size: 28px;
+        .logo-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 2rem;
+        }
+
+        .logo-row img { width: 40px; height: 40px; }
+
+        .logo-text {
+            font-size: 22px;
             font-weight: 800;
-            color: #F6475F;
-            margin-bottom: 24px;
-            display: inline-block;
-            letter-spacing: -0.5px;
+            color: #f6475f;
+            letter-spacing: -0.03em;
         }
 
         .icon-circle {
-            width: 80px;
-            height: 80px;
-            background-color: #fff1f2;
+            width: 88px;
+            height: 88px;
+            background: #d1fae5;
             border-radius: 50%;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            margin: 0 auto 24px;
+            margin: 0 auto 1.75rem;
         }
 
-        .icon {
-            font-size: 40px;
-            color: #F6475F;
-            font-weight: bold;
-        }
+        .icon-circle svg { width: 44px; height: 44px; color: #0d9488; }
 
         h1 {
-            margin: 0 0 16px;
-            font-size: 24px;
-            font-weight: 700;
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin-bottom: 0.75rem;
             color: #0f172a;
+            letter-spacing: -0.025em;
         }
 
         p {
-            margin: 0 0 24px;
             color: #64748b;
             line-height: 1.6;
+            margin-bottom: 1.75rem;
+            font-size: 15px;
         }
 
         .btn {
-            background-color: #F6475F;
-            color: white !important;
-            padding: 14px 32px;
-            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #f6475f;
+            color: #ffffff !important;
+            padding: 14px 36px;
+            border-radius: 0.75rem;
             text-decoration: none;
-            font-weight: 600;
-            display: inline-block;
-            transition: background-color 0.2s;
+            font-weight: 700;
+            font-size: 15px;
             border: none;
             cursor: pointer;
-            font-size: 16px;
-            width: 100%;
-            box-sizing: border-box;
+            transition: background-color 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 4px 14px -3px rgb(246 71 95 / 0.45);
         }
 
         .btn:hover {
-            background-color: #D5384EFF;
+            background: #d93a50;
+            box-shadow: 0 6px 18px -3px rgb(246 71 95 / 0.5);
+        }
+
+        .btn:focus-visible {
+            outline: 2px solid #d93a50;
+            outline-offset: 3px;
+        }
+
+        .btn svg { width: 18px; height: 18px; }
+
+        .redirect-hint {
+            margin-top: 1.25rem;
+            font-size: 13px;
+            color: #94a3b8;
+        }
+
+        .redirect-hint span { font-weight: 600; color: #f6475f; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .btn {
+                transition: none;
+            }
         }
     </style>
 </head>
 <body>
-<div class="container">
-    <div class="logo">KeyHome</div>
+    <div class="card">
+        <div class="logo-row">
+            <img src="{{ asset('images/logo.png') }}" alt="KeyHome">
+            <span class="logo-text">KeyHome</span>
+        </div>
 
-    <div class="icon-circle">
-        <span class="icon">&#10003;</span>
+        <div class="icon-circle" aria-hidden="true">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            </svg>
+        </div>
+
+        <h1>Email vérifié avec succès !</h1>
+
+        <p>Merci <strong>{{ $user->firstname }}</strong>, votre compte est maintenant sécurisé et actif.</p>
+
+        @php
+            $redirectUrl = config('app.email_verify_callback', 'http://localhost:8000');
+        @endphp
+
+        <a href="{{ $redirectUrl }}" class="btn">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3-3h-9m0 0 3-3m-3 3 3 3" />
+            </svg>
+            Accéder à mon espace
+        </a>
+
+        <p class="redirect-hint">
+            Redirection automatique dans <span id="countdown">5</span>s…
+        </p>
     </div>
 
-    <h1>Email vérifié avec succès !</h1>
-
-    <p>Merci <strong>{{ $user->firstname }}</strong>, votre compte est maintenant sécurisé et actif. Vous pouvez accéder
-        à votre espace.</p>
-
-    <a href="{{ config('app.email_verify_callback', 'http://localhost:8000') }}" class="btn">
-        Accéder à mon espace
-    </a>
-</div>
+    <script>
+        (function() {
+            var seconds = 5;
+            var el = document.getElementById('countdown');
+            var url = @json($redirectUrl);
+            var timer = setInterval(function() {
+                seconds--;
+                if (el) el.textContent = seconds;
+                if (seconds <= 0) {
+                    clearInterval(timer);
+                    window.location.href = url;
+                }
+            }, 1000);
+        })();
+    </script>
 </body>
 </html>

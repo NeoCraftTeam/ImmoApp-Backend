@@ -14,7 +14,7 @@ class AdTypeSeeder extends Seeder
     {
         // Crée les 8 types définis dans AdTypeFactory si aucun n'existe encore
         if (AdType::count() === 0) {
-            \App\Models\AdType::factory()->count(8)->create();
+            AdType::factory()->count(8)->create();
         }
     }
 }

@@ -8,12 +8,15 @@ use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 class WelcomeEmail extends Mailable implements ShouldQueue
 {
+    use Concerns\HasLocale;
+    use Concerns\HasUnsubscribeLinks;
     use Queueable, SerializesModels;
 
     /**
@@ -21,7 +24,7 @@ class WelcomeEmail extends Mailable implements ShouldQueue
      */
     public function __construct(public User $user)
     {
-        //
+        $this->applyRecipientLocale();
     }
 
     /**
@@ -30,7 +33,7 @@ class WelcomeEmail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Bienvenue sur KeyHome',
+            subject: __('emails.welcome.subject', ['app' => config('app.name')]),
         );
     }
 
@@ -41,13 +44,24 @@ class WelcomeEmail extends Mailable implements ShouldQueue
     {
         return new Content(
             view: 'emails.welcome',
+            with: $this->withUnsubscribe(),
         );
+    }
+
+    protected function resolveRecipientUser(): ?User
+    {
+        return $this->user;
+    }
+
+    protected function emailCategory(): string
+    {
+        return 'welcome_emails';
     }
 
     /**
      * Get the attachments for the message.
      *
-     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
+     * @return array<int, Attachment>
      */
     public function attachments(): array
     {

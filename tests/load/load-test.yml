@@ -1,0 +1,100 @@
+# Artillery load test — KeyHome API
+#
+# Target: 1000 concurrent virtual users across key endpoints.
+#
+# Prerequisites:
+#   npm install -g artillery
+#
+# Usage:
+#   artillery run tests/load/load-test.yml                          # default (staging)
+#   artillery run tests/load/load-test.yml --target http://localhost:8000  # local
+#   artillery run tests/load/load-test.yml --output report.json     # save report
+#   artillery report report.json                                     # HTML report
+#
+# Expected results (healthy):
+#   - p95 latency < 500ms
+#   - p99 latency < 1500ms
+#   - Error rate < 1%
+
+config:
+  target: "{{ $processEnvironment.API_BASE_URL || 'https://staging-api.keyhome.app' }}"
+  phases:
+    # Warm-up: 50 users/sec for 30s
+    - duration: 30
+      arrivalRate: 50
+      name: "Warm-up"
+    # Ramp-up: 50 → 200 users/sec over 60s
+    - duration: 60
+      arrivalRate: 50
+      rampTo: 200
+      name: "Ramp-up"
+    # Sustained: 200 users/sec for 120s (~1000 concurrent)
+    - duration: 120
+      arrivalRate: 200
+      name: "Sustained load"
+    # Cool-down: 200 → 10 users/sec over 30s
+    - duration: 30
+      arrivalRate: 200
+      rampTo: 10
+      name: "Cool-down"
+  defaults:
+    headers:
+      Accept: "application/json"
+      Content-Type: "application/json"
+  ensure:
+    thresholds:
+      - http.response_time.p95: 500
+      - http.response_time.p99: 1500
+
+scenarios:
+  # 40% — Browse ads (highest traffic endpoint)
+  - name: "Browse ads"
+    weight: 40
+    flow:
+      - get:
+          url: "/api/v1/ads?page=1&per_page=12"
+      - think: 2
+      - get:
+          url: "/api/v1/ads?page=2&per_page=12"
+
+  # 25% — Search ads (NLP + filters)
+  - name: "Search ads"
+    weight: 25
+    flow:
+      - get:
+          url: "/api/v1/ads?q=appartement&city=Yaoundé&per_page=12"
+      - think: 1
+      - get:
+          url: "/api/v1/ads?q=villa+piscine&city=Douala&per_page=12"
+
+  # 15% — View single ad
+  - name: "View ad detail"
+    weight: 15
+    flow:
+      - get:
+          url: "/api/v1/ads?per_page=1"
+          capture:
+            - json: "$.data[0].slug"
+              as: "adSlug"
+      - get:
+          url: "/api/v1/ads/{{ adSlug }}"
+
+  # 10% — Cities autocomplete (rapid typing)
+  - name: "City autocomplete"
+    weight: 10
+    flow:
+      - get:
+          url: "/api/v1/cities?q=Ya&per_page=10"
+      - think: 0.3
+      - get:
+          url: "/api/v1/cities?q=Yao&per_page=10"
+      - think: 0.3
+      - get:
+          url: "/api/v1/cities?q=Yaou&per_page=10"
+
+  # 10% — Health check
+  - name: "Health check"
+    weight: 10
+    flow:
+      - get:
+          url: "/api/health"

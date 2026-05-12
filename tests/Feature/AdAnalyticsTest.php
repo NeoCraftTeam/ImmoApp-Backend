@@ -8,6 +8,9 @@ use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
 
+/** @var list<string> Abilities required by token.role:agent middleware on owner API routes */
+const OWNER_SANCTUM_ABILITIES = ['role:agent', 'api:access'];
+
 // ══════════════════════════════════════════════════════════════
 // TRACKING ENDPOINTS
 // ══════════════════════════════════════════════════════════════
@@ -18,8 +21,8 @@ test('impression tracking is debounced at 30 seconds', function (): void {
 
     Sanctum::actingAs($user);
 
-    $this->postJson("/api/v1/ads/{$ad->id}/impression")->assertStatus(204);
-    $this->postJson("/api/v1/ads/{$ad->id}/impression")->assertStatus(204);
+    $this->postJson("/api/v1/ads/{$ad->slug}/impression")->assertStatus(204);
+    $this->postJson("/api/v1/ads/{$ad->slug}/impression")->assertStatus(204);
 
     expect(
         AdInteraction::where('user_id', $user->id)
@@ -86,8 +89,8 @@ test('analytics overview requires authentication', function (): void {
 });
 
 test('analytics overview returns empty data for user with no ads', function (): void {
-    $user = User::factory()->create();
-    Sanctum::actingAs($user);
+    $user = User::factory()->agents()->create();
+    Sanctum::actingAs($user, OWNER_SANCTUM_ABILITIES);
 
     $response = $this->getJson('/api/v1/my/ads/analytics');
     $response->assertStatus(200)
@@ -97,7 +100,7 @@ test('analytics overview returns empty data for user with no ads', function (): 
 });
 
 test('analytics overview aggregates all interaction types', function (): void {
-    $user = User::factory()->create();
+    $user = User::factory()->agents()->create();
     $ad = Ad::factory()->create(['user_id' => $user->id, 'status' => 'available']);
     $viewer = User::factory()->create();
 
@@ -111,7 +114,7 @@ test('analytics overview aggregates all interaction types', function (): void {
         ]);
     }
 
-    Sanctum::actingAs($user);
+    Sanctum::actingAs($user, OWNER_SANCTUM_ABILITIES);
 
     $response = $this->getJson('/api/v1/my/ads/analytics');
     $response->assertStatus(200)
@@ -145,7 +148,7 @@ test('analytics overview aggregates all interaction types', function (): void {
 });
 
 test('analytics overview supports period filtering', function (): void {
-    $user = User::factory()->create();
+    $user = User::factory()->agents()->create();
     $ad = Ad::factory()->create(['user_id' => $user->id, 'status' => 'available']);
     $viewer = User::factory()->create();
 
@@ -165,7 +168,7 @@ test('analytics overview supports period filtering', function (): void {
         'created_at' => now()->subDays(2),
     ]);
 
-    Sanctum::actingAs($user);
+    Sanctum::actingAs($user, OWNER_SANCTUM_ABILITIES);
 
     // 7d: only the recent view
     $response = $this->getJson('/api/v1/my/ads/analytics?period=7d');
@@ -177,17 +180,17 @@ test('analytics overview supports period filtering', function (): void {
 });
 
 test('single ad analytics requires ownership', function (): void {
-    $owner = User::factory()->create();
-    $otherUser = User::factory()->create();
+    $owner = User::factory()->agents()->create();
+    $otherUser = User::factory()->agents()->create();
     $ad = Ad::factory()->create(['user_id' => $owner->id, 'status' => 'available']);
 
-    Sanctum::actingAs($otherUser);
+    Sanctum::actingAs($otherUser, OWNER_SANCTUM_ABILITIES);
 
     $this->getJson("/api/v1/my/ads/{$ad->id}/analytics")->assertStatus(403);
 });
 
 test('single ad analytics returns detailed metrics', function (): void {
-    $owner = User::factory()->create();
+    $owner = User::factory()->agents()->create();
     $ad = Ad::factory()->create(['user_id' => $owner->id, 'status' => 'available']);
     $viewer1 = User::factory()->create();
     $viewer2 = User::factory()->create();
@@ -201,7 +204,7 @@ test('single ad analytics returns detailed metrics', function (): void {
     AdInteraction::create(['user_id' => $viewer2->id, 'ad_id' => $ad->id, 'type' => 'view', 'created_at' => now()->subDays(2)]);
     AdInteraction::create(['user_id' => $viewer2->id, 'ad_id' => $ad->id, 'type' => 'contact_click', 'created_at' => now()->subDay()]);
 
-    Sanctum::actingAs($owner);
+    Sanctum::actingAs($owner, OWNER_SANCTUM_ABILITIES);
 
     $response = $this->getJson("/api/v1/my/ads/{$ad->id}/analytics");
     $response->assertStatus(200)

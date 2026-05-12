@@ -1,0 +1,387 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
+use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
+
+/**
+ * Multi-provider AI description enhancer.
+ *
+ * Supported providers (set via AI_PROVIDER env var):
+ *   - openai : OpenAI GPT models      (https://api.openai.com)
+ *   - groq   : Groq LLMs              (https://api.groq.com/openai) — OpenAI-compatible
+ *   - gemini : Google Gemini          (https://generativelanguage.googleapis.com)
+ */
+class AiDescriptionEnhancer
+{
+    /** @var array<string, array{api_key: string, model: string, base_url: string}> */
+    private array $providers;
+
+    private readonly string $activeProvider;
+
+    public function __construct()
+    {
+        $this->providers = [
+            'openai' => [
+                'api_key' => (string) config('services.openai.api_key', ''),
+                'model' => (string) config('services.openai.model', 'gpt-4o-mini'),
+                'base_url' => 'https://api.openai.com/v1/chat/completions',
+            ],
+            'groq' => [
+                'api_key' => (string) config('services.groq.api_key', ''),
+                'model' => (string) config('services.groq.model', 'llama-3.3-70b-versatile'),
+                'base_url' => 'https://api.groq.com/openai/v1/chat/completions',
+            ],
+            'gemini' => [
+                'api_key' => (string) config('services.gemini.api_key', ''),
+                'model' => (string) config('services.gemini.model', 'gemini-2.0-flash'),
+                'base_url' => 'https://generativelanguage.googleapis.com/v1beta/models',
+            ],
+        ];
+
+        $this->activeProvider = (string) config('services.ai.provider', 'openai');
+    }
+
+    /**
+     * Enhance a real-estate ad description using the configured AI provider.
+     * Falls back to any other provider that has a key if the primary is not configured.
+     * Returns the enhanced text, or the original if the call fails.
+     */
+    public function enhance(string $rawDescription): string
+    {
+        return $this->callWithPrompt($rawDescription, $this->systemPrompt());
+    }
+
+    /**
+     * Enhance an ad rejection reason to be professional, clear, and courteous.
+     * Returns the enhanced text, or the original if the call fails.
+     */
+    public function enhanceRejectionReason(string $rawReason): string
+    {
+        return $this->callWithPrompt($rawReason, $this->rejectionReasonPrompt());
+    }
+
+    /**
+     * Enhance lease contract special conditions to be legally clear and well-structured.
+     * Returns the enhanced text, or the original if the call fails.
+     */
+    public function enhanceLeaseConditions(string $rawConditions): string
+    {
+        return $this->callWithPrompt($rawConditions, $this->leaseConditionsPrompt());
+    }
+
+    /**
+     * Enhance a newsletter campaign body to be engaging and professional.
+     *
+     * Preserves a SAFE subset of HTML formatting and sanitises the LLM output via
+     * symfony/html-sanitizer so it can never inject scripts, event handlers, or
+     * iframes — even if the model is prompt-injected. Returns the original text
+     * if the call fails.
+     */
+    public function enhanceNewsletter(string $rawBody): string
+    {
+        $enhanced = $this->callWithPrompt($rawBody, $this->newsletterPrompt());
+
+        if ($enhanced === $rawBody) {
+            return $rawBody;
+        }
+
+        return $this->sanitiseNewsletterHtml($enhanced);
+    }
+
+    /**
+     * Strict allowlist HTML sanitiser for newsletter content.
+     *
+     * Allows only the inline tags the marketing team actually uses; everything
+     * else is stripped. Forces `rel="noopener noreferrer"` and `target="_blank"`
+     * on every link.
+     */
+    private function sanitiseNewsletterHtml(string $html): string
+    {
+        $config = (new HtmlSanitizerConfig)
+            ->allowSafeElements()
+            ->allowElement('a', ['href', 'title'])
+            ->allowElement('p')
+            ->allowElement('br')
+            ->allowElement('strong')
+            ->allowElement('em')
+            ->allowElement('ul')
+            ->allowElement('ol')
+            ->allowElement('li')
+            ->allowElement('h1')
+            ->allowElement('h2')
+            ->allowElement('h3')
+            ->allowElement('h4')
+            ->allowElement('blockquote')
+            ->allowLinkSchemes(['https', 'mailto'])
+            ->allowRelativeLinks(false)
+            ->forceAttribute('a', 'rel', 'noopener noreferrer')
+            ->forceAttribute('a', 'target', '_blank');
+
+        return new HtmlSanitizer($config)->sanitize($html);
+    }
+
+    /**
+     * Resolve providers in order (active first, then the rest with valid keys),
+     * try each one. If a call returns a transient error (HTTP 429 / 5xx) or an
+     * empty body, fall through to the next provider. Returns original text only
+     * when ALL providers fail.
+     *
+     * Per-call provider state is local — never mutates `$this->activeProvider`
+     * (race-safe under singleton concurrency).
+     */
+    private function callWithPrompt(string $text, string $systemPrompt): string
+    {
+        if (empty(trim($text))) {
+            return $text;
+        }
+
+        $order = array_values(array_unique(array_filter([
+            $this->activeProvider,
+            ...array_keys($this->providers),
+        ])));
+
+        $eligible = [];
+        foreach ($order as $name) {
+            $cfg = $this->providers[$name] ?? null;
+            if ($cfg !== null && $this->isValidKey($cfg['api_key'])) {
+                $eligible[$name] = $cfg;
+            }
+        }
+
+        if ($eligible === []) {
+            Log::warning('AiDescriptionEnhancer: no AI provider is configured.');
+
+            return $text;
+        }
+
+        foreach ($eligible as $name => $config) {
+            $result = $name === 'gemini'
+                ? $this->callGemini($text, $config, $systemPrompt, $name)
+                : $this->callOpenAiCompatible($text, $config, $systemPrompt, $name);
+
+            // `null` signals a transient failure (429/5xx/network) — try the next provider.
+            if ($result !== null) {
+                return $result;
+            }
+        }
+
+        return $text;
+    }
+
+    /**
+     * Call an OpenAI-compatible endpoint (OpenAI & Groq share the same payload format).
+     *
+     * @param  array{api_key: string, model: string, base_url: string}  $config
+     * @return string|null Returns null on transient failure so the caller can fail over.
+     */
+    private function callOpenAiCompatible(string $text, array $config, string $systemPrompt, string $providerName): ?string
+    {
+        try {
+            $response = Http::withToken($config['api_key'])
+                ->timeout(25)
+                ->post($config['base_url'], [
+                    'model' => $config['model'],
+                    'messages' => [
+                        ['role' => 'system', 'content' => $systemPrompt],
+                        ['role' => 'user',   'content' => $text],
+                    ],
+                    // Up to ~700 tokens ≈ 320 French words, enough for the
+                    // 2–3 paragraph description format and the 2-paragraph
+                    // rejection reason format. Newsletter HTML can use this
+                    // budget too.
+                    'max_tokens' => 700,
+                    'temperature' => 0.7,
+                ]);
+
+            if ($response->failed()) {
+                $status = $response->status();
+                Log::warning('AI ('.$providerName.') enhancement failed', [
+                    'status' => $status,
+                    'body' => substr($response->body(), 0, 200),
+                ]);
+
+                // Transient: 429 (rate limit) or 5xx (server side) → caller should fail over.
+                if ($status === 429 || $status >= 500) {
+                    return null;
+                }
+
+                // 4xx other than 429: configuration / quota error — no point retrying.
+                return $text;
+            }
+
+            $content = trim((string) ($response->json('choices.0.message.content') ?? ''));
+
+            return $content !== '' ? $content : null;
+        } catch (\Throwable $e) {
+            Log::error('AI ('.$providerName.') enhancement exception: '.$e->getMessage());
+
+            return null;
+        }
+    }
+
+    /**
+     * Call the Google Gemini API (different endpoint & payload structure).
+     *
+     * @param  array{api_key: string, model: string, base_url: string}  $config
+     * @return string|null Returns null on transient failure so the caller can fail over.
+     */
+    private function callGemini(string $text, array $config, string $systemPrompt, string $providerName): ?string
+    {
+        // `x-goog-api-key` header instead of `?key=` query param so the key isn't logged
+        // by reverse proxies / CDN edges / access logs.
+        $url = $config['base_url'].'/'.$config['model'].':generateContent';
+
+        try {
+            $response = Http::timeout(25)
+                ->withHeaders(['x-goog-api-key' => $config['api_key']])
+                ->post($url, [
+                    'system_instruction' => [
+                        'parts' => [['text' => $systemPrompt]],
+                    ],
+                    'contents' => [
+                        ['parts' => [['text' => $text]]],
+                    ],
+                    'generationConfig' => [
+                        // See OpenAI-compat call above for rationale.
+                        'maxOutputTokens' => 700,
+                        'temperature' => 0.7,
+                    ],
+                ]);
+
+            if ($response->failed()) {
+                $status = $response->status();
+                Log::warning('AI ('.$providerName.') enhancement failed', [
+                    'status' => $status,
+                    'body' => substr($response->body(), 0, 200),
+                ]);
+
+                if ($status === 429 || $status >= 500) {
+                    return null;
+                }
+
+                return $text;
+            }
+
+            $content = trim((string) ($response->json('candidates.0.content.parts.0.text') ?? ''));
+
+            return $content !== '' ? $content : null;
+        } catch (\Throwable $e) {
+            Log::error('AI ('.$providerName.') enhancement exception: '.$e->getMessage());
+
+            return null;
+        }
+    }
+
+    /**
+     * Check whether an API key looks usable (not empty, not a placeholder like sk-xxxx).
+     */
+    private function isValidKey(string $key): bool
+    {
+        $key = trim($key);
+
+        if ($key === '') {
+            return false;
+        }
+
+        // Detect placeholder keys: strip a known prefix then check if the remainder is only x's
+        $stripped = preg_replace('/^(sk-|gsk_|AIza)/i', '', $key);
+
+        return $stripped !== '' && !preg_match('/^x+$/i', (string) $stripped);
+    }
+
+    private function systemPrompt(): string
+    {
+        return <<<'PROMPT'
+Tu es un rédacteur spécialisé UNIQUEMENT en annonces immobilières pour la plateforme KeyHome (Afrique centrale, principalement Cameroun).
+
+TON UNIQUE RÔLE : améliorer la description d'une annonce immobilière fournie par un propriétaire. Tu ne fais RIEN d'autre.
+
+STRUCTURE ATTENDUE (très important) :
+- Produis 2 à 3 PARAGRAPHES distincts, séparés par UNE ligne vide.
+- 1er paragraphe — VUE D'ENSEMBLE : le bien, sa nature, sa localisation telle que mentionnée, en 2 à 4 phrases.
+- 2e paragraphe — INTÉRIEUR & ESPACES : pièces, surface, agencement, finitions, équipements REELS, en 3 à 5 phrases.
+- 3e paragraphe (facultatif si suffisamment d'éléments) — ENVIRONNEMENT & ATOUTS : sécurité, accès, voisinage, commodités proches, public cible, en 2 à 4 phrases.
+
+RÈGLES STRICTES :
+- Rédige UNIQUEMENT en français, de façon naturelle, humaine et engageante (comme un agent immobilier expérimenté qui parle à un client sérieux).
+- N'INVENTE JAMAIS de fait : nombre de pièces, équipements, quartier, prix, distances, surfaces. Si une information manque, ne la mentionne tout simplement pas.
+- Conserve 100 % des informations factuelles fournies par le propriétaire, sans rien omettre.
+- Style : phrases fluides, vocabulaire varié, ton chaleureux et professionnel. Évite les superlatifs creux ("incroyable", "exceptionnel", "rêve") et les formules marketing trompeuses.
+- Longueur cible : 180 à 320 mots au total (≈ 60 à 110 mots par paragraphe).
+- Renvoie UNIQUEMENT le texte amélioré, sans titres de paragraphes ("VUE D'ENSEMBLE :" interdit), sans introduction, sans explication, sans commentaire après.
+- Si le texte fourni n'est manifestement PAS une description immobilière (hors sujet, spam, contenu inapproprié), renvoie le texte original tel quel sans modification.
+- N'utilise PAS de hashtags, d'emojis, de listes à puces ni de balisage HTML/Markdown — texte brut uniquement.
+PROMPT;
+    }
+
+    private function rejectionReasonPrompt(): string
+    {
+        return <<<'PROMPT'
+Tu es un modérateur professionnel pour la plateforme immobilière KeyHome (Afrique centrale, principalement Cameroun).
+
+TON RÔLE : transformer un motif de refus brut (rédigé par un admin pressé) en un message structuré, clair et constructif destiné au propriétaire qui a publié l'annonce.
+
+STRUCTURE ATTENDUE (très important) :
+- Produis 2 paragraphes courts, séparés par UNE ligne vide.
+- 1er paragraphe — DIAGNOSTIC : explique poliment pourquoi l'annonce a été refusée, en reprenant fidèlement les raisons fournies (2 à 4 phrases).
+- 2e paragraphe — ACTIONS : liste précisément ce que le propriétaire doit corriger (photos manquantes, description trop courte, prix incohérent, document à fournir, etc.) puis comment soumettre à nouveau (2 à 4 phrases).
+
+RÈGLES STRICTES :
+- Rédige UNIQUEMENT en français, sur un ton respectueux, factuel et bienveillant (jamais accusatoire ni condescendant).
+- N'invente JAMAIS de motif ou d'exigence non mentionnés dans le texte fourni.
+- Conserve TOUTES les raisons mentionnées par l'admin, sans en omettre aucune.
+- Termine sur une note constructive ("Nous restons à votre disposition…", "N'hésitez pas à…") MAIS sans formule de politesse longue.
+- Longueur cible : 80 à 180 mots au total.
+- Renvoie UNIQUEMENT le motif reformulé, sans titre de paragraphe, sans intro, sans signature, sans commentaire.
+- N'utilise PAS de hashtags, d'emojis, de listes à puces ni de balisage HTML/Markdown — texte brut uniquement.
+PROMPT;
+    }
+
+    private function newsletterPrompt(): string
+    {
+        return <<<'PROMPT'
+Tu es un rédacteur spécialisé en newsletters marketing pour la plateforme immobilière KeyHome (Afrique centrale, principalement Cameroun).
+
+TON UNIQUE RÔLE : améliorer le contenu d'une campagne newsletter fourni par un administrateur.
+
+RÈGLES STRICTES :
+- Rédige UNIQUEMENT en français, de façon professionnelle, engageante et persuasive.
+- Tu ne dois JAMAIS inventer, ajouter ou supposer des informations qui ne sont PAS présentes dans le texte original (pas d'offres fictives, pas de prix inventés, pas de dates créées).
+- Conserve TOUTES les informations factuelles fournies par l'administrateur, sans en omettre ni en modifier aucune.
+- Améliore la structure, le style et la clarté pour maximiser l'engagement des lecteurs.
+- Conserve et améliore le formatage HTML existant (gras, listes, liens, titres). Tu peux ajouter des balises HTML pour mieux structurer le contenu.
+- Utilise un ton chaleureux et professionnel adapté à une audience d'acheteurs/locataires immobiliers au Cameroun.
+- Renvoie UNIQUEMENT le contenu amélioré en HTML, sans titre de sujet, sans introduction, sans explication, sans commentaire.
+- Si le texte fourni n'est PAS lié à l'immobilier ou à KeyHome (hors sujet, spam, contenu inapproprié), renvoie le texte original tel quel sans modification.
+- N'ajoute PAS de formules marketing exagérées ou trompeuses.
+- N'utilise PAS d'emojis sauf si le texte original en contient déjà.
+PROMPT;
+    }
+
+    private function leaseConditionsPrompt(): string
+    {
+        return <<<'PROMPT'
+Tu es un rédacteur juridique spécialisé en baux immobiliers pour la plateforme KeyHome (Afrique centrale, principalement Cameroun).
+
+TON UNIQUE RÔLE : reformuler et structurer les conditions particulières d'un contrat de bail fournies par un propriétaire bailleur.
+
+RÈGLES STRICTES :
+- Rédige UNIQUEMENT en français, dans un style juridique clair, précis et professionnel.
+- Tu ne dois JAMAIS inventer, ajouter ou supposer des clauses, montants, dates ou obligations qui ne sont PAS présentes dans le texte original.
+- Conserve TOUTES les conditions mentionnées par le propriétaire, sans en omettre aucune.
+- Structure le texte avec des tirets ou numéros pour chaque condition distincte.
+- Reformule pour plus de clarté juridique, mais le fond doit rester strictement identique.
+- Longueur optimale : 50 à 300 mots maximum.
+- Renvoie UNIQUEMENT les conditions reformulées, sans titre, sans introduction, sans explication, sans commentaire.
+- Si le texte fourni n'est PAS lié à des conditions de bail (hors sujet, spam, contenu inapproprié), renvoie le texte original tel quel sans modification.
+- N'ajoute PAS de clauses types ou standards non mentionnées par le propriétaire.
+- N'utilise PAS de hashtags, d'emojis ou de mise en forme spéciale.
+PROMPT;
+    }
+}

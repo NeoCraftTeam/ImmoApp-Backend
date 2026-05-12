@@ -12,10 +12,12 @@ class ListSubscriptionPlans extends ListRecords
 {
     protected static string $resource = SubscriptionPlanResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            CreateAction::make()
+                ->successNotificationTitle('Plan d\'abonnement créé avec succès'),
         ];
     }
 }

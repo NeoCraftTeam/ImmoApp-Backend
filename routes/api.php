@@ -2,155 +2,168 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Api\V1\AdAnalyticsController;
-use App\Http\Controllers\Api\V1\AdController;
 use App\Http\Controllers\Api\V1\AdInteractionController;
 use App\Http\Controllers\Api\V1\AdTypeController;
 use App\Http\Controllers\Api\V1\AgencyController;
-use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\BailleurFollowController;
+use App\Http\Controllers\Api\V1\BoostController;
+use App\Http\Controllers\Api\V1\BulkAdController;
+use App\Http\Controllers\Api\V1\ChatE2eeIdentityController;
 use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\ClerkWebhookController;
+use App\Http\Controllers\Api\V1\ConversationController;
+use App\Http\Controllers\Api\V1\DocumentController;
+use App\Http\Controllers\Api\V1\DuplicateAdController;
+use App\Http\Controllers\Api\V1\ExpenseController;
+use App\Http\Controllers\Api\V1\FcmTokenController;
+use App\Http\Controllers\Api\V1\GdprController;
+use App\Http\Controllers\Api\V1\HealthCheckController;
+use App\Http\Controllers\Api\V1\LeaseContractController;
+use App\Http\Controllers\Api\V1\LoginHistoryController;
+use App\Http\Controllers\Api\V1\MessageController;
+use App\Http\Controllers\Api\V1\MyReviewsController;
+use App\Http\Controllers\Api\V1\NaturalSearchController;
+use App\Http\Controllers\Api\V1\NewsletterController;
 use App\Http\Controllers\Api\V1\NotificationController;
-use App\Http\Controllers\Api\V1\PaymentController;
+use App\Http\Controllers\Api\V1\NotificationPreferenceController;
+use App\Http\Controllers\Api\V1\PriceHeatmapController;
+use App\Http\Controllers\Api\V1\PropertyAttributeController;
+use App\Http\Controllers\Api\V1\PwaController;
+use App\Http\Controllers\Api\V1\QrCodeController;
 use App\Http\Controllers\Api\V1\QuarterController;
 use App\Http\Controllers\Api\V1\RecommendationController;
-use App\Http\Controllers\Api\V1\ReviewController;
-use App\Http\Controllers\Api\V1\SocialAuthController;
-use App\Http\Controllers\Api\V1\SubscriptionController;
+use App\Http\Controllers\Api\V1\RentEstimatorController;
+use App\Http\Controllers\Api\V1\SearchAlertController;
+use App\Http\Controllers\Api\V1\SignatureController;
+use App\Http\Controllers\Api\V1\StatsController;
+use App\Http\Controllers\Api\V1\TeamController;
+use App\Http\Controllers\Api\V1\TenantController;
+use App\Http\Controllers\Api\V1\TrustScoreController;
+use App\Http\Controllers\Api\V1\TurnstilePublicConfigController;
 use App\Http\Controllers\Api\V1\UserController;
+use App\Http\Controllers\Api\V1\VisitTrackingController;
+use App\Models\AdType;
+use App\Models\Agency;
+use App\Models\City;
+use App\Models\Quarter;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Broadcast;
 use Illuminate\Support\Facades\Route;
+
+// Public liveness probe — no auth, no infra details. Used by CI smoke tests and uptime monitors.
+Route::get('/ping', fn () => response()->json(['status' => 'ok'], 200));
+
+// Comprehensive health check — DB · Redis · Queue · Storage · Meilisearch · Flutterwave
+// Auth: optional static bearer token via HEALTH_CHECK_TOKEN env var (see HealthCheckController).
+// Use ?force=true to bypass the 30-second result cache.
+Route::get('/health', HealthCheckController::class)
+    ->middleware('throttle:30,1');
 
 // Prefix routes
 Route::prefix('v1')->group(function (): void {
 
-    //  Auth
-    Route::prefix('auth')->controller(AuthController::class)->group(function (): void {
-        // Public routes with throttling(rate limiting)
-        Route::post('registerCustomer', [AuthController::class, 'registerCustomer'])
-            ->middleware('throttle:5,1'); // 5 attempts per minute
+    Route::get('/config/turnstile', TurnstilePublicConfigController::class)
+        ->middleware('throttle:120,1');
 
-        Route::post('registerAgent', [AuthController::class, 'registerAgent'])
-            ->middleware('throttle:5,1'); //  5 attempts per minute
+    // Domain route files
+    require __DIR__.'/api/auth.php';
+    require __DIR__.'/api/ads.php';
+    require __DIR__.'/api/payments.php';
+    require __DIR__.'/api/viewings.php';
+    require __DIR__.'/api/surveys.php';
+    require __DIR__.'/api/geo.php';
 
-        Route::post('login', [AuthController::class, 'login'])
-            ->middleware('throttle:5,1'); //  5 attempts per minute
-
-        Route::post('resend-verification', [AuthController::class, 'resendVerificationEmail'])
-            ->middleware('throttle:2,5'); // 2 attempts every 5 minutes
-
-        Route::get('email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
-            ->middleware('throttle:5,10')
-            ->name('api.verification.verify');
-
-        // Password Reset
-        Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:3,10');
-        Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:3,10');
-
-        // Clerk JWT → Sanctum token exchange
-        Route::post('clerk/exchange', [AuthController::class, 'clerkExchange'])->middleware('throttle:10,1');
-        Route::post('clerk/verify-otp', [AuthController::class, 'verifyClerkOtp'])->middleware('throttle:5,1');
-        Route::post('clerk/complete-profile', [AuthController::class, 'completeClerkProfile'])->middleware('throttle:5,1');
-
-        // OAuth Social Authentication
-        Route::prefix('oauth')->controller(SocialAuthController::class)->group(function (): void {
-            // Public OAuth endpoints
-            Route::post('{provider}', 'authenticate')
-                ->middleware('throttle:10,1')
-                ->where('provider', 'google|facebook|apple');
-
-            Route::get('{provider}/redirect', 'redirect')
-                ->where('provider', 'google|facebook|apple');
-
-            Route::get('{provider}/callback', 'callback')
-                ->where('provider', 'google|facebook|apple');
-
-            // Authenticated OAuth endpoints (link/unlink)
-            Route::middleware('auth:sanctum')->group(function (): void {
-                Route::post('{provider}/link', 'link')
-                    ->where('provider', 'google|facebook|apple');
-
-                Route::delete('{provider}/unlink', 'unlink')
-                    ->where('provider', 'google|facebook|apple');
-            });
-        });
-
-        // Routes protégées
-        Route::middleware('auth:sanctum')->group(function (): void {
-            Route::post('registerAdmin', [AuthController::class, 'registerAdmin'])
-                ->middleware('can:admin-access');
-            Route::post('logout', [AuthController::class, 'logout']);
-            Route::post('refresh', [AuthController::class, 'refresh']);
-            Route::get('me', [AuthController::class, 'me']);
-            Route::post('email/resend', [AuthController::class, 'resendVerificationEmail'])->middleware('auth:sanctum');
-            Route::post('update-password', [AuthController::class, 'updatePassword'])->middleware('throttle:5,10');
-        });
-    });
-
-    // adType
-    Route::middleware('auth:sanctum')->controller(AdTypeController::class)->group(function (): void {
+    // --- AD TYPES ---
+    Route::controller(AdTypeController::class)->group(function (): void {
         Route::get('/ad-types', 'index');
         Route::get('/ad-types/{adType}', 'show');
-        Route::post('/ad-types', 'store');
-        Route::put('/ad-types/{adType}', 'update');
-        Route::delete('/ad-types/{adType}', 'destroy');
+    });
+    // Admin write actions: enforce MFA when admin has TOTP/email MFA configured.
+    Route::middleware(['auth:sanctum', 'mfa.admin'])->controller(AdTypeController::class)->group(function (): void {
+        Route::post('/ad-types', 'store')->can('create', AdType::class);
+        Route::put('/ad-types/{adType}', 'update')->can('update', 'adType');
+        Route::delete('/ad-types/{adType}', 'destroy')->can('delete', 'adType');
     });
 
-    // City
+    // --- CITIES ---
     Route::controller(CityController::class)->group(function (): void {
         Route::get('/cities', 'index');
         Route::get('/cities/{id}', 'show');
-        Route::post('/cities', 'store')->middleware('auth:sanctum');
-        Route::put('/cities/{city}', 'update')->middleware('auth:sanctum');
-        Route::delete('/cities/{city}', 'destroy')->middleware('auth:sanctum');
+        Route::post('/cities', 'store')->middleware(['auth:sanctum', 'mfa.admin'])->can('create', City::class);
+        Route::put('/cities/{city}', 'update')->middleware(['auth:sanctum', 'mfa.admin'])->can('update', 'city');
+        Route::delete('/cities/{city}', 'destroy')->middleware(['auth:sanctum', 'mfa.admin'])->can('delete', 'city');
     });
 
-    // Quarter
+    // --- QUARTERS ---
     Route::controller(QuarterController::class)->group(function (): void {
         Route::get('/quarters', 'index');
         Route::get('/quarters/{id}', 'show');
-        Route::post('/quarters', 'store')->middleware('auth:sanctum');
-        Route::put('/quarters/{quarter}', 'update')->middleware('auth:sanctum');
-        Route::delete('/quarters/{quarter}', 'destroy')->middleware('auth:sanctum');
+        Route::post('/quarters', 'store')->middleware(['auth:sanctum', 'mfa.admin'])->can('create', Quarter::class);
+        Route::put('/quarters/{quarter}', 'update')->middleware(['auth:sanctum', 'mfa.admin'])->can('update', 'quarter');
+        Route::delete('/quarters/{quarter}', 'destroy')->middleware(['auth:sanctum', 'mfa.admin'])->can('delete', 'quarter');
     });
 
-    // Agency
+    // --- AGENCIES ---
     Route::controller(AgencyController::class)->group(function (): void {
         Route::get('/agencies', 'index');
         Route::get('/agencies/{agency}', 'show');
-        Route::post('/agencies', 'store')->middleware('auth:sanctum');
-        Route::put('/agencies/{agency}', 'update')->middleware('auth:sanctum');
-        Route::delete('/agencies/{agency}', 'destroy')->middleware('auth:sanctum');
+        Route::post('/agencies', 'store')->middleware('auth:sanctum')->can('create', Agency::class);
+        Route::put('/agencies/{agency}', 'update')->middleware('auth:sanctum')->can('update', 'agency');
+        Route::delete('/agencies/{agency}', 'destroy')->middleware('auth:sanctum')->can('delete', 'agency');
     });
 
-    // User
+    // --- USERS ---
+    Route::get('/users/{identifier}/public-profile', [UserController::class, 'publicProfile'])
+        ->middleware('throttle:60,1');
     Route::middleware('auth:sanctum')->controller(UserController::class)->group(function (): void {
-        Route::get('/users', 'index');
+        // Read endpoints — admin listing + show — also gated by MFA when admin has it set up.
+        Route::get('/users', 'index')->middleware('mfa.admin')->can('viewAny', User::class);
         Route::get('/users/{id}', 'show');
-        Route::post('/users', 'store');
-        Route::put('/users/{user}', 'update');
-        Route::delete('/users/{user}', 'destroy');
+        // Mutating endpoints — gated for admin (and harmless for non-admin since `mfa.admin` is a no-op there).
+        Route::post('/users', 'store')->middleware('mfa.admin')->can('create', User::class);
+        // OWASP A05 — align with POST /users and DELETE /users/{user} which
+        // already enforce `mfa.admin`. An admin update can change a user's
+        // role or email, so it carries the same impact as create/destroy
+        // and must gate behind the same MFA bar.
+        Route::put('/users/{user}', 'update')->middleware('mfa.admin');
+        Route::delete('/users/{user}', 'destroy')->middleware('mfa.admin');
     });
 
-    // --- RECOMMANDATIONS ---
-    Route::middleware('auth:sanctum')->get('/recommendations', [RecommendationController::class, 'index']);
+    // --- BAILLEUR FOLLOW ---
+    // Status: optional auth — guests get following=false, authenticated users get their real state.
+    Route::get('/bailleurs/{username}/follow', [BailleurFollowController::class, 'status'])
+        ->middleware(['optional.auth', 'throttle:60,1']);
+    // Toggle: requires auth.
+    Route::post('/bailleurs/{username}/follow', [BailleurFollowController::class, 'toggle'])
+        ->middleware(['auth:sanctum', 'throttle:30,1']);
 
-    // --- MES ANNONCES DÉBLOQUÉES ---
-    Route::middleware('auth:sanctum')->get('/my/unlocked-ads', function () {
-        $user = request()->user();
-        $adIds = \App\Models\Payment::where('user_id', $user->id)
-            ->where('type', \App\Enums\PaymentType::UNLOCK)
-            ->where('status', \App\Enums\PaymentStatus::SUCCESS)
-            ->pluck('ad_id');
+    // --- RECOMMENDATIONS ---
+    // Server caches per-user/guest results 10 min (RecommendationEngine::CACHE_TTL_MINUTES).
+    // CDN cache only kicks in for guests (CdnCache short-circuits when $request->user() is set).
+    Route::middleware(['optional.auth', 'cdn.cache:600'])->get('/recommendations', [RecommendationController::class, 'index']);
 
-        $ads = \App\Models\Ad::with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')
-            ->whereIn('id', $adIds)
-            ->latest()
-            ->get();
+    // --- MY UNLOCKED ADS ---
+    Route::middleware('auth:sanctum')->get('/my/unlocked-ads', [UserController::class, 'unlockedAds']);
 
-        return \App\Http\Resources\AdResource::collection($ads);
+    // --- TRUST SCORE ---
+    Route::get('/users/{user}/trust-score', [TrustScoreController::class, 'show'])
+        ->middleware('throttle:60,1');
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/trust-score', [TrustScoreController::class, 'me']);
+        Route::post('/my/trust-score/consent', [TrustScoreController::class, 'consent'])
+            ->middleware('throttle:10,1');
     });
 
-    // --- MES FAVORIS ---
+    // --- GDPR Data Export & Account Deletion ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/data-export', [GdprController::class, 'export'])
+            ->middleware('throttle:5,1');
+        Route::delete('/my/account', [GdprController::class, 'deleteAccount'])
+            ->middleware('throttle:3,1');
+    });
+
+    // --- MY FAVORITES ---
     Route::middleware('auth:sanctum')->get('/my/favorites', [AdInteractionController::class, 'favorites']);
 
     // --- NOTIFICATIONS ---
@@ -163,88 +176,218 @@ Route::prefix('v1')->group(function (): void {
     });
 
     // --- PROPERTY ATTRIBUTES (public) ---
-    Route::get('/property-attributes', [NotificationController::class, 'propertyAttributes']);
+    Route::get('/property-attributes', [PropertyAttributeController::class, 'index']);
 
-    // --- PRIX DE DÉBLOCAGE ---
-    Route::get('/payments/unlock-price', fn () => response()->json([
-        'unlock_price' => (int) \App\Models\Setting::get('unlock_price', 500),
-    ]));
+    // --- VISIT TRACKING (anonymous) ---
+    Route::post('/track/visit', [VisitTrackingController::class, 'store'])
+        ->middleware('throttle:60,1');
+
+    // --- PUBLIC STATS (W37: extracted from inline closures to StatsController) ---
+    Route::controller(StatsController::class)->middleware('throttle:30,1')->group(function (): void {
+        Route::get('/stats/landing', 'landing')->name('stats.landing');
+        Route::get('/stats/testimonials', 'testimonials')->name('stats.testimonials');
+    });
 
     // --- CLERK WEBHOOKS ---
     Route::post('/clerk/webhook', [ClerkWebhookController::class, 'handle'])
         ->middleware('throttle:60,1');
 
-    // --- PAIEMENTS ---
-    Route::post('/payments/initialize/{ad}', [PaymentController::class, 'initialize'])
-        ->middleware(['auth:sanctum', 'throttle:10,1']);
-    Route::post('/payments/verify/{ad}', [PaymentController::class, 'verify'])
-        ->middleware('auth:sanctum');
-    Route::post('/payments/webhook', [PaymentController::class, 'webhook']);
-    Route::get('/payments/callback', [PaymentController::class, 'callback']);
-
-    // --- ABONNEMENTS AGENCES ---
-    Route::get('/subscriptions/plans', [SubscriptionController::class, 'plans']);
-    Route::middleware('auth:sanctum')->prefix('subscriptions')->group(function (): void {
-        Route::get('/current', [SubscriptionController::class, 'current']);
-        Route::post('/subscribe', [SubscriptionController::class, 'subscribe'])
-            ->middleware('throttle:5,1');
-        Route::post('/cancel', [SubscriptionController::class, 'cancel']);
-        Route::get('/history', [SubscriptionController::class, 'history']);
+    // --- LEASE CONTRACTS (landlord) ---
+    Route::middleware(['auth:sanctum', 'owner.role'])->prefix('my/lease-contracts')->controller(LeaseContractController::class)->group(function (): void {
+        Route::get('/', 'index');
+        // OWASP A01 / LLM10 — gate the AI lease-conditions enhancer to
+        // landlords (AGENT/ADMIN). The endpoint has no per-record context
+        // (only a free-text payload), so customer accounts have no
+        // legitimate reason to call it. Throttle keeps abuse + cost
+        // bounded even for legitimate agents.
+        Route::post('/ai/enhance-conditions', 'enhanceConditions')
+            ->middleware('throttle:10,1');
+        Route::get('/{leaseContract}', 'show')->name('lease-contracts.show');
+        Route::put('/{leaseContract}', 'update')->name('lease-contracts.update');
+        Route::post('/{ad}/generate', 'store')->name('lease-contracts.generate');
+        Route::get('/{leaseContract}/download', 'download')->name('lease-contracts.download');
     });
 
-    // --- REVIEWS ---
-    Route::get('/ads/{ad}/reviews', [ReviewController::class, 'index']);
-    Route::post('/reviews', [ReviewController::class, 'store'])
-        ->middleware(['auth:sanctum', 'throttle:10,1']);
+    // --- MY REVIEWS (landlord — reviews on my ads) ---
+    Route::middleware('auth:sanctum')->get('/my/reviews', [MyReviewsController::class, 'index']);
 
-    //  Ads
-    Route::prefix('ads')->controller(AdController::class)->middleware('optional.auth')->group(function (): void {
-        Route::get('/', 'index');
-        // Public nearby search by coordinates
-        Route::get('/nearby', 'ads_nearby_public')->middleware('throttle:60,1');
-
-        // Public search endpoint (must be before catch-all ID route)
-        Route::get('/search', 'search')->name('ads.search')->middleware('throttle:60,1');
-        Route::get('/autocomplete', 'autocomplete')->name('ads.autocomplete')->middleware('throttle:60,1');
-        Route::get('/facets', 'facets')->name('ads.facets')->middleware('throttle:60,1');
-
-        Route::middleware('auth:sanctum')->group(function (): void {
-            // Routes spécifiques AVANT les routes avec paramètres génériques
-            Route::get('/{user}/nearby', 'ads_nearby_user');
-
-            Route::post('', 'store');
-            Route::put('/{ad}', 'update');
-            Route::delete('/{id}', 'destroy');
-
-            // Ad visibility and status management (Task 4 & 5)
-            Route::post('/{ad}/toggle-visibility', 'toggleVisibility');
-            Route::post('/{ad}/set-status', 'setStatus');
-            Route::post('/{ad}/set-availability', 'setAvailability');
+    // --- QR & printables (landlord profile + per-ad assets) ---
+    Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner', 'token.role:agent'])
+        ->prefix('my/profile')
+        ->controller(QrCodeController::class)
+        ->group(function (): void {
+            Route::get('/qr-code', 'profileMeta')->middleware('throttle:60,1');
+            Route::get('/qr-code/image', 'profileQrImage')->middleware('throttle:60,1');
+            Route::get('/business-card', 'businessCard')->middleware('throttle:20,1');
+            Route::get('/business-card/preview', 'businessCardPreview')->middleware('throttle:20,1');
         });
 
-        // Capture le slug de l'annonce (doit être en dernier)
-        Route::get('/{slug}', 'show');
+    Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner', 'token.role:agent'])
+        ->prefix('my/ads/{ad}')
+        ->controller(QrCodeController::class)
+        ->group(function (): void {
+            Route::get('/qr-code', 'adMeta')->middleware('throttle:60,1');
+            Route::get('/qr-code/image', 'adQrImage')->middleware('throttle:60,1');
+            Route::get('/placarde', 'adPlacarde')->middleware('throttle:20,1');
+        });
+
+    // --- PWA (Push Subscriptions & Session Validation) ---
+    Route::prefix('pwa')->middleware('web')->group(function (): void {
+        Route::middleware('auth:web,sanctum')->group(function (): void {
+            Route::post('/push/subscribe', [PwaController::class, 'subscribe']);
+            Route::post('/push/unsubscribe', [PwaController::class, 'unsubscribe']);
+        });
+        Route::get('/session/validate', [PwaController::class, 'validateSession']);
     });
 
-    // --- INTERACTIONS (vues, favoris, impressions, partages, clics) ---
+    // --- Push (SPA / Bearer token — for Next.js frontend) ---
     Route::middleware('auth:sanctum')->group(function (): void {
-        Route::post('/ads/{ad}/view', [AdInteractionController::class, 'trackView'])
-            ->middleware('throttle:120,1');
-        Route::post('/ads/{ad}/favorite', [AdInteractionController::class, 'toggleFavorite'])
-            ->middleware('throttle:30,1');
-        Route::post('/ads/{ad}/impression', [AdInteractionController::class, 'trackImpression'])
-            ->middleware('throttle:300,1');
-        Route::post('/ads/{ad}/share', [AdInteractionController::class, 'trackShare'])
-            ->middleware('throttle:30,1');
-        Route::post('/ads/{ad}/contact-click', [AdInteractionController::class, 'trackContactClick'])
-            ->middleware('throttle:30,1');
-        Route::post('/ads/{ad}/phone-click', [AdInteractionController::class, 'trackPhoneClick'])
-            ->middleware('throttle:30,1');
+        Route::post('/push/subscribe', [PwaController::class, 'subscribe']);
+        Route::post('/push/unsubscribe', [PwaController::class, 'unsubscribe']);
     });
 
-    // --- ANALYTICS (dashboard bailleur/agence) ---
-    Route::middleware('auth:sanctum')->prefix('my/ads')->group(function (): void {
-        Route::get('/analytics', [AdAnalyticsController::class, 'overview']);
-        Route::get('/{ad}/analytics', [AdAnalyticsController::class, 'show']);
+    // --- SEARCH ALERTS ---
+    Route::middleware('auth:sanctum')->prefix('search-alerts')->group(function (): void {
+        Route::get('/', [SearchAlertController::class, 'index']);
+        Route::post('/', [SearchAlertController::class, 'store'])->middleware('throttle:20,1');
+        Route::put('/{searchAlert}', [SearchAlertController::class, 'update']);
+        Route::delete('/{searchAlert}', [SearchAlertController::class, 'destroy']);
+    });
+
+    // --- RENT ESTIMATOR (public) ---
+    Route::get('/rent-estimate', [RentEstimatorController::class, 'estimate'])
+        ->middleware(['throttle:30,1', 'cdn.cache:600']);
+
+    // --- PRICE HEATMAP (public) ---
+    Route::get('/price-heatmap', [PriceHeatmapController::class, 'index'])
+        ->middleware(['throttle:30,1', 'cdn.cache:1800']);
+
+    // --- NATURAL LANGUAGE SEARCH ---
+    Route::post('/search/parse', [NaturalSearchController::class, 'parse'])
+        ->middleware('throttle:30,1');
+
+    // --- NEWSLETTER ---
+    Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])
+        ->middleware('throttle:5,10');
+    Route::get('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'unsubscribe']);
+
+    // --- BOOST (owner) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/boost-plans', [BoostController::class, 'plans']);
+        Route::get('/my/ads/{ad}/boost-status', [BoostController::class, 'status']);
+        Route::post('/my/ads/{ad}/boost', [BoostController::class, 'boost'])->middleware('throttle:10,1');
+        Route::delete('/my/ads/{ad}/boost', [BoostController::class, 'unboost']);
+        Route::post('/my/ads/{ad}/duplicate', [DuplicateAdController::class, 'store']);
+        Route::put('/my/ads/bulk-update', [BulkAdController::class, 'bulkUpdate']);
+        Route::post('/my/ads/bulk-delete', [BulkAdController::class, 'bulkDelete']);
+    });
+
+    // --- TENANTS (owner) ---
+    Route::middleware('auth:sanctum')->prefix('my/tenants')->controller(TenantController::class)->group(function (): void {
+        Route::get('/', 'index');
+        Route::post('/', 'store')->middleware('throttle:30,1');
+        Route::get('/{tenant}', 'show');
+        Route::put('/{tenant}', 'update');
+        Route::delete('/{tenant}', 'destroy');
+    });
+
+    // --- EXPENSES (owner, per property) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/ads/{ad}/expenses', [ExpenseController::class, 'index']);
+        Route::post('/my/ads/{ad}/expenses', [ExpenseController::class, 'store'])->middleware('throttle:30,1');
+        Route::get('/my/ads/{ad}/profit-loss', [ExpenseController::class, 'profitLoss']);
+        Route::delete('/my/expenses/{expense}', [ExpenseController::class, 'destroy']);
+    });
+
+    // --- DOCUMENTS (owner, per property) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/ads/{ad}/documents', [DocumentController::class, 'index']);
+        Route::post('/my/ads/{ad}/documents', [DocumentController::class, 'store'])->middleware('throttle:20,1');
+        Route::get('/my/documents/{document}/download', [DocumentController::class, 'download']);
+        Route::delete('/my/documents/{document}', [DocumentController::class, 'destroy']);
+    });
+
+    // --- NOTIFICATION PREFERENCES (owner) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/notification-preferences', [NotificationPreferenceController::class, 'show']);
+        Route::put('/my/notification-preferences', [NotificationPreferenceController::class, 'update']);
+    });
+
+    // --- LOGIN HISTORY (owner) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/login-history', [LoginHistoryController::class, 'index']);
+        Route::delete('/my/login-history', [LoginHistoryController::class, 'destroy']);
+    });
+
+    // --- TEAM MANAGEMENT (agency owners) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/team', [TeamController::class, 'index']);
+        Route::post('/my/team/invite', [TeamController::class, 'invite'])->middleware('throttle:10,1');
+        Route::post('/my/team/invitations/{token}/accept', [TeamController::class, 'accept']);
+        Route::delete('/my/team/invitations/{teamInvitation}', [TeamController::class, 'destroy']);
+        Route::delete('/my/team/members/{user}', [TeamController::class, 'removeMember']);
+    });
+
+    // --- E-SIGNATURE (owner) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/lease-contracts/{leaseContract}/signatures', [SignatureController::class, 'index']);
+        Route::post('/my/lease-contracts/{leaseContract}/signatures', [SignatureController::class, 'store'])->middleware('throttle:10,1');
+    });
+
+    // --- E-SIGNATURE (public — no auth required) ---
+    Route::get('/signatures/{token}', [SignatureController::class, 'show']);
+    Route::post('/signatures/{token}/send-otp', [SignatureController::class, 'sendSignOtp'])->middleware('throttle:10,1');
+    Route::post('/signatures/{token}/sign', [SignatureController::class, 'sign'])->middleware('throttle:10,1');
+    Route::post('/signatures/{token}/decline', [SignatureController::class, 'decline'])->middleware('throttle:10,1');
+
+    // ─── BROADCASTING AUTH (Sanctum Bearer token) ──────────────────────────
+    // The default /broadcasting/auth route uses the 'web' middleware (session auth).
+    // The Next.js PWA sends a Sanctum Bearer token, so we need this API route.
+    Route::middleware('auth:sanctum')->post('/broadcasting/auth', fn (Request $request) => Broadcast::auth($request));
+
+    // ─── CHAT ────────────────────────────────────────────────────────────────
+    Route::middleware('auth:sanctum')->group(function (): void {
+        // Per-route rate limits driven by config('chat.rate_limits') so ops
+        // can tune them without a code change. Defaults match the historical
+        // hard-coded values: 60/min send, 10/min upload, 30/min typing.
+        $sendRpm = (int) config('chat.rate_limits.send_message', 60);
+        $uploadRpm = (int) config('chat.rate_limits.upload_attachment', 10);
+        $typingRpm = (int) config('chat.rate_limits.set_typing', 30);
+        $reactionRpm = (int) config('chat.rate_limits.reaction', 60);
+        $e2eePutRpm = (int) config('chat.rate_limits.e2ee_identity_update', 20);
+
+        // Conversations
+        Route::prefix('conversations')->group(function () use ($sendRpm, $uploadRpm, $typingRpm): void {
+            Route::get('/', [ConversationController::class, 'index']);
+            Route::post('/', [ConversationController::class, 'store']);
+            Route::get('/unread-count', [ConversationController::class, 'unreadCount']);
+            Route::get('/{uuid}', [ConversationController::class, 'show']);
+            Route::get('/{uuid}/messages', [ConversationController::class, 'messages']);
+            Route::post('/{uuid}/messages', [ConversationController::class, 'sendMessage'])
+                ->middleware("throttle:{$sendRpm},1");
+            Route::post('/{uuid}/attachments', [ConversationController::class, 'uploadAttachment'])
+                ->middleware("throttle:{$uploadRpm},1");
+            Route::patch('/{uuid}/read', [ConversationController::class, 'markAsRead']);
+            Route::post('/{uuid}/typing', [ConversationController::class, 'setTyping'])
+                ->middleware("throttle:{$typingRpm},1");
+            Route::patch('/{uuid}/archive', [ConversationController::class, 'archive']);
+            Route::patch('/{uuid}/unarchive', [ConversationController::class, 'unarchive']);
+        });
+
+        // Chat E2EE identity (RSA public key registration — private key stays on device)
+        Route::get('/my/chat-e2ee/public-key', [ChatE2eeIdentityController::class, 'show']);
+        Route::put('/my/chat-e2ee/public-key', [ChatE2eeIdentityController::class, 'update'])
+            ->middleware("throttle:{$e2eePutRpm},1");
+
+        // Individual message operations
+        Route::delete('/messages/{uuid}', [MessageController::class, 'destroy']);
+        Route::post('/messages/{uuid}/reactions', [MessageController::class, 'addReaction'])
+            ->middleware("throttle:{$reactionRpm},1");
+        Route::delete('/messages/{uuid}/reactions', [MessageController::class, 'removeReaction'])
+            ->middleware("throttle:{$reactionRpm},1");
+
+        // FCM tokens
+        Route::post('/fcm/token', [FcmTokenController::class, 'store']);
+        Route::delete('/fcm/token', [FcmTokenController::class, 'destroy']);
     });
 });

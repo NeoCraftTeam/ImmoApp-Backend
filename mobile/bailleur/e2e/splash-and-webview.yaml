@@ -1,0 +1,12 @@
+# Maestro E2E Test — Splash screen → WebView loads
+appId: cm.neocraft.keyhome.bailleur
+---
+- launchApp
+- assertVisible: "KeyHome Owner"
+- assertVisible: "Gérez vos biens en toute sérénité"
+- waitForAnimationToEnd
+# WebView should load after splash
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 15000
+- takeScreenshot: splash-to-webview

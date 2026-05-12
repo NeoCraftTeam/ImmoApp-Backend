@@ -2,7 +2,7 @@
 # PREPROD — Services applicatifs uniquement
 # ============================================================
 # DB, Redis et Meilisearch sont partagés avec la prod
-# (containers keyhome-db, keyhome-redis, keyhome-meilisearch)
+# (containers keyhome-prod-db, keyhome-prod-redis, keyhome-prod-meilisearch)
 # via le réseau externe keyhome_keyhome-network.
 #
 # Utilisation : placé dans /opt/keyhome-preprod/
@@ -18,6 +18,11 @@ services:
       - preprod-app-code:/shared-code
     networks:
       - preprod-network
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.25"
 
   app:
     image: ${APP_IMAGE:-keyhome-backend}
@@ -38,17 +43,38 @@ services:
       - keyhome-prod-network
     environment:
       - APP_ENV=${APP_ENV:-staging}
+      - DB_SSLMODE=prefer
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+      # PHP broadcaster must reach Reverb over the Docker network (public REVERB_HOST may not resolve in-container)
+      - REVERB_BROADCAST_HOST=reverb
+      - REVERB_BROADCAST_PORT=8080
+      - REVERB_BROADCAST_SCHEME=http
+    # FIX: healthcheck manquant — web et worker ne peuvent pas dépendre de app proprement sans ça
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'php-fpm' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "1.00"
 
   worker:
     image: ${APP_IMAGE:-keyhome-backend}
     container_name: ${COMPOSE_PREFIX:-keyhome-preprod}-worker
     restart: unless-stopped
     working_dir: /var/www
-    command: php artisan queue:work --queue=emails,default --tries=3 --timeout=90
+    command: php artisan queue:work --queue=notifications,emails,default --tries=3 --timeout=90
+    # FIX: depends_on sans condition → le worker pouvait démarrer avant que app et code-sync soient prêts
     depends_on:
-      - app
+      code-sync:
+        condition: service_completed_successfully
+      app:
+        condition: service_healthy
     env_file:
       - .env
     volumes:
@@ -64,8 +90,70 @@ services:
       - preprod-network
       - keyhome-prod-network
     environment:
+      - DB_SSLMODE=prefer
       - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
       - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+      - REVERB_BROADCAST_HOST=reverb
+      - REVERB_BROADCAST_PORT=8080
+      - REVERB_BROADCAST_SCHEME=http
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.50"
+
+  # ── Reverb — WebSocket server for chat real-time pipeline ────────────────
+  # Uses the SHARED prod Redis (keyhome-prod-redis) for broadcast pub/sub via
+  # the keyhome-prod-network. Isolated from prod by REDIS_PREFIX in .env.
+  reverb:
+    image: ${APP_IMAGE:-keyhome-backend}
+    container_name: ${COMPOSE_PREFIX:-keyhome-preprod}-reverb
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan reverb:start --host=0.0.0.0 --port=8080
+    depends_on:
+      code-sync:
+        condition: service_completed_successfully
+      app:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - preprod-app-code:/var/www
+      - preprod-storage-data:/var/www/storage
+      - ./.env:/var/www/.env
+    networks:
+      - preprod-network
+      - keyhome-prod-network
+      - traefik-public
+    environment:
+      - APP_ENV=${APP_ENV:-staging}
+      - DB_SSLMODE=prefer
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'reverb:start' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    # Each WS client consumes ≥1 fd; default container nofile is 1024 (set by
+    # the docker daemon, not by host's /etc/security/limits.conf). Reverb's
+    # docs recommend 10000 — enough for several thousand concurrent clients.
+    ulimits:
+      nofile:
+        soft: 10000
+        hard: 10000
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.50"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.keyhome-preprod-reverb.rule=Host(`${REVERB_DOMAIN:-reverb.keyhome.neocraft.dev}`)"
+      - "traefik.http.routers.keyhome-preprod-reverb.entrypoints=websecure"
+      - "traefik.http.routers.keyhome-preprod-reverb.tls.certresolver=letsencrypt"
+      - "traefik.http.services.keyhome-preprod-reverb.loadbalancer.server.port=8080"
 
   nightwatch-agent:
     image: laravelphp/nightwatch-agent:latest
@@ -81,14 +169,20 @@ services:
       start_period: 5s
     networks:
       - preprod-network
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.25"
 
   web:
     image: nginx:alpine
     container_name: ${COMPOSE_PREFIX:-keyhome-preprod}-web
     restart: unless-stopped
+    # FIX: condition service_started → service_healthy pour ne pas accepter de trafic avant que PHP-FPM soit up
     depends_on:
       app:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "${WEB_PORT:-9091}:80"
     volumes:
@@ -98,6 +192,27 @@ services:
     networks:
       - preprod-network
       - traefik-public
+    # FIX: healthcheck manquant sur le point d'entrée public
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/up || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.25"
+    # FIX: labels Traefik manquants
+    # et ne peut pas choisir le bon réseau (traefik-public vs preprod-network)
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.keyhome-preprod.rule=Host(`${APP_DOMAIN:-api.keyhome.neocraft.dev}`)"
+      - "traefik.http.routers.keyhome-preprod.entrypoints=websecure"
+      - "traefik.http.routers.keyhome-preprod.tls.certresolver=letsencrypt"
+      - "traefik.http.services.keyhome-preprod.loadbalancer.server.port=80"
 
 networks:
   preprod-network:

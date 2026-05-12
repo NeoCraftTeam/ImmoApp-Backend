@@ -12,6 +12,10 @@ test('anyone can view ad list', function (): void {
 
     $response->assertStatus(200)
         ->assertJsonCount(3, 'data');
+
+    $price = $response->json('data.0.price');
+    expect($price)->not->toBeString();
+    expect(is_int($price) || is_float($price))->toBeTrue();
 });
 
 test('single ad response structure is correct', function (): void {

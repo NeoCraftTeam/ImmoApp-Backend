@@ -1,0 +1,113 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Notifications;
+
+use App\Filament\Admin\Resources\AdReports\AdReportResource;
+use App\Mail\NewAdReportMail;
+use App\Models\AdReport;
+use App\Support\PanelUrl;
+use Filament\Actions\Action as FilamentAction;
+use Filament\Notifications\Notification as FilamentNotification;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Mail\Mailable;
+use Illuminate\Notifications\Notification;
+use NotificationChannels\WebPush\WebPushChannel;
+use NotificationChannels\WebPush\WebPushMessage;
+
+class NewAdListingReportNotification extends Notification implements ShouldQueue
+{
+    use Queueable;
+
+    public function __construct(
+        public AdReport $report,
+    ) {}
+
+    public function via(object $notifiable): array
+    {
+        $channels = ['database'];
+
+        if ($this->hasValidEmail($notifiable)) {
+            $channels[] = 'mail';
+        }
+
+        if ($notifiable->pushSubscriptions()->exists()) {
+            $channels[] = WebPushChannel::class;
+        }
+
+        return $channels;
+    }
+
+    public function toMail(object $notifiable): Mailable
+    {
+        return new NewAdReportMail($this->report, $notifiable)
+            ->to($notifiable->email);
+    }
+
+    public function toDatabase(object $notifiable): array
+    {
+        $url = $this->resolveReviewUrl();
+        $body = "Annonce « {$this->report->ad->title} » signalée par {$this->report->reporter->fullname}.";
+        if (filled($this->report->description)) {
+            $body .= "\n\nMessage du client: {$this->report->description}";
+        }
+
+        try {
+            return FilamentNotification::make()
+                ->title('Nouveau signalement annonce')
+                ->body($body)
+                ->warning()
+                ->icon('heroicon-o-flag')
+                ->actions([
+                    FilamentAction::make('review')
+                        ->label('Traiter')
+                        ->url($url)
+                        ->color('warning')
+                        ->button()
+                        ->markAsRead(),
+                ])
+                ->getDatabaseMessage();
+        } catch (\Throwable) {
+            return [
+                'title' => 'Nouveau signalement annonce',
+                'body' => $body,
+                'icon' => 'heroicon-o-flag',
+                'color' => 'warning',
+                'url' => $url,
+            ];
+        }
+    }
+
+    public function toWebPush(object $notifiable, Notification $notification): WebPushMessage
+    {
+        return (new WebPushMessage)
+            ->title('Nouveau signalement - KeyHome')
+            ->icon('/icons/icon-192x192.png')
+            ->badge('/icons/icon-72x72.png')
+            ->body("Annonce « {$this->report->ad->title} » signalée. Action admin requise.")
+            ->tag('ad-report-'.$this->report->id)
+            ->data(['url' => $this->resolveReviewUrl()]);
+    }
+
+    private function hasValidEmail(object $notifiable): bool
+    {
+        $email = data_get($notifiable, 'email');
+
+        return is_string($email)
+            && filled($email)
+            && filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+    }
+
+    private function resolveReviewUrl(): string
+    {
+        $fallback = PanelUrl::for('admin', "ad-reports/{$this->report->id}/edit");
+
+        try {
+            return AdReportResource::getUrl('edit', ['record' => $this->report->id], panel: 'admin');
+        } catch (\Throwable) {
+            return $fallback;
+        }
+    }
+}

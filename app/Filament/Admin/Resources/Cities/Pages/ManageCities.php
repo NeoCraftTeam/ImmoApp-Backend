@@ -12,10 +12,12 @@ class ManageCities extends ManageRecords
 {
     protected static string $resource = CityResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make()->label('Créer une ville'),
+            CreateAction::make()->label('Créer une ville')
+                ->successNotificationTitle('Ville créée avec succès'),
         ];
     }
 }

@@ -20,19 +20,23 @@ class VerificationCodeMail extends Mailable implements ShouldQueue
         public readonly string $otpCode,
         public readonly string $requestedFrom,
         public readonly string $requestedAt,
+        public readonly ?string $userRole = null,
     ) {}
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: $this->otpCode.' est votre code de vérification '.config('app.name'),
+            subject: __('emails.verification_code.subject', ['code' => $this->otpCode, 'app' => config('app.name')]),
         );
     }
 
     public function content(): Content
     {
+        $layout = $this->userRole === 'agent' ? 'emails.owner-layout' : 'emails.layout';
+
         return new Content(
             view: 'emails.verification-code',
+            with: ['emailLayout' => $layout, 'isOwner' => $this->userRole === 'agent'],
         );
     }
 }

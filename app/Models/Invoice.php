@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * @property string $id
@@ -18,13 +20,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $billing_period
  * @property int $amount
  * @property string $currency
- * @property \Illuminate\Support\Carbon $issued_at
- * @property \Illuminate\Support\Carbon|null $period_start
- * @property \Illuminate\Support\Carbon|null $period_end
+ * @property Carbon $issued_at
+ * @property Carbon|null $period_start
+ * @property Carbon|null $period_end
  */
 class Invoice extends Model
 {
-    use HasUuids;
+    use HasFactory, HasUuids;
 
     protected $fillable = [
         'invoice_number',
@@ -40,6 +42,7 @@ class Invoice extends Model
         'period_end',
     ];
 
+    #[\Override]
     protected function casts(): array
     {
         return [

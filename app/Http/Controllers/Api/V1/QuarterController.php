@@ -7,9 +7,11 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Requests\QuarterRequest;
 use App\Http\Resources\QuarterResource;
 use App\Models\Quarter;
+use Illuminate\Database\Connection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 final class QuarterController
@@ -104,7 +106,29 @@ final class QuarterController
      */
     public function index()
     {
-        $quarter = Quarter::paginate(config('pagination.default', 10));
+        $cityId = request('city_id');
+        $q = request('q');
+        $perPage = min((int) request('per_page', 50), 100);
+
+        $cacheKey = 'quarters:list:'.md5(($cityId ?? '').':'.($q ?? '').':'.$perPage.':'.request('page', 1));
+        $ttl = $q ? now()->addMinutes(5) : now()->addMinutes(30);
+
+        $quarter = Cache::remember($cacheKey, $ttl, function () use ($cityId, $q, $perPage) {
+            $query = Quarter::query()->with('city:id,name');
+
+            if ($cityId) {
+                $query->where('city_id', $cityId);
+            }
+
+            if (is_string($q) && strlen($q) >= 2) {
+                /** @var Connection $connection */
+                $connection = $query->getConnection();
+                $likeOp = $connection->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+                $query->where('name', $likeOp, '%'.$q.'%');
+            }
+
+            return $query->orderBy('name')->paginate($perPage);
+        });
 
         return QuarterResource::collection($quarter);
     }
@@ -224,10 +248,7 @@ final class QuarterController
                 'data' => new QuarterResource($quarter),
             ]);
         } catch (Throwable $e) {
-            return response()->json([
-                'message' => 'Erreur de creation',
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
-            ]);
+            throw $e;
         }
     }
 
@@ -432,10 +453,7 @@ final class QuarterController
             ]);
 
         } catch (Throwable $e) {
-            return response()->json([
-                'message' => 'Erreur de mise à jour',
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
-            ], 500); // Ajouter le code d'erreur
+            throw $e;
         }
     }
 
@@ -525,10 +543,7 @@ final class QuarterController
             ], 200);
 
         } catch (Throwable $e) {
-            return response()->json([
-                'message' => 'Erreur de suppression',
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
-            ], 500);
+            throw $e;
         }
     }
 }

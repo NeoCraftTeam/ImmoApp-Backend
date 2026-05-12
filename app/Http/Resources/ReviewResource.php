@@ -8,7 +8,21 @@ use App\Models\Review;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-/** @mixin Review */
+/**
+ * @mixin Review
+ *
+ * @OA\Schema(
+ *     schema="ReviewResource",
+ *
+ *     @OA\Property(property="id", type="integer"),
+ *     @OA\Property(property="rating", type="integer"),
+ *     @OA\Property(property="comment", type="string", nullable=true),
+ *     @OA\Property(property="ad_id", type="integer"),
+ *     @OA\Property(property="user_id", type="string"),
+ *     @OA\Property(property="created_at", type="string", format="date-time", nullable=true),
+ *     @OA\Property(property="updated_at", type="string", format="date-time", nullable=true)
+ * )
+ */
 final class ReviewResource extends JsonResource
 {
     #[\Override]
@@ -18,6 +32,9 @@ final class ReviewResource extends JsonResource
             'id' => $this->id,
             'rating' => $this->rating,
             'comment' => $this->comment,
+            'is_verified' => (bool) ($this->is_verified ?? false),
+            'owner_response' => $this->owner_response,
+            'owner_responded_at' => $this->owner_responded_at?->toIso8601String(),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
 

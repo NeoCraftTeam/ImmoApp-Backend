@@ -4,21 +4,33 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Enums\AdStatus;
+use App\Enums\PaymentType;
 use App\Enums\SubscriptionStatus;
 use App\Mail\SubscriptionInvoiceMail;
+use App\Mail\SubscriptionRenewalReminderMail;
 use App\Mail\SubscriptionSuccessEmail;
+use App\Models\Ad;
 use App\Models\Agency;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
+use App\Services\Payment\PaymentService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class SubscriptionService
 {
+    /** Days before expiry to send renewal reminder and generate payment link. */
+    private const int RENEWAL_REMINDER_DAYS = 3;
+
+    /** Extra days auto_renew subscriptions stay active past expiry before de-boosting. */
+    private const int GRACE_PERIOD_DAYS = 3;
+
     /**
      * Create a new subscription for an agency.
      */
@@ -122,6 +134,8 @@ class SubscriptionService
 
     /**
      * Check and expire subscriptions.
+     *
+     * Auto-renew subscriptions get a 3-day grace period.
      */
     public function expireSubscriptions(): int
     {
@@ -129,17 +143,55 @@ class SubscriptionService
             ->where('ends_at', '<=', now())
             ->get();
 
+        $count = 0;
+
         foreach ($expired as $subscription) {
+            if ($subscription->auto_renew && $subscription->ends_at->diffInDays(now()) < self::GRACE_PERIOD_DAYS) {
+                continue;
+            }
+
             DB::transaction(function () use ($subscription): void {
                 $subscription->expire();
 
                 $subscription->agency->users->each(function (User $user): void {
-                    $user->ads->each(fn (\App\Models\Ad $ad) => $ad->unboost());
+                    $user->ads->each(fn (Ad $ad) => $ad->unboost());
                 });
             });
+
+            $count++;
         }
 
-        return $expired->count();
+        return $count;
+    }
+
+    /**
+     * Process auto-renewals for subscriptions expiring soon.
+     *
+     * Generates a payment link and emails agency users 3 days before expiry.
+     */
+    public function processRenewals(): int
+    {
+        $subscriptions = Subscription::where('status', SubscriptionStatus::ACTIVE)
+            ->where('auto_renew', true)
+            ->whereDate('ends_at', '=', now()->addDays(self::RENEWAL_REMINDER_DAYS)->toDateString())
+            ->with(['agency.users', 'plan'])
+            ->get();
+
+        $count = 0;
+
+        foreach ($subscriptions as $subscription) {
+            try {
+                $this->sendRenewalReminder($subscription);
+                $count++;
+            } catch (\Throwable $e) {
+                Log::error('Renewal reminder failed', [
+                    'subscription_id' => $subscription->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $count;
     }
 
     /**
@@ -150,19 +202,73 @@ class SubscriptionService
         $agency->users()->get()->each(function ($user) use ($plan): void {
             /** @var User $user */
             $user->ads()
-                ->where('status', \App\Enums\AdStatus::AVAILABLE)
+                ->where('status', AdStatus::AVAILABLE)
                 ->get()
                 ->each(function ($ad) use ($plan): void {
-                    /** @var \App\Models\Ad $ad */
+                    /** @var Ad $ad */
                     $ad->boost($plan->boost_score, $plan->boost_duration_days);
                 });
         });
     }
 
     /**
+     * Send a renewal reminder with a pre-filled payment link.
+     */
+    private function sendRenewalReminder(Subscription $subscription): void
+    {
+        $agency = $subscription->agency;
+        $plan = $subscription->plan;
+        $firstUser = $agency->users->first();
+
+        if (!$firstUser || !$plan) {
+            return;
+        }
+
+        $amount = $subscription->billing_period === 'yearly'
+            ? (int) $plan->price_yearly
+            : (int) $plan->price;
+
+        $paymentService = app(PaymentService::class);
+
+        $result = $paymentService->createPayment($firstUser, [
+            'amount' => (float) $amount,
+            'type' => PaymentType::SUBSCRIPTION->value,
+            'payment_method' => 'flutterwave',
+            'agency_id' => $agency->id,
+            'plan_id' => $plan->id,
+            'period' => $subscription->billing_period,
+            'description' => "Renouvellement — {$plan->name} ({$subscription->billing_period})",
+            'meta' => [
+                'payment_type' => 'subscription',
+                'agency_id' => $agency->id,
+                'plan_id' => $plan->id,
+                'period' => $subscription->billing_period,
+                'renewal' => true,
+            ],
+        ]);
+
+        foreach ($agency->users as $user) {
+            try {
+                Mail::to($user->email)->send(new SubscriptionRenewalReminderMail(
+                    $subscription,
+                    $result['link'],
+                ));
+            } catch (\Throwable $e) {
+                Log::error("Renewal email failed for {$user->email}: ".$e->getMessage());
+            }
+        }
+
+        Log::info('Renewal reminder sent', [
+            'subscription_id' => $subscription->id,
+            'agency_id' => $agency->id,
+            'payment_link' => $result['link'],
+        ]);
+    }
+
+    /**
      * Get subscription statistics for an agency.
      *
-     * @return array{has_active_subscription: bool, current_plan: string|null, days_remaining: int, expires_at: \Illuminate\Support\Carbon|null, total_boosted_ads: int}
+     * @return array{has_active_subscription: bool, current_plan: string|null, days_remaining: int, expires_at: Carbon|null, total_boosted_ads: int}
      */
     public function getAgencyStats(Agency $agency): array
     {

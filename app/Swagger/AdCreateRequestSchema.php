@@ -30,7 +30,7 @@ namespace App\Swagger;
  *     @OA\Property(
  *         property="images",
  *         type="array",
- *         description="Images du bien (max 10, 5MB chaque)",
+ *         description="Images du bien (max 10, 20 Mo chacune)",
  *
  *         @OA\Items(type="string", format="binary"),
  *         maxItems=10

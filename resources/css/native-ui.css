@@ -208,7 +208,6 @@ button:active {
 }
 
 /* Réduire les délais de réponse */
-.is-native-app input,
 .is-native-app button,
 .is-native-app [role="button"] {
     -webkit-user-select: none;

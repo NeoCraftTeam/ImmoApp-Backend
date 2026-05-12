@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
-use App\Mail\VerifyEmailMail;
+use App\Mail\AdminWelcomeEmail;
+use App\Mail\VerificationCodeMail;
 use App\Mail\WelcomeEmail;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\URL;
 
@@ -96,14 +99,14 @@ it('resendVerificationEmail returns 200 for already-verified users', function ()
         ->assertJsonFragment(['message' => 'Si cette adresse est enregistrée et non vérifiée, un email a été envoyé.']);
 });
 
-it('resendVerificationEmail queues VerifyEmailMail for unverified users', function (): void {
+it('resendVerificationEmail queues VerificationCodeMail for unverified users', function (): void {
     Mail::fake();
     $user = User::factory()->unverified()->create();
 
     $this->postJson('/api/v1/auth/resend-verification', ['email' => $user->email])
         ->assertOk();
 
-    Mail::assertQueued(VerifyEmailMail::class, fn ($m) => $m->hasTo($user->email));
+    Mail::assertQueued(VerificationCodeMail::class, fn ($m) => $m->hasTo($user->email));
 });
 
 it('forgotPassword always returns 200 for unknown email', function (): void {
@@ -114,55 +117,111 @@ it('forgotPassword always returns 200 for unknown email', function (): void {
 
 // ── Welcome email déclenché par Verified event ─────────────────────────────────────────
 
-it('queues WelcomeEmail when the Verified event fires', function (): void {
+it('queues WelcomeEmail when the Verified event fires for customer', function (): void {
     Mail::fake();
-    $user = User::factory()->unverified()->create();
+    $user = User::factory()->unverified()->customers()->create();
 
     event(new Verified($user));
 
     Mail::assertQueued(WelcomeEmail::class, fn ($m) => $m->hasTo($user->email));
 });
 
+it('queues AdminWelcomeEmail when the Verified event fires for admin', function (): void {
+    Mail::fake();
+    $user = User::factory()->unverified()->admin()->create();
+
+    event(new Verified($user));
+
+    Mail::assertQueued(AdminWelcomeEmail::class, fn ($m) => $m->hasTo($user->email));
+});
+
 // ── sendEmailVerificationNotification utilise VerifyEmailMail ─────────────────────────
 
-it('sendEmailVerificationNotification queues VerifyEmailMail', function (): void {
+it('sendEmailVerificationNotification queues VerificationCodeMail with OTP', function (): void {
     Mail::fake();
     $user = User::factory()->unverified()->create();
 
     $user->sendEmailVerificationNotification();
 
-    Mail::assertQueued(VerifyEmailMail::class, fn ($m) => $m->hasTo($user->email));
+    Mail::assertQueued(VerificationCodeMail::class, fn ($m) => $m->hasTo($user->email));
+    expect(Cache::has('email_otp_'.$user->id))->toBeTrue();
 });
 
-// ── CreateAdminCommand ────────────────────────────────────────────────────────────────
+// ── OTP Email Verification ─────────────────────────────────────────────────────────────
 
-it('create-admin command creates an unverified admin and sends VerifyEmailMail', function (): void {
-    Mail::fake();
+it('verifies email with a valid OTP code', function (): void {
+    $user = User::factory()->unverified()->create();
+    Cache::put('email_otp_'.$user->id, '123456', now()->addMinutes(10));
 
-    $this->artisan('app:create-admin', [
-        '--email' => 'newadmin@keyhome.test',
-        '--firstname' => 'Super',
-        '--lastname' => 'Admin',
-        '--password' => 'Adm1nPass!',
-    ])->assertSuccessful();
+    $this->postJson('/api/v1/auth/verify-email-otp', [
+        'email' => $user->email,
+        'otp' => '123456',
+    ])
+        ->assertOk()
+        ->assertJsonStructure(['message', 'verified', 'access_token', 'user']);
 
-    $user = User::where('email', 'newadmin@keyhome.test')->first();
-
-    expect($user)->not->toBeNull()
-        ->and($user->email_verified_at)->toBeNull()
-        ->and($user->role->value)->toBe('admin');
-
-    Mail::assertQueued(VerifyEmailMail::class, fn ($m) => $m->hasTo('newadmin@keyhome.test'));
+    expect($user->fresh()?->hasVerifiedEmail())->toBeTrue();
+    expect(Cache::has('email_otp_'.$user->id))->toBeFalse();
 });
 
-it('create-admin command promotes existing user without sending verification', function (): void {
-    Mail::fake();
-    $user = User::factory()->create(['role' => \App\Enums\UserRole::CUSTOMER]);
+it('rejects an invalid OTP code', function (): void {
+    $user = User::factory()->unverified()->create();
+    Cache::put('email_otp_'.$user->id, '123456', now()->addMinutes(10));
 
-    $this->artisan('app:create-admin', ['--email' => $user->email])
-        ->expectsConfirmation('User '.$user->email.' exists as customer. Promote to admin?', 'yes')
-        ->assertSuccessful();
+    $this->postJson('/api/v1/auth/verify-email-otp', [
+        'email' => $user->email,
+        'otp' => '999999',
+    ])->assertStatus(400);
 
-    expect($user->fresh()?->role->value)->toBe('admin');
-    Mail::assertNothingQueued();
+    expect($user->fresh()?->hasVerifiedEmail())->toBeFalse();
+});
+
+it('rejects an expired OTP code', function (): void {
+    $user = User::factory()->unverified()->create();
+
+    $this->postJson('/api/v1/auth/verify-email-otp', [
+        'email' => $user->email,
+        'otp' => '123456',
+    ])->assertStatus(400);
+
+    expect($user->fresh()?->hasVerifiedEmail())->toBeFalse();
+});
+
+it('returns success for already-verified email via OTP', function (): void {
+    $user = User::factory()->create();
+
+    $this->postJson('/api/v1/auth/verify-email-otp', [
+        'email' => $user->email,
+        'otp' => '000000',
+    ])->assertOk()->assertJson(['verified' => true]);
+});
+
+it('returns access_token after successful OTP verification for auto-login', function (): void {
+    $user = User::factory()->unverified()->create();
+    Cache::put('email_otp_'.$user->id, '555555', now()->addMinutes(10));
+
+    $response = $this->postJson('/api/v1/auth/verify-email-otp', [
+        'email' => $user->email,
+        'otp' => '555555',
+    ])->assertOk();
+
+    expect($response->json('access_token'))->not->toBeEmpty();
+    expect($response->json('user'))->not->toBeEmpty();
+});
+
+it('returns user with onboarding_completed_at and point_balance for WelcomeModal', function (): void {
+    Setting::set('welcome_bonus_points', 5, 'Bonus bienvenue', 'credits');
+    $user = User::factory()->unverified()->create();
+    Cache::put('email_otp_'.$user->id, '123456', now()->addMinutes(10));
+
+    $response = $this->postJson('/api/v1/auth/verify-email-otp', [
+        'email' => $user->email,
+        'otp' => '123456',
+    ])->assertOk();
+
+    $userData = $response->json('user');
+    expect($userData)->toHaveKey('onboarding_completed_at');
+    expect($userData['onboarding_completed_at'])->toBeNull();
+    expect($userData)->toHaveKey('point_balance');
+    expect($userData['point_balance'])->toBeGreaterThanOrEqual(5);
 });

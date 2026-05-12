@@ -5,26 +5,27 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\AdStatus;
-use App\Enums\PaymentStatus;
-use App\Enums\PaymentType;
+use App\Enums\PropertyAttribute;
+use App\Enums\TransactionType;
+use App\Enums\UserType;
+use App\Enums\VerificationStatus;
 use App\Exceptions\InvalidStatusTransitionException;
+use App\Models\Concerns\HasPropertyAttributes;
+use App\Models\Concerns\HasVisibility;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\AdFactory;
 use Eloquent;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Str;
-use Laravel\Scout\Searchable;
 /**
- * @property-read \App\Models\Quarter|null $quarter
- * @property-read \App\Models\User|null $user
- * @property-read \App\Models\Agency|null $agency
- * @property-read \App\Models\AdType|null $ad_type
+ * @property-read Quarter|null $quarter
+ * @property-read User|null $user
+ * @property-read Agency|null $agency
+ * @property-read AdType|null $ad_type
  *
  * @method static AdFactory factory($count = null, $state = [])
  * @method static Builder<static>|Ad newModelQuery()
@@ -50,9 +51,9 @@ use Laravel\Scout\Searchable;
  * @property string $user_id
  * @property string $quarter_id
  * @property string $type_id
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
- * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property Carbon|null $created_at
+ * @property Carbon|null $updated_at
+ * @property Carbon|null $deleted_at
  *
  * @method static Builder<static>|Ad whereAdresse($value)
  * @method static Builder<static>|Ad whereBathrooms($value)
@@ -76,19 +77,40 @@ use Laravel\Scout\Searchable;
  *
  * @mixin Eloquent
  */
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
+use Laravel\Scout\Searchable;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Zap\Models\Concerns\HasSchedules;
 
 class Ad extends Model implements HasMedia
 {
-    use HasFactory, HasUuids, LogsActivity, SoftDeletes;
-    use InteractsWithMedia, Searchable;
+    use HasFactory, HasSchedules, HasUuids, LogsActivity, SoftDeletes;
+    use HasPropertyAttributes, HasVisibility, InteractsWithMedia, Searchable;
+
+    /**
+     * Statuses that are visible on the public frontend.
+     *
+     * @var array<int, AdStatus>
+     */
+    public const array PUBLIC_STATUSES = [
+        AdStatus::AVAILABLE,
+        AdStatus::RESERVED,
+    ];
 
     protected $table = 'ad';
 
+    /**
+     * SEC-006: status excluded — use transitionTo() or forceFill() only.
+     */
     protected $fillable = [
         'title',
         'slug',
@@ -100,23 +122,34 @@ class Ad extends Model implements HasMedia
         'bathrooms',
         'has_parking',
         'location',
-        'status',
         'is_visible',
         'available_from',
         'available_to',
         'attributes',
         'expires_at',
-        'user_id',
         'quarter_id',
         'type_id',
+        'transaction_type',
         'agency_id',
-        'is_boosted',
-        'boost_score',
-        'boost_expires_at',
-        'boosted_at',
         'deposit_amount',
         'minimum_lease_duration',
         'detailed_charges',
+        'charges_forfaitaires',
+        'charges_montant_forfait',
+        'charges_eau',
+        'charges_electricite',
+        'charges_autres',
+        'has_3d_tour',
+        'tour_config',
+        'tour_published_at',
+        // SEC-007: is_verified, verified_at, verification_status, verification_notes,
+        // verification_requested_at excluded — use forceFill() in admin/verification flows only.
+        'distance_main_road_m',
+        'distance_shops_m',
+        'distance_transport_m',
+        'distance_school_m',
+        'distance_hospital_m',
+        'draft_payload',
     ];
 
     protected $hidden = [
@@ -127,9 +160,12 @@ class Ad extends Model implements HasMedia
         'agency_id',
     ];
 
+    /** @var list<string> */
+    protected $appends = ['tour_scenes_count'];
+
     protected $casts = [
         'location' => Point::class, // Assuming 'point' is a custom cast for PostGIS
-        'status' => \App\Enums\AdStatus::class,
+        'status' => AdStatus::class,
         'has_parking' => 'boolean',
         'is_visible' => 'boolean',
         'available_from' => 'date',
@@ -140,6 +176,19 @@ class Ad extends Model implements HasMedia
         'is_boosted' => 'boolean',
         'boost_expires_at' => 'datetime',
         'boosted_at' => 'datetime',
+        'charges_forfaitaires' => 'boolean',
+        'charges_montant_forfait' => 'integer',
+        'charges_eau' => 'integer',
+        'charges_electricite' => 'integer',
+        'transaction_type' => TransactionType::class,
+        'has_3d_tour' => 'boolean',
+        'tour_config' => 'array',
+        'tour_published_at' => 'datetime',
+        'draft_payload' => 'array',
+        'is_verified' => 'boolean',
+        'verified_at' => 'datetime',
+        'verification_status' => VerificationStatus::class,
+        'verification_requested_at' => 'datetime',
     ];
 
     #[\Override]
@@ -159,6 +208,11 @@ class Ad extends Model implements HasMedia
             // Automatiquement lier l'agence de l'utilisateur créateur
             if (empty($ad->agency_id)) {
                 $ad->agency_id = auth()->user()?->agency_id;
+            }
+
+            // Default status when not set (status is not fillable for security)
+            if (empty($ad->status)) {
+                $ad->status = AdStatus::PENDING;
             }
         });
 
@@ -188,6 +242,28 @@ class Ad extends Model implements HasMedia
         $this->save();
     }
 
+    /** Return the number of 360\u00b0 scenes in the tour config. */
+    public function getTourScenesCountAttribute(): int
+    {
+        if (!$this->tour_config) {
+            return 0;
+        }
+
+        return count($this->tour_config['scenes'] ?? []);
+    }
+
+    /**
+     * Scope \u2014 ads that have a published 3D tour.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    #[Scope]
+    protected function withTour(Builder $query): Builder
+    {
+        return $query->where('has_3d_tour', true)->whereNotNull('tour_config');
+    }
+
     public static function generateUniqueSlug(string $title, ?string $ignoreId = null): string
     {
         $slug = Str::slug($title);
@@ -205,6 +281,21 @@ class Ad extends Model implements HasMedia
         return $slug;
     }
 
+    /**
+     * True when the listing is furnished (explicit attribute and/or type name typical of meublé listings).
+     */
+    public function isFurnishedForSearch(): bool
+    {
+        $attrs = $this->getAttribute('attributes');
+        if (is_array($attrs) && in_array(PropertyAttribute::Furnished->value, $attrs, true)) {
+            return true;
+        }
+
+        $typeName = $this->ad_type !== null ? $this->ad_type->name : '';
+
+        return (bool) preg_match('/meubl/i', (string) $typeName);
+    }
+
     public function toSearchableArray(): array
     {
         return [
@@ -217,6 +308,9 @@ class Ad extends Model implements HasMedia
             'bedrooms' => (int) $this->bedrooms,
             'bathrooms' => (int) $this->bathrooms,
             'has_parking' => (bool) $this->has_parking,
+            'has_3d_tour' => (bool) $this->has_3d_tour,
+            'is_verified' => (bool) $this->is_verified,
+            'is_furnished' => $this->isFurnishedForSearch(),
             'status' => $this->status,
             'is_visible' => (bool) $this->is_visible,
 
@@ -226,6 +320,7 @@ class Ad extends Model implements HasMedia
             'type' => $this->ad_type?->name,
             'type_id' => $this->type_id,
             'quarter_id' => $this->quarter_id,
+            'transaction_type' => $this->transaction_type?->value,
 
             // Pour la recherche géographique (optionnel)
             '_geo' => $this->location ? [
@@ -235,17 +330,25 @@ class Ad extends Model implements HasMedia
 
             'created_at' => $this->created_at?->timestamp,
 
+            // Rating & popularity — use eager-loaded aggregates (see makeAllSearchableUsing).
+            // Fallback to 0 if the withAvg/withCount was not applied (e.g. single-model scout index).
+            'reviews_avg_rating' => (float) ($this->reviews_avg_rating ?? 0),
+            'views_count' => (int) ($this->views_count ?? 0),
+
             // Boost
             'is_boosted' => (bool) $this->is_boosted,
             'boost_score' => (int) $this->boost_score,
             'boost_expires_at' => $this->boost_expires_at?->timestamp,
+
+            // Amenity slugs for filter-by-attribute support
+            'attributes' => $this->getAttribute('attributes') ?? [],
         ];
     }
 
     public function shouldBeSearchable(): bool
     {
-        // N'indexer que les annonces visibles, disponibles et non supprimées
-        return $this->is_visible && $this->status === AdStatus::AVAILABLE && !$this->trashed();
+        // N'indexer que les annonces visibles, publiquement listées et non supprimées
+        return $this->is_visible && in_array($this->status, self::PUBLIC_STATUSES, true) && !$this->trashed();
     }
 
     /**
@@ -256,14 +359,14 @@ class Ad extends Model implements HasMedia
         $user = $this->user;
 
         // Si l'utilisateur est de type AGENCY, on essaie de retourner le nom de son agence
-        if ($user && $user->type === \App\Enums\UserType::AGENCY) {
+        if ($user && $user->type === UserType::AGENCY) {
             $agency = $this->agency;
-            if ($agency instanceof \App\Models\Agency) {
+            if ($agency instanceof Agency) {
                 return $agency->name;
             }
 
             $userAgency = $user->agency;
-            if ($userAgency instanceof \App\Models\Agency) {
+            if ($userAgency instanceof Agency) {
                 return $userAgency->name;
             }
         }
@@ -293,9 +396,21 @@ class Ad extends Model implements HasMedia
         return $this->belongsTo(Quarter::class);
     }
 
-    public function reviews(): hasMany
+    public function reviews(): HasMany
     {
         return $this->hasMany(Review::class);
+    }
+
+    /** @return HasMany<AdReport, $this> */
+    public function reports(): HasMany
+    {
+        return $this->hasMany(AdReport::class);
+    }
+
+    /** @return HasMany<UnlockedAd, $this> */
+    public function unlockedAds(): HasMany
+    {
+        return $this->hasMany(UnlockedAd::class);
     }
 
     /** @return HasMany<AdInteraction, $this> */
@@ -339,6 +454,18 @@ class Ad extends Model implements HasMedia
         return $favorites > $unfavorites;
     }
 
+    /** @return HasMany<Payment, $this> */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /** @return HasMany<LeaseContract, $this> */
+    public function leaseContracts(): HasMany
+    {
+        return $this->hasMany(LeaseContract::class);
+    }
+
     /**
      * @return BelongsTo<AdType, $this>
      */
@@ -349,47 +476,55 @@ class Ad extends Model implements HasMedia
 
     protected function makeAllSearchableUsing(Builder $query): Builder
     {
-        return $query->with(['quarter.city', 'ad_type']);
+        // PERF-W24: eager-load everything toSearchableArray() needs so bulk indexing
+        // (Ad::all()->searchable()) does not fire an extra query per model.
+        return $query
+            ->with(['quarter.city', 'ad_type'])
+            ->withAvg('reviews', 'rating')
+            ->withCount([
+                'interactions as views_count' => fn (Builder $q) => $q->where('type', 'view'),
+            ]);
     }
 
     public function registerMediaCollections(): void
     {
         $this->addMediaCollection('images')
-            ->onlyKeepLatest(10)
-            ->useDisk('public');
+            ->onlyKeepLatest(10);
 
         $this->addMediaCollection('property_condition')
             ->singleFile()
-            ->acceptsMimeTypes(['application/pdf'])
-            ->useDisk('public');
+            ->acceptsMimeTypes(['application/pdf']);
     }
 
     public function registerMediaConversions(?Media $media = null): void
     {
+        // Tiny blur placeholder — sync, ~20px, used as blurDataURL before the real image loads.
+        $this->addMediaConversion('placeholder')
+            ->nonQueued()
+            ->fit(Fit::Max, 20, 20)
+            ->format('webp')
+            ->quality(30);
+
+        // Listing card thumbnail — landscape-safe, no upscaling, queued.
         $this->addMediaConversion('thumb')
-            ->nonQueued()
-            ->width(300)
-            ->height(300)
+            ->queued()
+            ->fit(Fit::Max, 480, 320)
             ->format('webp')
-            ->quality(80);
+            ->quality(78);
 
-        $this->addMediaConversion('medium')
-            ->nonQueued()
-            ->width(800)
-            ->height(600)
-            ->format('webp')
-            ->quality(80);
-
+        // Detail view & lightbox — high quality, landscape-safe, queued.
         $this->addMediaConversion('large')
             ->queued()
-            ->width(1200)
-            ->height(900)
+            ->fit(Fit::Max, 1280, 854)
             ->format('webp')
-            ->quality(85);
+            ->quality(82);
     }
 
     /**
      * Check if the ad is unlocked for a specific user.
+     *
+     * Result is memoized per request in a static array to avoid N+1 queries
+     * when AdResource calls this method multiple times for the same ad/user pair.
      */
     public function isUnlockedFor(?User $user): bool
     {
@@ -402,17 +537,24 @@ class Ad extends Model implements HasMedia
             return true;
         }
 
-        return Payment::where('user_id', $user->id)
-            ->where('ad_id', $this->id)
-            ->where('type', PaymentType::UNLOCK)
-            ->where('status', PaymentStatus::SUCCESS)
-            ->exists();
+        /** @var array<string, bool> $cache */
+        static $cache = [];
+
+        $key = $user->id.':'.$this->id;
+
+        if (!array_key_exists($key, $cache)) {
+            $cache[$key] = UnlockedAd::where('user_id', $user->id)
+                ->where('ad_id', $this->id)
+                ->exists();
+        }
+
+        return $cache[$key];
     }
 
     /**
      * Get all images for the ad (images are always visible).
      */
-    public function getAccessibleImages(?User $user): \Illuminate\Support\Collection
+    public function getAccessibleImages(?User $user): Collection
     {
         $media = $this->getMedia('images');
 
@@ -428,12 +570,12 @@ class Ad extends Model implements HasMedia
      */
     public function boost(int $score, int $durationDays): void
     {
-        $this->update([
+        $this->forceFill([
             'is_boosted' => true,
             'boost_score' => $score,
             'boost_expires_at' => now()->addDays($durationDays),
             'boosted_at' => now(),
-        ]);
+        ])->save();
     }
 
     /**
@@ -441,11 +583,11 @@ class Ad extends Model implements HasMedia
      */
     public function unboost(): void
     {
-        $this->update([
+        $this->forceFill([
             'is_boosted' => false,
             'boost_score' => 0,
             'boost_expires_at' => null,
-        ]);
+        ])->save();
     }
 
     /**
@@ -461,7 +603,7 @@ class Ad extends Model implements HasMedia
     /**
      * Scope to get only boosted ads
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function boosted($query)
     {
         return $query->where('is_boosted', true)
@@ -471,7 +613,7 @@ class Ad extends Model implements HasMedia
     /**
      * Scope to order by boost score then created_at
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function orderByBoost($query)
     {
         return $query->orderByDesc('boost_score')
@@ -481,16 +623,25 @@ class Ad extends Model implements HasMedia
     /**
      * Scope to get only visible ads
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function visible($query)
     {
         return $query->where('is_visible', true);
     }
 
     /**
+     * Scope to get only publicly listed ads (available + reserved).
+     */
+    #[Scope]
+    protected function publiclyListed($query)
+    {
+        return $query->whereIn('status', array_map(fn (AdStatus $s) => $s->value, self::PUBLIC_STATUSES));
+    }
+
+    /**
      * Scope to get only currently available ads based on date range
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function currentlyAvailable($query)
     {
         $today = now()->toDateString();
@@ -509,7 +660,7 @@ class Ad extends Model implements HasMedia
     /**
      * Scope to filter by property attributes
      */
-    #[\Illuminate\Database\Eloquent\Attributes\Scope]
+    #[Scope]
     protected function withAttributes($query, array $attributes)
     {
         foreach ($attributes as $attribute) {
@@ -520,30 +671,6 @@ class Ad extends Model implements HasMedia
     }
 
     /**
-     * Toggle ad visibility
-     */
-    public function toggleVisibility(): void
-    {
-        $this->update(['is_visible' => !$this->is_visible]);
-    }
-
-    /**
-     * Hide the ad
-     */
-    public function hide(): void
-    {
-        $this->update(['is_visible' => false]);
-    }
-
-    /**
-     * Show the ad
-     */
-    public function show(): void
-    {
-        $this->update(['is_visible' => true]);
-    }
-
-    /**
      * Set availability period
      */
     public function setAvailability(?\DateTimeInterface $from = null, ?\DateTimeInterface $to = null): void
@@ -551,42 +678,6 @@ class Ad extends Model implements HasMedia
         $this->update([
             'available_from' => $from,
             'available_to' => $to,
-        ]);
-    }
-
-    /**
-     * Check if ad has a specific property attribute
-     */
-    public function hasPropertyAttribute(string $attribute): bool
-    {
-        $attributes = $this->getAttribute('attributes') ?? [];
-
-        return in_array($attribute, $attributes, true);
-    }
-
-    /**
-     * Add attributes to the ad
-     *
-     * @param  array<string>  $newAttributes
-     */
-    public function addPropertyAttributes(array $newAttributes): void
-    {
-        $currentAttributes = $this->getAttribute('attributes') ?? [];
-        $this->update([
-            'attributes' => array_unique(array_merge($currentAttributes, $newAttributes)),
-        ]);
-    }
-
-    /**
-     * Remove attributes from the ad
-     *
-     * @param  array<string>  $attributesToRemove
-     */
-    public function removePropertyAttributes(array $attributesToRemove): void
-    {
-        $currentAttributes = $this->getAttribute('attributes') ?? [];
-        $this->update([
-            'attributes' => array_values(array_diff($currentAttributes, $attributesToRemove)),
         ]);
     }
 

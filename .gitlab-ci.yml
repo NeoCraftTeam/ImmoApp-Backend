@@ -7,21 +7,35 @@ stages:
   - notify
   - cleanup
 
+workflow:
+  rules:
+    - if: $CI_COMMIT_TITLE =~ /\[skip ci\]/i
+      when: never
+    - if: $CI_COMMIT_BRANCH
+
 variables:
   APP_IMAGE: $CI_REGISTRY_IMAGE/app
   IMAGE_TAG: $CI_COMMIT_REF_SLUG
-  CI_IMAGE: keyhome-ci:$CI_COMMIT_SHORT_SHA
+  CI_IMAGE: $CI_REGISTRY_IMAGE/ci:$CI_COMMIT_REF_SLUG
 
 default:
   tags:
     - self-hosted-shell
+  interruptible: true
+  before_script:
+    # Centralisation de l'authentification Docker
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
 
 # --- ETAPE 0 : BUILD IMAGE CI (une seule fois) ---
+# The CI image contains ONLY PHP extensions + Composer + installed vendor deps.
+# It does NOT include the application code, so `composer install` is only
+# re-run when composer.lock changes — not on every commit.
 prepare_ci_image:
   stage: prepare
   script:
     - |
-      docker build -t $CI_IMAGE -f - . <<'DOCKERFILE'
+      docker pull $CI_IMAGE || true
+      docker build --cache-from $CI_IMAGE -t $CI_IMAGE -f - . <<'DOCKERFILE'
       FROM php:8.4-cli-alpine
       RUN apk add --no-cache git libzip-dev icu-dev postgresql-dev libpng-dev oniguruma-dev gettext-dev freetype-dev libjpeg-turbo-dev libwebp-dev $PHPIZE_DEPS \
         && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
@@ -30,11 +44,18 @@ prepare_ci_image:
         && apk del $PHPIZE_DEPS && rm -rf /tmp/*
       COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
       WORKDIR /app
-      COPY . .
+      # Layer 1: install deps (cached until composer.lock changes)
+      COPY composer.json composer.lock ./
       RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
-        && cp .env.example .env \
-        && composer install --no-interaction --no-ansi
+        && touch .env \
+        && composer install --no-interaction --no-ansi --no-scripts -q
+      # Layer 2: copy code (fast, does not re-run composer install)
+      COPY . .
       DOCKERFILE
+      docker push $CI_IMAGE || true
+  retry:
+    max: 2
+    when: runner_system_failure
   rules:
     - if: $CI_COMMIT_BRANCH
 
@@ -43,9 +64,11 @@ phpstan:
   stage: quality
   needs: [prepare_ci_image]
   script:
-    - docker run --rm $CI_IMAGE ./vendor/bin/phpstan analyse --memory-limit=512M
+    - docker run --rm -e APP_KEY="base64:$(openssl rand -base64 32)" $CI_IMAGE ./vendor/bin/phpstan analyse --memory-limit=512M
   rules:
     - if: $CI_COMMIT_BRANCH
+      changes:
+        - '**/*.php'
 
 style_check:
   stage: quality
@@ -54,6 +77,8 @@ style_check:
     - docker run --rm $CI_IMAGE ./vendor/bin/pint --test
   rules:
     - if: $CI_COMMIT_BRANCH
+      changes:
+        - '**/*.php'
 
 composer_security:
   stage: quality
@@ -63,69 +88,84 @@ composer_security:
   rules:
     - if: $CI_COMMIT_BRANCH
 
+# Rector — automated refactor checks. Runs in --dry-run so it never modifies CI;
+# fails the job if there are unapplied automatic upgrades / fixes that should be
+# committed before merge.
+rector:
+  stage: quality
+  needs: [prepare_ci_image]
+  allow_failure: true # advisory in CI: do not block the pipeline (yet) — see AGENTS.md
+  script:
+    - docker run --rm $CI_IMAGE ./vendor/bin/rector process --dry-run --no-progress-bar
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        - '**/*.php'
+        - rector.php
+
 # --- ETAPE 2 : BUILD & PUSH (en parallèle avec tests) ---
 build_image:
   stage: build_and_test
-  needs: [phpstan, style_check, composer_security]
+  variables:
+    DOCKER_BUILDKIT: "1"
+  needs:
+    - job: phpstan
+      optional: true
+    - job: style_check
+      optional: true
+    - job: composer_security
   script:
-    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-    - docker build --pull -t $APP_IMAGE:$IMAGE_TAG -t $APP_IMAGE:latest .
+    # Pull the previous image to use as a cache source — dramatically speeds up
+    # builds when only code (not dependencies) changed.
+    - docker pull $APP_IMAGE:latest || true
+    - docker build --cache-from $APP_IMAGE:latest -t $APP_IMAGE:$IMAGE_TAG .
     - docker push $APP_IMAGE:$IMAGE_TAG
-    - docker push $APP_IMAGE:latest
+    - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        docker tag $APP_IMAGE:$IMAGE_TAG $APP_IMAGE:latest
+        docker push $APP_IMAGE:latest
+      fi
   after_script:
     - docker logout $CI_REGISTRY 2>/dev/null || true
+  retry:
+    max: 2
+    when: runner_system_failure
   rules:
-    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
 
 # --- ETAPE 2 : TESTS (en parallèle avec build) ---
 test_suite:
   stage: build_and_test
   needs: [prepare_ci_image]
   timeout: 10 minutes
+  retry:
+    max: 2
+    when: runner_system_failure
   script:
-    - docker network create ci-net-$CI_JOB_ID || true
     - |
-      docker run -d --name pg-$CI_JOB_ID \
+      # Create isolated network for this job
+      docker network create ci-net-$CI_JOB_ID
+
+      # Start PostgreSQL with PostGIS
+      docker run -d \
+        --name pg-$CI_JOB_ID \
         --network ci-net-$CI_JOB_ID \
-        --health-cmd="pg_isready -U gitlab -d testing" \
-        --health-interval=2s \
-        --health-timeout=5s \
-        --health-retries=10 \
         -e POSTGRES_DB=testing \
         -e POSTGRES_USER=gitlab \
         -e POSTGRES_PASSWORD=test_pass \
         postgis/postgis:15-3.3-alpine
-    # Wait for PostgreSQL container to be healthy (TCP ready)
-    - |
-      echo "Waiting for PostgreSQL health check..."
-      for i in $(seq 1 60); do
-        STATUS=$(docker inspect --format='{{.State.Health.Status}}' pg-$CI_JOB_ID 2>/dev/null || echo "starting")
-        if [ "$STATUS" = "healthy" ]; then
-          echo "Health check passed, verifying TCP from network..."
-          break
-        fi
-        if [ "$i" = "60" ]; then
-          echo "PostgreSQL failed to become healthy after 60s"
-          docker logs pg-$CI_JOB_ID 2>&1 | tail -20
-          exit 1
-        fi
-        sleep 1
-      done
-    # Verify actual TCP connectivity from within the Docker network (PostGIS may restart after init)
-    - |
+
+      # Wait until PostgreSQL accepts TCP connections (not just Unix socket).
+      # pg_isready without -h checks /var/run/postgresql (Unix socket) which
+      # becomes ready before TCP is bound — causing cross-container ECONNREFUSED.
+      echo "Waiting for PostgreSQL..."
       for i in $(seq 1 30); do
-        if docker run --rm --network ci-net-$CI_JOB_ID postgis/postgis:15-3.3-alpine pg_isready -h pg-$CI_JOB_ID -U gitlab -d testing -q 2>/dev/null; then
-          echo "PostgreSQL is accepting TCP connections on the network."
-          break
-        fi
-        if [ "$i" = "30" ]; then
-          echo "PostgreSQL not reachable via network after 30s"
-          docker logs pg-$CI_JOB_ID 2>&1 | tail -20
-          exit 1
-        fi
-        sleep 1
+        docker exec pg-$CI_JOB_ID pg_isready -U gitlab -h 127.0.0.1 -p 5432 && break
+        [ "$i" = "30" ] && echo "PostgreSQL failed to start" && exit 1
+        sleep 2
       done
-    - |
+
+      # Run test suite inside CI image
       docker run --rm \
         --network ci-net-$CI_JOB_ID \
         -e DB_CONNECTION=pgsql \
@@ -135,62 +175,85 @@ test_suite:
         -e DB_USERNAME=gitlab \
         -e DB_PASSWORD=test_pass \
         -e SCOUT_DRIVER=null \
-        $CI_IMAGE sh -c '
-          set -e
-          cp .env.example .env
-          cp .env.example .env.testing
-          rm -f database/data/cities.sql
-          php artisan key:generate --env=testing
-          php artisan migrate --env=testing --force
-          set +e
-          echo "=== RUNNING TESTS ==="
-          php artisan test --env=testing -v 2>&1
-          TEST_RC=$?
-          echo "=== TESTS FINISHED WITH RC=$TEST_RC ==="
-          exit $TEST_RC
-        '
+        $CI_IMAGE sh -c \
+        'set -e
+        cp .env.example .env
+        cp .env.example .env.testing
+        rm -f database/data/cities.sql
+        php artisan key:generate --env=testing
+        php artisan migrate --env=testing --force
+        echo "=== RUNNING TESTS ==="
+        set +e
+        php artisan test --env=testing -v 2>&1
+        TEST_RC=$?
+        echo "=== TESTS FINISHED WITH RC=$TEST_RC ==="
+        exit $TEST_RC'
   after_script:
     - docker rm -f pg-$CI_JOB_ID 2>/dev/null || true
     - docker network rm ci-net-$CI_JOB_ID 2>/dev/null || true
   rules:
     - if: $CI_COMMIT_BRANCH
 
-# --- ETAPE 3 : DEPLOIEMENT ---
-production_deploy:
+# ── Shared deploy template ─────────────────────────────────────────────────────
+# All differences between prod and preprod are expressed as job-level variables:
+#   DEPLOY_DIR          – root dir on the VPS (/opt/keyhome or /opt/keyhome-preprod)
+#   DEPLOY_BRANCH       – git branch to deploy (main / preprod)
+#   COMPOSE_SRC_FILE    – compose file to copy (docker-compose.yml / docker-compose.preprod.yml)
+#   COMPOSE_FALLBACK    – fallback container-name prefix if COMPOSE_PREFIX not set in .env
+#   REQUIRE_ENV_CHECK   – "true" to abort when .env is missing (preprod only)
+#   REQUIRE_NETWORK_CHECK – "true" to abort when the shared prod network is absent (preprod only)
+.deploy_template: &deploy_template
   stage: deploy
   needs: [build_image, test_suite]
   timeout: 15 minutes
+  interruptible: false
   script:
-    - mkdir -p /opt/keyhome/.docker/nginx/conf.d
-    - cp docker-compose.yml /opt/keyhome/docker-compose.yml
-    - cp -rf .docker/nginx/conf.d/. /opt/keyhome/.docker/nginx/conf.d/
-    # Sync codebase to VPS for reference and manual artisan commands
+    # ── Copy compose file + nginx config ───────────────────────────────────────
+    - mkdir -p $DEPLOY_DIR/.docker/nginx/conf.d
+    - cp $COMPOSE_SRC_FILE $DEPLOY_DIR/docker-compose.yml
+    - cp -rf .docker/nginx/conf.d/. $DEPLOY_DIR/.docker/nginx/conf.d/
+    # ── Sync codebase to VPS for reference and manual artisan commands ─────────
     - |
       AUTHENTICATED_URL="https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/${CI_PROJECT_PATH}.git"
-      if [ -d /opt/keyhome/codebase/.git ]; then
-        cd /opt/keyhome/codebase
+      if [ -d $DEPLOY_DIR/codebase/.git ]; then
+        cd $DEPLOY_DIR/codebase
         git remote set-url origin "$AUTHENTICATED_URL"
-        git fetch origin main && git reset --hard origin/main
+        git fetch origin $DEPLOY_BRANCH && git reset --hard origin/$DEPLOY_BRANCH
       else
-        git clone --depth 1 --branch main "$AUTHENTICATED_URL" /opt/keyhome/codebase
+        git clone --depth 1 --branch $DEPLOY_BRANCH "$AUTHENTICATED_URL" $DEPLOY_DIR/codebase
       fi
-    - cd /opt/keyhome || exit 1
-    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-    - export FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:main"
+    # ── Optional .env guard (preprod only: REQUIRE_ENV_CHECK=true) ─────────────
+    - |
+      if [ "${REQUIRE_ENV_CHECK}" = "true" ] && [ ! -f "$DEPLOY_DIR/.env" ]; then
+        echo "❌ $DEPLOY_DIR/.env n'existe pas."
+        echo "   Créez-le à partir de .env.preprod.example avant le premier déploiement."
+        echo "   Variables critiques : COMPOSE_PREFIX=keyhome-preprod, WEB_PORT=9091, DB_HOST=keyhome-db"
+        exit 1
+      fi
+    # ── Optional network guard (preprod shares prod infra: REQUIRE_NETWORK_CHECK=true) ──
+    - |
+      if [ "${REQUIRE_NETWORK_CHECK}" = "true" ] && ! docker network inspect keyhome_keyhome-network > /dev/null 2>&1; then
+        echo "❌ Le réseau 'keyhome_keyhome-network' n'existe pas. Assurez-vous que l'environnement de production est démarré."
+        exit 1
+      fi
+    - cd $DEPLOY_DIR || exit 1
+    - export FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:${DEPLOY_BRANCH}"
     - echo "🚀 Deploying image $FULL_IMAGE"
+    # ── Save current image for rollback in case migrations fail ────────────────
+    - |
+      ROLLBACK_IMAGE=$(docker inspect --format='{{.Config.Image}}' ${COMPOSE_PREFIX:-$COMPOSE_FALLBACK}-backend 2>/dev/null || echo "")
+      echo "📌 Rollback point: ${ROLLBACK_IMAGE:-none (first deploy)}"
     # Enable maintenance mode before deploy
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan down --retry=60 || true
-    - echo "📦 Stopping existing containers..."
-    - APP_IMAGE=$FULL_IMAGE docker compose down --remove-orphans || true
     - echo "📥 Pulling new image..."
     - APP_IMAGE=$FULL_IMAGE docker compose pull
     - echo "🔄 Starting containers..."
-    - APP_IMAGE=$FULL_IMAGE docker compose up -d --no-build
-    # Wait for app container to be healthy
+    - APP_IMAGE=$FULL_IMAGE docker compose up -d --no-build --remove-orphans
+    # ── Wait for app container to be healthy ───────────────────────────────────
     - |
       echo "⏳ Waiting for containers to be ready..."
       for i in $(seq 1 60); do
-        if APP_IMAGE=$FULL_IMAGE docker compose exec -T app php -v > /dev/null 2>&1; then
+        if APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan list > /dev/null 2>&1; then
           echo "✅ App container is ready"
           break
         fi
@@ -202,276 +265,175 @@ production_deploy:
         fi
         sleep 2
       done
-    # Clear cache BEFORE migrations to ensure fresh config is loaded
-    - echo "🧹 Clearing cache before migrations..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize:clear
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan config:cache
-    # Run migrations — rollback container on failure
+    # Nginx can cache the old app container IP after app is recreated — refresh web after app is up.
+    - echo "🔄 Recreating web (nginx) so FastCGI targets the current app container..."
+    - APP_IMAGE=$FULL_IMAGE docker compose up -d --no-build --no-deps --force-recreate web
+    # ── Run migrations with automatic rollback on failure ──────────────────────
     - |
-      echo "🗄️ Running migrations..."
+      echo "🗾 Running migrations..."
       if ! APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan migrate --force; then
-        echo "❌ Migration failed — rolling back..."
+        echo "❌ Migration failed — rolling back to previous image..."
         APP_IMAGE=$FULL_IMAGE docker compose logs app --tail=30
-        APP_IMAGE=$FULL_IMAGE docker compose down --remove-orphans || true
+        if [ -n "$ROLLBACK_IMAGE" ]; then
+          echo "🔄 Restoring $ROLLBACK_IMAGE ..."
+          APP_IMAGE=$ROLLBACK_IMAGE docker compose up -d --no-build --remove-orphans || true
+          APP_IMAGE=$ROLLBACK_IMAGE docker compose exec -T app php artisan up || true
+          echo "✅ Rolled back to previous image"
+        else
+          APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan up || true
+        fi
         exit 1
       fi
-    - echo "⚡ Optimizing..."
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan filament:assets
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app chmod +x resetFilamentLivewire.sh
+    # ── Runtime cache rebuild (needs real .env — cannot be done in Docker build) ──
+    - echo "🧹 Clearing stale caches..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize:clear
+    - echo "⚡ Rebuilding runtime caches..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app bash resetFilamentLivewire.sh
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan optimize
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan storage:link || true
-    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate || true
+    # ── Meilisearch: sync settings then full reindex ───────────────────────────
+    - echo "🔍 Syncing Meilisearch index settings..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan scout:sync-index-settings || true
     # Disable maintenance mode
     - echo "✅ Deployment complete, bringing app back up..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan up
+    # ── Non-blocking post-deploy tasks (run after app is live) ─────────────────
+    # NOTE: Full `scout:import` is intentionally NOT run here — it scans every Ad
+    # row and degrades deploy time linearly with catalog size. Reindex is now
+    # triggered by Eloquent observers (HasMedia / Searchable) on writes, plus a
+    # nightly `php artisan scout:import App\\Models\\Ad` cron for drift recovery
+    # (see AGENTS.md scaling section). This is also safer for blue/green deploys.
+    - echo "📄 Generating Swagger docs (non-blocking)..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate || true
   after_script:
     - docker logout $CI_REGISTRY 2>/dev/null || true
+
+# --- ETAPE 3 : DEPLOIEMENT ---
+production_deploy:
+  <<: *deploy_template
+  variables:
+    DEPLOY_DIR: /opt/keyhome
+    DEPLOY_BRANCH: main
+    COMPOSE_SRC_FILE: docker-compose.yml
+    COMPOSE_FALLBACK: keyhome-prod
+    REQUIRE_ENV_CHECK: "false"
+    REQUIRE_NETWORK_CHECK: "false"
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
 
 # --- DEPLOIEMENT PREPROD ---
 preprod_deploy:
-  stage: deploy
-  needs: [build_image, test_suite]
-  timeout: 15 minutes
-  script:
-    - mkdir -p /opt/keyhome-preprod/.docker/nginx/conf.d
-    # Utilise le docker-compose.preprod.yml (services app uniquement, pas de DB/Redis/Meilisearch)
-    - cp docker-compose.preprod.yml /opt/keyhome-preprod/docker-compose.yml
-    - cp -rf .docker/nginx/conf.d/. /opt/keyhome-preprod/.docker/nginx/conf.d/
-    # Sync codebase from preprod branch
-    - |
-      AUTHENTICATED_URL="https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/${CI_PROJECT_PATH}.git"
-      if [ -d /opt/keyhome-preprod/codebase/.git ]; then
-        cd /opt/keyhome-preprod/codebase
-        git remote set-url origin "$AUTHENTICATED_URL"
-        git fetch origin preprod && git reset --hard origin/preprod
-      else
-        git clone --depth 1 --branch preprod "$AUTHENTICATED_URL" /opt/keyhome-preprod/codebase
-      fi
-    - cd /opt/keyhome-preprod || exit 1
-    - |
-      if [ ! -f .env ]; then
-        echo "❌ /opt/keyhome-preprod/.env n'existe pas."
-        echo "   Créez-le à partir de .env.preprod.example avant le premier déploiement."
-        echo "   Variables critiques : COMPOSE_PREFIX=keyhome-preprod, WEB_PORT=9091, DB_HOST=keyhome-db"
-        exit 1
-      fi
-    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
-    - export APP_IMAGE="${CI_REGISTRY_IMAGE}/app:preprod"
-    - echo "🚀 Deploying PREPROD image $APP_IMAGE (shared infra with prod)"
-    # Ensure the prod network exists (needed for shared DB/Redis/Meilisearch)
-    - |
-      if ! docker network inspect keyhome_keyhome-network > /dev/null 2>&1; then
-        echo "❌ Le réseau keyhome_keyhome-network n'existe pas. La prod doit tourner d'abord."
-        exit 1
-      fi
-    # Create preprod database in prod's PostgreSQL if it doesn't exist
-    - |
-      echo "🗄️ Vérification de la base preprod..."
-      DB_EXISTS=$(docker exec keyhome-db psql -U postgres -tAc "SELECT 1 FROM pg_database WHERE datname = 'keyhome_preprod'" 2>/dev/null || echo "0")
-      if [ "$DB_EXISTS" != "1" ]; then
-        echo "  → Création de la base keyhome_preprod..."
-        docker exec keyhome-db psql -U postgres -c "CREATE DATABASE keyhome_preprod"
-        docker exec keyhome-db psql -U postgres -d keyhome_preprod -c "CREATE EXTENSION IF NOT EXISTS postgis"
-        echo "  ✅ Base keyhome_preprod créée avec PostGIS"
-      else
-        echo "  ✅ Base keyhome_preprod existe déjà"
-      fi
-    # Enable maintenance mode before deploy
-    - docker compose exec -T app php artisan down --retry=60 || true
-    - echo "📦 Stopping existing containers..."
-    - docker compose down --remove-orphans || true
-    - echo "📥 Pulling new image..."
-    - APP_IMAGE=$APP_IMAGE docker compose pull
-    - echo "🔄 Starting containers..."
-    - APP_IMAGE=$APP_IMAGE docker compose up -d --no-build
-    # Wait for app container to be healthy
-    - |
-      echo "⏳ Waiting for containers to be ready..."
-      for i in $(seq 1 60); do
-        if docker compose exec -T app php -v > /dev/null 2>&1; then
-          echo "✅ App container is ready"
-          break
-        fi
-        if [ "$i" = "60" ]; then
-          echo "❌ App container failed to start"
-          docker compose logs app --tail=50
-          docker compose ps -a
-          exit 1
-        fi
-        sleep 2
-      done
-    # Clear cache BEFORE migrations
-    - echo "🧹 Clearing cache before migrations..."
-    - docker compose exec -T app php artisan optimize:clear
-    - docker compose exec -T app php artisan config:cache
-    # Run migrations on the preprod database
-    - |
-      echo "🗄️ Running migrations..."
-      if ! docker compose exec -T app php artisan migrate --force; then
-        echo "❌ Migration failed — rolling back..."
-        docker compose logs app --tail=30
-        docker compose down --remove-orphans || true
-        exit 1
-      fi
-    - echo "⚡ Optimizing..."
-    - docker compose exec -T app php artisan optimize
-    - docker compose exec -T app php artisan filament:assets
-    - docker compose exec -T app chmod +x resetFilamentLivewire.sh
-    - docker compose exec -T app bash resetFilamentLivewire.sh
-    - docker compose exec -T app php artisan storage:link || true
-    - docker compose exec -T app php artisan l5-swagger:generate || true
-    # Disable maintenance mode
-    - echo "✅ Preprod deployment complete, bringing app back up..."
-    - docker compose exec -T app php artisan up
-  after_script:
-    - docker logout $CI_REGISTRY 2>/dev/null || true
+  <<: *deploy_template
+  variables:
+    DEPLOY_DIR: /opt/keyhome-preprod
+    DEPLOY_BRANCH: preprod
+    COMPOSE_SRC_FILE: docker-compose.preprod.yml
+    COMPOSE_FALLBACK: keyhome-preprod
+    REQUIRE_ENV_CHECK: "true"
+    REQUIRE_NETWORK_CHECK: "true"
   rules:
     - if: $CI_COMMIT_BRANCH == "preprod"
 
-# --- ETAPE 4 : SMOKE TEST POST-DEPLOIEMENT ---
-smoke_test:
+# --- ETAPE 4 : SMOKE TEST ---
+production_smoke_test:
   stage: smoke_test
   needs: [production_deploy]
-  timeout: 3 minutes
   script:
+    - echo "Running smoke tests on production..."
     - |
-      # Utilise la variable CI/CD API_BASE_URL (à définir dans GitLab Settings > CI/CD > Variables)
-      BASE_URL="${API_BASE_URL:-https://api.keyhome.neocraft.dev}"
-      echo "🔍 Running smoke tests on $BASE_URL..."
-
-      # Test 1: Health check endpoint
-      echo "→ Testing health endpoint..."
-      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/up")
-      if [ "$HTTP_CODE" != "200" ]; then
-        echo "❌ Health check failed (HTTP $HTTP_CODE)"
-        exit 1
-      fi
-      echo "  ✅ Health check passed"
-
-      # Test 2: API cities endpoint (public)
-      echo "→ Testing API endpoint..."
-      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/v1/cities")
-      if [ "$HTTP_CODE" != "200" ]; then
-        echo "❌ API endpoint failed (HTTP $HTTP_CODE)"
-        exit 1
-      fi
-      echo "  ✅ API endpoint passed"
-
-      # Test 3: Documentation accessible
-      echo "→ Testing Swagger docs..."
-      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/documentation")
-      if [ "$HTTP_CODE" != "200" ]; then
-        echo "⚠️  Swagger docs not accessible (HTTP $HTTP_CODE) - continuing anyway"
-      else
-        echo "  ✅ Swagger docs accessible"
-      fi
-
-      # Test 4: Admin panel loads
-      echo "→ Testing Filament admin..."
-      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L "$BASE_URL/admin/login")
-      if [ "$HTTP_CODE" != "200" ]; then
-        echo "❌ Admin panel failed (HTTP $HTTP_CODE)"
-        exit 1
-      fi
-      echo "  ✅ Admin panel accessible"
-
-      echo ""
-      echo "✅ All smoke tests passed!"
+      # PROD_API_URL must be set in GitLab CI/CD Variables (e.g. https://api.keyhome.app)
+      SMOKE_URL="${PROD_API_URL:-https://api.keyhome.app}"
+      echo "Smoke URL: $SMOKE_URL"
+      set +e
+      for i in $(seq 1 10); do
+        STATUS=$(curl --globoff --silent --output /dev/null --write-out "%{http_code}" "${SMOKE_URL}/api/ping" 2>/dev/null)
+        echo "Attempt $i — HTTP $STATUS"
+        if [ "$STATUS" = "200" ]; then
+          echo "✅ Smoke test passed"
+          exit 0
+        fi
+        sleep 5
+      done
+      echo "❌ Production smoke test failed after 10 attempts"
+      exit 1
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
 
-# --- SMOKE TEST PREPROD ---
 preprod_smoke_test:
   stage: smoke_test
   needs: [preprod_deploy]
-  timeout: 3 minutes
   script:
+    - echo "Running smoke tests on preproduction..."
     - |
-      BASE_URL="${PREPROD_API_BASE_URL:-https://preprod-api.keyhome.neocraft.dev}"
-      echo "🔍 Running PREPROD smoke tests on $BASE_URL..."
-
-      echo "→ Testing health endpoint..."
-      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/up")
-      if [ "$HTTP_CODE" != "200" ]; then
-        echo "❌ Health check failed (HTTP $HTTP_CODE)"
-        exit 1
-      fi
-      echo "  ✅ Health check passed"
-
-      echo "→ Testing API endpoint..."
-      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/v1/cities")
-      if [ "$HTTP_CODE" != "200" ]; then
-        echo "❌ API endpoint failed (HTTP $HTTP_CODE)"
-        exit 1
-      fi
-      echo "  ✅ API endpoint passed"
-
-      echo "→ Testing Filament admin..."
-      HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -L "$BASE_URL/admin/login")
-      if [ "$HTTP_CODE" != "200" ]; then
-        echo "❌ Admin panel failed (HTTP $HTTP_CODE)"
-        exit 1
-      fi
-      echo "  ✅ Admin panel accessible"
-
-      echo ""
-      echo "✅ All preprod smoke tests passed!"
+      set +e
+      PREPROD_PORT=$(grep -E "^WEB_PORT=" /opt/keyhome-preprod/.env 2>/dev/null | cut -d= -f2 | tr -d "[:space:]'\"" )
+      PREPROD_PORT=${PREPROD_PORT:-9091}
+      FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:preprod"
+      echo "Using port: $PREPROD_PORT"
+      for i in $(seq 1 15); do
+        STATUS=$(curl --globoff --silent --output /dev/null --write-out "%{http_code}" "http://127.0.0.1:${PREPROD_PORT}/api/ping" 2>/dev/null)
+        echo "Attempt $i — HTTP $STATUS (GET /api/ping)"
+        if [ "$STATUS" = "200" ]; then
+          echo "✅ Smoke test passed"
+          exit 0
+        fi
+        sleep 5
+      done
+      echo "❌ Preproduction smoke test failed after 15 attempts"
+      echo "--- docker compose ps ---"
+      cd /opt/keyhome-preprod && APP_IMAGE=$FULL_IMAGE docker compose ps -a || true
+      echo "--- docker compose logs (web, app) ---"
+      cd /opt/keyhome-preprod && APP_IMAGE=$FULL_IMAGE docker compose logs web app --tail=120 || true
+      echo "--- curl -v /up (last 40 lines) ---"
+      curl --globoff -v --max-time 15 "http://127.0.0.1:${PREPROD_PORT}/up" 2>&1 | tail -40 || true
+      exit 1
   rules:
     - if: $CI_COMMIT_BRANCH == "preprod"
 
-# --- ETAPE 5 : NOTIFICATIONS ---
-notify_slack_success:
+# --- ETAPE 5 : NOTIFICATION SLACK ---
+slack_success:
   stage: notify
+  allow_failure: true
   needs:
-    - job: smoke_test
+    - job: production_smoke_test
       optional: true
     - job: preprod_smoke_test
       optional: true
+    - job: production_deploy
+      optional: true
+    - job: preprod_deploy
+      optional: true
   script:
     - |
-      # Déterminer l'environnement
       if [ "$CI_COMMIT_BRANCH" = "main" ]; then
-        ENV_LABEL="Production"
-        ENV_EMOJI="🚀"
-        API_URL="${API_BASE_URL:-https://api.keyhome.neocraft.dev}"
+        WEBHOOK="$SLACK_WEBHOOK_PROD"
+        DEPLOY_ENV="Production"
       else
-        ENV_LABEL="Preprod"
-        ENV_EMOJI="🧪"
-        API_URL="${PREPROD_API_BASE_URL:-https://preprod-api.keyhome.neocraft.dev}"
+        WEBHOOK="${SLACK_WEBHOOK_PREPROD:-$SLACK_WEBHOOK_PROD}"
+        DEPLOY_ENV="Preproduction"
       fi
-
-      # Calculer la durée approximative
-      if [ -n "$CI_PIPELINE_CREATED_AT" ]; then
-        CREATED_TS=$(date -d "$CI_PIPELINE_CREATED_AT" +%s 2>/dev/null || echo "")
-        if [ -n "$CREATED_TS" ]; then
-          DURATION_MIN=$(( ($(date +%s) - CREATED_TS) / 60 ))
-        else
-          DURATION_MIN="?"
-        fi
-      else
-        DURATION_MIN="?"
+      if [ -z "$WEBHOOK" ]; then
+        echo "No Slack webhook configured for branch $CI_COMMIT_BRANCH, skipping"
+        exit 0
       fi
       SHORT_SHA="${CI_COMMIT_SHA:0:8}"
 
-      curl -sS -X POST -H 'Content-type: application/json' \
+      curl --globoff -sS -X POST -H 'Content-type: application/json' \
       --data "{
         \"attachments\": [{
-          \"color\": \"#36a64f\",
+          \"color\": \"#28a745\",
           \"blocks\": [
             {
               \"type\": \"header\",
-              \"text\": {\"type\": \"plain_text\", \"text\": \"$ENV_EMOJI Déploiement Backend $ENV_LABEL Réussi\", \"emoji\": true}
+              \"text\": {\"type\": \"plain_text\", \"text\": \"✅ Déploiement Backend $DEPLOY_ENV Réussi\", \"emoji\": true}
             },
             {
               \"type\": \"section\",
               \"fields\": [
-                {\"type\": \"mrkdwn\", \"text\": \"*Branche:*\n\`$CI_COMMIT_REF_NAME\`\"},
-                {\"type\": \"mrkdwn\", \"text\": \"*Commit:*\n\`$SHORT_SHA\`\"},
-                {\"type\": \"mrkdwn\", \"text\": \"*Auteur:*\n$GITLAB_USER_NAME\"},
-                {\"type\": \"mrkdwn\", \"text\": \"*Durée:*\n~${DURATION_MIN}min\"}
+                {\"type\": \"mrkdwn\", \"text\": \"*Environnement:*\\n$DEPLOY_ENV\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*Branche:*\\n\`$CI_COMMIT_REF_NAME\`\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*Auteur:*\\n$GITLAB_USER_NAME\"},
+                {\"type\": \"mrkdwn\", \"text\": \"*Commit:*\\n\`$SHORT_SHA\`\"}
               ]
             },
             {
@@ -481,23 +443,21 @@ notify_slack_success:
             {
               \"type\": \"actions\",
               \"elements\": [
-                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"🔗 Commit\"}, \"url\": \"$CI_PROJECT_URL/-/commit/$CI_COMMIT_SHA\"},
-                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"📊 Pipeline\"}, \"url\": \"$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID\"},
-                {"type": "button", "text": {"type": "plain_text", "text": "🌐 API"}, "url": "$API_URL/up"}
+                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"🚀 Voir la pipeline\"}, \"style\": \"primary\", \"url\": \"$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID\"}
               ]
             }
           ]
         }]
-      }" $SLACK_WEBHOOK_URL
+      }" "$WEBHOOK"
   when: on_success
   rules:
-    - if: $CI_COMMIT_BRANCH == "main"
-    - if: $CI_COMMIT_BRANCH == "preprod"
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
 
-notify_slack_failure:
+slack_failure:
   stage: notify
+  allow_failure: true
   needs:
-    - job: smoke_test
+    - job: production_smoke_test
       optional: true
     - job: preprod_smoke_test
       optional: true
@@ -513,10 +473,19 @@ notify_slack_failure:
       optional: true
   script:
     - |
+      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
+        WEBHOOK="$SLACK_WEBHOOK_PROD"
+      else
+        WEBHOOK="${SLACK_WEBHOOK_PREPROD:-$SLACK_WEBHOOK_PROD}"
+      fi
+      if [ -z "$WEBHOOK" ]; then
+        echo "No Slack webhook configured for branch $CI_COMMIT_BRANCH, skipping"
+        exit 0
+      fi
       SHORT_SHA="${CI_COMMIT_SHA:0:8}"
 
       # Récupérer le vrai job qui a échoué via l'API GitLab
-      FAILED_JOBS_JSON=$(curl -sS --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+      FAILED_JOBS_JSON=$(curl --globoff -sS --header "JOB-TOKEN: $CI_JOB_TOKEN" \
         "$CI_API_V4_URL/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/jobs?scope[]=failed" 2>/dev/null || echo "[]")
 
       # Extraire le premier job échoué (sans jq, avec grep/sed)
@@ -527,7 +496,7 @@ notify_slack_failure:
       [ -z "$FAILED_JOB" ] && FAILED_JOB="Voir la pipeline"
       [ -z "$FAILED_STAGE" ] && FAILED_STAGE="unknown"
 
-      curl -sS -X POST -H 'Content-type: application/json' \
+      curl --globoff -sS -X POST -H 'Content-type: application/json' \
       --data "{
         \"attachments\": [{
           \"color\": \"#dc3545\",
@@ -558,7 +527,7 @@ notify_slack_failure:
             }
           ]
         }]
-      }" $SLACK_WEBHOOK_URL
+      }" "$WEBHOOK"
   when: on_failure
   rules:
     - if: $CI_COMMIT_BRANCH
@@ -570,10 +539,9 @@ cleanup:
     - |
       echo "🧹 Starting cleanup..."
 
-      # 1. Supprimer l'image CI de ce pipeline
-      if docker images -q $CI_IMAGE 2>/dev/null | grep -q .; then
-        docker rmi $CI_IMAGE && echo "  ✓ Removed CI image: $CI_IMAGE"
-      fi
+      # 1. La CI image ($CI_IMAGE) est intentionnellement conservée —
+      #    elle sert de cache --cache-from pour le prochain pipeline sur cette branche.
+      #    Seules les images dangling (non taguées) sont supprimées ci-dessous.
 
       # 2. Nettoyer les images dangling (sans tag)
       DANGLING=$(docker images -f "dangling=true" -q 2>/dev/null | wc -l | tr -d ' ')

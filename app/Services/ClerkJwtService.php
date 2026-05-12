@@ -91,7 +91,28 @@ class ClerkJwtService
             return null;
         }
 
-        if (isset($payload['exp']) && (int) $payload['exp'] < time()) {
+        // Strict alg allowlist — Clerk uses RS256 exclusively. Refusing other algs
+        // defends against historical "alg=none" / HS256-confusion downgrade attacks
+        // (since openssl_verify treats RS256 specifically, this is defence-in-depth).
+        if (($header['alg'] ?? null) !== 'RS256') {
+            Log::warning('Clerk JWT rejected: unsupported alg', ['alg' => $header['alg'] ?? null]);
+
+            return null;
+        }
+
+        if (($header['typ'] ?? 'JWT') !== 'JWT') {
+            return null;
+        }
+
+        $now = time();
+        if (isset($payload['exp']) && (int) $payload['exp'] < $now) {
+            return null;
+        }
+        // 30s clock-skew tolerance for nbf / iat
+        if (isset($payload['nbf']) && (int) $payload['nbf'] > $now + 30) {
+            return null;
+        }
+        if (isset($payload['iat']) && (int) $payload['iat'] > $now + 30) {
             return null;
         }
 

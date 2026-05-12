@@ -8,9 +8,12 @@ use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
 
-test('recommendations endpoint returns 401 for guest', function (): void {
+test('recommendations endpoint returns cold start for guest', function (): void {
+    Ad::factory(3)->create(['status' => 'available']);
+
     $response = $this->getJson('/api/v1/recommendations');
-    $response->assertStatus(401);
+    $response->assertSuccessful()
+        ->assertJsonPath('meta.source', 'cold_start');
 });
 
 test('cold start returns mixed ads for user without history', function (): void {
@@ -76,11 +79,11 @@ test('ad view tracking is debounced', function (): void {
 
     Sanctum::actingAs($user);
 
-    // First view
-    $this->postJson("/api/v1/ads/{$ad->id}/view")->assertStatus(204);
+    // First view — route binds by slug, not UUID
+    $this->postJson("/api/v1/ads/{$ad->slug}/view")->assertStatus(204);
 
     // Second view within 5 minutes — should not create a duplicate
-    $this->postJson("/api/v1/ads/{$ad->id}/view")->assertStatus(204);
+    $this->postJson("/api/v1/ads/{$ad->slug}/view")->assertStatus(204);
 
     expect(
         AdInteraction::where('user_id', $user->id)

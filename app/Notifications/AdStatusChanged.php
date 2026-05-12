@@ -10,6 +10,8 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use NotificationChannels\WebPush\WebPushChannel;
+use NotificationChannels\WebPush\WebPushMessage;
 
 class AdStatusChanged extends Notification implements ShouldQueue
 {
@@ -26,7 +28,13 @@ class AdStatusChanged extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['database', 'mail'];
+        $channels = ['database'];
+
+        if ($notifiable->pushSubscriptions()->exists()) {
+            $channels[] = WebPushChannel::class;
+        }
+
+        return $channels;
     }
 
     public function toMail(object $notifiable): MailMessage
@@ -37,8 +45,19 @@ class AdStatusChanged extends Notification implements ShouldQueue
             ->line('Le statut de votre annonce "'.$this->ad->title.'" a été modifié.')
             ->line('Ancien statut: '.$this->oldStatus->getLabel())
             ->line('Nouveau statut: '.$this->newStatus->getLabel())
-            ->action('Voir l\'annonce', config('app.frontend_url').'/ads/'.$this->ad->slug)
+            ->action('Gérer l\'annonce', config('app.frontend_url').'/owner/ads/'.$this->ad->id)
             ->line('Merci d\'utiliser KeyHome !');
+    }
+
+    public function toWebPush(object $notifiable, Notification $notification): WebPushMessage
+    {
+        return (new WebPushMessage)
+            ->title('Statut modifié - KeyHome')
+            ->icon('/icons/icon-192x192.png')
+            ->badge('/icons/icon-72x72.png')
+            ->body('Le statut de "'.$this->ad->title.'" est passé à '.$this->newStatus->getLabel())
+            ->tag('ad-status-'.$this->ad->id)
+            ->data(['url' => config('app.frontend_url').'/owner/ads/'.$this->ad->id]);
     }
 
     /**

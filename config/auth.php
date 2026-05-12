@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\User;
+
 return [
 
     /*
@@ -65,8 +67,9 @@ return [
 
     'providers' => [
         'users' => [
-            'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', App\Models\User::class),
+            'driver' => 'eloquent-webauthn',
+            'model' => env('AUTH_MODEL', User::class),
+            'password_fallback' => true,
         ],
 
         // 'users' => [
@@ -115,5 +118,33 @@ return [
     */
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
+
+    /*
+    |--------------------------------------------------------------------------
+    | IP-Based Multi-Account Prevention
+    |--------------------------------------------------------------------------
+    |
+    | These settings control how many accounts can be registered from the same
+    | IP address within the configured number of days. Set max_accounts_per_ip
+    | to a high number to effectively disable this feature.
+    |
+    */
+
+    'ip_block_days' => env('AUTH_IP_BLOCK_DAYS', 30),
+
+    'max_accounts_per_ip' => env('AUTH_MAX_ACCOUNTS_PER_IP', 3),
+
+    /*
+    |--------------------------------------------------------------------------
+    | API MFA Session Lifetime
+    |--------------------------------------------------------------------------
+    |
+    | How long (in minutes) an admin's API MFA verification remains valid
+    | for a given Sanctum token. After this time the admin must re-verify.
+    | Default: 480 minutes (8 hours).
+    |
+    */
+
+    'mfa_api_session_lifetime' => env('MFA_API_SESSION_LIFETIME', 480),
 
 ];

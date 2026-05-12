@@ -20,6 +20,7 @@ class ResetPasswordMail extends Mailable implements ShouldQueue
         public readonly string $otpCode,
         public readonly string $requestedFrom,
         public readonly string $requestedAt,
+        public readonly ?string $userRole = null,
     ) {}
 
     public function envelope(): Envelope
@@ -31,8 +32,11 @@ class ResetPasswordMail extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
+        $layout = $this->userRole === 'agent' ? 'emails.owner-layout' : 'emails.layout';
+
         return new Content(
             view: 'emails.reset-password',
+            with: ['emailLayout' => $layout, 'isOwner' => $this->userRole === 'agent'],
         );
     }
 }

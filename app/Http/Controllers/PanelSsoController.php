@@ -30,7 +30,7 @@ class PanelSsoController
             abort(404);
         }
 
-        Auth::guard('web')->login($user, remember: true);
+        Auth::guard('web')->login($user, remember: false);
 
         return redirect($this->panelPath($user));
     }

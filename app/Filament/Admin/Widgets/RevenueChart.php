@@ -8,25 +8,28 @@ use App\Models\Payment;
 use Filament\Widgets\ChartWidget;
 use Flowframe\Trend\Trend;
 use Flowframe\Trend\TrendValue;
+use Illuminate\Support\Facades\Cache;
 
 class RevenueChart extends ChartWidget
 {
     protected static ?int $sort = 3;
 
-    // protected static ?string $heading = 'Évolution des Revenus';
+    protected ?string $heading = 'Évolution des Revenus';
+
+    protected ?string $pollingInterval = '60s';
 
     protected int|string|array $columnSpan = 1;
 
     #[\Override]
     protected function getData(): array
     {
-        $data = Trend::model(Payment::class)
+        $data = Cache::remember('admin_revenue_chart', 300, fn () => Trend::model(Payment::class)
             ->between(
                 start: now()->startOfYear(),
                 end: now(),
             )
             ->perMonth()
-            ->sum('amount');
+            ->sum('amount'));
 
         return [
             'datasets' => [

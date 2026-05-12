@@ -6,17 +6,20 @@ namespace App\Filament\Pages\Auth;
 
 use App\Enums\UserRole;
 use App\Filament\Forms\Components\NativePhoneInput;
+use App\Models\City;
 use App\Models\User;
 use App\Services\AgencyService;
 use Filament\Auth\Pages\Register as BaseRegister;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Checkbox;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 class CustomRegister extends BaseRegister
 {
@@ -29,6 +32,7 @@ class CustomRegister extends BaseRegister
                 $this->getLastnameFormComponent(),
                 $this->getEmailFormComponent(),
                 $this->getPhoneFormComponent(),
+                $this->getCityFormComponent(),
                 $this->getAgencyNameFormComponent(),
                 $this->getPasswordFormComponent(),
                 $this->getPasswordConfirmationFormComponent(),
@@ -68,9 +72,20 @@ class CustomRegister extends BaseRegister
             ->columns(1);
     }
 
+    protected function getCityFormComponent(): Component
+    {
+        return Select::make('city_id')
+            ->label('Ville')
+            ->searchable()
+            ->preload()
+            ->options(City::query()->orderBy('name')->pluck('name', 'id'))
+            ->required()
+            ->prefixIcon('heroicon-o-map-pin');
+    }
+
     protected function getAgencyNameFormComponent(): Component
     {
-        $panelId = \Filament\Facades\Filament::getCurrentPanel()->getId();
+        $panelId = Filament::getCurrentPanel()->getId();
 
         return TextInput::make('agency_name')
             ->label('Nom de votre agence')
@@ -82,20 +97,24 @@ class CustomRegister extends BaseRegister
     #[\Override]
     protected function handleRegistration(array $data): Model
     {
-        $panelId = \Filament\Facades\Filament::getCurrentPanel()->getId();
+        $panelId = Filament::getCurrentPanel()->getId();
 
         return DB::transaction(function () use ($data, $panelId) {
             // 1. On crée d'abord l'utilisateur de base
-            $user = User::create([
+            $user = new User;
+            $user->fill([
                 'firstname' => $data['firstname'],
                 'lastname' => $data['lastname'],
                 'email' => $data['email'],
-                'password' => Hash::make($data['password']),
+                'password' => $data['password'],
                 'phone_number' => $data['phone_number'] ?? null,
-                'phone_is_whatsapp' => $data['phone_is_whatsapp'] ?? false,
-                'role' => UserRole::CUSTOMER, // Rôle temporaire avant promotion
+                'city_id' => $data['city_id'] ?? null,
+            ]);
+            $user->forceFill([
+                'role' => UserRole::CUSTOMER,
                 'is_active' => true,
             ]);
+            $user->save();
 
             // 2. On utilise le service pour lui créer son Agence/Portefeuille et le promouvoir Agent
             try {
@@ -108,7 +127,7 @@ class CustomRegister extends BaseRegister
                     $agencyService->promoteToBailleur($user);
                 }
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::error('Registration promotion failed', [
+                Log::error('Registration promotion failed', [
                     'user_id' => $user->id,
                     'panel' => $panelId,
                     'error' => $e->getMessage(),

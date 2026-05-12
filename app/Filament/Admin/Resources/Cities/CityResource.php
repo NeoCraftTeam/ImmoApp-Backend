@@ -36,7 +36,7 @@ class CityResource extends Resource
 
     protected static bool $isScopedToTenant = false;
 
-    protected static string|null|\UnitEnum $navigationGroup = 'Villes & Quartiers';
+    protected static string|null|\UnitEnum $navigationGroup = 'Catalogue';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::HomeModern;
 
@@ -44,7 +44,11 @@ class CityResource extends Resource
 
     protected static ?string $navigationLabel = 'Villes';
 
+    protected static ?int $navigationSort = 1;
+
     protected static ?string $modelLabel = 'Ville';
+
+    protected static ?string $pluralModelLabel = 'Villes';
 
     #[\Override]
     public static function form(Schema $schema): Schema
@@ -52,7 +56,9 @@ class CityResource extends Resource
         return $schema
             ->components([
                 TextInput::make('name')
-                    ->required(),
+                    ->label('Nom')
+                    ->required()
+                    ->helperText('Nom de la ville'),
             ]);
     }
 
@@ -60,20 +66,28 @@ class CityResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->heading('Villes')
+            ->description('Liste des villes disponibles')
+            ->striped()
             ->recordTitleAttribute('name')
             ->columns([
                 TextColumn::make('name')
-                    ->searchable(),
+                    ->label('Nom')
+                    ->searchable()
+                    ->sortable(),
                 TextColumn::make('created_at')
-                    ->dateTime()
+                    ->label('Créé le')
+                    ->dateTime('d/m/Y à H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
-                    ->dateTime()
+                    ->label('Modifié le')
+                    ->dateTime('d/m/Y à H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('deleted_at')
-                    ->dateTime()
+                    ->label('Supprimé le')
+                    ->dateTime('d/m/Y à H:i')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
@@ -81,10 +95,14 @@ class CityResource extends Resource
                 TrashedFilter::make(),
             ])
             ->recordActions([
-                EditAction::make(),
-                DeleteAction::make(),
-                ForceDeleteAction::make(),
-                RestoreAction::make(),
+                EditAction::make()
+                    ->successNotificationTitle('Ville mise à jour'),
+                DeleteAction::make()
+                    ->successNotificationTitle('Ville supprimée'),
+                ForceDeleteAction::make()
+                    ->successNotificationTitle('Ville supprimée définitivement'),
+                RestoreAction::make()
+                    ->successNotificationTitle('Ville restaurée'),
             ])
             ->headerActions([
                 ImportAction::make()->label('Importer')
@@ -108,6 +126,7 @@ class CityResource extends Resource
             ]);
     }
 
+    #[\Override]
     public static function getPages(): array
     {
         return [
@@ -115,21 +134,12 @@ class CityResource extends Resource
         ];
     }
 
+    #[\Override]
     public static function getRecordRouteBindingEloquentQuery(): Builder
     {
         return parent::getRecordRouteBindingEloquentQuery()
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);
-    }
-
-    public static function getNavigationBadge(): ?string
-    {
-        return (string) static::getModel()::count();
-    }
-
-    public static function getNavigationBadgeTooltip(): ?string
-    {
-        return 'Nombre de villes';
     }
 }

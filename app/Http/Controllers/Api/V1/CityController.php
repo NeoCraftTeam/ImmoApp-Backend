@@ -14,6 +14,8 @@ use App\Http\Resources\CityResource;
 use App\Models\City;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Support\Facades\Cache;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 final class CityController
 {
@@ -57,7 +59,15 @@ final class CityController
     {
         $search = request('q');
         $perPage = min((int) request('per_page', 50), 100);
-        $cities = $action->handle($perPage, $search);
+
+        $cacheKey = 'cities:list:'.md5(($search ?? '').':'.$perPage);
+        $ttl = $search ? now()->addMinutes(5) : now()->addHour();
+
+        $cities = Cache::remember(
+            $cacheKey,
+            $ttl,
+            fn () => $action->handle($perPage, $search)
+        );
 
         return CityResource::collection($cities);
     }
@@ -98,12 +108,15 @@ final class CityController
         $this->authorize('create', City::class);
         try {
             $city = $action->handle($request->validated());
+            $this->invalidateCityCache();
 
             return response()->json([
                 'message' => 'Ville crée avec succès',
                 'data' => new CityResource($city),
             ], 201); // 201 = Created
 
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
         } catch (Exception $e) {
             return response()->json([
                 'message' => 'Erreur lors de la création',
@@ -199,11 +212,14 @@ final class CityController
 
         try {
             $city = $action->handle($city, $request->validated());
+            $this->invalidateCityCache();
 
             return response()->json([
                 'message' => 'Ville mise à jour avec succès',
                 'data' => new CityResource($city),
             ], 200);
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
         } catch (Exception $e) {
             return response()->json([
                 'message' => 'Erreur lors de la mise à jour',
@@ -244,15 +260,24 @@ final class CityController
 
         try {
             $action->handle($city);
+            $this->invalidateCityCache();
 
             return response()->json([
                 'message' => 'Ville supprimée avec succès',
             ], 200); // 200 = OK
+        } catch (HttpExceptionInterface $e) {
+            throw $e;
         } catch (Exception $e) {
             return response()->json([
                 'message' => 'Erreur lors de la suppression de la ville',
                 'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
             ], 500); // 500 = Internal Server Error
         }
+    }
+
+    private function invalidateCityCache(): void
+    {
+        Cache::forget('cities:list:'.md5(':50'));
+        Cache::forget('cities:list:'.md5(':100'));
     }
 }

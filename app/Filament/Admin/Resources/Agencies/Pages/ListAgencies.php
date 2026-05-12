@@ -12,10 +12,12 @@ class ListAgencies extends ListRecords
 {
     protected static string $resource = AgencyResource::class;
 
+    #[\Override]
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make(),
+            CreateAction::make()
+                ->successNotificationTitle('Agence créée avec succès'),
         ];
     }
 }

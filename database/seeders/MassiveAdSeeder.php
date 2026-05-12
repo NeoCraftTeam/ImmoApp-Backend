@@ -4,15 +4,20 @@ declare(strict_types=1);
 
 namespace Database\Seeders;
 
+use App\Enums\AdStatus;
 use App\Enums\UserRole;
 use App\Enums\UserType;
 use App\Models\Ad;
 use App\Models\AdType;
 use App\Models\Agency;
 use App\Models\City;
+use App\Models\PropertyAttribute;
 use App\Models\Quarter;
+use App\Models\Review;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -23,11 +28,30 @@ class MassiveAdSeeder extends Seeder
 {
     private const TOTAL_ADS = 2000;
 
-    private const IMAGE_POOL_SIZE = 100;
+    private const IMAGES_PER_AD_MIN = 7;
 
-    private const IMAGES_PER_AD = 5;
+    private const IMAGES_PER_AD_MAX = 10;
 
-    private string $imageDir;
+    private const SEED_FAST_MODE_DEFAULT = true;
+
+    /**
+     * Maps normalized ad type to folder name in resources/seeder-images/
+     * Download 10-20 images from Unsplash per category and place in these folders.
+     */
+    private const TYPE_TO_FOLDER = [
+        'chambre simple' => 'chambre',
+        'chambre meublee' => 'chambre',
+        'studio simple' => 'studio',
+        'studio meuble' => 'studio',
+        'appartement simple' => 'appartement',
+        'appartement meuble' => 'appartement',
+        'maison' => 'maison',
+        'terrain' => 'terrain',
+        'commercial' => 'commercial',
+        'commerces' => 'commercial',
+    ];
+
+    private string $imageBaseDir;
 
     /** @var string[] */
     private array $quarterIds = [];
@@ -46,6 +70,12 @@ class MassiveAdSeeder extends Seeder
 
     /** @var array<string, array{lat: float, lng: float}> */
     private array $quarterCoords = [];
+
+    /** @var string[] */
+    private array $customerIds = [];
+
+    /** @var string[] */
+    private array $attributeSlugs = [];
 
     /** @var string[] */
     private array $propertyNames = [
@@ -68,15 +98,27 @@ class MassiveAdSeeder extends Seeder
         'appartement meuble' => [75000, 350000],
         'maison' => [100000, 800000],
         'terrain' => [2000000, 50000000],
+        'commercial' => [500000, 50000000],
+        'commerces' => [500000, 50000000],
     ];
 
     public function run(): void
     {
-        $this->imageDir = storage_path('app/seed-images');
-        $this->command->info('Seeding '.self::TOTAL_ADS.' realistic ads with images...');
+        $this->imageBaseDir = resource_path('seeder-images');
+        $fastMode = config('seeding.massive_ad_fast_mode', self::SEED_FAST_MODE_DEFAULT);
+        $totalAds = $fastMode ? 200 : self::TOTAL_ADS;
+        $this->command->info('Seeding '.$totalAds.' realistic ads with images...'.($fastMode ? ' (fast mode)' : ''));
+
+        $this->ensureImageFoldersExist();
+        $hasImages = !empty($this->getImagesForType('maison'));
+        if (!$hasImages) {
+            $this->command->warn('No seeder images found. Seeding ads without images.');
+            $this->command->line('  To add images: place 10-20 jpg/png/webp per category in:');
+            $this->command->line('  '.$this->imageBaseDir.'/{maison,terrain,chambre,studio,appartement,commercial}/');
+        }
+
         $this->createUsers();
         $this->loadReferenceData();
-        $this->downloadImagePool();
 
         $this->command->info('Disabling media conversions for faster seeding...');
         app()->bind(FileManipulator::class, fn () => new class extends FileManipulator
@@ -92,11 +134,10 @@ class MassiveAdSeeder extends Seeder
             }
         });
 
-        $this->createAds();
+        $this->createAds($totalAds);
 
         app()->forgetInstance(FileManipulator::class);
 
-        $this->cleanupImagePool();
         $this->command->info('Seeding complete! '.Ad::count().' ads in database.');
         $this->command->warn('Run "php artisan media-library:regenerate" to generate image conversions.');
     }
@@ -106,11 +147,6 @@ class MassiveAdSeeder extends Seeder
         $this->command->info('Creating users...');
         $password = Hash::make('password');
         $cities = City::all();
-
-        User::factory()->admin()->recycle($cities)->create([
-            'email' => 'admin@keyhome.cm',
-            'password' => $password,
-        ]);
 
         $agencyAgents = User::factory()
             ->count(20)->agents()->state(['type' => UserType::AGENCY])
@@ -125,15 +161,16 @@ class MassiveAdSeeder extends Seeder
             $this->agencyMap[$agent->id] = $agency->id;
         });
 
-        User::factory()->count(50)->customers()->recycle($cities)->create(['password' => $password]);
-        $this->command->info('  1 admin, 40 agents (20 agences), 50 clients');
+        $customers = User::factory()->count(50)->customers()->recycle($cities)->create(['password' => $password]);
+        $this->customerIds = $customers->pluck('id')->toArray();
+        $this->command->info('  40 agents (20 agences), 50 clients');
     }
 
     private function loadReferenceData(): void
     {
         $coordsPath = storage_path('app/quarter_coordinates.json');
         if (file_exists($coordsPath)) {
-            $this->quarterCoords = json_decode(file_get_contents($coordsPath), true);
+            $this->quarterCoords = json_decode(file_get_contents($coordsPath), true) ?? [];
         }
 
         $quarters = Quarter::with('city')->get();
@@ -151,142 +188,153 @@ class MassiveAdSeeder extends Seeder
             }
         }
 
-        $this->command->info('  '.count($this->quarterIds).' quarters, '.count($this->agentIds).' agents, '.count($this->typeMap).' types');
-    }
-
-    private function downloadImagePool(): void
-    {
-        File::ensureDirectoryExists($this->imageDir);
-
-        $existing = count(glob($this->imageDir.'/*.jpg'));
-        if ($existing >= self::IMAGE_POOL_SIZE) {
-            $this->command->info("Image pool already has {$existing} images, skipping.");
-
-            return;
+        if (empty($this->customerIds)) {
+            $this->customerIds = User::where('role', UserRole::CUSTOMER)->pluck('id')->toArray();
         }
 
-        $this->command->info('Downloading '.self::IMAGE_POOL_SIZE.' images from Picsum...');
-        $progress = $this->command->getOutput()->createProgressBar(self::IMAGE_POOL_SIZE);
-        $progress->start();
+        $this->attributeSlugs = PropertyAttribute::query()->active()->pluck('slug')->toArray();
 
-        for ($i = 1; $i <= self::IMAGE_POOL_SIZE; $i++) {
-            $path = $this->imageDir.'/'.$i.'.jpg';
-            if (file_exists($path) && filesize($path) > 1000) {
-                $progress->advance();
-
-                continue;
-            }
-
-            $retries = 3;
-            while ($retries > 0) {
-                try {
-                    $url = "https://picsum.photos/seed/keyhome{$i}/800/600";
-                    $ctx = stream_context_create(['http' => ['timeout' => 15]]);
-                    $content = @file_get_contents($url, false, $ctx);
-                    if ($content !== false && strlen($content) > 1000) {
-                        file_put_contents($path, $content);
-                        break;
-                    }
-                } catch (\Exception $e) {
-                    // retry
-                }
-                $retries--;
-                usleep(500000);
-            }
-            $progress->advance();
-        }
-
-        $progress->finish();
-        $this->command->newLine();
-        $this->command->info('  '.count(glob($this->imageDir.'/*.jpg')).' images ready');
+        $this->command->info('  '.count($this->quarterIds).' quarters, '.count($this->agentIds).' agents, '.count($this->typeMap).' types, '.count($this->attributeSlugs).' attributes');
     }
 
-    private function createAds(): void
+    private function ensureImageFoldersExist(): void
     {
-        $this->command->info('Creating '.self::TOTAL_ADS.' ads with images...');
+        $folders = array_unique(array_values(self::TYPE_TO_FOLDER));
+        foreach ($folders as $folder) {
+            File::ensureDirectoryExists($this->imageBaseDir.'/'.$folder);
+        }
+
+        $total = 0;
+        $counts = [];
+        foreach ($folders as $folder) {
+            $n = count($this->globImages($this->imageBaseDir.'/'.$folder));
+            $counts[$folder] = $n;
+            $total += $n;
+        }
+
+        if ($total > 0) {
+            $details = collect($counts)->map(fn (int $n, string $f) => "{$f}:{$n}")->implode(', ');
+            $this->command->info("  {$total} images (".$details.')');
+        }
+    }
+
+    private function createAds(int $totalAds = self::TOTAL_ADS): void
+    {
+        $fastMode = config('seeding.massive_ad_fast_mode', self::SEED_FAST_MODE_DEFAULT);
+        $imgMin = self::IMAGES_PER_AD_MIN;
+        $imgMax = self::IMAGES_PER_AD_MAX;
+        $this->command->info("Creating {$totalAds} ads with {$imgMin}-{$imgMax} images each...");
 
         $typeNames = array_keys($this->typeMap);
-        $imageFiles = glob($this->imageDir.'/*.jpg');
-        $imageCount = count($imageFiles);
+        if (empty($typeNames)) {
+            $this->command->error('No ad types found. Run AdTypeSeeder first.');
 
-        if ($imageCount === 0) {
-            $this->command->error('No images available!');
+            return;
+        }
+        if (empty($this->quarterIds)) {
+            $this->command->error('No quarters found. Run CameroonCitiesSeeder first.');
+
+            return;
+        }
+        if (empty($this->agentIds)) {
+            $this->command->error('No agents found. Check createUsers().');
 
             return;
         }
 
-        $this->command->info("  Using {$imageCount} images from pool");
-
-        $progress = $this->command->getOutput()->createProgressBar(self::TOTAL_ADS);
+        $progress = $this->command->getOutput()->createProgressBar($totalAds);
         $progress->start();
 
-        $perType = (int) ceil(self::TOTAL_ADS / count($typeNames));
+        $perType = (int) ceil($totalAds / count($typeNames));
         $created = 0;
         $imageErrors = 0;
 
-        Ad::withoutSyncingToSearch(function () use ($typeNames, $perType, $imageFiles, &$created, &$imageErrors, $progress): void {
-            foreach ($typeNames as $typeName) {
-                $count = min($perType, self::TOTAL_ADS - $created);
-                $normalizedType = $this->normalizeTypeName($typeName);
+        Model::withoutEvents(function () use ($typeNames, $perType, $totalAds, $imgMin, $imgMax, &$created, &$imageErrors, $progress): void {
+            Ad::withoutSyncingToSearch(function () use ($typeNames, $perType, $totalAds, $imgMin, $imgMax, &$created, &$imageErrors, $progress): void {
+                DB::transaction(function () use ($typeNames, $perType, $totalAds, $imgMin, $imgMax, &$created, &$imageErrors, $progress): void {
+                    foreach ($typeNames as $typeName) {
+                        $count = min($perType, $totalAds - $created);
+                        $normalizedType = $this->normalizeTypeName($typeName);
+                        $imageFiles = $this->getImagesForType($normalizedType);
 
-                for ($i = 0; $i < $count; $i++) {
-                    $quarterId = $this->quarterIds[array_rand($this->quarterIds)];
-                    $quarterLabel = $this->quarterNames[$quarterId] ?? 'Douala';
-                    $agentId = $this->agentIds[array_rand($this->agentIds)];
+                        for ($i = 0; $i < $count; $i++) {
+                            $quarterId = $this->quarterIds[array_rand($this->quarterIds)];
+                            $quarterLabel = $this->quarterNames[$quarterId] ?? 'Douala';
+                            $agentId = $this->agentIds[array_rand($this->agentIds)];
 
-                    $coords = $this->quarterCoords[$quarterId] ?? ['lat' => 4.05, 'lng' => 9.7];
-                    $lat = $coords['lat'] + (mt_rand(-300, 300) / 100000);
-                    $lng = $coords['lng'] + (mt_rand(-300, 300) / 100000);
+                            $coords = $this->quarterCoords[$quarterId] ?? ['lat' => 4.05, 'lng' => 9.7];
+                            $lat = $coords['lat'] + (mt_rand(-300, 300) / 100000);
+                            $lng = $coords['lng'] + (mt_rand(-300, 300) / 100000);
 
-                    $bedrooms = $this->bedroomsForType($normalizedType);
-                    $surface = $this->surfaceForType($normalizedType);
-                    $title = $this->generateTitle($normalizedType, $quarterLabel, $bedrooms, $surface);
-                    $description = $this->generateDescription($normalizedType, $quarterLabel, $bedrooms, $surface);
-                    $priceRange = $this->priceRanges[$normalizedType] ?? [25000, 200000];
+                            $bedrooms = $this->bedroomsForType($normalizedType);
+                            $surface = $this->surfaceForType($normalizedType);
+                            $title = $this->generateTitle($normalizedType, $quarterLabel, $bedrooms, $surface);
+                            $description = $this->generateDescription($normalizedType, $quarterLabel, $bedrooms, $surface);
+                            $priceRange = $this->priceRanges[$normalizedType] ?? [25000, 200000];
 
-                    $daysAgo = mt_rand(1, 120);
+                            $daysAgo = mt_rand(1, 120);
 
-                    $ad = Ad::forceCreate([
-                        'id' => (string) Str::orderedUuid(),
-                        'title' => $title,
-                        'slug' => Str::slug($title).'-'.Str::random(6),
-                        'description' => $description,
-                        'adresse' => $quarterLabel,
-                        'price' => mt_rand($priceRange[0], $priceRange[1]),
-                        'surface_area' => $surface,
-                        'bedrooms' => $bedrooms,
-                        'bathrooms' => max(1, (int) round($bedrooms * 0.7)),
-                        'has_parking' => in_array($normalizedType, ['maison', 'appartement meuble', 'appartement simple']),
-                        'location' => "POINT({$lng} {$lat})",
-                        'status' => $this->randomStatus(),
-                        'user_id' => $agentId,
-                        'quarter_id' => $quarterId,
-                        'type_id' => $this->typeMap[$typeName],
-                        'agency_id' => $this->agencyMap[$agentId] ?? null,
-                        'created_at' => now()->subDays($daysAgo),
-                        'updated_at' => now()->subDays($daysAgo),
-                    ]);
+                            $attributes = $this->randomAttributes();
 
-                    $usedIndexes = [];
-                    for ($img = 0; $img < self::IMAGES_PER_AD; $img++) {
-                        try {
-                            do {
-                                $idx = array_rand($imageFiles);
-                            } while (in_array($idx, $usedIndexes) && count($usedIndexes) < $imageCount);
-                            $usedIndexes[] = $idx;
+                            $price = mt_rand($priceRange[0], $priceRange[1]);
+                            $isTerrain = in_array($normalizedType, ['terrain', 'commercial', 'commerces']);
+                            $hasForfait = !$isTerrain && (bool) mt_rand(0, 1);
+                            $hasDetailed = !$isTerrain && !$hasForfait;
 
-                            $ad->addMedia($imageFiles[$idx])
-                                ->preservingOriginal()
-                                ->toMediaCollection('images');
-                        } catch (\Exception $e) {
-                            $imageErrors++;
+                            $status = AdStatus::from($this->randomStatus());
+                            $ad = Ad::forceCreate([
+                                'id' => (string) Str::orderedUuid(),
+                                'title' => $title,
+                                'slug' => Ad::generateUniqueSlug($title),
+                                'description' => $description,
+                                'adresse' => $quarterLabel,
+                                'price' => $price,
+                                'surface_area' => $surface,
+                                'bedrooms' => $bedrooms,
+                                'bathrooms' => max(1, (int) round($bedrooms * 0.7)),
+                                'has_parking' => in_array($normalizedType, ['maison', 'appartement meuble', 'appartement simple']),
+                                'location' => "POINT({$lng} {$lat})",
+                                'status' => $status,
+                                'user_id' => $agentId,
+                                'quarter_id' => $quarterId,
+                                'type_id' => $this->typeMap[$typeName],
+                                'agency_id' => $this->agencyMap[$agentId] ?? null,
+                                'attributes' => $attributes,
+                                'deposit_amount' => $isTerrain ? null : $this->depositForType($normalizedType, $price),
+                                'minimum_lease_duration' => $isTerrain ? null : $this->leaseDurationForType(),
+                                'charges_forfaitaires' => $hasForfait,
+                                'charges_montant_forfait' => $hasForfait ? $this->chargesForfaitForType($normalizedType) : null,
+                                'charges_eau' => $hasDetailed ? mt_rand(2, 8) * 1000 : null,
+                                'charges_electricite' => $hasDetailed ? mt_rand(3, 15) * 1000 : null,
+                                'charges_autres' => $hasDetailed ? $this->generateChargesAutres() : null,
+                                'created_at' => now()->subDays($daysAgo),
+                                'updated_at' => now()->subDays($daysAgo),
+                            ]);
+
+                            $imagesPerAd = mt_rand($imgMin, $imgMax);
+                            $shuffled = $imageFiles;
+                            shuffle($shuffled);
+                            $toAdd = array_slice($shuffled, 0, $imagesPerAd);
+                            foreach ($toAdd as $path) {
+                                try {
+                                    $ad->addMedia($path)
+                                        ->preservingOriginal()
+                                        ->toMediaCollection('images');
+                                } catch (\Exception $e) {
+                                    $imageErrors++;
+                                }
+                            }
+
+                            $this->seedProximityData($ad, $normalizedType);
+
+                            $this->createReviewsForAd($ad, $daysAgo);
+
+                            $created++;
+                            $progress->advance();
                         }
                     }
-
-                    $created++;
-                    $progress->advance();
-                }
-            }
+                });
+            });
         });
 
         $progress->finish();
@@ -296,6 +344,49 @@ class MassiveAdSeeder extends Seeder
             $msg .= " ({$imageErrors} image errors)";
         }
         $this->command->info($msg);
+    }
+
+    /**
+     * Glob images in directory (jpg, jpeg, png, webp). Portable: works without GLOB_BRACE (Alpine/musl).
+     *
+     * @return string[]
+     */
+    private function globImages(string $dir): array
+    {
+        $extensions = ['jpg', 'jpeg', 'png', 'webp'];
+        $files = [];
+        foreach ($extensions as $ext) {
+            $found = glob($dir.'/*.'.$ext);
+            if ($found !== false) {
+                $files = array_merge($files, $found);
+            }
+        }
+
+        return $files;
+    }
+
+    /**
+     * @return string[]
+     */
+    private function getImagesForType(string $normalizedType): array
+    {
+        $folder = self::TYPE_TO_FOLDER[$normalizedType] ?? 'maison';
+        $dir = $this->imageBaseDir.'/'.$folder;
+        $files = $this->globImages($dir);
+        if (!empty($files)) {
+            return $files;
+        }
+        foreach (array_unique(array_values(self::TYPE_TO_FOLDER)) as $fallback) {
+            if ($fallback === $folder) {
+                continue;
+            }
+            $fallbackFiles = $this->globImages($this->imageBaseDir.'/'.$fallback);
+            if (!empty($fallbackFiles)) {
+                return $fallbackFiles;
+            }
+        }
+
+        return [];
     }
 
     private function normalizeTypeName(string $name): string
@@ -309,6 +400,8 @@ class MassiveAdSeeder extends Seeder
             'appartement meuble' => 'appartement meuble',
             'maison' => 'maison',
             'terrain' => 'terrain',
+            'commercial' => 'commercial',
+            'commerces' => 'commercial',
         ];
 
         $lower = mb_strtolower($name);
@@ -482,11 +575,201 @@ class MassiveAdSeeder extends Seeder
         return $options[array_rand($options)];
     }
 
-    private function cleanupImagePool(): void
+    /**
+     * @return string[]
+     */
+    private function randomAttributes(): array
     {
-        if (File::isDirectory($this->imageDir)) {
-            File::deleteDirectory($this->imageDir);
-            $this->command->info('Image pool cleaned up');
+        if (empty($this->attributeSlugs)) {
+            return [];
         }
+
+        $count = min(mt_rand(4, 8), count($this->attributeSlugs));
+        $shuffled = $this->attributeSlugs;
+        shuffle($shuffled);
+
+        return array_slice($shuffled, 0, $count);
+    }
+
+    private function seedProximityData(Ad $ad, string $type): void
+    {
+        // 70% of non-terrain/commercial ads get proximity data
+        if (in_array($type, ['terrain', 'commercial', 'commerces'], true)) {
+            return;
+        }
+        if (mt_rand(1, 10) > 7) {
+            return;
+        }
+
+        $isUrban = in_array($type, ['chambre simple', 'chambre meublee', 'studio simple', 'studio meuble'], true);
+        $isApartment = str_contains($type, 'appartement');
+
+        $data = [];
+
+        // Route principale — always present
+        $data['distance_main_road_m'] = $isUrban
+            ? mt_rand(20, 400)
+            : ($isApartment ? mt_rand(50, 800) : mt_rand(100, 2000));
+
+        // Commerces / marchés
+        if (mt_rand(0, 1)) {
+            $data['distance_shops_m'] = $isUrban
+                ? mt_rand(50, 700)
+                : ($isApartment ? mt_rand(100, 1500) : mt_rand(200, 3000));
+        }
+
+        // Transport en commun
+        if (mt_rand(0, 1)) {
+            $data['distance_transport_m'] = $isUrban
+                ? mt_rand(30, 300)
+                : ($isApartment ? mt_rand(50, 600) : mt_rand(100, 1200));
+        }
+
+        // École / Université
+        if (mt_rand(0, 1)) {
+            $data['distance_school_m'] = $isUrban
+                ? mt_rand(100, 1000)
+                : ($isApartment ? mt_rand(200, 2000) : mt_rand(300, 5000));
+        }
+
+        // Hôpital / Clinique
+        if (mt_rand(0, 1)) {
+            $data['distance_hospital_m'] = $isUrban
+                ? mt_rand(300, 2000)
+                : ($isApartment ? mt_rand(500, 5000) : mt_rand(1000, 10000));
+        }
+
+        $ad->updateQuietly($data);
+    }
+
+    private function createReviewsForAd(Ad $ad, int $daysAgo): void
+    {
+        if (empty($this->customerIds)) {
+            return;
+        }
+
+        $reviewCount = mt_rand(3, 15);
+        $maxPossible = min($reviewCount, count($this->customerIds));
+        $reviewCount = $maxPossible;
+
+        $usedCustomers = [];
+        $comments = [
+            'Logement excellent, exactement comme décrit dans l\'annonce. Propriétaire très sympathique et disponible. Je recommande vivement sans hésitation.',
+            'Appartement propre, bien aménagé et très bien situé. Accès facile, quartier calme et sécurisé. L\'eau et l\'électricité sont disponibles 24h/24. Très satisfait.',
+            'Villa magnifique avec tout le confort moderne. Le gardien est présent la nuit, le parking est spacieux. Je n\'ai rien à redire, c\'est parfait pour une famille.',
+            'Chambre propre et bien entretenue dans une concession calme. Le propriétaire est sérieux, réactif et respectueux. Voisinage agréable. Je reviendrai.',
+            'Studio meublé de qualité, mobilier neuf, climatisation fonctionnelle. Internet inclus. L\'annonce correspondait à 100% à la réalité. Très bonne expérience.',
+            'Superbe appartement, finitions haut de gamme. Quartier résidentiel très bien desservi par les transports. Tout est conforme aux photos.',
+            'Bonne adresse, proximité des commerces et du marché. Eau courante, électricité stable. Le propriétaire nous a aidés pour l\'installation. Très content.',
+            'Logement idéal pour un professionnel. Calme, bien éclairé, cuisine bien équipée. La sécurité du quartier est rassurante. Je recommande à 100%.',
+            'Maison spacieuse avec jardin, forage d\'eau privé et groupe électrogène. Idéale pour une grande famille. Le prix est juste par rapport au standing.',
+            'Très bon logement dans l\'ensemble. Quelques petits détails à finir dans la salle de bain, mais rien de grave. Propriétaire de bonne volonté.',
+            'Appartement conforme à l\'annonce. Bon rapport qualité-prix pour le quartier. Le seul bémol est le bruit de la route principale le matin.',
+            'Bon séjour. Le logement est propre et fonctionnel. Propriétaire disponible sur WhatsApp pour tout problème. Je recommande.',
+            'Chambre correcte et bien entretenue. Eau chaude disponible le matin. Voisinage calme. Légèrement loin du marché mais accessible en moto.',
+            'Studio bien équipé, cuisine fonctionnelle, bonne ventilation naturelle. Quelques coupures d\'électricité occasionnelles mais c\'est la norme dans le quartier.',
+            'Belle villa, bien construite. Le jardin nécessite un peu d\'entretien mais l\'ensemble est en bon état. Quartier résidentiel agréable.',
+            'Logement dans une bonne résidence sécurisée. Gardiennage 24h/24. Parking couvert. L\'appartement est propre et les voisins sont respectueux.',
+            'Appartement meublé de bon standing. Lit confortable, TV écran plat, WiFi rapide. Quelques équipements de cuisine manquants mais globalement satisfait.',
+            'Logement correct sans plus. Le prix est légèrement élevé par rapport à ce qui est proposé. Quelques travaux de rénovation seraient bienvenus.',
+            'Chambre propre mais un peu petite. La douche fonctionne bien, l\'électricité est stable. Quartier un peu bruyant la nuit.',
+            'Studio acceptable pour le prix demandé. La plomberie a quelques problèmes que le propriétaire a promis de réparer.',
+            'Appartement conforme à la description mais les photos le montraient plus lumineux. Correct pour une première installation.',
+            'Maison spacieuse mais nécessitant quelques réparations (carrelage fissuré, peinture à refaire). Propriétaire de bonne volonté.',
+            'Logement décevant par rapport aux photos. La cuisine n\'était pas équipée comme indiqué. Le propriétaire doit corriger son annonce.',
+            'Des problèmes de plomberie récurrents. L\'eau chaude ne fonctionnait pas la moitié du temps. Propriétaire difficile à joindre.',
+            'Quartier moins sécurisé que ce qui était annoncé. Quelques nuisances sonores la nuit. Le logement en lui-même est correct.',
+            'Résidence bien entretenue, ascenseur fonctionnel, parking sécurisé. Appartement lumineux et spacieux. Charges raisonnables. Très satisfait.',
+            'Propriétaire réactif et professionnel. Logement livré propre avec tout le nécessaire. Je n\'hésite pas à recommander cette adresse.',
+            'Très bon rapport qualité-prix. Le quartier est en plein développement, tout est à portée de main. Électricité et eau jamais en panne.',
+            'Séjour professionnel réussi grâce à ce logement bien équipé et bien placé. WiFi excellent, climatisation puissante. Reviendrai sans hésiter.',
+            'Superbe vue depuis le balcon, appartement lumineux, finitions modernes. Le gardiennage 24h/24 est un vrai plus pour la sécurité.',
+        ];
+
+        for ($i = 0; $i < $reviewCount; $i++) {
+            $customerId = $this->customerIds[array_rand($this->customerIds)];
+            if (in_array($customerId, $usedCustomers, true)) {
+                continue;
+            }
+            $usedCustomers[] = $customerId;
+
+            $reviewDaysAgo = mt_rand(0, min($daysAgo, 90));
+            $rating = (float) mt_rand(1, 5);
+            if (mt_rand(0, 1) === 1 && $rating < 5) {
+                $rating += 0.5;
+            }
+
+            Review::forceCreate([
+                'id' => (string) Str::orderedUuid(),
+                'ad_id' => $ad->id,
+                'user_id' => $customerId,
+                'rating' => min(5.0, $rating),
+                'comment' => $this->pick($comments),
+                'agency_id' => $ad->agency_id,
+                'created_at' => now()->subDays($reviewDaysAgo),
+                'updated_at' => now()->subDays($reviewDaysAgo),
+            ]);
+        }
+    }
+
+    private function depositForType(string $type, int $price): string
+    {
+        $months = match (true) {
+            $type === 'maison' => mt_rand(1, 3),
+            str_contains($type, 'appartement meuble') => mt_rand(1, 2),
+            str_contains($type, 'appartement') => mt_rand(1, 2),
+            default => 1,
+        };
+        $amount = number_format($months * $price, 0, ',', ' ');
+
+        return $months === 1
+            ? "1 mois de caution ({$amount} FCFA)"
+            : "{$months} mois de caution ({$amount} FCFA)";
+    }
+
+    private function leaseDurationForType(): string
+    {
+        return $this->pick([
+            'Mensuel, sans engagement',
+            '3 mois renouvelables',
+            '6 mois renouvelables',
+            '6 mois ferme',
+            '1 an renouvelable',
+            '1 an ferme',
+            '2 ans renouvelables',
+        ]);
+    }
+
+    private function chargesForfaitForType(string $type): int
+    {
+        return match (true) {
+            $type === 'maison' => mt_rand(10, 35) * 1000,
+            str_contains($type, 'appartement') => mt_rand(6, 22) * 1000,
+            str_contains($type, 'studio') => mt_rand(4, 14) * 1000,
+            default => mt_rand(2, 8) * 1000,
+        };
+    }
+
+    private function generateChargesAutres(): ?string
+    {
+        $pool = [
+            'Gardiennage' => [3000, 4000, 5000, 6000, 7000, 8000, 10000],
+            'Enlèvement des ordures' => [1000, 1500, 2000, 2500, 3000],
+            'Entretien espaces communs' => [2000, 2500, 3000, 4000, 5000],
+            'Groupe électrogène' => [3000, 4000, 5000, 6000],
+            'Gardien de nuit' => [3000, 4000, 5000, 6000, 7000],
+            'Nettoyage parties communes' => [1500, 2000, 2500, 3000],
+        ];
+
+        $items = [];
+        foreach ($pool as $label => $amounts) {
+            if (mt_rand(0, 2) === 0) {
+                $amount = $amounts[array_rand($amounts)];
+                $formatted = number_format($amount, 0, ',', ' ');
+                $items[] = "{$label} : {$formatted} FCFA/mois";
+            }
+        }
+
+        return empty($items) ? null : implode(', ', $items);
     }
 }

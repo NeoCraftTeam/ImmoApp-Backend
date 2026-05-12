@@ -41,7 +41,7 @@ describe('Google OAuth Authentication', function (): void {
             'google_id' => 'google-123',
         ]);
 
-        $socialiteUser = \Mockery::mock(SocialiteUser::class);
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
         $socialiteUser->shouldReceive('getId')->andReturn('google-123');
         $socialiteUser->shouldReceive('getEmail')->andReturn('test@example.com');
         $socialiteUser->shouldReceive('getName')->andReturn('Test User');
@@ -72,7 +72,7 @@ describe('Google OAuth Authentication', function (): void {
     });
 
     it('creates new user with Google OAuth', function (): void {
-        $socialiteUser = \Mockery::mock(SocialiteUser::class);
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
         $socialiteUser->shouldReceive('getId')->andReturn('google-new-456');
         $socialiteUser->shouldReceive('getEmail')->andReturn('newuser@example.com');
         $socialiteUser->shouldReceive('getName')->andReturn('New User');
@@ -108,7 +108,7 @@ describe('Google OAuth Authentication', function (): void {
     });
 
     it('always creates customer accounts via OAuth (agents need manual setup)', function (): void {
-        $socialiteUser = \Mockery::mock(SocialiteUser::class);
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
         $socialiteUser->shouldReceive('getId')->andReturn('google-agent-789');
         $socialiteUser->shouldReceive('getEmail')->andReturn('agent@example.com');
         $socialiteUser->shouldReceive('getName')->andReturn('Agent User');
@@ -136,13 +136,13 @@ describe('Google OAuth Authentication', function (): void {
         ]);
     });
 
-    it('links Google to existing email account', function (): void {
+    it('links Google to existing email account requires confirmation', function (): void {
         $existingUser = User::factory()->create([
             'email' => 'existing@example.com',
             'google_id' => null,
         ]);
 
-        $socialiteUser = \Mockery::mock(SocialiteUser::class);
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
         $socialiteUser->shouldReceive('getId')->andReturn('google-link-123');
         $socialiteUser->shouldReceive('getEmail')->andReturn('existing@example.com');
         $socialiteUser->shouldReceive('getName')->andReturn('Existing User');
@@ -158,18 +158,22 @@ describe('Google OAuth Authentication', function (): void {
             'token' => 'valid-token',
         ]);
 
+        // Security fix (P4-33): auto-linking is disabled — user must confirm in a separate step
         $response->assertOk()
-            ->assertJson(['is_new_user' => false]);
+            ->assertJsonFragment(['requires_link_confirmation' => true])
+            ->assertJsonStructure(['linking_token', 'message']);
 
+        // Google ID should NOT be linked yet — pending confirmation
         $existingUser->refresh();
-        expect($existingUser->google_id)->toBe('google-link-123');
-        expect($existingUser->oauth_provider)->toBe('google');
+        expect($existingUser->google_id)->toBeNull();
+        expect($existingUser->pending_oauth_provider)->toBe('google');
+        expect($existingUser->pending_oauth_token)->not->toBeNull();
     });
 });
 
 describe('Facebook OAuth Authentication', function (): void {
     it('authenticates user with Facebook', function (): void {
-        $socialiteUser = \Mockery::mock(SocialiteUser::class);
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
         $socialiteUser->shouldReceive('getId')->andReturn('fb-123');
         $socialiteUser->shouldReceive('getEmail')->andReturn('fbuser@example.com');
         $socialiteUser->shouldReceive('getName')->andReturn('FB User');
@@ -201,7 +205,7 @@ describe('Facebook OAuth Authentication', function (): void {
 
 describe('Apple OAuth Authentication', function (): void {
     it('authenticates user with Apple using id_token', function (): void {
-        $socialiteUser = \Mockery::mock(SocialiteUser::class);
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
         $socialiteUser->shouldReceive('getId')->andReturn('apple-123');
         $socialiteUser->shouldReceive('getEmail')->andReturn('appleuser@privaterelay.appleid.com');
         $socialiteUser->shouldReceive('getName')->andReturn('Apple User');
@@ -235,7 +239,7 @@ describe('OAuth Provider Link/Unlink', function (): void {
             'google_id' => null,
         ]);
 
-        $socialiteUser = \Mockery::mock(SocialiteUser::class);
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
         $socialiteUser->shouldReceive('getId')->andReturn('google-link-456');
         $socialiteUser->shouldReceive('getEmail')->andReturn($user->email);
 
@@ -266,7 +270,7 @@ describe('OAuth Provider Link/Unlink', function (): void {
             'password' => bcrypt('password'),
         ]);
 
-        $socialiteUser = \Mockery::mock(SocialiteUser::class);
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
         $socialiteUser->shouldReceive('getId')->andReturn('google-existing-789');
 
         Socialite::shouldReceive('driver')
@@ -373,7 +377,7 @@ describe('OAuth Error Handling', function (): void {
     });
 
     it('handles missing email from OAuth provider', function (): void {
-        $socialiteUser = \Mockery::mock(SocialiteUser::class);
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
         $socialiteUser->shouldReceive('getId')->andReturn('no-email-123');
         $socialiteUser->shouldReceive('getEmail')->andReturn(null);
 

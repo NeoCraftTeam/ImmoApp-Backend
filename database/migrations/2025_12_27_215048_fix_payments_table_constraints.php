@@ -17,7 +17,7 @@ return new class extends Migration
 
             // On convertit les enums en string pour donner plus de flexibilité et éviter les blocages de types
             $table->string('type')->change(); // 'unlock', 'boost', 'subscription'
-            $table->string('payment_method')->change(); // 'fedapay', 'orange_money', etc.
+            $table->string('payment_method')->change(); // 'orange_money', 'mobile_money', 'flutterwave', etc.
         });
     }
 

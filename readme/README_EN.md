@@ -1,7 +1,10 @@
 # KeyHome — Complete Technical Documentation (English)
 
-> **Generated:** 2026-02-22 | **Stack:** Laravel 12 · Next.js 16 · Expo 54 · PostgreSQL/PostGIS · MeiliSearch  
+> **Generated:** 2026-02-22 | **Last reviewed:** April 2026
+> **Stack:** Laravel 12 · Next.js 16 · Expo 54 · PostgreSQL/PostGIS · MeiliSearch · Flutterwave
 > **Repository root:** `/Users/feze/Developer/Laravel/ImmoApp-Backend`
+
+> ⚠️ **Note:** This document was generated February 2026 and partially reviewed April 2026. Some sections may lag behind the current codebase. The root [`README.md`](../README.md) is the authoritative quick-reference.
 
 ---
 
@@ -11,14 +14,13 @@
 **KeyHome is a full-stack real-estate SaaS platform for French-speaking West/Central Africa that lets property owners and agencies list, promote, and monetise rental/sale listings while giving buyers a personalised, AI-powered search experience.**
 
 ### One-paragraph summary
-KeyHome is composed of a Laravel 12 REST API backend, a Next.js 16 web frontend authenticated via Clerk, three Filament 4 admin/management panels (Admin, Agency, Bailleur/Owner), and two Expo React-Native mobile shells (one per panel). Listings are searchable via MeiliSearch full-text + PostGIS geo-search. Revenue is generated through pay-per-unlock contacts (FedaPay, XOF), agency subscription plans, and boosted listings. A weighted-scoring recommendation engine personalises the home feed. The entire stack runs on Docker Compose with Traefik reverse proxy and an optional Prometheus/Grafana monitoring profile.
+KeyHome is composed of a Laravel 12 REST API backend, a Next.js 16 web frontend authenticated via Clerk, and two Filament 4 panels (Admin, Agency). Listings are searchable via MeiliSearch full-text + PostGIS geo-search. Revenue is generated through pay-per-unlock contacts (Flutterwave, XAF/XOF), agency subscription plans, and boosted listings. A weighted-scoring recommendation engine personalises the home feed. The entire stack runs on Docker Compose with Traefik reverse proxy and an optional Prometheus/Grafana monitoring profile.
 
 ### Target users
 | User type | Entry point |
 |-----------|-------------|
 | Property seekers | Next.js web app (`keyhome-frontend-next`) |
-| Individual landlords (Bailleurs) | Filament `/owner` panel + Expo `mobile/bailleur` shell |
-| Real-estate agencies | Filament `/agency` panel + Expo `mobile/agency` shell |
+| Real-estate agencies / owners | Filament `/agency` panel + Expo `mobile/agency` shell |
 | Platform administrators | Filament `/admin` panel |
 
 ### Problem solved
@@ -28,8 +30,8 @@ Fragmented, low-quality listing portals in the African market → KeyHome provid
 **Monorepo** hosting four distinct applications sharing one backend API:
 - Laravel REST API (monolith)
 - Next.js 16 SPA/SSR (web frontend)
-- Two Expo WebView shells (iOS/Android)
-- Three Filament panels (web-based back-offices)
+- Expo WebView shell (iOS/Android, agency)
+- Two Filament panels (web-based back-offices: Admin + Agency)
 
 ---
 

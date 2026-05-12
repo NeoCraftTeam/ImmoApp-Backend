@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Contracts\RecommendationEngineInterface;
 use App\Enums\AdStatus;
+use App\Http\Controllers\Api\V1\RecommendationController;
 use App\Models\Ad;
 use App\Models\AdInteraction;
 use App\Models\User;
@@ -27,9 +29,9 @@ use Illuminate\Support\Facades\Cache;
  *   - Boosted ads
  *   - Latest ads
  *
- * @see \App\Http\Controllers\Api\V1\RecommendationController
+ * @see RecommendationController
  */
-final class RecommendationEngine
+final class RecommendationEngine implements RecommendationEngineInterface
 {
     /** Maximum number of results to return */
     private const int RESULT_LIMIT = 15;
@@ -49,6 +51,17 @@ final class RecommendationEngine
     /** Standard eager-load relations for ads */
     private const array AD_EAGER_LOADS = ['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'];
 
+    /**
+     * Hard cap on candidates loaded into PHP memory for scoring.
+     *
+     * Without this cap, `personalizedRecommendations()` materialised the entire
+     * AVAILABLE catalog → memory growth scaled linearly with inventory and
+     * caused OOM on large markets. The pre-filter SQL keeps to ads that match
+     * one of the user's preferences (type / city / price band), and the cap
+     * bounds memory and CPU regardless of catalog size.
+     */
+    private const int CANDIDATE_CAP = 200;
+
     // ── Weights ───────────────────────────────────────────────────────
     private const int W_TYPE = 40;
 
@@ -67,19 +80,23 @@ final class RecommendationEngine
     // ══════════════════════════════════════════════════════════════════
 
     /**
-     * Get recommendations for a user.
+     * Get recommendations for a user (or cold-start for guests).
      *
      * @return array{ads: Collection<int, Ad>, meta: array<string, mixed>}
      */
-    public function recommend(User $user): array
+    public function recommend(?User $user): array
     {
-        $cacheKey = "reco_v2_user_{$user->id}";
+        $cacheKey = $user ? "reco_v2_user_{$user->id}" : 'reco_v2_guest';
 
         return Cache::remember($cacheKey, now()->addMinutes(self::CACHE_TTL_MINUTES), function () use ($user): array {
+            if (!$user) {
+                return $this->coldStart();
+            }
+
             $profile = $this->buildUserProfile($user);
 
             if ($profile === null) {
-                return $this->coldStart($user);
+                return $this->coldStart();
             }
 
             return $this->personalizedRecommendations($user, $profile);
@@ -207,12 +224,46 @@ final class RecommendationEngine
         $maxPopularity = max($popularityMap ?: [1]);
 
         // ── Candidate ads ────────────────────────────────────────────
+        // Pre-filter in SQL: only ads matching at least one preference signal
+        // (preferred type, preferred city, or fitting the user's budget band).
+        // Then cap the result set so PHP memory stays bounded regardless of
+        // catalog size.
+        $preferredTypeIds = array_keys($profile['type_weights']);
+        $preferredCityIds = array_keys($profile['city_weights']);
+        $minBudget = (float) $profile['min_price'];
+        $maxBudget = (float) $profile['max_price'];
+
         $candidates = Ad::with(self::AD_EAGER_LOADS)
             ->visible()
             ->where('status', AdStatus::AVAILABLE)
             ->whereNotIn('id', $profile['seen_ad_ids'])
+            ->where(function (Builder $query) use ($preferredTypeIds, $preferredCityIds, $minBudget, $maxBudget): void {
+                $hasFilter = false;
+
+                if (!empty($preferredTypeIds)) {
+                    $query->orWhereIn('type_id', $preferredTypeIds);
+                    $hasFilter = true;
+                }
+
+                if (!empty($preferredCityIds)) {
+                    $query->orWhereHas('quarter', fn (Builder $q) => $q->whereIn('city_id', $preferredCityIds));
+                    $hasFilter = true;
+                }
+
+                if ($minBudget > 0 && $maxBudget > 0 && $maxBudget > $minBudget) {
+                    $query->orWhereBetween('price', [$minBudget, $maxBudget]);
+                    $hasFilter = true;
+                }
+
+                if (!$hasFilter) {
+                    // Profile has no usable signal — fall back to "any AVAILABLE ad".
+                    $query->whereRaw('1 = 1');
+                }
+            })
             ->withCount('reviews')
             ->withAvg('reviews', 'rating')
+            ->latest('created_at')
+            ->limit(self::CANDIDATE_CAP)
             ->get();
 
         // ── Score each candidate ─────────────────────────────────────
@@ -299,12 +350,11 @@ final class RecommendationEngine
      *
      * @return array{ads: Collection<int, Ad>, meta: array<string, mixed>}
      */
-    private function coldStart(User $user): array
+    private function coldStart(): array
     {
         $limit = self::RESULT_LIMIT;
         $trendingLimit = (int) ceil($limit * 0.4);
         $boostedLimit = (int) ceil($limit * 0.3);
-        $latestLimit = $limit - $trendingLimit - $boostedLimit;
 
         $collected = collect();
         $excludeIds = [];
@@ -408,12 +458,18 @@ final class RecommendationEngine
             ->where('status', AdStatus::AVAILABLE)
             ->whereNotIn('id', $excludeIds)
             ->where(function (Builder $query) use ($preferredTypeIds, $profile): void {
-                // Outside preferred types OR outside budget range
+                // We want ads that are EITHER outside preferred types OR outside the
+                // budget band. Each branch is wrapped in its own where() so OR/AND
+                // precedence is unambiguous (previous version mixed bare orWhere()
+                // with whereNotIn(), which can let in many in-band wrong-type rows).
                 if (!empty($preferredTypeIds)) {
                     $query->whereNotIn('type_id', $preferredTypeIds);
                 }
-                $query->orWhere('price', '<', $profile['min_price'])
-                    ->orWhere('price', '>', $profile['max_price']);
+
+                $query->orWhere(function (Builder $sub) use ($profile): void {
+                    $sub->where('price', '<', $profile['min_price'])
+                        ->orWhere('price', '>', $profile['max_price']);
+                });
             })
             ->inRandomOrder()
             ->take($limit)

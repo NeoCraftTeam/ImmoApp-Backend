@@ -4,33 +4,32 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Enums\PaymentMethod;
-use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
 use App\Http\Requests\Api\V1\SubscribeRequest;
 use App\Http\Resources\SubscriptionPlanResource;
 use App\Http\Resources\SubscriptionResource;
-use App\Models\Payment;
+use App\Models\Agency;
 use App\Models\SubscriptionPlan;
-use App\Services\FedaPayService;
+use App\Models\User;
+use App\Services\Payment\PaymentService;
 use App\Services\SubscriptionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use OpenApi\Annotations as OA;
 
 /**
  * @OA\Tag(
  *     name="📦 Abonnements Agences",
- *     description="Gestion des abonnements pour les agences immobilières. Permet de consulter les plans disponibles, souscrire via FedaPay, consulter l'abonnement actif, l'annuler et voir l'historique. Les agences reçoivent une facture par email à chaque souscription."
+ *     description="Gestion des abonnements pour les agences immobilières. Permet de consulter les plans disponibles, souscrire via Flutterwave, consulter l'abonnement actif, l'annuler et voir l'historique. Les agences reçoivent une facture par email à chaque souscription."
  * )
  */
 final class SubscriptionController
 {
     public function __construct(
-        protected FedaPayService $fedaPay,
+        protected PaymentService $paymentService,
         protected SubscriptionService $subscriptionService,
     ) {}
 
@@ -80,10 +79,10 @@ final class SubscriptionController
      */
     public function plans(): AnonymousResourceCollection
     {
-        $plans = SubscriptionPlan::query()
+        $plans = Cache::remember('subscription:plans:active', now()->addHours(24), fn () => SubscriptionPlan::query()
             ->where('is_active', true)
             ->orderBy('sort_order')
-            ->get();
+            ->get());
 
         return SubscriptionPlanResource::collection($plans);
     }
@@ -144,9 +143,9 @@ final class SubscriptionController
      */
     public function current(Request $request): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
-        /** @var \App\Models\Agency|null $agency */
+        /** @var Agency|null $agency */
         $agency = $user->agency;
 
         if (!$agency) {
@@ -178,7 +177,7 @@ final class SubscriptionController
      *     path="/api/v1/subscriptions/subscribe",
      *     operationId="subscribe",
      *     summary="Souscrire à un plan d'abonnement",
-     *     description="Initie le processus de souscription à un plan d'abonnement pour l'agence de l'utilisateur. Crée une transaction de paiement FedaPay et retourne l'URL de paiement. Le frontend (mobile ou web) doit **rediriger l'utilisateur** vers `payment_url` pour finaliser le paiement. Une fois le paiement confirmé par le webhook FedaPay, l'abonnement est activé automatiquement, les annonces de l'agence sont boostées, et une **facture est envoyée par email** à tous les membres de l'agence.",
+     *     description="Initie le processus de souscription à un plan d'abonnement pour l'agence de l'utilisateur. Crée une transaction de paiement et retourne l'URL de paiement. Le frontend (mobile ou web) doit **rediriger l'utilisateur** vers `payment_url` pour finaliser le paiement. Une fois le paiement confirmé par le webhook, l'abonnement est activé automatiquement, les annonces de l'agence sont boostées, et une **facture est envoyée par email** à tous les membres de l'agence.",
      *     tags={"📦 Abonnements Agences"},
      *     security={{"sanctum":{}}},
      *
@@ -201,7 +200,7 @@ final class SubscriptionController
      *
      *         @OA\JsonContent(
      *
-     *             @OA\Property(property="payment_url", type="string", description="URL FedaPay vers laquelle rediriger l'utilisateur pour payer", example="https://checkout.fedapay.com/pay/abc123"),
+     *             @OA\Property(property="payment_url", type="string", description="URL vers laquelle rediriger l'utilisateur pour payer", example="https://checkout.flutterwave.com/pay/abc123"),
      *             @OA\Property(property="message", type="string", example="Redirigez l'utilisateur vers cette URL pour payer.")
      *         )
      *     ),
@@ -225,19 +224,30 @@ final class SubscriptionController
      *         )
      *     ),
      *
-     *     @OA\Response(response=500, description="Erreur technique FedaPay ou serveur")
+     *     @OA\Response(response=500, description="Erreur technique serveur")
      * )
      */
     public function subscribe(SubscribeRequest $request): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
-        /** @var \App\Models\Agency|null $agency */
+        /** @var Agency|null $agency */
         $agency = $user->agency;
 
         if (!$agency) {
             return response()->json([
                 'message' => 'Vous devez appartenir à une agence pour souscrire.',
+            ], 403);
+        }
+
+        // OWASP A01 — only the agency owner may engage agency funds via a
+        // subscription payment. A viewer/manager attached to the agency
+        // must not be allowed to launch a paid flow on the company's
+        // behalf. `cancel()` does not enforce this for legacy UX reasons,
+        // but `subscribe()` carries financial commitment so we gate it.
+        if ($agency->owner_id !== $user->id) {
+            return response()->json([
+                'message' => 'Seul le propriétaire de l\'agence peut souscrire un abonnement.',
             ], 403);
         }
 
@@ -258,48 +268,49 @@ final class SubscriptionController
             ], 422);
         }
 
-        $callbackUrl = $request->input(
-            'callback_url',
-            config('app.frontend_url', config('app.url')).'/subscription/callback'
-        );
-
-        $paymentData = $this->fedaPay->createSubscriptionPayment(
-            $amount,
-            $agency,
-            $plan->id,
-            $period,
-            $callbackUrl,
-        );
-
-        if (!$paymentData['success']) {
+        // SEC: Prevent double subscription payment — reject if already active.
+        $existingActive = $agency->getCurrentSubscription();
+        if ($existingActive && !$existingActive->isExpired()) {
             return response()->json([
-                'message' => 'Erreur lors de l\'initialisation du paiement.',
-                'error' => config('app.debug') ? ($paymentData['message'] ?? null) : null,
-            ], 500);
+                'message' => 'Votre agence a déjà un abonnement actif.',
+            ], 409);
         }
 
-        DB::beginTransaction();
+        // Idempotency guard: prevent double-click / retry from creating duplicate payments
+        $lockKey = "subscribe:{$agency->id}:{$plan->id}:{$period}";
+        $lock = Cache::lock($lockKey, 15);
+
+        if (!$lock->get()) {
+            return response()->json([
+                'message' => 'Paiement en cours de traitement, veuillez patienter.',
+            ], 409);
+        }
+
         try {
-            Payment::create([
-                'user_id' => $user->id,
+            $result = $this->paymentService->createPayment($user, [
+                'amount' => (float) $amount,
+                'type' => PaymentType::SUBSCRIPTION->value,
+                'payment_method' => 'flutterwave',
                 'agency_id' => $agency->id,
                 'plan_id' => $plan->id,
                 'period' => $period,
-                'amount' => $amount,
-                'transaction_id' => (string) $paymentData['transaction_id'],
-                'status' => PaymentStatus::PENDING,
-                'payment_method' => PaymentMethod::FEDAPAY,
-                'type' => PaymentType::SUBSCRIPTION,
+                'description' => "Abonnement {$plan->name} ({$period})",
+                'meta' => [
+                    'payment_type' => 'subscription',
+                    'agency_id' => $agency->id,
+                    'plan_id' => $plan->id,
+                    'period' => $period,
+                ],
             ]);
 
-            DB::commit();
+            $lock->release();
 
             return response()->json([
-                'payment_url' => $paymentData['url'],
+                'payment_url' => $result['link'],
                 'message' => 'Redirigez l\'utilisateur vers cette URL pour payer.',
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
+            $lock->release();
             Log::error('Erreur création paiement abonnement: '.$e->getMessage());
 
             return response()->json([
@@ -357,9 +368,9 @@ final class SubscriptionController
      */
     public function cancel(Request $request): JsonResponse
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
-        /** @var \App\Models\Agency|null $agency */
+        /** @var Agency|null $agency */
         $agency = $user->agency;
 
         if (!$agency) {
@@ -464,9 +475,9 @@ final class SubscriptionController
      */
     public function history(Request $request): AnonymousResourceCollection
     {
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
-        /** @var \App\Models\Agency|null $agency */
+        /** @var Agency|null $agency */
         $agency = $user->agency;
 
         if (!$agency) {
@@ -479,5 +490,40 @@ final class SubscriptionController
             ->paginate(15);
 
         return SubscriptionResource::collection($subscriptions);
+    }
+
+    /**
+     * Toggle auto-renewal for the agency's current subscription.
+     */
+    public function toggleAutoRenew(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        /** @var Agency|null $agency */
+        $agency = $user->agency;
+
+        if (!$agency) {
+            return response()->json([
+                'message' => 'Vous n\'appartenez à aucune agence.',
+            ], 403);
+        }
+
+        $subscription = $agency->getCurrentSubscription();
+
+        if (!$subscription) {
+            return response()->json([
+                'message' => 'Aucun abonnement actif.',
+            ], 404);
+        }
+
+        $subscription->update(['auto_renew' => !$subscription->auto_renew]);
+
+        return response()->json([
+            'message' => $subscription->auto_renew
+                ? 'Le renouvellement automatique est activé.'
+                : 'Le renouvellement automatique est désactivé.',
+            'auto_renew' => $subscription->auto_renew,
+            'subscription' => new SubscriptionResource($subscription->load('plan')),
+        ]);
     }
 }
