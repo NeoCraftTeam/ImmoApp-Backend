@@ -18,7 +18,7 @@
     <table style="width: 100%; border-collapse: collapse; margin-top: 16px;">
         <tr>
             <td style="padding: 12px 0; border-bottom: 1px solid #f1f5f9; vertical-align: top; width: 28px;">
-                <span style="color: #F6475F; font-weight: 700; font-size: 16px;">→</span>
+                <span style="color: #0d9488; font-weight: 700; font-size: 16px;">→</span>
             </td>
             <td style="padding: 12px 0 12px 12px; border-bottom: 1px solid #f1f5f9;">
                 <strong>Publier des annonces</strong><br>
@@ -27,7 +27,7 @@
         </tr>
         <tr>
             <td style="padding: 12px 0; border-bottom: 1px solid #f1f5f9; vertical-align: top; width: 28px;">
-                <span style="color: #F6475F; font-weight: 700; font-size: 16px;">→</span>
+                <span style="color: #0d9488; font-weight: 700; font-size: 16px;">→</span>
             </td>
             <td style="padding: 12px 0 12px 12px; border-bottom: 1px solid #f1f5f9;">
                 <strong>Gérer les réservations</strong><br>
@@ -36,7 +36,7 @@
         </tr>
         <tr>
             <td style="padding: 12px 0; vertical-align: top; width: 28px;">
-                <span style="color: #F6475F; font-weight: 700; font-size: 16px;">→</span>
+                <span style="color: #0d9488; font-weight: 700; font-size: 16px;">→</span>
             </td>
             <td style="padding: 12px 0 12px 12px;">
                 <strong>Suivre vos statistiques</strong><br>

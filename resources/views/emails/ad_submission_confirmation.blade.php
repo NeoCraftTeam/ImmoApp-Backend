@@ -76,7 +76,7 @@
                             <div style="
                                     width: 28px; height: 28px;
                                     border-radius: 50%;
-                                    background-color: #F6475F;
+                                    background-color: #0d9488;
                                     color: #ffffff;
                                     text-align: center;
                                     line-height: 28px;

@@ -88,7 +88,7 @@
         margin-top: 16px;
         border-collapse: collapse;
         background-color: #f8fafc;
-        border-left: 3px solid #F6475F;
+        border-left: 3px solid #0d9488;
         border-radius: 0 8px 8px 0;
     ">
         <tr>
@@ -106,7 +106,7 @@
     @endif
 
     <div class="btn-wrapper">
-        <a href="{{ config('app.url') }}/owner/viewings/viewing-reservations" class="btn">
+        <a href="{{ rtrim(config('app.frontend_url', config('app.url')), '/') }}/owner/viewings" class="btn">
             Gérer la demande
         </a>
     </div>
