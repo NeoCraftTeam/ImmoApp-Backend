@@ -280,7 +280,9 @@ services:
   # max_client_conn=500 with default_pool_size=25 means up to 500 PHP connections
   # share just 25 backend PostgreSQL connections → avoids connection exhaustion.
   pgbouncer:
-    image: bitnami/pgbouncer:1
+    # Bitnami retired rolling tags on docker.io/bitnami/*; legacy images live under
+    # bitnamilegacy/ with the same env contract (POSTGRESQL_*, PGBOUNCER_*).
+    image: bitnamilegacy/pgbouncer:1-debian-12
     container_name: ${COMPOSE_PREFIX:-keyhome-prod}-pgbouncer
     restart: unless-stopped
     depends_on:
