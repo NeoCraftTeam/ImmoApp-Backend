@@ -289,6 +289,9 @@ services:
       db:
         condition: service_healthy
     environment:
+      # Bitnami default listen port is 6432; Laravel/.env use DB_PORT=5432 to reach the
+      # pooler. Explicit 5432 keeps healthcheck + app connection consistent.
+      PGBOUNCER_PORT: "5432"
       POSTGRESQL_HOST: db
       POSTGRESQL_PORT: "5432"
       POSTGRESQL_DATABASE: ${DB_DATABASE:-keyhome}
@@ -306,11 +309,15 @@ services:
     networks:
       - keyhome-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U ${DB_USERNAME:-postgres} || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h 127.0.0.1 -p 5432 -U ${DB_USERNAME:-postgres} || exit 1",
+        ]
       interval: 10s
       timeout: 5s
-      retries: 5
-      start_period: 15s
+      retries: 6
+      start_period: 30s
     deploy:
       resources:
         limits:
