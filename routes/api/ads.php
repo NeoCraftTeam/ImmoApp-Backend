@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\V1\AdAiController;
 use App\Http\Controllers\Api\V1\AdAnalyticsController;
 use App\Http\Controllers\Api\V1\AdController;
+use App\Http\Controllers\Api\V1\AdDraftEditController;
 use App\Http\Controllers\Api\V1\AdGeoController;
 use App\Http\Controllers\Api\V1\AdImageSearchController;
 use App\Http\Controllers\Api\V1\AdInteractionController;
@@ -56,6 +57,11 @@ Route::prefix('ads')->middleware('optional.auth')->group(function (): void {
         Route::post('/{ad}/publish', [AdStatusController::class, 'publish'])->middleware('throttle:20,1');
         Route::post('/{ad}/set-availability', [AdStatusController::class, 'setAvailability']);
         Route::patch('/{ad}/autosave', [AdStatusController::class, 'autosave'])->middleware('throttle:60,1');
+
+        // Pending-edit draft (server-side draft for modifying live ads)
+        Route::patch('/{ad}/edit-draft', [AdDraftEditController::class, 'save'])->middleware('throttle:60,1');
+        Route::post('/{ad}/edit-draft/apply', [AdDraftEditController::class, 'apply'])->middleware('throttle:20,1');
+        Route::delete('/{ad}/edit-draft', [AdDraftEditController::class, 'discard'])->middleware('throttle:20,1');
     });
 
     // Must be last — captures {id}

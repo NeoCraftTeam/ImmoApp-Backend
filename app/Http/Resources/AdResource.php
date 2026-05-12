@@ -115,6 +115,12 @@ final class AdResource extends JsonResource
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
 
+            // Pending-edit draft payload — visible only to the ad owner
+            'draft_payload' => $this->when(
+                $user?->id === $this->user_id || $user?->isAdmin(),
+                $this->draft_payload
+            ),
+
             'user' => $this->whenLoaded('user', function () use ($user) {
                 $owner = $this->user;
                 $isUnlocked = $this->isUnlockedFor($user);
