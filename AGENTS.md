@@ -85,6 +85,10 @@ vendor/bin/phpstan analyse
 vendor/bin/rector process --dry-run
 ```
 
+## Marketing / contenu social (docs)
+
+- **Calendrier idées posts (Facebook, Instagram, X, TikTok):** [`docs/marketing/calendrier-publications-virales-keyhome.md`](docs/marketing/calendrier-publications-virales-keyhome.md) — liste d’idées avec cases `- [ ]` pour le suivi ; mis à jour manuellement par l’équipe.
+
 ## Architecture
 
 ### Backend Layers
@@ -127,7 +131,7 @@ vendor/bin/rector process --dry-run
 - `AdBoostService` — ad promotion logic.
 - `AdReportService` — abuse reporting.
 - `AgencyService` — agency CRUD.
-- `ViewingScheduleService` / `ReservationService` — viewing calendar & booking.
+- `ViewingScheduleService` / `ReservationService` — viewing calendar & booking. Slot validation uses `ViewingScheduleService::isOfferedBookableSlot()` (same duration/buffer as `GET /ads/{ad}/slots`), not Zap’s `Ad::isBookableAtTime()` which defaulted to 60-minute slots and disagreed with the public slot list. Client `POST /api/v1/ads/{ad}/reservations` uses RateLimiter **`viewings.reserve`** (default 20/min per authenticated user; `RL_VIEWINGS_RESERVE` / `config/rate_limiting.php`). **At most one active reservation** (`pending` or `confirmed`) per `(client, ad)` — enforced in `ReservationService::assertSlotIsAvailable()` + partial unique index `tr_unique_client_ad_active`; duplicate attempt returns **409** `CLIENT_ACTIVE_RESERVATION_EXISTS`. **Notifications** (mail + `database` + optional Web Push) for create / confirm / cancel / expire are sent from `TentativeReservationObserver`; reservation-related `Notification` classes call `$this->afterCommit()` so queued workers only process jobs after the `tentative_reservations` row is visible (avoids failed jobs when `QUEUE_CONNECTION` is Redis and the HTTP request still holds an open DB transaction). On create, the **client** and **landlord** each receive a **different** notification class (not a duplicate to the same inbox).
 - `LeaseContractService` — lease management.
 - `TourService` / `PanoramaProcessor` — 360° virtual tours.
 - `AiDescriptionEnhancer`, `AiDigestService`, `AiSearchService` — AI-powered features.
@@ -154,7 +158,7 @@ vendor/bin/rector process --dry-run
 - `PropertyAttributeImportService` — bulk attribute import.
 - `UserAgentParser` — browser/device detection.
 - `Media/MediaPathGenerator` — Spatie media paths.
-- `QrCodeService` (`final readonly`) — Apple-style branded scannable QR generator + UTM URL helpers (`appendUtm`, `absoluteFrontendUrl`, `adListingUrl`, `landlordProfileUrl`). Public render API: `pngDataUriForUrl(url, size=800)` returns `data:image/png;base64,...`, `renderRichPng(url, size)` returns binary PNG, `renderRichSvg(url)` returns the branded SVG. Implementation: chillerlan/php-qrcode v5, ECC level **H**, **#000000** modules, `quietzoneSize: 4`, circular modules with `circleRadius: 0.5`, finder + alignment patterns kept square. Branded SVG layout: matrix at **62 % of canvas** (room for rings), 5 decorative dashed rings (2 inner halos + 3 outer signature rings, brand crimson on the outer one) anchored to the matrix half-DIAGONAL so they NEVER overlap data → 100 % scannable. Centre punch-out at 10 % of `qrSize` with the embedded official KeyHome PNG logo (`keyhome-frontend-next/public/icons/icon-512x512.png`). Rasterisation chain: **Imagick → rsvg-convert → plain chillerlan PNG** fallback (DomPDF can't render the branded SVG reliably).
+- `QrCodeService` (`final readonly`) — TikTok/Snap-inspired circular-framed branded QR + URL helpers (`appendUtm`, `absoluteFrontendUrl`, `adListingUrl`, `landlordProfileUrl`). **`$includeUtm` defaults to `false`** for generic callers; **owner QR / printables pass `true`** via `QrCodeController` so scans carry `utm_*`. Public render API: `pngDataUriForUrl`, `renderRichPng`, `renderRichSvg`. chillerlan/php-qrcode v5, ECC **H**, **#000000** modules, `quietzoneSize: 4`, rounded data modules (`circleRadius: 0.5`), finders + alignment kept square. Matrix ~**64 %** of canvas; **five concentric dashed strokes in black / grey only** sit **outside** the inscribed data circle (dash phase from `crc32` of the target URL) → rings never cover modules. Centre: white plate + faint **camera-outline** glyph + embedded KeyHome PNG (`keyhome-frontend-next/public/icons/icon-512x512.png`). Rasterisation: **Imagick → rsvg-convert → plain chillerlan PNG** fallback.
 
 ### QR Code & Printable Assets (`app/Http/Controllers/Api/V1/QrCodeController.php`)
 - All routes in `routes/api.php` are gated by `auth:sanctum` + `owner.role` + `panel.role:owner` + `token.role:agent` (so customers get **403** on profile + ad endpoints).
@@ -167,13 +171,13 @@ vendor/bin/rector process --dry-run
   - `GET /api/v1/my/profile/qr-code/image` → `image/png`.
   - `GET /api/v1/my/profile/business-card` → 90 × 55 mm landscape PDF (`pdf.business-card` blade, paper `[0,0,255.118,155.906]` landscape, rounded corners via `border-radius: 3mm` + thin `#CBD5E1` border so DomPDF actually paints them, avatar / role / KeyHome stat line / contact list / KeyHome key+keyring badge / 22 mm branded QR + `Scannez · mes annonces`).
   - `GET /api/v1/my/profile/business-card/preview` → returns **HTML** (not PDF, `Content-Type: text/html`) rendered through `pdf.business-card-preview` blade — same DOM as the PDF blade, transparent background, JS auto-fits the card to the iframe via `min(scaleX, scaleY)`. Used as `srcDoc` of the iframe inside `QrCodeDialog`.
-- UTM scheme: `utm_source=keyhome`, `utm_medium=qr|placard|visitcard|visitcard_preview`, `utm_campaign=owner_share`, `utm_content=ad_<id>` or `profile_<id>`.
-- Controller is `final` with DI on `QrCodeService` (readonly). All view data centralised in `buildBusinessCardPayload(User, utmMedium)` so the PDF and HTML preview stay perfectly in sync. Helpers `loadAdCoverAsBase64`, `loadUserAvatarAsBase64` resolve Spatie media → storage path → absolute URL → null, returning `data:<mime>;base64,...` URIs (DomPDF runs with `isRemoteEnabled: false`).
+- **UTM (owner QR)** : les endpoints bailleur utilisent `$includeUtm=true` (`owner_share`, `utm_medium=qr`) dans la matrice PNG/SVG **et** les champs `ad_url` / `profile_url` du JSON pour que scanner et bouton « Copier le lien » coïncident ; aucune ligne d’URL lisible sous le QR dans la modale (`QrCodeDialog`) ; les PDF carte/pancarde n’affichent pas non plus l’URL complète comme texte.
+- Controller is `final` with DI on `QrCodeService` (readonly). View data via `buildBusinessCardPayload(User)`. Helpers `loadAdCoverAsBase64`, `loadUserAvatarAsBase64` resolve Spatie media → storage path → absolute URL → null, returning `data:<mime>;base64,...` URIs (DomPDF runs with `isRemoteEnabled: false`).
 - **Frontend integration**:
-  - `QrCodeDialog.tsx` (`variant: 'ad' | 'profile'`, optional `ad: {id, title}`) — fetches the meta JSON via React Query. Profile variant additionally fetches the HTML preview and renders it inside an `<iframe srcDoc>` above the QR PNG so users see the printable card before downloading. Buttons: copy link, download PNG, ad → "Pancarte A5", profile → "Carte de visite" (teal `#0D9488` / hover `#0F766E`).
+  - `QrCodeDialog.tsx` — cadre QR circulaire centré ; grille header + hiérarchie typo ; skeleton chargement méta (+ aperçu carte profil) ; erreur + réessai ; actions cibles tactiles ≥44 px (`aria-busy`, `shadow.agentFocusRing`) ; snackbar `Alert` succès/erreur ; désactive transitions si `prefers-reduced-motion`. « Copier le lien public » / PNG / pancarte ou carte PDF reprennent les `*_url` de l’API (avec `utm_*`).
   - `ownerService` methods: `getAdQrCodeMeta`, `downloadAdQrPng`, `downloadAdPlacarde`, `getProfileQrMeta`, `downloadProfileQrPng`, `downloadBusinessCard`, `fetchBusinessCardPreviewHtml`.
   - Owner pages: **Mes annonces** action menu → "QR code & pancarte" opens the dialog with `variant="ad"`. **Profil bailleur** → "QR code & carte de visite" Paper card with an "Ouvrir" button opens `variant="profile"`.
-- **Tests**: `tests/Feature/QrCodeTest.php` (6 assertions × meta + image + PDF + ownership/role guards). Smoke script `tests/qr-pdf-smoke.php` regenerates `/tmp/qr-rich.png`, `/tmp/placarde-sample.pdf`, `/tmp/business-card-sample.pdf` for visual review.
+- **Tests**: `tests/Feature/QrCodeTest.php` (meta + image + PDF + ownership/role guards + `utm_*` sur les métadonnées). Smoke script `tests/qr-pdf-smoke.php` regenerates `/tmp/qr-rich.png`, `/tmp/placarde-sample.pdf`, `/tmp/business-card-sample.pdf` for visual review.
 
 ### Actions (`app/Actions/`)
 - `CreateAd`, `UpdateAd`, `UnlockAd`, `HandlePostPaymentActions`, `SubmitAnonymousSurveyAction`.
@@ -194,9 +198,80 @@ vendor/bin/rector process --dry-run
 - **Stripe env vars** : `STRIPE_KEY` (`pk_test_*` / `pk_live_*`), `STRIPE_SECRET` (`sk_*`), `STRIPE_WEBHOOK_SECRET` (`whsec_*`), optional `STRIPE_CURRENCY=eur`, `STRIPE_WEBHOOK_TOLERANCE=300`. All in `.env.example`.
 - Amounts resolved server-side from `PointPackage`/`SubscriptionPlan` — never trust client amounts.
 - DB locks (`lockForUpdate`) prevent double-spending on verification.
+- **Payment trace (`kh_payment_trace`).** Optional JSON blob under `gateway_response`, populated by Flutterwave and Stripe services with French-facing labels (PayPal, card brands, Apple/Google Pay, Orange/MTN hints). **`App\Support\PaymentPresentation`** is the single consumer for **`PaymentResource`** (`gateway_label`, `payment_method_label`, `payment_method_detail`), **`GET /payments/history`**, PDF `payment-history`, PWA tables, Filament Transactions/Refunds + Agency payments.
+- **Payment history API** uses Laravel `paginate()` on `GET /api/v1/payments/history` (`page`, `per_page` default **10**, max **50**); JSON includes `data` plus `meta` (`current_page`, `last_page`, `per_page`, `total`) and `links`. **`GET /api/v1/payments/{payment}/receipt`** (`auth:sanctum`, same user as the payment) streams a single-transaction PDF (DomPDF view `pdf.payment-receipt`).
 - Events: `PaymentInitiated`, `PaymentSucceeded`, `PaymentFailed`.
 - **Crédits (`POST /credits/purchase/{package}`)** — accepte `callback_url` optionnelle ; validée par `App\Support\FrontendRedirectGuard` (même politique d’hôte que OAuth / `FRONTEND_URL` + `OAUTH_ALLOWED_REDIRECT_HOSTS`). Passée à `PaymentService::createPayment` comme `redirect_url` vers Flutterwave.
 - **Frontend integration** (Phase 3, à venir) : `pnpm add @stripe/stripe-js @stripe/react-stripe-js` ; `PaymentModal.tsx` détecte `gateway === 'stripe'` dans la réponse de `/payments/initiate_payment` et utilise le `payment_link` retourné comme `clientSecret` pour `<Elements>` + `<PaymentElement>` ; pour Flutterwave (mobile money), comportement actuel inchangé (redirect hosted checkout).
+
+### Stripe — sauvegarde et réutilisation des cartes (Mai 2026)
+
+Cartes Stripe enregistrables côté `User`, réutilisables off-session pour les paiements suivants (achats de crédits notamment), avec UI complète de gestion sur la page profil.
+
+**Comportement utilisateur (résumé)**
+- À l'étape « ÉTAPE 2 SUR 2 · PAIEMENT », le header est désormais **compact horizontal** (~80–100 px) : pack name + « N crédits » à gauche, prix local + « ≈ XAF » à droite, icône carte rose. Sur mobile (< 600 px), retour à un layout vertical avec marges réduites.
+- Lorsque l'utilisateur paie par **carte** et qu'il n'a aucune carte enregistrée, une case **« Sauvegarder pour mes prochains paiements »** apparaît sous le PaymentElement (cochée par défaut). Si cochée à la confirmation, le PaymentIntent est créé avec `setup_future_usage: 'off_session'` côté serveur et la carte est attachée au `Stripe Customer` automatiquement.
+- Lorsque l'utilisateur **a déjà au moins une carte enregistrée**, le flux insère une étape **`pick-card`** : liste de radio-boutons type Stripe (« Visa •••• 4242 · Par défaut · Expire 12/27 ») + ligne « + Utiliser une autre carte » (carte par défaut auto-sélectionnée). En cliquant « Payer maintenant », le serveur crée le PaymentIntent avec `payment_method = pm_xxx`, `confirm = true`, `off_session = true` (idempotency key `kh_initiate:{tx_ref}`).
+- Le retour serveur immédiat est exposé via `status` (`success | failed | requires_action | pending`). Le frontend court-circuite : `success` → vérif + succès direct ; `failed` → écran erreur ; `requires_action` → ouvre Stripe Elements en mode `confirmCardPayment(clientSecret)` (l'auto-confirm sur `mount` déclenche immédiatement le 3DS overlay) ; `pending` (nouvelle carte) → flow Elements normal.
+
+**Backend — services & contrats**
+- **`App\Contracts\StripeSavedCardServiceInterface`** : extrait la surface Stripe « gestion de cartes » de `StripePaymentService` (qui est `final readonly` et donc non mockable directement). Méthodes : `listSavedCards(stripeCustomerId)`, `detachSavedCard(stripeCustomerId, pmId)`, `setDefaultSavedCard(stripeCustomerId, pmId)`, `createSetupIntent(stripeCustomerId)`. Bindée dans `AppServiceProvider::register()` → `StripePaymentService`.
+- **`StripePaymentService::initiate(array $payload)`** étendu :
+  - `customer_id?: string` — ID Stripe Customer (résolu côté `PaymentService::createPayment` en amont via `User::hasStripeId() ? User::stripeId() : User::createAsStripeCustomer()`, jamais d'appel `createOrGetStripeCustomer()` à chaud).
+  - `save_payment_method?: bool` — ajoute `setup_future_usage: 'off_session'` au PaymentIntent + force `customer` à être présent.
+  - `payment_method_id?: string` — déclenche le branche réutilisation : `payment_method = pm_xxx`, `confirm = true`, `off_session = true`. La réponse interne propage le `status` Stripe immédiat (`succeeded`/`requires_action`/`failed`) pour que `PaymentService` dispatch les events `PaymentSucceeded`/`PaymentFailed` **après** le commit DB.
+- **`PaymentService::createPayment`** : orchestrateur central. Extrait `save_payment_method` + `payment_method_id` du payload validé, résout le Stripe Customer ID (cf. ci-dessus), forward au gateway via la registry indexée par `getName()`. Inclut maintenant `'status'` dans la réponse JSON pour les retours immédiats.
+- **`PaymentMethod::gateway()`** inchangée : `CARD → Stripe`. Adding new methods requires only one match arm.
+
+**Endpoints REST (auth + sanctum + throttle:60,1)**
+| Verbe | URL | Description |
+|---|---|---|
+| `GET` | `/api/v1/payments/stripe/payment-methods` | Liste les cartes Stripe attachées au Customer du user authentifié. Retourne `[]` quand pas de Customer (jamais d'erreur). |
+| `DELETE` | `/api/v1/payments/stripe/payment-methods/{paymentMethod}` | Détache la carte (idempotent : 404 Stripe est silencieusement avalé). Vide `default_payment_method` si la carte supprimée était par défaut. |
+| `POST` | `/api/v1/payments/stripe/payment-methods/{paymentMethod}/set-default` | Marque la carte comme `invoice_settings.default_payment_method` sur le Customer. |
+| `POST` | `/api/v1/payments/stripe/setup-intent` | Crée un Stripe SetupIntent pour attacher une nouvelle carte sans paiement (consommé par la PWA dans le dialog « Ajouter une carte »). |
+
+Le paramètre `{paymentMethod}` est contraint au format `pm_*` via une regex pattern dans la route.
+
+**Form Requests (validation stricte, pas de validation inline)**
+- **`App\Http\Requests\Api\V1\PurchaseCreditPackageRequest`** : valide `POST /credits/purchase/{package}`. Champs : `callback_url?` (FrontendRedirectGuard), `payment_method?` (PaymentMethod enum), `save_payment_method?: bool`, `payment_method_id?: string` (regex `pm_*`), `turnstile_token?: string` (trait `EnsuresCreditPurchasePassesTurnstile` lorsque Turnstile est configuré). Le `withValidator()` rejette `save_payment_method` et `payment_method_id` quand `payment_method !== card`.
+- **`App\Http\Requests\Api\V1\StripePaymentMethodRequest`** : valide le path parameter `paymentMethod` (regex `pm_[a-zA-Z0-9_]+`) pour `destroy()` et `setDefault()`.
+- **`App\Http\Requests\Api\V1\FlutterwaveInitiateRequest`** étendue (même règles `save_payment_method` + `payment_method_id` + même garde card-only) — réutilisée par `PaymentController::initiate()`. Pour `type: credit`, `turnstile_token` est exigé lorsque Turnstile est configuré ; la vérification tourne **avant** le bloc optionnel sur `payment_method` (donc même si `payment_method` est omis).
+
+**Controller — `App\Http\Controllers\Api\V1\StripePaymentMethodController`**
+- `final readonly` avec DI sur `StripeSavedCardServiceInterface` (et non `StripePaymentService` direct → permet de stub en test).
+- Résout le Stripe Customer ID via `User::hasStripeId()` puis `User::createAsStripeCustomer()` au besoin (un seul appel Stripe par user au pire). Pour `index()`, retourne `[]` quand le user n'a pas encore de Customer (n'appelle pas Stripe inutilement).
+
+**Cashier — Customer model**
+- Trait `Laravel\Cashier\Billable` sur `App\Models\User` (déjà en place). Tables custom **`cashier_subscriptions`** + **`cashier_subscription_items`** pour ne pas collisionner avec la table `subscriptions` métier (`App\Models\Subscription`).
+- `User::createAsStripeCustomer()` est appelée uniquement quand `hasStripeId()` est `false` — l'ID est ensuite persisté dans `users.stripe_id` par Cashier. Tous les paiements off-session ultérieurs réutilisent ce même Customer (idempotence native côté Stripe).
+
+**Tests — `tests/Feature/Payment/StripeSavedCardTest.php`**
+14 cas couverts. Utilise un fake `StripeServiceFake` qui implémente **les deux** contrats (`PaymentGatewayInterface` + `StripeSavedCardServiceInterface`) → injecté dans le container avant chaque test. Couvre : liste vide pour user sans Customer, liste populée, détachement, set-default, création de SetupIntent, achat avec `save_payment_method=true` (PaymentIntent reçoit `setup_future_usage: 'off_session'`), réutilisation avec `payment_method_id` (succès direct → status `success`), réutilisation 3DS (status `requires_action`), réutilisation refusée (status `failed`), guard 422 quand `save_payment_method` envoyé avec `payment_method != card`.
+
+**Frontend — composants**
+- **`PaymentModal.tsx`** : nouveau header compact horizontal. Props ajoutées `subLabel?` et `stepHint?`. Le composant utilise `<Price amountXAF={amount} primary="local" showOriginal />` pour rendre la devise locale (CHF, EUR…) avec « ≈ N FCFA » en sous-ligne. Icone `CreditCardIcon` (cercle rose) à gauche du bloc texte sur desktop, retour à la verticale en < 600 px.
+- **`PaymentFlow.tsx`** : ajout du step `'pick-card'` rendu juste après `select-method` si l'utilisateur a sélectionné Carte ET a au moins une carte enregistrée. Mémorise `selectedSavedCardId` dans le state et le forward à `submit(method, null, { savedCardId })`. Sur retour depuis `stripe-confirm`, revient automatiquement à `pick-card` quand des cartes existent. Pour **`PaymentType.CREDIT`**, si `data.show_credits_turnstile` + site key (`PurchaseCreditsModal` / `GET /config/turnstile`), l’étape **`credit-turnstile`** s’affiche **après** « Continuer » sur le choix du moyen de paiement et **avant** téléphone / pick-card / `initiate_payment` ; retour au sélecteur de moyen réinitialise le jeton.
+- **`SavedCardPicker.tsx`** : composant contrôlé (radio-group ARIA-compliant). Rend les cartes avec brand label FR (`Visa`, `Mastercard`, etc.), `•••• 4242`, expiry `MM/YY`, suffix « Par défaut » sur la carte default. Toujours une ligne « + Utiliser une autre carte » à la fin (style dashed). Boutons « Retour » + « Payer maintenant ». Tests Vitest : `src/tests/components/SavedCardPicker.test.tsx` (7 cas).
+- **`StripeConfirmStep.tsx`** :
+  - Nouveaux props : `showSaveCheckbox`, `defaultSaveCheckbox`, `onSaveCheckboxChange`, `reuseSavedPaymentMethodId`, `autoConfirmOnMount`.
+  - Quand `reuseSavedPaymentMethodId !== null` : remplace le PaymentElement par un bloc « Validation en cours par votre banque » + spinner, et appelle `stripe.confirmCardPayment(clientSecret)` au submit (3DS flow on the same PaymentIntent).
+  - `autoConfirmOnMount=true` (guard `useRef` anti-StrictMode-double-call) déclenche le 3DS dès que Stripe.js est prêt — utilisé quand l'initiate renvoie `requires_action`.
+  - Checkbox « Sauvegarder pour mes prochains paiements » rendu uniquement pour une nouvelle carte ET utilisateur authentifié (jamais sur réutilisation : la carte est déjà sauvegardée).
+- **`SavedCardsManager.tsx`** : gestion compte (rendu sur `/profile` Paiements + `/owner/profile` Paiements, accents teal pour le owner via prop `accent` / `accentHover`). TanStack Query pour la liste (`STRIPE_SAVED_CARDS_QUERY_KEY = ['payments', 'stripe', 'cards']`, staleTime 60 s), mutations `delete` + `setDefault` + invalidation. Dialog « Ajouter une carte » avec Stripe SetupIntent flow complet (`stripe.confirmSetup` redirect `if_required`). `window.confirm()` natif avant deletion (UX simple, compatible PWA standalone). Reset du `client_secret` à la fermeture du dialog pour forcer un nouveau SetupIntent.
+- **Services frontend** (`src/services/payments.service.ts`) : `listStripePaymentMethods()`, `deleteStripePaymentMethod(id)`, `setDefaultStripePaymentMethod(id)`, `createStripeSetupIntent()`. URL-encode le `pm_xxx` pour DELETE/POST set-default.
+- **Types** (`src/types/index.ts`) : `StripePaymentMethod { id, brand, last4, exp_month, exp_year, is_default }`, `StripeSetupIntent { client_secret, id }`, `PaymentInitiateStatus = 'pending' | 'success' | 'failed' | 'requires_action' | 'cancelled'`. `FlutterwaveInitiatePayload` étendu avec `save_payment_method` + `payment_method_id`. `FlutterwaveInitiateResponse.gateway` inclut `'stripe'` et `status: PaymentInitiateStatus`.
+- **`usePayment.ts`** : surface `stripeInitialStatus: PaymentInitiateStatus | null` (séparé de `stripeClientSecret`) pour que le PaymentFlow puisse short-circuit sur `success`/`failed`.
+
+**Idempotence & sécurité**
+- Aucun numéro de carte brut n'est jamais transmis ni stocké côté Laravel — seulement les `pm_*` IDs Stripe.
+- Idempotency keys côté Stripe : `kh_initiate:{tx_ref}` pour les PaymentIntents (réutilisable safely sur retry), `kh_refund:{intent}:{amount}` pour les remboursements. Set-default & detach n'ont pas besoin d'idempotency keys (opérations naturellement idempotentes côté Stripe).
+- DB locks (`lockForUpdate` dans `processWebhook()` + `verify()`) protègent contre le double-crédit même quand le webhook arrive avant le retour `verify`.
+- Le frontend valide côté formulaire que `save_payment_method` et `payment_method_id` ne sont jamais envoyés ensemble (mutually exclusive UI flows).
+
+**Risques résiduels / limitations connues**
+- Le user qui change d'environnement (test → prod) sur le même compte garde un `users.stripe_id` pointant vers l'environnement précédent — pas de chemin auto pour invalider. Mitigation manuelle : `User->update(['stripe_id' => null])` puis recréer.
+- La suppression d'une carte par défaut chez Stripe **ne réassigne pas** automatiquement la suivante comme défaut — l'utilisateur doit cliquer « Étoile » sur une autre. Volontaire : laisser le choix.
 
 ### TrustScore System
 - **Bidirectional trust scoring** (0–100) for both tenants and landlords, modelled after `KeyScoreService`.
@@ -482,8 +557,9 @@ Storybook, Vitest, Playwright.
 - `src/app/` — Next.js App Router pages. Key routes:
   - `(public)/` — listing pages, home, search, ad detail.
   - `(owner)/owner/` — landlord dashboard (ads, expenses, leases, viewings).
-  - `credits/callback/` — Flutterwave payment return page with retry/polling logic.
-  - `payment-success/` — ad unlock payment return page with extended polling.
+  - `payment/return/` — **canonique** : retour unifié après tous les moyens de paiement (`?flow=credit|unlock|subscription|boost` + `tx_ref` / `status` Flutterwave, etc.). La page route vers les vues partagées dans `src/components/payment/return/`.
+  - `credits/callback/` — **legacy** : réexporte la même vue crédits que `/payment/return?flow=credit` (signets / anciens `redirect_url`).
+  - `payment-success/` — **legacy** : réexporte la même vue déblocage que `/payment/return?flow=unlock`.
   - `confidentialite/`, `conditions/` — politique de confidentialité et CGU ; styles partagés via `confidentialite/legal.module.css` ; libellé « dernière mise à jour » dans `src/lib/legal-documents.ts`.
 - `src/components/` — shared UI components.
   - `ui/` — base primitives (shadcn-style + MUI hybrids).
@@ -502,7 +578,7 @@ Storybook, Vitest, Playwright.
 
 ### Thème & retours paiement (May 2026)
 - **`ThemeProvider`** — préférence persistée `localStorage` `kh_theme_choice` : `system` \| `light` \| `dark` ; `useThemeMode()` expose `choice` et `setChoice`. Pages **Paramètres** client et bailleur : `ToggleButtonGroup` Clair / Sombre / Système.
-- **Retour après paiement** — `src/lib/payment-return.ts` : `rememberPaymentOriginPath()` avant redirection Flutterwave (`creditsService.purchase`, `paymentsService.flutterwaveInitiate`) ; `consumePaymentReturnPath(fallback)` sur les pages callback pour retrouver la page d’origine (`sessionStorage` `kh_payment_return_path`).
+- **Retour après paiement** — `src/lib/payment-return.ts` : `rememberPaymentOriginPath()` avant redirection hosted checkout / init ; `consumePaymentReturnPath(fallback)` sur les pages de retour. **`/payment/return`** est l’URL cible par défaut côté backend (`PaymentService` → `redirect_url`, sans `FLW_REDIRECT_URL`). **`buildStripeConfirmReturnUrl`** (Stripe wallet / PayPal) pointe sur la même route avec `?flow=…`. Flutterwave n’appelle cette URL qu’**après** son propre écran de confirmation (paramètres `status`, `tx_ref`, …). Le flux mobile money dans `usePayment` enchaîne avec `location.assign` **sans** étape intermédiaire « Redirection… » côté KeyHome pour ne pas masquer la page Flutterwave.
 
 ### Landing polish & résilience UI (May 2026)
 - **Landing publique** (`src/components/landing/*`, `/`) — repasse UX/a11y : hiérarchie, espacements, tokens (`tokens.ts`), CTAs qui pointent vers des routes joignables (ex. bailleur → `/owner/login`), FAQ (`aria-expanded` / `aria-controls`), nav mobile (`role="dialog"`), pied de page et newsletter (validation email, états d’erreur), `.hero-section` min-heights responsives dans `globals.css`. Tests Vitest : `src/tests/components/NewsletterSection.test.tsx`.
@@ -859,11 +935,11 @@ All 14 items from `COMPREHENSIVE_ASSESSMENT_REPORT.md` have been addressed:
 - **Client PWA**: `PaymentHistoryTableModern.tsx` — same period chips already present, "Télécharger CSV" button replaced with "Télécharger PDF" (real backend call, not client-side CSV).
 
 #### Owner QR & printables (Mai 2026 — restauré après rollback accidentel)
-- **Backend**: `App\Services\QrCodeService`, `App\Http\Controllers\Api\V1\QrCodeController`, dépendance directe `chillerlan/php-qrcode`. URLs publiques = `config('app.frontend_url')` + chemins `/ads/{slug}` et `/bailleurs/{username}` avec paramètres UTM (`utm_source=keyhome`, `utm_medium` = `qr` | `placard` | `visitcard` | `visitcard_preview`, `utm_campaign=owner_share`).
+- **Backend**: `App\Services\QrCodeService`, `App\Http\Controllers\Api\V1\QrCodeController`, `chillerlan/php-qrcode`. **Owner QR/imprimables** : `$includeUtm=true` depuis le contrôleur — encodage + JSON `*_url` incluent `utm_*`; pas d’URL affichée en clair sous le QR dans la PWA (`QrCodeDialog`). Rendu rich : silhouette circulaire, **anneaux discontinus noir/gris hors zone utile**, centre icône appareil + logo KeyHome.
 - **Routes** (middleware `auth:sanctum`, `owner.role`, `panel.role:owner`, `token.role:agent`) : `GET /api/v1/my/ads/{ad}/qr-code` (JSON), `GET …/qr-code/image` (PNG), `GET …/placarde` (PDF A5) ; `GET /api/v1/my/profile/qr-code`, `…/qr-code/image`, `…/business-card`, `…/business-card/preview` (PDF carte + aperçu filigrané).
 - **Vues PDF** : `resources/views/pdf/ad-placarde.blade.php`, `business-card.blade.php`, `business-card-preview.blade.php`.
 - **Frontend** : `src/components/owner/QrCodeDialog.tsx`, méthodes dans `owner.service.ts`, helpers `src/lib/qr-public-links.ts` ; entrées **Mes annonces** (menu actions) et **Profil bailleur** (encart « QR code & carte de visite »).
-- **Tests** : `tests/Feature/QrCodeTest.php`, `keyhome-frontend-next/src/tests/lib/qr-public-links.test.ts`.
+- **Tests** : `tests/Feature/QrCodeTest.php`.
 
 #### Admin Report PDF / CSV (dashboard & rapports)
 - Template `resources/views/pdf/admin-monthly-report.blade.php` rebranded: teal (#0d9488) → brand #F6475F throughout (header gradient, section titles, highlights).
@@ -1421,6 +1497,38 @@ Full-parity sweep aligning the chat UX with WhatsApp / Messenger while keeping t
 
 **Tests:** `tests/Feature/Chat/ChatE2eeTest.php` (identity API, first/follow-up sealed send, missing key 422, broadcast payload, conversation resource PEMs, **conversation list `last_message.e2ee`**).
 
+### Chat — désactivation E2EE par défaut (Mai 2026)
+
+Le mode **client-sealed** (E2EE bout-en-bout, AES-GCM côté navigateur, clé privée RSA en `localStorage`) introduit ci-dessus est désormais **désactivé par défaut**. Tous les nouveaux messages sont chiffrés **côté serveur** (`EncryptionService` + `CHAT_ENCRYPTION_KEY`, AES-256-CBC avec HMAC-SHA256), exactement comme les autres lignes non scellées. Le serveur déchiffre à la volée (`Message::getDecryptedBodyAttribute`) avant broadcast/notification, sur un canal Reverb privé authentifié par Sanctum.
+
+**Pourquoi ce changement.** Avec le modèle E2EE pur, la clé privée RSA ne quitte jamais l'appareil. Un utilisateur qui ouvre KeyHome depuis un **nouvel ordinateur ou un nouveau navigateur** n'a aucune clé locale → tout son historique sealed s'affiche comme « 🔒 Message chiffré (clé indisponible sur cet appareil) ». Pour un produit immobilier B2C utilisé en consultation occasionnelle (PWA + bureau pro + téléphone perso), c'était inutilisable. Le compromis retenu est celui de **WhatsApp Web / Telegram / Slack** : confidentialité opérationnelle (transport TLS + canal privé + stockage chiffré côté serveur), au prix d'une E2EE absolue.
+
+**Flag serveur.** `config/chat.php` :
+
+```php
+'client_sealed_enabled' => env('CHAT_CLIENT_SEALED_ENABLED', false),
+```
+
+Quand `false` (défaut), `MessageService::send()` **ignore** silencieusement tout payload `$e2ee` reçu — un `Log::warning` est émis pour repérer un frontend resté câblé sur le mode sealed, mais la requête n'est jamais rejetée : le `body` plaintext est encrypté server-side et le message part. `SendMessageRequest` rend `e2ee_ciphertext_b64` / `e2ee_iv_b64` optionnels dans ce cas et autorise le `body` plaintext même si `is_client_sealed=true` est encore envoyé par un vieux client (rétrocompat).
+
+**Frontend.** `useChat::wantsE2ee` est hardcodé à `false` (la condition d'origine est conservée juste à côté en commentaire pour réactivation). `AuthProvider` n'appelle plus `syncChatE2eePublicKeyWithServer` au démarrage — plus aucune keypair n'est générée localement. Les modules `chat-e2ee-crypto.ts` / `chat-e2ee-identity.ts` sont conservés intacts (commentaires `⚠️ INACTIVE BY DEFAULT`) pour le jour où une E2EE portable sera implémentée.
+
+**Messages historiques scellés.** Les lignes `is_client_sealed=true` déjà en base restent telles quelles : la BDD stocke uniquement le ciphertext AES-GCM. Sur l'appareil d'origine, elles continuent de s'afficher correctement (la clé privée locale est toujours là). Sur un nouvel appareil, elles s'affichent désormais en libellé doux : **« Message d'un ancien appareil (non lisible ici) »** — au lieu du cadenas anxiogène précédent. Cette copy est appliquée aux 4 surfaces concernées : `MessageBubble.tsx` (bulle), `ReplyPreview.tsx` (placeholder de citation), `ConversationItem.tsx` (aperçu liste), `ChatNotificationListener.tsx` (toast). Le `reply_to.body` injecté par `useChat` quand le parent est sealed et non déchiffrable utilise la même copy.
+
+**Tests.** `tests/Feature/Chat/ChatE2eeTest.php` :
+- Les tests existants (envoi sealed, broadcast, ressources `e2ee`, conversation list `last_message.e2ee`) activent désormais explicitement `config(['chat.client_sealed_enabled' => true])` dans `beforeEach` pour rester valides.
+- Nouveau test `downgrades a sealed payload to server-encrypted when client_sealed_enabled is false` : POST avec `is_client_sealed=true` + `e2ee_*` + plaintext `body`. Assertions : 201, `data.is_client_sealed=false`, `data.body` = plaintext, `data.e2ee=null`, `conversations.e2ee_wrapped_key_*` non mis à jour.
+
+**Réactivation future (piste portable E2EE).** Si l'on veut retrouver une E2EE vraie tout en gardant la portabilité cross-device, la voie recommandée est celle de **Signal Desktop / ProtonMail** :
+
+1. Garder la keypair RSA-OAEP-256 locale (`chat-e2ee-crypto.ts` est déjà prête).
+2. Chiffrer la clé privée avec un **passphrase utilisateur** via PBKDF2-SHA256 (≥ 200 k itérations) + AES-GCM, et stocker le blob chiffré côté serveur (`users.chat_e2ee_private_key_encrypted`).
+3. Sur un nouveau device, demander le passphrase à l'utilisateur, télécharger le blob, déchiffrer la clé privée localement, l'écrire en `localStorage` (ou IndexedDB), et le bootstrap E2EE redémarre.
+4. Risque résiduel : si l'utilisateur oublie le passphrase, son historique sealed est définitivement perdu (même nous ne pouvons rien faire) — c'est précisément le trade-off Signal.
+5. À ce moment-là : `CHAT_CLIENT_SEALED_ENABLED=true` côté env, dé-commenter le bootstrap dans `AuthProvider` (+ les imports `syncChatE2eePublicKeyWithServer` / `rtrimPem`), remettre la vraie condition `wantsE2ee` dans `useChat.ts` (à côté du `false`).
+
+**Rétrocompatibilité.** Les anciens clients (mobile, vieux PWA cachés) qui continuent d'envoyer `is_client_sealed=true` ne sont **jamais rejetés** : le serveur dégrade gracieusement et stocke le `body` plaintext. Aucun message n'est perdu pendant la transition.
+
 ---
 
 ## Enterprise Audit — Mai 2026
@@ -1685,6 +1793,7 @@ Round de fixes ciblés sur les bugs visibles signalés par l'utilisateur (chat c
 - **Ad detail page perçu lente** : ajouté `src/app/ads/[slug]/loading.tsx` avec un skeleton complet (hero + titre + chips + sidebar) qui s'affiche **instantanément** au tap, pendant que le server-side fetch de `generateMetadata` + JSON-LD finit. Combiné avec `router.prefetch('/ads/{slug}')` posé sur `onMouseEnter` / `onTouchStart` de l'`AdCard` → le chunk + le data sont chauds avant même le tap.
 - **Ad detail — impression** : `openAdDetailPrintPdf()` (`html2canvas` + `jspdf`). Avant capture : `document.fonts.ready`, fenêtre `windowWidth`/`windowHeight` = dimensions du root, `onclone` (`prepareAdPrintClone`) — `overflow` hidden/clip → visible, zones scrollables dépliées, `img` dimensionnées ; hero mobile `.kh-ad-print-hero-mobile` — hauteur dérivée du ratio image pour une capture non rognée. Classe sur le hero : `AdDetailClient.tsx`.
 - **Ad detail — contact** : libellés du type « Échanger avec {prénom} », « Message WhatsApp », « Appeler {prénom} » ; `ViewingBookingPanel` « Proposer une visite avec {prénom} » ; brouillon chat via `buildDraftMessage(..., hostFirstName)`.
+- **Visites (liste bailleur + onglet client)** : `src/app/(owner)/owner/viewings/page.tsx` — état erreur avec réessai, squelettes détaillés, liste `ul`/`li`, cibles tactiles 44px, panneau repliable avec `aria-expanded` / `aria-controls`, transitions `transition.polish` + `prefers-reduced-motion`. `ViewingBookingPanel` — onglet « Mes réservations » : panel ARIA, erreur chargement + réessai, squelettes carte, cartes avec motion token, dialogue d’annulation explicite, `activeMyReservationsCount` pour le libellé d’onglet.
 - **Ad detail — équipements & charges (alignement)** : `PropertyAttributes.tsx` utilise une cellule d’icône fixe 40×40 (`LIST_ICON_CELL_SX`) en liste et dans le dialogue ; texte en `flex: 1; minWidth: 0`. `AdDetailClient.tsx` — bloc Charges : pictogrammes dans une colonne 22px (`CHARGES_ICON_SLOT_SX`), valeurs à droite `maxWidth: 60%` (répété desktop + mobile).
 - **Signalement annonce** : `AdReportReceivedNotification` → canal `database` toujours, + `mail` si e-mail valide ; copy API / modale / notifications admin harmonisés en français. Test : accusé réception database seul si e-mail invalide (`AdReportFeatureTest`).
 
@@ -1700,6 +1809,7 @@ Round de fixes ciblés sur les bugs visibles signalés par l'utilisateur (chat c
   - `RegistrationService::register()` — token vérifié AVANT toute création ; échec → `ValidationException` ciblée sur `turnstile_token`.
 - **Form Requests** : `LoginRequest` et `RegisterRequest` acceptent désormais `turnstile_token: nullable|string|max:2048`.
 - **Config** : `services.turnstile.{site_key,secret_key}` lus depuis `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY`. La site key est exposée au frontend via `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (optionnel) et/ou `GET /api/v1/config/turnstile` (`TurnstilePublicConfigController`, throttle 120/min).
+- **`GET /api/v1/config/turnstile`** : `site_key`, `verification_required` (`TurnstileService::isConfigured()`), **`show_credits_turnstile`** (affichage étape captcha achat crédits : vrai en `local` / `testing` dès qu’une `site_key` est définie, y compris clés factices Cloudflare — l’API reste fail-open tant que le secret n’est pas « réel » ; en prod aligné sur l’enforcement).
 - **Frontend** : `src/components/auth/TurnstileWidget.tsx` — rendu **explicit** (`api.js?render=explicit`), **`render()` après `Script.onLoad` uniquement** (pas `turnstile.ready()` : incompatible avec le `defer` imposé par `next/script` afterInteractive — erreur Cloudflare sinon), préconnexion `challenges.cloudflare.com`, `size="flexible"`. `src/hooks/useTurnstileSiteKey.ts` : sur hôtes de dev (`localhost`, `127.0.0.1`, `*.test`, etc.) on **ignore** `NEXT_PUBLIC_TURNSTILE_SITE_KEY` si défini et on lit `GET /config/turnstile` — aligne le widget sur les clés factices Laravel (`APP_ENV=local` + clés vides) et évite l’erreur **110200** quand seule l’API autorise localhost. Sur hôtes « prod-like », `NEXT_PUBLIC_*` prime ; sinon fetch `/config/turnstile` comme repli Vercel. `TurnstileConfigAlert` + `onErrorCode` sur `/login`, `/owner/login`, `/register` guident la config Cloudflare si le widget échoue.
 - **Câblage login** : page `/login` pose `turnstileToken` dans le state, le passe à `login(email, password, token)` ; le bouton submit est désactivé tant que le token n'est pas obtenu (uniquement si Turnstile est configuré). `useAuthActions.login`/`loginOwner` et `authService.login` étendus pour accepter le 4ᵉ argument optionnel.
 - **Intégration UI complète** : Turnstile rendu sur `/login` (action=`login`), `/owner/login` (action=`login-owner`) et `/register` (action=`register-customer` ou `register-agent` selon le rôle). Sur les pages login, l’ordre du formulaire est : mot de passe → Turnstile (`minHeight`) → lien mot de passe oublié → « Se connecter ». Le submit reste désactivé tant que la config Turnstile n’est pas résolue ; si un widget est affiché, jusqu’à token Cloudflare. `authService.registerCustomer` / `registerAgent` propagent `turnstile_token` (champ optionnel) vers le backend. `RegistrationService::register` l'extrait via `$request->input('turnstile_token')` — vérification via `TurnstileService::verify()` avant rate-limit hit, échec → `ValidationException` ciblée sur `turnstile_token`. `.env.example` (backend + frontend) documente `TURNSTILE_SITE_KEY` / `TURNSTILE_SECRET_KEY` / `NEXT_PUBLIC_TURNSTILE_SITE_KEY`. **Fail-open en dev** : `TurnstileService::isConfigured()` est `false` lorsque le secret est **vide** *ou* lorsqu’il s’agit du **secret de test visible** Cloudflare (`1x0000…AA`, injecté par `config/services.php` quand `APP_ENV=local` sans `TURNSTILE_USE_PRODUCTION_KEYS`). Sinon, sans `turnstile_token`, `POST /auth/login` renvoyait **401 « Identifiants invalides. »** (Postman, `keyhome.test`, etc.). En prod, secret réel → vérification obligatoire comme prévu.
