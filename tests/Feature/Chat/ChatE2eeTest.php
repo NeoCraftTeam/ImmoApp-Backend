@@ -15,6 +15,12 @@ uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
     config(['chat.encryption_key' => bin2hex(random_bytes(32))]);
+
+    // The E2EE / client-sealed code path is now opt-in (disabled by default
+    // since May 2026 for cross-device portability). Tests that exercise the
+    // sealed branch need it explicitly turned on; the dedicated fallback test
+    // below overrides this to false to verify graceful degradation.
+    config(['chat.client_sealed_enabled' => true]);
 });
 
 /**
@@ -227,6 +233,39 @@ it('includes tenant and landlord E2EE public keys on conversation resource', fun
         ->assertOk()
         ->assertJsonPath('data.e2ee.tenant_public_key_pem', $tenant->chat_e2ee_public_key_pem)
         ->assertJsonPath('data.e2ee.landlord_public_key_pem', $landlord->chat_e2ee_public_key_pem);
+});
+
+it('downgrades a sealed payload to server-encrypted when client_sealed_enabled is false', function (): void {
+    // Production default (May 2026): the E2EE feature flag is off, so any client
+    // that still sends `is_client_sealed=true` must be silently degraded to the
+    // server-side AES branch — the body provided by the client (sent as a normal
+    // `body` field) is what the server stores. We never want to lose the user's
+    // message, even if the frontend hasn't been redeployed yet.
+    config(['chat.client_sealed_enabled' => false]);
+
+    ['tenant' => $tenant, 'conversation' => $conv] = chatTrioWithE2eeKeys();
+
+    $this->actingAs($tenant)
+        ->postJson("/api/v1/conversations/{$conv->id}/messages", [
+            'is_client_sealed' => true,
+            'e2ee_ciphertext_b64' => base64_encode('opaque'),
+            'e2ee_iv_b64' => base64_encode(random_bytes(12)),
+            'e2ee_wrapped_keys' => [
+                'tenant' => 'wk-t',
+                'landlord' => 'wk-l',
+            ],
+            'body' => 'Bonjour, ce message doit être server-encrypted.',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.is_client_sealed', false)
+        ->assertJsonPath('data.body', 'Bonjour, ce message doit être server-encrypted.')
+        ->assertJsonPath('data.e2ee', null);
+
+    // The conversation must not get its wrapped session keys updated, since
+    // the sealed branch never ran.
+    $conv->refresh();
+    expect($conv->e2ee_wrapped_key_tenant)->toBeNull()
+        ->and($conv->e2ee_wrapped_key_landlord)->toBeNull();
 });
 
 it('includes e2ee ciphertext on conversation list last_message when sealed', function (): void {

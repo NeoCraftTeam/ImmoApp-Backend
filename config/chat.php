@@ -14,6 +14,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Client-sealed (E2EE) messages
+    |--------------------------------------------------------------------------
+    | When false (default since May 2026), the server transparently ignores any
+    | `is_client_sealed=true` payload and falls back to server-side AES
+    | encryption (CHAT_ENCRYPTION_KEY). This trades end-to-end confidentiality
+    | for portability: a user opening their account on a new device or browser
+    | can immediately read their full history. WhatsApp Web / Telegram model.
+    |
+    | Flip to true to re-enable optional client-sealed messages (requires the
+    | frontend E2EE bootstrap to run again and the historic device key to be
+    | available). Legacy messages stored with is_client_sealed=true remain in
+    | the database and are still served as such; clients without the matching
+    | private key render a graceful fallback.
+    */
+    'client_sealed_enabled' => env('CHAT_CLIENT_SEALED_ENABLED', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Rate Limits (requests per minute)
     |--------------------------------------------------------------------------
     */

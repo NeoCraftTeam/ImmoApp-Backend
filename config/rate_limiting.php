@@ -38,4 +38,17 @@ return [
         'history' => (int) env('RL_PAYMENT_HISTORY', 60),    // per minute
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Viewings — tentative reservations (client POST)
+    |--------------------------------------------------------------------------
+    |
+    | Per authenticated user / minute. Keeps abuse bounded while allowing
+    | legitimate retries (validation errors, slot contention, flaky networks).
+    |
+    */
+    'viewings' => [
+        'reserve' => (int) env('RL_VIEWINGS_RESERVE', 20),
+    ],
+
 ];
