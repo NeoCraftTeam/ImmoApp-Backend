@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\CancelledBy;
 use App\Enums\ReservationStatus;
+use App\Exceptions\Viewing\ClientHasActiveReservationForAdException;
 use App\Exceptions\Viewing\ScheduleHasActiveReservationsException;
 use App\Exceptions\Viewing\SelfReservationException;
 use App\Exceptions\Viewing\SlotAlreadyReservedException;
@@ -14,9 +15,6 @@ use App\Models\Ad;
 use App\Models\TentativeReservation;
 use App\Models\User;
 use App\Models\Zap\Schedule;
-use App\Notifications\ReservationCancelledNotification;
-use App\Notifications\ReservationCreatedClientNotification;
-use App\Notifications\ReservationCreatedLandlordNotification;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
 use Carbon\Carbon;
@@ -43,6 +41,7 @@ final readonly class ReservationService implements ReservationServiceInterface
      * @throws SelfReservationException
      * @throws SlotNotAvailableException
      * @throws SlotAlreadyReservedException
+     * @throws ClientHasActiveReservationForAdException
      */
     public function reserve(Ad $ad, User $client, array $data): TentativeReservation
     {
@@ -50,12 +49,12 @@ final readonly class ReservationService implements ReservationServiceInterface
             throw new SelfReservationException;
         }
 
-        $this->assertSlotIsAvailable($ad, $data);
+        $this->assertSlotIsAvailable($ad, $client, $data);
 
         try {
             $reservation = DB::transaction(function () use ($ad, $client, $data): TentativeReservation {
                 // Re-verify inside the transaction to guard against race conditions.
-                $this->assertSlotIsAvailable($ad, $data);
+                $this->assertSlotIsAvailable($ad, $client, $data);
 
                 // Create the exclusive Zap appointment schedule.
                 $appointmentSchedule = $this->viewingScheduleService->reserveSlot($ad, [
@@ -81,13 +80,13 @@ final readonly class ReservationService implements ReservationServiceInterface
                     'expires_at' => now()->addHours(24),
                 ]);
             });
-        } catch (UniqueConstraintViolationException) {
+        } catch (UniqueConstraintViolationException $e) {
+            if (str_contains($e->getMessage(), 'tr_unique_client_ad_active')) {
+                throw new ClientHasActiveReservationForAdException;
+            }
+
             throw new SlotAlreadyReservedException;
         }
-
-        // Dispatch notifications after the transaction commits.
-        $client->notify(new ReservationCreatedClientNotification($reservation));
-        $ad->user->notify(new ReservationCreatedLandlordNotification($reservation));
 
         return $reservation;
     }
@@ -114,15 +113,6 @@ final readonly class ReservationService implements ReservationServiceInterface
             }
         });
 
-        // Notify the other party after the transaction commits.
-        $reservation->loadMissing(['client', 'ad.user']);
-
-        if ($cancelledBy === CancelledBy::Landlord) {
-            $reservation->client->notify(new ReservationCancelledNotification($reservation));
-        } else {
-            $reservation->ad->user->notify(new ReservationCancelledNotification($reservation));
-        }
-
         return $reservation->fresh() ?? $reservation;
     }
 
@@ -134,10 +124,10 @@ final readonly class ReservationService implements ReservationServiceInterface
     {
         $stale = TentativeReservation::query()
             ->expiredAndPending()
-            ->with('appointmentSchedule')
+            ->with(['appointmentSchedule', 'client', 'ad'])
             ->get();
 
-        return DB::transaction(function () use ($stale): int {
+        DB::transaction(function () use ($stale): void {
             foreach ($stale as $reservation) {
                 $reservation->update([
                     'status' => ReservationStatus::Expired,
@@ -149,9 +139,9 @@ final readonly class ReservationService implements ReservationServiceInterface
                     $this->viewingScheduleService->releaseSlot($reservation->appointmentSchedule);
                 }
             }
-
-            return $stale->count();
         });
+
+        return $stale->count();
     }
 
     /**
@@ -204,7 +194,7 @@ final readonly class ReservationService implements ReservationServiceInterface
     {
         $query = TentativeReservation::query()
             ->where('client_id', $client->id)
-            ->with(['ad.quarter', 'ad.media'])
+            ->with(['ad.quarter.city', 'ad.media', 'ad.user', 'ad.user.agency', 'ad.agency'])
             ->orderByDesc('slot_date')
             ->orderBy('slot_starts_at');
 
@@ -225,23 +215,36 @@ final readonly class ReservationService implements ReservationServiceInterface
 
     /**
      * @throws SlotNotAvailableException
+     * @throws SlotAlreadyReservedException
+     * @throws ClientHasActiveReservationForAdException
      */
-    private function assertSlotIsAvailable(Ad $ad, array $data): void
+    private function assertSlotIsAvailable(Ad $ad, User $client, array $data): void
     {
-        // Check date is not in the past.
-        if (Carbon::parse($data['slot_date'])->isPast() && !Carbon::parse($data['slot_date'])->isToday()) {
+        // Full slot instant must not be in the past (same calendar as app TZ).
+        $slotStartsAt = Carbon::parse($data['slot_date'].' '.$data['slot_starts_at']);
+        if ($slotStartsAt->isPast()) {
             throw new SlotNotAvailableException;
         }
 
-        // Check Zap confirms the slot is bookable.
-        $isBookable = $ad->isBookableAtTime(
+        // Must match GET /slots: use schedule metadata (duration + buffer), not Zap defaults.
+        if (!$this->viewingScheduleService->isOfferedBookableSlot(
+            $ad,
             $data['slot_date'],
             $data['slot_starts_at'],
-            $data['slot_ends_at']
-        );
-
-        if (!$isBookable) {
+            $data['slot_ends_at'],
+        )) {
             throw new SlotNotAvailableException;
+        }
+
+        // One active (pending or confirmed) reservation per client per ad — avoids duplicate requests / multi-slot confusion.
+        $clientHasActiveForAd = TentativeReservation::query()
+            ->where('ad_id', $ad->id)
+            ->where('client_id', $client->id)
+            ->active()
+            ->exists();
+
+        if ($clientHasActiveForAd) {
+            throw new ClientHasActiveReservationForAdException;
         }
 
         // Check our own DB has no active reservation for this exact slot.

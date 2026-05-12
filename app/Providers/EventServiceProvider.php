@@ -6,7 +6,9 @@ namespace App\Providers;
 
 use App\Events\AdCreated;
 use App\Events\AdStatusTransitioned;
+use App\Events\PaymentSucceeded;
 use App\Listeners\AutoBoostNewAd;
+use App\Listeners\FulfilPaymentOnSuccess;
 use App\Listeners\LogAuthenticationEvents;
 use App\Listeners\MatchSearchAlertsOnAdAvailable;
 use App\Listeners\NotifyAdminsOfPendingAd;
@@ -58,6 +60,15 @@ class EventServiceProvider extends ServiceProvider
             NotifyAdminsOfPendingAd::class,
             MatchSearchAlertsOnAdAvailable::class,
             SendAdApprovedEmail::class,
+        ],
+
+        // Payment fulfilment — credits / subscription / boost are awarded
+        // by `HandlePostPaymentActions`. Listener is synchronous + idempotent
+        // so the user sees the updated balance the moment polling reports
+        // SUCCESS (critical for the Stripe off-session path where
+        // `PaymentService::createPayment` settles the intent in ~150 ms).
+        PaymentSucceeded::class => [
+            FulfilPaymentOnSuccess::class,
         ],
 
         // Security audit trail — log all auth events

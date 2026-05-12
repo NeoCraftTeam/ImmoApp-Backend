@@ -156,9 +156,11 @@ final readonly class ViewingReservationController
             ->join('ad', 'ad.id', '=', 'tentative_reservations.ad_id')
             ->where('ad.user_id', $request->user()->id)
             ->with([
-                'ad:id,title,slug,user_id,quarter_id',
-                'ad.quarter:id,name,city_id',
-                'ad.media',
+                'ad' => fn ($q) => $q->with([
+                    'quarter',
+                    'media',
+                    'ad_type',
+                ]),
                 'client:id,firstname,lastname,avatar,phone_number,email',
             ])
             ->when(

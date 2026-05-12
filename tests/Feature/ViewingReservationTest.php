@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\ReservationStatus;
+use App\Exceptions\Viewing\ClientHasActiveReservationForAdException;
 use App\Exceptions\Viewing\SelfReservationException;
 use App\Exceptions\Viewing\SlotAlreadyReservedException;
 use App\Exceptions\Viewing\SlotNotAvailableException;
@@ -287,7 +288,9 @@ it('returns 410 Gone when the slot is not offered by the availability schedule',
         'slot_starts_at' => '23:00',
         'slot_ends_at' => '23:30',
     ])->assertStatus(410)
-        ->assertJsonPath('error.code', 'SLOT_NOT_AVAILABLE');
+        ->assertJsonPath('error.code', 'SLOT_NOT_AVAILABLE')
+        ->assertJsonPath('error.message', 'Ce créneau n\'est pas disponible pour la date demandée.')
+        ->assertJsonPath('error.hint', 'Ce créneau n\'existe pas ou la date est passée.');
 });
 
 // ===========================================================================
@@ -316,6 +319,31 @@ it('returns 409 Conflict when the slot is taken by a concurrent booking', functi
 });
 
 // ===========================================================================
+// TC-RES-11b — POST reservation: client already has an active reservation on this ad → 409
+// ===========================================================================
+
+it('returns 409 Conflict when the client already has an active reservation for this ad', function (): void {
+    $owner = User::factory()->create();
+    $client = User::factory()->create();
+    $ad = makeAd($owner);
+    UnlockedAd::factory()->create(['user_id' => $client->id, 'ad_id' => $ad->id, 'payment_id' => null]);
+
+    $this->mock(ReservationServiceInterface::class)
+        ->shouldReceive('reserve')
+        ->once()
+        ->andThrow(new ClientHasActiveReservationForAdException);
+
+    Sanctum::actingAs($client);
+
+    $this->postJson("/api/v1/ads/{$ad->id}/reservations", [
+        'slot_date' => now()->addDay()->toDateString(),
+        'slot_starts_at' => '11:00',
+        'slot_ends_at' => '11:30',
+    ])->assertConflict()
+        ->assertJsonPath('error.code', 'CLIENT_ACTIVE_RESERVATION_EXISTS');
+});
+
+// ===========================================================================
 // TC-RES-12 — GET /my/reservations: unauthenticated → 401
 // ===========================================================================
 
@@ -335,7 +363,12 @@ it('returns only the authenticated client\'s reservations', function (): void {
     $ad = makeAd($owner);
 
     TentativeReservation::factory()->create(['ad_id' => $ad->id, 'client_id' => $clientA->id]);
-    TentativeReservation::factory()->create(['ad_id' => $ad->id, 'client_id' => $clientA->id, 'slot_starts_at' => '11:00:00', 'slot_ends_at' => '11:30:00']);
+    TentativeReservation::factory()->cancelled()->create([
+        'ad_id' => $ad->id,
+        'client_id' => $clientA->id,
+        'slot_starts_at' => '11:00:00',
+        'slot_ends_at' => '11:30:00',
+    ]);
     TentativeReservation::factory()->create(['ad_id' => $ad->id, 'client_id' => $clientB->id, 'slot_starts_at' => '12:00:00', 'slot_ends_at' => '12:30:00']);
 
     Sanctum::actingAs($clientA);
@@ -353,9 +386,15 @@ it('filters personal reservations by status query parameter', function (): void 
     $owner = User::factory()->create();
     $client = User::factory()->create();
     $ad = makeAd($owner);
+    $adOther = makeAd($owner);
 
     TentativeReservation::factory()->pending()->create(['ad_id' => $ad->id, 'client_id' => $client->id]);
-    TentativeReservation::factory()->confirmed()->create(['ad_id' => $ad->id, 'client_id' => $client->id, 'slot_starts_at' => '11:00:00', 'slot_ends_at' => '11:30:00']);
+    TentativeReservation::factory()->confirmed()->create([
+        'ad_id' => $adOther->id,
+        'client_id' => $client->id,
+        'slot_starts_at' => '11:00:00',
+        'slot_ends_at' => '11:30:00',
+    ]);
     TentativeReservation::factory()->cancelled()->create(['ad_id' => $ad->id, 'client_id' => $client->id, 'slot_starts_at' => '12:00:00', 'slot_ends_at' => '12:30:00']);
 
     Sanctum::actingAs($client);

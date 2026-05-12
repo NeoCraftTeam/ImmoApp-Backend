@@ -38,9 +38,14 @@ interface ViewingScheduleServiceInterface
     /**
      * Return bookable slots for a given date.
      *
-     * @return list<array{starts_at: string, ends_at: string}>
+     * @return list<array{start_time: string, end_time: string, is_available: bool, buffer_minutes: int}>
      */
     public function getBookableSlotsForDate(Ad $ad, string $date): array;
+
+    /**
+     * Whether the exact window is listed as an available slot for this ad (same rules as GET /slots).
+     */
+    public function isOfferedBookableSlot(Ad $ad, string $date, string $startTime, string $endTime): bool;
 
     /**
      * Return bookable slots grouped by date for a date range.

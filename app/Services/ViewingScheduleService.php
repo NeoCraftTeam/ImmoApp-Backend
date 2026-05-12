@@ -122,13 +122,33 @@ final class ViewingScheduleService implements ViewingScheduleServiceInterface
     /**
      * Return bookable slots for a given date.
      *
-     * @return list<array{starts_at: string, ends_at: string, is_available: bool}>
+     * @return list<array{start_time: string, end_time: string, is_available: bool, buffer_minutes: int}>
      */
     public function getBookableSlotsForDate(Ad $ad, string $date): array
     {
         $meta = $this->getAvailabilityMetadata($ad);
 
         return $ad->getBookableSlots($date, $meta['slot_duration'], $meta['buffer_minutes']);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function isOfferedBookableSlot(Ad $ad, string $date, string $startTime, string $endTime): bool
+    {
+        $wantStart = Carbon::parse($startTime)->format('H:i');
+        $wantEnd = Carbon::parse($endTime)->format('H:i');
+
+        foreach ($this->getBookableSlotsForDate($ad, $date) as $slot) {
+            $slotStart = Carbon::parse((string) $slot['start_time'])->format('H:i');
+            $slotEnd = Carbon::parse((string) $slot['end_time'])->format('H:i');
+
+            if ($slotStart === $wantStart && $slotEnd === $wantEnd && !empty($slot['is_available'])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

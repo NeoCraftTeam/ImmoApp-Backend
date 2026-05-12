@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Observers;
 
+use App\Enums\CancelledBy;
 use App\Enums\ReservationStatus;
 use App\Models\TentativeReservation;
 use App\Notifications\ReservationCancelledNotification;
@@ -43,6 +44,15 @@ class TentativeReservationObserver
     }
 
     private function notifyCancellation(TentativeReservation $reservation): void
+    {
+        match ($reservation->cancelled_by) {
+            CancelledBy::Landlord => $reservation->client->notify(new ReservationCancelledNotification($reservation)),
+            CancelledBy::Client => $reservation->ad->user->notify(new ReservationCancelledNotification($reservation)),
+            default => $this->notifyCancellationBothParties($reservation),
+        };
+    }
+
+    private function notifyCancellationBothParties(TentativeReservation $reservation): void
     {
         $reservation->client->notify(new ReservationCancelledNotification($reservation));
         $reservation->ad->user->notify(new ReservationCancelledNotification($reservation));

@@ -18,11 +18,15 @@ class ReservationExpiredNotification extends Notification implements ShouldQueue
 
     public function __construct(
         private readonly TentativeReservation $reservation,
-    ) {}
+    ) {
+        $this->afterCommit();
+    }
 
     /** @return list<string> */
     public function via(mixed $notifiable): array
     {
+        $this->reservation->loadMissing(['ad', 'client']);
+
         $channels = ['database', 'mail'];
 
         if ($notifiable->pushSubscriptions()->exists()) {

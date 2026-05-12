@@ -359,11 +359,17 @@ it('denies calendar access to a non-owner', function (): void {
 
 it('returns a paginated list of reservations for the landlord', function (): void {
     $owner = User::factory()->create();
-    $client = User::factory()->create();
+    $clientA = User::factory()->create();
+    $clientB = User::factory()->create();
     $ad = availAd($owner);
 
-    TentativeReservation::factory()->pending()->create(['ad_id' => $ad->id, 'client_id' => $client->id]);
-    TentativeReservation::factory()->confirmed()->create(['ad_id' => $ad->id, 'client_id' => $client->id, 'slot_starts_at' => '11:00:00', 'slot_ends_at' => '11:30:00']);
+    TentativeReservation::factory()->pending()->create(['ad_id' => $ad->id, 'client_id' => $clientA->id]);
+    TentativeReservation::factory()->confirmed()->create([
+        'ad_id' => $ad->id,
+        'client_id' => $clientB->id,
+        'slot_starts_at' => '11:00:00',
+        'slot_ends_at' => '11:30:00',
+    ]);
 
     Sanctum::actingAs($owner);
 

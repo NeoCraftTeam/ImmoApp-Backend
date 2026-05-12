@@ -31,14 +31,46 @@ final class TentativeReservationResource extends JsonResource
 
             'ad' => new AdResource($this->whenLoaded('ad')),
             'client' => $this->when(
-                $this->relationLoaded('ad') && $request->user()?->id === $this->ad->user_id,
-                fn () => new UserResource($this->whenLoaded('client'))
+                $this->relationLoaded('client'),
+                function () use ($request) {
+                    $forLandlord = $this->clientContactVisibleToLandlord($request);
+                    if ($forLandlord !== null) {
+                        return $forLandlord;
+                    }
+
+                    return new UserResource($this->client);
+                }
             ),
 
             'next_steps' => $this->when(
                 $this->wasRecentlyCreated,
                 'Votre créneau est retenu pendant 24h. Le propriétaire vous contactera pour confirmer la visite. Assurez-vous d\'être joignable sur votre numéro enregistré.'
             ),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function clientContactVisibleToLandlord(Request $request): ?array
+    {
+        if (!$this->relationLoaded('ad') || !$this->relationLoaded('client')) {
+            return null;
+        }
+
+        if ($request->user()?->id !== $this->ad->user_id) {
+            return null;
+        }
+
+        $client = $this->client;
+
+        return [
+            'id' => $client->id,
+            'firstname' => $client->firstname,
+            'lastname' => $client->lastname,
+            'avatar' => $client->getFilamentAvatarUrl(),
+            'phone_number' => $client->phone_number,
+            'email' => $client->email,
         ];
     }
 }
