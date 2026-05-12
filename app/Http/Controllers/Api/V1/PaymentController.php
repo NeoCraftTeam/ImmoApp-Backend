@@ -6,10 +6,13 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\HandlePostPaymentActions;
 use App\Enums\PaymentStatus;
+use App\Enums\PaymentType;
 use App\Exceptions\InvalidWebhookSignatureException;
 use App\Exceptions\PaymentGatewayException;
 use App\Http\Requests\Api\V1\FlutterwaveInitiateRequest;
 use App\Http\Requests\Api\V1\FlutterwaveVerifyRequest;
+use App\Http\Requests\Api\V1\PaymentHistoryRequest;
+use App\Http\Requests\Api\V1\PaymentReceiptPdfRequest;
 use App\Http\Resources\PaymentResource;
 use App\Jobs\ProcessFlutterwaveWebhookJob;
 use App\Models\Payment;
@@ -17,9 +20,11 @@ use App\Models\PromoCode;
 use App\Models\PromoCodeUsage;
 use App\Models\User;
 use App\Services\Payment\PaymentService;
+use App\Support\PaymentPresentation;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -30,6 +35,25 @@ use OpenApi\Annotations as OA;
  */
 final class PaymentController
 {
+    /**
+     * ISO 4217 codes accepted by {@see resolveVisitorLocalePdfHints()} mapped to a display symbol for PDF receipts.
+     *
+     * @var array<string, string>
+     */
+    private const array VISITOR_LOCALE_SYMBOL_BY_CCY = [
+        'EUR' => '€',
+        'USD' => '$',
+        'CAD' => '$',
+        'AUD' => '$',
+        'MXN' => '$',
+        'BRL' => '$',
+        'GBP' => '£',
+        'CHF' => 'CHF',
+        'JPY' => '¥',
+        'CNY' => '¥',
+        'KRW' => '₩',
+    ];
+
     public function __construct(
         protected HandlePostPaymentActions $postPaymentActions,
         protected PaymentService $paymentService,
@@ -113,6 +137,10 @@ final class PaymentController
                 'plan_id' => $validated['plan_id'] ?? null,
                 'period' => $validated['period'] ?? null,
                 'description' => $description,
+                'save_payment_method' => (bool) ($validated['save_payment_method'] ?? false),
+                'payment_method_id' => isset($validated['payment_method_id']) && is_string($validated['payment_method_id']) && $validated['payment_method_id'] !== ''
+                    ? $validated['payment_method_id']
+                    : null,
                 'meta' => [
                     'package_id' => ($type === 'credit') ? ($validated['plan_id'] ?? null) : null,
                 ],
@@ -132,7 +160,13 @@ final class PaymentController
                 'payment_link' => $result['link'],
                 'tx_ref' => $result['tx_ref'],
                 'gateway' => $result['gateway'],
-                'status' => 'pending',
+                // The orchestrator already mapped the gateway's reply onto
+                // the internal Payment status (PENDING / SUCCESS / FAILED /
+                // CANCELLED) when Stripe could short-circuit the flow
+                // (saved card off-session). Surface the same value here
+                // so the frontend can skip the verify poll on instant
+                // success / failure.
+                'status' => $result['status'],
             ]);
         });
     }
@@ -197,7 +231,7 @@ final class PaymentController
      *
      * Returns ONLY the status (`pending` | `success` | `failed` | `cancelled`)
      * for a given `tx_ref`. Designed for the post-checkout callback page
-     * (`/credits/callback`, `/payment-success`) where the user's session
+     * (`/payment/return`, `/credits/callback`, `/payment-success`) where the user's session
      * cookie may have been lost during the cross-origin Flutterwave redirect.
      *
      * Security:
@@ -448,25 +482,23 @@ final class PaymentController
      *     @OA\Response(response=200, description="Liste paginée des transactions")
      * )
      */
-    public function history(Request $request): JsonResponse
+    public function history(PaymentHistoryRequest $request): AnonymousResourceCollection
     {
         /** @var User $user */
         $user = $request->user();
 
-        $payments = Payment::where('user_id', $user->id)
+        /** @var array{page?: int, per_page?: int} $validated */
+        $validated = $request->validated();
+        $perPage = min(max((int) ($validated['per_page'] ?? 10), 1), 50);
+
+        $payments = Payment::query()
+            ->where('user_id', $user->id)
             ->with('pointPackage')
             ->orderByDesc('created_at')
-            ->paginate(20);
+            ->orderByDesc('id')
+            ->paginate($perPage);
 
-        return response()->json([
-            'data' => PaymentResource::collection($payments),
-            'meta' => [
-                'current_page' => $payments->currentPage(),
-                'last_page' => $payments->lastPage(),
-                'per_page' => $payments->perPage(),
-                'total' => $payments->total(),
-            ],
-        ]);
+        return PaymentResource::collection($payments);
     }
 
     /**
@@ -496,29 +528,11 @@ final class PaymentController
 
         $period = $request->integer('period', 0);
 
-        // Visitor's locale currency (CHF / EUR / USD…) and the per-XAF rate
-        // — both come from the frontend's `useCurrency()` so the PDF can
-        // render the local converted amount as primary with the canonical
-        // FCFA as a reference subtitle. We accept only ISO codes from a
-        // fixed allow-list and a positive finite rate; anything else falls
-        // back to FCFA-only display (no conversion).
-        $allowedCurrencies = ['EUR', 'USD', 'GBP', 'CHF', 'CAD', 'JPY', 'MXN', 'BRL', 'CNY', 'AUD', 'KRW'];
-        $rawCurrency = strtoupper((string) $request->query('currency', ''));
-        $rawRate = (float) $request->query('rate', 0);
-        $useLocale = in_array($rawCurrency, $allowedCurrencies, true)
-            && is_finite($rawRate)
-            && $rawRate > 0;
-        $localeCurrency = $useLocale ? $rawCurrency : null;
-        $localeRate = $useLocale ? $rawRate : null;
-        $localeSymbol = $useLocale ? match ($rawCurrency) {
-            'EUR' => '€',
-            'USD', 'CAD', 'AUD', 'MXN', 'BRL' => '$',
-            'GBP' => '£',
-            'CHF' => 'CHF',
-            'JPY', 'CNY' => '¥',
-            'KRW' => '₩',
-            default => $rawCurrency,
-        } : null;
+        [
+            'localeCurrency' => $localeCurrency,
+            'localeRate' => $localeRate,
+            'localeSymbol' => $localeSymbol,
+        ] = $this->resolveVisitorLocalePdfHints($request);
 
         $query = Payment::where('user_id', $user->id)
             ->with('pointPackage', 'ad')
@@ -571,5 +585,102 @@ final class PaymentController
             ]);
 
         return $pdf->download('keyhome-paiements-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    /**
+     * Export a single payment as a printable PDF receipt (same auth as history/export).
+     *
+     * @OA\Get(
+     *     path="/api/v1/payments/{payment}/receipt",
+     *     summary="Reçu PDF d'une transaction",
+     *     tags={"💰 Paiements"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Response(response=200, description="PDF"),
+     *     @OA\Response(response=403, description="Interdit"),
+     *     @OA\Response(response=404, description="Introuvable")
+     * )
+     */
+    public function receipt(PaymentReceiptPdfRequest $request, Payment $payment): Response
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        abort_unless($payment->user_id === $user->id, 403);
+
+        [
+            'localeCurrency' => $localeCurrency,
+            'localeRate' => $localeRate,
+            'localeSymbol' => $localeSymbol,
+        ] = $this->resolveVisitorLocalePdfHints($request);
+
+        $payment->loadMissing('pointPackage', 'ad');
+
+        $presentation = PaymentPresentation::forPayment($payment);
+
+        $typeLabel = match ($payment->type) {
+            PaymentType::UNLOCK => 'Déblocage',
+            PaymentType::SUBSCRIPTION => 'Abonnement',
+            PaymentType::BOOST => 'Boost',
+            PaymentType::CREDIT => 'Crédits',
+        };
+
+        $logoPath = public_path('images/keyhomelogo_transparent.png');
+        $logoBase64 = file_exists($logoPath)
+            ? 'data:image/png;base64,'.base64_encode((string) file_get_contents($logoPath))
+            : null;
+
+        $pdf = Pdf::loadView('pdf.payment-receipt', [
+            'user' => $user,
+            'payment' => $payment,
+            'presentation' => $presentation,
+            'typeLabel' => $typeLabel,
+            'generatedAt' => now()->format('d/m/Y à H:i'),
+            'logoBase64' => $logoBase64,
+            'localeCurrency' => $localeCurrency,
+            'localeRate' => $localeRate,
+            'localeSymbol' => $localeSymbol,
+        ])
+            ->setPaper('a4', 'portrait')
+            ->setOptions([
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => false,
+                'defaultFont' => 'DejaVu Sans',
+            ]);
+
+        $safeRef = preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $payment->transaction_id) ?? 'recu';
+
+        return $pdf->stream('keyhome-recu-'.$safeRef.'.pdf');
+    }
+
+    /**
+     * @return array{
+     *     localeCurrency: string|null,
+     *     localeRate: float|null,
+     *     localeSymbol: string|null
+     * }
+     */
+    private function resolveVisitorLocalePdfHints(Request $request): array
+    {
+        $allowedCurrencies = ['EUR', 'USD', 'GBP', 'CHF', 'CAD', 'JPY', 'MXN', 'BRL', 'CNY', 'AUD', 'KRW'];
+        $rawCurrency = strtoupper((string) $request->query('currency', ''));
+        $rawRate = (float) $request->query('rate', 0);
+        $useLocale = in_array($rawCurrency, $allowedCurrencies, true)
+            && is_finite($rawRate)
+            && $rawRate > 0;
+
+        if (!$useLocale) {
+            return [
+                'localeCurrency' => null,
+                'localeRate' => null,
+                'localeSymbol' => null,
+            ];
+        }
+
+        return [
+            'localeCurrency' => $rawCurrency,
+            'localeRate' => $rawRate,
+            'localeSymbol' => self::VISITOR_LOCALE_SYMBOL_BY_CCY[$rawCurrency],
+        ];
     }
 }

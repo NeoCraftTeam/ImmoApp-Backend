@@ -55,6 +55,14 @@ final readonly class PaymentService
     /**
      * Create a pending payment record and obtain the checkout link.
      *
+     * Stripe-only options (silently ignored by other gateways):
+     *  - `save_payment_method` (bool) → asks Stripe to attach the card to
+     *    the Customer on success so it can be re-charged off-session later.
+     *  - `payment_method_id` (`pm_xxx`) → reuse a previously saved card.
+     *    The PaymentIntent is confirmed server-side, off-session ;
+     *    `initiateWithFallback()` may return `status === 'success'`
+     *    (instant fulfilment), `'requires_action'` (3DS), or `'failed'`.
+     *
      * @param  array{
      *     amount: float,
      *     currency?: string,
@@ -67,9 +75,11 @@ final readonly class PaymentService
      *     period?: string|null,
      *     description?: string,
      *     redirect_url?: string|null,
+     *     save_payment_method?: bool,
+     *     payment_method_id?: string|null,
      *     meta?: array<string, mixed>
      * } $data
-     * @return array{payment: Payment, link: string, tx_ref: string, gateway: string}
+     * @return array{payment: Payment, link: string, tx_ref: string, gateway: string, status: string}
      */
     public function createPayment(User $user, array $data): array
     {
@@ -88,8 +98,13 @@ final readonly class PaymentService
         $redirectUrl = is_string($redirectUrl) && $redirectUrl !== '' ? $redirectUrl : null;
 
         if ($redirectUrl === null) {
-            $redirectUrl = config('payment.gateways.flutterwave.redirect_url')
-                ?: config('app.frontend_url', config('app.url')).'/payment/callback';
+            $configured = config('payment.gateways.flutterwave.redirect_url');
+            $redirectUrl = (is_string($configured) && $configured !== '')
+                ? $configured
+                : $this->defaultFrontendPaymentReturnUrl(
+                    (string) $data['type'],
+                    self::stringOrNull($data['ad_id'] ?? null),
+                );
         }
 
         $gatewayPayload = [
@@ -105,6 +120,27 @@ final readonly class PaymentService
             'meta' => $meta,
         ];
 
+        // Stripe-only options. `customer_id` is resolved lazily through
+        // Cashier so users who never paid by card stay free of a Stripe
+        // Customer record until they opt in.
+        $savePaymentMethod = (bool) ($data['save_payment_method'] ?? false);
+        $paymentMethodId = self::stringOrNull($data['payment_method_id'] ?? null);
+        $needsStripeCustomer = $savePaymentMethod || $paymentMethodId !== null;
+        $isStripeFlow = ($data['payment_method'] ?? null) === PaymentMethod::CARD->value;
+
+        if ($isStripeFlow && $needsStripeCustomer) {
+            // Avoid the unnecessary `customers.retrieve` round-trip
+            // performed by Cashier's `createOrGetStripeCustomer()` when
+            // the user already has a stored `stripe_id`. We only need
+            // the id string ; creating one if missing covers the
+            // first-time card flow.
+            $gatewayPayload['customer_id'] = $user->hasStripeId()
+                ? (string) $user->stripeId()
+                : (string) $user->createAsStripeCustomer()->id;
+            $gatewayPayload['save_payment_method'] = $savePaymentMethod;
+            $gatewayPayload['payment_method_id'] = $paymentMethodId;
+        }
+
         // Route to the gateway implied by the chosen `payment_method`. If
         // the method is unknown or its gateway isn't registered, we fall
         // back to the legacy default (Flutterwave). Mobile money +
@@ -113,14 +149,21 @@ final readonly class PaymentService
 
         [$result, $usedGateway] = $this->initiateWithFallback($gatewayPayload, $primaryGateway);
 
-        $payment = DB::transaction(function () use ($data, $txRef, $result, $user, $usedGateway): Payment {
+        $initialStatus = match ($result['status']) {
+            'success' => PaymentStatus::SUCCESS,
+            'failed' => PaymentStatus::FAILED,
+            'cancelled' => PaymentStatus::CANCELLED,
+            default => PaymentStatus::PENDING,
+        };
+
+        $payment = DB::transaction(function () use ($data, $txRef, $result, $user, $usedGateway, $initialStatus): Payment {
             $payment = new Payment;
             $payment->type = PaymentType::from((string) $data['type']);
             $payment->amount = (int) round((float) $data['amount']);
             $payment->transaction_id = $txRef;
             $payment->payment_method = PaymentMethod::from((string) ($data['payment_method'] ?? 'flutterwave'));
             $payment->user_id = $user->id;
-            $payment->status = PaymentStatus::PENDING;
+            $payment->status = $initialStatus;
             $payment->gateway = $usedGateway->getName();
             $payment->payment_link = $result['link'];
             $payment->phone_number = $data['phone_number'] ?? null;
@@ -135,12 +178,23 @@ final readonly class PaymentService
             return $payment;
         });
 
+        // Off-session confirm path : Stripe already settled the intent so
+        // we can dispatch the terminal event immediately. Webhook arrival
+        // is still expected and remains idempotent (the orphan-debit guard
+        // in `processWebhook()` ignores duplicate SUCCESS/FAILED states).
+        if ($initialStatus === PaymentStatus::SUCCESS) {
+            PaymentSucceeded::dispatch($payment);
+        } elseif ($initialStatus === PaymentStatus::FAILED) {
+            PaymentFailed::dispatch($payment);
+        }
+
         Log::info('Payment created', [
             'payment_id' => $payment->id,
             'gateway' => $usedGateway->getName(),
             'amount' => $data['amount'],
             'user_id' => $user->id,
             'tx_ref' => $txRef,
+            'initial_status' => $initialStatus->value,
         ]);
 
         return [
@@ -148,6 +202,7 @@ final readonly class PaymentService
             'link' => $result['link'],
             'tx_ref' => $txRef,
             'gateway' => $usedGateway->getName(),
+            'status' => $result['status'],
         ];
     }
 
@@ -243,7 +298,10 @@ final readonly class PaymentService
 
                 // Update payment_method from gateway resolution (e.g. orange_money, mobile_money, card)
                 if (!empty($result['payment_method'])) {
-                    $updateData['payment_method'] = PaymentMethod::tryFrom($result['payment_method']);
+                    $resolvedMethod = PaymentMethod::tryFrom($result['payment_method']);
+                    if ($resolvedMethod instanceof PaymentMethod) {
+                        $updateData['payment_method'] = $resolvedMethod;
+                    }
                 }
 
                 $locked->forceFill($updateData)->save();
@@ -372,7 +430,10 @@ final readonly class PaymentService
                 ];
 
                 if (!empty($data['payment_method'])) {
-                    $webhookUpdate['payment_method'] = PaymentMethod::tryFrom($data['payment_method']);
+                    $resolvedMethod = PaymentMethod::tryFrom($data['payment_method']);
+                    if ($resolvedMethod instanceof PaymentMethod) {
+                        $webhookUpdate['payment_method'] = $resolvedMethod;
+                    }
                 }
 
                 $payment->forceFill($webhookUpdate)->save();
@@ -533,5 +594,47 @@ final readonly class PaymentService
             'stripe' => app(StripePaymentService::class),
             default => throw new \InvalidArgumentException("Gateway [{$name}] not supported."),
         };
+    }
+
+    /**
+     * Default Flutterwave hosted-checkout return URL on the PWA.
+     *
+     * Flutterwave only redirects after its own confirmation UI, appending
+     * `status`, `tx_ref`, and related query parameters.
+     */
+    private function defaultFrontendPaymentReturnUrl(string $paymentType, ?string $adId): string
+    {
+        $base = rtrim((string) config('app.frontend_url', config('app.url')), '/');
+
+        $flow = match ($paymentType) {
+            PaymentType::CREDIT->value => 'credit',
+            PaymentType::UNLOCK->value => 'unlock',
+            PaymentType::SUBSCRIPTION->value => 'subscription',
+            PaymentType::BOOST->value => 'boost',
+            default => 'credit',
+        };
+
+        $query = ['flow' => $flow];
+        if (is_string($adId) && $adId !== '') {
+            $query['ad_id'] = $adId;
+        }
+
+        return $base.'/payment/return?'.http_build_query($query);
+    }
+
+    /**
+     * Narrow a `mixed` payload value to a non-empty string or null.
+     *
+     * Centralises the `is_string + !== ''` guard so PHPStan sees a single,
+     * unambiguous type-narrowing path (avoids the false-positive
+     * `booleanAnd.rightAlwaysTrue` reported when the same chain is inlined).
+     */
+    private static function stringOrNull(mixed $value): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+
+        return $value === '' ? null : $value;
     }
 }

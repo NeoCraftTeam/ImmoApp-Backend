@@ -11,6 +11,7 @@ use App\Filament\Exports\PaymentExporter;
 use App\Filament\Imports\PaymentImporter;
 use App\Models\Payment;
 use App\Services\Payment\RefundService;
+use App\Support\PaymentPresentation;
 use BackedEnum;
 use Filament\Actions\Action as RecordAction;
 use Filament\Actions\ExportAction;
@@ -100,11 +101,18 @@ class PaymentResource extends Resource
                             ->label('Type de paiement')
                             ->badge()
                             ->color('info'),
+                        TextEntry::make('presentation_method')
+                            ->label('Moyen réel')
+                            ->state(fn (Payment $record): string => PaymentPresentation::forPayment($record)['payment_method_label']),
+                        TextEntry::make('presentation_detail')
+                            ->label('Complément trace')
+                            ->state(fn (Payment $record): ?string => PaymentPresentation::forPayment($record)['payment_method_detail'])
+                            ->placeholder('—'),
                         TextEntry::make('payment_method')
-                            ->label('Moyen de paiement')
+                            ->label('Code moyen')
                             ->badge()
-                            ->color('primary')
-                            ->icon(Heroicon::CreditCard),
+                            ->color('gray')
+                            ->placeholder('—'),
                         TextEntry::make('transaction_id')
                             ->label('Référence transaction')
                             ->copyable()
@@ -140,11 +148,11 @@ class PaymentResource extends Resource
                     ->iconColor('primary')
                     ->columns(3)
                     ->schema([
-                        TextEntry::make('gateway')
-                            ->label('Passerelle')
+                        TextEntry::make('gateway_display')
+                            ->label('Passerelle (paiement)')
+                            ->state(fn (Payment $record): string => PaymentPresentation::forPayment($record)['gateway_label'])
                             ->badge()
-                            ->color('info')
-                            ->formatStateUsing(fn (?string $state): string => $state ? ucfirst($state) : '—'),
+                            ->color('info'),
                         TextEntry::make('points_awarded')
                             ->label('Crédits attribués')
                             ->badge()
@@ -200,10 +208,19 @@ class PaymentResource extends Resource
                     ->searchable()
                     ->copyable()
                     ->copyMessage('ID copié !'),
-                TextColumn::make('payment_method')
-                    ->label('Moyen de paiement')
-                    ->badge()
-                    ->searchable(),
+                TextColumn::make('payment_trace')
+                    ->label('Moyen / trace')
+                    ->state(function (Payment $record): string {
+                        $row = PaymentPresentation::forPayment($record);
+                        $line = $row['payment_method_label'];
+                        if (($row['payment_method_detail'] ?? null) !== null && $row['payment_method_detail'] !== '') {
+                            $line .= ' — '.$row['payment_method_detail'];
+                        }
+
+                        return $line;
+                    })
+                    ->description(fn (Payment $record): string => PaymentPresentation::forPayment($record)['gateway_label'])
+                    ->wrap(),
                 TextColumn::make('ad.title')
                     ->label('Annonce')
                     ->searchable()

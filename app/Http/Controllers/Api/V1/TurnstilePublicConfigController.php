@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Services\TurnstileService;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
 
@@ -19,8 +20,13 @@ final class TurnstilePublicConfigController
         $raw = config('services.turnstile.site_key');
         $siteKey = is_string($raw) && $raw !== '' ? $raw : null;
 
+        /** @var TurnstileService $turnstile */
+        $turnstile = app(TurnstileService::class);
+
         return ApiResponse::success('OK', [
             'site_key' => $siteKey,
+            'verification_required' => $turnstile->isConfigured(),
+            'show_credits_turnstile' => $turnstile->shouldShowCreditsTurnstileStep(),
         ]);
     }
 }

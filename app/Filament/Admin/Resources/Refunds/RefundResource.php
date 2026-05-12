@@ -6,7 +6,9 @@ namespace App\Filament\Admin\Resources\Refunds;
 
 use App\Enums\RefundStatus;
 use App\Filament\Admin\Resources\Refunds\Pages\ManageRefunds;
+use App\Models\Payment;
 use App\Models\Refund;
+use App\Support\PaymentPresentation;
 use Filament\Actions\ViewAction;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
@@ -16,6 +18,7 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 final class RefundResource extends Resource
 {
@@ -34,6 +37,13 @@ final class RefundResource extends Resource
     protected static ?string $pluralLabel = 'Remboursements';
 
     protected static ?string $navigationLabel = 'Remboursements';
+
+    #[\Override]
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->with(['payment', 'user', 'processedBy']);
+    }
 
     #[\Override]
     public static function form(Schema $schema): Schema
@@ -80,13 +90,58 @@ final class RefundResource extends Resource
                             ->badge()
                             ->formatStateUsing(fn (bool $state): string => $state ? 'Partiel' : 'Total')
                             ->color(fn (bool $state): string => $state ? 'warning' : 'info'),
+                    ]),
+
+                Section::make("Paiement d'origine")
+                    ->icon(Heroicon::CreditCard)
+                    ->iconColor('gray')
+                    ->columns(2)
+                    ->schema([
                         TextEntry::make('payment.transaction_id')
-                            ->label("Réf. paiement d'origine")
+                            ->label('Réf. transaction')
                             ->copyable()
                             ->copyMessage('Référence copiée !')
                             ->icon(Heroicon::QrCode)
                             ->badge()
-                            ->color('gray'),
+                            ->color('gray')
+                            ->placeholder('—'),
+                        TextEntry::make('presentation_gateway_label')
+                            ->label('Passerelle')
+                            ->state(function (Refund $record): string {
+                                $payment = $record->payment;
+
+                                return $payment instanceof Payment
+                                    ? PaymentPresentation::forPayment($payment)['gateway_label']
+                                    : '—';
+                            })
+                            ->badge()
+                            ->color('info'),
+                        TextEntry::make('presentation_method')
+                            ->label('Moyen réel')
+                            ->state(function (Refund $record): string {
+                                $payment = $record->payment;
+
+                                return $payment instanceof Payment
+                                    ? PaymentPresentation::forPayment($payment)['payment_method_label']
+                                    : '—';
+                            })
+                            ->placeholder('—'),
+                        TextEntry::make('presentation_detail')
+                            ->label('Complément trace')
+                            ->state(function (Refund $record): ?string {
+                                $payment = $record->payment;
+
+                                return $payment instanceof Payment
+                                    ? PaymentPresentation::forPayment($payment)['payment_method_detail']
+                                    : null;
+                            })
+                            ->placeholder('—'),
+                        TextEntry::make('payment.payment_method')
+                            ->label('Code moyen')
+                            ->formatStateUsing(fn ($state): string => $state instanceof \BackedEnum ? $state->value : (string) ($state ?? ''))
+                            ->badge()
+                            ->color('gray')
+                            ->placeholder('—'),
                     ]),
 
                 Section::make('Parties concernées')
@@ -157,6 +212,36 @@ final class RefundResource extends Resource
                     ->searchable()
                     ->copyable()
                     ->copyMessage('ID copié !'),
+                TextColumn::make('payment_origin_trace')
+                    ->label('Moyen / trace')
+                    ->state(function (Refund $record): string {
+                        $payment = $record->payment;
+
+                        if (!$payment instanceof Payment) {
+                            return '—';
+                        }
+
+                        $row = PaymentPresentation::forPayment($payment);
+                        $line = $row['payment_method_label'];
+
+                        $detail = $row['payment_method_detail'] ?? null;
+
+                        if (($detail ?? '') !== '') {
+                            $line .= ' — '.$detail;
+                        }
+
+                        return $line;
+                    })
+                    ->description(function (Refund $record): string {
+                        $payment = $record->payment;
+
+                        if (!$payment instanceof Payment) {
+                            return '—';
+                        }
+
+                        return PaymentPresentation::forPayment($payment)['gateway_label'];
+                    })
+                    ->wrap(),
                 TextColumn::make('user.fullname')
                     ->label('Utilisateur')
                     ->searchable(),

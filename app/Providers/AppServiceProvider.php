@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Contracts\AiSearchServiceInterface;
 use App\Contracts\PaymentGatewayInterface;
 use App\Contracts\RecommendationEngineInterface;
+use App\Contracts\StripeSavedCardServiceInterface;
 use App\Contracts\TrustScoreServiceInterface;
 use App\Enums\UserRole;
 use App\Enums\UserType;
@@ -68,6 +69,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(AiSearchServiceInterface::class, AiSearchService::class);
         $this->app->bind(RecommendationEngineInterface::class, RecommendationEngine::class);
         $this->app->bind(TrustScoreServiceInterface::class, TrustScoreService::class);
+        $this->app->bind(StripeSavedCardServiceInterface::class, StripePaymentService::class);
 
         // WebAuthn: use cache (Redis) for challenge storage instead of session.
         // The default SessionChallengeRepository breaks with SESSION_DRIVER=cookie
@@ -269,6 +271,9 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('payments.webhook', fn (Request $r) => Limit::perMinute(config('rate_limiting.payments.webhook', 120))->by($r->ip()));
 
         RateLimiter::for('payments.history', fn (Request $r) => Limit::perMinute(config('rate_limiting.payments.history', 60))->by(optional($r->user())->id ?? $r->ip()));
+
+        RateLimiter::for('viewings.reserve', fn (Request $r) => Limit::perMinute(max(1, config('rate_limiting.viewings.reserve', 20)))
+            ->by(optional($r->user())->id ?? $r->ip()));
     }
 
     private function resolvePaymentGateway(mixed $app, string $name): PaymentGatewayInterface

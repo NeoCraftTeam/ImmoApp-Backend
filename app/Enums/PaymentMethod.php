@@ -18,9 +18,9 @@ enum PaymentMethod: string
     {
         return match ($this) {
             self::ORANGE_MONEY => 'Orange Money',
-            self::MOBILE_MONEY => 'Mobile Money',
+            self::MOBILE_MONEY => 'MTN Mobile Money',
             self::CARD => 'Carte bancaire',
-            self::FLUTTERWAVE => 'Flutterwave',
+            self::FLUTTERWAVE => 'Autre · Flutterwave',
         };
     }
 

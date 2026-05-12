@@ -7,6 +7,7 @@ namespace App\Filament\Agency\Resources\Payments;
 use App\Enums\PaymentStatus;
 use App\Filament\Agency\Resources\Payments\Pages\ManagePayments;
 use App\Models\Payment;
+use App\Support\PaymentPresentation;
 use BackedEnum;
 use Filament\Actions\ViewAction;
 use Filament\Infolists\Components\TextEntry;
@@ -73,8 +74,21 @@ class PaymentResource extends Resource
                             ->label('Type')
                             ->badge()
                             ->color('info'),
+                        TextEntry::make('presentation_method')
+                            ->label('Moyen réel')
+                            ->state(fn (Payment $record): string => PaymentPresentation::forPayment($record)['payment_method_label']),
+                        TextEntry::make('presentation_detail')
+                            ->label('Complément trace')
+                            ->state(fn (Payment $record): ?string => PaymentPresentation::forPayment($record)['payment_method_detail'])
+                            ->placeholder('—'),
+                        TextEntry::make('presentation_gateway_label')
+                            ->label('Passerelle')
+                            ->state(fn (Payment $record): string => PaymentPresentation::forPayment($record)['gateway_label'])
+                            ->badge()
+                            ->color('gray'),
                         TextEntry::make('payment_method')
-                            ->label('Moyen de paiement')
+                            ->label('Code moyen')
+                            ->formatStateUsing(fn ($state): string => $state instanceof BackedEnum ? $state->value : (string) ($state ?? ''))
                             ->badge()
                             ->color('primary'),
                         TextEntry::make('transaction_id')
@@ -134,6 +148,20 @@ class PaymentResource extends Resource
                         PaymentStatus::FAILED => 'danger',
                         default => 'gray',
                     }),
+                TextColumn::make('payment_trace')
+                    ->label('Moyen / trace')
+                    ->state(function (Payment $record): string {
+                        $row = PaymentPresentation::forPayment($record);
+                        $line = $row['payment_method_label'];
+
+                        if (($row['payment_method_detail'] ?? '') !== '') {
+                            $line .= ' — '.$row['payment_method_detail'];
+                        }
+
+                        return $line;
+                    })
+                    ->description(fn (Payment $record): string => PaymentPresentation::forPayment($record)['gateway_label'])
+                    ->wrap(),
                 TextColumn::make('transaction_id')
                     ->label('Référence')
                     ->searchable()

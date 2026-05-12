@@ -168,7 +168,7 @@
             font-size: 7.5pt;
             font-weight: bold;
         }
-        .status-paid      { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
+        .status-success   { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
         .status-pending   { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
         .status-failed    { background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
         .status-cancelled { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
@@ -336,12 +336,6 @@
                     'subscription' => 'Abonnement',
                     'boost'        => 'Boost',
                 ];
-                $methodLabels = [
-                    'mobile_money'  => 'MTN MoMo',
-                    'orange_money'  => 'Orange Money',
-                    'card'          => 'Carte',
-                    'flutterwave'   => 'Flutterwave',
-                ];
             @endphp
             <table class="tx-table">
                 <thead>
@@ -362,11 +356,10 @@
                             $typeKey   = $payment->type->value ?? 'other';
                             $typeLbl   = $typeLabels[$typeKey] ?? ucfirst($typeKey);
                             $statusKey = $payment->status->value ?? 'other';
-                            $methodKey = $payment->payment_method?->value ?? 'flutterwave';
-                            $methodLbl = $methodLabels[$methodKey] ?? ucfirst($methodKey);
+                            $presentation = \App\Support\PaymentPresentation::forPayment($payment);
                             $packName  = $payment->pointPackage?->name;
                             $credits   = $payment->pointPackage?->points_awarded;
-                            $isPaid    = $statusKey === 'paid';
+                            $isPaid    = $statusKey === 'success';
                         @endphp
                         <tr class="{{ $i % 2 === 1 ? 'tx-row-even' : '' }}">
                             <td style="font-size:8.5pt; color:#64748b; white-space:nowrap;">
@@ -396,13 +389,25 @@
                                     <span style="color:#cbd5e1;">—</span>
                                 @endif
                             </td>
-                            <td class="center" style="font-size:8pt; color:#64748b;">
-                                {{ $methodLbl }}
+                            <td class="center" style="font-size:7.6pt; color:#475569; line-height:1.35;">
+                                <strong style="font-weight:600;color:#334155;">
+                                    {{ $presentation['payment_method_label'] }}
+                                </strong>
+                                @if(filled($presentation['payment_method_detail']))
+                                    <div style="font-size:7pt;color:#64748b;margin-top:2px;">
+                                        {{ $presentation['payment_method_detail'] }}
+                                    </div>
+                                @endif
+                                <div style="font-size:7pt;color:#94a3b8;margin-top:3px;">
+                                    Passerelle : {{ $presentation['gateway_label'] }}
+                                </div>
                             </td>
                             <td class="center">
-                                <span class="status-badge status-{{ $statusKey }}">
-                                    @if($statusKey === 'paid') ✓ Payé
-                                    @elseif($statusKey === 'pending') En attente
+                                <span class="status-badge status-{{ $statusKey === 'success' ? 'success' : $statusKey }}">
+                                    @if($statusKey === 'success')
+                                        Réussi
+                                    @elseif($statusKey === 'pending')
+                                        En attente
                                     @elseif($statusKey === 'failed') Échoué
                                     @elseif($statusKey === 'cancelled') Annulé
                                     @elseif($statusKey === 'refunded') Remboursé

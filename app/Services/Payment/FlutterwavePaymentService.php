@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Payment;
 
 use App\Contracts\PaymentGatewayInterface;
+use App\Enums\PaymentMethod;
 use App\Exceptions\InvalidWebhookSignatureException;
 use App\Exceptions\PaymentGatewayException;
 use Illuminate\Http\Client\PendingRequest;
@@ -153,7 +154,7 @@ final readonly class FlutterwavePaymentService implements PaymentGatewayInterfac
             'currency' => (string) ($data['currency'] ?? ''),
             'payment_method' => $this->resolvePaymentMethod($data),
             'paid_at' => $status === 'successful' ? (string) ($data['created_at'] ?? now()->toISOString()) : null,
-            'raw' => $data,
+            'raw' => $this->withKhPaymentTrace($data),
         ];
     }
 
@@ -209,7 +210,7 @@ final readonly class FlutterwavePaymentService implements PaymentGatewayInterfac
             'amount' => (float) ($data['amount'] ?? 0),
             'currency' => (string) ($data['currency'] ?? ''),
             'payment_method' => $this->resolvePaymentMethod($data),
-            'raw' => $data,
+            'raw' => $this->withKhPaymentTrace($data),
         ];
     }
 
@@ -265,6 +266,37 @@ final readonly class FlutterwavePaymentService implements PaymentGatewayInterfac
             ->baseUrl($this->baseUrl)
             ->acceptJson()
             ->timeout(30);
+    }
+
+    /**
+     * Normalised audit trail keyed like Stripe rows — avoids persisting redundant columns.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function withKhPaymentTrace(array $data): array
+    {
+        $resolved = $this->resolvePaymentMethod($data);
+        $enum = $resolved !== null ? PaymentMethod::tryFrom($resolved) : null;
+        $typeRaw = strtolower((string) ($data['payment_type'] ?? ''));
+
+        $detail = null;
+
+        if (str_contains($typeRaw, 'mtn')) {
+            $detail = 'MTN Cameroun';
+        } elseif (str_contains($typeRaw, 'orange')) {
+            $detail = 'Orange Cameroun';
+        } elseif ($typeRaw !== '') {
+            $detail = ucfirst(trim($typeRaw));
+        }
+
+        return array_merge($data, [
+            'kh_payment_trace' => [
+                'label_fr' => $enum?->label() ?? ($typeRaw !== '' ? ucfirst(trim($typeRaw)) : 'Flutterwave'),
+                'detail_fr' => $detail,
+                'flutterwave_payment_type' => $typeRaw ?: null,
+            ],
+        ]);
     }
 
     /**

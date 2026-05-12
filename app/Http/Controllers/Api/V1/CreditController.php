@@ -9,6 +9,7 @@ use App\Actions\UnlockAd;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
 use App\Exceptions\PaymentGatewayException;
+use App\Http\Requests\Api\V1\PurchaseCreditPackageRequest;
 use App\Http\Resources\PointPackageResource;
 use App\Models\Ad;
 use App\Models\Payment;
@@ -132,7 +133,7 @@ final class CreditController
      *     @OA\Response(response=500, description="Erreur paiement")
      * )
      */
-    public function purchase(Request $request, PointPackage $package): JsonResponse
+    public function purchase(PurchaseCreditPackageRequest $request, PointPackage $package): JsonResponse
     {
         if (!$package->is_active) {
             return response()->json([
@@ -140,9 +141,7 @@ final class CreditController
             ], 422);
         }
 
-        $validated = $request->validate([
-            'callback_url' => ['nullable', 'string', 'url', 'max:2048'],
-        ]);
+        $validated = $request->validated();
 
         $redirectUrl = null;
         if (!empty($validated['callback_url'])) {
@@ -155,15 +154,25 @@ final class CreditController
         }
 
         $user = $request->user();
+        // Default to the legacy Flutterwave hosted-checkout when the client
+        // doesn't specify ; the Stripe Elements flow is opted in via
+        // `payment_method=card`.
+        $paymentMethod = (string) ($validated['payment_method'] ?? 'flutterwave');
+        $savePaymentMethod = (bool) ($validated['save_payment_method'] ?? false);
+        $paymentMethodId = isset($validated['payment_method_id']) && is_string($validated['payment_method_id']) && $validated['payment_method_id'] !== ''
+            ? $validated['payment_method_id']
+            : null;
 
         try {
             $result = $this->paymentService->createPayment($user, [
                 'amount' => (float) $package->price,
                 'type' => PaymentType::CREDIT->value,
-                'payment_method' => 'flutterwave',
+                'payment_method' => $paymentMethod,
                 'plan_id' => $package->id,
                 'description' => "Achat pack: {$package->name}",
                 'redirect_url' => $redirectUrl,
+                'save_payment_method' => $savePaymentMethod,
+                'payment_method_id' => $paymentMethodId,
                 'meta' => [
                     'package_id' => $package->id,
                 ],
@@ -184,6 +193,12 @@ final class CreditController
             // purchase" which races with concurrent purchases).
             'tx_ref' => $result['tx_ref'],
             'gateway' => $result['gateway'],
+            // `status` lets the frontend short-circuit the verification
+            // poll when Stripe already settled the intent off-session
+            // (`status: 'success'`) or rejected the saved card outright
+            // (`status: 'failed'`). Otherwise it stays `'pending'` and
+            // the existing callback / clientSecret flow applies.
+            'status' => $result['status'],
             'message' => 'Redirigez l\'utilisateur vers cette URL pour payer.',
         ]);
     }
@@ -247,6 +262,17 @@ final class CreditController
         }
 
         if ($payment->status === PaymentStatus::SUCCESS) {
+            // Safety net: when `PaymentSucceeded` was emitted before any
+            // listener was registered (e.g. legacy rows) or if the
+            // dispatching closure swallowed the listener exception, run
+            // the fulfilment here. `HandlePostPaymentActions` is idempotent
+            // — it locks the buyer + skips when a PointTransaction already
+            // links to this payment — so this never double-credits.
+            $this->postPaymentActions->execute(
+                $payment,
+                (array) ($payment->gateway_response ?? []),
+            );
+
             return response()->json([
                 'status' => 'completed',
                 'message' => 'Achat de crédits confirmé.',

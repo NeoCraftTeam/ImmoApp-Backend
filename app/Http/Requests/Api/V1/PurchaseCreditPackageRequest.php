@@ -10,7 +10,21 @@ use App\Services\Payment\PaymentMethodGateService;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
-class FlutterwaveInitiateRequest extends FormRequest
+/**
+ * Validates the credit-pack purchase request.
+ *
+ * Accepts two distinct sub-flows that both ultimately route to a
+ * `PaymentGatewayInterface::initiate()` call:
+ *  - Flutterwave hosted-checkout: requires `payment_method` ∈ mobile money
+ *    family (or unset → default `flutterwave`).
+ *  - Stripe in-page Elements / saved-card reuse: `payment_method=card`,
+ *    optionally with `save_payment_method=true` and/or `payment_method_id`.
+ *
+ * `payment_method_id` matches `pm_*` to keep raw input strict ; the
+ * controller still cross-checks ownership against the Stripe Customer
+ * before charging (defence in depth).
+ */
+class PurchaseCreditPackageRequest extends FormRequest
 {
     use EnsuresCreditPurchasePassesTurnstile;
 
@@ -23,21 +37,8 @@ class FlutterwaveInitiateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'type' => ['required', 'string', 'in:subscription,credit'],
+            'callback_url' => ['nullable', 'string', 'url', 'max:2048'],
             'payment_method' => ['nullable', 'string', 'in:mobile_money,orange_money,flutterwave,card'],
-            'phone_number' => ['nullable', 'string', 'regex:/^\\+?[0-9\\s\\-]{7,20}$/'],
-            'agency_id' => ['required_if:type,subscription', 'nullable', 'uuid', 'exists:agency,id'],
-            'plan_id' => [
-                'required_if:type,subscription',
-                'required_if:type,credit',
-                'nullable',
-                'uuid',
-            ],
-            'period' => ['required_if:type,subscription', 'nullable', 'string', 'in:monthly,yearly'],
-            'promo_code' => ['nullable', 'string', 'max:50'],
-            // Stripe-only options. Silently ignored when `payment_method`
-            // is anything other than `card`. The `withValidator()` hook
-            // surfaces a French error message in that case.
             'save_payment_method' => ['nullable', 'boolean'],
             'payment_method_id' => ['nullable', 'string', 'regex:/^pm_[A-Za-z0-9_]+$/', 'max:255'],
             'turnstile_token' => ['nullable', 'string', 'max:2048'],
@@ -45,17 +46,14 @@ class FlutterwaveInitiateRequest extends FormRequest
     }
 
     /**
-     * Reject payment methods that an admin has disabled via Filament.
-     * Runs after the basic `in:` rule so we know the value is one of the
-     * known cases before we hit the gate service.
+     * Reject payment methods that an admin has disabled via Filament,
+     * mirroring `FlutterwaveInitiateRequest::withValidator()`.
      */
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $v): void {
-            // Must run even when `payment_method` is omitted (defaults on the server).
-            if ($this->input('type') === 'credit') {
-                $this->enforceTurnstileForCreditPurchase($v);
-            }
+            // This request is credits-only — enforce before optional `payment_method` checks.
+            $this->enforceTurnstileForCreditPurchase($v);
 
             $method = $this->input('payment_method');
             if (!is_string($method) || $method === '') {
@@ -83,8 +81,7 @@ class FlutterwaveInitiateRequest extends FormRequest
                         'L\'enregistrement de la carte n\'est disponible que pour les paiements par carte bancaire.',
                     );
                 }
-                $paymentMethodId = $this->input('payment_method_id');
-                if (is_string($paymentMethodId) && $paymentMethodId !== '') {
+                if (is_string($this->input('payment_method_id')) && $this->input('payment_method_id') !== '') {
                     $v->errors()->add(
                         'payment_method_id',
                         'La réutilisation d\'une carte enregistrée n\'est disponible que pour les paiements par carte bancaire.',
@@ -99,14 +96,8 @@ class FlutterwaveInitiateRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'type.required' => 'Le type de paiement est requis.',
-            'type.in' => 'Le type doit être subscription ou credit.',
-            'phone_number.regex' => 'Le format du numéro de téléphone est invalide.',
-            'agency_id.required_if' => 'L\'agence est requise pour un abonnement.',
-            'agency_id.exists' => 'L\'agence spécifiée est introuvable.',
-            'plan_id.required_if' => 'Le plan est requis pour ce type de paiement.',
-            'period.required_if' => 'La période est requise pour un abonnement.',
-            'period.in' => 'La période doit être monthly ou yearly.',
+            'callback_url.url' => 'L\'URL de retour est invalide.',
+            'payment_method.in' => 'Le moyen de paiement sélectionné n\'est pas pris en charge.',
             'payment_method_id.regex' => 'L\'identifiant de carte enregistrée est invalide.',
         ];
     }

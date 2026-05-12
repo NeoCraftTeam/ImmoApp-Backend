@@ -53,6 +53,30 @@ final readonly class TurnstileService
     }
 
     /**
+     * Whether the credits purchase UI should mount the Turnstile step after the
+     * user picks a payment method.
+     *
+     * In production this tracks {@see isConfigured()}. In `local` / `testing`,
+     * any non-empty site key (including Cloudflare dummy keys from
+     * `config/services.php`) still shows the widget so the flow matches prod,
+     * while {@see isConfigured()} stays false so the API does not reject missing
+     * tokens (fail-open for Postman / incomplete dev setup).
+     */
+    public function shouldShowCreditsTurnstileStep(): bool
+    {
+        $site = trim((string) config('services.turnstile.site_key', ''));
+        if ($site === '') {
+            return false;
+        }
+
+        if ($this->isConfigured()) {
+            return true;
+        }
+
+        return app()->environment(['local', 'testing']);
+    }
+
+    /**
      * Verify a Turnstile token against Cloudflare's siteverify endpoint.
      *
      * Returns `true` when the token is valid OR when Turnstile is not

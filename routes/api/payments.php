@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\PaymentMethodController;
 use App\Http\Controllers\Api\V1\PromoCodeController;
 use App\Http\Controllers\Api\V1\RefundController;
+use App\Http\Controllers\Api\V1\StripePaymentMethodController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
 use Illuminate\Support\Facades\Route;
 
@@ -19,7 +20,8 @@ Route::get('/payments/methods', [PaymentMethodController::class, 'index'])
     ->middleware('throttle:60,1');
 
 // --- PUBLIC PAYMENT STATUS (auth-less, status-only) ---
-// Allows the post-checkout callback page (`/credits/callback`,
+// Allows the post-checkout callback page (`/payment/return`,
+// `/credits/callback`,
 // `/payment-success`) to poll a payment's status WITHOUT requiring a
 // session — critical when the user's session cookie was lost during the
 // cross-origin Flutterwave redirect (Safari / Firefox SameSite=Lax + cross-domain).
@@ -55,8 +57,29 @@ Route::middleware('auth:sanctum')->group(function (): void {
         ->middleware('throttle:payments.cancel');
     Route::get('/payments/history', [PaymentController::class, 'history'])
         ->middleware('throttle:payments.history');
+    Route::get('/payments/{payment}/receipt', [PaymentController::class, 'receipt'])
+        ->whereUuid('payment')
+        ->middleware('throttle:10,1');
     Route::get('/payments/export', [PaymentController::class, 'export'])
         ->middleware('throttle:10,1');
+
+    // --- STRIPE SAVED CARDS ---
+    // CRUD on the authenticated user's Stripe Customer payment methods.
+    // The Customer record is created lazily by Cashier
+    // (`createOrGetStripeCustomer()`) the first time the user opts in to
+    // save a card OR requests a SetupIntent from the profile page.
+    Route::prefix('payments/stripe')->group(function (): void {
+        Route::get('/payment-methods', [StripePaymentMethodController::class, 'index'])
+            ->middleware('throttle:60,1');
+        Route::delete('/payment-methods/{paymentMethod}', [StripePaymentMethodController::class, 'destroy'])
+            ->where('paymentMethod', 'pm_[A-Za-z0-9_]+')
+            ->middleware('throttle:30,1');
+        Route::post('/payment-methods/{paymentMethod}/set-default', [StripePaymentMethodController::class, 'setDefault'])
+            ->where('paymentMethod', 'pm_[A-Za-z0-9_]+')
+            ->middleware('throttle:30,1');
+        Route::post('/setup-intent', [StripePaymentMethodController::class, 'setupIntent'])
+            ->middleware('throttle:30,1');
+    });
 });
 
 // --- REFUNDS (admin) ---
