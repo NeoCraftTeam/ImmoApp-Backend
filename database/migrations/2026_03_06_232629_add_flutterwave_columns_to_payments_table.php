@@ -35,9 +35,10 @@ return new class extends Migration
             $table->index(['gateway', 'transaction_id']);
         });
 
-        // Add 'flutterwave' to the payment_method check constraint
+        // Align CHECK with persisted enum values (PaymentMethod). Stripe routes store `card`,
+        // not `stripe`; legacy rows may still use `stripe`. Must include `card` before enforcing.
         DB::statement('ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_payment_method_check');
-        DB::statement("ALTER TABLE payments ADD CONSTRAINT payments_payment_method_check CHECK (payment_method::text IN ('orange_money','mobile_money','stripe','flutterwave'))");
+        DB::statement("ALTER TABLE payments ADD CONSTRAINT payments_payment_method_check CHECK (payment_method::text IN ('orange_money','mobile_money','card','stripe','flutterwave'))");
     }
 
     /**
