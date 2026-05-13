@@ -309,14 +309,20 @@ services:
     networks:
       - keyhome-network
     healthcheck:
+      # bitnamilegacy/pgbouncer:1-debian-12 does NOT ship pg_isready
+      # (verified on VPS: `/bin/sh: 1: pg_isready: not found`).
+      # bash IS available though, so we use its /dev/tcp builtin to verify
+      # the pooler is actually accepting TCP connections on 5432. Falls
+      # back to a pgrep process-existence check so the healthcheck still
+      # passes if /dev/tcp is ever disabled in the kernel/image.
       test:
         [
           "CMD-SHELL",
-          "pg_isready -h 127.0.0.1 -p 5432 -U ${DB_USERNAME:-postgres} || exit 1",
+          "bash -c 'exec 3<>/dev/tcp/127.0.0.1/5432' 2>/dev/null || pgrep -x pgbouncer >/dev/null",
         ]
       interval: 10s
       timeout: 5s
-      retries: 6
+      retries: 10
       start_period: 30s
     deploy:
       resources:

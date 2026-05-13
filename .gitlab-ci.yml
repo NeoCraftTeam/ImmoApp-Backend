@@ -34,8 +34,22 @@ prepare_ci_image:
   stage: prepare
   script:
     - |
-      docker pull $CI_IMAGE || true
-      docker build --cache-from $CI_IMAGE -t $CI_IMAGE -f - . <<'DOCKERFILE'
+      # Only push the CI image to the registry on protected branches (main / preprod).
+      # On feature branches we still BUILD the image locally so the quality jobs
+      # (phpstan, pint, rector, composer_audit, test_suite) on the SAME self-hosted
+      # runner can use it — but we skip the push to avoid polluting the registry
+      # with one ~1.4 GB image per branch slug.
+      #
+      # Cache source: on feature branches we pull ci:main (stable base) instead of
+      # a per-branch tag that doesn't exist, so the build still benefits from layer
+      # caching.
+      if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "preprod" ]; then
+        CACHE_FROM=$CI_IMAGE
+      else
+        CACHE_FROM=$CI_REGISTRY_IMAGE/ci:main
+      fi
+      docker pull $CACHE_FROM || true
+      docker build --cache-from $CACHE_FROM -t $CI_IMAGE -f - . <<'DOCKERFILE'
       FROM php:8.4-cli-alpine
       RUN apk add --no-cache git libzip-dev icu-dev postgresql-dev libpng-dev oniguruma-dev gettext-dev freetype-dev libjpeg-turbo-dev libwebp-dev $PHPIZE_DEPS \
         && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
@@ -52,7 +66,11 @@ prepare_ci_image:
       # Layer 2: copy code (fast, does not re-run composer install)
       COPY . .
       DOCKERFILE
-      docker push $CI_IMAGE || true
+      if [ "$CI_COMMIT_BRANCH" = "main" ] || [ "$CI_COMMIT_BRANCH" = "preprod" ]; then
+        docker push $CI_IMAGE || true
+      else
+        echo "ℹ️  Skipping registry push for feature branch '$CI_COMMIT_BRANCH' (image kept locally on runner)"
+      fi
   retry:
     max: 2
     when: runner_system_failure
@@ -539,9 +557,16 @@ cleanup:
     - |
       echo "🧹 Starting cleanup..."
 
-      # 1. La CI image ($CI_IMAGE) est intentionnellement conservée —
-      #    elle sert de cache --cache-from pour le prochain pipeline sur cette branche.
-      #    Seules les images dangling (non taguées) sont supprimées ci-dessous.
+      # 1. CI image policy:
+      #    - main/preprod  → conservée (pushée au registry + sert de cache pour le prochain pipeline)
+      #    - feature branch → supprimée du runner local (jamais pushée, cache-from utilise ci:main)
+      #      Sans ça, chaque feature branch laisserait un fantôme de ~1.4 GB sur le runner.
+      if [ "$CI_COMMIT_BRANCH" != "main" ] && [ "$CI_COMMIT_BRANCH" != "preprod" ]; then
+        if docker image inspect $CI_IMAGE >/dev/null 2>&1; then
+          docker rmi $CI_IMAGE 2>/dev/null || true
+          echo "  ✓ Removed local feature-branch CI image ($CI_IMAGE)"
+        fi
+      fi
 
       # 2. Nettoyer les images dangling (sans tag)
       DANGLING=$(docker images -f "dangling=true" -q 2>/dev/null | wc -l | tr -d ' ')
