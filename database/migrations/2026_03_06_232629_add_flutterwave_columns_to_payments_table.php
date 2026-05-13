@@ -35,8 +35,29 @@ return new class extends Migration
             $table->index(['gateway', 'transaction_id']);
         });
 
-        // Align CHECK with persisted enum values (PaymentMethod). Stripe routes store `card`,
-        // not `stripe`; legacy rows may still use `stripe`. Must include `card` before enforcing.
+        // Legacy rows may store Flutterwave `payment_type` strings (visa, banktransfer, …) or
+        // mixed casing ; normalise everything to PaymentMethod-backed values before CHECK.
+        DB::statement(<<<'SQL'
+            UPDATE payments
+            SET payment_method = CASE
+                WHEN btrim(payment_method::text) = '' THEN 'flutterwave'
+                WHEN lower(btrim(payment_method::text)) IN (
+                    'orange_money','mobile_money','card','stripe','flutterwave'
+                ) THEN lower(btrim(payment_method::text))
+                WHEN lower(btrim(payment_method::text)) LIKE '%orange%' THEN 'orange_money'
+                WHEN lower(btrim(payment_method::text)) LIKE '%mtn%'
+                    OR lower(btrim(payment_method::text)) LIKE '%mobile%' THEN 'mobile_money'
+                WHEN lower(btrim(payment_method::text)) LIKE '%card%'
+                    OR lower(btrim(payment_method::text)) IN ('visa','mastercard','verve','amex','discover','diners') THEN 'card'
+                ELSE 'flutterwave'
+            END
+            WHERE payment_method IS NOT NULL
+                AND lower(btrim(payment_method::text)) NOT IN (
+                    'orange_money','mobile_money','card','stripe','flutterwave'
+                )
+        SQL);
+
+        // Align CHECK with persisted enum values (PaymentMethod).
         DB::statement('ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_payment_method_check');
         DB::statement("ALTER TABLE payments ADD CONSTRAINT payments_payment_method_check CHECK (payment_method::text IN ('orange_money','mobile_money','card','stripe','flutterwave'))");
     }
