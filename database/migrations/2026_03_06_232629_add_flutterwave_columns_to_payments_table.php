@@ -35,6 +35,11 @@ return new class extends Migration
             $table->index(['gateway', 'transaction_id']);
         });
 
+        // Drop the old CHECK constraint first so the normalisation UPDATE below is not
+        // blocked by values ('flutterwave', legacy strings) that the old constraint
+        // doesn't allow. The new constraint is re-added after the UPDATE.
+        DB::statement('ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_payment_method_check');
+
         // Legacy rows may store Flutterwave `payment_type` strings (visa, banktransfer, …) or
         // mixed casing ; normalise everything to PaymentMethod-backed values before CHECK.
         DB::statement(<<<'SQL'
@@ -56,9 +61,6 @@ return new class extends Migration
                     'orange_money','mobile_money','card','stripe','flutterwave'
                 )
         SQL);
-
-        // Align CHECK with persisted enum values (PaymentMethod).
-        DB::statement('ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_payment_method_check');
         DB::statement("ALTER TABLE payments ADD CONSTRAINT payments_payment_method_check CHECK (payment_method::text IN ('orange_money','mobile_money','card','stripe','flutterwave'))");
     }
 

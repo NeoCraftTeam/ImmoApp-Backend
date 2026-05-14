@@ -16,9 +16,8 @@ services:
           cpus: "0.50"
 
   # L'application Laravel (PHP-FPM)
-  # NOTE: container_name intentionally removed so `docker compose up --scale app=N` works.
-  # Nginx upstream (php_fpm) will round-robin across all replicas via Docker DNS.
   app:
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-app
     build:
       context: .
       dockerfile: Dockerfile
@@ -42,7 +41,7 @@ services:
       - keyhome-network
     environment:
       - DB_HOST=pgbouncer
-      - DB_HOST_READ=${DB_HOST_READ:-db-replica}
+      - DB_HOST_READ=db
       - DB_SSLMODE=disable
       - REDIS_HOST=redis
       - APP_ENV=${APP_ENV:-production}
@@ -354,7 +353,7 @@ services:
     profiles:
       - replica
     environment:
-      POSTGRES_DB: ${DB_DATABASE:-keyhome}
+      POSTGRES_DB: ${DB_DATABASE:-keyhome_prod}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
       PGDATA: /var/lib/postgresql/data
@@ -363,7 +362,7 @@ services:
     networks:
       - keyhome-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-keyhome}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-keyhome_prod}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -382,7 +381,7 @@ services:
     container_name: ${COMPOSE_PREFIX:-keyhome-prod}-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_DATABASE:-keyhome}
+      POSTGRES_DB: ${DB_DATABASE:-keyhome_prod}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
     volumes:
@@ -391,7 +390,7 @@ services:
       - keyhome-network
     # FIX: healthcheck manquant — app et worker ne peuvent pas savoir si la DB est prête
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-keyhome}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-keyhome_prod}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -420,7 +419,7 @@ services:
         condition: service_healthy
     environment:
       POSTGRES_HOST: db
-      POSTGRES_DB: ${DB_DATABASE:-keyhome}
+      POSTGRES_DB: ${DB_DATABASE:-keyhome_prod}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
       POSTGRES_EXTRA_OPTS: "-Z6 --schema=public --blobs"
@@ -550,10 +549,16 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@admin.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
-    ports:
-      - "5050:80"
     networks:
       - keyhome-network
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.keyhome-pgadmin.rule=Host(`${PGADMIN_DOMAIN:-pgadmin.keyhome.app}`)"
+      - "traefik.http.routers.keyhome-pgadmin.entrypoints=websecure"
+      - "traefik.http.routers.keyhome-pgadmin.tls.certresolver=letsencrypt"
+      - "traefik.http.services.keyhome-pgadmin.loadbalancer.server.port=80"
 
   # --- MONITORING STACK (use: docker compose --profile monitoring up -d) ---
 
@@ -582,16 +587,22 @@ services:
     restart: unless-stopped
     profiles:
       - monitoring
-    # Port exposé uniquement en dev. En prod, utilisez un reverse proxy Nginx
-    # ports:
-    #   - "3000:3000"
     volumes:
       - keyhome-grafana-data:/var/lib/grafana
       - .docker/monitoring/grafana/provisioning:/etc/grafana/provisioning
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_SERVER_ROOT_URL=https://${GRAFANA_DOMAIN:-grafana.keyhome.app}
     networks:
       - keyhome-network
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.keyhome-grafana.rule=Host(`${GRAFANA_DOMAIN:-grafana.keyhome.app}`)"
+      - "traefik.http.routers.keyhome-grafana.entrypoints=websecure"
+      - "traefik.http.routers.keyhome-grafana.tls.certresolver=letsencrypt"
+      - "traefik.http.services.keyhome-grafana.loadbalancer.server.port=3000"
 
   # Node Exporter : Métriques du serveur (CPU, RAM, Disque du VPS)
   node-exporter:
@@ -634,7 +645,7 @@ services:
     profiles:
       - monitoring
     environment:
-      DATA_SOURCE_NAME: "postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-password}@db:5432/${DB_DATABASE:-keyhome}?sslmode=disable"
+      DATA_SOURCE_NAME: "postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-password}@db:5432/${DB_DATABASE:-keyhome_prod}?sslmode=disable"
     networks:
       - keyhome-network
 
