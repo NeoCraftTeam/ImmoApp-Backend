@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Mail\Concerns\HasSender;
 use App\Mail\Concerns\HasUnsubscribeLinks;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
@@ -15,13 +16,14 @@ use Illuminate\Queue\SerializesModels;
 
 class AdminWelcomeEmail extends Mailable implements ShouldQueue
 {
-    use HasUnsubscribeLinks, Queueable, SerializesModels;
+    use HasSender, HasUnsubscribeLinks, Queueable, SerializesModels;
 
     public function __construct(public User $user) {}
 
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: $this->senderFrom('marketing'),
             subject: 'Bienvenue sur le panneau d\'administration KeyHome',
         );
     }

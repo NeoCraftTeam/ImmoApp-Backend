@@ -44,6 +44,7 @@
         "meilisearch/meilisearch-php": "^1.16",
         "owenvoke/blade-fontawesome": "^3.1",
         "phpseclib/phpseclib": "^3.0.52",
+        "resend/resend-laravel": "^1.4",
         "sentry/sentry-laravel": "^4.20",
         "socialiteproviders/apple": "^5.9",
         "spatie/laravel-activitylog": "^4.11",

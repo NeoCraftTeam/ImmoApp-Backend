@@ -14,6 +14,7 @@ use Illuminate\Queue\SerializesModels;
 
 class BailleurWelcomeEmail extends Mailable implements ShouldQueue
 {
+    use Concerns\HasSender;
     use Concerns\HasUnsubscribeLinks;
     use Queueable, SerializesModels;
 
@@ -25,6 +26,7 @@ class BailleurWelcomeEmail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: $this->senderFrom('marketing'),
             subject: 'Bienvenue sur KeyHome - Espace Bailleur',
         );
     }

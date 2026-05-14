@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mail;
 
 use App\Filament\Admin\Resources\AdReports\AdReportResource;
+use App\Mail\Concerns\HasSender;
 use App\Models\AdReport;
 use App\Models\User;
 use Illuminate\Mail\Mailable;
@@ -14,7 +15,7 @@ use Illuminate\Queue\SerializesModels;
 
 class NewAdReportMail extends Mailable
 {
-    use SerializesModels;
+    use HasSender, SerializesModels;
 
     public function __construct(
         public AdReport $report,
@@ -24,6 +25,7 @@ class NewAdReportMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: $this->senderFrom('support'),
             subject: 'KeyHome - Nouveau signalement d\'annonce a traiter',
         );
     }

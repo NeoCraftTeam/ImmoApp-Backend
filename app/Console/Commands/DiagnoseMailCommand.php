@@ -24,29 +24,46 @@ class DiagnoseMailCommand extends Command
 
         // 1. Mail configuration
         $mailer = config('mail.default');
-        $host = config('mail.mailers.smtp.host');
-        $port = config('mail.mailers.smtp.port');
-        $encryption = config('mail.mailers.smtp.encryption');
-        $username = config('mail.mailers.smtp.username');
-        $from = config('mail.from.address');
+        $from   = config('mail.from.address');
+
+        // Resend-specific
+        $resendKey = config('services.resend.key', env('RESEND_KEY', ''));
+        $resendKeyMasked = $resendKey
+            ? substr((string) $resendKey, 0, 6).'****'.substr((string) $resendKey, -4)
+            : '(not set)';
+
+        // Named senders
+        $senderNoreply   = config('mail.senders.noreply.address', '(not set)');
+        $senderSupport   = config('mail.senders.support.address', '(not set)');
+        $senderMarketing = config('mail.senders.marketing.address', '(not set)');
 
         $this->line('<fg=yellow>1. Mail Configuration</>');
         $this->table(['Key', 'Value'], [
-            ['MAIL_MAILER', $mailer],
-            ['MAIL_HOST', $host ?? '(not set)'],
-            ['MAIL_PORT', $port ?? '(not set)'],
-            ['MAIL_ENCRYPTION', $encryption ?? '(not set)'],
-            ['MAIL_USERNAME', $username ?? '(not set)'],
-            ['MAIL_FROM_ADDRESS', $from ?? '(not set)'],
+            ['MAIL_MAILER',             $mailer],
+            ['MAIL_FROM_ADDRESS',       $from ?? '(not set)'],
+            ['RESEND_KEY',              $resendKeyMasked],
+            ['sender: noreply',         $senderNoreply],
+            ['sender: support',         $senderSupport],
+            ['sender: marketing',       $senderMarketing],
         ]);
 
         if ($mailer === 'log') {
             $this->error('  ⚠  MAIL_MAILER=log — emails are written to the log file, NOT sent!');
-            $this->line('     Fix: set MAIL_MAILER=smtp in your .env');
+            $this->line('     Fix: set MAIL_MAILER=resend + RESEND_KEY=re_xxx in your .env');
         } elseif ($mailer === 'array') {
             $this->error('  ⚠  MAIL_MAILER=array — emails are discarded in memory, NOT sent!');
+        } elseif ($mailer === 'resend' && empty($resendKey)) {
+            $this->error('  ⚠  MAIL_MAILER=resend but RESEND_KEY is not set!');
+            $this->line('     Fix: add RESEND_KEY=re_xxxx to your .env (get it at resend.com)');
+        } elseif ($mailer === 'resend') {
+            $this->info('  ✓  Resend mailer configured.');
+            // SMTP fallback still shown for info
+            $smtpHost = config('mail.mailers.smtp.host');
+            if ($smtpHost) {
+                $this->line("     SMTP fallback available: {$smtpHost}");
+            }
         } else {
-            $this->info('  ✓  Mailer driver looks correct.');
+            $this->info("  ✓  Mailer driver '{$mailer}' looks correct.");
         }
         $this->newLine();
 

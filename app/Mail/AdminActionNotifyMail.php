@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Mail\Concerns\HasSender;
 use App\Mail\Concerns\HasUnsubscribeLinks;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
@@ -19,7 +20,7 @@ use Illuminate\Queue\SerializesModels;
  */
 class AdminActionNotifyMail extends Mailable implements ShouldQueue
 {
-    use HasUnsubscribeLinks, Queueable, SerializesModels;
+    use HasSender, HasUnsubscribeLinks, Queueable, SerializesModels;
 
     /**
      * @param  array{event: string, entity: string, entity_name: string, description: string, changes: array<string, mixed>, date: string}  $details
@@ -40,6 +41,7 @@ class AdminActionNotifyMail extends Mailable implements ShouldQueue
         $prefix = $isActor ? 'Confirmation' : 'Alerte';
 
         return new Envelope(
+            from: $this->senderFrom('support'),
             subject: "KeyHome — {$prefix} : ".$this->details['description'],
         );
     }

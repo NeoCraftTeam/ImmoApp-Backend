@@ -20,6 +20,7 @@ use Illuminate\Queue\SerializesModels;
 class FirstAdUnlockCongratulationsMail extends Mailable implements ShouldQueue
 {
     use Concerns\HasLocale;
+    use Concerns\HasSender;
     use Concerns\HasUnsubscribeLinks;
     use Queueable, SerializesModels;
 
@@ -36,6 +37,7 @@ class FirstAdUnlockCongratulationsMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: $this->senderFrom('marketing'),
             subject: 'Bravo — vous avez débloqué votre première annonce sur '.config('app.name'),
         );
     }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Mail;
 
 use App\Filament\Admin\Resources\Ads\AdResource;
+use App\Mail\Concerns\HasSender;
 use App\Models\Ad;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
@@ -19,7 +20,7 @@ use Symfony\Component\Routing\Exception\RouteNotFoundException;
 
 class NewAdSubmissionMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use HasSender, Queueable, SerializesModels;
 
     public User $author;
 
@@ -45,6 +46,7 @@ class NewAdSubmissionMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: $this->senderFrom('support'),
             subject: 'Nouvelle Annonce : '.$this->ad->title,
         );
     }

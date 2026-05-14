@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Mail\Concerns\HasSender;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -20,7 +21,7 @@ use Illuminate\Queue\SerializesModels;
  */
 final class SupportContactMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use HasSender, Queueable, SerializesModels;
 
     public function __construct(
         public readonly string $contactName,
@@ -35,6 +36,7 @@ final class SupportContactMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: $this->senderFrom('support'),
             subject: '[Contact] '.$this->contactSubject.' — '.$this->contactName,
             replyTo: [new Address($this->contactEmail, $this->contactName)],
         );
