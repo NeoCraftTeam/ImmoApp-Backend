@@ -41,7 +41,7 @@ class AdminActionNotifyMail extends Mailable implements ShouldQueue
         $prefix = $isActor ? 'Confirmation' : 'Alerte';
 
         return new Envelope(
-            from: $this->senderFrom('support'),
+            from: $this->senderFrom('admin'),
             subject: "KeyHome — {$prefix} : ".$this->details['description'],
         );
     }
