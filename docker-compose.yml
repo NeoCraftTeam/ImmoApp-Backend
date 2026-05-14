@@ -16,9 +16,8 @@ services:
           cpus: "0.50"
 
   # L'application Laravel (PHP-FPM)
-  # NOTE: container_name intentionally removed so `docker compose up --scale app=N` works.
-  # Nginx upstream (php_fpm) will round-robin across all replicas via Docker DNS.
   app:
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-app
     build:
       context: .
       dockerfile: Dockerfile
@@ -42,7 +41,7 @@ services:
       - keyhome-network
     environment:
       - DB_HOST=pgbouncer
-      - DB_HOST_READ=${DB_HOST_READ:-db-replica}
+      - DB_HOST_READ=db
       - DB_SSLMODE=disable
       - REDIS_HOST=redis
       - APP_ENV=${APP_ENV:-production}
@@ -354,7 +353,7 @@ services:
     profiles:
       - replica
     environment:
-      POSTGRES_DB: ${DB_DATABASE:-keyhome}
+      POSTGRES_DB: ${DB_DATABASE:-keyhome_prod}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
       PGDATA: /var/lib/postgresql/data
@@ -363,7 +362,7 @@ services:
     networks:
       - keyhome-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-keyhome}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-keyhome_prod}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -382,7 +381,7 @@ services:
     container_name: ${COMPOSE_PREFIX:-keyhome-prod}-db
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_DATABASE:-keyhome}
+      POSTGRES_DB: ${DB_DATABASE:-keyhome_prod}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
     volumes:
@@ -391,7 +390,7 @@ services:
       - keyhome-network
     # FIX: healthcheck manquant — app et worker ne peuvent pas savoir si la DB est prête
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-keyhome}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d ${DB_DATABASE:-keyhome_prod}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -420,7 +419,7 @@ services:
         condition: service_healthy
     environment:
       POSTGRES_HOST: db
-      POSTGRES_DB: ${DB_DATABASE:-keyhome}
+      POSTGRES_DB: ${DB_DATABASE:-keyhome_prod}
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
       POSTGRES_EXTRA_OPTS: "-Z6 --schema=public --blobs"
