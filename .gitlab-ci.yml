@@ -286,6 +286,31 @@ test_suite:
     # Nginx can cache the old app container IP after app is recreated — refresh web after app is up.
     - echo "🔄 Recreating web (nginx) so FastCGI targets the current app container..."
     - APP_IMAGE=$FULL_IMAGE docker compose up -d --no-build --no-deps --force-recreate web
+    # ── Ensure the database + PostGIS extension exist (idempotent) ─────────────
+    - |
+      DB_NAME=$(grep -E "^DB_DATABASE=" $DEPLOY_DIR/.env 2>/dev/null | cut -d= -f2 | tr -d "[:space:]'\"")
+      DB_USER=$(grep -E "^DB_USERNAME=" $DEPLOY_DIR/.env 2>/dev/null | cut -d= -f2 | tr -d "[:space:]'\"")
+      DB_NAME=${DB_NAME:-keyhome_prod}
+      DB_USER=${DB_USER:-postgres}
+      echo "🔎 Checking database '${DB_NAME}' exists on host 'db'..."
+      # Connect to the 'postgres' system database to avoid "db does not exist" error
+      DB_EXISTS=$(APP_IMAGE=$FULL_IMAGE docker compose exec -T db \
+        psql -U "$DB_USER" -d postgres -tAc \
+        "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'" 2>/dev/null || echo "")
+      if [ "$DB_EXISTS" != "1" ]; then
+        echo "⚠️  Database '${DB_NAME}' not found — creating it..."
+        APP_IMAGE=$FULL_IMAGE docker compose exec -T db \
+          psql -U "$DB_USER" -d postgres -c "CREATE DATABASE \"${DB_NAME}\" OWNER \"${DB_USER}\";"
+        echo "✅ Database '${DB_NAME}' created."
+        # Enable PostGIS (required for the geometry columns in the ad table)
+        echo "🗺  Enabling PostGIS extension..."
+        APP_IMAGE=$FULL_IMAGE docker compose exec -T db \
+          psql -U "$DB_USER" -d "$DB_NAME" \
+          -c "CREATE EXTENSION IF NOT EXISTS postgis; CREATE EXTENSION IF NOT EXISTS postgis_topology;"
+        echo "✅ PostGIS enabled."
+      else
+        echo "✅ Database '${DB_NAME}' already exists."
+      fi
     # ── Run migrations with automatic rollback on failure ──────────────────────
     - |
       echo "🗾 Running migrations..."

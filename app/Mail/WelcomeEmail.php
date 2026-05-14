@@ -16,6 +16,7 @@ use Illuminate\Queue\SerializesModels;
 class WelcomeEmail extends Mailable implements ShouldQueue
 {
     use Concerns\HasLocale;
+    use Concerns\HasSender;
     use Concerns\HasUnsubscribeLinks;
     use Queueable, SerializesModels;
 
@@ -33,6 +34,7 @@ class WelcomeEmail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: $this->senderFrom('marketing'),
             subject: __('emails.welcome.subject', ['app' => config('app.name')]),
         );
     }

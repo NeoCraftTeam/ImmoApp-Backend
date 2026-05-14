@@ -18,6 +18,32 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Sender Addresses
+    |--------------------------------------------------------------------------
+    |
+    | Named senders used by the HasSender trait. Each Mailable calls
+    | $this->senderFrom('noreply'|'support'|'marketing') to get the right
+    | FROM address without hard-coding strings.
+    |
+    */
+
+    'senders' => [
+        'noreply' => [
+            'address' => env('MAIL_NOREPLY_ADDRESS', 'noreply@keyhome.app'),
+            'name'    => env('MAIL_NOREPLY_NAME', 'KeyHome'),
+        ],
+        'support' => [
+            'address' => env('MAIL_SUPPORT_ADDRESS', 'support@keyhome.app'),
+            'name'    => env('MAIL_SUPPORT_NAME', 'KeyHome Support'),
+        ],
+        'marketing' => [
+            'address' => env('MAIL_MARKETING_ADDRESS', 'marketing@keyhome.app'),
+            'name'    => env('MAIL_MARKETING_NAME', 'KeyHome'),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Mailer Configurations
     |--------------------------------------------------------------------------
     |
@@ -82,7 +108,7 @@ return [
         'failover' => [
             'transport' => 'failover',
             'mailers' => [
-                'smtp',
+                'resend',
                 'log',
             ],
             'retry_after' => 60,
@@ -111,8 +137,8 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-        'name' => env('MAIL_FROM_NAME', 'Example'),
+        'address' => env('MAIL_FROM_ADDRESS', 'noreply@keyhome.app'),
+        'name' => env('MAIL_FROM_NAME', 'KeyHome'),
     ],
 
     /*

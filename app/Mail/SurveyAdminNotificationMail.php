@@ -2,6 +2,7 @@
 
 namespace App\Mail;
 
+use App\Mail\Concerns\HasSender;
 use App\Models\Survey;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
@@ -13,7 +14,7 @@ use Illuminate\Queue\SerializesModels;
 
 class SurveyAdminNotificationMail extends Mailable implements ShouldQueue
 {
-    use Queueable, SerializesModels;
+    use HasSender, Queueable, SerializesModels;
 
     public function __construct(
         public Survey $survey,
@@ -33,6 +34,7 @@ class SurveyAdminNotificationMail extends Mailable implements ShouldQueue
             : 'Anonyme';
 
         return new Envelope(
+            from: $this->senderFrom('support'),
             subject: 'Nouveau sondage reçu — '.$respondentName.' a répondu à : '.$this->survey->title,
         );
     }

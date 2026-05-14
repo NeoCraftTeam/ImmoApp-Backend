@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Mail\Concerns\HasSender;
 use App\Models\NewsletterCampaign;
 use App\Models\NewsletterSubscriber;
 use Illuminate\Mail\Mailable;
@@ -13,7 +14,7 @@ use Illuminate\Queue\SerializesModels;
 
 class NewsletterBroadcastMail extends Mailable
 {
-    use SerializesModels;
+    use HasSender, SerializesModels;
 
     public function __construct(
         public NewsletterCampaign $campaign,
@@ -23,6 +24,7 @@ class NewsletterBroadcastMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: $this->senderFrom('marketing'),
             subject: $this->campaign->subject,
         );
     }

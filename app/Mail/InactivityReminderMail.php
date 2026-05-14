@@ -15,6 +15,7 @@ use Illuminate\Queue\SerializesModels;
 class InactivityReminderMail extends Mailable implements ShouldQueue
 {
     use Concerns\HasLocale;
+    use Concerns\HasSender;
     use Concerns\HasUnsubscribeLinks;
     use Queueable, SerializesModels;
 
@@ -30,6 +31,7 @@ class InactivityReminderMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: $this->senderFrom('marketing'),
             subject: __('emails.inactivity.subject', [
                 'name' => $this->user->firstname,
                 'app' => config('app.name'),
