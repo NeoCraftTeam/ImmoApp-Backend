@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\City;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\RateLimiter;
 
 uses(RefreshDatabase::class);
@@ -238,20 +239,27 @@ test('forbidden api request returns json 403 not html', function (): void {
 test('password fields are exempt from html sanitization', function (): void {
     $city = City::factory()->create();
 
-    // A password with < > should NOT be stripped so that confirm_password still matches
+    // Angle brackets must survive SanitizeInput identically on both fields (no asymmetric strip).
+    $passwordWithAngles = 'Pa<sS>w0rd!!'; // satisfies RegisterRequest Password rule (mixed, number, punctuation)
+
     $response = $this->postJson('/api/v1/auth/registerCustomer', [
         'firstname' => 'Test',
         'lastname' => 'User',
         'email' => 'test.sanitize@example.com',
-        'password' => 'P@ssword123!',
-        'confirm_password' => 'P@ssword123!',
+        'password' => $passwordWithAngles,
+        'confirm_password' => $passwordWithAngles,
         'phone_number' => '+237699000001',
         'city_id' => $city->id,
     ]);
 
-    // If sanitization incorrectly modifies passwords it causes confirm_password mismatch
-    if ($response->status() === 422) {
-        expect($response->json('errors'))->not->toHaveKey('confirm_password');
+    /** @var array<string, mixed> $errors */
+    $errors = (array) ($response->json('errors') ?? []);
+
+    expect($errors)->not->toHaveKey('confirm_password');
+
+    $passwordErrors = Arr::wrap($errors['password'] ?? []);
+    foreach ($passwordErrors as $msg) {
+        expect((string) $msg)->not->toContain('confirmation');
     }
 });
 

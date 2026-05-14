@@ -193,6 +193,7 @@ test_suite:
         -e DB_USERNAME=gitlab \
         -e DB_PASSWORD=test_pass \
         -e SCOUT_DRIVER=null \
+        -e MAIL_MAILER=array \
         $CI_IMAGE sh -c \
         'set -e
         cp .env.example .env
