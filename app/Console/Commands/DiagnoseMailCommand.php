@@ -24,17 +24,17 @@ class DiagnoseMailCommand extends Command
 
         // 1. Mail configuration
         $mailer = config('mail.default');
-        $from   = config('mail.from.address');
+        $from = config('mail.from.address');
 
         // Resend-specific
-        $resendKey = config('services.resend.key', env('RESEND_KEY', ''));
+        $resendKey = config('services.resend.key', '');
         $resendKeyMasked = $resendKey
             ? substr((string) $resendKey, 0, 6).'****'.substr((string) $resendKey, -4)
             : '(not set)';
 
         // Named senders
-        $senderNoreply   = config('mail.senders.noreply.address', '(not set)');
-        $senderSupport   = config('mail.senders.support.address', '(not set)');
+        $senderNoreply = config('mail.senders.noreply.address', '(not set)');
+        $senderSupport = config('mail.senders.support.address', '(not set)');
         $senderMarketing = config('mail.senders.marketing.address', '(not set)');
 
         $this->line('<fg=yellow>1. Mail Configuration</>');

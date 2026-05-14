@@ -26,7 +26,7 @@ class AgencyWelcomeEmail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            from: $this->senderFrom('marketing'),
+            from: $this->senderFrom('bailleurs'),
             subject: 'Bienvenue sur KeyHome - Espace Agence',
         );
     }

@@ -30,15 +30,31 @@ return [
     'senders' => [
         'noreply' => [
             'address' => env('MAIL_NOREPLY_ADDRESS', 'noreply@keyhome.app'),
-            'name'    => env('MAIL_NOREPLY_NAME', 'KeyHome'),
+            'name' => env('MAIL_NOREPLY_NAME', 'KeyHome'),
         ],
-        'support' => [
-            'address' => env('MAIL_SUPPORT_ADDRESS', 'support@keyhome.app'),
-            'name'    => env('MAIL_SUPPORT_NAME', 'KeyHome Support'),
+        'notifications' => [
+            'address' => env('MAIL_NOTIFICATIONS_ADDRESS', 'notifications@keyhome.app'),
+            'name' => env('MAIL_NOTIFICATIONS_NAME', 'KeyHome Notifications'),
         ],
         'marketing' => [
             'address' => env('MAIL_MARKETING_ADDRESS', 'marketing@keyhome.app'),
-            'name'    => env('MAIL_MARKETING_NAME', 'KeyHome'),
+            'name' => env('MAIL_MARKETING_NAME', 'KeyHome'),
+        ],
+        'support' => [
+            'address' => env('MAIL_SUPPORT_ADDRESS', 'support@keyhome.app'),
+            'name' => env('MAIL_SUPPORT_NAME', 'KeyHome Support'),
+        ],
+        'bailleurs' => [
+            'address' => env('MAIL_BAILLEURS_ADDRESS', 'bailleurs@keyhome.app'),
+            'name' => env('MAIL_BAILLEURS_NAME', 'KeyHome Bailleurs'),
+        ],
+        'admin' => [
+            'address' => env('MAIL_ADMIN_ADDRESS', 'admin@keyhome.app'),
+            'name' => env('MAIL_ADMIN_NAME', 'KeyHome Admin'),
+        ],
+        'facturation' => [
+            'address' => env('MAIL_FACTURATION_ADDRESS', 'facturation@keyhome.app'),
+            'name' => env('MAIL_FACTURATION_NAME', 'KeyHome Facturation'),
         ],
     ],
 

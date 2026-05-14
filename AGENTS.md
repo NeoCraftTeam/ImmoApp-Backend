@@ -67,6 +67,16 @@ php artisan test --filter="it can login with valid credentials"
 Tests require a PostgreSQL `testing` database (see `phpunit.xml`). Meilisearch driver is set to `null`
 in tests. Payment gateway uses fake Flutterwave keys.
 
+### Parallel tests (`php artisan test --parallel`)
+
+Laravel + ParaTest reuse the **same** Postgres server but fork one schema database per worker: `testing_test_1`, `testing_test_2`, … derived from `DB_DATABASE` in `phpunit.xml`. That requires DDL:
+
+1. **`CREATEDB` (or equivalent) on `DB_USERNAME`** — otherwise worker startup fails with opaque `QueryException` on the first migration / connection.
+2. **Connect Postgres on the real server/port (usually 5432)** — **not PgBouncer** in pooling mode (`CREATE DATABASE` will fail).
+3. First run or after resetting workers: **`php artisan test --parallel --recreate-databases`** (drops and recreates per-worker databases).
+
+`phpunit.xml` pins **`DB_CONNECTION=pgsql`** and base connection fields (`DB_HOST`, `DB_PORT`, `DB_DATABASE`). **`DB_USERNAME` / `DB_PASSWORD`** must remain available via your shell environment or IDE test runner (`artisan test` clears keys that exist only in `.env` from Laravel’s Env repository).
+
 **Frontend Python smoke (Playwright):** `scripts/frontend_panel_smoke.py` hits `/`, `/owner/login`, and unauthenticated `/owner/dashboard` (expect redirect to login). **Optional auth** when **both** vars are set: `SMOKE_OWNER_EMAIL` + `SMOKE_OWNER_PASSWORD` (owner dashboard screenshot), `SMOKE_CLIENT_EMAIL` + `SMOKE_CLIENT_PASSWORD` (client `/home` screenshot); emails are masked in logs. See script docstring for `FRONTEND_SMOKE_AUTH_TIMEOUT_MS` and all env vars. Prefer the venv in `scripts/.venv-smoke/` + `scripts/requirements-playwright-smoke.txt`; invoke via `.agents/skills/webapp-testing/scripts/with_server.py` (see script docstring). Next.js allows only one `next dev` per project — stop duplicates before spawning another. Screenshots: `artifacts/` (gitignored).
 
 ### When the user asks to « test then commit » (backend)

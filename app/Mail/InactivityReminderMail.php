@@ -31,7 +31,7 @@ class InactivityReminderMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            from: $this->senderFrom('marketing'),
+            from: $this->senderFrom('notifications'),
             subject: __('emails.inactivity.subject', [
                 'name' => $this->user->firstname,
                 'app' => config('app.name'),

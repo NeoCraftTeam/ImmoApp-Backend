@@ -46,7 +46,7 @@ class NewAdSubmissionMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            from: $this->senderFrom('support'),
+            from: $this->senderFrom('admin'),
             subject: 'Nouvelle Annonce : '.$this->ad->title,
         );
     }

@@ -37,7 +37,7 @@ class AdminActionPerformedMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            from: $this->senderFrom('support'),
+            from: $this->senderFrom('admin'),
             subject: 'KeyHome — Confirmation de votre action : '.$this->details['description'],
         );
     }

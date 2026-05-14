@@ -25,7 +25,7 @@ class NewAdReportMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            from: $this->senderFrom('support'),
+            from: $this->senderFrom('admin'),
             subject: 'KeyHome - Nouveau signalement d\'annonce a traiter',
         );
     }

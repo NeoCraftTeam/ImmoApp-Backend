@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Mail\Concerns\HasSender;
 use App\Mail\Concerns\HasUnsubscribeLinks;
 use App\Models\Payment;
 use App\Models\PointPackage;
@@ -18,7 +19,7 @@ use Illuminate\Queue\SerializesModels;
 
 class CreditPurchaseConfirmationMail extends Mailable implements ShouldQueue
 {
-    use HasUnsubscribeLinks, Queueable, SerializesModels;
+    use HasSender, HasUnsubscribeLinks, Queueable, SerializesModels;
 
     public function __construct(
         public User $user,
@@ -34,6 +35,7 @@ class CreditPurchaseConfirmationMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: $this->senderFrom('facturation'),
             subject: 'Achat de crédits confirmé — '.$this->package->name,
         );
     }

@@ -23,7 +23,7 @@ class AdminWelcomeEmail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            from: $this->senderFrom('marketing'),
+            from: $this->senderFrom('admin'),
             subject: 'Bienvenue sur le panneau d\'administration KeyHome',
         );
     }

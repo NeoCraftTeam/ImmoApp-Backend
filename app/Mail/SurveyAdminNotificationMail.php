@@ -34,7 +34,7 @@ class SurveyAdminNotificationMail extends Mailable implements ShouldQueue
             : 'Anonyme';
 
         return new Envelope(
-            from: $this->senderFrom('support'),
+            from: $this->senderFrom('admin'),
             subject: 'Nouveau sondage reçu — '.$respondentName.' a répondu à : '.$this->survey->title,
         );
     }

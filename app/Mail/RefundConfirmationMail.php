@@ -17,6 +17,7 @@ use Illuminate\Queue\SerializesModels;
 class RefundConfirmationMail extends Mailable implements ShouldQueue
 {
     use Concerns\HasLocale;
+    use Concerns\HasSender;
     use Concerns\HasUnsubscribeLinks;
     use Queueable, SerializesModels;
 
@@ -32,6 +33,7 @@ class RefundConfirmationMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: $this->senderFrom('facturation'),
             subject: __('emails.refund.subject', ['amount' => number_format((float) $this->refund->amount, 0, ',', ' ')]),
         );
     }
