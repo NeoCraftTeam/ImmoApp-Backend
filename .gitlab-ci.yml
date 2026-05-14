@@ -194,6 +194,7 @@ test_suite:
         -e DB_PASSWORD=test_pass \
         -e SCOUT_DRIVER=null \
         -e MAIL_MAILER=array \
+        -e RESEND_KEY= \
         $CI_IMAGE sh -c \
         'set -e
         cp .env.example .env

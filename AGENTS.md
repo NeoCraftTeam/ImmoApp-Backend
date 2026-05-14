@@ -65,7 +65,7 @@ php artisan test --filter="it can login with valid credentials"
 ```
 
 Tests require a PostgreSQL `testing` database (see `phpunit.xml`). Meilisearch driver is set to `null`
-in tests. Payment gateway uses fake Flutterwave keys. **Mail:** PHPUnit uses `tests/bootstrap.php` (see `phpunit.xml`) to force `MAIL_MAILER=array` and drop `RESEND_KEY` before Laravel loads, so `cp .env.example` in CI cannot call the real Resend API. The GitLab `test_suite` job also exports `MAIL_MAILER=array`.
+in tests. Payment gateway uses fake Flutterwave keys. **Mail:** PHPUnit uses `tests/bootstrap.php` (see `phpunit.xml`) to force `MAIL_MAILER=array` and drop `RESEND_KEY` before Laravel loads, so `cp .env.example` in CI cannot call the real Resend API. `tests/TestCase::setUp()` also sets `mail.default=array` and `services.resend.key` empty after the app boots so sync-queue notification mail cannot resolve the HTTP Resend transport. GitHub Actions / GitLab additionally export `MAIL_MAILER=array` and `RESEND_KEY` empty where applicable.
 
 ### Parallel tests (`php artisan test --parallel`)
 
