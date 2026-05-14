@@ -549,10 +549,16 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@admin.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
-    ports:
-      - "5050:80"
     networks:
       - keyhome-network
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.keyhome-pgadmin.rule=Host(`${PGADMIN_DOMAIN:-pgadmin.keyhome.app}`)"
+      - "traefik.http.routers.keyhome-pgadmin.entrypoints=websecure"
+      - "traefik.http.routers.keyhome-pgadmin.tls.certresolver=letsencrypt"
+      - "traefik.http.services.keyhome-pgadmin.loadbalancer.server.port=80"
 
   # --- MONITORING STACK (use: docker compose --profile monitoring up -d) ---
 
@@ -581,16 +587,22 @@ services:
     restart: unless-stopped
     profiles:
       - monitoring
-    # Port exposé uniquement en dev. En prod, utilisez un reverse proxy Nginx
-    # ports:
-    #   - "3000:3000"
     volumes:
       - keyhome-grafana-data:/var/lib/grafana
       - .docker/monitoring/grafana/provisioning:/etc/grafana/provisioning
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_SERVER_ROOT_URL=https://${GRAFANA_DOMAIN:-grafana.keyhome.app}
     networks:
       - keyhome-network
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.keyhome-grafana.rule=Host(`${GRAFANA_DOMAIN:-grafana.keyhome.app}`)"
+      - "traefik.http.routers.keyhome-grafana.entrypoints=websecure"
+      - "traefik.http.routers.keyhome-grafana.tls.certresolver=letsencrypt"
+      - "traefik.http.services.keyhome-grafana.loadbalancer.server.port=3000"
 
   # Node Exporter : Métriques du serveur (CPU, RAM, Disque du VPS)
   node-exporter:
@@ -633,7 +645,7 @@ services:
     profiles:
       - monitoring
     environment:
-      DATA_SOURCE_NAME: "postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-password}@db:5432/${DB_DATABASE:-keyhome}?sslmode=disable"
+      DATA_SOURCE_NAME: "postgresql://${DB_USERNAME:-postgres}:${DB_PASSWORD:-password}@db:5432/${DB_DATABASE:-keyhome_prod}?sslmode=disable"
     networks:
       - keyhome-network
 
