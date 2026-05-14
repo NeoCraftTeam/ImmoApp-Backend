@@ -16,6 +16,7 @@ use Illuminate\Queue\SerializesModels;
 class FailedPaymentRetryMail extends Mailable implements ShouldQueue
 {
     use Concerns\HasLocale;
+    use Concerns\HasSender;
     use Concerns\HasUnsubscribeLinks;
     use Queueable, SerializesModels;
 
@@ -30,6 +31,7 @@ class FailedPaymentRetryMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: $this->senderFrom('facturation'),
             subject: __('emails.failed_payment.subject', ['app' => config('app.name')]),
         );
     }

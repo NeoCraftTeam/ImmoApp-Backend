@@ -52,6 +52,10 @@ return [
             'address' => env('MAIL_ADMIN_ADDRESS', 'admin@keyhome.app'),
             'name'    => env('MAIL_ADMIN_NAME', 'KeyHome Admin'),
         ],
+        'facturation' => [
+            'address' => env('MAIL_FACTURATION_ADDRESS', 'facturation@keyhome.app'),
+            'name'    => env('MAIL_FACTURATION_NAME', 'KeyHome Facturation'),
+        ],
     ],
 
     /*

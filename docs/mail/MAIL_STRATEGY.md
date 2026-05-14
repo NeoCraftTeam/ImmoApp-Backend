@@ -13,7 +13,7 @@
 Chaque email partant de l'application utilise **une adresse `FROM` sémantiquement cohérente** avec son contenu.
 Le trait `HasSender` (`app/Mail/Concerns/HasSender.php`) centralise l'accès à ces adresses via `$this->senderFrom('type')`.
 
-### Les 6 senders applicatifs (Resend)
+### Les 7 senders applicatifs (Resend)
 
 | Sender | Adresse | Nom affiché | `.env` variable | Rôle |
 |---|---|---|---|---|
@@ -23,6 +23,7 @@ Le trait `HasSender` (`app/Mail/Concerns/HasSender.php`) centralise l'accès à 
 | `support` | `support@keyhome.app` | KeyHome Support | `MAIL_SUPPORT_ADDRESS` | Service client, formulaire contact |
 | `bailleurs` | `bailleurs@keyhome.app` | KeyHome Bailleurs | `MAIL_BAILLEURS_ADDRESS` | Onboarding bailleurs & agences |
 | `admin` | `admin@keyhome.app` | KeyHome Admin | `MAIL_ADMIN_ADDRESS` | Notifications internes, modération |
+| `facturation` | `facturation@keyhome.app` | KeyHome Facturation | `MAIL_FACTURATION_ADDRESS` | Factures, reçus, remboursements, paiements |
 
 > **Défaut :** Tout Mailable sans `from:` explicite utilise `mail.from.address` = `noreply@keyhome.app`.
 
@@ -51,9 +52,6 @@ Le trait `HasSender` (`app/Mail/Concerns/HasSender.php`) centralise l'accès à 
 | `PasskeyNotificationMail` | Notification passkey | Gestion passkeys |
 | `AdSubmissionConfirmationMail` | Annonce soumise avec succès | Soumission annonce |
 | `AdUnlockConfirmationMail` | Annonce débloquée | Déblocage avec crédits |
-| `CreditPurchaseConfirmationMail` | Reçu achat de crédits | Paiement points |
-| `RefundConfirmationMail` | Confirmation de remboursement | Remboursement traité |
-| `SubscriptionInvoiceMail` | Votre facture KeyHome | Facture abonnement |
 | `SubscriptionSuccessEmail` | Abonnement activé | Souscription réussie |
 | `InvitationMail` | Vous êtes invité à rejoindre l'équipe | Invitation team |
 | `GdprDataExportMail` | Votre export de données | Demande RGPD |
@@ -75,11 +73,20 @@ Le trait `HasSender` (`app/Mail/Concerns/HasSender.php`) centralise l'accès à 
 | `PostViewingFeedbackMail` | Comment s'est passée votre visite ? | Post-visite |
 | `SubscriptionExpiringEmail` | Votre abonnement expire bientôt | J-7 expiration |
 | `SubscriptionRenewalReminderMail` | Renouvellement de votre abonnement | Avant renouvellement |
-| `FailedPaymentRetryMail` | Problème avec votre paiement | Échec paiement |
 | `WeeklyDigestMail` | Votre résumé hebdomadaire KeyHome | Digest automatique |
 | `InactivityReminderMail` | Vous nous manquez ! | X jours sans connexion |
 | `FirstAdCelebrationMail` | Bravo pour votre 1ère annonce ! | Milestone bailleur |
 | `FirstAdUnlockCongratulationsMail` | Vous avez débloqué votre 1ère annonce | Milestone client |
+
+### 💳 facturation@ — Paiements & facturation
+*Emails financiers. L'utilisateur peut répondre à facturation@ pour toute question.*
+
+| Classe | Sujet | Déclencheur |
+|---|---|---|
+| `SubscriptionInvoiceMail` | Votre facture KeyHome | Facture abonnement générée |
+| `CreditPurchaseConfirmationMail` | Achat de crédits confirmé | Achat de points |
+| `RefundConfirmationMail` | Confirmation de remboursement | Remboursement traité |
+| `FailedPaymentRetryMail` | Problème avec votre paiement | Échec paiement |
 
 ### 🟢 marketing@ — Campagnes & lifecycle
 *Emails de masse ou séquences marketing. Désabonnement facile obligatoire.*
@@ -194,6 +201,8 @@ MAIL_BAILLEURS_ADDRESS=bailleurs@keyhome.app
 MAIL_BAILLEURS_NAME="KeyHome Bailleurs"
 MAIL_ADMIN_ADDRESS=admin@keyhome.app
 MAIL_ADMIN_NAME="KeyHome Admin"
+MAIL_FACTURATION_ADDRESS=facturation@keyhome.app
+MAIL_FACTURATION_NAME="KeyHome Facturation"
 ```
 
 ### DNS à configurer sur Resend

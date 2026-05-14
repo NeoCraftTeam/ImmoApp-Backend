@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Mail\Concerns\HasSender;
 use App\Mail\Concerns\HasUnsubscribeLinks;
 use App\Models\Invoice;
 use App\Models\User;
@@ -17,7 +18,7 @@ use Illuminate\Queue\SerializesModels;
 
 class SubscriptionInvoiceMail extends Mailable implements ShouldQueue
 {
-    use HasUnsubscribeLinks, Queueable, SerializesModels;
+    use HasSender, HasUnsubscribeLinks, Queueable, SerializesModels;
 
     public function __construct(
         public User $user,
@@ -27,6 +28,7 @@ class SubscriptionInvoiceMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: $this->senderFrom('facturation'),
             subject: config('app.name').' — Facture '.$this->invoice->invoice_number,
         );
     }

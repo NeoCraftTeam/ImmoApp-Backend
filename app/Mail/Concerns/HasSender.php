@@ -9,13 +9,14 @@ use Illuminate\Mail\Mailables\Address;
 /**
  * Provides typed sender addresses for Mailables.
  *
- * Six senders are supported, each configured via .env:
+ * Seven senders are supported, each configured via .env:
  *   - 'noreply'       → MAIL_NOREPLY_ADDRESS       (transactionnel pur — OTP, reçus, sécurité)
  *   - 'notifications' → MAIL_NOTIFICATIONS_ADDRESS (alertes système — annonces, rappels, abonnements)
  *   - 'marketing'     → MAIL_MARKETING_ADDRESS     (newsletters, campagnes, promotions)
  *   - 'support'       → MAIL_SUPPORT_ADDRESS       (service client, signalements, formulaire contact)
  *   - 'bailleurs'     → MAIL_BAILLEURS_ADDRESS     (onboarding bailleurs & agences)
  *   - 'admin'         → MAIL_ADMIN_ADDRESS         (notifications internes, modération)
+ *   - 'facturation'   → MAIL_FACTURATION_ADDRESS   (factures, remboursements, paiements)
  *
  * Usage in a Mailable's envelope():
  *
