@@ -51,6 +51,9 @@ Route::prefix('auth')->group(function (): void {
     Route::post('clerk/verify-otp', [ClerkAuthController::class, 'verifyClerkOtp'])->middleware('throttle:auth.clerk-otp');
     Route::post('clerk/complete-profile', [ClerkAuthController::class, 'completeClerkProfile'])->middleware('throttle:auth.clerk-otp');
 
+    // Socialite routes below are an optional parallel to Clerk on the PWA (mobile /
+    // legacy); production browser auth is Clerk-first — see `SocialAuthController`.
+
     // OAuth Social Authentication
     Route::prefix('oauth')->controller(SocialAuthController::class)->group(function (): void {
         Route::post('{provider}', 'authenticate')

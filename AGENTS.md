@@ -306,6 +306,7 @@ Le paramètre `{paymentMethod}` est contraint au format `pm_*` via une regex pat
 
 ### Auth
 - API: Laravel Sanctum (Bearer tokens + SPA session cookies).
+- **Clerk complétion profil / OAuth (Mai 2026)** : ne pas envoyer `phone_number` à `signUp.update` — téléphone via `POST /auth/clerk/complete-profile` ou profil Laravel. Bouton GitHub : `NEXT_PUBLIC_OAUTH_GITHUB_ENABLED=true` + provider activé dans Clerk. Google One Tap : monté uniquement sur `/login` (client).
 - Filament panels: session-based with MFA (TOTP + email) + **Passkeys (WebAuthn)**.
 - **WebAuthn/Passkeys** (`laragear/webauthn ^5`):
   - User provider driver: `eloquent-webauthn` with `password_fallback: true` in `config/auth.php`.
