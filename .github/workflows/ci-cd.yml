@@ -93,6 +93,8 @@ jobs:
         DB_PASSWORD: password
         CACHE_DRIVER: redis
         REDIS_HOST: 127.0.0.1
+        MAIL_MAILER: array
+        RESEND_KEY: ''
       run: php artisan test
 
   # -----------------------------------------------------------------------------

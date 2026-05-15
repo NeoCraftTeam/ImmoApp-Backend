@@ -92,17 +92,20 @@ return [
             'throw' => false,
         ],
 
-        // ─── BACKUPS (S3/R2) ────────────────────────────────────────────
-        // Production: set BACKUP_DISKS=local,backups for offsite storage
+        // ─── BACKUPS (Cloudflare R2) ─────────────────────────────────────
+        // Production: set BACKUP_DISKS=backups in .env
+        // Required vars: BACKUP_R2_ACCESS_KEY_ID, BACKUP_R2_SECRET_ACCESS_KEY,
+        //                BACKUP_R2_BUCKET, BACKUP_R2_ENDPOINT (https://{id}.r2.cloudflarestorage.com)
         'backups' => [
             'driver' => 's3',
-            'key' => env('BACKUP_AWS_ACCESS_KEY_ID', env('AWS_ACCESS_KEY_ID')),
-            'secret' => env('BACKUP_AWS_SECRET_ACCESS_KEY', env('AWS_SECRET_ACCESS_KEY')),
-            'region' => env('BACKUP_AWS_REGION', env('AWS_DEFAULT_REGION', 'auto')),
-            'bucket' => env('BACKUP_AWS_BUCKET', env('AWS_BUCKET')),
-            'url' => env('BACKUP_AWS_URL', env('AWS_URL')),
-            'endpoint' => env('BACKUP_AWS_ENDPOINT', env('AWS_ENDPOINT')),
-            'use_path_style_endpoint' => env('BACKUP_AWS_USE_PATH_STYLE', env('AWS_USE_PATH_STYLE_ENDPOINT', false)),
+            'key' => env('BACKUP_R2_ACCESS_KEY_ID'),
+            'secret' => env('BACKUP_R2_SECRET_ACCESS_KEY'),
+            'region' => 'auto',
+            'bucket' => env('BACKUP_R2_BUCKET', 'keyhome-db-backups'),
+            'endpoint' => env('BACKUP_R2_ENDPOINT'),
+            'use_path_style_endpoint' => false,
+            // ⚠️ R2 ne supporte pas les ACLs — obligatoire
+            'retain_visibility' => false,
             'throw' => false,
         ],
 

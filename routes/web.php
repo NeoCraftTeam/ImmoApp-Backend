@@ -74,6 +74,7 @@ Route::get('/verify-email', function (Request $request) {
         'keyhomeback.neocraft.dev',
         'localhost',
         '127.0.0.1',
+        'api.keyhome.app',
     ];
 
     $parsedHost = parse_url($verifyUrl, PHP_URL_HOST);

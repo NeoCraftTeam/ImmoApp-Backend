@@ -40,6 +40,7 @@ return [
         'https://preview.keyhome.neocraft.dev',
         'https://keyhome.app',
         'https://www.keyhome.app',
+        'https://api.keyhome.app',
     ]),
 
     // Covers named preview/staging subdomains on both .neocraft.dev and .neocraft.de.

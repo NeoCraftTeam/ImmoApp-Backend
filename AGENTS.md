@@ -65,7 +65,7 @@ php artisan test --filter="it can login with valid credentials"
 ```
 
 Tests require a PostgreSQL `testing` database (see `phpunit.xml`). Meilisearch driver is set to `null`
-in tests. Payment gateway uses fake Flutterwave keys. **Mail:** PHPUnit uses `tests/bootstrap.php` (see `phpunit.xml`) to force `MAIL_MAILER=array` and drop `RESEND_KEY` before Laravel loads, so `cp .env.example` in CI cannot call the real Resend API. The GitLab `test_suite` job also exports `MAIL_MAILER=array`.
+in tests. Payment gateway uses fake Flutterwave keys. **Mail:** PHPUnit uses `tests/bootstrap.php` (see `phpunit.xml`) to force `MAIL_MAILER=array` and drop `RESEND_KEY` before Laravel loads, so `cp .env.example` in CI cannot call the real Resend API. `tests/TestCase::setUp()` also sets `mail.default=array` and `services.resend.key` empty after the app boots so sync-queue notification mail cannot resolve the HTTP Resend transport. GitHub Actions / GitLab additionally export `MAIL_MAILER=array` and `RESEND_KEY` empty where applicable.
 
 ### Parallel tests (`php artisan test --parallel`)
 
@@ -306,6 +306,7 @@ Le paramètre `{paymentMethod}` est contraint au format `pm_*` via une regex pat
 
 ### Auth
 - API: Laravel Sanctum (Bearer tokens + SPA session cookies).
+- **Clerk complétion profil / OAuth (Mai 2026)** : ne pas envoyer `phone_number` à `signUp.update` — téléphone via `POST /auth/clerk/complete-profile` ou profil Laravel. Bouton GitHub OAuth : **affiché par défaut** dans `getConfiguredOAuthProviders()` ; masquer avec `NEXT_PUBLIC_OAUTH_GITHUB_ENABLED=false` lorsque GitHub n'est pas activé dans Clerk. Google One Tap : monté uniquement sur `/login` (client).
 - Filament panels: session-based with MFA (TOTP + email) + **Passkeys (WebAuthn)**.
 - **WebAuthn/Passkeys** (`laragear/webauthn ^5`):
   - User provider driver: `eloquent-webauthn` with `password_fallback: true` in `config/auth.php`.
