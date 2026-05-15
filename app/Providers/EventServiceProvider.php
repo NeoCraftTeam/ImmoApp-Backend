@@ -25,7 +25,7 @@ use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 use SocialiteProviders\Apple\AppleExtendSocialite;
 use SocialiteProviders\Manager\SocialiteWasCalled;
-use Spatie\Backup\Events\BackupZipWasCreated;
+use Spatie\Backup\Events\BackupWasSuccessful;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -43,8 +43,8 @@ class EventServiceProvider extends ServiceProvider
             AppleExtendSocialite::class.'@handle',
         ],
 
-        // Backup: send zip by email when enabled
-        BackupZipWasCreated::class => [
+        // Backup: R2 signed URL sent by email after successful backup
+        BackupWasSuccessful::class => [
             SendBackupByEmailListener::class,
         ],
 
