@@ -7,6 +7,9 @@
 #
 # Utilisation : placé dans /opt/keyhome-preprod/
 # Les variables sont lues depuis /opt/keyhome-preprod/.env
+#
+# GitLab preprod_deploy : aucun service db ici — le job CI utilise DEPLOY_POSTGRES_CONTAINER
+# (défaut keyhome-prod-db) pour CREATE DATABASE sur l’instance Postgres partagée.
 # ============================================================
 
 services:
