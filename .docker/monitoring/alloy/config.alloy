@@ -1,0 +1,104 @@
+// ============================================================
+// Grafana Alloy — collecte logs Docker → Loki
+// Remplace Promtail (EOL depuis le 02/03/2026)
+// ============================================================
+
+// Découverte automatique des containers Docker en cours d'exécution
+discovery.docker "containers" {
+  host             = "unix:///var/run/docker.sock"
+  refresh_interval = "10s"
+
+  filter {
+    name   = "status"
+    values = ["running"]
+  }
+}
+
+// Relabeling : extraire les métadonnées Docker → labels Loki
+discovery.relabel "docker_logs" {
+  targets = discovery.docker.containers.targets
+
+  // Nom du container (sans le "/" initial)
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+
+  // Image Docker
+  rule {
+    source_labels = ["__meta_docker_container_image"]
+    target_label  = "image"
+  }
+
+  // Nom du service Compose
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  // Job fixe = "docker"
+  rule {
+    replacement  = "docker"
+    target_label = "job"
+  }
+
+  // Chemin vers le fichier de log JSON du container
+  rule {
+    source_labels = ["__meta_docker_container_id"]
+    target_label  = "__path__"
+    replacement   = "/var/lib/docker/containers/$1/$1-json.log"
+  }
+}
+
+// Lecture des fichiers de logs
+loki.source.file "docker_logs" {
+  targets    = discovery.relabel.docker_logs.output
+  forward_to = [loki.process.docker_logs.receiver]
+}
+
+// Pipeline de traitement
+loki.process "docker_logs" {
+  forward_to = [loki.write.default.receiver]
+
+  // Ignorer les logs trop anciens (evite les 400 "timestamp too old" de Loki)
+  stage.drop {
+    older_than          = "168h"
+    drop_counter_reason = "log_too_old"
+  }
+
+  // Parser le JSON produit par le driver de log Docker
+  stage.json {
+    expressions = {
+      output = "log",
+      stream = "stream",
+      time   = "time",
+    }
+  }
+
+  // Utiliser le champ "log" comme contenu de la ligne
+  stage.output {
+    source = "output"
+  }
+
+  // Extraire le niveau de log Laravel / nginx
+  stage.regex {
+    expression = "(?P<level>INFO|ERROR|WARNING|DEBUG|CRITICAL|ALERT|EMERGENCY|NOTICE)"
+    source     = "output"
+  }
+
+  // Promouvoir level et stream en labels Loki
+  stage.labels {
+    values = {
+      level  = null,
+      stream = null,
+    }
+  }
+}
+
+// Envoi vers Loki
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

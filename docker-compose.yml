@@ -646,16 +646,21 @@ services:
       timeout: 10s
       retries: 3
 
-  # Promtail : Agent collecteur de logs Docker → Loki
-  promtail:
-    image: grafana/promtail:3.4
-    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-promtail
+  # Grafana Alloy : Agent collecteur de logs Docker → Loki
+  # Remplace Promtail (EOL depuis le 02/03/2026)
+  alloy:
+    image: grafana/alloy:latest
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-alloy
     restart: unless-stopped
     profiles:
       - monitoring
-    command: -config.file=/etc/promtail/promtail.yml
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy
+      - --server.http.listen-addr=0.0.0.0:12345
     volumes:
-      - ./.docker/monitoring/promtail/promtail.yml:/etc/promtail/promtail.yml:ro
+      - ./.docker/monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
@@ -665,7 +670,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128m
+          memory: 256m
           cpus: "0.25"
 
 networks:
