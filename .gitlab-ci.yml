@@ -599,48 +599,72 @@ cleanup:
   stage: cleanup
   script:
     - |
-      echo "🧹 Starting cleanup..."
+      echo "🧹 ══════════════════════════════════════════════"
+      echo "🧹  CLEANUP PIPELINE — branch: $CI_COMMIT_BRANCH"
+      echo "🧹 ══════════════════════════════════════════════"
 
-      # 1. CI image policy:
-      #    - main/preprod  → conservée (pushée au registry + sert de cache pour le prochain pipeline)
-      #    - feature branch → supprimée du runner local (jamais pushée, cache-from utilise ci:main)
-      #      Sans ça, chaque feature branch laisserait un fantôme de ~1.4 GB sur le runner.
+      # ── 1. Image CI (feature branches seulement) ──────────────────────────
+      # main/preprod conservées → cache du prochain pipeline
+      # feature branch → supprimée (~1.4 GB de fantôme sinon)
       if [ "$CI_COMMIT_BRANCH" != "main" ] && [ "$CI_COMMIT_BRANCH" != "preprod" ]; then
         if docker image inspect $CI_IMAGE >/dev/null 2>&1; then
           docker rmi $CI_IMAGE 2>/dev/null || true
-          echo "  ✓ Removed local feature-branch CI image ($CI_IMAGE)"
+          echo "  ✓ Image CI feature-branch supprimée ($CI_IMAGE)"
         fi
       fi
 
-      # 2. Nettoyer les images dangling (sans tag)
+      # ── 2. Images dangling (sans tag = orphelines de build) ───────────────
       DANGLING=$(docker images -f "dangling=true" -q 2>/dev/null | wc -l | tr -d ' ')
       if [ "$DANGLING" -gt 0 ]; then
         docker rmi $(docker images -f "dangling=true" -q) 2>/dev/null || true
-        echo "  ✓ Removed $DANGLING dangling images"
+        echo "  ✓ $DANGLING images dangling supprimées"
+      else
+        echo "  ✓ Aucune image dangling"
       fi
 
-      # 3. Nettoyer les containers arrêtés depuis plus de 1h
-      STOPPED=$(docker ps -a -f "status=exited" --format '{{.ID}}' 2>/dev/null | wc -l | tr -d ' ')
-      if [ "$STOPPED" -gt 0 ]; then
-        docker container prune -f --filter "until=1h" 2>/dev/null
-        echo "  ✓ Cleaned stopped containers"
-      fi
+      # ── 3. Containers arrêtés (> 1h) ──────────────────────────────────────
+      docker container prune -f --filter "until=1h" 2>/dev/null || true
+      echo "  ✓ Containers arrêtés nettoyés (> 1h)"
 
-      # 4. Nettoyer les networks orphelins (sauf ceux en cours d'utilisation)
+      # ── 4. Networks inutilisés ─────────────────────────────────────────────
       docker network prune -f --filter "until=1h" 2>/dev/null || true
-      echo "  ✓ Cleaned unused networks"
+      echo "  ✓ Networks inutilisés nettoyés"
 
-      # 5. Nettoyer les volumes orphelins (attention: pas les données!)
-      # docker volume prune -f --filter "label!=keep" 2>/dev/null || true
-
-      # 6. Nettoyer le build cache Docker (garde 10GB)
+      # ── 5. Build cache (garde 10 GB pour ne pas casser le cache-from) ─────
       docker builder prune -f --keep-storage=10GB 2>/dev/null || true
-      echo "  ✓ Cleaned build cache (keeping 10GB)"
+      echo "  ✓ Build cache nettoyé (10 GB conservés)"
 
-      # 7. Rapport final
+      # ── 6. Nettoyage VPS (runner = même machine que le VPS) ───────────────
+      #    Volumes preprod orphelins connus (ancien nom de projet)
+      ORPHAN_VOLUMES="keyhome-preprod_keyhome-app-code keyhome-preprod_keyhome-db-data keyhome-preprod_keyhome-meilisearch-data keyhome-preprod_keyhome-storage-data"
+      for vol in $ORPHAN_VOLUMES; do
+        if docker volume inspect "$vol" >/dev/null 2>&1; then
+          docker volume rm "$vol" 2>/dev/null && echo "  ✓ Volume orphelin supprimé: $vol" || echo "  ⚠ Volume $vol en cours d'utilisation — ignoré"
+        fi
+      done
+
+      # ── 7. Alerte disque (seuil 80%) ──────────────────────────────────────
+      DISK_USED=$(df /var/lib/docker | awk 'NR==2{print $5}' | tr -d '%')
       echo ""
-      echo "📊 Disk usage after cleanup:"
+      echo "💾 Utilisation disque /var/lib/docker : ${DISK_USED}%"
+      if [ "$DISK_USED" -ge 80 ]; then
+        echo "  🚨 ALERTE : disque > 80% ! Nettoyage agressif en cours..."
+        docker system prune -af --volumes --filter "label!=com.docker.compose.service=db" 2>/dev/null || true
+        docker builder prune -af 2>/dev/null || true
+        echo "  ✓ Nettoyage agressif terminé"
+      elif [ "$DISK_USED" -ge 70 ]; then
+        echo "  ⚠  AVERTISSEMENT : disque > 70% — surveiller l'espace"
+      else
+        echo "  ✓ Espace disque OK"
+      fi
+
+      # ── 8. Rapport final ──────────────────────────────────────────────────
+      echo ""
+      echo "📊 Résumé après nettoyage :"
       docker system df 2>/dev/null || true
+      echo ""
+      echo "🏁 Cleanup terminé."
   when: always
+  allow_failure: true
   rules:
     - if: $CI_COMMIT_BRANCH
