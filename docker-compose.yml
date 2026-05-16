@@ -478,6 +478,13 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@admin.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      # Fix redirect loop behind Cloudflare + Traefik (HTTPS → HTTP interne)
+      # La session cookie est perdue sans ces réglages (SameSite/Secure mismatch)
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "False"
+      PGADMIN_CONFIG_SESSION_COOKIE_SECURE: "False"
+      PGADMIN_CONFIG_SESSION_COOKIE_SAMESITE: "'Lax'"
+      PGADMIN_CONFIG_WTF_CSRF_SSL_STRICT: "False"
+      PGADMIN_CONFIG_PROXY_X_FOR_COUNT: "1"
     networks:
       - keyhome-network
       - traefik-public
