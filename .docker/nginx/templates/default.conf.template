@@ -1,10 +1,10 @@
 # ── PHP-FPM upstream ─────────────────────────────────────────────────────────
-# Docker DNS round-robins across all `app` replicas when scaled with
-# `docker compose up --scale app=N`. The resolver forces DNS re-lookup
-# every 10 s so new containers are picked up without an Nginx reload.
+# PHP_FPM_HOST is set via docker-compose environment (e.g. keyhome-prod-app).
+# Using the full container name avoids Docker DNS ambiguity when prod and
+# preprod containers share the same network and both export service name "app".
 upstream php_fpm {
     least_conn;
-    server app:9000;
+    server ${PHP_FPM_HOST}:9000;
     keepalive 32;
 }
 
