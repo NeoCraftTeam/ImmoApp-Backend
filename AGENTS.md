@@ -620,6 +620,8 @@ Storybook, Vitest, Playwright.
 | `CLERK_SECRET_KEY` | Clerk server-side |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Web Push notifications |
 | `NEXT_PUBLIC_OWNER_PANEL` | `next`=integrated UI, `laravel`=Filament panel |
+| `NEXT_PUBLIC_REVERB_APP_KEY` | Doit égaler backend `REVERB_APP_KEY`. |
+| `NEXT_PUBLIC_REVERB_HOST` | Hostname WebSocket public (ex. `reverb.keyhome.app`). Avec `_PORT` (déf. 443) et `_SCHEME` (déf. https). Sans **les deux**, le temps réel est désactivé côté client (`isReverbRealtimeConfigured()` dans `src/lib/echo.ts`) — pas de crash Pusher au login ; le chat dégrade en polling / refetch. |
 | `NEXT_PUBLIC_MEILISEARCH_HOST` | MeiliSearch for client-side search |
 | `NEXT_PUBLIC_MEILISEARCH_KEY` | MeiliSearch search-only API key |
 | `NEXT_PUBLIC_SITE_URL` | **SEO / Open Graph**: public site origin (canonical, `metadataBase`, sitemap, `robots.ts`). Priority over `NEXT_PUBLIC_APP_URL`; on Vercel, `VERCEL_URL` is used if unset. Fallback `https://keyhome.app`. Helpers: `src/lib/site-url.ts` (`getSiteOrigin`, `absoluteUrl`, `absoluteAssetUrl`). Tests: `src/tests/lib/site-url.test.ts`. |
