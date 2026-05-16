@@ -481,6 +481,11 @@ services:
     networks:
       - keyhome-network
       - traefik-public
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.50"
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=traefik-public"
@@ -506,8 +511,14 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--storage.tsdb.retention.time=15d'
     networks:
       - keyhome-network
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.50"
 
   # Grafana : Visualisation des données
   grafana:
@@ -532,6 +543,11 @@ services:
       - "traefik.http.routers.keyhome-grafana.entrypoints=websecure"
       - "traefik.http.routers.keyhome-grafana.tls.certresolver=letsencrypt"
       - "traefik.http.services.keyhome-grafana.loadbalancer.server.port=3000"
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.50"
 
   # Node Exporter : Métriques du serveur (CPU, RAM, Disque du VPS)
   node-exporter:
@@ -565,6 +581,11 @@ services:
       - /var/lib/docker/:/var/lib/docker:ro
     networks:
       - keyhome-network
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.25"
 
   # Postgres Exporter : Métriques spécifiques à la DB
   postgres-exporter:
