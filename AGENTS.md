@@ -501,6 +501,11 @@ All prefixed `/api/v1/`: `auth.php`, `ads.php`, `payments.php`, `viewings.php`, 
   - **`cedrickdev` branch**: `build:check` (`npm run build`) runs as quality gate. Vercel deploys the preview automatically — NO `build:preprod` or `deploy:preprod` jobs in CI.
   - **`main` branch**: `build:prod` (vercel build --prod) → `deploy:production` (vercel deploy --prebuilt). Requires `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` GitLab CI variables.
 - **Proxy**: Traefik (HTTPS Let's Encrypt) in front of `web` service.
+- **Edge Traefik vs Nginx interne (prod)** — à garder en tête pour le diagnostic réseau :
+  - En production, **Traefik** termine le TLS (Let's Encrypt) et route le trafic vers les services Docker exposés sur le réseau ; le conteneur **`web` (Nginx)** relaie surtout le **FastCGI vers PHP-FPM** (`app`), pas une couche « bord Internet » autonome.
+  - Erreurs **intermittentes** (**503**, routage incohérent) : vérifier en priorité **les logs Traefik**, les **labels Docker** (routers/middlewares), l’état des **services** Traefik et les **healthchecks** des conteneurs **amont** — avant de chercher la cause uniquement dans la config Nginx interne.
+  - Nginx dans `web` reste utile pour les **en-têtes vers PHP-FPM** (ex. `X-Forwarded-Proto`, `X-Forwarded-For`), mais la couche **edge** face au public reste **Traefik** (ou un CDN devant), pas ce Nginx.
+  - Si les **503** (ou échecs intermittents) se reproduisent en appelant **directement** le port publié du conteneur `web` (sans Traefik), prioriser **Nginx / PHP-FPM** et le conteneur **`app`** — la cause n’est alors pas uniquement au bord Traefik.
 - **Preprod**: `docker-compose.preprod.yml` — shares prod DB/Redis/Meilisearch via external network.
 
 ### Key Packages
