@@ -581,6 +581,10 @@ services:
     restart: unless-stopped
     profiles:
       - monitoring
+    command:
+      - --housekeeping_interval=30s        # Scan toutes les 30s au lieu de 1s (moins de CPU)
+      - --disable_metrics=advtcp,cpuLoad,memory_numa,tcp,udp,sched,process,hugetlb,referenced_memory,resctrl
+      - --store_container_labels=false
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:rw
