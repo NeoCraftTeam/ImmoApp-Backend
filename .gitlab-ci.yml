@@ -231,6 +231,10 @@ test_suite:
   interruptible: false
   script:
     # ── Copy compose file + nginx config ───────────────────────────────────────
+    # rm -rf avant mkdir : évite les erreurs "Permission denied" si les dossiers
+    # ont été créés manuellement en SSH par un autre utilisateur (ex: cedrick).
+    # Le runner doit toujours être propriétaire de ces répertoires.
+    - rm -rf $DEPLOY_DIR/.docker/nginx/conf.d $DEPLOY_DIR/.docker/nginx/templates $DEPLOY_DIR/.docker/php
     - mkdir -p $DEPLOY_DIR/.docker/nginx/conf.d $DEPLOY_DIR/.docker/nginx/templates $DEPLOY_DIR/.docker/php
     - cp $COMPOSE_SRC_FILE $DEPLOY_DIR/docker-compose.yml
     - cp -rf .docker/nginx/conf.d/. $DEPLOY_DIR/.docker/nginx/conf.d/
