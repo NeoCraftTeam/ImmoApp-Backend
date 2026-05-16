@@ -622,6 +622,52 @@ services:
     networks:
       - keyhome-network
 
+  # Loki : Agrégation et stockage des logs
+  loki:
+    image: grafana/loki:3.4
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-loki
+    restart: unless-stopped
+    profiles:
+      - monitoring
+    command: -config.file=/etc/loki/loki.yml
+    volumes:
+      - ./.docker/monitoring/loki/loki.yml:/etc/loki/loki.yml:ro
+      - keyhome-loki-data:/loki
+    networks:
+      - keyhome-network
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.50"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3100/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Promtail : Agent collecteur de logs Docker → Loki
+  promtail:
+    image: grafana/promtail:3.4
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-promtail
+    restart: unless-stopped
+    profiles:
+      - monitoring
+    command: -config.file=/etc/promtail/promtail.yml
+    volumes:
+      - ./.docker/monitoring/promtail/promtail.yml:/etc/promtail/promtail.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - keyhome-network
+    depends_on:
+      - loki
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+          cpus: "0.25"
+
 networks:
   keyhome-network:
     driver: bridge
@@ -642,4 +688,6 @@ volumes:
   keyhome-grafana-data:
     driver: local
   keyhome-meilisearch-data:
+    driver: local
+  keyhome-loki-data:
     driver: local
