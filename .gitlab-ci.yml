@@ -231,9 +231,11 @@ test_suite:
   interruptible: false
   script:
     # ── Copy compose file + nginx config ───────────────────────────────────────
-    - mkdir -p $DEPLOY_DIR/.docker/nginx/conf.d
+    - mkdir -p $DEPLOY_DIR/.docker/nginx/conf.d $DEPLOY_DIR/.docker/nginx/templates $DEPLOY_DIR/.docker/php
     - cp $COMPOSE_SRC_FILE $DEPLOY_DIR/docker-compose.yml
     - cp -rf .docker/nginx/conf.d/. $DEPLOY_DIR/.docker/nginx/conf.d/
+    - cp -rf .docker/nginx/templates/. $DEPLOY_DIR/.docker/nginx/templates/
+    - cp .docker/php/www.conf $DEPLOY_DIR/.docker/php/www.conf
     # ── Sync codebase to VPS for reference and manual artisan commands ─────────
     - |
       AUTHENTICATED_URL="https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/${CI_PROJECT_PATH}.git"

@@ -508,6 +508,14 @@ services:
       - '--web.console.templates=/usr/share/prometheus/consoles'
     networks:
       - keyhome-network
+      - traefik-public
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      - "traefik.http.routers.keyhome-prometheus.rule=Host(`${PROMETHEUS_DOMAIN:-prometheus.keyhome.app}`)"
+      - "traefik.http.routers.keyhome-prometheus.entrypoints=websecure"
+      - "traefik.http.routers.keyhome-prometheus.tls.certresolver=letsencrypt"
+      - "traefik.http.services.keyhome-prometheus.loadbalancer.server.port=9090"
 
   # Grafana : Visualisation des données
   grafana:
