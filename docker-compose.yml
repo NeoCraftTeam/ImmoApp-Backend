@@ -37,6 +37,7 @@ services:
       - keyhome-app-code:/var/www
       - keyhome-storage-data:/var/www/storage
       - ./.env:/var/www/.env
+      - .docker/php/www.conf:/usr/local/etc/php-fpm.d/www.conf:ro
     networks:
       - keyhome-network
     environment:
@@ -247,10 +248,14 @@ services:
         condition: service_healthy
     ports:
       - "${WEB_PORT:-9090}:80"
+    environment:
+      - PHP_FPM_HOST=${COMPOSE_PREFIX:-keyhome-prod}-app
+      - NGINX_ENVSUBST_FILTER=PHP_FPM_HOST
     volumes:
       - keyhome-app-code:/var/www
       - keyhome-storage-data:/var/www/storage
-      - .docker/nginx/conf.d:/etc/nginx/conf.d
+      - .docker/nginx/conf.d/fastcgi-cache.conf:/etc/nginx/conf.d/fastcgi-cache.conf:ro
+      - .docker/nginx/templates:/etc/nginx/templates:ro
     networks:
       - keyhome-network
       - traefik-public
