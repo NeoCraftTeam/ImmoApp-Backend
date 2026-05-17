@@ -76,8 +76,8 @@ Route::prefix('v1')->group(function (): void {
 
     // --- AD TYPES ---
     Route::controller(AdTypeController::class)->group(function (): void {
-        Route::get('/ad-types', 'index');
-        Route::get('/ad-types/{adType}', 'show');
+        Route::get('/ad-types', 'index')->middleware('cdn.cache:3600');
+        Route::get('/ad-types/{adType}', 'show')->middleware('cdn.cache:3600');
     });
     // Admin write actions: enforce MFA when admin has TOTP/email MFA configured.
     Route::middleware(['auth:sanctum', 'mfa.admin'])->controller(AdTypeController::class)->group(function (): void {
@@ -88,8 +88,8 @@ Route::prefix('v1')->group(function (): void {
 
     // --- CITIES ---
     Route::controller(CityController::class)->group(function (): void {
-        Route::get('/cities', 'index');
-        Route::get('/cities/{id}', 'show');
+        Route::get('/cities', 'index')->middleware('cdn.cache:3600');
+        Route::get('/cities/{id}', 'show')->middleware('cdn.cache:3600');
         Route::post('/cities', 'store')->middleware(['auth:sanctum', 'mfa.admin'])->can('create', City::class);
         Route::put('/cities/{city}', 'update')->middleware(['auth:sanctum', 'mfa.admin'])->can('update', 'city');
         Route::delete('/cities/{city}', 'destroy')->middleware(['auth:sanctum', 'mfa.admin'])->can('delete', 'city');
@@ -97,8 +97,8 @@ Route::prefix('v1')->group(function (): void {
 
     // --- QUARTERS ---
     Route::controller(QuarterController::class)->group(function (): void {
-        Route::get('/quarters', 'index');
-        Route::get('/quarters/{id}', 'show');
+        Route::get('/quarters', 'index')->middleware('cdn.cache:3600');
+        Route::get('/quarters/{id}', 'show')->middleware('cdn.cache:3600');
         Route::post('/quarters', 'store')->middleware(['auth:sanctum', 'mfa.admin'])->can('create', Quarter::class);
         Route::put('/quarters/{quarter}', 'update')->middleware(['auth:sanctum', 'mfa.admin'])->can('update', 'quarter');
         Route::delete('/quarters/{quarter}', 'destroy')->middleware(['auth:sanctum', 'mfa.admin'])->can('delete', 'quarter');
@@ -176,7 +176,7 @@ Route::prefix('v1')->group(function (): void {
     });
 
     // --- PROPERTY ATTRIBUTES (public) ---
-    Route::get('/property-attributes', [PropertyAttributeController::class, 'index']);
+    Route::get('/property-attributes', [PropertyAttributeController::class, 'index'])->middleware('cdn.cache:1800');
 
     // --- VISIT TRACKING (anonymous) ---
     Route::post('/track/visit', [VisitTrackingController::class, 'store'])
@@ -184,8 +184,8 @@ Route::prefix('v1')->group(function (): void {
 
     // --- PUBLIC STATS (W37: extracted from inline closures to StatsController) ---
     Route::controller(StatsController::class)->middleware('throttle:30,1')->group(function (): void {
-        Route::get('/stats/landing', 'landing')->name('stats.landing');
-        Route::get('/stats/testimonials', 'testimonials')->name('stats.testimonials');
+        Route::get('/stats/landing', 'landing')->name('stats.landing')->middleware('cdn.cache:300');
+        Route::get('/stats/testimonials', 'testimonials')->name('stats.testimonials')->middleware('cdn.cache:3600');
     });
 
     // --- CLERK WEBHOOKS ---

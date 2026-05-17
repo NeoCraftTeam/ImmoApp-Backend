@@ -8,6 +8,7 @@ use App\Enums\AdStatus;
 use App\Events\AdCreated;
 use App\Events\AdStatusTransitioned;
 use App\Models\Ad;
+use Illuminate\Support\Facades\Cache;
 
 class AdObserver
 {
@@ -29,6 +30,7 @@ class AdObserver
     public function created(Ad $ad): void
     {
         AdCreated::dispatch($ad);
+        $this->invalidateFeedCache();
     }
 
     /**
@@ -38,6 +40,13 @@ class AdObserver
      */
     public function updated(Ad $ad): void
     {
+        // Invalidate feed cache when visibility-affecting columns change.
+        // 5min TTL is fine for normal eventual consistency, but newly published
+        // or unpublished ads should appear/disappear immediately.
+        if ($ad->wasChanged(['status', 'is_visible', 'boost_score'])) {
+            $this->invalidateFeedCache();
+        }
+
         if (!$ad->wasChanged('status')) {
             return;
         }
@@ -51,5 +60,30 @@ class AdObserver
         }
 
         AdStatusTransitioned::dispatch($ad, $oldStatus, $newStatus);
+    }
+
+    /**
+     * Handle the Ad "deleted" event.
+     */
+    public function deleted(Ad $ad): void
+    {
+        $this->invalidateFeedCache();
+    }
+
+    /**
+     * Forget the per_page-keyed guest feed cache entries.
+     *
+     * The cache key pattern is `ads:feed:guest:first:pp={N}` for N in [1..50].
+     * We forget the common page sizes; the rare custom sizes will refresh
+     * naturally at TTL expiry (5 min).
+     */
+    private function invalidateFeedCache(): void
+    {
+        foreach ([15, 20, 30, 50] as $perPage) {
+            Cache::forget("ads:feed:guest:first:pp={$perPage}");
+        }
+
+        // Guest recommendations cold-start may also include this ad.
+        Cache::forget('reco_v2_guest');
     }
 }

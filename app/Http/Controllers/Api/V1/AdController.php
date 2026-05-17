@@ -123,8 +123,11 @@ final class AdController
      * On top of the index, the *first page* (no cursor, no exclude_ids,
      * default per_page) is hit by every guest landing on the home and is
      * shared across users — we cache the resolved Eloquent collection for
-     * 60 s so a cold load never exceeds the 1 s Nightwatch SLA. Authenticated
-     * users and subsequent pages bypass the cache to keep personalised
+     * 300 s (5 min) so a cold load never exceeds the 1 s Nightwatch SLA.
+     * Aligned with the route-level `cdn.cache:300` so Cloudflare absorbs
+     * the guest traffic at the edge while the app cache backs subsequent
+     * cursor pages and the rare CDN miss. Authenticated users and
+     * subsequent pages bypass the cache to keep personalised
      * recommendations fresh.
      */
     public function feed(AdRequest $request): AnonymousResourceCollection
@@ -160,7 +163,7 @@ final class AdController
         };
 
         $ads = $isFirstPageGuest
-            ? Cache::remember("ads:feed:guest:first:pp={$perPage}", 60, $build)
+            ? Cache::remember("ads:feed:guest:first:pp={$perPage}", 300, $build)
             : $build();
 
         return AdApiResource::collection($ads);
