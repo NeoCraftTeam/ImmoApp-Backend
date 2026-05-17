@@ -478,6 +478,13 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@admin.com}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      # Fix redirect loop behind Cloudflare + Traefik (HTTPS → HTTP interne)
+      # La session cookie est perdue sans ces réglages (SameSite/Secure mismatch)
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "False"
+      PGADMIN_CONFIG_SESSION_COOKIE_SECURE: "False"
+      PGADMIN_CONFIG_SESSION_COOKIE_SAMESITE: "'Lax'"
+      PGADMIN_CONFIG_WTF_CSRF_SSL_STRICT: "False"
+      PGADMIN_CONFIG_PROXY_X_FOR_COUNT: "1"
     networks:
       - keyhome-network
       - traefik-public
@@ -574,6 +581,10 @@ services:
     restart: unless-stopped
     profiles:
       - monitoring
+    command:
+      - --housekeeping_interval=30s        # Scan toutes les 30s au lieu de 1s (moins de CPU)
+      - --disable_metrics=advtcp,cpuLoad,memory_numa,tcp,udp,sched,process,hugetlb,referenced_memory,resctrl
+      - --store_container_labels=false
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:rw
@@ -611,6 +622,57 @@ services:
     networks:
       - keyhome-network
 
+  # Loki : Agrégation et stockage des logs
+  loki:
+    image: grafana/loki:3.4
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-loki
+    restart: unless-stopped
+    profiles:
+      - monitoring
+    command: -config.file=/etc/loki/loki.yml
+    volumes:
+      - ./.docker/monitoring/loki/loki.yml:/etc/loki/loki.yml:ro
+      - keyhome-loki-data:/loki
+    networks:
+      - keyhome-network
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.50"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3100/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Grafana Alloy : Agent collecteur de logs Docker → Loki
+  # Remplace Promtail (EOL depuis le 02/03/2026)
+  alloy:
+    image: grafana/alloy:latest
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-alloy
+    restart: unless-stopped
+    profiles:
+      - monitoring
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+    volumes:
+      - ./.docker/monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - keyhome-network
+    depends_on:
+      - loki
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.25"
+
 networks:
   keyhome-network:
     driver: bridge
@@ -631,4 +693,6 @@ volumes:
   keyhome-grafana-data:
     driver: local
   keyhome-meilisearch-data:
+    driver: local
+  keyhome-loki-data:
     driver: local
