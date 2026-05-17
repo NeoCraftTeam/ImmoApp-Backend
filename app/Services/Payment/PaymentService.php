@@ -79,7 +79,7 @@ final readonly class PaymentService
      *     payment_method_id?: string|null,
      *     meta?: array<string, mixed>
      * } $data
-     * @return array{payment: Payment, link: string, tx_ref: string, gateway: string, status: string}
+     * @return array{payment: Payment, link: string, tx_ref: string, gateway: string, status: string, stripe_flow: string|null}
      */
     public function createPayment(User $user, array $data): array
     {
@@ -203,6 +203,7 @@ final readonly class PaymentService
             'tx_ref' => $txRef,
             'gateway' => $usedGateway->getName(),
             'status' => $result['status'],
+            'stripe_flow' => $result['stripe_flow'] ?? null,
         ];
     }
 
@@ -532,7 +533,7 @@ final readonly class PaymentService
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return array{0: array{link: string, tx_ref: string, status: string, gateway: string}, 1: PaymentGatewayInterface}
+     * @return array{0: array{link: string, tx_ref: string, status: string, gateway: string, stripe_flow?: string}, 1: PaymentGatewayInterface}
      */
     private function initiateWithFallback(array $payload, ?PaymentGatewayInterface $primary = null): array
     {

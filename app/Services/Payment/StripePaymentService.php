@@ -14,6 +14,7 @@ use App\Support\XafEurConverter;
 use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Cashier;
 use Stripe\Charge;
+use Stripe\Checkout\Session as CheckoutSession;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Exception\SignatureVerificationException;
 use Stripe\PaymentIntent;
@@ -119,7 +120,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
      *     payment_method_id?: string|null,
      *     meta?: array<string, mixed>
      * } $payload
-     * @return array{link: string, tx_ref: string, status: string, gateway: string}
+     * @return array{link: string, tx_ref: string, status: string, gateway: string, stripe_flow: string}
      */
     public function initiate(array $payload): array
     {
@@ -149,55 +150,115 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
             'xaf_to_eur_rate' => (string) XafEurConverter::rate(),
         ], fn ($v): bool => $v !== null && $v !== '');
 
-        $params = [
-            'amount' => $eurCents,
-            'currency' => $currency,
-            'description' => mb_substr($description, 0, 1000),
-            'receipt_email' => (string) $payload['email'],
+        if ($paymentMethodId !== null) {
+            // ── Off-session saved-card flow ──────────────────────────────────────
+            // Confirm the PaymentIntent server-side with the saved card.
+            // Stripe runs the SCA exemption logic and either succeeds
+            // immediately (`succeeded`) or returns `requires_action` (3DS).
+            // We pin `payment_method_types` to `card` because
+            // `automatic_payment_methods` cannot be combined with an
+            // explicit `payment_method`.
+            $params = [
+                'amount' => $eurCents,
+                'currency' => $currency,
+                'description' => mb_substr($description, 0, 1000),
+                'receipt_email' => (string) $payload['email'],
+                'metadata' => $meta,
+                'payment_method' => $paymentMethodId,
+                'payment_method_types' => ['card'],
+                'confirm' => true,
+                'off_session' => true,
+            ];
+
+            if ($customerId !== null) {
+                $params['customer'] = $customerId;
+            }
+
+            try {
+                $intent = $this->stripe->paymentIntents->create(
+                    $params,
+                    ['idempotency_key' => 'kh_initiate:'.$txRef],
+                );
+            } catch (ApiErrorException $e) {
+                Log::error('Stripe initiate (off-session) failed', [
+                    'tx_ref' => $txRef,
+                    'message' => $e->getMessage(),
+                    'stripe_code' => $e->getStripeCode(),
+                ]);
+
+                throw new PaymentGatewayException(
+                    'Stripe a refusé l\'initialisation du paiement. Réessayez ou choisissez un autre moyen de paiement.',
+                    previous: $e,
+                );
+            }
+
+            $stripeStatus = (string) ($intent->status ?? 'requires_payment_method');
+            $normalisedStatus = match ($stripeStatus) {
+                'succeeded' => 'success',
+                'requires_action' => 'requires_action',
+                'requires_payment_method' => 'failed',
+                'requires_confirmation', 'processing' => 'pending',
+                'canceled' => 'cancelled',
+                default => 'pending',
+            };
+
+            return [
+                'link' => (string) $intent->client_secret,
+                'tx_ref' => $txRef,
+                'status' => $normalisedStatus,
+                'gateway' => $this->getName(),
+                'stripe_flow' => 'payment_intent',
+            ];
+        }
+
+        // ── Checkout Session (new-card / first-time in-page flow) ────────────
+        // Create a Checkout Session with `ui_mode: 'custom'` so the frontend
+        // can mount the Payment Element via `CheckoutElementsProvider`.
+        // The full dynamic payment-method catalogue (Card, Apple Pay, Google
+        // Pay, SEPA, Bancontact, iDEAL, Klarna, Link…) is controlled from
+        // the Stripe Dashboard → Settings → Payment methods.
+        $paymentIntentData = [
             'metadata' => $meta,
+            'receipt_email' => (string) $payload['email'],
+            'description' => mb_substr($description, 0, 1000),
+        ];
+
+        if ($savePaymentMethod && $customerId !== null) {
+            $paymentIntentData['setup_future_usage'] = 'off_session';
+        }
+
+        $sessionParams = [
+            'ui_mode' => 'custom',
+            'mode' => 'payment',
+            'line_items' => [
+                [
+                    'price_data' => [
+                        'currency' => $currency,
+                        'product_data' => ['name' => mb_substr($description, 0, 250)],
+                        'unit_amount' => $eurCents,
+                    ],
+                    'quantity' => 1,
+                ],
+            ],
+            'locale' => 'fr',
+            'metadata' => $meta,
+            'payment_intent_data' => $paymentIntentData,
+            'return_url' => (string) $payload['redirect_url'],
         ];
 
         if ($customerId !== null) {
-            $params['customer'] = $customerId;
-        }
-
-        if ($savePaymentMethod && $customerId !== null) {
-            // Stripe attaches the PaymentMethod to the Customer once the
-            // intent succeeds. Skipping the Customer guard would 400 from
-            // Stripe (setup_future_usage requires `customer`).
-            $params['setup_future_usage'] = 'off_session';
-        }
-
-        if ($paymentMethodId !== null) {
-            // Reuse path: cardholder picked a saved card. Confirm the intent
-            // server-side, off-session ; Stripe runs the SCA exemption flow
-            // and either succeeds immediately or returns `requires_action`
-            // for 3DS. We pin `payment_method_types` to `card` because
-            // `automatic_payment_methods` cannot be combined with an
-            // explicit `payment_method`.
-            $params['payment_method'] = $paymentMethodId;
-            $params['payment_method_types'] = ['card'];
-            $params['confirm'] = true;
-            $params['off_session'] = true;
+            $sessionParams['customer'] = $customerId;
         } else {
-            // First-time / in-page card flow: let Stripe surface the full
-            // dynamic catalogue (Card, Apple Pay, Google Pay, SEPA,
-            // Bancontact, iDEAL, Klarna, Cash App Pay, Link, etc.) filtered
-            // by the visitor's location and currency. Disable methods you
-            // don't want from the Stripe Dashboard → Settings → Payment
-            // methods (single source of truth).
-            $params['automatic_payment_methods'] = ['enabled' => true];
+            $sessionParams['customer_email'] = (string) $payload['email'];
         }
 
         try {
-            $intent = $this->stripe->paymentIntents->create(
-                $params,
-                [
-                    'idempotency_key' => 'kh_initiate:'.$txRef,
-                ],
+            $session = $this->stripe->checkout->sessions->create(
+                $sessionParams,
+                ['idempotency_key' => 'kh_cs:'.$txRef],
             );
         } catch (ApiErrorException $e) {
-            Log::error('Stripe initiate failed', [
+            Log::error('Stripe checkout session creation failed', [
                 'tx_ref' => $txRef,
                 'message' => $e->getMessage(),
                 'stripe_code' => $e->getStripeCode(),
@@ -209,30 +270,12 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
             );
         }
 
-        // Normalise the post-creation status. For the in-page flow this is
-        // always `pending` (the cardholder hasn't entered details yet). For
-        // the off-session confirm path the intent is already terminal —
-        // either `succeeded`, `requires_action` (3DS), or `requires_payment_method`
-        // (the saved card was declined : we surface `failed` so the
-        // orchestrator marks the local Payment as FAILED right away).
-        $stripeStatus = (string) ($intent->status ?? 'requires_payment_method');
-        $normalisedStatus = match ($stripeStatus) {
-            'succeeded' => 'success',
-            'requires_action' => 'requires_action',
-            'requires_payment_method' => $paymentMethodId !== null ? 'failed' : 'pending',
-            'requires_confirmation', 'processing' => 'pending',
-            'canceled' => 'cancelled',
-            default => 'pending',
-        };
-
         return [
-            // For Stripe, `link` carries the client secret consumed by
-            // `<PaymentElement>` on the frontend. The interface name is
-            // a leftover from the Flutterwave-only era.
-            'link' => (string) $intent->client_secret,
+            'link' => (string) $session->client_secret,
             'tx_ref' => $txRef,
-            'status' => $normalisedStatus,
+            'status' => 'pending',
             'gateway' => $this->getName(),
+            'stripe_flow' => 'checkout_session',
         ];
     }
 
@@ -531,6 +574,11 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
         $object = $event->data->object ?? null;
         $eventName = (string) $event->type;
 
+        // Checkout Session events (ui_mode: 'custom' — Payment Element flow).
+        if ($object instanceof CheckoutSession) {
+            return $this->normaliseCheckoutSessionEvent($eventName, $object);
+        }
+
         // We only care about PaymentIntent events for the orchestrator.
         // Subscription / invoice events are handled separately by Cashier.
         if (!$object instanceof PaymentIntent) {
@@ -567,6 +615,42 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
             'currency' => $normalised['currency'],
             'payment_method' => $normalised['payment_method'],
             'raw' => $normalised['raw'],
+        ];
+    }
+
+    /**
+     * Translate a Checkout Session event (`checkout.session.completed` etc.)
+     * into the gateway-agnostic webhook shape expected by the orchestrator.
+     *
+     * The XAF amount is read from `session.metadata.xaf_amount` (written at
+     * session creation time) to avoid a lossy EUR-cents → XAF round-trip.
+     *
+     * @return array{event: string, tx_ref: string, status: string, amount: float, currency: string, payment_method: string|null, raw: array<string, mixed>}
+     */
+    private function normaliseCheckoutSessionEvent(string $eventName, CheckoutSession $session): array
+    {
+        $txRef = (string) ($session->metadata->tx_ref ?? '');
+        $paymentStatus = (string) ($session->payment_status ?? '');
+
+        $normalisedStatus = match ($eventName) {
+            'checkout.session.completed' => $paymentStatus === 'paid' ? 'success' : 'pending',
+            'checkout.session.async_payment_succeeded' => 'success',
+            'checkout.session.async_payment_failed' => 'failed',
+            default => 'ignored',
+        };
+
+        $metadata = $session->metadata instanceof StripeObject ? $session->metadata->toArray() : [];
+        $xafFromMeta = isset($metadata['xaf_amount']) ? (float) $metadata['xaf_amount'] : null;
+        $xafAmount = $xafFromMeta ?? XafEurConverter::toXaf((int) ($session->amount_total ?? 0));
+
+        return [
+            'event' => $eventName,
+            'tx_ref' => $txRef,
+            'status' => $normalisedStatus,
+            'amount' => $xafAmount,
+            'currency' => strtoupper((string) config('payment.default_currency', 'XAF')),
+            'payment_method' => PaymentMethod::CARD->value,
+            'raw' => $session->toArray(),
         ];
     }
 
