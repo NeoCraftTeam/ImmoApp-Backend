@@ -25,7 +25,11 @@ use Illuminate\Support\Facades\Route;
 // Ad CRUD & public search
 Route::prefix('ads')->middleware('optional.auth')->group(function (): void {
     Route::get('/', [AdController::class, 'index']);
-    Route::get('/feed', [AdController::class, 'feed']);
+    // /feed is the home page firehose for both guests and logged-in users.
+    // 5min CDN cache covers guests entirely (Cloudflare absorbs the load and
+    // origin only sees one request every 5min per cursor). Authenticated users
+    // still hit the app (CdnCache short-circuits when $request->user() exists).
+    Route::get('/feed', [AdController::class, 'feed'])->middleware('cdn.cache:300');
 
     // Geo proximity (public)
     Route::get('/nearby', [AdGeoController::class, 'ads_nearby_public'])->middleware('throttle:60,1');
