@@ -7,10 +7,14 @@ use App\Providers\EventServiceProvider;
 use App\Providers\Filament\AdminPanelProvider;
 use App\Providers\Filament\AgencyPanelProvider;
 use App\Providers\MailHeaderServiceProvider;
+use App\Providers\ObserverServiceProvider;
+use App\Providers\RateLimitServiceProvider;
 use App\Providers\TelescopeServiceProvider;
 
 return array_filter([
     AppServiceProvider::class,
+    ObserverServiceProvider::class,
+    RateLimitServiceProvider::class,
     AuthServiceProvider::class,
     BroadcastServiceProvider::class,
     EventServiceProvider::class,

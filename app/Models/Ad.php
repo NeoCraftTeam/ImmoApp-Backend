@@ -434,11 +434,23 @@ class Ad extends Model implements HasMedia
             ->count();
     }
 
-    /** Check if a user has favorited this ad. */
-    public function isFavoritedBy(?User $user): bool
+    /**
+     * Check if a user has favorited this ad.
+     *
+     * For single-ad lookups (detail page) pass no second argument — two queries
+     * will be fired. For list contexts, call `loadFavoritedIds()` once for the
+     * entire collection and pass the result here to avoid N+1.
+     *
+     * @param  array<string>|null  $preloadedFavoritedIds  Output of `Ad::loadFavoritedIds()`
+     */
+    public function isFavoritedBy(?User $user, ?array $preloadedFavoritedIds = null): bool
     {
         if (!$user) {
             return false;
+        }
+
+        if ($preloadedFavoritedIds !== null) {
+            return in_array($this->id, $preloadedFavoritedIds, true);
         }
 
         $favorites = AdInteraction::where('user_id', $user->id)
@@ -452,6 +464,44 @@ class Ad extends Model implements HasMedia
             ->count();
 
         return $favorites > $unfavorites;
+    }
+
+    /**
+     * Bulk-load the ad IDs that a user has favorited — one query for the
+     * whole set, suitable for eliminating N+1 in paginated listing responses.
+     *
+     * Usage:
+     *   $favorited = Ad::loadFavoritedIds($user->id, $ads->pluck('id')->all());
+     *   // then in each resource: $ad->isFavoritedBy($user, $favorited)
+     *
+     * @param  array<string>  $adIds
+     * @return array<string>
+     */
+    public static function loadFavoritedIds(string $userId, array $adIds): array
+    {
+        if ($adIds === []) {
+            return [];
+        }
+
+        $rows = AdInteraction::whereIn('ad_id', $adIds)
+            ->where('user_id', $userId)
+            ->whereIn('type', [AdInteraction::TYPE_FAVORITE, AdInteraction::TYPE_UNFAVORITE])
+            ->selectRaw('ad_id, type, COUNT(*) as cnt')
+            ->groupBy('ad_id', 'type')
+            ->get();
+
+        /** @var array<string, array<string, int>> $byAd */
+        $byAd = [];
+        foreach ($rows as $row) {
+            /** @var object{ad_id: string, type: string, cnt: int|string} $row */
+            $byAd[$row->ad_id][$row->type] = (int) $row->cnt;
+        }
+
+        return array_values(array_filter(
+            array_keys($byAd),
+            static fn (string $adId): bool => ($byAd[$adId][AdInteraction::TYPE_FAVORITE] ?? 0)
+                > ($byAd[$adId][AdInteraction::TYPE_UNFAVORITE] ?? 0),
+        ));
     }
 
     /** @return HasMany<Payment, $this> */

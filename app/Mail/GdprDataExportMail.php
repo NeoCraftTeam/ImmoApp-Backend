@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace App\Mail;
 
 use App\Models\Ad;
-use App\Models\Payment;
 use App\Models\PointTransaction;
 use App\Models\Review;
-use App\Models\UnlockedAd;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -65,9 +63,6 @@ class GdprDataExportMail extends Mailable implements ShouldQueue
 
         $paymentsPayload = [];
         foreach ($user->payments()->get() as $payment) {
-            if (!$payment instanceof Payment) {
-                continue;
-            }
             $paymentsPayload[] = [
                 'id' => $payment->id,
                 'amount' => $payment->amount,
@@ -79,9 +74,6 @@ class GdprDataExportMail extends Mailable implements ShouldQueue
 
         $unlockedAdsPayload = [];
         foreach ($user->unlockedAds()->with('ad:id,title')->get() as $unlock) {
-            if (!$unlock instanceof UnlockedAd) {
-                continue;
-            }
             $unlockedAdsPayload[] = [
                 'ad_id' => $unlock->ad_id,
                 'ad_title' => $unlock->ad?->title,

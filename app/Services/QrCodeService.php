@@ -14,8 +14,12 @@ use chillerlan\QRCode\QROptions;
 use Throwable;
 
 /**
- * Builds public listing/profile URLs (`appendUtm`; `$includeUtm` defaults **off**
- * — pass `true` from owner QR/placarde/card controllers for scan + attribution).
+ * Renders branded QR codes as SVG and PNG for owner assets (placards, business cards, API).
+ *
+ * URL construction has been extracted to {@see AdUrlBuilder}; this class is
+ * responsible only for visual QR rendering. The URL delegation methods below
+ * are kept for backwards compatibility but are marked @deprecated.
+ *
  * TikTok/Snap-inspired circular-framed scannable QR PNGs for owner assets.
  *
  * Visual design:
@@ -32,68 +36,63 @@ use Throwable;
  */
 final readonly class QrCodeService
 {
+    public function __construct(
+        private AdUrlBuilder $urlBuilder,
+    ) {}
+
     private const string BRAND = '#F6475F';
 
     private const string DARK = '#000000';
 
     private const string LIGHT = '#FFFFFF';
 
-    // ─── Public URL helpers ────────────────────────────────────────────────
-
+    // ─── URL delegation (backwards-compat wrappers over AdUrlBuilder) ──────
     /**
+     * Append UTM (or any) query parameters to a URL.
+     *
      * @param  array<string, string>  $utm
      */
+    #[\Deprecated(message: 'Inject AdUrlBuilder and call appendUtm() directly.')]
     public function appendUtm(string $absoluteUrl, array $utm): string
     {
-        if ($utm === []) {
-            return $absoluteUrl;
-        }
-
-        $sep = str_contains($absoluteUrl, '?') ? '&' : '?';
-
-        return $absoluteUrl.$sep.http_build_query($utm);
+        return $this->urlBuilder->appendUtm($absoluteUrl, $utm);
     }
 
+    /**
+     * Resolve an absolute frontend URL for the given path.
+     */
+    #[\Deprecated(message: 'Inject AdUrlBuilder and call absoluteFrontendUrl() directly.')]
     public function absoluteFrontendUrl(string $path): string
     {
-        $base = rtrim((string) config('app.frontend_url', config('app.url')), '/');
-        $path = '/'.ltrim($path, '/');
-
-        return $base.$path;
+        return $this->urlBuilder->absoluteFrontendUrl($path);
     }
 
+    /**
+     * Build the canonical listing URL for an ad, optionally with UTM parameters.
+     *
+     * Returns a clean URL by default (`$includeUtm = false`). Pass `true` from
+     * QR/placard controllers to enable scan attribution tracking.
+     *
+     * @return string Fully-qualified frontend URL.
+     */
+    #[\Deprecated(message: 'Inject AdUrlBuilder and call adListingUrl() directly.')]
     public function adListingUrl(Ad $ad, string $utmMedium = 'qr', bool $includeUtm = false): string
     {
-        $slug = $ad->slug ?: $ad->id;
-        $url = $this->absoluteFrontendUrl('/ads/'.$slug);
-
-        if (!$includeUtm) {
-            return $url;
-        }
-
-        return $this->appendUtm($url, [
-            'utm_source' => 'keyhome',
-            'utm_medium' => $utmMedium,
-            'utm_campaign' => 'owner_share',
-            'utm_content' => 'ad_'.$ad->id,
-        ]);
+        return $this->urlBuilder->adListingUrl($ad, $utmMedium, $includeUtm);
     }
 
+    /**
+     * Build the canonical landlord profile URL, optionally with UTM parameters.
+     *
+     * Returns a clean URL by default (`$includeUtm = false`). Pass `true` from
+     * QR/placard controllers to enable scan attribution tracking.
+     *
+     * @return string Fully-qualified frontend URL.
+     */
+    #[\Deprecated(message: 'Inject AdUrlBuilder and call landlordProfileUrl() directly.')]
     public function landlordProfileUrl(User $user, string $utmMedium = 'qr', bool $includeUtm = false): string
     {
-        $username = $user->username ?: $user->id;
-        $url = $this->absoluteFrontendUrl('/bailleurs/'.$username);
-
-        if (!$includeUtm) {
-            return $url;
-        }
-
-        return $this->appendUtm($url, [
-            'utm_source' => 'keyhome',
-            'utm_medium' => $utmMedium,
-            'utm_campaign' => 'owner_share',
-            'utm_content' => 'profile_'.$user->id,
-        ]);
+        return $this->urlBuilder->landlordProfileUrl($user, $utmMedium, $includeUtm);
     }
 
     // ─── QR rendering ──────────────────────────────────────────────────────

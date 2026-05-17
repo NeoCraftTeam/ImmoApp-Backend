@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\UserRole;
+use App\Http\Requests\Api\V1\SocialAuthRequest;
 use App\Mail\OAuthLinkAttemptMail;
 use App\Models\User;
 use App\Services\UtmAttributionService;
@@ -84,7 +85,7 @@ final class SocialAuthController
             new OA\Response(response: 422, description: 'Validation error'),
         ]
     )]
-    public function authenticate(Request $request, string $provider): JsonResponse
+    public function authenticate(SocialAuthRequest $request, string $provider): JsonResponse
     {
         // Validate provider
         if (!in_array($provider, self::SUPPORTED_PROVIDERS, true)) {
@@ -93,18 +94,6 @@ final class SocialAuthController
                 'supported_providers' => self::SUPPORTED_PROVIDERS,
             ], 400);
         }
-
-        $request->validate([
-            'token' => 'required|string',
-            'id_token' => 'nullable|string',
-            'role' => 'nullable|string|in:customer,agent',
-            'session_id' => 'nullable|string|max:64',
-            'utm_source' => 'nullable|string|max:100',
-            'utm_medium' => 'nullable|string|max:100',
-            'utm_campaign' => 'nullable|string|max:255',
-            'utm_content' => 'nullable|string|max:255',
-            'utm_term' => 'nullable|string|max:255',
-        ]);
 
         $utmPayload = $request->only(UtmAttributionService::ATTRIBUTION_REQUEST_KEYS);
 
@@ -118,8 +107,11 @@ final class SocialAuthController
                 ], 401);
             }
 
-            // Find or create user
-            $result = $this->findOrCreateUser($socialUser, $provider, $request->role, $request, $utmPayload);
+            // Find or create user.
+            // NOTE: OAuth users always receive the CUSTOMER role regardless of the
+            // `role` parameter passed to `authenticate()`. Role escalation (agent/admin)
+            // requires explicit verification and cannot be granted via OAuth flow alone.
+            $result = $this->findOrCreateUser($socialUser, $provider, $request, $utmPayload);
             $user = $result['user'];
             $isNewUser = $result['is_new'];
 
@@ -288,7 +280,7 @@ final class SocialAuthController
             /** @phpstan-ignore method.notFound */
             $socialUser = Socialite::driver($provider)->stateless()->user();
 
-            $result = $this->findOrCreateUser($socialUser, $provider, null, $request, []);
+            $result = $this->findOrCreateUser($socialUser, $provider, $request, []);
             $user = $result['user'];
 
             $user->forceFill([
@@ -553,7 +545,6 @@ final class SocialAuthController
     private function findOrCreateUser(
         mixed $socialUser,
         string $provider,
-        ?string $role,
         Request $request,
         array $utmPayload,
     ): array {

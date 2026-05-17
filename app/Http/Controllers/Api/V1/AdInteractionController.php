@@ -10,6 +10,7 @@ use App\Models\AdInteraction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 use OpenApi\Annotations as OA;
 
 /**
@@ -228,31 +229,41 @@ final class AdInteractionController
     {
         $user = $request->user();
 
-        // Determine current state: favorites vs unfavorites count
-        $favorites = AdInteraction::where('user_id', $user->id)
-            ->where('ad_id', $ad->id)
-            ->where('type', AdInteraction::TYPE_FAVORITE)
-            ->count();
+        /**
+         * Wrapped in a transaction with a row-level lock to prevent the
+         * read-then-write race condition where two concurrent requests
+         * could both read the same favorite state before either writes.
+         *
+         * Canonical favorite-state logic lives here.
+         *
+         * @see Ad::isFavoritedBy() — mirrors this logic; keep them in sync.
+         */
+        $result = DB::transaction(function () use ($user, $ad): array {
+            // Lock the user's interaction rows for this ad to serialise concurrent toggles.
+            $interactions = AdInteraction::where('user_id', $user->id)
+                ->where('ad_id', $ad->id)
+                ->whereIn('type', [AdInteraction::TYPE_FAVORITE, AdInteraction::TYPE_UNFAVORITE])
+                ->lockForUpdate()
+                ->get();
 
-        $unfavorites = AdInteraction::where('user_id', $user->id)
-            ->where('ad_id', $ad->id)
-            ->where('type', AdInteraction::TYPE_UNFAVORITE)
-            ->count();
+            $favorites = $interactions->where('type', AdInteraction::TYPE_FAVORITE)->count();
+            $unfavorites = $interactions->where('type', AdInteraction::TYPE_UNFAVORITE)->count();
+            $isFavorited = $favorites > $unfavorites;
 
-        $isFavorited = $favorites > $unfavorites;
+            AdInteraction::create([
+                'user_id' => $user->id,
+                'ad_id' => $ad->id,
+                'type' => $isFavorited ? AdInteraction::TYPE_UNFAVORITE : AdInteraction::TYPE_FAVORITE,
+                'created_at' => now(),
+            ]);
 
-        // Create the toggle interaction
-        AdInteraction::create([
-            'user_id' => $user->id,
-            'ad_id' => $ad->id,
-            'type' => $isFavorited ? AdInteraction::TYPE_UNFAVORITE : AdInteraction::TYPE_FAVORITE,
-            'created_at' => now(),
-        ]);
+            return [
+                'is_favorited' => !$isFavorited,
+                'message' => $isFavorited ? 'Retiré des favoris' : 'Ajouté aux favoris',
+            ];
+        });
 
-        return response()->json([
-            'is_favorited' => !$isFavorited,
-            'message' => $isFavorited ? 'Retiré des favoris' : 'Ajouté aux favoris',
-        ]);
+        return response()->json($result);
     }
 
     /**
@@ -330,6 +341,12 @@ final class AdInteractionController
     {
         $user = $request->user();
 
+        /**
+         * Canonical favorite-state logic lives in AdInteractionController::toggleFavorite().
+         *
+         * @see AdInteractionController::toggleFavorite() — source of truth for the fav/unfav counting logic.
+         * @see Ad::isFavoritedBy() — model helper that also implements this logic; keep all three in sync.
+         */
         // Use a single query with GROUP BY to determine favorite state, avoiding N+1
         $favoritedAdIds = AdInteraction::where('user_id', $user->id)
             ->whereIn('type', [AdInteraction::TYPE_FAVORITE, AdInteraction::TYPE_UNFAVORITE])

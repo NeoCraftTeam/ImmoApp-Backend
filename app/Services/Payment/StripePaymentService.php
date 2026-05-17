@@ -10,6 +10,7 @@ use App\Enums\PaymentGateway;
 use App\Enums\PaymentMethod;
 use App\Exceptions\InvalidWebhookSignatureException;
 use App\Exceptions\PaymentGatewayException;
+use App\Support\XafEurConverter;
 use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Cashier;
 use Stripe\Charge;
@@ -53,9 +54,14 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
         $secret = (string) config('services.stripe.secret');
 
         if ($secret === '') {
-            // Boot-time guard: a misconfigured production deploy with empty
-            // STRIPE_SECRET would otherwise leak through and 500 on the
-            // first card attempt. Throw early with a clear log line.
+            // Boot-time guard: a misconfigured production deploy with an empty
+            // STRIPE_SECRET must fail immediately with a clear message rather
+            // than constructing a broken StripeClient that produces cryptic
+            // SDK errors on the first card attempt.
+            if (app()->isProduction()) {
+                throw new \RuntimeException('STRIPE_SECRET is not configured. Set the STRIPE_SECRET environment variable before deploying.');
+            }
+
             Log::warning('Stripe secret key is not configured; card payments will fail until STRIPE_SECRET is set.');
         }
 
@@ -118,7 +124,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
     public function initiate(array $payload): array
     {
         $xafAmount = (float) $payload['amount'];
-        $eurCents = self::convertXafToEurCents($xafAmount);
+        $eurCents = XafEurConverter::toEurCents($xafAmount);
         $currency = strtolower((string) config('services.stripe.currency', 'eur'));
         $txRef = (string) $payload['tx_ref'];
         $description = (string) ($payload['description'] ?? 'Paiement KeyHome');
@@ -140,7 +146,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
             'plan_id' => isset($rawMeta['plan_id']) ? (string) $rawMeta['plan_id'] : null,
             'period' => isset($rawMeta['period']) ? (string) $rawMeta['period'] : null,
             'xaf_amount' => (string) (int) round($xafAmount),
-            'xaf_to_eur_rate' => (string) self::pegRate(),
+            'xaf_to_eur_rate' => (string) XafEurConverter::rate(),
         ], fn ($v): bool => $v !== null && $v !== '');
 
         $params = [
@@ -580,7 +586,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
 
         if ($amount !== null && $amount > 0.0) {
             // The caller passes an XAF amount; convert to EUR cents.
-            $params['amount'] = self::convertXafToEurCents($amount);
+            $params['amount'] = XafEurConverter::toEurCents($amount);
         }
 
         try {
@@ -602,7 +608,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
         // Stripe returns `amount_refunded` in the smallest currency unit
         // (cents). Convert back to XAF for our records using the same peg.
         $eurAmountCents = (int) ($refund->amount ?? 0);
-        $xafAmountRefunded = self::convertEurCentsToXaf($eurAmountCents);
+        $xafAmountRefunded = XafEurConverter::toXaf($eurAmountCents);
 
         return [
             'refund_id' => (string) $refund->id,
@@ -612,37 +618,8 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
         ];
     }
 
-    /**
-     * Convert XAF (whole francs) to EUR cents using the pegged rate.
-     */
-    public static function convertXafToEurCents(float $xafAmount): int
-    {
-        $rate = self::pegRate();
-
-        // XAF amount → EUR amount → cents. Round to nearest cent.
-        return (int) round(($xafAmount / $rate) * 100);
-    }
-
-    /**
-     * Convert EUR cents back to XAF (whole francs).
-     */
-    public static function convertEurCentsToXaf(int $eurCents): float
-    {
-        $rate = self::pegRate();
-
-        return round(($eurCents / 100) * $rate, 0);
-    }
-
-    /**
-     * Pegged conversion rate (1 EUR = 655.957 XAF). Defaults to the BEAC
-     * official peg; can be overridden via `services.stripe.xaf_to_eur_rate`.
-     */
-    private static function pegRate(): float
-    {
-        $rate = (float) config('services.stripe.xaf_to_eur_rate', 655.957);
-
-        return $rate > 0 ? $rate : 655.957;
-    }
+    // Currency conversion is delegated to App\Support\XafEurConverter.
+    // See that class for the BEAC peg rate and override mechanism.
 
     /**
      * Resolve the settled Charge backing a PaymentIntent (wallet / PayPal / card PAN).
@@ -912,7 +889,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
         // back-converted amount with a wider tolerance handled upstream.
         $metadata = $intent->metadata->toArray();
         $xafFromMeta = isset($metadata['xaf_amount']) ? (float) $metadata['xaf_amount'] : null;
-        $xafAmount = $xafFromMeta ?? self::convertEurCentsToXaf((int) ($intent->amount ?? 0));
+        $xafAmount = $xafFromMeta ?? XafEurConverter::toXaf((int) ($intent->amount ?? 0));
 
         $expectedCurrency = (string) config('payment.default_currency', 'XAF');
 
