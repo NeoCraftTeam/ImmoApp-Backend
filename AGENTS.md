@@ -506,7 +506,7 @@ All prefixed `/api/v1/`: `auth.php`, `ads.php`, `payments.php`, `viewings.php`, 
   - Erreurs **intermittentes** (**503**, routage incohérent) : vérifier en priorité **les logs Traefik**, les **labels Docker** (routers/middlewares), l’état des **services** Traefik et les **healthchecks** des conteneurs **amont** — avant de chercher la cause uniquement dans la config Nginx interne.
   - Nginx dans `web` reste utile pour les **en-têtes vers PHP-FPM** (ex. `X-Forwarded-Proto`, `X-Forwarded-For`), mais la couche **edge** face au public reste **Traefik** (ou un CDN devant), pas ce Nginx.
   - Si les **503** (ou échecs intermittents) se reproduisent en appelant **directement** le port publié du conteneur `web` (sans Traefik), prioriser **Nginx / PHP-FPM** et le conteneur **`app`** — la cause n’est alors pas uniquement au bord Traefik.
-- **Preprod**: `docker-compose.preprod.yml` — shares prod DB/Redis/Meilisearch via external network.
+- **Preprod**: `docker-compose.preprod.yml` — shares prod DB/Redis/Meilisearch via external network. The `web` (Nginx) service must mirror prod: mount `.docker/nginx/templates` + `fastcgi-cache.conf` as a **file**, set `PHP_FPM_HOST` to the PHP container (`${COMPOSE_PREFIX}-backend`) and `NGINX_ENVSUBST_FILTER` so `/up` and `/api/*` hit Laravel (see `docker-compose.yml` `web` service).
 
 ### Key Packages
 - `filament/filament ~4.0` + media-library plugin.
@@ -645,6 +645,7 @@ Storybook, Vitest, Playwright.
 - `react-hooks/globals` — **error**. Cannot reassign module-level variables inside a component's render body. Move to `useEffect`.
 - `react-hooks/refs` — **error**. Cannot read `ref.current` during render. Store anchor elements in state instead of reading from a ref in JSX props.
 - `jsx-a11y/alt-text` — **warning**. All `<img>` must have `alt`.
+- **Landmark `<main>`** — Une seule balise `<main id="main-content" tabIndex={-1}>` enveloppe `{children}` dans `src/app/layout.tsx`. Les pages et layouts imbriqués n’utilisent plus `<main>` / `component="main"` ni de second `#main-content` (landing, tableau de bord client, owner, recherche, layout annonces, détail annonce, sondages, CGU/confidentialité, page Sentry d’exemple) — évite Axe/deque « Ensures the document has a main landmark » et skip link stable.
 
 ### Known Frontend Fixes (do not revert)
 - **Logout re-authentication bug (fixed)**: Three root causes combined to log users back in after logout — (1) `clerkExchangeDoneRef.current = false` was set at logout start, allowing the auth effect to re-run the Clerk JWT exchange while `signOut()` was still in-flight; (2) `signOut({ redirectUrl })` caused Clerk to navigate concurrently with our `window.location.replace`, creating a timing race; (3) the 1.2 s Clerk sign-out fallback was too short for mobile connections. Fix: removed the ref reset from logout, call `signOut()` without `redirectUrl`, increased fallback to 4 s, changed default redirect from `/home` (protected) to `/login` (public), and always use `window.location.replace` (hard nav) for both Clerk and non-Clerk paths so the React tree is fully torn down. Do NOT re-introduce `clerkExchangeDoneRef.current = false` inside `logout()` — the flag resets naturally in the `!isSignedIn` effect branch when Clerk propagates the sign-out.

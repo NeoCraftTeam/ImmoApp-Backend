@@ -188,10 +188,16 @@ services:
         condition: service_healthy
     ports:
       - "${WEB_PORT:-9091}:80"
+    # Parity with docker-compose.yml (prod): envsubst templates → Laravel vhost + FastCGI to PHP-FPM.
+    # Mounting the whole conf.d dir (without templates) removed the image default server and broke /up + /api/*.
+    environment:
+      - PHP_FPM_HOST=${COMPOSE_PREFIX:-keyhome-preprod}-backend
+      - NGINX_ENVSUBST_FILTER=PHP_FPM_HOST
     volumes:
       - preprod-app-code:/var/www
       - preprod-storage-data:/var/www/storage
-      - .docker/nginx/conf.d:/etc/nginx/conf.d
+      - .docker/nginx/conf.d/fastcgi-cache.conf:/etc/nginx/conf.d/fastcgi-cache.conf:ro
+      - .docker/nginx/templates:/etc/nginx/templates:ro
     networks:
       - preprod-network
       - traefik-public
