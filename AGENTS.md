@@ -506,7 +506,7 @@ All prefixed `/api/v1/`: `auth.php`, `ads.php`, `payments.php`, `viewings.php`, 
   - Erreurs **intermittentes** (**503**, routage incohérent) : vérifier en priorité **les logs Traefik**, les **labels Docker** (routers/middlewares), l’état des **services** Traefik et les **healthchecks** des conteneurs **amont** — avant de chercher la cause uniquement dans la config Nginx interne.
   - Nginx dans `web` reste utile pour les **en-têtes vers PHP-FPM** (ex. `X-Forwarded-Proto`, `X-Forwarded-For`), mais la couche **edge** face au public reste **Traefik** (ou un CDN devant), pas ce Nginx.
   - Si les **503** (ou échecs intermittents) se reproduisent en appelant **directement** le port publié du conteneur `web` (sans Traefik), prioriser **Nginx / PHP-FPM** et le conteneur **`app`** — la cause n’est alors pas uniquement au bord Traefik.
-- **Preprod**: `docker-compose.preprod.yml` — shares prod DB/Redis/Meilisearch via external network.
+- **Preprod**: `docker-compose.preprod.yml` — shares prod DB/Redis/Meilisearch via external network. The `web` (Nginx) service must mirror prod: mount `.docker/nginx/templates` + `fastcgi-cache.conf` as a **file**, set `PHP_FPM_HOST` to the PHP container (`${COMPOSE_PREFIX}-backend`) and `NGINX_ENVSUBST_FILTER` so `/up` and `/api/*` hit Laravel (see `docker-compose.yml` `web` service).
 
 ### Key Packages
 - `filament/filament ~4.0` + media-library plugin.
