@@ -627,6 +627,7 @@ Storybook, Vitest, Playwright.
 | `NEXT_PUBLIC_SITE_URL` | **SEO / Open Graph**: public site origin (canonical, `metadataBase`, sitemap, `robots.ts`). Priority over `NEXT_PUBLIC_APP_URL`; on Vercel, `VERCEL_URL` is used if unset. Fallback `https://keyhome.app`. Helpers: `src/lib/site-url.ts` (`getSiteOrigin`, `absoluteUrl`, `absoluteAssetUrl`). Tests: `src/tests/lib/site-url.test.ts`. |
 | `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` | Optional. Google Search Console → HTML tag: paste **only** the `content` value. Injected in root `layout.tsx` via `src/lib/seo-verification.ts`. |
 | `NEXT_PUBLIC_BING_SITE_VERIFICATION` | Optional. Bing Webmaster Tools → Meta tag (`msvalidate.01`): paste **only** the `content` value. |
+| `NEXT_PUBLIC_MICROSOFT_CLARITY_PROJECT_ID` | Optional. Microsoft Clarity (recordings/heatmaps): project ID from clarity.microsoft.com Setup. Injected in root `layout.tsx` via `MicrosoftClarity`; empty = disabled. CSP: `*.clarity.ms` + `c.bing.com`. |
 
 ### SEO, canonicals & GEO (frontend, May 2026)
 - **Centralisation** — `metadataBase`, canonicals, JSON-LD (`JsonLd`, annonces, villes, recherche, blog, comparaison), OG/Twitter images via `absoluteUrl` / `absoluteAssetUrl` pour éviter les URL relatives incorrectes sur crawl / partage. **Devise** : `BRAND_TAGLINE` / `BRAND_TITLE_WITH_TAGLINE` dans `src/lib/brand.ts` (métadonnées globales, JSON-LD Organization/WebSite, image OG dynamique, manifests PWA).
