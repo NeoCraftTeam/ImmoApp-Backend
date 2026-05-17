@@ -363,11 +363,10 @@ test_suite:
     - echo "✅ Deployment complete, bringing app back up..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan up
     # ── Non-blocking post-deploy tasks (run after app is live) ─────────────────
-    # NOTE: Full `scout:import` is intentionally NOT run here — it scans every Ad
-    # row and degrades deploy time linearly with catalog size. Reindex is now
-    # triggered by Eloquent observers (HasMedia / Searchable) on writes, plus a
-    # nightly `php artisan scout:import App\\Models\\Ad` cron for drift recovery
-    # (see AGENTS.md scaling section). This is also safer for blue/green deploys.
+    # scout:import is launched detached (-d) so the pipeline returns immediately
+    # regardless of catalog size — the container process keeps running on its own.
+    - echo "🔍 Meilisearch reindex lancé en arrière-plan..."
+    - APP_IMAGE=$FULL_IMAGE docker compose exec -dT app php artisan scout:import "App\\Models\\Ad" || true
     - echo "📄 Generating Swagger docs (non-blocking)..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate || true
   after_script:
