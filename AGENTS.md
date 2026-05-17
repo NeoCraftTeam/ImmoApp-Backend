@@ -597,6 +597,7 @@ Storybook, Vitest, Playwright.
 ### Thème & retours paiement (May 2026)
 - **`ThemeProvider`** — préférence persistée `localStorage` `kh_theme_choice` : `system` \| `light` \| `dark` ; `useThemeMode()` expose `choice` et `setChoice`. Pages **Paramètres** client et bailleur : `ToggleButtonGroup` Clair / Sombre / Système.
 - **Retour après paiement** — `src/lib/payment-return.ts` : `rememberPaymentOriginPath()` avant redirection hosted checkout / init ; `consumePaymentReturnPath(fallback)` sur les pages de retour. **`/payment/return`** est l’URL cible par défaut côté backend (`PaymentService` → `redirect_url`, sans `FLW_REDIRECT_URL`). **`buildStripeConfirmReturnUrl`** (Stripe wallet / PayPal) pointe sur la même route avec `?flow=…`. Flutterwave n’appelle cette URL qu’**après** son propre écran de confirmation (paramètres `status`, `tx_ref`, …). Le flux mobile money dans `usePayment` enchaîne avec `location.assign` **sans** étape intermédiaire « Redirection… » côté KeyHome pour ne pas masquer la page Flutterwave.
+- **Écran « vérification du paiement »** — composant `VerifyingView` : spinner `AppLoader` 64 px (même famille que la porte `(dashboard)` en attente auth), sans `LinearProgress` ; passage aux états terminaux toujours géré par `usePaymentStatusPolling` (`DEFAULT_MINIMUM_VERIFYING_MS` = 4000 par défaut, option `minimumVerifyingMs` inchangée côté hook).
 
 ### Landing polish & résilience UI (May 2026)
 - **Landing publique** (`src/components/landing/*`, `/`) — repasse UX/a11y : hiérarchie, espacements, tokens (`tokens.ts`), CTAs qui pointent vers des routes joignables (ex. bailleur → `/owner/login`), FAQ (`aria-expanded` / `aria-controls`), nav mobile (`role="dialog"`), pied de page et newsletter (validation email, états d’erreur), `.hero-section` min-heights responsives dans `globals.css`. Tests Vitest : `src/tests/components/NewsletterSection.test.tsx`.
@@ -1313,7 +1314,7 @@ Root cause (3 independent issues stacked):
 #### 6. Ad context in conversation list (previous session)
 `ConversationResource.php` — added `slug` to the ad array.  
 `types/chat.ts` — added `slug` to `ConversationAd` interface.  
-`ChatHeader.tsx` — desktop (`md+`): full-width "Annonce liée" row (cover + title + `ExternalLink`). **Mobile:** compact **`Building2`** button in the nav bar opens a **bottom sheet** (title, thumbnail, « Ouvrir l'annonce ») so message list gets more height — app-like shell. **Viewport (client + owner layouts):** `maximumScale: 1` + `userScalable: false` so the PWA/chat shell does not invite pinch-zoom like a website (Safari may still allow minimal zoom in edge cases).
+`ChatHeader.tsx` — desktop (`md+`): full-width "Annonce liée" row (cover + title + `ExternalLink`). **Mobile:** compact **`Building2`** button in the nav bar opens a **bottom sheet** (title, thumbnail, « Ouvrir l'annonce ») so message list gets more height — app-like shell. **Viewport (client + owner layouts):** `maximumScale: 5` + `userScalable: true` for WCAG zoom (axe meta-viewport); `viewportFit: 'cover'` unchanged.
 
 #### 7. Cross-panel security guard & panel-aware chat links
 **Bug:** Owner/agent clicking "Voir l'annonce" in chat navigated to `/ads/[slug]` (client panel), loading the client layout with owner session — cross-panel access.

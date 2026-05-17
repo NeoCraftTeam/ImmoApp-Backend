@@ -6,10 +6,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Mail\AccountDeletedMail;
 use App\Models\Ad;
-use App\Models\Payment;
 use App\Models\PointTransaction;
 use App\Models\Review;
-use App\Models\UnlockedAd;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -44,10 +42,6 @@ final class GdprController
 
         $paymentsPayload = [];
         foreach ($user->payments()->get() as $payment) {
-            if (!$payment instanceof Payment) {
-                continue;
-            }
-
             $paymentsPayload[] = [
                 'id' => $payment->id,
                 'amount' => $payment->amount,
@@ -59,10 +53,6 @@ final class GdprController
 
         $unlockedAdsPayload = [];
         foreach ($user->unlockedAds()->with('ad:id,title')->get() as $unlock) {
-            if (!$unlock instanceof UnlockedAd) {
-                continue;
-            }
-
             $unlockedAdsPayload[] = [
                 'ad_id' => $unlock->ad_id,
                 'ad_title' => $unlock->ad?->title,

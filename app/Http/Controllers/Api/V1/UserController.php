@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Laravel\Sanctum\NewAccessToken;
 use Throwable;
 
 final readonly class UserController
@@ -310,7 +311,11 @@ final readonly class UserController
 
         $data = $request->validated();
 
-        // Vérification email existant avant transaction
+        // Vérification email existant avant transaction.
+        // NOTE: RegistrationService::register() handles the same guard for the
+        // public /register route. This admin-facing store() path is intentionally
+        // separate because it skips Turnstile, rate-limiting, and email-verification
+        // steps that are not applicable when an admin creates a user directly.
         if (User::where('email', $data['email'])->exists()) {
             Log::warning('User creation attempt with existing email', [
                 'email' => $data['email'],
@@ -323,8 +328,37 @@ final readonly class UserController
         }
 
         try {
-            DB::beginTransaction();
+            [$user, $token] = $this->createUserFromRequest($request, $data);
 
+            return response()->json([
+                'message' => 'Création réussie.',
+                'user' => new UserResource($user),
+                'access_token' => $token->plainTextToken,
+            ], 201);
+
+        } catch (Throwable $e) {
+            Log::error('User creation failed', [
+                'exception' => $e->getMessage(),
+                'ip' => $request->ip(),
+            ]);
+            throw $e;
+        }
+    }
+
+    /**
+     * Persist a new User record and its optional avatar inside a transaction.
+     *
+     * Extracted from `store()` so the transaction boundary and model-construction
+     * details are separated from HTTP response logic.
+     *
+     * @param  array<string, mixed>  $data  Validated request data.
+     * @return array{0: User, 1: NewAccessToken}
+     *
+     * @throws Throwable
+     */
+    private function createUserFromRequest(UserRequest $request, array $data): array
+    {
+        return DB::transaction(function () use ($request, $data): array {
             // Création de l'utilisateur
             $user = new User;
             $user->fill([
@@ -356,23 +390,8 @@ final readonly class UserController
             // Création du token
             $token = $user->createToken('creation_token_'.now()->timestamp);
 
-            DB::commit();
-
-            return response()->json([
-                'message' => 'Création réussie.',
-                'user' => new UserResource($user),
-                'access_token' => $token->plainTextToken,
-            ], 201);
-
-        } catch (Throwable $e) {
-            DB::rollBack();
-
-            Log::error('User creation failed', [
-                'exception' => $e->getMessage(),
-                'ip' => $request->ip(),
-            ]);
-            throw $e;
-        }
+            return [$user, $token];
+        });
     }
 
     /**

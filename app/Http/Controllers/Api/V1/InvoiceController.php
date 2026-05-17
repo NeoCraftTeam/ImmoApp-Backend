@@ -62,8 +62,6 @@ final class InvoiceController
             abort(403, 'Vous n\'appartenez à aucune agence.');
         }
 
-        assert($agency instanceof Agency);
-
         $invoices = Invoice::query()
             ->where('agency_id', $agency->id)
             ->orderByDesc('issued_at')

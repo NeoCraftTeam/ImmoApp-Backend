@@ -8,6 +8,7 @@ use App\Contracts\AiSearchServiceInterface;
 use App\Models\AdType;
 use App\Models\City; // used in enrichWithIds
 use App\Models\Quarter;
+use App\Support\AiCircuitBreaker;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -23,6 +24,8 @@ use Illuminate\Support\Facades\Log;
  */
 class AiSearchService implements AiSearchServiceInterface
 {
+    private readonly AiCircuitBreaker $circuitBreaker;
+
     private const int CACHE_TTL_SECONDS = 86400; // 24 hours
 
     private const string CACHE_PREFIX = 'ai_search:';
@@ -47,6 +50,16 @@ class AiSearchService implements AiSearchServiceInterface
         'together' => ['url' => 'https://api.together.xyz/v1/chat/completions',        'config_key' => 'services.together', 'default_model' => 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo'],
         'mistral' => ['url' => 'https://api.mistral.ai/v1/chat/completions',          'config_key' => 'services.mistral',  'default_model' => 'mistral-small-latest'],
     ];
+
+    public function __construct()
+    {
+        $this->circuitBreaker = new AiCircuitBreaker(
+            namespace: 'ai_search',
+            failureThreshold: self::CIRCUIT_FAILURE_THRESHOLD,
+            openTtlSeconds: self::CIRCUIT_OPEN_TTL,
+            failureTtlSeconds: self::CONTEXT_CACHE_TTL,
+        );
+    }
 
     /**
      * Parse a property image into structured search parameters.
@@ -232,7 +245,7 @@ class AiSearchService implements AiSearchServiceInterface
         );
 
         foreach ($providers as $name) {
-            if (Cache::has($this->circuitKey($name))) {
+            if ($this->circuitBreaker->isOpen($name)) {
                 Log::debug("AiSearchService: circuit open for [{$name}], skipping.");
 
                 continue;
@@ -243,7 +256,7 @@ class AiSearchService implements AiSearchServiceInterface
                 : ($name === 'gemini' ? $this->parseWithGemini($query, $displayCurrency) : null);
 
             if ($result !== null) {
-                $this->resetCircuit($name);
+                $this->circuitBreaker->reset($name);
                 Log::debug("AiSearchService: parsed successfully via [{$name}].");
 
                 return $result;
@@ -287,7 +300,7 @@ class AiSearchService implements AiSearchServiceInterface
 
             if ($response->failed()) {
                 Log::warning("AiSearchService: [{$name}] HTTP {$response->status()}", ['body' => substr($response->body(), 0, 200)]);
-                $this->recordFailure($name);
+                $this->circuitBreaker->recordFailure($name);
 
                 return null;
             }
@@ -296,7 +309,7 @@ class AiSearchService implements AiSearchServiceInterface
             $decoded = $content !== '' ? $this->extractJson($content) : null;
             if ($decoded === null) {
                 Log::warning("AiSearchService: [{$name}] invalid JSON", ['content' => substr($content, 0, 200)]);
-                $this->recordFailure($name);
+                $this->circuitBreaker->recordFailure($name);
 
                 return null;
             }
@@ -304,7 +317,7 @@ class AiSearchService implements AiSearchServiceInterface
             return $this->normalizeParsedResult($decoded);
         } catch (\Throwable $e) {
             Log::error("AiSearchService: [{$name}] exception: ".$e->getMessage());
-            $this->recordFailure($name);
+            $this->circuitBreaker->recordFailure($name);
 
             return null;
         }
@@ -341,7 +354,7 @@ class AiSearchService implements AiSearchServiceInterface
 
             if ($response->failed()) {
                 Log::warning('AiSearchService: [gemini] HTTP '.$response->status(), ['body' => substr($response->body(), 0, 200)]);
-                $this->recordFailure('gemini');
+                $this->circuitBreaker->recordFailure('gemini');
 
                 return null;
             }
@@ -350,7 +363,7 @@ class AiSearchService implements AiSearchServiceInterface
             $decoded = $content !== '' ? $this->extractJson($content) : null;
             if ($decoded === null) {
                 Log::warning('AiSearchService: [gemini] invalid JSON', ['content' => substr($content, 0, 200)]);
-                $this->recordFailure('gemini');
+                $this->circuitBreaker->recordFailure('gemini');
 
                 return null;
             }
@@ -358,38 +371,10 @@ class AiSearchService implements AiSearchServiceInterface
             return $this->normalizeParsedResult($decoded);
         } catch (\Throwable $e) {
             Log::error('AiSearchService: [gemini] exception: '.$e->getMessage());
-            $this->recordFailure('gemini');
+            $this->circuitBreaker->recordFailure('gemini');
 
             return null;
         }
-    }
-
-    private function circuitKey(string $provider): string
-    {
-        return "ai_search:circuit:{$provider}";
-    }
-
-    private function failureKey(string $provider): string
-    {
-        return "ai_search:failures:{$provider}";
-    }
-
-    private function recordFailure(string $provider): void
-    {
-        $key = $this->failureKey($provider);
-        $failures = (int) Cache::get($key, 0) + 1;
-        Cache::put($key, $failures, self::CONTEXT_CACHE_TTL);
-
-        if ($failures >= self::CIRCUIT_FAILURE_THRESHOLD) {
-            Cache::put($this->circuitKey($provider), true, self::CIRCUIT_OPEN_TTL);
-            Log::warning("AiSearchService: circuit opened for [{$provider}] after {$failures} failures.");
-        }
-    }
-
-    private function resetCircuit(string $provider): void
-    {
-        Cache::forget($this->failureKey($provider));
-        Cache::forget($this->circuitKey($provider));
     }
 
     /**

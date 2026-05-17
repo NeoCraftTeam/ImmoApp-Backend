@@ -22,7 +22,7 @@ interface PaymentGatewayInterface
      *     description?: string,
      *     meta?: array<string, mixed>
      * } $payload
-     * @return array{link: string, tx_ref: string, status: string, gateway: string}
+     * @return array{link: string, tx_ref: string, status: string, gateway: string, stripe_flow?: string}
      */
     public function initiate(array $payload): array;
 

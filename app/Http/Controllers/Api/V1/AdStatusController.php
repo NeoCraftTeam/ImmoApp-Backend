@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\AdStatus;
 use App\Exceptions\InvalidStatusTransitionException;
+use App\Http\Requests\Api\V1\PublishAdRequest;
 use App\Models\Ad;
 use App\Support\AdScoutSync;
 use App\Support\GeoLocation;
@@ -140,10 +141,14 @@ final class AdStatusController
      *     @OA\Response(response=422, description="Missing required fields or not a draft")
      * )
      */
-    public function publish(Ad $ad): JsonResponse
+    public function publish(PublishAdRequest $request, Ad $ad): JsonResponse
     {
         $this->authorize('update', $ad);
 
+        // PublishAdRequest::withValidator() has already confirmed the ad is a
+        // DRAFT with all required fields filled. Inside the transaction we re-lock
+        // the row to guard against concurrent publishes, but we don't repeat the
+        // field-presence checks — the FormRequest owns that responsibility.
         $response = DB::transaction(function () use ($ad): JsonResponse {
             $locked = Ad::lockForUpdate()->find($ad->id);
 
@@ -154,41 +159,12 @@ final class AdStatusController
                 ], 404);
             }
 
+            // Guard against a concurrent status change between FormRequest
+            // validation and the lock being acquired.
             if ($locked->status !== AdStatus::DRAFT) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Seuls les brouillons peuvent être publiés.',
-                ], 422);
-            }
-
-            $missing = [];
-            if (!$locked->title) {
-                $missing[] = 'titre';
-            }
-            if (!$locked->description) {
-                $missing[] = 'description';
-            }
-            if (!$locked->adresse) {
-                $missing[] = 'adresse';
-            }
-            if ($locked->getAttribute('price') === null) {
-                $missing[] = 'prix';
-            }
-            if ($locked->getAttribute('surface_area') === null) {
-                $missing[] = 'surface';
-            }
-            if (!$locked->quarter_id) {
-                $missing[] = 'quartier';
-            }
-            if (!$locked->type_id) {
-                $missing[] = 'type';
-            }
-
-            if (!empty($missing)) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Veuillez compléter les champs obligatoires avant de publier : '.implode(', ', $missing),
-                    'data' => ['missing_fields' => $missing],
                 ], 422);
             }
 

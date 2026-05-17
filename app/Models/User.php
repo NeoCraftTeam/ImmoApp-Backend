@@ -6,12 +6,14 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 
-use App\Enums\AdminPermission;
 use App\Enums\UserRole;
 use App\Enums\UserType;
 use App\Mail\ForgotPasswordMail;
 use App\Mail\VerificationCodeMail;
 use App\Mail\VerifyEmailMail;
+use App\Models\Concerns\HasAdminPermissions;
+use App\Services\AvatarGeneratorService;
+use App\Services\OtpService;
 use App\Support\ChatAvatarUrl;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\UserFactory;
@@ -40,7 +42,6 @@ use Illuminate\Notifications\DatabaseNotificationCollection;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
@@ -52,7 +53,6 @@ use Laragear\WebAuthn\WebAuthnData;
 use Laravel\Cashier\Billable;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\PersonalAccessToken;
-use Laravolt\Avatar\Facade;
 use NotificationChannels\WebPush\HasPushSubscriptions;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -156,7 +156,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     use Billable;
 
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, HasPushSubscriptions, HasUuids, \Illuminate\Auth\MustVerifyEmail, LogsActivity, Notifiable, softDeletes;
+    use HasAdminPermissions, HasApiTokens, HasFactory, HasPushSubscriptions, HasUuids, \Illuminate\Auth\MustVerifyEmail, LogsActivity, Notifiable, SoftDeletes;
 
     use InteractsWithMedia;
     use WebAuthnAuthentication;
@@ -223,14 +223,18 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
      */
     protected $hidden = ['password', 'app_authentication_secret', 'app_authentication_recovery_codes', 'remember_token', 'location', 'created_at', 'updated_at', 'google_id', 'facebook_id', 'apple_id'];
 
+    // =========================================================================
+    // Boot
+    // =========================================================================
+
     #[\Override]
     protected static function booted(): void
     {
-        static::saving(function ($user): void {
+        static::saving(function (User $user): void {
             $user->validateAgentType();
         });
 
-        static::creating(function ($user): void {
+        static::creating(function (User $user): void {
             if (empty($user->role)) {
                 $user->role = UserRole::CUSTOMER;
             }
@@ -256,6 +260,15 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         // SOLID compliance — the User model no longer knows about PointService.
     }
 
+    // =========================================================================
+    // Internal helpers
+    // =========================================================================
+
+    /**
+     * Ensure agent users have a valid type set (individual or agency).
+     *
+     * @throws InvalidArgumentException
+     */
     private function validateAgentType(): void
     {
         if ($this->role === UserRole::AGENT && !in_array($this->type, [UserType::INDIVIDUAL, UserType::AGENCY])) {
@@ -263,14 +276,23 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         }
     }
 
+    // =========================================================================
+    // Public helpers / accessors
+    // =========================================================================
+
+    /**
+     * Generate a URL-safe username that is unique across the users table.
+     */
     public function generateUniqueUsername(): string
     {
         $base = Str::slug(trim(($this->firstname ?? '').' '.($this->lastname ?? '')));
         if (empty($base)) {
             $base = 'user';
         }
+
         $candidate = $base;
         $i = 2;
+
         while (static::where('username', $candidate)->where('id', '!=', $this->id ?? '')->exists()) {
             $candidate = $base.'-'.$i;
             $i++;
@@ -279,25 +301,93 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return $candidate;
     }
 
-    private function assignDefaultAvatar(): void
+    /**
+     * Generate a default avatar via {@see AvatarGeneratorService} and update
+     * the in-memory `avatar` attribute.
+     *
+     * Kept for backward compatibility — delegates all file I/O to the service.
+     */
+    public function assignDefaultAvatar(): void
     {
-        $name = trim(($this->firstname ?? '').' '.($this->lastname ?? ''));
-        if (empty($name)) {
-            $name = 'U';
-        }
-
-        $storagePath = 'avatars/'.$this->id.'/avatar.webp';
-        $tempFile = sys_get_temp_dir().'/avatar_'.uniqid('', true).'.png';
-        Facade::create($name)->save($tempFile, 80);
-        Storage::disk(config('filesystems.app_media_disk'))->put($storagePath, (string) file_get_contents($tempFile));
-        @unlink($tempFile);
-        $this->avatar = $storagePath;
+        app(AvatarGeneratorService::class)->generateAndAssign($this);
     }
 
+    /**
+     * Returns true if the user may publish ads (agent or admin).
+     */
     public function canPublishAds(): bool
     {
         return in_array($this->role, [UserRole::AGENT, UserRole::ADMIN]);
     }
+
+    /**
+     * Returns true if the user holds the Agent role.
+     */
+    public function isAgent(): bool
+    {
+        return $this->role === UserRole::AGENT;
+    }
+
+    /**
+     * Returns true if the user holds the Admin role.
+     */
+    public function isAdmin(): bool
+    {
+        return $this->role === UserRole::ADMIN;
+    }
+
+    /**
+     * Returns true if the user holds the Customer role.
+     */
+    public function isCustomer(): bool
+    {
+        return $this->role === UserRole::CUSTOMER;
+    }
+
+    /**
+     * Returns true if the user's type is Individual.
+     */
+    public function isAnIndividual(): bool
+    {
+        return $this->type === UserType::INDIVIDUAL;
+    }
+
+    /**
+     * Returns true if the user's type is Agency.
+     */
+    public function isAnAgency(): bool
+    {
+        return $this->type === UserType::AGENCY;
+    }
+
+    /**
+     * Returns true when the user must change their password on next login.
+     */
+    public function hasMustChangePassword(): bool
+    {
+        return $this->must_change_password_at !== null;
+    }
+
+    // =========================================================================
+    // Computed / virtual attributes
+    // =========================================================================
+
+    /**
+     * Full display name — returns the agency name for agency-type users,
+     * otherwise concatenates first and last name.
+     */
+    public function getFullnameAttribute(): string
+    {
+        if ($this->type === UserType::AGENCY && $this->relationLoaded('agency') && $this->agency instanceof Agency) {
+            return $this->agency->name;
+        }
+
+        return trim(($this->firstname ?? '').' '.($this->lastname ?? ''));
+    }
+
+    // =========================================================================
+    // Relationships
+    // =========================================================================
 
     /** @return HasMany<Ad, $this> */
     public function ads(): HasMany
@@ -305,21 +395,25 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return $this->hasMany(Ad::class);
     }
 
+    /** @return HasOne<EmailPreference, $this> */
     public function emailPreference(): HasOne
     {
         return $this->hasOne(EmailPreference::class);
     }
 
+    /** @return BelongsTo<Agency, $this> */
     public function agency(): BelongsTo
     {
         return $this->belongsTo(Agency::class);
     }
 
+    /** @return HasMany<Payment, $this> */
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
     }
 
+    /** @return HasMany<UnlockedAd, $this> */
     public function unlockedAds(): HasMany
     {
         return $this->hasMany(UnlockedAd::class);
@@ -337,6 +431,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return $this->hasMany(PointTransaction::class);
     }
 
+    /** @return BelongsTo<City, $this> */
     public function city(): BelongsTo
     {
         return $this->belongsTo(City::class);
@@ -360,13 +455,21 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return $this->hasMany(AdInteraction::class);
     }
 
-    /** @return BelongsToMany<User, $this> — bailleurs que cet utilisateur suit */
+    /**
+     * Bailleurs que cet utilisateur suit.
+     *
+     * @return BelongsToMany<User, $this>
+     */
     public function following(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'user_follows', 'follower_id', 'followed_id');
     }
 
-    /** @return BelongsToMany<User, $this> — utilisateurs qui suivent ce bailleur */
+    /**
+     * Utilisateurs qui suivent ce bailleur.
+     *
+     * @return BelongsToMany<User, $this>
+     */
     public function followers(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'user_follows', 'followed_id', 'follower_id');
@@ -408,49 +511,12 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return $this->hasMany(TrustScore::class);
     }
 
-    /**
-     * returns true if the user is an agent.
-     */
-    public function isAgent(): bool
-    {
-        return $this->role === UserRole::AGENT;
-    }
-
-    public function getFullnameAttribute(): string
-    {
-        if ($this->type === UserType::AGENCY && $this->relationLoaded('agency') && $this->agency instanceof Agency) {
-            return $this->agency->name;
-        }
-
-        return trim(($this->firstname ?? '').' '.($this->lastname ?? ''));
-    }
+    // =========================================================================
+    // Media Library
+    // =========================================================================
 
     /**
-     * returns true if the user is a customer.
-     */
-    public function isCustomer(): bool
-    {
-        return $this->role === UserRole::CUSTOMER;
-    }
-
-    /**
-     * returns true if the user is an individual.
-     */
-    public function isAnIndividual(): bool
-    {
-        return $this->type === UserType::INDIVIDUAL;
-    }
-
-    /**
-     * returns true if the user is an agency.
-     */
-    public function isAnAgency(): bool
-    {
-        return $this->type === UserType::AGENCY;
-    }
-
-    /**
-     * Définir les collections de médias
+     * Register Spatie media collections for avatar uploads.
      */
     public function registerMediaCollections(): void
     {
@@ -460,7 +526,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
-     * Définir les conversions d'images (optionnel)
+     * Register image conversions applied when media is added.
      */
     public function registerMediaConversions(?Media $media = null): void
     {
@@ -470,6 +536,13 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             ->sharpen(10);
     }
 
+    // =========================================================================
+    // Filament contracts
+    // =========================================================================
+
+    /**
+     * Determine whether this user may access the given Filament panel.
+     */
     public function canAccessPanel(Panel $panel): bool
     {
         if ($this->isAdmin()) {
@@ -477,6 +550,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         }
 
         $panelId = $panel->getId();
+
         if ($panelId === 'agency') {
             return $this->role === UserRole::AGENT && $this->type === UserType::AGENCY;
         }
@@ -488,6 +562,11 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return false;
     }
 
+    /**
+     * Return the tenants (agencies) accessible to this user for the given panel.
+     *
+     * @return Collection<int, Agency>
+     */
     public function getTenants(Panel $panel): Collection
     {
         if ($this->isAdmin()) {
@@ -497,6 +576,9 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return collect([$this->agency])->filter();
     }
 
+    /**
+     * Determine whether this user can access a specific tenant.
+     */
     public function canAccessTenant(Model $tenant): bool
     {
         if ($this->isAdmin()) {
@@ -507,75 +589,19 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
-     * returns true if the user is an admin.
+     * Return the user's display name for Filament UI.
      */
-    public function isAdmin(): bool
-    {
-        return $this->role === UserRole::ADMIN;
-    }
-
-    /**
-     * Super-admin status. A super-admin bypasses every granular admin permission check.
-     *
-     * Backward compatibility: if `admin_permissions` is `null`, the user is treated as
-     * super-admin (this preserves access for every existing administrator).
-     */
-    public function isSuperAdmin(): bool
-    {
-        if (!$this->isAdmin()) {
-            return false;
-        }
-
-        return (bool) $this->is_super_admin || $this->admin_permissions === null;
-    }
-
-    /**
-     * Check whether the admin has a given granular permission.
-     *
-     * Non-admins always return `false`.
-     * Super-admins always return `true`.
-     */
-    public function hasAdminPermission(AdminPermission|string $permission): bool
-    {
-        if (!$this->isAdmin()) {
-            return false;
-        }
-
-        if ($this->isSuperAdmin()) {
-            return true;
-        }
-
-        $value = $permission instanceof AdminPermission ? $permission->value : $permission;
-
-        return in_array($value, (array) ($this->admin_permissions ?? []), true);
-    }
-
-    /**
-     * Check whether the admin has at least one of the supplied permissions.
-     *
-     * @param  iterable<AdminPermission|string>  $permissions
-     */
-    public function hasAnyAdminPermission(iterable $permissions): bool
-    {
-        foreach ($permissions as $permission) {
-            if ($this->hasAdminPermission($permission)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    public function webAuthnData(): WebAuthnData
-    {
-        return WebAuthnData::make($this->email, trim("{$this->firstname} {$this->lastname}"));
-    }
-
     public function getFilamentName(): string
     {
         return "{$this->firstname} {$this->lastname}";
     }
 
+    /**
+     * Return a publicly accessible avatar URL for the Filament UI.
+     *
+     * Returns null (letting Filament render its placeholder) when no avatar
+     * is stored or the file no longer exists on disk.
+     */
     public function getFilamentAvatarUrl(): ?string
     {
         if (str_starts_with($this->avatar ?? '', 'http')) {
@@ -583,11 +609,12 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         }
 
         $disk = config('filesystems.app_media_disk');
+
         if ($this->avatar && Storage::disk($disk)->exists($this->avatar)) {
             return Storage::disk($disk)->url($this->avatar);
         }
 
-        // Privacy: Return null to let Filament/Frontend handle the default placeholder
+        // Privacy: Return null to let Filament/Frontend handle the default placeholder.
         return null;
     }
 
@@ -602,65 +629,86 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return ChatAvatarUrl::resolve($raw !== '' && $raw !== '0' ? $raw : null);
     }
 
+    // =========================================================================
+    // WebAuthn
+    // =========================================================================
+
+    /**
+     * Return the WebAuthn identity data for this user.
+     */
+    public function webAuthnData(): WebAuthnData
+    {
+        return WebAuthnData::make($this->email, trim("{$this->firstname} {$this->lastname}"));
+    }
+
+    // =========================================================================
+    // Multi-factor: TOTP App
+    // =========================================================================
+
+    /** {@inheritDoc} */
     public function getAppAuthenticationSecret(): ?string
     {
-        // This method should return the user's saved app authentication secret.
-
         return $this->app_authentication_secret;
     }
 
+    /** {@inheritDoc} */
     public function saveAppAuthenticationSecret(?string $secret): void
     {
-        // This method should save the user's app authentication secret.
-
         $this->app_authentication_secret = $secret;
         $this->save();
     }
 
+    /**
+     * Return the account label shown inside the user's authenticator app.
+     *
+     * Using the email address ensures uniqueness across multiple accounts.
+     */
     public function getAppAuthenticationHolderName(): string
     {
-        // In a user's authentication app, each account can be represented by a "holder name".
-        // If the user has multiple accounts in your app, it might be a good idea to use
-        // their email address as then they are still uniquely identifiable.
-
         return $this->email;
     }
 
     /**
+     * {@inheritDoc}
+     *
      * @return array<string>|null
      */
     public function getAppAuthenticationRecoveryCodes(): ?array
     {
-        // This method should return the user's saved app authentication recovery codes.
-
         return $this->app_authentication_recovery_codes;
     }
 
     /**
-     * @param  array<string> | null  $codes
+     * {@inheritDoc}
+     *
+     * @param  array<string>|null  $codes
      */
     public function saveAppAuthenticationRecoveryCodes(?array $codes): void
     {
-        // This method should save the user's app authentication recovery codes.
-
         $this->app_authentication_recovery_codes = $codes;
         $this->save();
     }
 
+    // =========================================================================
+    // Multi-factor: Email OTP
+    // =========================================================================
+
+    /** {@inheritDoc} */
     public function hasEmailAuthentication(): bool
     {
-        // This method should return true if the user has enabled email authentication.
-
         return (bool) $this->has_email_authentication;
     }
 
+    /** {@inheritDoc} */
     public function toggleEmailAuthentication(bool $condition): void
     {
-        // This method should save whether or not the user has enabled email authentication.
-
         $this->has_email_authentication = $condition;
         $this->save();
     }
+
+    // =========================================================================
+    // Casts & logging
+    // =========================================================================
 
     /**
      * Get the attributes that should be cast.
@@ -693,6 +741,9 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         ];
     }
 
+    /**
+     * Configure which attributes are recorded by Spatie activity log.
+     */
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
@@ -701,6 +752,10 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             ->dontSubmitEmptyLogs()
             ->setDescriptionForEvent(fn (string $eventName): string => "Utilisateur « {$this->firstname} {$this->lastname} » {$eventName}");
     }
+
+    // =========================================================================
+    // Notifications / Email
+    // =========================================================================
 
     /**
      * Send the password reset notification using our styled email template.
@@ -720,21 +775,19 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     /**
      * Send a 6-digit OTP code for email verification instead of a magic link.
      *
-     * The OTP is stored in cache with a 10-minute TTL keyed by the user's ID.
+     * OTP generation and cache management is delegated to {@see OtpService}.
+     * A per-user cooldown prevents flooding when the method is called repeatedly.
      */
     #[\Override]
     public function sendEmailVerificationNotification(): void
     {
-        $cooldownKey = 'email_otp_sent_'.$this->id;
+        $otpService = app(OtpService::class);
 
-        if (Cache::has('email_otp_'.$this->id) && Cache::has($cooldownKey)) {
+        if ($otpService->isCoolingDown((string) $this->id)) {
             return;
         }
 
-        $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-
-        Cache::put('email_otp_'.$this->id, $otp, now()->addMinutes(10));
-        Cache::put($cooldownKey, true, now()->addSeconds(60));
+        $otp = $otpService->generate((string) $this->id);
 
         $requestedFrom = request()->ip() ?? 'inconnu';
         $requestedAt = now()->translatedFormat('d F Y à H:i');
@@ -765,10 +818,5 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
 
         Mail::to($this->email, $this->firstname)
             ->queue(new VerifyEmailMail($verificationUrl, $ttlMinutes, $requestedFrom, $requestedAt));
-    }
-
-    public function hasMustChangePassword(): bool
-    {
-        return $this->must_change_password_at !== null;
     }
 }

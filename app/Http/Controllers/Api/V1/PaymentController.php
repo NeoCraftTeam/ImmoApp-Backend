@@ -167,6 +167,9 @@ final class PaymentController
                 // so the frontend can skip the verify poll on instant
                 // success / failure.
                 'status' => $result['status'],
+                // Stripe-only: tells the frontend which SDK flow to use for
+                // the `payment_link` secret ('checkout_session' or 'payment_intent').
+                'stripe_flow' => $result['stripe_flow'] ?? null,
             ]);
         });
     }
@@ -419,7 +422,11 @@ final class PaymentController
         // Stripe sends many event types (`payment_intent.created`, etc.); we
         // only want post-payment side-effects on terminal success events so
         // we don't redundantly schedule jobs that early-return.
-        if ($txRef !== '' && $event === 'payment_intent.succeeded') {
+        if ($txRef !== '' && in_array($event, [
+            'payment_intent.succeeded',
+            'checkout.session.completed',
+            'checkout.session.async_payment_succeeded',
+        ], true)) {
             ProcessFlutterwaveWebhookJob::dispatch(
                 $txRef,
                 'stripe',
