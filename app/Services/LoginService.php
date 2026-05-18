@@ -217,6 +217,19 @@ final readonly class LoginService
 
         $ua = UserAgentParser::parse($request->userAgent() ?? '');
 
+        $tz = config('app.timezone', 'Africa/Douala');
+        $carbonNow = now()->setTimezone($tz);
+        $offset = $carbonNow->format('P'); // +01:00
+        $loginAt = $carbonNow->translatedFormat('d F Y \\à H:i')
+            .' (UTC'.str_replace(':00', '', $offset).')';
+
+        $locationLabel = match (true) {
+            $currentCity !== '' && $currentCountry !== '' => $currentCity.', '.$currentCountry,
+            $currentCity !== '' => $currentCity,
+            $currentCountry !== '' => $currentCountry,
+            default => $currentIp,
+        };
+
         if ($locationChanged) {
             Mail::to($user->email, $user->firstname)->queue(new NewLocationSignInMail(
                 userName: $user->firstname ?? $user->email,
@@ -226,7 +239,7 @@ final readonly class LoginService
                 device: $ua['device_type'],
                 browser: $ua['browser_name'],
                 operatingSystem: $ua['operating_system'],
-                loginAt: now()->translatedFormat('d F Y \\à H:i'),
+                loginAt: $loginAt,
                 secureAccountUrl: config('app.frontend_url').'/security/sessions',
                 supportEmail: config('mail.from.address'),
             ));
@@ -235,9 +248,10 @@ final readonly class LoginService
                 deviceType: $ua['device_type'],
                 browserName: $ua['browser_name'],
                 operatingSystem: $ua['operating_system'],
-                location: ($currentCity ?: $currentIp).', '.$currentCountry,
+                location: $locationLabel,
                 ipAddress: $currentIp,
-                sessionCreatedAt: now()->translatedFormat('d F Y \\à H:i'),
+                sessionCreatedAt: $loginAt,
+                userName: $user->firstname ?? $user->email,
                 signInMethod: 'Email / Mot de passe',
                 revokeSessionUrl: config('app.frontend_url').'/security/sessions',
                 supportEmail: config('mail.from.address'),

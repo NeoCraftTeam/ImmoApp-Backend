@@ -39,9 +39,16 @@ class NewLocationSignInMail extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
-        return new Envelope(
-            subject: 'Nouvelle connexion depuis '.$this->city.', '.$this->country.' — '.config('app.name'),
-        );
+        $locationParts = array_filter([
+            $this->city !== 'Inconnue' ? $this->city : null,
+            $this->country !== 'Inconnu' ? $this->country : null,
+        ]);
+
+        $subject = $locationParts !== []
+            ? 'Connexion depuis '.implode(', ', $locationParts).' — '.config('app.name')
+            : 'Connexion depuis un nouvel emplacement — '.config('app.name');
+
+        return new Envelope(subject: $subject);
     }
 
     public function content(): Content

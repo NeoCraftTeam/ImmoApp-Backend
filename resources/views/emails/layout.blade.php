@@ -258,21 +258,12 @@
 
             <div class="header">
                 <a href="{{ $emailFrontendUrl ?? config('app.frontend_url', config('app.url')) }}" style="display: inline-block;">
-                    @php
-                        $resolvedLogoUrl = $emailLogoUrl ?? asset('images/logo.png');
-                        $resolvedLogoB64 = $emailLogoBase64 ?? \App\Support\EmailBranding::pngBase64('images/logo.png');
-                    @endphp
-                    @if(!empty($resolvedLogoB64))
-                        <img src="data:image/png;base64,{{ $resolvedLogoB64 }}"
-                            alt="{{ config('app.name') }}"
-                            class="logo-img"
-                            style="max-height: 48px; height: auto; width: auto;" />
-                    @else
-                        <img src="{{ $resolvedLogoUrl }}"
-                            alt="{{ config('app.name') }}"
-                            class="logo-img"
-                            style="max-height: 48px; height: auto; width: auto;" />
-                    @endif
+                    <img src="{{ $emailLogoUrl ?? asset('images/keyhomelogo_email.png') }}"
+                        alt="{{ config('app.name') }}"
+                        class="logo-img"
+                        width="160"
+                        height="40"
+                        style="max-height:40px;height:auto;width:auto;max-width:160px;display:block;border:0;" />
                 </a>
             </div>
 

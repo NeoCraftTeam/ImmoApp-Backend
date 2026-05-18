@@ -270,21 +270,12 @@
 
             <div class="header">
                 <a href="{{ $emailFrontendUrl ?? (rtrim(config('app.frontend_url', config('app.url')), '/') . '/owner') }}" style="display: inline-block;">
-                    @php
-                        $resolvedLogoUrl = $emailOwnerLogoUrl ?? asset('images/logo-teal.png');
-                        $resolvedOwnerLogoB64 = $emailOwnerLogoBase64 ?? \App\Support\EmailBranding::pngBase64('images/logo-teal.png');
-                    @endphp
-                    @if(!empty($resolvedOwnerLogoB64))
-                        <img src="data:image/png;base64,{{ $resolvedOwnerLogoB64 }}"
-                            alt="{{ config('app.name') }}"
-                            class="logo-img"
-                            style="max-height: 48px; height: auto; width: auto;" />
-                    @else
-                        <img src="{{ $resolvedLogoUrl }}"
-                            alt="{{ config('app.name') }}"
-                            class="logo-img"
-                            style="max-height: 48px; height: auto; width: auto;" />
-                    @endif
+                    <img src="{{ $emailOwnerLogoUrl ?? asset('images/logo-teal.png') }}"
+                        alt="{{ config('app.name') }}"
+                        class="logo-img"
+                        width="160"
+                        height="40"
+                        style="max-height:40px;height:auto;width:auto;max-width:160px;display:block;border:0;" />
                 </a>
             </div>
 

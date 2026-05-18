@@ -152,30 +152,16 @@ class AppServiceProvider extends ServiceProvider
 
         // ── Email view composers ──────────────────────────────────────────────
 
-        // Partage le logo et l'URL frontend avec toutes les vues emails.*
-        // MAIL_ASSET_BASE_URL doit pointer vers le domaine public (ex: https://keyhome.app)
-        // pour que les clients email (Gmail, Outlook) puissent charger l'image.
-        // Les data: URI sont bloqués par la plupart des clients email modernes.
-        //
-        // Base64 data is read once at provider boot and shared via a closure
-        // so subsequent email sends do not hit the filesystem at all.
+        // Shares the hosted logo URLs with all emails.* views.
+        // MAIL_ASSET_BASE_URL must point to the public domain (e.g. https://keyhome.app)
+        // so Gmail, Outlook, and Apple Mail can load the image.
+        // data: URI base64 embeds are blocked by virtually every modern email client
+        // and have been removed — always use the hosted URL.
         $assetBase = rtrim((string) config('app.mail_asset_base_url', config('app.url')), '/');
-
-        $logoPath = public_path('images/keyhomelogo_email.png');
-        $emailLogoBase64 = (file_exists($logoPath) && filesize($logoPath) < 150000)
-            ? base64_encode((string) file_get_contents($logoPath))
-            : '';
-
-        $tealLogoPath = public_path('images/logo-teal.png');
-        $emailOwnerLogoBase64 = (file_exists($tealLogoPath) && filesize($tealLogoPath) < 150000)
-            ? base64_encode((string) file_get_contents($tealLogoPath))
-            : '';
 
         $emailViewData = [
             'emailLogoUrl' => $assetBase.'/images/keyhomelogo_email.png',
-            'emailLogoBase64' => $emailLogoBase64,
             'emailOwnerLogoUrl' => $assetBase.'/images/logo-teal.png',
-            'emailOwnerLogoBase64' => $emailOwnerLogoBase64,
             'emailFrontendUrl' => config('app.frontend_url', config('app.url')),
         ];
 

@@ -36,7 +36,7 @@ class NewsletterBroadcastMail extends Mailable
             with: [
                 'body' => $this->campaign->body,
                 'name' => $this->subscriber->name,
-                'unsubscribeUrl' => url("/api/v1/newsletter/unsubscribe/{$this->subscriber->token}"),
+                'unsubscribeUrl' => route('newsletter.unsubscribe.web', ['token' => $this->subscriber->token]),
             ],
         );
     }
