@@ -30,6 +30,8 @@ use App\Services\WebAuthn\CacheChallengeRepository;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Mail\Events\MessageSending;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
@@ -167,6 +169,36 @@ class AppServiceProvider extends ServiceProvider
 
         View::composer(['emails.*', 'emails.reservation.*'], static function ($view) use ($emailViewData): void {
             $view->with($emailViewData);
+        });
+
+        // ── Auto plain-text MIME part ─────────────────────────────────────────
+        // Resend (and most ESPs) flag emails that ship only text/html as a
+        // deliverability risk. Rather than adding `text:` to every Mailable,
+        // we generate a plain-text fallback from the HTML body at send time.
+        Event::listen(MessageSending::class, static function (MessageSending $event): void {
+            if ($event->message->getTextBody() !== null) {
+                return;
+            }
+
+            $html = $event->message->getHtmlBody();
+
+            if ($html === null || $html === '') {
+                return;
+            }
+
+            $plain = (string) preg_replace(
+                ['/<br\s*\/?>/i', '/<\/(?:p|div|li|h[1-6]|tr)>/i'],
+                "\n",
+                $html
+            );
+            $plain = html_entity_decode(
+                strip_tags($plain),
+                ENT_QUOTES | ENT_HTML5,
+                'UTF-8'
+            );
+            $plain = (string) preg_replace('/\n{3,}/', "\n\n", trim($plain));
+
+            $event->message->text($plain);
         });
 
         ResetPassword::createUrlUsing(function (object $notifiable, string $token) {

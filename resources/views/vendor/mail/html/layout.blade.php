@@ -91,9 +91,8 @@
 
         {{-- Header avec logo à gauche et titre --}}
         <div class="email-header">
-            <img src="data:image/png;base64,{{ base64_encode(file_get_contents(public_path('images/logo.png'))) }}"
-                 alt="KeyHome logo" style="max-height:50px;">
-            <h1>KeyHome</h1>
+            <img src="{{ rtrim(config('app.mail_asset_base_url', config('app.url')), '/') }}/images/keyhomelogo_email.png"
+                 alt="KeyHome" width="140" height="40" style="max-height:40px;width:auto;display:block;border:0;">
         </div>
 
         {{-- Contenu principal --}}

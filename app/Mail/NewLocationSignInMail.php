@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Mail\Concerns\HasSender;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -17,6 +18,7 @@ use Illuminate\Queue\SerializesModels;
  */
 class NewLocationSignInMail extends Mailable implements ShouldQueue
 {
+    use HasSender;
     use Queueable;
     use SerializesModels;
 
@@ -48,7 +50,10 @@ class NewLocationSignInMail extends Mailable implements ShouldQueue
             ? 'Connexion depuis '.implode(', ', $locationParts).' — '.config('app.name')
             : 'Connexion depuis un nouvel emplacement — '.config('app.name');
 
-        return new Envelope(subject: $subject);
+        return new Envelope(
+            from: $this->senderFrom('notifications'),
+            subject: $subject,
+        );
     }
 
     public function content(): Content

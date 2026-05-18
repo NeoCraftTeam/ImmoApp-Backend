@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\ChatE2eeIdentityController;
 use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\ClerkWebhookController;
 use App\Http\Controllers\Api\V1\ConversationController;
+use App\Http\Controllers\Api\V1\CookieConsentController;
 use App\Http\Controllers\Api\V1\DocumentController;
 use App\Http\Controllers\Api\V1\DuplicateAdController;
 use App\Http\Controllers\Api\V1\ExpenseController;
@@ -154,6 +155,12 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/my/trust-score/consent', [TrustScoreController::class, 'consent'])
             ->middleware('throttle:10,1');
     });
+
+    // --- Cookie consent logging (CNIL Art. 5-1-a — proof of consent) ---
+    // Open to everyone (including anonymous visitors). auth:sanctum is optional
+    // so the controller can attach user_id for authenticated users.
+    Route::post('/consent/cookies', CookieConsentController::class)
+        ->middleware('throttle:30,1');
 
     // --- GDPR Data Export & Account Deletion ---
     Route::middleware('auth:sanctum')->group(function (): void {
