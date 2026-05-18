@@ -29,6 +29,9 @@ Schedule::command('app:auto-hide-stale-ads')->dailyAt('03:00');
 Schedule::command('app:send-post-viewing-thanks')->dailyAt('10:00');
 
 // — GDPR data retention (P2-29) —
+// Step 1: anonymize personal data 30 days after soft-delete (Art. 17 RGPD — droit à l'oubli)
+Schedule::command('gdpr:anonymize-deleted')->dailyAt('03:15');
+// Step 2: hard-delete anonymized records after 2-year retention threshold
 Schedule::command('app:purge-expired-data')->dailyAt('03:30');
 
 // — Smart notification digests —
