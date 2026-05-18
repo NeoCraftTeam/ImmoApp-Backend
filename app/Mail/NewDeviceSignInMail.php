@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Mail\Concerns\HasSender;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
@@ -13,6 +14,7 @@ use Illuminate\Queue\SerializesModels;
 
 class NewDeviceSignInMail extends Mailable implements ShouldQueue
 {
+    use HasSender;
     use Queueable;
     use SerializesModels;
 
@@ -36,6 +38,7 @@ class NewDeviceSignInMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
+            from: $this->senderFrom('notifications'),
             subject: 'Nouvelle connexion à votre compte — '.config('app.name'),
         );
     }
