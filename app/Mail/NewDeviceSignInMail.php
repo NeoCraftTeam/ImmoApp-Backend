@@ -23,15 +23,20 @@ class NewDeviceSignInMail extends Mailable implements ShouldQueue
         public readonly string $location,
         public readonly string $ipAddress,
         public readonly string $sessionCreatedAt,
+        public readonly ?string $userName = null,
         public readonly ?string $signInMethod = null,
         public readonly ?string $revokeSessionUrl = null,
         public readonly ?string $supportEmail = null,
-    ) {}
+    ) {
+        if (app()->environment(['production', 'staging'])) {
+            $this->onQueue('emails');
+        }
+    }
 
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Nouvelle connexion à votre compte '.config('app.name'),
+            subject: 'Nouvelle connexion à votre compte — '.config('app.name'),
         );
     }
 

@@ -7,9 +7,15 @@ namespace App\Http\Controllers\Dev;
 use App\Enums\UserRole;
 use App\Mail\AccountDeletedMail;
 use App\Mail\ForgotPasswordMail;
+use App\Mail\NewDeviceSignInMail;
+use App\Mail\NewLocationSignInMail;
+use App\Mail\NewsletterBroadcastMail;
+use App\Mail\NewsletterConfirmationMail;
 use App\Mail\ResetPasswordMail;
 use App\Mail\VerificationCodeMail;
 use App\Mail\WelcomeDripMail;
+use App\Models\NewsletterCampaign;
+use App\Models\NewsletterSubscriber;
 use App\Models\User;
 use Illuminate\Http\Response;
 use Illuminate\Mail\Mailable;
@@ -101,6 +107,10 @@ final class EmailPreviewController
             ['slug' => 'welcome-drip-1', 'name' => 'Bienvenue — Jour 1', 'layout' => 'client'],
             ['slug' => 'welcome-drip-3', 'name' => 'Bienvenue — Jour 3', 'layout' => 'client'],
             ['slug' => 'welcome-drip-7', 'name' => 'Bienvenue — Jour 7', 'layout' => 'client'],
+            ['slug' => 'new-device-signin', 'name' => 'Connexion nouvel appareil (sécurité)', 'layout' => 'client'],
+            ['slug' => 'new-location-signin', 'name' => 'Connexion nouvel emplacement (sécurité)', 'layout' => 'client'],
+            ['slug' => 'newsletter-confirmation', 'name' => 'Newsletter — Confirmation abonnement', 'layout' => 'client'],
+            ['slug' => 'newsletter-broadcast', 'name' => 'Newsletter — Envoi campagne', 'layout' => 'client'],
         ]);
     }
 
@@ -124,6 +134,53 @@ final class EmailPreviewController
             'welcome-drip-1' => new WelcomeDripMail($this->fakeUser(), 1),
             'welcome-drip-3' => new WelcomeDripMail($this->fakeUser(), 3),
             'welcome-drip-7' => new WelcomeDripMail($this->fakeUser(), 7),
+
+            'new-device-signin' => new NewDeviceSignInMail(
+                deviceType: 'Mobile',
+                browserName: 'Chrome',
+                operatingSystem: 'Android 14',
+                location: 'Yaoundé, CM',
+                ipAddress: '102.244.103.52',
+                sessionCreatedAt: now()->setTimezone('Africa/Douala')->translatedFormat('d F Y \à H:i').' (UTC+1)',
+                userName: 'Jean',
+                signInMethod: 'Email / Mot de passe',
+                revokeSessionUrl: 'https://keyhome.app/security/sessions',
+                supportEmail: config('mail.from.address'),
+            ),
+
+            'new-location-signin' => new NewLocationSignInMail(
+                userName: 'Jean',
+                city: 'Paris',
+                country: 'FR',
+                ipAddress: '92.184.22.15',
+                device: 'Ordinateur',
+                browser: 'Safari',
+                operatingSystem: 'macOS',
+                loginAt: now()->setTimezone('Africa/Douala')->translatedFormat('d F Y \à H:i').' (UTC+1)',
+                secureAccountUrl: 'https://keyhome.app/security/sessions',
+                supportEmail: config('mail.from.address'),
+            ),
+
+            'newsletter-confirmation' => new NewsletterConfirmationMail(
+                subscriber: tap(new NewsletterSubscriber, static function (NewsletterSubscriber $s): void {
+                    $s->email = 'jean@example.com';
+                    $s->name = 'Jean Dupont';
+                    $s->token = str_repeat('a', 64);
+                }),
+            ),
+
+            'newsletter-broadcast' => new NewsletterBroadcastMail(
+                campaign: tap(new NewsletterCampaign, static function (NewsletterCampaign $c): void {
+                    $c->subject = 'Les meilleures offres immobilières du mois';
+                    $c->body = '<p>Découvrez notre <strong>sélection exclusive</strong> de biens disponibles à Yaoundé et Douala. Des appartements modernes, des villas spacieuses et des studios pour les jeunes actifs.</p>';
+                }),
+                subscriber: tap(new NewsletterSubscriber, static function (NewsletterSubscriber $s): void {
+                    $s->email = 'jean@example.com';
+                    $s->name = 'Jean Dupont';
+                    $s->token = str_repeat('b', 64);
+                }),
+            ),
+
             default => null,
         };
     }

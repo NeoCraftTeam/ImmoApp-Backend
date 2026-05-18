@@ -32,7 +32,7 @@ class NewsletterConfirmationMail extends Mailable
             view: 'emails.newsletter.confirmation',
             with: [
                 'name' => $this->subscriber->name,
-                'unsubscribeUrl' => url("/api/v1/newsletter/unsubscribe/{$this->subscriber->token}"),
+                'unsubscribeUrl' => route('newsletter.unsubscribe.web', ['token' => $this->subscriber->token]),
             ],
         );
     }

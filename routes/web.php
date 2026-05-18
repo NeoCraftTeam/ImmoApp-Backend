@@ -9,6 +9,7 @@ use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\Dev\EmailPreviewController;
 use App\Http\Controllers\EmailPreferenceController;
 use App\Http\Controllers\MediaProxyController;
+use App\Http\Controllers\NewsletterWebController;
 use App\Http\Controllers\PanelSsoController;
 use App\Http\Controllers\PwaManifestController;
 use App\Http\Controllers\TourImageProxyController;
@@ -117,6 +118,11 @@ Route::prefix('email')->group(function (): void {
         ->middleware('throttle:10,1')
         ->name('email.preferences.update');
 });
+
+// ── Newsletter Unsubscribe (public web — returns HTML confirmation page) ──
+Route::get('/newsletter/unsubscribe/{token}', NewsletterWebController::class)
+    ->middleware('throttle:30,1')
+    ->name('newsletter.unsubscribe.web');
 
 // ── Panel Tour Routes (web session auth — called from Filament Blade components) ──
 Route::middleware(['auth'])->prefix('panel-api/v1')->group(function (): void {
