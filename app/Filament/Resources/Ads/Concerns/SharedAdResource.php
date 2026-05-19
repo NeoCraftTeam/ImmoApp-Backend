@@ -194,7 +194,26 @@ trait SharedAdResource
                                 ->required()
                                 ->minValue(0)
                                 ->prefix('FCFA')
-                                ->extraInputAttributes(['inputmode' => 'numeric']),
+                                ->extraInputAttributes(['inputmode' => 'numeric'])
+                                ->columnSpan(fn (callable $get) => $get('transaction_type') === 'location' ? 1 : 2),
+                            ToggleButtons::make('price_period')
+                                ->label('Période')
+                                ->options([
+                                    'mois' => 'Par mois',
+                                    'jour' => 'Par jour',
+                                ])
+                                ->icons([
+                                    'mois' => 'heroicon-o-calendar-days',
+                                    'jour' => 'heroicon-o-sun',
+                                ])
+                                ->colors([
+                                    'mois' => 'primary',
+                                    'jour' => 'warning',
+                                ])
+                                ->default('mois')
+                                ->inline()
+                                ->visible(fn (callable $get) => $get('transaction_type') === 'location'),
+
                             TextInput::make('surface_area')
                                 ->label('Surface (m²)')
                                 ->required()
@@ -525,12 +544,15 @@ trait SharedAdResource
                         ->size('lg')
                         ->columnSpanFull(),
                     TextEntry::make('price')
-                        ->money('xaf')
-                        ->label('Prix mensuel')
+                        ->label('Prix')
                         ->icon('heroicon-o-banknotes')
                         ->iconColor('success')
                         ->weight('bold')
-                        ->size('lg'),
+                        ->size('lg')
+                        ->formatStateUsing(fn ($state, $record): string => number_format((float) $state, 0, ',', ' ').' XAF'.match ($record?->price_period) {
+                            'jour' => ' /jour',
+                            default => ' /mois',
+                        }),
                     TextEntry::make('status')
                         ->label('Statut')
                         ->badge()

@@ -73,6 +73,7 @@ final readonly class AdSearchController
             $quarterName = $validated['quarter'] ?? null;
             $transactionType = $validated['transaction_type'] ?? null;
 
+            $pricePeriod = $validated['price_period'] ?? null;
             $minBedrooms = isset($validated['bedrooms']) ? (int) $validated['bedrooms'] : null;
             $minBathrooms = isset($validated['bathrooms']) ? (int) $validated['bathrooms'] : null;
             $minPrice = isset($validated['price_min']) ? (float) $validated['price_min'] : null;
@@ -109,6 +110,9 @@ final readonly class AdSearchController
             }
             if (!empty($transactionType)) {
                 $filters[] = sprintf("transaction_type = '%s'", $transactionType);
+            }
+            if (!empty($pricePeriod)) {
+                $filters[] = sprintf("price_period = '%s'", $pricePeriod);
             }
             if ($minBedrooms !== null) {
                 $filters[] = sprintf('bedrooms >= %d', $minBedrooms);
@@ -214,6 +218,7 @@ final readonly class AdSearchController
         $quarterId = $validated['quarter_id'] ?? null;
         $quarterName = $validated['quarter'] ?? null;
         $transactionType = $validated['transaction_type'] ?? null;
+        $pricePeriod = $validated['price_period'] ?? null;
         $perPage = min(max((int) ($validated['per_page'] ?? config('pagination.per_page', 15)), 1), 100);
         $minBedrooms = isset($validated['bedrooms']) ? (int) $validated['bedrooms'] : null;
         $minBathrooms = isset($validated['bathrooms']) ? (int) $validated['bathrooms'] : null;
@@ -296,6 +301,10 @@ final readonly class AdSearchController
 
         if ($transactionType) {
             $query->where('transaction_type', $transactionType);
+        }
+
+        if ($pricePeriod) {
+            $query->where('price_period', $pricePeriod);
         }
 
         foreach ($amenities as $amenity) {
