@@ -1,6 +1,20 @@
 # KeyHome — La plateforme immobilière qui réinvente la recherche de logement en Afrique centrale
 
-> *Trouver un logement au Cameroun n'a jamais été aussi simple, aussi sûr, et aussi immersif.*
+> **Devise :** *Votre patrimoine immobilier en poche*  
+> *Trouver un logement au Cameroun et en zone CEMAC/UEMOA n'a jamais été aussi simple, aussi sûr, et aussi immersif.*
+
+---
+
+## Positionnement en une phrase
+
+KeyHome est une **marketplace immobilière SaaS** orientée **location et vente à moyen/long terme** en Afrique subsaharienne francophone — **pas** une plateforme de location vacances type Airbnb. Nous connectons locataires, acheteurs, bailleurs et agences avec des outils professionnels (modération, Trust Score, visites 360°, crédits de déblocage, paiements Mobile Money + carte).
+
+| | KeyHome | Plateformes vacances (ex. Airbnb) |
+|---|---|---|
+| **Usage principal** | Logement durable, bail, achat | Séjour court, tourisme |
+| **Zone** | CEMAC, UEMOA, diaspora (XAF/XOF + 27 devises affichées) | Mondial, hébergement temporaire |
+| **Confiance** | KeyScore annonce + Trust Score utilisateur, KYC bailleur | Avis voyageurs, Superhost |
+| **Monétisation** | Crédits pour débloquer le contact, abonnements bailleur, boost | Commission nuitée + frais voyageur |
 
 ---
 
@@ -8,7 +22,9 @@
 
 Chercher un logement au Cameroun, c'est souvent une aventure épuisante et frustrante. On passe des heures à appeler des numéros qui ne répondent plus. On se déplace pour visiter des biens qui ne correspondent pas du tout aux photos. On négocie avec des intermédiaires peu fiables qui font monter les prix. Et parfois, on tombe carrément sur des arnaques — photos volées, bailleurs fantômes, logements qui n'existent pas. **KeyHome est né exactement pour mettre fin à tout ça.**
 
-KeyHome est une **plateforme immobilière digitale de nouvelle génération**, pensée et construite spécifiquement pour le marché camerounais et d'Afrique centrale. Elle connecte directement les locataires et les bailleurs à Yaoundé, Douala, Bafoussam et au-delà — avec une expérience moderne, transparente et sécurisée qui n'a rien à envier aux grandes plateformes internationales.
+KeyHome est une **plateforme immobilière digitale de nouvelle génération**, pensée pour le **Cameroun, la zone CEMAC et l'UEMOA** (devises **XAF/XOF** natives, Mobile Money, réalités du marché local). Elle connecte locataires, acheteurs, **bailleurs particuliers**, **agences immobilières** et **administrateurs** — à Yaoundé, Douala, Bafoussam, Abidjan, Dakar et au-delà — avec une expérience moderne, transparente et sécurisée.
+
+**Deux applications PWA installables distinctes** sur le même écosystème : une app **client** (rose `#F6475F`, recherche et favoris) et une app **bailleur** (teal `#0D9488`, publication et gestion) — installables séparément sur l'écran d'accueil du téléphone, comme deux produits dédiés.
 
 Pas de numéros de téléphone exposés publiquement à n'importe qui. Pas de mauvaises surprises à l'arrivée. Pas d'intermédiaire qui gonfle les prix. Juste des logements vérifiés, des bailleurs identifiés, et des outils puissants pour prendre la meilleure décision possible — depuis son téléphone, en quelques minutes.
 
@@ -72,15 +88,21 @@ Avant même de débloquer une annonce, chaque bien affiché sur KeyHome est acco
 
 Plus le KeyScore est élevé, plus l'annonce est fiable et le bailleur sérieux. Le locataire peut ainsi trier ses résultats par KeyScore pour voir en priorité les annonces les plus dignes de confiance — sans avoir à débloquer chaque annonce pour s'en rendre compte.
 
+### 5 bis. Le Trust Score — La réputation des personnes (opt-in)
+
+En complément du KeyScore *par annonce*, KeyHome propose un **Trust Score bidirectionnel** (0–100, paliers Bronze → Platine) pour **locataires et bailleurs**, basé sur des signaux concrets : ponctualité aux visites, fiabilité des paiements, complétude du profil, avis, ancienneté, documents, vérification d'identité, etc.
+
+Le score n'est calculé et affiché **qu'avec le consentement explicite** de l'utilisateur (RGPD) — pas de notation cachée. Sur les profils publics et dans l'app, il aide à choisir un interlocuteur sérieux avant même le premier échange.
+
 ---
 
 ### 6. Débloquer une annonce — Accéder à l'essentiel
 
 KeyHome fonctionne sur un **modèle de déblocage par crédits**. Tout le monde peut consulter les annonces, voir les photos, lire les descriptions et les informations générales. Mais pour accéder aux coordonnées complètes du bailleur et aux informations exclusives, le locataire **débloque l'annonce en utilisant ses crédits**.
 
-Ces crédits s'achètent directement depuis l'application via un paiement sécurisé par **MTN Mobile Money, Orange Money, ou même par carte bancaire internationale**. Des packs de crédits sont disponibles à différents tarifs, et des **codes promo** sont régulièrement proposés aux utilisateurs fidèles.
+Ces crédits s'achètent directement depuis l'application via **Flutterwave** (MTN Mobile Money, Orange Money) ou **Stripe** (carte bancaire, avec possibilité de **sauvegarder une carte** pour les achats suivants). Des packs de crédits sont disponibles à différents tarifs, et des **codes promo** sont régulièrement proposés aux utilisateurs fidèles. **Des crédits de bienvenue** sont offerts à l'inscription pour tester le déblocage sans friction.
 
-Ce modèle protège tout le monde : les bailleurs ne sont pas spammés par des curieux qui n'ont pas d'intention réelle, et les locataires qui débloquent une annonce sont des personnes sérieuses et véritablement intéressées.
+Ce modèle protège tout le monde : les bailleurs ne sont pas spammés par des curieux qui n'ont pas d'intention réelle, et les locataires qui débloquent une annonce sont des personnes sérieuses et véritablement intéressées. Le numéro du bailleur **n'est pas exposé publiquement** avant déblocage — le contact passe par KeyHome (chat intégré après déblocage).
 
 **Après le déblocage, le locataire accède à :**
 
@@ -149,15 +171,15 @@ Après avoir interagi avec un bailleur ou visité un logement grâce à KeyHome,
 
 ---
 
-### 15. Discuter directement avec le bailleur — Une messagerie intégrée et chiffrée
+### 15. Discuter directement avec le bailleur — Messagerie intégrée en temps réel
 
-Une fois une annonce débloquée, le locataire n'a plus besoin de jongler entre le téléphone, WhatsApp et les SMS pour échanger avec le bailleur. KeyHome intègre une **messagerie en temps réel** directement dans l'application, conçue pour des échanges immobiliers sérieux et structurés.
+Une fois une annonce débloquée, le locataire n'a plus besoin de jongler entre le téléphone, WhatsApp et les SMS pour échanger avec le bailleur. KeyHome intègre une **messagerie en temps réel** (WebSocket / Reverb) directement dans l'application, conçue pour des échanges immobiliers sérieux et structurés.
 
-Le locataire peut envoyer un message texte, **partager une photo** (par exemple une capture d'un document, une question sur un détail du logement) ou même **transmettre un fichier PDF** (justificatif d'emploi, garant, attestation bancaire). Tous les messages sont **chiffrés de bout en bout** avec un standard cryptographique de niveau bancaire (AES-256 + HMAC-SHA256) — ni KeyHome, ni un tiers, ni un éventuel attaquant qui intercepterait le trafic ne peut lire le contenu de la conversation. Seuls les deux participants peuvent en lire le contenu.
+Le locataire peut envoyer un message texte, **partager une photo**, un **PDF**, des **notes vocales**, des **réactions** et répondre en citation. Les messages texte sont **chiffrés côté serveur** (AES-256-CBC + intégrité HMAC) ; seuls les participants authentifiés accèdent au fil via un **canal privé** sécurisé. Les pièces jointes sont stockées sur un stockage cloud dédié avec URLs signées.
 
-Les messages arrivent **instantanément** (notifications push sur le téléphone, alerte dans l'application). Si le bailleur ne lit pas son message dans les 5 minutes, le locataire reçoit en plus une copie par email pour s'assurer que l'information ne soit jamais perdue. Les conversations s'archivent automatiquement, restent consultables à tout moment, et les fichiers partagés sont stockés de manière sécurisée pendant toute la durée des échanges.
+Les messages arrivent **instantanément** (notifications push, alerte in-app). Si le bailleur ne lit pas son message dans les 5 minutes, une **relance par e-mail** peut être envoyée. Les conversations restent **archivables et consultables** — fini les échanges WhatsApp perdus dans une liste de contacts.
 
-C'est la fin des numéros de téléphone qui changent, des messages WhatsApp qui se perdent, des conversations qu'on ne retrouve plus quand on en a besoin. **Tout est centralisé, traçable, et protégé** — au bénéfice du locataire comme du bailleur.
+**Tout est centralisé et traçable** au bénéfice du locataire comme du bailleur, avec modération et signalement en cas d'abus.
 
 ---
 
@@ -385,15 +407,22 @@ Pour les bailleurs particuliers comme pour les agences, **la facturation est cen
 
 ---
 
-### 20. Sécurité du compte — Un journal de connexion et un contrôle total
+### 20. Sécurité du compte — Passkeys, journal de connexion et contrôle total
 
-Le bailleur dispose d'un **journal de connexion détaillé** : chaque connexion à son compte est tracée (date, heure, ville approximative, type d'appareil, navigateur). Si une connexion suspecte est détectée (par exemple depuis un pays étranger ou un appareil inhabituel), il peut **fermer cette session à distance** ou **déconnecter tous ses appareils en un clic** depuis son tableau de bord sécurité. Cette transparence et ce contrôle sont essentiels pour un bailleur qui gère un patrimoine qui peut représenter des dizaines de millions de FCFA d'actifs.
+Le bailleur (et le client) peut se connecter par **mot de passe**, **OAuth** (Google, etc.), **magic link** ou **Passkey / WebAuthn** (empreinte digitale, Face ID) — sans SMS OTP fragile. Gestion des passkeys depuis le profil (ajout, renommage, suppression, alerte e-mail).
+
+Un **journal de connexion** trace date, IP, appareil et navigateur. **Déconnexion à distance** de toutes les sessions possible. **MFA** (TOTP + e-mail) sur les panels admin Filament. **Cloudflare Turnstile** anti-bot sur login et inscription. Cette stack sécurise un patrimoine qui peut représenter des dizaines de millions de FCFA d'actifs.
 
 ---
 
-### 21. Application mobile native — KeyHome partout, même hors ligne
+### 21. Double PWA installable — Client et bailleur, deux apps sur un écran
 
-KeyHome est disponible en **application web installable** (PWA) directement depuis n'importe quel navigateur, sans passer par un store — et bientôt en applications natives Android et iOS dédiées. Une fois installée, l'application fonctionne **même hors ligne** pour consulter les annonces déjà chargées, et envoie de véritables **notifications push système** comme une app native. Pour un bailleur qui se déplace beaucoup, qui a parfois une connexion instable, ou qui veut juste l'avoir à portée d'un tap depuis son écran d'accueil, c'est un confort essentiel.
+KeyHome est disponible en **Progressive Web App (PWA)** : pas besoin du Play Store pour tester — installation depuis le navigateur en un tap. **Deux identités distinctes** :
+
+- **App client** (`/home`, thème rose) — recherche, favoris, messages, paiements crédits
+- **App bailleur** (`/owner/`, thème teal) — dashboard, publication, QR codes, abonnements
+
+Chaque PWA a son **manifeste, son scope et son icône** : sur mobile, elles s'installent comme **deux applications séparées**. Mode **hors ligne partiel** (cache des pages bailleur consultées), **notifications push** (FCM), session persistante (Sanctum + cookies sécurisés). Shell **React Native** bailleur en cours pour une app native complémentaire.
 
 ---
 
@@ -403,7 +432,7 @@ KeyHome n'est pas juste une énième plateforme d'annonces immobilières en lign
 
 | Problème réel du marché | Solution KeyHome |
 |---|---|
-| Manque de confiance entre locataires et bailleurs | Badge vérifié + KeyScore + avis vérifiés |
+| Manque de confiance entre locataires et bailleurs | Badge vérifié + KeyScore + Trust Score (opt-in) + avis vérifiés |
 | Opacité des prix du marché | Carte des prix + outil d'estimation |
 | Perte de temps en visites inutiles | Visite virtuelle 3D disponible 24h/24 |
 | Bonnes annonces qui partent trop vite | Alertes de recherche en temps réel |
@@ -420,19 +449,21 @@ KeyHome n'est pas juste une énième plateforme d'annonces immobilières en lign
 | Quartier inconnu pour le locataire | Fiche qualité de vie automatique |
 | Frais cachés à l'arrivée | Détail des charges (eau, électricité, forfait) |
 | Connexion suspecte sur le compte | Journal de connexion + déconnexion à distance |
-| Pas d'app native disponible | PWA installable + mode hors ligne |
+| Pas d'app native disponible | Double PWA client/bailleur + push + mode hors ligne partiel |
+| Location vacances / tourisme | Focus location longue durée + vente + outils pro bailleur |
+| Paiement diaspora compliqué | Flutterwave (Mobile Money) + Stripe (carte EUR) |
 
 Pour les **locataires**, KeyHome garantit une recherche rapide, intelligente et sécurisée. L'IA en langage naturel (texte, photo et voix), la carte interactive, la visite 3D, la messagerie chiffrée, les alertes de recherche, la conversion automatique en devise locale et le KeyScore transforment une expérience de recherche normalement épuisante en un processus fluide, agréable et fiable — que l'utilisateur soit à Bonamoussadi, à Bafoussam, ou à Bruxelles.
 
 Pour les **bailleurs**, KeyHome offre une vitrine professionnelle, des outils de gestion modernes (conseiller IA de prix, description IA, dashboard analytique, contrats PDF, affiches QR pour les pancartes physiques, messagerie chiffrée), et une exposition ciblée auprès de milliers de locataires sérieux — avec la tranquillité d'esprit d'une plateforme qui protège leur identité (numéro de téléphone masqué), filtre les curieux des vrais candidats grâce au modèle de crédits, et leur donne les clés pour comprendre et optimiser leurs performances.
 
-Pour la **diaspora camerounaise et les investisseurs internationaux**, KeyHome est la première plateforme immobilière africaine pensée pour eux : prix automatiquement convertis dans 27 devises, recherche IA qui comprend les budgets en euros ou en dollars, messagerie sécurisée pour préparer un retour au pays ou un investissement à distance, et la même qualité d'expérience qu'ils utilisent sur Airbnb ou Zillow — appliquée enfin au marché camerounais.
+Pour la **diaspora et les investisseurs internationaux**, KeyHome est pensée pour eux : prix convertis dans **27 devises**, recherche IA en budgets EUR/USD, messagerie et visites 360° à distance, paiement **carte Stripe** depuis l'étranger — le tout appliqué au **marché locatif africain**, pas au tourisme de courte durée.
 
 ---
 
-> **KeyHome. Votre logement, simplifié.**
+> **KeyHome — *Votre patrimoine immobilier en poche*.**
 
 ---
 
-*© 2026 KeyHome — keyhome.app*
-*Disponible pour le moment sur Web, Android et iOS (prochainement)*
+*© 2026 KeyHome — [keyhome.app](https://keyhome.app)*  
+*Web + PWA client & bailleur installables · Shell mobile bailleur (React Native) en cours*
