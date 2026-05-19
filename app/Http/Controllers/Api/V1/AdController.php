@@ -12,6 +12,7 @@ use App\Http\Requests\AdRequest;
 use App\Http\Resources\AdResource as AdApiResource;
 use App\Models\Ad;
 use App\Models\AdInteraction;
+use App\Models\User;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -438,7 +439,7 @@ final class AdController
      */
     public function destroy(string $id): JsonResponse
     {
-        $ad = Ad::findOrFail($id);
+        $ad = $this->resolveAdForAuthenticatedOwner($id);
 
         $this->authorize('delete', $ad);
 
@@ -449,7 +450,11 @@ final class AdController
 
             $imagesCount = $ad->getMedia('images')->count();
 
-            $ad->delete();
+            if ($ad->trashed()) {
+                $ad->forceDelete();
+            } else {
+                $ad->delete();
+            }
 
             $this->log->info('Ad deleted successfully with ID: '.$id);
 
@@ -457,7 +462,7 @@ final class AdController
 
             return response()->json([
                 'success' => true,
-                'message' => 'Ad deleted successfully',
+                'message' => 'Annonce supprimée.',
                 'data' => [
                     'deleted_ad_id' => $id,
                     'deleted_images_count' => $imagesCount,
@@ -473,6 +478,26 @@ final class AdController
             ]);
             throw $e;
         }
+    }
+
+    /**
+     * Resolve an ad for owner write/delete, including drafts and soft-deleted rows
+     * still visible in GET /my/ads (withTrashed).
+     *
+     * Non-admins only see their own ads; others receive 404 (not 403) via ModelNotFoundException.
+     */
+    private function resolveAdForAuthenticatedOwner(string $id): Ad
+    {
+        /** @var User $user */
+        $user = auth()->user();
+
+        $query = Ad::query()->withTrashed();
+
+        if (!$user->isAdmin()) {
+            $query->where('user_id', $user->id);
+        }
+
+        return $query->where('id', $id)->firstOrFail();
     }
 
     /**

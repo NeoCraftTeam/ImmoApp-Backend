@@ -68,7 +68,8 @@ test('user cannot delete other user ad', function (): void {
     Sanctum::actingAs($attacker);
     $response = $this->deleteJson("/api/v1/ads/{$ad->id}");
 
-    $response->assertStatus(403); // Forbidden
+    $response->assertNotFound()
+        ->assertJsonPath('code', 'NOT_FOUND');
 
     $this->assertNotSoftDeleted('ad', ['id' => $ad->id]);
 });

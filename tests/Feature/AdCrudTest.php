@@ -226,7 +226,8 @@ it('agent cannot delete another agents ad', function (): void {
     Sanctum::actingAs($otherAgent);
     $response = $this->deleteJson("/api/v1/ads/{$ad->id}");
 
-    $response->assertForbidden();
+    $response->assertNotFound()
+        ->assertJsonPath('code', 'NOT_FOUND');
     $this->assertNotSoftDeleted('ad', ['id' => $ad->id]);
 });
 

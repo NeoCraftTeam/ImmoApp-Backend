@@ -35,6 +35,7 @@ use Laragear\WebAuthn\Exceptions\AttestationException;
 use League\Flysystem\UnableToRetrieveMetadata;
 use Sentry\Laravel\Integration;
 use Symfony\Component\HttpKernel\Exception\HttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -100,6 +101,28 @@ return Application::configure(basePath: dirname(__DIR__))
                     'code' => 'NOT_FOUND',
                 ], 404);
             }
+        });
+
+        $exceptions->renderable(function (NotFoundHttpException $e, Request $request) {
+            if (!$request->is('api/*') && !$request->expectsJson()) {
+                return null;
+            }
+
+            $raw = $e->getMessage();
+
+            if (str_starts_with($raw, 'No query results for model')) {
+                return response()->json([
+                    'message' => 'Ressource introuvable.',
+                    'code' => 'NOT_FOUND',
+                ], 404);
+            }
+
+            $message = trim($raw) !== '' ? $raw : 'Ressource introuvable.';
+
+            return response()->json([
+                'message' => $message,
+                'code' => 'NOT_FOUND',
+            ], 404);
         });
 
         $exceptions->renderable(function (AuthorizationException $e, Request $request) {
@@ -192,6 +215,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 && !$e instanceof AuthenticationException
                 && !$e instanceof AuthorizationException
                 && !$e instanceof ModelNotFoundException
+                && !$e instanceof NotFoundHttpException
                 && !$e instanceof ThrottleRequestsException
                 && !$e instanceof RegistrationEmailTakenException
             ) {
