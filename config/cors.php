@@ -40,6 +40,7 @@ return [
         'https://preview.keyhome.neocraft.dev',
         'https://keyhome.app',
         'https://www.keyhome.app',
+        'https://owner.keyhome.app',
         'https://api.keyhome.app',
     ]),
 
