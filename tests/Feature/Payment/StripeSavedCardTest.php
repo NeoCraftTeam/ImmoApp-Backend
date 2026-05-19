@@ -75,11 +75,16 @@ function fakeStripeService(array $config = []): PaymentGatewayInterface
                 throw new PaymentGatewayException('Stripe initiate failed (forced).');
             }
 
+            $paymentMethodId = $payload['payment_method_id'] ?? null;
+
             return $this->config['initiate'] ?? [
-                'link' => 'pi_test_default_secret_xxx',
+                'link' => $paymentMethodId !== null
+                    ? 'pi_test_default_secret_xxx'
+                    : 'cs_test_default_secret_xxx',
                 'tx_ref' => (string) ($payload['tx_ref'] ?? 'KH-FAKE'),
                 'status' => 'pending',
                 'gateway' => 'stripe',
+                'stripe_flow' => $paymentMethodId !== null ? 'payment_intent' : 'checkout_session',
             ];
         }
 
@@ -336,6 +341,27 @@ it('forwards save_payment_method=true to the Stripe gateway when paying for a cr
         ->and($stub->calls['initiate'][0]['customer_id'])->toBe('cus_save_card_123')
         ->and($stub->calls['initiate'][0]['save_payment_method'])->toBeTrue()
         ->and($stub->calls['initiate'][0]['payment_method_id'])->toBeNull();
+});
+
+it('returns stripe_flow checkout_session for a new card initiate', function (): void {
+    Event::fake();
+
+    $package = PointPackage::factory()->create(['price' => 1000, 'is_active' => true]);
+    $user = User::factory()->create(['stripe_id' => 'cus_new_card_123']);
+
+    bindStripeService(fakeStripeService());
+
+    $this->actingAs($user)
+        ->postJson('/api/v1/payments/initiate_payment', [
+            'type' => 'credit',
+            'plan_id' => $package->id,
+            'payment_method' => 'card',
+            'save_payment_method' => true,
+        ])
+        ->assertOk()
+        ->assertJsonPath('gateway', 'stripe')
+        ->assertJsonPath('stripe_flow', 'checkout_session')
+        ->assertJsonPath('status', 'pending');
 });
 
 // ────────────────────────────────────────────────────────────────────
