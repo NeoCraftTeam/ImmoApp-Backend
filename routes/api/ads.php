@@ -50,11 +50,9 @@ Route::prefix('ads')->middleware('optional.auth')->group(function (): void {
         Route::get('/{user}/nearby', [AdGeoController::class, 'ads_nearby_user']);
     });
 
-    // CRUD write + status — owner/admin only (belt-and-suspenders with AdPolicy)
+    // Owner-panel write + status — AGENT only (admins use Filament; AdPolicy on update/delete below)
     Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner', 'token.role:agent'])->group(function (): void {
         Route::post('', [AdController::class, 'store']);
-        Route::put('/{ad}', [AdController::class, 'update']);
-        Route::delete('/{id}', [AdController::class, 'destroy']);
 
         Route::post('/{ad}/toggle-visibility', [AdStatusController::class, 'toggleVisibility']);
         Route::post('/{ad}/set-status', [AdStatusController::class, 'setStatus']);
@@ -66,6 +64,12 @@ Route::prefix('ads')->middleware('optional.auth')->group(function (): void {
         Route::patch('/{ad}/edit-draft', [AdDraftEditController::class, 'save'])->middleware('throttle:60,1');
         Route::post('/{ad}/edit-draft/apply', [AdDraftEditController::class, 'apply'])->middleware('throttle:20,1');
         Route::delete('/{ad}/edit-draft', [AdDraftEditController::class, 'discard'])->middleware('throttle:20,1');
+    });
+
+    // Ad update/delete — AdPolicy: admin (any ad) or agent (own ad); not owner-panel scoped
+    Route::middleware(['auth:sanctum'])->group(function (): void {
+        Route::put('/{ad}', [AdController::class, 'update']);
+        Route::delete('/{id}', [AdController::class, 'destroy']);
     });
 
     // Must be last — captures {id}
