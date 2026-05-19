@@ -117,6 +117,7 @@ class Ad extends Model implements HasMedia
         'description',
         'adresse',
         'price',
+        'price_period',
         'surface_area',
         'bedrooms',
         'bathrooms',
@@ -321,6 +322,7 @@ class Ad extends Model implements HasMedia
             'type_id' => $this->type_id,
             'quarter_id' => $this->quarter_id,
             'transaction_type' => $this->transaction_type?->value,
+            'price_period' => $this->price_period,
 
             // Pour la recherche géographique (optionnel)
             '_geo' => $this->location ? [
