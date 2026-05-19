@@ -136,6 +136,32 @@ describe('Clerk Exchange – authentication flows', function (): void {
         $response->assertUnauthorized();
     });
 
+    it('returns 403 when admin exchanges with login_context owner', function (): void {
+        User::factory()->admin()->create([
+            'clerk_id' => 'clerk_admin_owner',
+            'email' => 'admin-owner@example.com',
+        ]);
+
+        $this->mock(ClerkJwtService::class)
+            ->shouldReceive('verifyAndFetchUser')
+            ->once()
+            ->andReturn(fakeClerkPayload([
+                'id' => 'clerk_admin_owner',
+                'email_addresses' => [
+                    ['id' => 'iea_1', 'email_address' => 'admin-owner@example.com'],
+                ],
+            ]));
+
+        $response = $this->withToken('fake-clerk-jwt')
+            ->postJson('/api/v1/auth/clerk/exchange', [
+                'login_context' => 'owner',
+            ]);
+
+        $response->assertForbidden()
+            ->assertJsonPath('code', 'ROLE_CONTEXT_MISMATCH')
+            ->assertJsonPath('message', 'Utilisez le panneau administrateur.');
+    });
+
     it('returns 403 with email hint when the Laravel account is not verified', function (): void {
         $user = User::factory()->unverified()->create([
             'clerk_id' => 'clerk_abc123',

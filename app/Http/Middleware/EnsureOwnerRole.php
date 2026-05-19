@@ -15,7 +15,7 @@ use Symfony\Component\HttpFoundation\Response;
  * Complements the existing AdPolicy checks with an explicit HTTP-layer rejection
  * so that even if a policy is misconfigured, customers cannot mutate owner resources.
  *
- * Allowed roles: AGENT, ADMIN
+ * Allowed roles: AGENT only (platform admins use Filament /admin).
  */
 final class EnsureOwnerRole
 {
@@ -24,9 +24,11 @@ final class EnsureOwnerRole
         /** @var User|null $user */
         $user = $request->user();
 
-        if (!$user || (!$user->isAgent() && !$user->isAdmin())) {
+        if (!$user || !$user->mayAccessOwnerPanel()) {
             return response()->json([
-                'message' => 'Cette action est réservée aux propriétaires et agences.',
+                'message' => $user?->isAdmin()
+                    ? 'Utilisez le panneau administrateur.'
+                    : 'Cette action est réservée aux propriétaires et agences.',
             ], 403);
         }
 

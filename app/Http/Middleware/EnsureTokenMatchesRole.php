@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
-use App\Enums\UserRole;
 use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
@@ -33,7 +32,7 @@ final class EnsureTokenMatchesRole
 
         if ($token instanceof PersonalAccessToken) {
             $hasWildcard = $token->can('*');
-            $hasRole = $token->can("role:{$requiredRole}") || $token->can('role:admin');
+            $hasRole = $token->can("role:{$requiredRole}");
 
             // Instrumentation (OWASP A01): wildcard tokens bypass role
             // checks. We keep accepting them to avoid breaking active
@@ -67,9 +66,11 @@ final class EnsureTokenMatchesRole
         // source for non-PAT auth flows.
         if ($user instanceof User) {
             $userRole = $user->role->value;
-            if ($userRole !== $requiredRole && $userRole !== UserRole::ADMIN->value) {
+            if ($userRole !== $requiredRole) {
                 return response()->json([
-                    'message' => 'Rôle utilisateur non autorisé pour ce contexte.',
+                    'message' => $user->isAdmin() && $requiredRole === 'agent'
+                        ? 'Utilisez le panneau administrateur.'
+                        : 'Rôle utilisateur non autorisé pour ce contexte.',
                     'code' => 'USER_ROLE_MISMATCH',
                 ], 403);
             }

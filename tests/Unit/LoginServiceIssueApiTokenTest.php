@@ -28,14 +28,11 @@ it('issues an owner-scoped token for an agent in owner context', function (): vo
     expect($token->accessToken->abilities)->toContain('role:agent');
 });
 
-it('issues an owner-scoped token for admin in owner context', function (): void {
+it('rejects admin in owner context', function (): void {
     $user = User::factory()->admin()->create();
 
-    $token = app(LoginService::class)->issueApiTokenForLoginContext($user, 'owner');
-
-    expect($token->accessToken->name)->toStartWith('owner_token_');
-    expect($token->accessToken->abilities)->toContain('role:admin');
-});
+    app(LoginService::class)->issueApiTokenForLoginContext($user, 'owner');
+})->throws(RoleContextMismatchException::class, 'Utilisez le panneau administrateur.');
 
 it('issues a client-scoped token for admin in client context', function (): void {
     $user = User::factory()->admin()->create();

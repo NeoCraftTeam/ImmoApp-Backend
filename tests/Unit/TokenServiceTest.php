@@ -34,13 +34,13 @@ it('creates an owner-prefixed token for an agent', function (): void {
     expect($token->accessToken->abilities)->toContain('role:agent', 'api:access');
 });
 
-it('creates an owner-prefixed token for an admin', function (): void {
+it('creates a client-prefixed token for an admin', function (): void {
     $user = User::factory()->admin()->create();
     $service = app(TokenService::class);
 
     $token = $service->createForUser($user, 'registration');
 
-    expect($token->accessToken->name)->toStartWith('owner_registration_');
+    expect($token->accessToken->name)->toStartWith('client_registration_');
     expect($token->accessToken->abilities)->toContain('role:admin', 'api:access');
 });
 

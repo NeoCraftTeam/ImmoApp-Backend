@@ -27,7 +27,7 @@ final class TokenService
      */
     public function createForUser(User $user, string $suffix, ?string $prefixOverride = null): NewAccessToken
     {
-        $prefix = $prefixOverride ?? ($user->isAgent() || $user->isAdmin() ? 'owner' : 'client');
+        $prefix = $prefixOverride ?? $user->sanctumSessionPrefix();
         $roleAbility = 'role:'.$user->role->value;
 
         $expirationMinutes = (int) config('sanctum.expiration', 43200);

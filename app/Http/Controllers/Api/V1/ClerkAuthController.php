@@ -6,11 +6,13 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Enums\UserRole;
 use App\Enums\UserType;
+use App\Exceptions\RoleContextMismatchException;
 use App\Http\Requests\Api\V1\ClerkExchangeRequest;
 use App\Http\Resources\UserResource;
 use App\Mail\VerificationCodeMail;
 use App\Models\User;
 use App\Services\ClerkJwtService;
+use App\Services\LoginService;
 use App\Services\TokenService;
 use App\Services\UserWelcomeService;
 use App\Services\UtmAttributionService;
@@ -23,10 +25,14 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
+use Laravel\Sanctum\NewAccessToken;
 
 final readonly class ClerkAuthController
 {
-    public function __construct(private TokenService $tokenService) {}
+    public function __construct(
+        private TokenService $tokenService,
+        private LoginService $loginService,
+    ) {}
 
     /**
      * @OA\Post(
@@ -85,8 +91,14 @@ final readonly class ClerkAuthController
                 $user->update(['clerk_id' => $clerkId]);
             }
 
-            $prefix = $user->isAgent() || $user->isAdmin() ? 'owner' : 'client';
-            $token = $this->tokenService->rotateForUser($user, 'clerk', "{$prefix}_clerk_%", $prefix);
+            try {
+                $token = $this->rotateClerkToken($user, $request->input('login_context'));
+            } catch (RoleContextMismatchException $e) {
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'code' => 'ROLE_CONTEXT_MISMATCH',
+                ], 403);
+            }
 
             auth()->setUser($user);
 
@@ -234,8 +246,14 @@ final readonly class ClerkAuthController
             Cache::forget('clerk_verified_'.$clerkId);
             Cache::forget('clerk_pending_'.$clerkId);
 
-            $prefix = $user->isAgent() || $user->isAdmin() ? 'owner' : 'client';
-            $token = $this->tokenService->rotateForUser($user, 'clerk', "{$prefix}_clerk_%", $prefix);
+            try {
+                $token = $this->rotateClerkToken($user, $request->input('login_context'));
+            } catch (RoleContextMismatchException $e) {
+                return response()->json([
+                    'message' => $e->getMessage(),
+                    'code' => 'ROLE_CONTEXT_MISMATCH',
+                ], 403);
+            }
 
             auth()->setUser($user);
 
@@ -383,8 +401,14 @@ final readonly class ClerkAuthController
         Cache::forget('clerk_verified_'.$clerkId);
         Cache::forget('clerk_pending_'.$clerkId);
 
-        $prefix = $user->isAgent() || $user->isAdmin() ? 'owner' : 'client';
-        $token = $this->tokenService->rotateForUser($user, 'clerk', "{$prefix}_clerk_%", $prefix);
+        try {
+            $token = $this->rotateClerkToken($user, $request->input('login_context'));
+        } catch (RoleContextMismatchException $e) {
+            return response()->json([
+                'message' => $e->getMessage(),
+                'code' => 'ROLE_CONTEXT_MISMATCH',
+            ], 403);
+        }
 
         auth()->setUser($user);
 
@@ -398,6 +422,20 @@ final readonly class ClerkAuthController
             'user' => new UserResource($user),
             'panel_sso_url' => $this->buildPanelSsoUrl($user),
         ], $isNew ? 201 : 200);
+    }
+
+    /**
+     * @throws RoleContextMismatchException
+     */
+    private function rotateClerkToken(User $user, ?string $loginContext): NewAccessToken
+    {
+        if ($loginContext !== null) {
+            $this->loginService->assertRoleContext($user, $loginContext);
+        }
+
+        $prefix = $user->sanctumSessionPrefix();
+
+        return $this->tokenService->rotateForUser($user, 'clerk', "{$prefix}_clerk_%", $prefix);
     }
 
     /**

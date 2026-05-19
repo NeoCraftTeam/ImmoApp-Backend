@@ -111,7 +111,7 @@ it('B5: middleware rejects a non-PAT user whose role does not match (TransientTo
     expect((string) $response->getContent())->toContain('USER_ROLE_MISMATCH');
 });
 
-it('B5: middleware allows admin via User-role fallback for any required role', function (): void {
+it('B5: middleware rejects admin via User-role fallback on owner token routes', function (): void {
     $admin = User::factory()->create(['role' => UserRole::ADMIN]);
     $admin->setRelation('currentAccessToken', new TransientToken);
 
@@ -121,7 +121,8 @@ it('B5: middleware allows admin via User-role fallback for any required role', f
     $middleware = app(EnsureTokenMatchesRole::class);
     $response = $middleware->handle($request, fn ($r) => response('ok', 200), 'agent');
 
-    expect($response->getStatusCode())->toBe(200);
+    expect($response->getStatusCode())->toBe(403);
+    expect((string) $response->getContent())->toContain('panneau administrateur');
 });
 
 it('B5: middleware allows matching role via User-role fallback', function (): void {
