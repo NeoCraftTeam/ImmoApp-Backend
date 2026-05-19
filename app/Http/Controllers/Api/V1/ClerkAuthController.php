@@ -83,7 +83,7 @@ final readonly class ClerkAuthController
                     'message' => 'Veuillez vérifier votre adresse email avant de vous connecter.',
                     'email_verification_required' => true,
                     'email' => $user->email,
-                    'role' => $user->role?->value,
+                    'role' => $user->role->value,
                 ], 403);
             }
 
@@ -235,7 +235,7 @@ final readonly class ClerkAuthController
                     'message' => 'Veuillez vérifier votre adresse email avant de vous connecter.',
                     'email_verification_required' => true,
                     'email' => $user->email,
-                    'role' => $user->role?->value,
+                    'role' => $user->role->value,
                 ], 403);
             }
 
