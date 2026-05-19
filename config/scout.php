@@ -149,6 +149,7 @@ return [
                     'type_id',
                     'quarter_id',
                     'transaction_type',
+                    'price_period',
                     'bedrooms',
                     'bathrooms',
                     'price',

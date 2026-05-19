@@ -30,6 +30,7 @@ final class AdDraftEditController
         'description' => ['sometimes', 'nullable', 'string'],
         'adresse' => ['sometimes', 'nullable', 'string', 'max:500'],
         'price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+        'price_period' => ['sometimes', 'nullable', 'string', 'in:mois,jour'],
         'surface_area' => ['sometimes', 'nullable', 'numeric', 'min:0'],
         'bedrooms' => ['sometimes', 'nullable', 'integer', 'min:0'],
         'bathrooms' => ['sometimes', 'nullable', 'integer', 'min:0'],
