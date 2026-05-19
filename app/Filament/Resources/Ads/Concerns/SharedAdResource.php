@@ -544,22 +544,15 @@ trait SharedAdResource
                         ->size('lg')
                         ->columnSpanFull(),
                     TextEntry::make('price')
-                        ->money('xaf')
-                        ->label(fn ($record) => match ($record?->price_period) {
-                            'jour' => 'Prix par jour',
-                            default => 'Prix par mois',
-                        })
+                        ->label('Prix')
                         ->icon('heroicon-o-banknotes')
                         ->iconColor('success')
                         ->weight('bold')
                         ->size('lg')
-                        ->suffixAction(
-                            \Filament\Infolists\Components\Actions\Action::make('price_period_badge')
-                                ->label(fn ($record) => $record?->price_period === 'jour' ? '/jour' : '/mois')
-                                ->badge()
-                                ->color(fn ($record) => $record?->price_period === 'jour' ? 'warning' : 'primary')
-                                ->disabled()
-                        ),
+                        ->formatStateUsing(fn ($state, $record): string => number_format((float) $state, 0, ',', ' ').' XAF'.match ($record?->price_period) {
+                            'jour' => ' /jour',
+                            default => ' /mois',
+                        }),
                     TextEntry::make('status')
                         ->label('Statut')
                         ->badge()
