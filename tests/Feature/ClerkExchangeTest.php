@@ -157,9 +157,9 @@ describe('Clerk Exchange – authentication flows', function (): void {
                 'login_context' => 'owner',
             ]);
 
-        $response->assertForbidden()
-            ->assertJsonPath('code', 'ROLE_CONTEXT_MISMATCH')
-            ->assertJsonPath('message', 'Utilisez le panneau administrateur.');
+        $response->assertUnauthorized()
+            ->assertJsonPath('code', 'PANEL_ACCESS_DENIED')
+            ->assertJsonPath('message', 'Identifiants incorrects ou accès non autorisé pour cette interface.');
     });
 
     it('returns 403 with email hint when the Laravel account is not verified', function (): void {

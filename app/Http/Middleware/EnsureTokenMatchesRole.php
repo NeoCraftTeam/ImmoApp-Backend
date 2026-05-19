@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Models\User;
+use App\Support\AuthError;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -49,10 +50,7 @@ final class EnsureTokenMatchesRole
             }
 
             if (!$hasWildcard && !$hasRole) {
-                return response()->json([
-                    'message' => 'Token non autorisé pour ce contexte.',
-                    'code' => 'TOKEN_ROLE_MISMATCH',
-                ], 403);
+                return AuthError::tokenContextDenied(code: AuthError::CODE_TOKEN_ROLE_MISMATCH);
             }
 
             return $next($request);
@@ -67,12 +65,7 @@ final class EnsureTokenMatchesRole
         if ($user instanceof User) {
             $userRole = $user->role->value;
             if ($userRole !== $requiredRole) {
-                return response()->json([
-                    'message' => $user->isAdmin() && $requiredRole === 'agent'
-                        ? 'Utilisez le panneau administrateur.'
-                        : 'Rôle utilisateur non autorisé pour ce contexte.',
-                    'code' => 'USER_ROLE_MISMATCH',
-                ], 403);
+                return AuthError::panelAccessDenied(code: AuthError::CODE_USER_ROLE_MISMATCH);
             }
         }
 

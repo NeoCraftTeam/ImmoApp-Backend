@@ -11,6 +11,7 @@ use App\Http\Requests\LoginRequest;
 use App\Http\Resources\UserResource;
 use App\Services\LoginService;
 use App\Services\TokenService;
+use App\Support\AuthError;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -67,9 +68,7 @@ final readonly class AuthController
             ]);
 
         } catch (AuthenticationException) {
-            return response()->json([
-                'message' => 'Identifiants invalides.',
-            ], 401);
+            return AuthError::loginFailure();
 
         } catch (EmailNotVerifiedException $e) {
             return response()->json([
@@ -85,10 +84,7 @@ final readonly class AuthController
             ], 403);
 
         } catch (RoleContextMismatchException $e) {
-            return response()->json([
-                'message' => $e->getMessage(),
-                'code' => 'ROLE_CONTEXT_MISMATCH',
-            ], 403);
+            return AuthError::loginPanelMismatch(code: $e->authCode);
 
         } catch (Throwable $e) {
             Log::error('Login error', [

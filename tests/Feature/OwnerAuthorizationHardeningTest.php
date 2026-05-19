@@ -122,7 +122,9 @@ it('B5: middleware rejects admin via User-role fallback on owner token routes', 
     $response = $middleware->handle($request, fn ($r) => response('ok', 200), 'agent');
 
     expect($response->getStatusCode())->toBe(403);
-    expect((string) $response->getContent())->toContain('panneau administrateur');
+    expect((string) $response->getContent())->toContain('USER_ROLE_MISMATCH')
+        ->and((string) $response->getContent())->toContain("Cette interface n'est pas disponible pour ce compte.")
+        ->and((string) $response->getContent())->not->toContain('panneau administrateur');
 });
 
 it('B5: middleware allows matching role via User-role fallback', function (): void {

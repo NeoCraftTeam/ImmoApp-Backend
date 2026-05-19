@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Models\User;
+use App\Support\AuthError;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -25,11 +26,7 @@ final class EnsureOwnerRole
         $user = $request->user();
 
         if (!$user || !$user->mayAccessOwnerPanel()) {
-            return response()->json([
-                'message' => $user?->isAdmin()
-                    ? 'Utilisez le panneau administrateur.'
-                    : 'Cette action est réservée aux propriétaires et agences.',
-            ], 403);
+            return AuthError::panelAccessDenied();
         }
 
         return $next($request);
