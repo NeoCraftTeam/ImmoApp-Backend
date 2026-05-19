@@ -78,7 +78,7 @@ it('returns 401 for invalid credentials', function (): void {
     ]);
 
     $response->assertUnauthorized();
-    expect($response->json('message'))->toBe('Identifiants invalides.');
+    expect($response->json('message'))->toBe('Identifiants incorrects ou accès non autorisé pour cette interface.');
 });
 
 it('returns 403 for inactive account', function (): void {
@@ -110,7 +110,7 @@ it('returns 403 for unverified email', function (): void {
     $response->assertForbidden();
 });
 
-it('returns 403 for role context mismatch — customer as owner', function (): void {
+it('returns 401 for role context mismatch — customer as owner', function (): void {
     $user = createVerifiedUser('customer');
 
     $response = $this->postJson('/api/v1/auth/login', [
@@ -119,11 +119,12 @@ it('returns 403 for role context mismatch — customer as owner', function (): v
         'login_context' => 'owner',
     ]);
 
-    $response->assertForbidden();
-    expect($response->json('code'))->toBe('ROLE_CONTEXT_MISMATCH');
+    $response->assertUnauthorized()
+        ->assertJsonPath('code', 'PANEL_ACCESS_DENIED')
+        ->assertJsonPath('message', 'Identifiants incorrects ou accès non autorisé pour cette interface.');
 });
 
-it('returns 403 for role context mismatch — agent as client', function (): void {
+it('returns 401 for role context mismatch — agent as client', function (): void {
     $user = createVerifiedUser('agent');
 
     $response = $this->postJson('/api/v1/auth/login', [
@@ -132,8 +133,8 @@ it('returns 403 for role context mismatch — agent as client', function (): voi
         'login_context' => 'client',
     ]);
 
-    $response->assertForbidden();
-    expect($response->json('code'))->toBe('ROLE_CONTEXT_MISMATCH');
+    $response->assertUnauthorized()
+        ->assertJsonPath('code', 'PANEL_ACCESS_DENIED');
 });
 
 it('returns 429 when rate limited', function (): void {

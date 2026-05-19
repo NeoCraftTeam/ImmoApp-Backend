@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Exceptions\RoleContextMismatchException;
 use App\Models\User;
 use App\Services\LoginService;
+use App\Support\AuthError;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -32,7 +33,7 @@ it('rejects admin in owner context', function (): void {
     $user = User::factory()->admin()->create();
 
     app(LoginService::class)->issueApiTokenForLoginContext($user, 'owner');
-})->throws(RoleContextMismatchException::class, 'Utilisez le panneau administrateur.');
+})->throws(RoleContextMismatchException::class, AuthError::LOGIN_FAILURE_MESSAGE);
 
 it('issues a client-scoped token for admin in client context', function (): void {
     $user = User::factory()->admin()->create();
@@ -46,13 +47,13 @@ it('rejects customer in owner context', function (): void {
     $user = User::factory()->customers()->create();
 
     app(LoginService::class)->issueApiTokenForLoginContext($user, 'owner');
-})->throws(RoleContextMismatchException::class, 'Accès réservé aux propriétaires et agences.');
+})->throws(RoleContextMismatchException::class, AuthError::LOGIN_FAILURE_MESSAGE);
 
 it('rejects agent in client context', function (): void {
     $user = User::factory()->agents()->create();
 
     app(LoginService::class)->issueApiTokenForLoginContext($user, 'client');
-})->throws(RoleContextMismatchException::class, 'Accès réservé aux clients. Utilisez le panneau propriétaire.');
+})->throws(RoleContextMismatchException::class, AuthError::LOGIN_FAILURE_MESSAGE);
 
 it('revokes prior tokens in the same context prefix when issuing again', function (): void {
     $user = User::factory()->customers()->create();

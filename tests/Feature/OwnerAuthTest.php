@@ -43,9 +43,9 @@ test('admin cannot login with login_context=owner', function (): void {
         'login_context' => 'owner',
     ]);
 
-    $response->assertForbidden()
-        ->assertJsonPath('code', 'ROLE_CONTEXT_MISMATCH')
-        ->assertJsonPath('message', 'Utilisez le panneau administrateur.');
+    $response->assertUnauthorized()
+        ->assertJsonPath('code', 'PANEL_ACCESS_DENIED')
+        ->assertJsonPath('message', 'Identifiants incorrects ou accès non autorisé pour cette interface.');
 });
 
 test('customer cannot login with login_context=owner', function (): void {
@@ -60,8 +60,8 @@ test('customer cannot login with login_context=owner', function (): void {
         'login_context' => 'owner',
     ]);
 
-    $response->assertForbidden()
-        ->assertJsonPath('code', 'ROLE_CONTEXT_MISMATCH');
+    $response->assertUnauthorized()
+        ->assertJsonPath('code', 'PANEL_ACCESS_DENIED');
 });
 
 test('agent cannot login with login_context=client', function (): void {
@@ -76,8 +76,8 @@ test('agent cannot login with login_context=client', function (): void {
         'login_context' => 'client',
     ]);
 
-    $response->assertForbidden()
-        ->assertJsonPath('code', 'ROLE_CONTEXT_MISMATCH');
+    $response->assertUnauthorized()
+        ->assertJsonPath('code', 'PANEL_ACCESS_DENIED');
 });
 
 test('customer can login with login_context=client', function (): void {

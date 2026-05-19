@@ -13,6 +13,7 @@ use App\Mail\NewDeviceSignInMail;
 use App\Mail\NewLocationSignInMail;
 use App\Models\LoginHistory;
 use App\Models\User;
+use App\Support\AuthError;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Support\Facades\Hash;
@@ -62,7 +63,7 @@ final readonly class LoginService
                 'ip' => $request->ip(),
                 'email' => $email,
             ]);
-            throw new AuthenticationException('Identifiants invalides.');
+            throw new AuthenticationException(AuthError::LOGIN_FAILURE_MESSAGE);
         }
 
         $user = User::where('email', $email)->first();
@@ -77,7 +78,7 @@ final readonly class LoginService
                 'timestamp' => now(),
             ]);
 
-            throw new AuthenticationException('Identifiants invalides.');
+            throw new AuthenticationException(AuthError::LOGIN_FAILURE_MESSAGE);
         }
 
         if (isset($user->is_active) && !$user->is_active) {
@@ -172,15 +173,11 @@ final readonly class LoginService
     private function enforceRoleContext(User $user, string $loginContext): void
     {
         if ($loginContext === 'owner' && !$user->mayAccessOwnerPanel()) {
-            throw new RoleContextMismatchException(
-                $user->isAdmin()
-                    ? 'Utilisez le panneau administrateur.'
-                    : 'Accès réservé aux propriétaires et agences.',
-            );
+            throw new RoleContextMismatchException(AuthError::CODE_PANEL_ACCESS_DENIED);
         }
 
         if ($loginContext === 'client' && !$user->isCustomer() && !$user->isAdmin()) {
-            throw new RoleContextMismatchException('Accès réservé aux clients. Utilisez le panneau propriétaire.');
+            throw new RoleContextMismatchException(AuthError::CODE_PANEL_ACCESS_DENIED);
         }
     }
 

@@ -10,6 +10,7 @@ use App\Mail\PasskeyNotificationMail;
 use App\Models\User;
 use App\Services\LoginService;
 use App\Support\ApiResponse;
+use App\Support\AuthError;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Contracts\Support\Responsable;
 use Illuminate\Http\JsonResponse;
@@ -142,10 +143,7 @@ final readonly class WebAuthnApiController
             try {
                 $newToken = $this->loginService->issueApiTokenForLoginContext($user, $loginContext);
             } catch (RoleContextMismatchException $e) {
-                return response()->json([
-                    'message' => $e->getMessage(),
-                    'code' => 'ROLE_CONTEXT_MISMATCH',
-                ], 403);
+                return AuthError::loginPanelMismatch(code: $e->authCode);
             }
 
             // Set the verified user on the guard so $request->user() is populated

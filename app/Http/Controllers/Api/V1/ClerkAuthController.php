@@ -16,6 +16,7 @@ use App\Services\LoginService;
 use App\Services\TokenService;
 use App\Services\UserWelcomeService;
 use App\Services\UtmAttributionService;
+use App\Support\AuthError;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -94,10 +95,7 @@ final readonly class ClerkAuthController
             try {
                 $token = $this->rotateClerkToken($user, $request->input('login_context'));
             } catch (RoleContextMismatchException $e) {
-                return response()->json([
-                    'message' => $e->getMessage(),
-                    'code' => 'ROLE_CONTEXT_MISMATCH',
-                ], 403);
+                return AuthError::loginPanelMismatch(code: $e->authCode);
             }
 
             auth()->setUser($user);
@@ -249,10 +247,7 @@ final readonly class ClerkAuthController
             try {
                 $token = $this->rotateClerkToken($user, $request->input('login_context'));
             } catch (RoleContextMismatchException $e) {
-                return response()->json([
-                    'message' => $e->getMessage(),
-                    'code' => 'ROLE_CONTEXT_MISMATCH',
-                ], 403);
+                return AuthError::loginPanelMismatch(code: $e->authCode);
             }
 
             auth()->setUser($user);
@@ -404,10 +399,7 @@ final readonly class ClerkAuthController
         try {
             $token = $this->rotateClerkToken($user, $request->input('login_context'));
         } catch (RoleContextMismatchException $e) {
-            return response()->json([
-                'message' => $e->getMessage(),
-                'code' => 'ROLE_CONTEXT_MISMATCH',
-            ], 403);
+            return AuthError::loginPanelMismatch(code: $e->authCode);
         }
 
         auth()->setUser($user);

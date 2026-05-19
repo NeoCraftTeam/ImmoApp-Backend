@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\AuthError;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -26,13 +27,7 @@ class EnsureCorrectRoleForPanel
 
         if ($panel === 'owner') {
             if (!$user->mayAccessOwnerPanel()) {
-                return response()->json([
-                    'message' => $user->isAdmin()
-                        ? 'Utilisez le panneau administrateur.'
-                        : 'Accès refusé. Cet espace est réservé aux bailleurs.',
-                    'code' => $user->isAdmin() ? 'ADMIN_PANEL_REQUIRED' : 'OWNER_ACCESS_REQUIRED',
-                    'role' => $user->role,
-                ], 403);
+                return AuthError::panelAccessDenied();
             }
         } elseif ($panel === 'customer') {
             // Customers or Guests can access customer panel
