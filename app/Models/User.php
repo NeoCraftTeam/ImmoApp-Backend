@@ -329,6 +329,22 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
+     * Integrated Next.js owner panel (/owner/*) — AGENT only; admins use Filament.
+     */
+    public function mayAccessOwnerPanel(): bool
+    {
+        return $this->isAgent();
+    }
+
+    /**
+     * Sanctum token name prefix for API session isolation (owner vs client).
+     */
+    public function sanctumSessionPrefix(): string
+    {
+        return $this->isAgent() ? 'owner' : 'client';
+    }
+
+    /**
      * Returns true if the user holds the Admin role.
      */
     public function isAdmin(): bool

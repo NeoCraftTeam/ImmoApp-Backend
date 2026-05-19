@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Enums\UserRole;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -26,11 +25,12 @@ class EnsureCorrectRoleForPanel
         }
 
         if ($panel === 'owner') {
-            // Only AGENT or ADMIN can access owner panel
-            if ($user->role !== UserRole::AGENT && $user->role !== UserRole::ADMIN) {
+            if (!$user->mayAccessOwnerPanel()) {
                 return response()->json([
-                    'message' => 'Accès refusé. Cet espace est réservé aux bailleurs.',
-                    'code' => 'OWNER_ACCESS_REQUIRED',
+                    'message' => $user->isAdmin()
+                        ? 'Utilisez le panneau administrateur.'
+                        : 'Accès refusé. Cet espace est réservé aux bailleurs.',
+                    'code' => $user->isAdmin() ? 'ADMIN_PANEL_REQUIRED' : 'OWNER_ACCESS_REQUIRED',
                     'role' => $user->role,
                 ], 403);
             }

@@ -129,9 +129,17 @@ final readonly class LoginService
      */
     public function issueApiTokenForLoginContext(User $user, string $loginContext): NewAccessToken
     {
-        $this->enforceRoleContext($user, $loginContext);
+        $this->assertRoleContext($user, $loginContext);
 
         return $this->rotateApiTokenForLoginContext($user, $loginContext);
+    }
+
+    /**
+     * @throws RoleContextMismatchException
+     */
+    public function assertRoleContext(User $user, string $loginContext): void
+    {
+        $this->enforceRoleContext($user, $loginContext);
     }
 
     private function rotateApiTokenForLoginContext(User $user, string $loginContext): NewAccessToken
@@ -163,8 +171,12 @@ final readonly class LoginService
 
     private function enforceRoleContext(User $user, string $loginContext): void
     {
-        if ($loginContext === 'owner' && !$user->isAgent() && !$user->isAdmin()) {
-            throw new RoleContextMismatchException('Accès réservé aux propriétaires et agences.');
+        if ($loginContext === 'owner' && !$user->mayAccessOwnerPanel()) {
+            throw new RoleContextMismatchException(
+                $user->isAdmin()
+                    ? 'Utilisez le panneau administrateur.'
+                    : 'Accès réservé aux propriétaires et agences.',
+            );
         }
 
         if ($loginContext === 'client' && !$user->isCustomer() && !$user->isAdmin()) {

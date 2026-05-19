@@ -31,6 +31,23 @@ test('agent can login with login_context=owner', function (): void {
         ->assertJsonPath('role', 'agent');
 });
 
+test('admin cannot login with login_context=owner', function (): void {
+    User::factory()->admin()->create([
+        'email' => 'admin@test.com',
+        'password' => bcrypt('password'),
+    ]);
+
+    $response = $this->postJson('/api/v1/auth/login', [
+        'email' => 'admin@test.com',
+        'password' => 'password',
+        'login_context' => 'owner',
+    ]);
+
+    $response->assertForbidden()
+        ->assertJsonPath('code', 'ROLE_CONTEXT_MISMATCH')
+        ->assertJsonPath('message', 'Utilisez le panneau administrateur.');
+});
+
 test('customer cannot login with login_context=owner', function (): void {
     User::factory()->customers()->create([
         'email' => 'client@test.com',
