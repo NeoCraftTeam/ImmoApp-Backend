@@ -100,6 +100,38 @@ vendor/bin/rector process --dry-run
 ## Marketing / contenu social (docs)
 
 - **Calendrier idées posts (Facebook, Instagram, X, TikTok):** [`docs/marketing/calendrier-publications-virales-keyhome.md`](docs/marketing/calendrier-publications-virales-keyhome.md) — liste d’idées avec cases `- [ ]` pour le suivi ; mis à jour manuellement par l’équipe.
+- **Plan visuels + légendes :** [`docs/marketing/plan-contenus-visuels-keyhome.md`](docs/marketing/plan-contenus-visuels-keyhome.md), [`docs/marketing/legendes-reseaux-sociaux-keyhome.md`](docs/marketing/legendes-reseaux-sociaux-keyhome.md). Assets générés : `assets/social/`, `assets/keyhome-*.png` (hors git par défaut — regénérer ou versionner si besoin campagne).
+
+### Préférences affiches sociales (génération IA / design)
+
+**Règles communes (toutes affiches)**
+- Plateforme **web uniquement** : MacBook / navigateur `keyhome.app` — **pas de mockups smartphone**.
+- **Logo sur affiches** : **pas de fond coloré** — **juste la clé** (silhouette blanche ; anneaux + pastille optionnels si lisibles, mais **sans** bloc/carré rose `#F6475F` derrière). Fond du logo **transparent**, posé sur le dégradé de l’affiche. Ne pas coller le fichier « app icon » avec fond plein. Réf. forme : `assets/KeyHome_*.png` (extraire la clé sans le fond).
+- Texte en **français** ; légendes longues souvent en caption réseau (pas sur le visuel).
+- Couleur marque client : `#F6475F` ; panneau bailleur : `#0D9488` (affiches bailleur uniquement).
+
+**Style A — Affiche ville / recherche (préférence actuelle, ex. Douala)**
+
+| Paramètre | Valeur |
+|-----------|--------|
+| **FORMAT** | 1080×1350 portrait |
+| **BACKGROUND** | Midnight `#141419` + halo radial crimson `#F6475F` doux |
+| **TYPO** | Titre ville en blanc oversized bold (ex. « Trouvez votre chez-vous à Douala ») ; sous-titre (ex. « Studios, appartements, villas — filtrés et vérifiés ») |
+| **VISUAL** | Split : gauche = intérieur moderne aspirational (éclairage chaud, plantes) ; droite = laptop/navigateur avec résultats keyhome.app et prix **FCFA** |
+| **ACCENT** | Grille de **3 miniatures** d’annonces flottantes en bas |
+| **CTA** | Texte : **« Rechercher maintenant — keyhome.app »** (une ligne ou texte + URL lisible) |
+| **TONE** | Fresh, modern, aspirational |
+| **Exemple fichier** | `assets/keyhome-poster-douala-1080x1350.png` — dupliquer le template en changeant la ville |
+
+**Style B — Flyer lancement / features (variante)**
+
+| Paramètre | Valeur |
+|-----------|--------|
+| **FORMAT** | 1080×1350 (ou 1080×1920 story) |
+| **BACKGROUND** | Option lumineuse : fond plein `#F6475F` (panel client) **ou** Style A midnight + glow |
+| **HEADLINE** | « Votre patrimoine immobilier en poche » |
+| **CTA v4** | Ligne texte **« Accéder à la plateforme »** + **bouton** pilule blanche **`keyhome.app`** (texte rose `#F6475F`) — ne pas inverser |
+| **Features** | Annonces vérifiées · Visites 3D · Location & Vente · Bailleurs certifiés — **sans** « Paiement Mobile Money » sur les visuels |
 
 ## Architecture
 
