@@ -352,7 +352,7 @@ final class PaymentController
      *     summary="Webhook passerelle de paiement",
      *     tags={"💰 Paiements"},
      *
-     *     @OA\Parameter(name="gateway", in="path", required=true, @OA\Schema(type="string", enum={"flutterwave"})),
+     *     @OA\Parameter(name="gateway", in="path", required=true, @OA\Schema(type="string", enum={"geniuspay", "flutterwave"})),
      *
      *     @OA\Response(response=200, description="Webhook traité"),
      *     @OA\Response(response=401, description="Signature invalide")
@@ -443,6 +443,10 @@ final class PaymentController
     {
         Log::info("--- WEBHOOK {$gateway} START ---");
 
+        if ($gateway === 'geniuspay') {
+            return $this->handleGeniusPayWebhook($request);
+        }
+
         $payload = $request->all();
         $headers = [
             'verif-hash' => (string) $request->header('verif-hash', ''),
@@ -450,7 +454,7 @@ final class PaymentController
             'flutterwave-signature' => (string) $request->header('flutterwave-signature', ''),
         ];
 
-        // 1. Verify signature synchronously — fast hash check, must reply to Flutterwave quickly.
+        // 1. Verify signature synchronously — fast hash check, must reply quickly.
         try {
             $data = $this->paymentService->processWebhook($payload, $headers, $gateway);
             $txRef = (string) ($data['tx_ref'] ?? '');
@@ -468,6 +472,49 @@ final class PaymentController
             ProcessFlutterwaveWebhookJob::dispatch(
                 $txRef,
                 $gateway,
+                (array) ($data['raw'] ?? []),
+                $request->header('X-Request-ID'),
+                $request->header('X-Correlation-ID'),
+            );
+        }
+
+        return response()->json(['status' => 'ok']);
+    }
+
+    private function handleGeniusPayWebhook(Request $request): JsonResponse
+    {
+        $rawPayload = (string) $request->getContent();
+        if ($rawPayload === '') {
+            return response()->json(['status' => 'error', 'message' => 'Missing payload'], 400);
+        }
+
+        /** @var array<string, mixed>|null $decoded */
+        $decoded = json_decode($rawPayload, true);
+        if (!is_array($decoded)) {
+            return response()->json(['status' => 'error', 'message' => 'Invalid JSON'], 400);
+        }
+
+        $headers = [
+            'X-Webhook-Signature' => (string) $request->header('X-Webhook-Signature', ''),
+            'X-Webhook-Timestamp' => (string) $request->header('X-Webhook-Timestamp', ''),
+            'X-Webhook-Event' => (string) $request->header('X-Webhook-Event', ''),
+        ];
+
+        try {
+            $data = $this->paymentService->processWebhook($decoded, $headers, 'geniuspay');
+            $txRef = (string) ($data['tx_ref'] ?? '');
+        } catch (InvalidWebhookSignatureException) {
+            return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
+        } catch (PaymentGatewayException|\Exception $e) {
+            Log::error('geniuspay webhook signature/parse error: '.$e->getMessage());
+
+            return response()->json(['status' => 'error'], 500);
+        }
+
+        if ($txRef !== '' && in_array((string) ($data['event'] ?? ''), ['payment.success'], true)) {
+            ProcessFlutterwaveWebhookJob::dispatch(
+                $txRef,
+                'geniuspay',
                 (array) ($data['raw'] ?? []),
                 $request->header('X-Request-ID'),
                 $request->header('X-Correlation-ID'),

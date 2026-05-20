@@ -20,23 +20,23 @@ enum PaymentMethod: string
             self::ORANGE_MONEY => 'Orange Money',
             self::MOBILE_MONEY => 'MTN Mobile Money',
             self::CARD => 'Carte bancaire',
-            self::FLUTTERWAVE => 'Autre · Flutterwave',
+            self::FLUTTERWAVE => 'Autre · Mobile Money',
         };
     }
 
     /**
      * Routing rule: which gateway processes this method.
      *
-     * Mobile Money & Orange Money → Flutterwave (CEMAC/UEMOA mobile rails).
+     * Mobile Money & Orange Money → GeniusPay (CEMAC mobile rails).
      * Carte bancaire → Stripe (PCI-compliant card processor, EUR billing).
-     * `flutterwave` (legacy umbrella) stays on Flutterwave.
+     * `flutterwave` (legacy umbrella) → GeniusPay hosted checkout.
      */
     public function gateway(): PaymentGateway
     {
         return match ($this) {
             self::ORANGE_MONEY,
             self::MOBILE_MONEY,
-            self::FLUTTERWAVE => PaymentGateway::Flutterwave,
+            self::FLUTTERWAVE => PaymentGateway::GeniusPay,
             self::CARD => PaymentGateway::Stripe,
         };
     }

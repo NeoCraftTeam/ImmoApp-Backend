@@ -14,21 +14,25 @@ use Illuminate\Support\Facades\Http;
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
-    config()->set('payment.default', 'flutterwave');
-    config()->set('payment.gateways.flutterwave.secret_key', 'FLWSECK_TEST-fake');
-    config()->set('payment.gateways.flutterwave.webhook_secret', 'test_webhook_secret_123');
-    config()->set('payment.gateways.flutterwave.base_url', 'https://api.flutterwave.com/v3');
-    config()->set('payment.gateways.flutterwave.redirect_url', 'https://test.app/payment/callback');
+    config()->set('payment.default', 'geniuspay');
+    config()->set('payment.gateways.geniuspay.api_key', 'pk_sandbox_test_fake');
+    config()->set('payment.gateways.geniuspay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.geniuspay.webhook_secret', 'whsec_sandbox_test_secret_123');
+    config()->set('payment.gateways.geniuspay.base_url', 'https://pay.genius.ci/api/v1/merchant');
+    config()->set('payment.gateways.geniuspay.redirect_url', 'https://test.app/payment/callback');
 });
 
 // ─── CRÉATION ────────────────────────────────────────────────────────────
 
 it('should create pending payment in database when payment is initiated', function (): void {
     Http::fake([
-        'api.flutterwave.com/*' => Http::response([
-            'status' => 'success',
-            'data' => ['link' => 'https://checkout.flutterwave.com/pay/test123'],
-        ], 200),
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'MTX-SVC-001',
+                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-SVC-001',
+            ],
+        ], 201),
     ]);
 
     $user = User::factory()->create();
@@ -46,17 +50,20 @@ it('should create pending payment in database when payment is initiated', functi
     $this->assertDatabaseHas('payments', [
         'user_id' => $user->id,
         'status' => PaymentStatus::PENDING->value,
-        'gateway' => 'flutterwave',
+        'gateway' => 'geniuspay',
         'amount' => 150000,
     ]);
 });
 
 it('should return payment link when payment is created', function (): void {
     Http::fake([
-        'api.flutterwave.com/*' => Http::response([
-            'status' => 'success',
-            'data' => ['link' => 'https://checkout.flutterwave.com/pay/test123'],
-        ], 200),
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'MTX-SVC-001',
+                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-SVC-001',
+            ],
+        ], 201),
     ]);
 
     $user = User::factory()->create();
@@ -69,16 +76,19 @@ it('should return payment link when payment is created', function (): void {
 
     expect($result)
         ->toHaveKey('link')
-        ->and($result['link'])->toContain('checkout.flutterwave.com');
+        ->and($result['link'])->toContain('pay.genius.ci/checkout');
 });
 
 it('should fire PaymentInitiated event when payment is created', function (): void {
     Event::fake();
     Http::fake([
-        'api.flutterwave.com/*' => Http::response([
-            'status' => 'success',
-            'data' => ['link' => 'https://checkout.flutterwave.com/pay/test123'],
-        ], 200),
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'MTX-SVC-001',
+                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-SVC-001',
+            ],
+        ], 201),
     ]);
 
     $user = User::factory()->create();
@@ -94,9 +104,9 @@ it('should fire PaymentInitiated event when payment is created', function (): vo
 
 it('should mark payment as failed when gateway throws exception', function (): void {
     Http::fake([
-        'api.flutterwave.com/*' => Http::response([
-            'status' => 'error',
-            'message' => 'Bad request',
+        'pay.genius.ci/*' => Http::response([
+            'success' => false,
+            'error' => ['message' => 'Bad request'],
         ], 400),
     ]);
 
@@ -124,26 +134,24 @@ it('should mark payment as failed when gateway throws exception', function (): v
 it('should mark payment as success when gateway confirms payment', function (): void {
     Event::fake();
 
-    Http::fake(function ($request) {
-        if (str_contains((string) $request->url(), 'verify_by_reference')) {
-            return Http::response([
-                'status' => 'success',
-                'data' => [
-                    'status' => 'successful',
-                    'amount' => 10000,
-                    'currency' => 'XAF',
-                ],
-            ], 200);
-        }
-
-        return Http::response(['status' => 'success', 'data' => ['link' => 'https://test']], 200);
-    });
+    Http::fake([
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'MTX-VERIFY-OK',
+                'status' => 'completed',
+                'amount' => 10000,
+                'currency' => 'XAF',
+            ],
+        ], 200),
+    ]);
 
     $user = User::factory()->create();
     $payment = Payment::factory()->pending()->create([
         'user_id' => $user->id,
-        'gateway' => 'flutterwave',
+        'gateway' => 'geniuspay',
         'amount' => 10000,
+        'gateway_response' => ['genius_reference' => 'MTX-VERIFY-OK'],
     ]);
 
     $service = app(PaymentService::class);
@@ -157,7 +165,7 @@ it('should return cached success without calling gateway when already paid', fun
     Http::preventStrayRequests();
 
     $payment = Payment::factory()->success()->create([
-        'gateway' => 'flutterwave',
+        'gateway' => 'geniuspay',
     ]);
 
     $service = app(PaymentService::class);
@@ -171,26 +179,35 @@ it('should fire PaymentSucceeded event only once for duplicate webhooks', functi
     Event::fake();
 
     $payment = Payment::factory()->pending()->create([
-        'gateway' => 'flutterwave',
+        'gateway' => 'geniuspay',
         'amount' => 150000,
     ]);
 
+    $secret = config('payment.gateways.geniuspay.webhook_secret');
+    $timestamp = time();
     $webhookPayload = [
-        'event' => 'charge.completed',
+        'event' => 'payment.success',
         'data' => [
-            'tx_ref' => $payment->transaction_id,
-            'status' => 'successful',
+            'reference' => 'MTX-DUP-001',
+            'status' => 'completed',
             'amount' => 150000,
             'currency' => 'XAF',
+            'metadata' => ['tx_ref' => $payment->transaction_id],
         ],
     ];
-    $headers = ['verif-hash' => config('payment.gateways.flutterwave.webhook_secret')];
+    $encoded = json_encode($webhookPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    $signature = hash_hmac('sha256', $timestamp.'.'.$encoded, (string) $secret);
+    $headers = [
+        'X-Webhook-Signature' => $signature,
+        'X-Webhook-Timestamp' => (string) $timestamp,
+        'X-Webhook-Event' => 'payment.success',
+    ];
 
     $service = app(PaymentService::class);
 
-    $service->processWebhook($webhookPayload, $headers, 'flutterwave');
-    $service->processWebhook($webhookPayload, $headers, 'flutterwave');
-    $service->processWebhook($webhookPayload, $headers, 'flutterwave');
+    $service->processWebhook($webhookPayload, $headers, 'geniuspay');
+    $service->processWebhook($webhookPayload, $headers, 'geniuspay');
+    $service->processWebhook($webhookPayload, $headers, 'geniuspay');
 
     Event::assertDispatchedTimes(PaymentSucceeded::class, 1);
 });
@@ -204,7 +221,7 @@ it('should prevent user from verifying another users payment', function (): void
     Payment::factory()->pending()->create([
         'transaction_id' => 'KH-NOTMINE',
         'user_id' => $owner->id,
-        'gateway' => 'flutterwave',
+        'gateway' => 'geniuspay',
     ]);
 
     $response = $this->actingAs($intruder)

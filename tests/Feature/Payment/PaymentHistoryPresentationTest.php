@@ -41,7 +41,7 @@ it('masks phone detail when kh_payment_trace is absent for mobile wallets', func
 
     Payment::factory()->success()->create([
         'user_id' => $user->id,
-        'gateway' => 'flutterwave',
+        'gateway' => 'geniuspay',
         'payment_method' => PaymentMethod::ORANGE_MONEY->value,
         'phone_number' => '+237 6 71 82 93 94',
         'gateway_response' => ['status' => 'ok'],
@@ -53,5 +53,5 @@ it('masks phone detail when kh_payment_trace is absent for mobile wallets', func
 
     $response->assertSuccessful();
     expect($response->json('data.0.payment_method_detail'))->toBe('··· 9394');
-    expect($response->json('data.0.gateway_label'))->toBe('Flutterwave');
+    expect($response->json('data.0.gateway_label'))->toBe('GeniusPay');
 });

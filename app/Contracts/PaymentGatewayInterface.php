@@ -13,7 +13,7 @@ interface PaymentGatewayInterface
      *     amount: float,
      *     currency: string,
      *     email: string,
-     *     phone: string,
+     *     phone?: string,
      *     name: string,
      *     tx_ref: string,
      *     redirect_url: string,
@@ -22,7 +22,7 @@ interface PaymentGatewayInterface
      *     description?: string,
      *     meta?: array<string, mixed>
      * } $payload
-     * @return array{link: string, tx_ref: string, status: string, gateway: string, stripe_flow?: string}
+     * @return array{link: string, tx_ref: string, status: string, gateway: string, stripe_flow?: string, raw?: array<string, mixed>}
      */
     public function initiate(array $payload): array;
 

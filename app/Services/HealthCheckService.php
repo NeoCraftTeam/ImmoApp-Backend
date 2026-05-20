@@ -11,12 +11,12 @@ use Illuminate\Support\Facades\Http;
 /**
  * Enterprise health-check service.
  *
- * Checks: Database · Redis · Queue · Storage · Meilisearch · Flutterwave
+ * Checks: Database · Redis · Queue · Storage · Meilisearch · GeniusPay
  *
  * Status tiers
  * ─────────────
  *  healthy   — all checks pass
- *  degraded  — non-critical check failed (Redis, Queue, Meilisearch, Flutterwave)
+ *  degraded  — non-critical check failed (Redis, Queue, Meilisearch, GeniusPay)
  *  unhealthy — critical check failed (Database or Storage)
  *
  * Results are cached for CACHE_TTL seconds so monitoring bursts don't
@@ -64,7 +64,7 @@ final readonly class HealthCheckService
             'queue' => $this->checkQueue(),
             'storage' => $this->checkStorage(),
             'meilisearch' => $this->checkMeilisearch(),
-            'flutterwave' => $this->checkFlutterwave(),
+            'geniuspay' => $this->checkGeniusPay(),
         ];
 
         $status = $this->resolveOverallStatus($checks);
@@ -253,21 +253,19 @@ final readonly class HealthCheckService
         }
     }
 
-    private function checkFlutterwave(): array
+    private function checkGeniusPay(): array
     {
         $start = hrtime(true);
+        $baseUrl = rtrim((string) config('payment.gateways.geniuspay.base_url', 'https://pay.genius.ci/api/v1/merchant'), '/');
 
         try {
-            // HEAD /v3/transaction/verify is lightweight and auth-gated
-            // (401 = reachable, 5xx = gateway problem, timeout = down)
             $response = Http::timeout(5)
                 ->connectTimeout(3)
-                ->withoutVerifying() // avoid cert chain issues in dev
-                ->head('https://api.flutterwave.com/v3/transactions/verify_by_reference');
+                ->withoutVerifying()
+                ->head($baseUrl.'/account');
 
             $latency = $this->ms($start);
 
-            // 401 Unauthorized confirms the API is alive (no key sent intentionally)
             if ($response->status() < 500) {
                 return [
                     'status' => 'healthy',

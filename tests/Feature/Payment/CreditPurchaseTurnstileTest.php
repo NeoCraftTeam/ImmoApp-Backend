@@ -14,10 +14,11 @@ use Illuminate\Support\Facades\Http;
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
-    config()->set('payment.default', 'flutterwave');
-    config()->set('payment.gateways.flutterwave.secret_key', 'FLWSECK_TEST-fake');
-    config()->set('payment.gateways.flutterwave.webhook_secret', 'test_webhook_secret_123');
-    config()->set('payment.gateways.flutterwave.redirect_url', 'https://test.app/payment/callback');
+    config()->set('payment.default', 'geniuspay');
+    config()->set('payment.gateways.geniuspay.api_key', 'pk_sandbox_test_fake');
+    config()->set('payment.gateways.geniuspay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.geniuspay.webhook_secret', 'whsec_sandbox_test_secret_123');
+    config()->set('payment.gateways.geniuspay.redirect_url', 'https://test.app/payment/callback');
 });
 
 it('rejects credit initiate without turnstile when turnstile is configured', function (): void {
@@ -39,10 +40,13 @@ it('allows credit initiate without turnstile when turnstile is not configured', 
     config()->set('services.turnstile.secret_key', '');
 
     Http::fake([
-        'api.flutterwave.com/*' => Http::response([
-            'status' => 'success',
-            'data' => ['link' => 'https://checkout.flutterwave.com/pay/test'],
-        ], 200),
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'MTX-TURNSTILE',
+                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-TURNSTILE',
+            ],
+        ], 201),
     ]);
 
     $package = PointPackage::factory()->create(['price' => 1000, 'is_active' => true]);
@@ -60,10 +64,13 @@ it('does not require turnstile for subscription initiate when turnstile is confi
     config()->set('services.turnstile.secret_key', 'real-test-secret-not-dummy-placeholder');
 
     Http::fake([
-        'api.flutterwave.com/*' => Http::response([
-            'status' => 'success',
-            'data' => ['link' => 'https://checkout.flutterwave.com/pay/test'],
-        ], 200),
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'MTX-TURNSTILE',
+                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-TURNSTILE',
+            ],
+        ], 201),
     ]);
 
     $agency = Agency::factory()->create();
@@ -93,10 +100,13 @@ it('passes credit initiate with valid turnstile token when turnstile is configur
 
     Http::fake([
         'challenges.cloudflare.com/*' => Http::response(['success' => true], 200),
-        'api.flutterwave.com/*' => Http::response([
-            'status' => 'success',
-            'data' => ['link' => 'https://checkout.flutterwave.com/pay/test'],
-        ], 200),
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'MTX-TURNSTILE',
+                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-TURNSTILE',
+            ],
+        ], 201),
     ]);
 
     $package = PointPackage::factory()->create(['price' => 1000, 'is_active' => true]);
@@ -128,10 +138,13 @@ it('allows credits purchase endpoint with valid turnstile token when configured'
 
     Http::fake([
         'challenges.cloudflare.com/*' => Http::response(['success' => true], 200),
-        'api.flutterwave.com/*' => Http::response([
-            'status' => 'success',
-            'data' => ['link' => 'https://checkout.flutterwave.com/pay/test'],
-        ], 200),
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'MTX-TURNSTILE',
+                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-TURNSTILE',
+            ],
+        ], 201),
     ]);
 
     $package = PointPackage::factory()->create(['price' => 1000, 'is_active' => true]);

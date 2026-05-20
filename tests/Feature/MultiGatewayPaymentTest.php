@@ -4,7 +4,7 @@ use App\Contracts\PaymentGatewayInterface;
 use App\Enums\PaymentGateway;
 use App\Exceptions\PaymentGatewayException;
 use App\Models\User;
-use App\Services\Payment\FlutterwavePaymentService;
+use App\Services\Payment\GeniusPayPaymentService;
 use App\Services\Payment\PaymentService;
 
 /**
@@ -27,16 +27,16 @@ function makeGatewayMock(string $name, array|PaymentGatewayException $initiateRe
 }
 
 it('uses primary gateway when it succeeds', function (): void {
-    $primaryMock = makeGatewayMock(PaymentGateway::Flutterwave->value, [
-        'link' => 'https://flutterwave.example/pay/abc',
+    $primaryMock = makeGatewayMock(PaymentGateway::GeniusPay->value, [
+        'link' => 'https://pay.genius.ci/checkout/MTX-001',
         'tx_ref' => 'KH-TEST001',
         'status' => 'pending',
-        'gateway' => 'flutterwave',
+        'gateway' => 'geniuspay',
     ]);
 
-    $this->app->bind(FlutterwavePaymentService::class, fn () => $primaryMock);
+    $this->app->bind(GeniusPayPaymentService::class, fn () => $primaryMock);
 
-    config(['payment.default' => 'flutterwave', 'payment.fallback' => null]);
+    config(['payment.default' => 'geniuspay', 'payment.fallback' => null]);
 
     $user = User::factory()->create();
     $result = app(PaymentService::class)->createPayment($user, [
@@ -46,14 +46,14 @@ it('uses primary gateway when it succeeds', function (): void {
         'payment_method' => 'flutterwave',
     ]);
 
-    expect($result['gateway'])->toBe('flutterwave')
-        ->and($result['link'])->toBe('https://flutterwave.example/pay/abc');
+    expect($result['gateway'])->toBe('geniuspay')
+        ->and($result['link'])->toBe('https://pay.genius.ci/checkout/MTX-001');
 });
 
 it('falls back to secondary gateway when primary fails', function (): void {
     $primaryMock = makeGatewayMock(
-        PaymentGateway::Flutterwave->value,
-        new PaymentGatewayException('Flutterwave: connexion echouee.')
+        PaymentGateway::GeniusPay->value,
+        new PaymentGatewayException('GeniusPay: connexion echouee.')
     );
 
     $fallbackMock = makeGatewayMock('wave', [
@@ -63,9 +63,9 @@ it('falls back to secondary gateway when primary fails', function (): void {
         'gateway' => 'wave',
     ]);
 
-    $this->app->bind(FlutterwavePaymentService::class, fn () => $primaryMock);
+    $this->app->bind(GeniusPayPaymentService::class, fn () => $primaryMock);
 
-    config(['payment.default' => 'flutterwave', 'payment.fallback' => null]);
+    config(['payment.default' => 'geniuspay', 'payment.fallback' => null]);
 
     $service = new PaymentService($primaryMock, $fallbackMock);
     $user = User::factory()->create();
@@ -82,8 +82,8 @@ it('falls back to secondary gateway when primary fails', function (): void {
 
 it('throws exception when both primary and fallback gateways fail', function (): void {
     $primaryMock = makeGatewayMock(
-        PaymentGateway::Flutterwave->value,
-        new PaymentGatewayException('Flutterwave: connexion echouee.')
+        PaymentGateway::GeniusPay->value,
+        new PaymentGatewayException('GeniusPay: connexion echouee.')
     );
 
     $fallbackMock = makeGatewayMock(
@@ -105,12 +105,12 @@ it('throws exception when both primary and fallback gateways fail', function ():
 it('propagates primary exception when no fallback is configured', function (): void {
     $primaryMock = makeGatewayMock(
         PaymentGateway::Flutterwave->value,
-        new PaymentGatewayException('Flutterwave: cle API invalide.')
+        new PaymentGatewayException('GeniusPay: cle API invalide.')
     );
 
-    $this->app->bind(FlutterwavePaymentService::class, fn () => $primaryMock);
+    $this->app->bind(GeniusPayPaymentService::class, fn () => $primaryMock);
 
-    config(['payment.default' => 'flutterwave', 'payment.fallback' => null]);
+    config(['payment.default' => 'geniuspay', 'payment.fallback' => null]);
 
     $user = User::factory()->create();
 
@@ -119,5 +119,5 @@ it('propagates primary exception when no fallback is configured', function (): v
         'currency' => 'XAF',
         'type' => 'credit',
         'payment_method' => 'flutterwave',
-    ]))->toThrow(PaymentGatewayException::class, 'Flutterwave: cle API invalide.');
+    ]))->toThrow(PaymentGatewayException::class, 'GeniusPay: cle API invalide.');
 });

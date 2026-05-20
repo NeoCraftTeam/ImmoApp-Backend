@@ -35,9 +35,9 @@ Route::get('/payments/{txRef}/public-status', [PaymentController::class, 'public
     ->middleware('throttle:60,1');
 
 // --- PAYMENTS — multi-gateway webhooks ---
-// Flutterwave: legacy `{gateway}` placeholder (constraint = flutterwave).
+// GeniusPay + legacy Flutterwave (`{gateway}` placeholder).
 Route::post('/webhooks/{gateway}', [PaymentController::class, 'handleWebhook'])
-    ->where('gateway', 'flutterwave')
+    ->where('gateway', 'geniuspay|flutterwave')
     ->middleware('throttle:payments.webhook');
 
 // Stripe: dedicated endpoint — verifies `Stripe-Signature` against the

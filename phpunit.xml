@@ -35,7 +35,10 @@
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="SCOUT_DRIVER" value="null"/>
-        <env name="PAYMENT_GATEWAY" value="flutterwave"/>
+        <env name="PAYMENT_DEFAULT_GATEWAY" value="geniuspay"/>
+        <env name="GENIUSPAY_API_KEY" value="pk_sandbox_test_fake"/>
+        <env name="GENIUSPAY_API_SECRET" value="sk_sandbox_test_fake"/>
+        <env name="GENIUSPAY_WEBHOOK_SECRET" value="whsec_sandbox_test_secret_123"/>
         <env name="FLW_SECRET_KEY" value="FLWSECK_TEST-fake"/>
         <env name="FLW_WEBHOOK_SECRET" value="test_webhook_secret_123"/>
         <env name="TURNSTILE_SITE_KEY" value=""/>

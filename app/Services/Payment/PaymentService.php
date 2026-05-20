@@ -98,7 +98,8 @@ final readonly class PaymentService
         $redirectUrl = is_string($redirectUrl) && $redirectUrl !== '' ? $redirectUrl : null;
 
         if ($redirectUrl === null) {
-            $configured = config('payment.gateways.flutterwave.redirect_url');
+            $configured = config('payment.gateways.geniuspay.redirect_url')
+                ?? config('payment.gateways.flutterwave.redirect_url');
             $redirectUrl = (is_string($configured) && $configured !== '')
                 ? $configured
                 : $this->defaultFrontendPaymentReturnUrl(
@@ -143,8 +144,8 @@ final readonly class PaymentService
 
         // Route to the gateway implied by the chosen `payment_method`. If
         // the method is unknown or its gateway isn't registered, we fall
-        // back to the legacy default (Flutterwave). Mobile money +
-        // Orange Money → Flutterwave; Card → Stripe.
+        // back to the legacy default (GeniusPay). Mobile money +
+        // Orange Money → GeniusPay; Card → Stripe.
         $primaryGateway = $this->resolveGatewayForMethod($data['payment_method'] ?? null);
 
         [$result, $usedGateway] = $this->initiateWithFallback($gatewayPayload, $primaryGateway);
@@ -166,6 +167,9 @@ final readonly class PaymentService
             $payment->status = $initialStatus;
             $payment->gateway = $usedGateway->getName();
             $payment->payment_link = $result['link'];
+            if (isset($result['raw'])) {
+                $payment->gateway_response = $result['raw'];
+            }
             $payment->phone_number = $data['phone_number'] ?? null;
             $payment->ad_id = $data['ad_id'] ?? null;
             $payment->agency_id = $data['agency_id'] ?? null;
@@ -246,9 +250,13 @@ final readonly class PaymentService
         // can call `paymentIntents.retrieve()` directly. Falling back to
         // tx_ref forces a metadata search which has a ~1 min indexing lag
         // on Stripe's side and would race the immediate post-confirm verify.
-        $reference = $gatewayName === 'stripe' && !empty($payment->payment_link)
-            ? (string) $payment->payment_link
-            : (string) $payment->transaction_id;
+        $reference = match ($gatewayName) {
+            'stripe' => !empty($payment->payment_link)
+                ? (string) $payment->payment_link
+                : (string) $payment->transaction_id,
+            'geniuspay' => self::geniusPayReferenceFromPayment($payment) ?? (string) $payment->transaction_id,
+            default => (string) $payment->transaction_id,
+        };
 
         $result = $verifyingGateway->verify($reference);
 
@@ -533,7 +541,7 @@ final readonly class PaymentService
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return array{0: array{link: string, tx_ref: string, status: string, gateway: string, stripe_flow?: string}, 1: PaymentGatewayInterface}
+     * @return array{0: array{link: string, tx_ref: string, status: string, gateway: string, stripe_flow?: string, raw?: array<string, mixed>}, 1: PaymentGatewayInterface}
      */
     private function initiateWithFallback(array $payload, ?PaymentGatewayInterface $primary = null): array
     {
@@ -546,7 +554,7 @@ final readonly class PaymentService
             // matches the orchestrator's primary (mobile money flow). For
             // Stripe card payments we propagate the error so the frontend
             // can offer a retry / alternative method instead of silently
-            // switching to Flutterwave.
+            // switching to another gateway.
             if ($this->fallbackGateway === null || $primary->getName() !== $this->gateway->getName()) {
                 throw $e;
             }
@@ -591,6 +599,7 @@ final readonly class PaymentService
         // path working when a webhook arrives before the registry was wired
         // (rare, but possible during deploys / artisan commands).
         return $this->registry[$name] ?? match ($name) {
+            'geniuspay' => app(GeniusPayPaymentService::class),
             'flutterwave' => app(FlutterwavePaymentService::class),
             'stripe' => app(StripePaymentService::class),
             default => throw new \InvalidArgumentException("Gateway [{$name}] not supported."),
@@ -598,9 +607,24 @@ final readonly class PaymentService
     }
 
     /**
-     * Default Flutterwave hosted-checkout return URL on the PWA.
+     * GeniusPay verify endpoint expects the MTX reference, not our KH tx_ref.
+     */
+    private static function geniusPayReferenceFromPayment(Payment $payment): ?string
+    {
+        $response = $payment->gateway_response;
+        if (!is_array($response)) {
+            return null;
+        }
+
+        $reference = $response['genius_reference'] ?? $response['reference'] ?? null;
+
+        return is_string($reference) && $reference !== '' ? $reference : null;
+    }
+
+    /**
+     * Default hosted-checkout return URL on the PWA (GeniusPay / legacy Flutterwave).
      *
-     * Flutterwave only redirects after its own confirmation UI, appending
+     * The gateway redirects after its own confirmation UI, appending
      * `status`, `tx_ref`, and related query parameters.
      */
     private function defaultFrontendPaymentReturnUrl(string $paymentType, ?string $adId): string
