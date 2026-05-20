@@ -87,6 +87,10 @@ final class MyAdsController
             $query->where('quarter_id', $quarterId);
         }
 
+        if (request()->boolean('is_boosted')) {
+            $query->where('is_boosted', true)->where('boost_expires_at', '>', now());
+        }
+
         if ($minPrice = request('price_min')) {
             $query->where('price', '>=', (float) $minPrice);
         }

@@ -7,6 +7,7 @@ namespace App\Actions;
 use App\Enums\PaymentType;
 use App\Enums\PointTransactionType;
 use App\Mail\CreditPurchaseConfirmationMail;
+use App\Models\Ad;
 use App\Models\Agency;
 use App\Models\Payment;
 use App\Models\PointPackage;
@@ -43,6 +44,7 @@ final readonly class HandlePostPaymentActions
             match ($payment->type) {
                 PaymentType::SUBSCRIPTION => $this->activateSubscription($payment, $metadata),
                 PaymentType::CREDIT => $this->fulfillCreditPurchase($payment, $metadata),
+                PaymentType::BOOST => $this->activateBoost($payment, $metadata),
                 default => null,
             };
         });
@@ -126,6 +128,52 @@ final readonly class HandlePostPaymentActions
         } catch (\Exception $e) {
             Log::error('Erreur email achat crédits: '.$e->getMessage());
         }
+    }
+
+    /**
+     * Activate boost on the ad after a successful BOOST payment.
+     * Idempotent: skip if the ad is already boosted by this payment.
+     *
+     * @param  array<string, mixed>  $metadata
+     */
+    private function activateBoost(Payment $payment, array $metadata): void
+    {
+        $adId = $payment->ad_id ?? ($metadata['ad_id'] ?? null);
+        $planId = $payment->plan_id ?? ($metadata['plan_id'] ?? null);
+
+        if (!$adId) {
+            Log::warning('Boost payment sans ad_id — impossible d\'activer le boost', ['payment_id' => $payment->id]);
+
+            return;
+        }
+
+        $ad = Ad::find($adId);
+
+        if (!$ad) {
+            Log::warning('Boost payment: annonce introuvable', ['payment_id' => $payment->id, 'ad_id' => $adId]);
+
+            return;
+        }
+
+        // Idempotency: if the ad was already boosted by this exact payment, skip.
+        if ($ad->boosted_at && $ad->isBoosted()) {
+            Log::info('Boost déjà actif pour cette annonce, skip', ['payment_id' => $payment->id, 'ad_id' => $adId]);
+
+            return;
+        }
+
+        $plan = $planId ? SubscriptionPlan::find($planId) : null;
+        $boostScore = $plan !== null ? ($plan->boost_score ?? 100) : 100;
+        $durationDays = $plan !== null ? ($plan->boost_duration_days ?? 7) : 7;
+
+        $ad->boost($boostScore, $durationDays);
+
+        Log::info('Boost activé via paiement', [
+            'payment_id' => $payment->id,
+            'ad_id' => $adId,
+            'boost_score' => $boostScore,
+            'duration_days' => $durationDays,
+        ]);
     }
 
     /**

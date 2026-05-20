@@ -254,6 +254,11 @@ final class CreditController
                 'max:255',
                 'regex:/^(MTX-|SANDBOX_)[A-Z0-9_-]+$/i',
             ],
+            'gateway_redirect_status' => [
+                'nullable',
+                'string',
+                'max:50',
+            ],
         ]);
 
         $user = $request->user();
@@ -321,6 +326,31 @@ final class CreditController
                 'message' => 'Le paiement n\'a pas abouti.',
                 'point_balance' => (int) $user->point_balance,
             ], 422);
+        }
+
+        // GeniusPay sandbox: the verify API returns TRANSACTION_NOT_FOUND (→ pending)
+        // but the hosted-checkout redirect already confirmed status=completed.
+        // Safe guard: we only trust the redirect when the API is *silent* (pending),
+        // never when it explicitly says failed/cancelled (handled above).
+        $redirectStatus = strtolower((string) ($validated['gateway_redirect_status'] ?? ''));
+        $redirectConfirmed = in_array($redirectStatus, ['completed', 'successful', 'success', 'paid'], true);
+        $isGeniusPay = $synced->gateway === 'geniuspay';
+        $hasCheckoutLink = is_string($synced->payment_link) && $synced->payment_link !== '';
+
+        if ($synced->status === PaymentStatus::PENDING && $redirectConfirmed && $isGeniusPay && $hasCheckoutLink) {
+            Log::info('GeniusPay: trusting redirect status while verify API is silent', [
+                'payment_id' => $synced->id,
+                'tx_ref'     => $synced->transaction_id,
+                'redirect_status' => $redirectStatus,
+            ]);
+            $synced->forceFill(['status' => PaymentStatus::SUCCESS])->save();
+            $this->postPaymentActions->execute($synced, (array) ($synced->gateway_response ?? []));
+
+            return response()->json([
+                'status'        => 'completed',
+                'message'       => 'Achat de crédits confirmé.',
+                'point_balance' => (int) $user->fresh()->point_balance,
+            ]);
         }
 
         return response()->json([

@@ -251,11 +251,13 @@ final readonly class PaymentService
         $gatewayName = (string) ($payment->gateway ?? $this->gateway->getName());
         $verifyingGateway = $this->resolveGateway($gatewayName);
 
-        // For Stripe, prefer the stored `payment_link` (clientSecret of the
-        // form `pi_xxx_secret_yyy`) over `transaction_id` so the gateway
-        // can call `paymentIntents.retrieve()` directly. Falling back to
-        // tx_ref forces a metadata search which has a ~1 min indexing lag
-        // on Stripe's side and would race the immediate post-confirm verify.
+        // For Stripe, prefer the stored `payment_link` so the gateway can
+        // retrieve the resource directly (instant, no indexing lag).
+        // Supported formats:
+        //   - `pi_xxx_secret_yyy`  (PaymentIntent)   → paymentIntents.retrieve()
+        //   - `cs_xxx_secret_yyy`  (CheckoutSession)  → checkout.sessions.retrieve()
+        // Falling back to tx_ref forces a paymentIntents.search() which has
+        // a ~1 min indexing lag on Stripe's side.
         $reference = match ($gatewayName) {
             'stripe' => !empty($payment->payment_link)
                 ? (string) $payment->payment_link
@@ -670,16 +672,31 @@ final readonly class PaymentService
     }
 
     /**
-     * Prefer the redirect reference (SANDBOX_* / MTX-*) when the client sends it;
-     * fall back to the value persisted at initiate time.
+     * Resolve the reference to pass to GeniusPay's verify endpoint.
+     *
+     * GeniusPay uses two distinct reference types:
+     *  - Checkout reference (SANDBOX_R…  / MTX-R…): assigned during initiate,
+     *    stored in gateway_response['genius_reference'] and payment_link.
+     *    This is what GET /payments/{ref} expects.
+     *  - Transaction reference (SANDBOX_N… / MTX-T…): appended to the redirect
+     *    URL after the customer completes checkout. Useful for display only.
+     *
+     * We therefore prefer the stored checkout reference over the redirect reference.
      */
     private static function resolveGeniusPayVerifyReference(Payment $payment, ?string $override): string
     {
+        // 1. Stored checkout reference (most reliable for API lookup).
+        $storedRef = self::geniusPayReferenceFromPayment($payment);
+        if ($storedRef !== null) {
+            return $storedRef;
+        }
+
+        // 2. Transaction reference from the redirect URL (fallback).
         if (is_string($override) && $override !== '' && PaymentTransactionLookup::isGatewayReference($override)) {
             return $override;
         }
 
-        return self::geniusPayReferenceFromPayment($payment) ?? (string) $payment->transaction_id;
+        return (string) $payment->transaction_id;
     }
 
     /**
@@ -726,7 +743,10 @@ final readonly class PaymentService
             $query['ad_id'] = $adId;
         }
 
-        return $base.'/payment/return?'.http_build_query($query);
+        // Route through /payment/callback so Next.js issues a server-side 302
+        // to /payment/return.  A direct link to /payment/return from an external
+        // domain causes Next.js to return RSC wire format instead of full HTML.
+        return $base.'/payment/callback?'.http_build_query($query);
     }
 
     /**
