@@ -17,6 +17,7 @@ use App\Models\PointPackage;
 use App\Models\Setting;
 use App\Services\Payment\PaymentService;
 use App\Support\FrontendRedirectGuard;
+use App\Support\PaymentTransactionLookup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -180,10 +181,16 @@ final class CreditController
         } catch (PaymentGatewayException $e) {
             Log::error('Erreur initiation paiement crédits: '.$e->getMessage());
 
+            $status = $e->getCode();
+            if ($status < 400 || $status >= 600) {
+                $status = 502;
+            }
+
             return response()->json([
-                'message' => 'Erreur lors de l\'initialisation du paiement.',
+                'message' => $e->getMessage(),
+                'code' => $status === 422 ? 'PAYMENT_VALIDATION_ERROR' : 'PAYMENT_GATEWAY_ERROR',
                 'error' => config('app.debug') ? $e->getMessage() : null,
-            ], 500);
+            ], $status);
         }
 
         return response()->json([
@@ -235,23 +242,34 @@ final class CreditController
     public function verifyPurchase(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'tx_ref' => ['nullable', 'string', 'max:255'],
+            'tx_ref' => [
+                'nullable',
+                'string',
+                'max:255',
+                'regex:/^KH-[A-Z0-9]{6,32}$/i',
+            ],
+            'reference' => [
+                'nullable',
+                'string',
+                'max:255',
+                'regex:/^(MTX-|SANDBOX_)[A-Z0-9_-]+$/i',
+            ],
         ]);
 
         $user = $request->user();
 
-        // When a `tx_ref` is provided, target the exact payment created by
-        // the current checkout session. Falls back to "latest credit
-        // purchase" only when the frontend cannot supply it (legacy flow).
-        // Targeting prevents the polling page from accidentally reporting
-        // the status of an unrelated past purchase.
-        $query = Payment::query()
+        // Target the exact checkout session via KH tx_ref or GeniusPay reference.
+        // Falls back to "latest credit purchase" only when neither is supplied (legacy).
+        $payment = PaymentTransactionLookup::findForUser(
+            $user,
+            $validated['tx_ref'] ?? null,
+            $validated['reference'] ?? null,
+            PaymentType::CREDIT,
+        ) ?? Payment::query()
             ->where('user_id', $user->id)
-            ->where('type', PaymentType::CREDIT);
-
-        $payment = !empty($validated['tx_ref'])
-            ? $query->where('transaction_id', $validated['tx_ref'])->first()
-            : $query->latest()->first();
+            ->where('type', PaymentType::CREDIT)
+            ->latest()
+            ->first();
 
         if (!$payment) {
             return response()->json([
@@ -280,16 +298,12 @@ final class CreditController
             ]);
         }
 
-        if ($payment->status === PaymentStatus::FAILED) {
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'Le paiement a échoué.',
-                'point_balance' => (int) $user->point_balance,
-            ], 422);
-        }
-
-        // Payment is still PENDING — verify via Flutterwave gateway
-        $synced = $this->paymentService->syncPaymentStatus($payment);
+        // PENDING / FAILED / CANCELLED — re-query GeniusPay (sandbox may complete
+        // after an early failed verify; syncPaymentStatus reopens orphan debits).
+        $synced = $this->paymentService->syncPaymentStatus(
+            $payment,
+            $validated['reference'] ?? null,
+        );
 
         if ($synced->status === PaymentStatus::SUCCESS) {
             $this->postPaymentActions->execute($synced, (array) ($synced->gateway_response ?? []));

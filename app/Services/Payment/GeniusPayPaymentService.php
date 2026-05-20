@@ -9,6 +9,7 @@ use App\Enums\PaymentMethod;
 use App\Exceptions\InvalidWebhookSignatureException;
 use App\Exceptions\PaymentGatewayException;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -47,7 +48,7 @@ final readonly class GeniusPayPaymentService implements PaymentGatewayInterface
 
         $body = [
             'amount' => (int) round((float) $payload['amount']),
-            'currency' => (string) $payload['currency'],
+            'currency' => $this->normalizeCurrencyForApi((string) $payload['currency']),
             'description' => (string) ($payload['description'] ?? 'Paiement KeyHome'),
             'customer' => [
                 'name' => (string) $payload['name'],
@@ -73,11 +74,10 @@ final readonly class GeniusPayPaymentService implements PaymentGatewayInterface
                 'response' => $response->json(),
             ]);
 
-            $message = $response->status() >= 500
-                ? 'Passerelle de paiement indisponible'
-                : 'GeniusPay : '.($response->json('error.message') ?? $response->json('message') ?? 'Initialisation du paiement échouée.');
-
-            throw new PaymentGatewayException($message, $response->status());
+            throw new PaymentGatewayException(
+                $this->parseInitiateErrorMessage($response),
+                $this->resolveHttpStatusForException($response->status()),
+            );
         }
 
         /** @var array<string, mixed> $data */
@@ -106,13 +106,16 @@ final readonly class GeniusPayPaymentService implements PaymentGatewayInterface
         $response = $this->client()->get('/payments/'.$externalReference);
 
         if ($response->failed() || $response->json('success') !== true) {
-            Log::warning('GeniusPay verify failed', [
+            Log::warning('GeniusPay verify unavailable', [
                 'reference' => $externalReference,
+                'http_status' => $response->status(),
                 'response' => $response->json(),
             ]);
 
+            // Keep the local payment pending — a 404/wrong reference or transient
+            // API error must not poison the row as FAILED before the webhook lands.
             return [
-                'status' => 'failed',
+                'status' => 'pending',
                 'amount' => 0.0,
                 'currency' => '',
                 'payment_method' => null,
@@ -239,12 +242,13 @@ final readonly class GeniusPayPaymentService implements PaymentGatewayInterface
      */
     private function normaliseTransaction(array $data): array
     {
-        $status = strtolower((string) ($data['status'] ?? 'failed'));
+        $status = $this->extractGatewayStatus($data);
         $mappedStatus = match ($status) {
-            'completed', 'successful', 'success' => 'success',
+            'completed', 'complete', 'successful', 'success', 'paid' => 'success',
             'cancelled', 'canceled' => 'cancelled',
             'expired', 'failed' => 'failed',
-            default => $status,
+            'pending', 'processing', 'in_progress', 'in-progress' => 'pending',
+            default => 'pending',
         };
 
         $paidAt = null;
@@ -270,6 +274,31 @@ final readonly class GeniusPayPaymentService implements PaymentGatewayInterface
     /**
      * @param  array<string, mixed>  $data
      */
+    private function extractGatewayStatus(array $data): string
+    {
+        foreach (['status', 'payment_status', 'state'] as $key) {
+            $value = $data[$key] ?? null;
+            if (is_string($value) && $value !== '') {
+                return strtolower($value);
+            }
+        }
+
+        $nested = $data['payment'] ?? $data['transaction'] ?? null;
+        if (is_array($nested)) {
+            foreach (['status', 'payment_status', 'state'] as $key) {
+                $value = $nested[$key] ?? null;
+                if (is_string($value) && $value !== '') {
+                    return strtolower($value);
+                }
+            }
+        }
+
+        return 'pending';
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
     private function resolveTxRefFromPayload(array $data): string
     {
         $metadata = $data['metadata'] ?? [];
@@ -282,12 +311,123 @@ final readonly class GeniusPayPaymentService implements PaymentGatewayInterface
 
     private function resolveGeniusPaymentMethod(string $paymentMethod): ?string
     {
+        $configured = config('payment.geniuspay_payment_methods', []);
+        if (is_array($configured) && isset($configured[$paymentMethod]) && is_string($configured[$paymentMethod])) {
+            return $configured[$paymentMethod];
+        }
+
         return match ($paymentMethod) {
             'orange_money' => 'orange_money',
             'mobile_money' => 'mtn_money',
-            'flutterwave' => null,
+            'flutterwave', 'card' => null,
             default => null,
         };
+    }
+
+    /**
+     * GeniusPay merchant API accepts XOF, EUR, USD only (amounts are stored in XOF).
+     * KeyHome ledger uses XAF for Cameroon — map 1:1 for the gateway request.
+     */
+    private function normalizeCurrencyForApi(string $currency): string
+    {
+        $normalized = strtoupper(trim($currency));
+
+        return match ($normalized) {
+            'XAF', 'XOF', '' => 'XOF',
+            'EUR', 'USD' => $normalized,
+            default => 'XOF',
+        };
+    }
+
+    private function parseInitiateErrorMessage(Response $response): string
+    {
+        if ($response->status() >= 500) {
+            return 'Passerelle de paiement indisponible.';
+        }
+
+        /** @var array<string, mixed>|null $json */
+        $json = $response->json();
+        if (!is_array($json)) {
+            return 'GeniusPay : échec de l\'initialisation du paiement.';
+        }
+
+        /** @var array<string, mixed>|null $errorBlock */
+        $errorBlock = is_array($json['error'] ?? null) ? $json['error'] : null;
+        /** @var array<string, array<int, string>|string>|null $fieldErrors */
+        $fieldErrors = null;
+        if (is_array($errorBlock['errors'] ?? null)) {
+            $fieldErrors = $errorBlock['errors'];
+        } elseif (is_array($json['errors'] ?? null)) {
+            $fieldErrors = $json['errors'];
+        }
+
+        if (is_array($fieldErrors) && $fieldErrors !== []) {
+            $messages = [];
+            foreach ($fieldErrors as $field => $rules) {
+                $label = $this->fieldLabelFr((string) $field);
+                foreach ((array) $rules as $rule) {
+                    $messages[] = $this->translateValidationRule((string) $rule, $label);
+                }
+            }
+
+            if ($messages !== []) {
+                return 'GeniusPay : '.implode(' ', array_values(array_unique($messages)));
+            }
+        }
+
+        $rawMessage = (string) ($errorBlock['message'] ?? $json['message'] ?? '');
+
+        if ($rawMessage !== '') {
+            return 'GeniusPay : '.$this->translateKnownApiMessage($rawMessage);
+        }
+
+        return 'GeniusPay : échec de l\'initialisation du paiement.';
+    }
+
+    private function translateValidationRule(string $rule, string $fieldLabel): string
+    {
+        return match ($rule) {
+            'validation.in' => "La valeur du champ « {$fieldLabel} » n'est pas acceptée par GeniusPay.",
+            'validation.required' => "Le champ « {$fieldLabel} » est requis.",
+            'validation.min' => "Le champ « {$fieldLabel} » est trop petit.",
+            'validation.max' => "Le champ « {$fieldLabel} » est trop grand.",
+            default => str_starts_with($rule, 'validation.')
+                ? "Erreur de validation sur le champ « {$fieldLabel} »."
+                : $rule,
+        };
+    }
+
+    private function translateKnownApiMessage(string $message): string
+    {
+        return match ($message) {
+            'validation.in' => 'Une ou plusieurs valeurs envoyées ne sont pas acceptées par GeniusPay (vérifiez la devise et le moyen de paiement).',
+            default => $message,
+        };
+    }
+
+    private function fieldLabelFr(string $field): string
+    {
+        $normalized = str_replace(['customer.', '_'], ['', ' '], $field);
+
+        return match ($field) {
+            'currency' => 'devise',
+            'amount' => 'montant',
+            'payment_method' => 'moyen de paiement',
+            'customer.phone' => 'téléphone',
+            'customer.email' => 'e-mail',
+            'customer.name' => 'nom',
+            'customer.country' => 'pays',
+            default => trim($normalized) !== '' ? trim($normalized) : $field,
+        };
+    }
+
+    private function resolveHttpStatusForException(int $status): int
+    {
+        if ($status >= 400 && $status < 600) {
+            return $status;
+        }
+
+        return 502;
     }
 
     /**

@@ -21,6 +21,7 @@ use App\Models\PromoCodeUsage;
 use App\Models\User;
 use App\Services\Payment\PaymentService;
 use App\Support\PaymentPresentation;
+use App\Support\PaymentTransactionLookup;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -203,15 +204,20 @@ final class PaymentController
         /** @var User $user */
         $user = $request->user();
 
-        $payment = Payment::where('transaction_id', $validated['tx_ref'])
-            ->where('user_id', $user->id)
-            ->first();
+        $payment = PaymentTransactionLookup::findForUser(
+            $user,
+            $validated['tx_ref'] ?? null,
+            $validated['reference'] ?? null,
+        );
 
-        if (!$payment) {
+        if ($payment === null) {
             return response()->json(['message' => 'Paiement introuvable.'], 404);
         }
 
-        $payment = $this->paymentService->syncPaymentStatus($payment);
+        $payment = $this->paymentService->syncPaymentStatus(
+            $payment,
+            $validated['reference'] ?? null,
+        );
 
         if ($payment->isPaid()) {
             $this->postPaymentActions->execute($payment, (array) ($payment->gateway_response ?? []));
@@ -262,14 +268,7 @@ final class PaymentController
         // Hard-validate the format BEFORE hitting the DB so a flood of
         // malformed requests can't produce a SQL injection attempt against
         // the UUID-shaped column.
-        if (!preg_match('/^KH-[A-Z0-9]{6,32}$/i', $txRef)) {
-            return response()->json(['status' => 'unknown']);
-        }
-
-        /** @var Payment|null $payment */
-        $payment = Payment::query()
-            ->where('transaction_id', $txRef)
-            ->first();
+        $payment = PaymentTransactionLookup::findByPublicReference($txRef);
 
         if ($payment === null) {
             return response()->json(['status' => 'unknown']);

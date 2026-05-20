@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\PaymentGatewayException;
 use App\Exceptions\RegistrationEmailTakenException;
 use App\Http\Middleware\AddRequestId;
 use App\Http\Middleware\CacheHeaders;
@@ -201,6 +202,22 @@ return Application::configure(basePath: dirname(__DIR__))
 
                 return $fileUploadErrorResponse('Le fichier téléversé est invalide ou trop volumineux.');
             }
+        });
+
+        $exceptions->renderable(function (PaymentGatewayException $e, Request $request) {
+            if (!$request->is('api/*')) {
+                return null;
+            }
+
+            $status = $e->getCode();
+            if ($status < 400 || $status >= 600) {
+                $status = 502;
+            }
+
+            return response()->json([
+                'message' => $e->getMessage(),
+                'code' => $status === 422 ? 'PAYMENT_VALIDATION_ERROR' : 'PAYMENT_GATEWAY_ERROR',
+            ], $status);
         });
 
         // Generic API 500 handler — registered LAST so specific handlers above take priority.

@@ -8,6 +8,7 @@ use App\Models\Payment;
 use App\Models\User;
 use App\Services\Payment\PaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 
@@ -53,6 +54,12 @@ it('should create pending payment in database when payment is initiated', functi
         'gateway' => 'geniuspay',
         'amount' => 150000,
     ]);
+
+    Http::assertSent(function (Request $request) use ($result): bool {
+        $successUrl = (string) ($request->data()['success_url'] ?? '');
+
+        return str_contains($successUrl, 'tx_ref='.urlencode($result['tx_ref']));
+    });
 });
 
 it('should return payment link when payment is created', function (): void {
@@ -152,6 +159,37 @@ it('should mark payment as success when gateway confirms payment', function (): 
         'gateway' => 'geniuspay',
         'amount' => 10000,
         'gateway_response' => ['genius_reference' => 'MTX-VERIFY-OK'],
+    ]);
+
+    $service = app(PaymentService::class);
+    $updated = $service->syncPaymentStatus($payment);
+
+    expect($updated->status)->toBe(PaymentStatus::SUCCESS);
+    Event::assertDispatched(PaymentSucceeded::class);
+});
+
+it('reopens FAILED geniuspay payment when sync confirms completed', function (): void {
+    Event::fake();
+
+    Http::fake([
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'SANDBOX-REOPEN-001',
+                'status' => 'completed',
+                'amount' => 10000,
+                'currency' => 'XOF',
+            ],
+        ], 200),
+    ]);
+
+    $user = User::factory()->create();
+    $payment = Payment::factory()->create([
+        'user_id' => $user->id,
+        'status' => PaymentStatus::FAILED,
+        'gateway' => 'geniuspay',
+        'amount' => 10000,
+        'gateway_response' => ['genius_reference' => 'SANDBOX-REOPEN-001'],
     ]);
 
     $service = app(PaymentService::class);

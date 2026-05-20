@@ -121,6 +121,34 @@ it('marks payment FAILED when gateway returns mismatched amount', function (): v
     Event::assertDispatched(PaymentFailed::class);
 });
 
+it('accepts XOF from geniuspay when ledger currency is XAF', function (): void {
+    Event::fake();
+
+    $payment = Payment::factory()->pending()->create([
+        'gateway' => 'geniuspay',
+        'amount' => 5000,
+        'gateway_response' => ['genius_reference' => 'SANDBOX-XOF-LEDGER'],
+    ]);
+
+    Http::fake([
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'SANDBOX-XOF-LEDGER',
+                'status' => 'completed',
+                'amount' => 5000,
+                'currency' => 'XOF',
+            ],
+        ], 200),
+    ]);
+
+    $service = app(PaymentService::class);
+    $result = $service->syncPaymentStatus($payment);
+
+    expect($result->status)->toBe(PaymentStatus::SUCCESS);
+    Event::assertDispatched(PaymentSucceeded::class);
+});
+
 it('marks payment FAILED when gateway returns wrong currency', function (): void {
     Event::fake();
 

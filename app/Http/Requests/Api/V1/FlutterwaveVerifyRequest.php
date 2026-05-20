@@ -13,11 +13,24 @@ class FlutterwaveVerifyRequest extends FormRequest
         return true;
     }
 
-    /** @return array<string, array<int, string>> */
+    /** @return array<string, array<int, mixed>> */
     public function rules(): array
     {
         return [
-            'tx_ref' => ['required', 'string', 'max:255'],
+            'tx_ref' => [
+                'required_without:reference',
+                'nullable',
+                'string',
+                'max:255',
+                'regex:/^KH-[A-Z0-9]{6,32}$/i',
+            ],
+            'reference' => [
+                'required_without:tx_ref',
+                'nullable',
+                'string',
+                'max:255',
+                'regex:/^(MTX-|SANDBOX_)[A-Z0-9_-]+$/i',
+            ],
         ];
     }
 
@@ -26,8 +39,12 @@ class FlutterwaveVerifyRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'tx_ref.required' => 'La référence de transaction est requise.',
+            'tx_ref.required_without' => 'La référence de transaction KeyHome ou la référence GeniusPay est requise.',
             'tx_ref.string' => 'La référence de transaction doit être une chaîne.',
+            'tx_ref.regex' => 'La référence KeyHome est invalide.',
+            'reference.required_without' => 'La référence de transaction KeyHome ou la référence GeniusPay est requise.',
+            'reference.string' => 'La référence GeniusPay doit être une chaîne.',
+            'reference.regex' => 'La référence GeniusPay est invalide.',
         ];
     }
 }

@@ -56,6 +56,62 @@ it('initiates payment and returns checkout url', function (): void {
         ->and($result['link'])->toContain('pay.genius.ci/checkout');
 });
 
+it('maps XAF to XOF when calling geniuspay api', function (): void {
+    Http::fake([
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'MTX-CURRENCY',
+                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-CURRENCY',
+            ],
+        ], 201),
+    ]);
+
+    $this->service->initiate(validGeniusPayInitiatePayload(['currency' => 'XAF']));
+
+    Http::assertSent(fn (Request $request) => $request->data()['currency'] === 'XOF');
+});
+
+it('omits payment_method for hosted checkout defaults', function (): void {
+    Http::fake([
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'MTX-CHECKOUT',
+                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-CHECKOUT',
+            ],
+        ], 201),
+    ]);
+
+    $this->service->initiate(validGeniusPayInitiatePayload(['payment_method' => 'flutterwave']));
+
+    Http::assertSent(fn (Request $request) => !array_key_exists('payment_method', $request->data()));
+});
+
+it('surfaces french message for geniuspay validation errors', function (): void {
+    Http::fake([
+        'pay.genius.ci/*' => Http::response([
+            'success' => false,
+            'error' => [
+                'code' => 'VALIDATION_ERROR',
+                'message' => 'validation.in',
+                'errors' => [
+                    'currency' => ['validation.in'],
+                ],
+            ],
+        ], 422),
+    ]);
+
+    try {
+        $this->service->initiate(validGeniusPayInitiatePayload(['currency' => 'CHF']));
+        expect(false)->toBeTrue('Expected PaymentGatewayException');
+    } catch (PaymentGatewayException $e) {
+        expect($e->getCode())->toBe(422)
+            ->and($e->getMessage())->toContain('devise')
+            ->and($e->getMessage())->not->toContain('validation.in');
+    }
+});
+
 it('sends geniuspay auth headers', function (): void {
     Http::fake([
         'pay.genius.ci/*' => Http::response([
@@ -105,6 +161,75 @@ it('verifies completed transaction by reference', function (): void {
         ->toHaveKey('status', 'success')
         ->toHaveKey('amount', 150000.0)
         ->toHaveKey('currency', 'XAF');
+});
+
+it('maps XOF currency from geniuspay verify response', function (): void {
+    Http::fake([
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'SANDBOX-XOF-001',
+                'status' => 'completed',
+                'amount' => 5000,
+                'currency' => 'XOF',
+            ],
+        ], 200),
+    ]);
+
+    $result = $this->service->verify('SANDBOX-XOF-001');
+
+    expect($result)
+        ->toHaveKey('status', 'success')
+        ->toHaveKey('currency', 'XOF');
+});
+
+it('maps paid status from geniuspay verify response', function (): void {
+    Http::fake([
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'SANDBOX-PAID-001',
+                'status' => 'paid',
+                'amount' => 2500,
+                'currency' => 'XOF',
+            ],
+        ], 200),
+    ]);
+
+    $result = $this->service->verify('SANDBOX-PAID-001');
+
+    expect($result)->toHaveKey('status', 'success');
+});
+
+it('reads nested payment status from geniuspay verify response', function (): void {
+    Http::fake([
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'SANDBOX-NESTED-001',
+                'payment' => ['status' => 'completed'],
+                'amount' => 2500,
+                'currency' => 'XOF',
+            ],
+        ], 200),
+    ]);
+
+    $result = $this->service->verify('SANDBOX-NESTED-001');
+
+    expect($result)->toHaveKey('status', 'success');
+});
+
+it('returns pending when geniuspay verify HTTP call fails', function (): void {
+    Http::fake([
+        'pay.genius.ci/*' => Http::response([
+            'success' => false,
+            'error' => ['code' => 'TRANSACTION_NOT_FOUND', 'message' => 'Transaction not found'],
+        ], 404),
+    ]);
+
+    $result = $this->service->verify('SANDBOX-MISSING');
+
+    expect($result)->toHaveKey('status', 'pending');
 });
 
 it('validates webhook hmac signature', function (): void {
