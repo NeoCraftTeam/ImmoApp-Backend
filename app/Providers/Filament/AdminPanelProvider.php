@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\Auth\MultiFactor\CacheEmailAuthentication;
 use App\Enums\AdStatus;
 use App\Filament\Admin\Pages\Auth\AdminLogin;
 use App\Filament\Admin\Pages\Dashboard;
@@ -21,7 +22,6 @@ use App\Http\Middleware\FilamentAuthenticate;
 use App\Http\Middleware\RequirePasswordChange;
 use App\Models\Ad;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
-use Filament\Auth\MultiFactor\Email\EmailAuthentication;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -58,7 +58,8 @@ class AdminPanelProvider extends PanelProvider
                     ->recoveryCodeCount(10)
                     ->regenerableRecoveryCodes(false)
                     ->brandName('KeyHome Admin'),
-                EmailAuthentication::make(),
+                CacheEmailAuthentication::make()
+                    ->codeExpiryMinutes(30),
             ], isRequired: false)
             ->passwordReset()
             ->emailVerification()
