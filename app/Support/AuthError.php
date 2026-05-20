@@ -26,7 +26,7 @@ final class AuthError
     public const string CODE_USER_ROLE_MISMATCH = 'USER_ROLE_MISMATCH';
 
     /** Wrong password, unknown email, failed CAPTCHA, or wrong login panel. */
-    public const string LOGIN_FAILURE_MESSAGE = 'Identifiants incorrects ou accès non autorisé pour cette interface.';
+    public const string LOGIN_FAILURE_MESSAGE = 'Identifiants incorrects';
 
     /** Authenticated user on an API route for the wrong interface. */
     public const string PANEL_UNAVAILABLE_MESSAGE = 'Cette interface n\'est pas disponible pour ce compte.';

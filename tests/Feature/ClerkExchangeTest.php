@@ -159,7 +159,7 @@ describe('Clerk Exchange – authentication flows', function (): void {
 
         $response->assertUnauthorized()
             ->assertJsonPath('code', 'PANEL_ACCESS_DENIED')
-            ->assertJsonPath('message', 'Identifiants incorrects ou accès non autorisé pour cette interface.');
+            ->assertJsonPath('message', 'Identifiants incorrects');
     });
 
     it('returns 403 with email hint when the Laravel account is not verified', function (): void {
