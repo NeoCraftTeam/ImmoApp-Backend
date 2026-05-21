@@ -126,6 +126,9 @@ final class AdResource extends JsonResource
             'canonical_url' => $this->buildCanonicalUrl(),
             'whatsapp_share_url' => $this->buildWhatsAppShareUrl(),
 
+            // Item 11 — Prescreening questions (public — client reads before booking)
+            'prescreening_questions' => $this->prescreening_questions ?? [],
+
             'user' => $this->whenLoaded('user', function () use ($user) {
                 $owner = $this->user;
                 $isUnlocked = $this->isUnlockedFor($user);

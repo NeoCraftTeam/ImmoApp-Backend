@@ -21,6 +21,8 @@ class StoreTentativeReservationRequest extends FormRequest
             'slot_starts_at' => ['required', 'date_format:H:i'],
             'slot_ends_at' => ['required', 'date_format:H:i', 'after:slot_starts_at'],
             'client_message' => ['nullable', 'string', 'max:500'],
+            'prescreening_answers' => ['nullable', 'array', 'max:20'],
+            'prescreening_answers.*' => ['nullable', 'string', 'max:1000'],
         ];
     }
 

@@ -453,8 +453,8 @@ En Afrique, la hiérarchie des canaux de notification :
 
 | # | Feature | Gap |
 |---|---------|-----|
-| 11 | **Visites** | Prescreening locataire avant confirmation |
-| 12 | **Annonces** | Stats par annonce (vues, contacts, taux clic) |
+| 11 | **Visites** | Prescreening locataire avant confirmation | ✅ **DONE** — `prescreening_questions jsonb` on `ad` + `prescreening_answers jsonb` on `tentative_reservations` · `PrescreeningController` (`PATCH/DELETE /my/ads/{ad}/prescreening`) · `AdResource` exposes questions · `TentativeReservationResource` exposes answers · `StoreTentativeReservationRequest` accepts answers |
+| 12 | **Annonces** | Stats par annonce (vues, contacts, taux clic) | ✅ **DONE** (pre-existing) — `GET /my/ads/{ad}/analytics` via `AdAnalyticsController::show()` + `AdAnalyticsService` — impressions, views, contacts, unlocks, funnel, daily breakdown, audience |
 | 13 | **Boost** | Estimation reach avant achat |
 | 14 | **Prix marché** | Fourchette loyer suggéré lors de la création |
 | 15 | **Trust** | Explication score transparent ("Pour augmenter votre score, faites X") |

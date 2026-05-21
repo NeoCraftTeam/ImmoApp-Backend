@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\AdStatusController;
 use App\Http\Controllers\Api\V1\KeyScoreController;
 use App\Http\Controllers\Api\V1\MyAdsController;
 use App\Http\Controllers\Api\V1\NeighborhoodScorecardController;
+use App\Http\Controllers\Api\V1\PrescreeningController;
 use App\Http\Controllers\Api\V1\QrCodeController;
 use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\TourController;
@@ -123,6 +124,12 @@ Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner', 'token.role
     Route::get('/{ad}/qr-code/image', [QrCodeController::class, 'adQrImage'])->middleware('throttle:60,1');
     Route::get('/{ad}/placarde', [QrCodeController::class, 'adPlacarde'])->middleware('throttle:20,1');
     Route::get('/{ad}/analytics', [AdAnalyticsController::class, 'show']);
+
+    // Item 11 — Prescreening questions (landlord manages)
+    Route::patch('/{ad}/prescreening', [PrescreeningController::class, 'update'])
+        ->middleware('throttle:30,1');
+    Route::delete('/{ad}/prescreening', [PrescreeningController::class, 'destroy'])
+        ->middleware('throttle:30,1');
 });
 
 // KeyScore

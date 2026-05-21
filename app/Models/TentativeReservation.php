@@ -72,6 +72,7 @@ class TentativeReservation extends Model
         'cancellation_reason',
         'expires_at',
         'notified_at',
+        'prescreening_answers',
     ];
 
     protected $hidden = ['deleted_at'];
@@ -85,6 +86,7 @@ class TentativeReservation extends Model
             'notified_at' => 'datetime',
             'status' => ReservationStatus::class,
             'cancelled_by' => CancelledBy::class,
+            'prescreening_answers' => 'array',
         ];
     }
 

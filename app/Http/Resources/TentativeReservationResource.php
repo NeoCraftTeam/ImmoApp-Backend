@@ -22,6 +22,7 @@ final class TentativeReservationResource extends JsonResource
             'slot_starts_at' => $this->slot_starts_at,
             'slot_ends_at' => $this->slot_ends_at,
             'client_message' => $this->client_message,
+            'prescreening_answers' => $this->prescreening_answers,
             'landlord_notes' => $this->landlord_notes,
             'cancelled_by' => $this->cancelled_by?->value,
             'cancellation_reason' => $this->cancellation_reason,
