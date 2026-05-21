@@ -10,4 +10,5 @@ enum PointTransactionType: string
     case UNLOCK = 'unlock';     // unlocked an ad contact (debit)
     case BONUS = 'bonus';       // welcome or promotional bonus
     case REFUND = 'refund';     // manual refund by admin
+    case BOOST = 'boost';       // boosted an ad (debit — landlord side)
 }

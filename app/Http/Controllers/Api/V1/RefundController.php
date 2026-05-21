@@ -6,8 +6,10 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Requests\RefundRequest;
 use App\Models\Payment;
+use App\Models\Refund;
 use App\Services\Payment\RefundService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 final readonly class RefundController
 {
@@ -60,6 +62,81 @@ final readonly class RefundController
         } catch (\InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/v1/payments/{payment}/refund-request",
+     *     summary="Self-service refund request (user-facing). Creates a Pending refund for admin review.",
+     *     tags={"Payments"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Parameter(name="payment", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\RequestBody(required=true, @OA\JsonContent(
+     *         required={"reason"},
+     *
+     *         @OA\Property(property="reason", type="string", example="Service non rendu")
+     *     )),
+     *
+     *     @OA\Response(response=201, description="Refund request created"),
+     *     @OA\Response(response=403, description="Payment does not belong to user"),
+     *     @OA\Response(response=422, description="Already has a pending or completed refund")
+     * )
+     */
+    public function requestRefund(Request $request, Payment $payment): JsonResponse
+    {
+        if ($payment->user_id !== $request->user()->id) {
+            abort(403, 'Accès refusé.');
+        }
+
+        $existing = $payment->refunds()
+            ->whereIn('status', ['pending', 'processing', 'completed'])
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'message' => 'Une demande de remboursement est déjà en cours pour ce paiement.',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'reason' => 'required|string|min:10|max:1000',
+        ]);
+
+        $refund = Refund::create([
+            'payment_id' => $payment->id,
+            'user_id' => $request->user()->id,
+            'amount' => $payment->amount,
+            'currency' => $payment->currency ?? 'XAF',
+            'reason' => $validated['reason'],
+            'is_partial' => false,
+        ]);
+
+        return response()->json([
+            'message' => 'Votre demande de remboursement a été envoyée à notre équipe.',
+            'refund_id' => $refund->id,
+        ], 201);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/v1/payments/refunds",
+     *     summary="List authenticated user's own refunds",
+     *     tags={"Payments"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Response(response=200, description="Paginated list of refunds")
+     * )
+     */
+    public function userRefunds(Request $request): JsonResponse
+    {
+        $refunds = Refund::where('user_id', $request->user()->id)
+            ->with(['payment:id,type,amount,currency,created_at'])
+            ->latest()
+            ->paginate(15);
+
+        return response()->json($refunds);
     }
 
     /**

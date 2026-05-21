@@ -25,12 +25,25 @@ use LogicException;
  *
  * Using the cache keyed by user ID removes the dependency on session continuity
  * across Livewire requests entirely.
+ *
+ * Root cause of the "code always invalid" bug (fixed here):
+ *   During Filament 4's MFA challenge, `Filament::auth()->user()` returns null
+ *   because the guard is not yet established — the user passed credentials but
+ *   has not completed MFA. `verifyCode()` therefore cannot compute the OTP
+ *   cache key and always returns false.
+ *
+ * Fix: `sendCode()` writes a short-lived session→user_id mapping to cache.
+ *   `verifyCode()` first tries `Filament::auth()->user()` (works when guard is
+ *   available), then falls back to loading the user via the cached mapping.
  */
 final class CacheEmailAuthentication extends EmailAuthentication
 {
     private const string CACHE_PREFIX = 'filament_email_otp_';
 
     private const string EXPIRY_SUFFIX = '_expires_at';
+
+    /** Maps current session ID → pending user ID during MFA challenge. */
+    private const string SESSION_MAP_PREFIX = 'filament_email_otp_sess_';
 
     private function otpKey(HasEmailAuthentication $user): string
     {
@@ -43,8 +56,16 @@ final class CacheEmailAuthentication extends EmailAuthentication
         return $this->otpKey($user).self::EXPIRY_SUFFIX;
     }
 
+    /** Cache key that maps the current session to the pending user ID. */
+    private function sessionUserKey(): string
+    {
+        return self::SESSION_MAP_PREFIX.session()->getId();
+    }
+
     /**
      * Generate OTP, store hash+expiry in cache, send notification.
+     * Also caches the session→user_id mapping so verifyCode() can resolve
+     * the user even when Filament::auth()->user() is null (MFA challenge).
      *
      * Returns false when rate-limited (same behaviour as parent).
      */
@@ -67,6 +88,11 @@ final class CacheEmailAuthentication extends EmailAuthentication
         Cache::put($this->otpKey($user), Hash::make($code), $expiresAt);
         Cache::put($this->expiryKey($user), $expiresAt, $expiresAt);
 
+        // Store session → user_id so verifyCode() can look up the user
+        // when Filament::auth()->user() is null during the challenge step.
+        /** @phpstan-ignore-next-line */
+        Cache::put($this->sessionUserKey(), $user->getKey(), $expiresAt); // @phpstan-ignore-line
+
         if (!method_exists($user, 'notify')) {
             throw new LogicException('Model does not have a notify() method.');
         }
@@ -80,12 +106,25 @@ final class CacheEmailAuthentication extends EmailAuthentication
     }
 
     /**
-     * Verify OTP from cache.  Clears keys on success (one-time use).
+     * Verify OTP from cache.  Clears all keys on success (one-time use).
      */
     #[\Override]
     public function verifyCode(string $code): bool
     {
+        // Primary path: guard is already set (e.g. "remember me" session).
         $user = Filament::auth()->user();
+
+        // Fallback: during the MFA challenge Filament::auth()->user() is null
+        // because the guard isn't established until MFA succeeds. Resolve the
+        // user via the session→user_id cache mapping written in sendCode().
+        if (!($user instanceof HasEmailAuthentication)) {
+            $userId = Cache::get($this->sessionUserKey());
+
+            if ($userId !== null) {
+                /** @phpstan-ignore method.notFound */
+                $user = Filament::auth()->getProvider()->retrieveById($userId);
+            }
+        }
 
         if (!($user instanceof HasEmailAuthentication)) {
             return false;
@@ -105,6 +144,7 @@ final class CacheEmailAuthentication extends EmailAuthentication
 
         Cache::forget($this->otpKey($user));
         Cache::forget($this->expiryKey($user));
+        Cache::forget($this->sessionUserKey());
 
         return true;
     }

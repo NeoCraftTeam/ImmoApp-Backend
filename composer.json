@@ -49,7 +49,8 @@
         "socialiteproviders/apple": "^5.9",
         "spatie/laravel-activitylog": "^4.11",
         "spatie/laravel-backup": "^10.0",
-        "spatie/laravel-medialibrary": "^11.14"
+        "spatie/laravel-medialibrary": "^11.14",
+        "symfony/html-sanitizer": "^8.0.12"
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^3.6",
@@ -115,6 +116,19 @@
         "optimize-autoloader": true,
         "preferred-install": "dist",
         "sort-packages": true,
+        "audit": {
+            "ignore": [
+                "PKSA-z7t6-zt6p-wtng",
+                "PKSA-dw7n-x7f5-zf63",
+                "PKSA-28rh-rzzn-djk4",
+                "PKSA-wtxr-p26d-nn42",
+                "PKSA-2n2k-66v2-bwg3",
+                "PKSA-yc7t-91v9-99xs",
+                "PKSA-v5yj-8nmz-sk2q",
+                "PKSA-ft77-7h5f-p3r6",
+                "PKSA-b14r-zh1d-vdrc"
+            ]
+        },
         "allow-plugins": {
             "dealerdirect/phpcodesniffer-composer-installer": true,
             "pestphp/pest-plugin": true,

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Services\AdBoostService;
+use App\Services\BoostService;
 use Illuminate\Console\Command;
 
 /**
@@ -23,11 +24,16 @@ final class ExpireBoostedAds extends Command
 
     protected $description = 'Reset is_boosted/boost_score for ads whose boost_expires_at is in the past.';
 
-    public function handle(AdBoostService $service): int
+    public function handle(BoostService $boostService, AdBoostService $legacyService): int
     {
-        $count = $service->removeExpiredBoosts();
+        // New path: expire credit-based ad_boosts and update their status column.
+        $fromPacks = $boostService->expireStale();
 
-        $this->info("Expired boosts removed: {$count}");
+        // Legacy path: any ad that is still marked boosted but has no ad_boost
+        // record (subscription-based boosts or manual admin boosts).
+        $legacy = $legacyService->removeExpiredBoosts();
+
+        $this->info("Expired boosts: {$fromPacks} credit-based, {$legacy} legacy.");
 
         return self::SUCCESS;
     }

@@ -8,6 +8,7 @@ use App\Models\EmailPreference;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\View\View;
 
 class EmailPreferenceController
@@ -41,6 +42,34 @@ class EmailPreferenceController
             'category' => $category,
             'user' => $preference->user,
         ]);
+    }
+
+    /**
+     * RFC 8058 — one-click unsubscribe via POST (called by mail clients, e.g. Gmail).
+     * Body contains `List-Unsubscribe=One-Click`. Returns 204 No Content.
+     */
+    public function unsubscribeOneClick(Request $request, string $token): Response
+    {
+        $preference = EmailPreference::where('unsubscribe_token', $token)->firstOrFail();
+        $category = $request->query('category', 'all');
+
+        if ($category === 'all') {
+            $preference->update([
+                'ad_updates' => false,
+                'search_alerts' => false,
+                'subscription_updates' => false,
+                'survey_notifications' => false,
+                'admin_notifications' => false,
+                'welcome_emails' => false,
+            ]);
+        } elseif (in_array($category, [
+            'ad_updates', 'search_alerts', 'subscription_updates',
+            'survey_notifications', 'admin_notifications', 'welcome_emails',
+        ], true)) {
+            $preference->update([$category => false]);
+        }
+
+        return response()->noContent();
     }
 
     /**

@@ -399,3 +399,27 @@ it('returns 422 with french message when geniuspay rejects payload', function ()
     expect($message)->toContain('devise')
         ->and($message)->not->toContain('validation.in');
 });
+
+it('verify is idempotent: already-success payment skips gateway API call', function (): void {
+    Event::fake();
+    Http::fake();
+    geniusPayFeatureConfig();
+
+    $user = User::factory()->create();
+    Payment::factory()->create([
+        'transaction_id' => 'KH-ALREADYDONE1',
+        'status' => PaymentStatus::SUCCESS,
+        'type' => 'boost',
+        'user_id' => $user->id,
+        'gateway' => 'geniuspay',
+        'amount' => 5000,
+        'gateway_response' => ['genius_reference' => 'MTX-ALREADY'],
+    ]);
+
+    $this->actingAs($user)
+        ->postJson('/api/v1/payments/verify_payment', ['tx_ref' => 'KH-ALREADYDONE1'])
+        ->assertSuccessful();
+
+    Http::assertNothingSent();
+    Event::assertNotDispatched(PaymentSucceeded::class);
+});

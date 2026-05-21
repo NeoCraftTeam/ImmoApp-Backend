@@ -233,7 +233,7 @@ class SubscriptionService
         $result = $paymentService->createPayment($firstUser, [
             'amount' => (float) $amount,
             'type' => PaymentType::SUBSCRIPTION->value,
-            'payment_method' => 'flutterwave',
+            'payment_method' => 'orange_money',
             'agency_id' => $agency->id,
             'plan_id' => $plan->id,
             'period' => $subscription->billing_period,

@@ -358,6 +358,10 @@ class Ad extends Model implements HasMedia
      */
     public function getPublisherName(): string
     {
+        if (!$this->relationLoaded('user')) {
+            return '';
+        }
+
         $user = $this->user;
 
         // Si l'utilisateur est de type AGENCY, on essaie de retourner le nom de son agence
@@ -516,6 +520,12 @@ class Ad extends Model implements HasMedia
     public function leaseContracts(): HasMany
     {
         return $this->hasMany(LeaseContract::class);
+    }
+
+    /** @return HasMany<AdBoost, $this> */
+    public function adBoosts(): HasMany
+    {
+        return $this->hasMany(AdBoost::class);
     }
 
     /**

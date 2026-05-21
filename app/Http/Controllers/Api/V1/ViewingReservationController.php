@@ -160,6 +160,7 @@ final readonly class ViewingReservationController
                     'quarter',
                     'media',
                     'ad_type',
+                    'user',
                 ]),
                 'client:id,firstname,lastname,avatar,phone_number,email',
             ])
@@ -186,9 +187,9 @@ final readonly class ViewingReservationController
         );
 
         abort_unless(
-            $reservation->status === ReservationStatus::Pending,
+            in_array($reservation->status, [ReservationStatus::Pending, ReservationStatus::Expired], true),
             422,
-            'Seule une réservation en attente peut être confirmée.'
+            'Cette réservation a déjà été confirmée ou annulée.'
         );
 
         $confirmed = $this->confirmReservation->execute($reservation);

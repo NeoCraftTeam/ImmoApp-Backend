@@ -39,9 +39,10 @@ class PointService
         User $user,
         int $cost,
         string $description,
-        ?string $adId = null
+        ?string $adId = null,
+        PointTransactionType $type = PointTransactionType::UNLOCK,
     ): PointTransaction {
-        return DB::transaction(function () use ($user, $cost, $description, $adId): PointTransaction {
+        return DB::transaction(function () use ($user, $cost, $description, $adId, $type): PointTransaction {
             /** @var User $freshUser */
             $freshUser = User::query()
                 ->lockForUpdate()
@@ -52,11 +53,11 @@ class PointService
             }
 
             $freshUser->decrement('point_balance', $cost);
-            $user->point_balance = $freshUser->point_balance; // decrement() already updates in-memory
+            $user->point_balance = $freshUser->point_balance;
 
             return PointTransaction::create([
                 'user_id' => $user->id,
-                'type' => PointTransactionType::UNLOCK,
+                'type' => $type,
                 'points' => -$cost,
                 'description' => $description,
                 'ad_id' => $adId,

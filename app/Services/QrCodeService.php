@@ -33,9 +33,7 @@ use Throwable;
  */
 final readonly class QrCodeService
 {
-    public function __construct(
-        private AdUrlBuilder $urlBuilder,
-    ) {}
+    public function __construct() {}
 
     private const string BRAND = '#F6475F';
 

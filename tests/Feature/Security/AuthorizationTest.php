@@ -99,7 +99,7 @@ it('should reject sql injection attempt in reference field', function (): void {
         'tx_ref' => "'; DROP TABLE payments; --",
     ]);
 
-    $response->assertNotFound();
+    $response->assertUnprocessable(); // validation rejects before DB query
 });
 
 // ─── EXPOSITION DE DONNÉES SENSIBLES ─────────────────────────────────────

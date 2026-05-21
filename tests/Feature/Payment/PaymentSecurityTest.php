@@ -385,8 +385,10 @@ it('passes allowed callback_url to geniuspay for credit purchase', function (): 
         }
         $data = $request->data();
 
-        return ($data['success_url'] ?? null) === $callback
-            && ($data['error_url'] ?? null) === $callback;
+        // appendTxRefToReturnUrl appends ?tx_ref=KH-... to the URL; verify the
+        // callback base URL is still the prefix of success_url and error_url.
+        return str_starts_with((string) ($data['success_url'] ?? ''), $callback)
+            && str_starts_with((string) ($data['error_url'] ?? ''), $callback);
     });
 });
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Chat;
 
 use App\Models\Conversation;
+use App\Support\UploadedFileInspector;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -87,10 +88,10 @@ final readonly class AttachmentService
     public function upload(UploadedFile $file, Conversation $conversation): array
     {
         $mime = $this->normalizeDetectedMime($file);
-        $type = $this->resolveType($mime, (int) $file->getSize());
+        $type = $this->resolveType($mime, (int) $file->getSize(), $file);
 
         $uuid = (string) Str::uuid();
-        $ext = $file->getClientOriginalExtension();
+        $ext = UploadedFileInspector::extensionForMime($mime);
         $prefix = (string) config('chat.attachment_prefix', 'chats');
         $path = "{$prefix}/{$conversation->id}/{$uuid}.{$ext}";
 
@@ -101,7 +102,7 @@ final readonly class AttachmentService
         return [
             'url' => $path,
             'signed_url' => $signedUrl,
-            'original_name' => $file->getClientOriginalName(),
+            'original_name' => UploadedFileInspector::sanitizeDisplayFilename($file->getClientOriginalName()),
             'mime_type' => $mime,
             'size' => (int) $file->getSize(),
             'type' => $type,
@@ -146,13 +147,15 @@ final readonly class AttachmentService
      *
      * @throws InvalidArgumentException on invalid MIME type or excessive file size
      */
-    private function resolveType(string $mime, int $sizeBytes): string
+    private function resolveType(string $mime, int $sizeBytes, UploadedFile $file): string
     {
         $imageLimitBytes = (int) config('chat.uploads.image_max_mb', 10) * 1024 * 1024;
         $fileLimitBytes = (int) config('chat.uploads.file_max_mb', 20) * 1024 * 1024;
         $audioLimitBytes = (int) config('chat.uploads.audio_max_mb', 5) * 1024 * 1024;
 
         if (in_array($mime, self::IMAGE_MIMES, true)) {
+            UploadedFileInspector::assertSafeRasterImage($file);
+
             if ($sizeBytes > $imageLimitBytes) {
                 throw new InvalidArgumentException('Image too large (max 10 MB).');
             }
@@ -169,6 +172,8 @@ final readonly class AttachmentService
         }
 
         if (in_array($mime, self::DOCUMENT_MIMES, true)) {
+            UploadedFileInspector::assertSafeOfficeDocument($file);
+
             if ($sizeBytes > $fileLimitBytes) {
                 throw new InvalidArgumentException('Document too large (max 20 MB).');
             }
@@ -185,14 +190,16 @@ final readonly class AttachmentService
      */
     private function normalizeDetectedMime(UploadedFile $file): string
     {
-        $mime = strtolower(trim($file->getMimeType() ?: ''));
+        UploadedFileInspector::rejectDangerousFilename($file->getClientOriginalName());
+
+        $mime = UploadedFileInspector::detectContentMime($file);
         $ext = strtolower($file->getClientOriginalExtension());
 
         if ($mime === 'video/webm') {
             return 'audio/webm';
         }
 
-        if ($mime === '' || $mime === 'application/octet-stream') {
+        if ($mime === '' || in_array($mime, ['application/octet-stream', 'application/x-empty'], true)) {
             return match ($ext) {
                 'webm' => 'audio/webm',
                 'mp4', 'm4a' => 'audio/mp4',

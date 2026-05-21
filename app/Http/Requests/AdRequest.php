@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\Enums\AdStatus;
+use App\Rules\VerifiedImageUpload;
+use App\Rules\VerifiedPdfUpload;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Clickbar\Magellan\Http\Requests\TransformsGeojsonGeometry;
 use Clickbar\Magellan\Rules\GeometryGeojsonRule;
@@ -24,11 +26,40 @@ final class AdRequest extends FormRequest
      */
     private const int MAX_IMAGE_KILOBYTES = 20480;
 
-    private function imageFileRule(bool $sometimes = false): string
+    /**
+     * @return array<int, mixed>
+     */
+    private function imageFileRules(bool $sometimes = false): array
     {
-        $core = 'image|mimes:jpeg,jpg,png,gif,webp|max:'.self::MAX_IMAGE_KILOBYTES.'|dimensions:max_width=8000,max_height=8000';
+        $rules = [
+            'image',
+            'mimes:jpeg,jpg,png,gif,webp',
+            'mimetypes:image/jpeg,image/png,image/gif,image/webp',
+            'max:'.self::MAX_IMAGE_KILOBYTES,
+            'dimensions:max_width=8000,max_height=8000',
+            new VerifiedImageUpload,
+        ];
 
-        return $sometimes ? 'sometimes|'.$core : $core;
+        if ($sometimes) {
+            array_unshift($rules, 'sometimes');
+        }
+
+        return $rules;
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    private function propertyConditionPdfRules(): array
+    {
+        return [
+            'nullable',
+            'file',
+            'mimes:pdf',
+            'mimetypes:application/pdf',
+            'max:10240',
+            new VerifiedPdfUpload,
+        ];
     }
 
     public function rules(): array
@@ -116,24 +147,24 @@ final class AdRequest extends FormRequest
 
                 // Images,   plusieurs formats possibles
                 'images' => 'sometimes|array|max:10',
-                'images.*' => $this->imageFileRule(false),
+                'images.*' => $this->imageFileRules(false),
 
                 // Alias populaires (acceptation de variations courantes)
-                'image' => $this->imageFileRule(true),
+                'image' => $this->imageFileRules(true),
                 'photos' => 'sometimes|array|max:10',
-                'photos.*' => $this->imageFileRule(false),
+                'photos.*' => $this->imageFileRules(false),
 
                 // Support pour images[0], images[1], etc.
-                'images.0' => $this->imageFileRule(true),
-                'images.1' => $this->imageFileRule(true),
-                'images.2' => $this->imageFileRule(true),
-                'images.3' => $this->imageFileRule(true),
-                'images.4' => $this->imageFileRule(true),
-                'images.5' => $this->imageFileRule(true),
-                'images.6' => $this->imageFileRule(true),
-                'images.7' => $this->imageFileRule(true),
-                'images.8' => $this->imageFileRule(true),
-                'images.9' => $this->imageFileRule(true),
+                'images.0' => $this->imageFileRules(true),
+                'images.1' => $this->imageFileRules(true),
+                'images.2' => $this->imageFileRules(true),
+                'images.3' => $this->imageFileRules(true),
+                'images.4' => $this->imageFileRules(true),
+                'images.5' => $this->imageFileRules(true),
+                'images.6' => $this->imageFileRules(true),
+                'images.7' => $this->imageFileRules(true),
+                'images.8' => $this->imageFileRules(true),
+                'images.9' => $this->imageFileRules(true),
                 'attributes' => ['sometimes', 'array'],
                 'attributes.*' => [
                     'string',
@@ -161,7 +192,7 @@ final class AdRequest extends FormRequest
                 'distance_hospital_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
 
                 // Property condition PDF
-                'property_condition' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
+                'property_condition' => $this->propertyConditionPdfRules(),
 
                 // Boost request
                 'is_boost_requested' => ['nullable', 'boolean'],
@@ -242,34 +273,34 @@ final class AdRequest extends FormRequest
                 'distance_hospital_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
 
                 // Property condition PDF
-                'property_condition' => ['nullable', 'file', 'mimes:pdf', 'max:10240'],
+                'property_condition' => $this->propertyConditionPdfRules(),
 
                 // Boost request
                 'is_boost_requested' => ['nullable', 'boolean'],
 
                 // Images, plusieurs formats possibles
                 'images' => 'sometimes|array|max:10',
-                'images.*' => $this->imageFileRule(false),
+                'images.*' => $this->imageFileRules(false),
 
                 'images_to_delete' => 'sometimes|array',
                 'images_to_delete.*' => 'exists:media,id',
 
                 // Alias populaires (acceptation de variations courantes)
-                'image' => $this->imageFileRule(true),
+                'image' => $this->imageFileRules(true),
                 'photos' => 'sometimes|array|max:10',
-                'photos.*' => $this->imageFileRule(false),
+                'photos.*' => $this->imageFileRules(false),
 
                 // Support pour images[0], images[1], etc.
-                'images.0' => $this->imageFileRule(true),
-                'images.1' => $this->imageFileRule(true),
-                'images.2' => $this->imageFileRule(true),
-                'images.3' => $this->imageFileRule(true),
-                'images.4' => $this->imageFileRule(true),
-                'images.5' => $this->imageFileRule(true),
-                'images.6' => $this->imageFileRule(true),
-                'images.7' => $this->imageFileRule(true),
-                'images.8' => $this->imageFileRule(true),
-                'images.9' => $this->imageFileRule(true),
+                'images.0' => $this->imageFileRules(true),
+                'images.1' => $this->imageFileRules(true),
+                'images.2' => $this->imageFileRules(true),
+                'images.3' => $this->imageFileRules(true),
+                'images.4' => $this->imageFileRules(true),
+                'images.5' => $this->imageFileRules(true),
+                'images.6' => $this->imageFileRules(true),
+                'images.7' => $this->imageFileRules(true),
+                'images.8' => $this->imageFileRules(true),
+                'images.9' => $this->imageFileRules(true),
             ];
         }
 

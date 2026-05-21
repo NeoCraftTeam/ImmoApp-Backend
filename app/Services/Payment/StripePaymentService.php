@@ -570,7 +570,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
         } catch (ApiErrorException $e) {
             Log::error('Stripe verify (checkout session) failed', [
                 'session_id' => $sessionId,
-                'message'    => $e->getMessage(),
+                'message' => $e->getMessage(),
             ]);
 
             throw new PaymentGatewayException(
@@ -589,12 +589,12 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
         $paymentStatus = (string) ($session->payment_status ?? 'unpaid');
 
         return [
-            'status'         => $paymentStatus === 'paid' ? 'success' : 'pending',
-            'amount'         => 0.0,
-            'currency'       => (string) config('payment.default_currency', 'XAF'),
+            'status' => $paymentStatus === 'paid' ? 'success' : 'pending',
+            'amount' => 0.0,
+            'currency' => (string) config('payment.default_currency', 'XAF'),
             'payment_method' => null,
-            'paid_at'        => null,
-            'raw'            => ['session_payment_status' => $paymentStatus],
+            'paid_at' => null,
+            'raw' => ['session_payment_status' => $paymentStatus],
         ];
     }
 

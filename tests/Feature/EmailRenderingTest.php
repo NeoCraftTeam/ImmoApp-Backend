@@ -66,7 +66,7 @@ it('renders without errors and produces valid HTML', function (Closure $factory)
 it('client layout uses pink accent bar', function (): void {
     $html = new VerificationCodeMail('123456', '127.0.0.1', 'now', 'customer')->render();
 
-    expect($html)->toContain('#f43f5e');
+    expect($html)->toContain('#F6475F');
 });
 
 it('owner layout uses teal accent bar', function (): void {

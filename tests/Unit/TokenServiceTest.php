@@ -76,9 +76,11 @@ it('revokes matching tokens before creating a new one', function (): void {
 
     $newToken = $service->rotateForUser($user, 'token', 'owner_token_%');
 
-    // Old matching tokens deleted, unrelated kept, new one created
-    expect($user->tokens()->count())->toBe(2);
-    expect($user->tokens()->where('name', 'like', 'client_other_%')->exists())->toBeTrue();
+    // Matching tokens are soft-revoked (revoked_at set), not hard-deleted.
+    // Active tokens: client_other_333 + new owner_token_* = 2.
+    expect($user->tokens()->whereNull('revoked_at')->count())->toBe(2);
+    expect($user->tokens()->where('name', 'like', 'client_other_%')->whereNull('revoked_at')->exists())->toBeTrue();
+    expect($user->tokens()->where('name', 'like', 'owner_token_%')->whereNotNull('revoked_at')->count())->toBe(2);
     expect($newToken->accessToken->name)->toStartWith('owner_token_');
 });
 

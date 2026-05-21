@@ -13,6 +13,7 @@ use App\Enums\UserRole;
 use App\Enums\UserType;
 use App\Models\CashierSubscription;
 use App\Models\CashierSubscriptionItem;
+use App\Models\EmailSuppression;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
 use App\Services\AiSearchService;
@@ -174,6 +175,29 @@ class AppServiceProvider extends ServiceProvider
 
         View::composer(['emails.*', 'emails.reservation.*'], static function ($view) use ($emailViewData): void {
             $view->with($emailViewData);
+        });
+
+        // ── E-2 : Suppression guard ───────────────────────────────────────────
+        // Return false to cancel sending to any address in email_suppressions.
+        // Laravel's Mailer::sendNow() uses events->until(), so false stops the send.
+        Event::listen(MessageSending::class, static function (MessageSending $event): ?bool {
+            $recipients = array_keys(
+                array_merge(
+                    $event->message->getTo(),
+                    $event->message->getCc(),
+                    $event->message->getBcc(),
+                )
+            );
+
+            foreach ($recipients as $address) {
+                if (EmailSuppression::where('email', strtolower((string) $address))->exists()) {
+                    Log::info('mail.suppressed', ['email' => $address]);
+
+                    return false;
+                }
+            }
+
+            return null;
         });
 
         // ── Auto plain-text MIME part ─────────────────────────────────────────

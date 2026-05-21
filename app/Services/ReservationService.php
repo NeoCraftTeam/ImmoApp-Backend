@@ -77,7 +77,7 @@ final readonly class ReservationService implements ReservationServiceInterface
                     'slot_ends_at' => $data['slot_ends_at'],
                     'status' => ReservationStatus::Pending,
                     'client_message' => $data['client_message'] ?? null,
-                    'expires_at' => now()->addHours(24),
+                    'expires_at' => now()->addHours((int) config('viewings.reservation_ttl_hours', 72)),
                 ]);
             });
         } catch (UniqueConstraintViolationException $e) {

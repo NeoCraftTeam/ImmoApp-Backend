@@ -6,6 +6,7 @@ namespace App\Mail\Concerns;
 
 use App\Models\EmailPreference;
 use App\Models\User;
+use Symfony\Component\Mime\Email;
 
 /**
  * Adds unsubscribe and preference management URLs to marketing emails.
@@ -40,10 +41,20 @@ trait HasUnsubscribeLinks
         $token = $preference->unsubscribe_token;
         $category = $this->emailCategory();
 
-        $unsubscribeUrl = route('email.unsubscribe', ['token' => $token])
-            .($category !== 'all' ? '?category='.urlencode((string) $category) : '');
+        $categorySuffix = $category !== 'all' ? '?category='.urlencode((string) $category) : '';
 
+        $unsubscribeUrl = route('email.unsubscribe', ['token' => $token]).$categorySuffix;
+        $oneClickUrl = route('email.unsubscribe.one-click', ['token' => $token]).$categorySuffix;
         $preferencesUrl = route('email.preferences', ['token' => $token]);
+
+        // RFC 8058 — List-Unsubscribe one-click POST header required by Gmail & Yahoo since 2024.
+        // withSymfonyMessage() is available on all Mailable subclasses that use this trait.
+        // @phpstan-ignore-next-line (call.undefined)
+        $this->withSymfonyMessage(static function (Email $message) use ($oneClickUrl): void {
+            $h = $message->getHeaders();
+            $h->addTextHeader('List-Unsubscribe', '<'.$oneClickUrl.'>');
+            $h->addTextHeader('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click');
+        });
 
         return [
             'unsubscribeUrl' => $unsubscribeUrl,

@@ -72,12 +72,14 @@ class PointTransactionsTable
                         PointTransactionType::UNLOCK => 'warning',
                         PointTransactionType::BONUS => 'info',
                         PointTransactionType::REFUND => 'gray',
+                        PointTransactionType::BOOST => 'primary',
                     })
                     ->formatStateUsing(fn (PointTransactionType $state): string => match ($state) {
                         PointTransactionType::PURCHASE => 'Achat',
                         PointTransactionType::UNLOCK => 'Déblocage',
                         PointTransactionType::BONUS => 'Bonus',
                         PointTransactionType::REFUND => 'Remboursement',
+                        PointTransactionType::BOOST => 'Boost',
                     }),
 
                 TextColumn::make('points')

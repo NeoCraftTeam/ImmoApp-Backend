@@ -681,19 +681,22 @@ final readonly class PaymentService
      *  - Transaction reference (SANDBOX_N… / MTX-T…): appended to the redirect
      *    URL after the customer completes checkout. Useful for display only.
      *
-     * We therefore prefer the stored checkout reference over the redirect reference.
+     * When the caller provides an explicit override (e.g. from the redirect
+     * callback), that value is fresher than what was stored at initiate time
+     * (sandbox may reassign the reference after the hosted-checkout flow).
+     * We therefore prefer the override, then the stored reference.
      */
     private static function resolveGeniusPayVerifyReference(Payment $payment, ?string $override): string
     {
-        // 1. Stored checkout reference (most reliable for API lookup).
+        // 1. Explicit override from the redirect callback (fresher in sandbox flows).
+        if (is_string($override) && $override !== '' && PaymentTransactionLookup::isGatewayReference($override)) {
+            return $override;
+        }
+
+        // 2. Stored checkout reference recorded at initiate time.
         $storedRef = self::geniusPayReferenceFromPayment($payment);
         if ($storedRef !== null) {
             return $storedRef;
-        }
-
-        // 2. Transaction reference from the redirect URL (fallback).
-        if (is_string($override) && $override !== '' && PaymentTransactionLookup::isGatewayReference($override)) {
-            return $override;
         }
 
         return (string) $payment->transaction_id;

@@ -15,6 +15,7 @@ use App\Filament\Imports\AdImporter;
 use App\Filament\Resources\Ads\Concerns\SharedAdResource;
 use App\Mail\AdDeclinedMail;
 use App\Models\Ad;
+use App\Support\AdScoutSync;
 use BackedEnum;
 use Carbon\Carbon;
 use Filament\Actions\BulkAction;
@@ -203,7 +204,8 @@ class AdResource extends Resource
                                 if ($ad->status !== AdStatus::PENDING) {
                                     continue;
                                 }
-                                $ad->forceFill(['status' => AdStatus::AVAILABLE])->save();
+                                Ad::withoutSyncingToSearch(fn () => $ad->forceFill(['status' => AdStatus::AVAILABLE])->save());
+                                AdScoutSync::syncSearchIndexBestEffort($ad->refresh());
                             }
                         }),
                     BulkAction::make('reject')

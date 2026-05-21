@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Models\Ad;
 use App\Models\User;
+use App\Rules\VerifiedImageUpload;
 use App\Services\TourService;
 use App\Support\PanoramaAngles;
 use App\Support\TourAssetToken;
@@ -59,7 +60,15 @@ final readonly class TourController
         $request->validate([
             'scenes' => ['required', 'array', 'min:1', 'max:20'],
             'scenes.*.title' => ['required', 'string', 'max:50'],
-            'scenes.*.image' => ['required', 'file', 'mimes:jpg,jpeg,webp', 'max:30720'],
+            'scenes.*.image' => [
+                'required',
+                'file',
+                'image',
+                'mimes:jpg,jpeg,webp',
+                'mimetypes:image/jpeg,image/webp',
+                'max:30720',
+                new VerifiedImageUpload,
+            ],
             'scenes.*.client_id' => ['nullable', 'string', 'max:100'],
             'scenes.*.hotspots' => ['nullable', 'array'],
             'scenes.*.hotspots.*.pitch' => ['required_with:scenes.*.hotspots', 'numeric', 'between:-90,90'],

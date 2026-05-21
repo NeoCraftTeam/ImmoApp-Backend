@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Rules\VerifiedImageUpload;
 use Illuminate\Foundation\Http\FormRequest;
 
 final class AdImageRequest extends FormRequest
@@ -11,7 +12,14 @@ final class AdImageRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'image_path' => ['required', 'image', 'max:2048'],
+            'image_path' => [
+                'required',
+                'image',
+                'mimes:jpeg,jpg,png,webp,gif',
+                'mimetypes:image/jpeg,image/png,image/webp,image/gif',
+                'max:2048',
+                new VerifiedImageUpload,
+            ],
             'ad_id' => ['required', 'exists:ad'],
         ];
     }

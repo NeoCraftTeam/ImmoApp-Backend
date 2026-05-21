@@ -144,8 +144,8 @@ vendor/bin/rector process --dry-run
 - **Support** (`app/Support/`) — utility helpers (`ApiResponse`, `GeoLocation`, `PanelUrl`, `TourAssetToken`, etc.).
 
 ### Models (`app/Models/`)
-`Ad`, `AdInteraction`, `AdReport`, `AdType`, `Agency`, `AnonymousSurveyAnswer`, `AnonymousSurveyResponse`,
-`City`, `Document`, `EmailPreference`, `Expense`, `Invoice`, `LeaseContract`, `LeaseSignatureRequest`,
+`Ad`, `AdBoost`, `AdInteraction`, `AdReport`, `AdType`, `Agency`, `AnonymousSurveyAnswer`, `AnonymousSurveyResponse`,
+`BoostPack`, `City`, `Document`, `EmailPreference`, `Expense`, `Invoice`, `LeaseContract`, `LeaseSignatureRequest`,
 `LoginHistory`, `NewsletterCampaign`, `NewsletterSubscriber`, `NotificationPreference`, `Payment`,
 `PersonalAccessToken`, `PointPackage`, `PointTransaction`, `PromoCode`, `PromoCodeUsage`,
 `PropertyAttribute`, `PropertyAttributeCategory`, `PushSubscription`, `Quarter`, `QueueFailedJob`,
@@ -172,8 +172,9 @@ vendor/bin/rector process --dry-run
 - `Payment/PaymentMethodGateService` — admin-controlled per-method gating. Persisted in `Setting` (`payment_method:{value}:enabled`), cached 5 min, same pattern as `FeatureFlagService`. Methods: `isEnabled / enable / disable / reset / available / describeAvailable / describeAll`. Defaults via `match` (compile-time exhaustive). Consumed by `GET /api/v1/payments/methods` (public catalogue) and `FlutterwaveInitiateRequest::withValidator()` (rejects disabled methods at validation time with French error label).
 - `Payment/RefundService` — refund processing (gateway-agnostic via the registry).
 - `SubscriptionService` — plan management & renewals.
-- `PointService` — credit wallet operations.
-- `AdBoostService` — ad promotion logic.
+- `PointService` — credit wallet operations. `deduct()` accepts optional `PointTransactionType` param (defaults `UNLOCK`); add `type: PointTransactionType::BOOST` for landlord boost debits.
+- `BoostService` — credit-based boost orchestrator. `apply(User, Ad, BoostPack)` atomic: deducts credits, writes `AdBoost` record, calls `Ad::boost()`. `expireStale()` marks expired `ad_boosts` rows and calls `Ad::unboost()`.
+- `AdBoostService` — subscription-based ad promotion logic (legacy, still used by `ExpireBoostedAds` command for subscription-sourced boosts).
 - `AdReportService` — abuse reporting.
 - `AgencyService` — agency CRUD.
 - `ViewingScheduleService` / `ReservationService` — viewing calendar & booking. Slot validation uses `ViewingScheduleService::isOfferedBookableSlot()` (same duration/buffer as `GET /ads/{ad}/slots`), not Zap’s `Ad::isBookableAtTime()` which defaulted to 60-minute slots and disagreed with the public slot list. Client `POST /api/v1/ads/{ad}/reservations` uses RateLimiter **`viewings.reserve`** (default 20/min per authenticated user; `RL_VIEWINGS_RESERVE` / `config/rate_limiting.php`). **At most one active reservation** (`pending` or `confirmed`) per `(client, ad)` — enforced in `ReservationService::assertSlotIsAvailable()` + partial unique index `tr_unique_client_ad_active`; duplicate attempt returns **409** `CLIENT_ACTIVE_RESERVATION_EXISTS`. **Notifications** (mail + `database` + optional Web Push) for create / confirm / cancel / expire are sent from `TentativeReservationObserver`; reservation-related `Notification` classes call `$this->afterCommit()` so queued workers only process jobs after the `tentative_reservations` row is visible (avoids failed jobs when `QUEUE_CONNECTION` is Redis and the HTTP request still holds an open DB transaction). On create, the **client** and **landlord** each receive a **different** notification class (not a duplicate to the same inbox).
@@ -441,8 +442,8 @@ Le paramètre `{paymentMethod}` est contraint au format `pm_*` via une regex pat
 ### Filament Panels
 - **Admin** (`app/Filament/Admin/`) — full platform management. Path: `/admin`.
   Provider: `app/Providers/Filament/AdminPanelProvider.php`.
-  Resources: `AcquisitionUsers`, `ActivityLogs`, `AdReports`, `AdTypes`, `Ads`, `Agencies`, `Cities`,
-  `NewsletterCampaigns`, `NewsletterSubscribers`, `Payments`, `PendingAds`, `PointPackages`,
+  Resources: `AcquisitionUsers`, `ActivityLogs`, `AdReports`, `AdTypes`, `Ads`, `Agencies`, `BoostPacks`,
+  `Cities`, `NewsletterCampaigns`, `NewsletterSubscribers`, `Payments`, `PendingAds`, `PointPackages`,
   `PointTransactions`, `PromoCodes`, `PropertyAttributeCategories`, `PropertyAttributes`, `Quarters`,
   `Refunds`, `Reviews`, `SiteVisits`, `SubscriptionPlans`, `SubscriptionResource`, `Surveys`,
   `UnlockedAds`, `Users`.
@@ -487,8 +488,8 @@ All prefixed `/api/v1/`: `auth.php`, `ads.php`, `payments.php`, `viewings.php`, 
 `SanitizeInput`, `SecurityHeaders`, `VerifyCsrfToken`.
 
 ### Enums (`app/Enums/`)
-`AdReportReason`, `AdReportScamReason`, `AdReportStatus`, `AdStatus`, `CancelledBy`,
-`PaymentGateway`, `PaymentMethod`, `PaymentStatus`, `PaymentType`, `PointTransactionType`,
+`AdBoostStatus` (Active/Expired/Cancelled), `AdReportReason`, `AdReportScamReason`, `AdReportStatus`, `AdStatus`, `CancelledBy`,
+`PaymentGateway`, `PaymentMethod`, `PaymentStatus`, `PaymentType`, `PointTransactionType` (PURCHASE/UNLOCK/BONUS/REFUND/**BOOST**),
 `PropertyAttribute`, `RefundStatus`, `ReservationStatus`, `SubscriptionStatus`,
 `SurveyAnonymousAudience`, `TransactionType`, `TrustScoreTier`, `UserRole`, `UserType`, `VerificationStatus`.
 

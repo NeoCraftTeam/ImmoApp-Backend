@@ -21,6 +21,7 @@ class DatabaseSeeder extends Seeder
             AdTypeSeeder::class,
             SubscriptionPlanSeeder::class,
             PointSystemSeeder::class,
+            BoostPackSeeder::class,
             CameroonCitiesSeeder::class,
             PropertyAttributeSeeder::class,
             MassiveAdSeeder::class,

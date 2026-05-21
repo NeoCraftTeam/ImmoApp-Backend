@@ -107,6 +107,7 @@ final readonly class ClerkAuthController
 
             return response()->json([
                 'access_token' => $token->plainTextToken,
+                'expires_at' => $token->accessToken->expires_at,
                 'user' => new UserResource($user),
                 'panel_sso_url' => $this->buildPanelSsoUrl($user),
             ]);
@@ -260,6 +261,7 @@ final readonly class ClerkAuthController
             return response()->json([
                 'state' => 'authenticated',
                 'access_token' => $token->plainTextToken,
+                'expires_at' => $token->accessToken->expires_at,
                 'user' => new UserResource($user),
                 'panel_sso_url' => $this->buildPanelSsoUrl($user),
             ]);
@@ -411,6 +413,7 @@ final readonly class ClerkAuthController
 
         return response()->json([
             'access_token' => $token->plainTextToken,
+            'expires_at' => $token->accessToken->expires_at,
             'user' => new UserResource($user),
             'panel_sso_url' => $this->buildPanelSsoUrl($user),
         ], $isNew ? 201 : 200);

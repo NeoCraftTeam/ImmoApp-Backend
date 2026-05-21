@@ -340,15 +340,15 @@ final class CreditController
         if ($synced->status === PaymentStatus::PENDING && $redirectConfirmed && $isGeniusPay && $hasCheckoutLink) {
             Log::info('GeniusPay: trusting redirect status while verify API is silent', [
                 'payment_id' => $synced->id,
-                'tx_ref'     => $synced->transaction_id,
+                'tx_ref' => $synced->transaction_id,
                 'redirect_status' => $redirectStatus,
             ]);
             $synced->forceFill(['status' => PaymentStatus::SUCCESS])->save();
             $this->postPaymentActions->execute($synced, (array) ($synced->gateway_response ?? []));
 
             return response()->json([
-                'status'        => 'completed',
-                'message'       => 'Achat de crédits confirmé.',
+                'status' => 'completed',
+                'message' => 'Achat de crédits confirmé.',
                 'point_balance' => (int) $user->fresh()->point_balance,
             ]);
         }

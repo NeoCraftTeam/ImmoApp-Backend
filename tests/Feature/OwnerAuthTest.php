@@ -45,7 +45,7 @@ test('admin cannot login with login_context=owner', function (): void {
 
     $response->assertUnauthorized()
         ->assertJsonPath('code', 'PANEL_ACCESS_DENIED')
-        ->assertJsonPath('message', 'Identifiants incorrects ');
+        ->assertJsonPath('message', 'Identifiants incorrects');
 });
 
 test('customer cannot login with login_context=owner', function (): void {
