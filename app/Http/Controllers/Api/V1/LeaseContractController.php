@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\LeaseAuditEvent;
 use App\Http\Requests\Api\V1\EnhanceLeaseConditionsRequest;
 use App\Http\Requests\Api\V1\GenerateLeaseContractRequest;
 use App\Http\Requests\Api\V1\UpdateLeaseContractRequest;
 use App\Http\Resources\LeaseContractResource;
 use App\Models\Ad;
 use App\Models\LeaseContract;
+use App\Models\LeaseSignatureAuditLog;
 use App\Services\AiDescriptionEnhancer;
 use App\Services\LeaseContractService;
 use Illuminate\Http\JsonResponse;
@@ -48,11 +50,19 @@ final class LeaseContractController
     /**
      * Generate a lease contract PDF for the given ad.
      */
-    public function show(LeaseContract $leaseContract): LeaseContractResource|JsonResponse
+    public function show(Request $request, LeaseContract $leaseContract): LeaseContractResource|JsonResponse
     {
         if ($leaseContract->user_id !== auth()->id()) {
             return response()->json(['message' => 'Non autorisé'], 403);
         }
+
+        LeaseSignatureAuditLog::record(
+            leaseContractId: $leaseContract->id,
+            event: LeaseAuditEvent::Viewed,
+            userId: auth()->id(),
+            ipAddress: $request->ip(),
+            userAgent: $request->userAgent(),
+        );
 
         return new LeaseContractResource($leaseContract->load(['ad', 'ad.media', 'ad.ad_type', 'ad.quarter.city']));
     }
@@ -108,6 +118,15 @@ final class LeaseContractController
             $request->validated(),
         );
 
+        LeaseSignatureAuditLog::record(
+            leaseContractId: $contract->id,
+            event: LeaseAuditEvent::Generated,
+            userId: auth()->id(),
+            ipAddress: $request->ip(),
+            userAgent: $request->userAgent(),
+            metadata: ['contract_number' => $contract->contract_number],
+        );
+
         return response()->json([
             'success' => true,
             'message' => "Contrat {$contract->contract_number} généré avec succès.",
@@ -118,7 +137,7 @@ final class LeaseContractController
     /**
      * Download the lease contract PDF.
      */
-    public function download(LeaseContract $leaseContract): StreamedResponse|JsonResponse
+    public function download(Request $request, LeaseContract $leaseContract): StreamedResponse|JsonResponse
     {
         if ($leaseContract->user_id !== auth()->id()) {
             return response()->json(['message' => 'Non autorisé'], 403);
@@ -129,10 +148,50 @@ final class LeaseContractController
             return response()->json(['message' => 'Fichier introuvable'], 404);
         }
 
+        LeaseSignatureAuditLog::record(
+            leaseContractId: $leaseContract->id,
+            event: LeaseAuditEvent::Downloaded,
+            userId: auth()->id(),
+            ipAddress: $request->ip(),
+            userAgent: $request->userAgent(),
+        );
+
         return response()->streamDownload(
             fn () => print (Storage::disk($disk)->get($leaseContract->pdf_path)),
             "contrat-{$leaseContract->contract_number}.pdf",
             ['Content-Type' => 'application/pdf']
         );
+    }
+
+    /**
+     * Return the audit trail for a lease contract (owner only).
+     *
+     * @OA\Get(
+     *     path="/api/v1/lease-contracts/{leaseContract}/audit-log",
+     *     summary="Journal d'audit d'un contrat de bail",
+     *     description="Retourne le journal chronologique des événements du contrat : génération, consultation, téléchargement, signature.",
+     *     tags={"📄 Contrats de bail"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Parameter(name="leaseContract", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=200, description="Journal d'audit"),
+     *     @OA\Response(response=403, description="Non autorisé"),
+     *     @OA\Response(response=404, description="Contrat introuvable")
+     * )
+     */
+    public function auditLog(LeaseContract $leaseContract): JsonResponse
+    {
+        if ($leaseContract->user_id !== auth()->id()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        $logs = LeaseSignatureAuditLog::query()
+            ->where('lease_contract_id', $leaseContract->id)
+            ->with('user:id,firstname,lastname,email')
+            ->orderBy('occurred_at')
+            ->get(['id', 'lease_contract_id', 'user_id', 'event', 'ip_address', 'metadata', 'occurred_at']);
+
+        return response()->json(['data' => $logs]);
     }
 }

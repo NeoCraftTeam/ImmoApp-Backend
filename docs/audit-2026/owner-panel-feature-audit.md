@@ -438,14 +438,14 @@ En Afrique, la hiérarchie des canaux de notification :
 
 | # | Feature | Gap | Action |
 |---|---------|-----|--------|
-| 1 | **Bail** | Audit trail signature inexistant (illégal sans) | `LeaseSignatureAuditLog` table + middleware |
+| 1 | **Bail** | Audit trail signature inexistant (illégal sans) | `LeaseSignatureAuditLog` table + middleware | ✅ **DONE** — migration + model + `LeaseAuditEvent` enum + `GET /{contract}/audit-log` + logging in store/show/download |
 | 2 | **Bail** | PDF signé non généré | Integration laravel-pdf ou gotenberg |
 | 3 | **Notifications** | SMS absent (canal #1 Afrique sub-saharienne) | Orange SMS API / Twilio |
 | 4 | **Notifications** | WhatsApp Business absent | 360dialog ou Meta Cloud API |
 | 5 | **Visites** | Pas de rappel automatique J-1 / H-2 | Queue job `SendViewingReminder` | ✅ **DONE** — `SendViewingReminders` command + `ViewingReminderNotification` + scheduled daily 08:00 |
 | 6 | **Trust Score** | Badge vérifié absent sur profil/annonces | Frontend uniquement |
 | 7 | **Annonces** | Partage WhatsApp 1-clic absent | `<a href="https://wa.me/?text=...">` |
-| 8 | **Boost** | Dashboard ROI boost absent | `AdInteraction` stats endpoint |
+| 8 | **Boost** | Dashboard ROI boost absent | `AdInteraction` stats endpoint | ✅ **DONE** — `GET /my/ads/{ad}/boost/roi` via `BoostController::boostRoi()` — before/during/after windows + delta |
 | 9 | **Dashboard** | Taux occupation manquant | Calcul depuis `LeaseContract` | ✅ **DONE** — `GET /api/v1/my/stats` via `OwnerDashboardController` |
 | 10 | **Contrats** | Alerte renouvellement absente | Queue + notification J-30, J-60 | ✅ **DONE** — `CheckLeaseExpirations` (90/60/30/14/7j) + `LeaseExpiringNotification` scheduled daily 09:00 |
 
@@ -576,8 +576,8 @@ KeyHome ───────┼────────────────
 
 ### Sprint 3 (4 semaines) — Différenciation premium
 - [ ] PDF bail signé (Gotenberg sidecar + endpoint)
-- [ ] Audit trail signature bail
-- [ ] Dashboard boost ROI
+- [x] Audit trail signature bail — `LeaseSignatureAuditLog` + `LeaseAuditEvent` + `GET /my/lease-contracts/{id}/audit-log`
+- [x] Dashboard boost ROI — `GET /my/ads/{ad}/boost/roi` (before/during/after + delta)
 - [ ] WhatsApp Business API (360dialog)
 - [ ] Fourchette prix suggérée dans formulaire création annonce
 
