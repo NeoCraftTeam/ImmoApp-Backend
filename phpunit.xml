@@ -43,5 +43,6 @@
         <env name="FLW_WEBHOOK_SECRET" value="test_webhook_secret_123"/>
         <env name="TURNSTILE_SITE_KEY" value=""/>
         <env name="TURNSTILE_SECRET_KEY" value=""/>
+        <env name="CHAT_ENCRYPTION_KEY" value="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"/>
     </php>
 </phpunit>
