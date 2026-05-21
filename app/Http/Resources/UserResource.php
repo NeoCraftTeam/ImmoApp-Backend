@@ -6,6 +6,7 @@ namespace App\Http\Resources;
 
 use App\Models\Agency;
 use App\Models\City;
+use App\Models\TrustScore;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -97,7 +98,51 @@ final class UserResource extends JsonResource
                 $request->user()?->id === $this->id,
                 $this->chat_e2ee_public_key_pem,
             ),
+
+            // Item 6 — Trust badge (always public)
+            'is_verified' => $this->email_verified_at !== null,
+            'trust_score' => $this->getTrustScoreValue(),
+            'trust_tier' => $this->getTrustTierValue(),
+            'trust_tier_label' => $this->getTrustTierLabel(),
+            'trust_tier_hex_color' => $this->getTrustTierHexColor(),
         ];
+    }
+
+    private function latestTrustScore(): ?TrustScore
+    {
+        return Cache::remember(
+            "trust_score_resource:{$this->id}",
+            now()->addHour(),
+            fn () => $this->trustScores()->latest('computed_at')->first(),
+        );
+    }
+
+    private function getTrustScoreValue(): int
+    {
+        $ts = $this->latestTrustScore();
+
+        return $ts !== null ? $ts->score : 0;
+    }
+
+    private function getTrustTierValue(): string
+    {
+        $ts = $this->latestTrustScore();
+
+        return $ts !== null ? $ts->tier->value : 'non_verifie';
+    }
+
+    private function getTrustTierLabel(): string
+    {
+        $ts = $this->latestTrustScore();
+
+        return $ts !== null ? $ts->tier->label() : 'Non vérifié';
+    }
+
+    private function getTrustTierHexColor(): string
+    {
+        $ts = $this->latestTrustScore();
+
+        return $ts !== null ? $ts->tier->hexColor() : '#9CA3AF';
     }
 
     private function getAvatarUrl(): ?string

@@ -443,8 +443,8 @@ En Afrique, la hiérarchie des canaux de notification :
 | 3 | **Notifications** | SMS absent (canal #1 Afrique sub-saharienne) | Orange SMS API / Twilio |
 | 4 | **Notifications** | WhatsApp Business absent | 360dialog ou Meta Cloud API |
 | 5 | **Visites** | Pas de rappel automatique J-1 / H-2 | Queue job `SendViewingReminder` | ✅ **DONE** — `SendViewingReminders` command + `ViewingReminderNotification` + scheduled daily 08:00 |
-| 6 | **Trust Score** | Badge vérifié absent sur profil/annonces | Frontend uniquement |
-| 7 | **Annonces** | Partage WhatsApp 1-clic absent | `<a href="https://wa.me/?text=...">` |
+| 6 | **Trust Score** | Badge vérifié absent sur profil/annonces | Frontend uniquement | ✅ **DONE** — `is_verified`, `trust_score`, `trust_tier`, `trust_tier_label`, `trust_tier_hex_color` added to `UserResource` + inline owner in `AdResource` |
+| 7 | **Annonces** | Partage WhatsApp 1-clic absent | `<a href="https://wa.me/?text=...">` | ✅ **DONE** — `whatsapp_share_url` + `canonical_url` added to `AdResource` |
 | 8 | **Boost** | Dashboard ROI boost absent | `AdInteraction` stats endpoint | ✅ **DONE** — `GET /my/ads/{ad}/boost/roi` via `BoostController::boostRoi()` — before/during/after windows + delta |
 | 9 | **Dashboard** | Taux occupation manquant | Calcul depuis `LeaseContract` | ✅ **DONE** — `GET /api/v1/my/stats` via `OwnerDashboardController` |
 | 10 | **Contrats** | Alerte renouvellement absente | Queue + notification J-30, J-60 | ✅ **DONE** — `CheckLeaseExpirations` (90/60/30/14/7j) + `LeaseExpiringNotification` scheduled daily 09:00 |
