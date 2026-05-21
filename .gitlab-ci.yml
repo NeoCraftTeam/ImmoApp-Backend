@@ -393,6 +393,15 @@ test_suite:
     - APP_IMAGE=$FULL_IMAGE docker compose exec -dT app php artisan scout:import "App\\Models\\Ad" || true
     - echo "📄 Generating Swagger docs (non-blocking)..."
     - APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan l5-swagger:generate || true
+    - echo "🔎 Pinging IndexNow (Bing) + Google sitemap..."
+    - |
+      if [ -n "${INDEXNOW_KEY}" ]; then
+        curl -s "https://api.indexnow.org/indexnow?url=https://keyhome.app/sitemap.xml&key=${INDEXNOW_KEY}" || true
+        curl -s "https://www.google.com/ping?sitemap=https://keyhome.app/sitemap.xml" || true
+        echo "✅ Sitemap pings sent"
+      else
+        echo "⚠️  INDEXNOW_KEY not set — skipping sitemap ping"
+      fi
   after_script:
     - docker logout $CI_REGISTRY 2>/dev/null || true
 

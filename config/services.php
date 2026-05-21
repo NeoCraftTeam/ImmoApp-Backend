@@ -213,4 +213,16 @@ return [
         'xaf_to_eur_rate' => 655.957,
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | IndexNow (instant indexing — Bing, Yandex, Seznam)
+    |--------------------------------------------------------------------------
+    | Generate a key at https://www.bing.com/webmasters and host the file
+    | {key}.txt (containing just the key) at keyhome-frontend-next/public/.
+    */
+    'indexnow' => [
+        'key' => env('INDEXNOW_KEY', ''),
+        'host' => env('INDEXNOW_HOST', 'keyhome.app'),
+    ],
+
 ];

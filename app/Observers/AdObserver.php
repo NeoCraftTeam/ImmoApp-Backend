@@ -8,10 +8,13 @@ use App\Enums\AdStatus;
 use App\Events\AdCreated;
 use App\Events\AdStatusTransitioned;
 use App\Models\Ad;
+use App\Services\IndexNowService;
 use Illuminate\Support\Facades\Cache;
 
 class AdObserver
 {
+    public function __construct(private readonly IndexNowService $indexNow) {}
+
     /**
      * Ensure tour_config always has a default_scene set before saving.
      */
@@ -31,6 +34,9 @@ class AdObserver
     {
         AdCreated::dispatch($ad);
         $this->invalidateFeedCache();
+        if ($ad->status === AdStatus::AVAILABLE && $ad->slug) {
+            $this->indexNow->ping($this->adUrl($ad->slug));
+        }
     }
 
     /**
@@ -60,6 +66,10 @@ class AdObserver
         }
 
         AdStatusTransitioned::dispatch($ad, $oldStatus, $newStatus);
+
+        if ($newStatus === AdStatus::AVAILABLE && $ad->slug) {
+            $this->indexNow->ping($this->adUrl($ad->slug));
+        }
     }
 
     /**
@@ -68,6 +78,16 @@ class AdObserver
     public function deleted(Ad $ad): void
     {
         $this->invalidateFeedCache();
+        if ($ad->slug) {
+            $this->indexNow->ping($this->adUrl($ad->slug));
+        }
+    }
+
+    private function adUrl(string $slug): string
+    {
+        $host = rtrim((string) config('services.indexnow.host', 'keyhome.app'), '/');
+
+        return "https://{$host}/ads/{$slug}";
     }
 
     /**
