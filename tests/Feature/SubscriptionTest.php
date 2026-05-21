@@ -14,6 +14,10 @@ use Laravel\Sanctum\Sanctum;
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
+    config()->set('payment.gateways.geniuspay.api_key', 'pk_sandbox_test_fake');
+    config()->set('payment.gateways.geniuspay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.geniuspay.redirect_url', 'https://test.app/payment/callback');
+
     $this->plan = SubscriptionPlan::create([
         'name' => 'Premium',
         'slug' => 'premium-test',
@@ -125,9 +129,12 @@ test('user without agency cannot subscribe', function (): void {
 
 test('agent can initiate subscription payment', function (): void {
     Http::fake([
-        'api.flutterwave.com/*' => Http::response([
-            'status' => 'success',
-            'data' => ['link' => 'https://checkout.flutterwave.com/pay/sub-123'],
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'checkout_url' => 'https://pay.genius.ci/checkout/sub-123',
+                'reference' => 'MTX-SUB-123',
+            ],
         ], 200),
     ]);
 
@@ -151,9 +158,12 @@ test('agent can initiate subscription payment', function (): void {
 
 test('agent can subscribe yearly with correct amount', function (): void {
     Http::fake([
-        'api.flutterwave.com/*' => Http::response([
-            'status' => 'success',
-            'data' => ['link' => 'https://checkout.flutterwave.com/pay/sub-yearly'],
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'checkout_url' => 'https://pay.genius.ci/checkout/sub-yearly',
+                'reference' => 'MTX-SUB-YEARLY',
+            ],
         ], 200),
     ]);
 

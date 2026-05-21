@@ -78,7 +78,6 @@ test('health check returns correct json structure', function (): void {
             'queue',
             'storage',
             'meilisearch',
-            'flutterwave',
         ],
     ]);
 });

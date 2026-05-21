@@ -4,111 +4,128 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\AdBoostStatus;
 use App\Models\Ad;
-use App\Models\Agency;
-use App\Models\SubscriptionPlan;
+use App\Models\AdBoost;
+use App\Models\BoostPack;
 use App\Models\User;
+use App\Services\BoostService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * Owner ad boost endpoints.
+ * Owner ad boost endpoints (credit-based, no subscription required).
  */
-final class BoostController
+final readonly class BoostController
 {
+    public function __construct(private BoostService $boostService) {}
+
     /**
-     * Get available boost plans.
+     * List active boost packs available for purchase.
+     * Public endpoint (no auth required to browse packs).
      */
-    public function plans(): JsonResponse
+    public function packs(): JsonResponse
     {
-        // Boost plans rarely change; cache the slimmed projection for 1 hour.
-        $plans = Cache::remember(
-            'boost:plans:active',
+        $packs = Cache::remember(
+            'boost:packs:active',
             now()->addHour(),
-            fn () => SubscriptionPlan::query()
-                ->where('is_active', true)
-                ->whereNotNull('boost_score')
-                ->orderBy('sort_order')
-                ->get(['id', 'name', 'price', 'boost_score', 'boost_duration_days', 'description']),
+            fn () => BoostPack::query()
+                ->active()
+                ->get(['id', 'name', 'slug', 'description', 'reach_description', 'duration_days', 'boost_score', 'price_credits', 'is_popular']),
         );
 
-        return response()->json(['data' => $plans]);
+        return response()->json(['data' => $packs]);
     }
 
     /**
-     * Get current boost status for an ad.
+     * Get current boost status + history for an ad (owner only).
      */
-    public function status(Ad $ad): JsonResponse
+    public function status(Request $request, Ad $ad): JsonResponse
     {
-        if ($ad->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
+        abort_unless($ad->user_id === $request->user()?->id, 403, 'Forbidden');
+
+        $activeBoost = AdBoost::query()
+            ->where('ad_id', $ad->id)
+            ->active()
+            ->with('boostPack:id,name,slug')
+            ->first();
 
         return response()->json([
             'data' => [
                 'is_boosted' => $ad->isBoosted(),
                 'boost_score' => $ad->boost_score,
-                'boost_expires_at' => $ad->boost_expires_at,
-                'boosted_at' => $ad->boosted_at,
+                'boost_expires_at' => $ad->boost_expires_at?->toIso8601String(),
+                'boosted_at' => $ad->boosted_at?->toIso8601String(),
+                'active_boost' => $activeBoost,
             ],
         ]);
     }
 
     /**
-     * Boost an ad manually (owner self-service).
+     * Boost an ad by purchasing a boost pack with the owner's credit balance.
      *
-     * SEC: Requires an active subscription with a boost entitlement.
-     * Score and duration are derived from the subscription plan to prevent abuse.
+     * SEC: Only the ad owner can boost. Credits deducted atomically.
+     *      Score and duration come from the pack record (server-side) — no client input.
      */
     public function boost(Request $request, Ad $ad): JsonResponse
     {
-        if ($ad->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
-
         /** @var User $user */
         $user = $request->user();
-        /** @var Agency|null $agency */
-        $agency = $user->agency;
 
-        if (!$agency || !$agency->hasActiveSubscription()) {
+        abort_unless($ad->user_id === $user->id, 403, 'Seul le propriétaire peut booster cette annonce.');
+
+        $validated = $request->validate([
+            'boost_pack_id' => ['required', 'uuid', 'exists:boost_packs,id'],
+        ]);
+
+        /** @var BoostPack $pack */
+        $pack = BoostPack::query()->where('id', $validated['boost_pack_id'])->where('is_active', true)->firstOrFail();
+
+        if ($user->point_balance < $pack->price_credits) {
             return response()->json([
-                'message' => 'Un abonnement actif est requis pour booster une annonce.',
-            ], 403);
+                'message' => "Crédits insuffisants. Vous avez {$user->point_balance} crédit(s), ce pack en coûte {$pack->price_credits}.",
+                'code' => 'INSUFFICIENT_CREDITS',
+            ], 422);
         }
 
-        $subscription = $agency->getCurrentSubscription();
-        $plan = $subscription?->plan;
-
-        if (!$plan || !$plan->boost_score) {
+        try {
+            $boost = $this->boostService->apply($user, $ad, $pack);
+        } catch (\RuntimeException $e) {
             return response()->json([
-                'message' => 'Votre plan ne permet pas de booster les annonces.',
-            ], 403);
+                'message' => $e->getMessage(),
+                'code' => 'BOOST_FAILED',
+            ], 422);
         }
-
-        $ad->boost($plan->boost_score, $plan->boost_duration_days ?? 7);
 
         return response()->json([
-            'message' => 'Annonce boostée avec succès.',
+            'message' => "Annonce boostée avec succès pour {$pack->duration_days} jours !",
             'data' => [
+                'boost_id' => $boost->id,
                 'is_boosted' => true,
-                'boost_expires_at' => $ad->fresh()?->boost_expires_at,
+                'boost_score' => $boost->boost_score,
+                'expires_at' => $boost->expires_at->toIso8601String(),
+                'credits_remaining' => $user->point_balance,
             ],
         ]);
     }
 
     /**
-     * Remove boost from an ad.
+     * Cancel active boost on an ad (owner can cancel early — no refund).
      */
-    public function unboost(Ad $ad): JsonResponse
+    public function unboost(Request $request, Ad $ad): JsonResponse
     {
-        if ($ad->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Forbidden'], 403);
-        }
+        abort_unless($ad->user_id === $request->user()?->id, 403, 'Forbidden');
+
+        AdBoost::query()
+            ->where('ad_id', $ad->id)
+            ->where('status', AdBoostStatus::Active)
+            ->update(['status' => AdBoostStatus::Cancelled]);
 
         $ad->unboost();
 
-        return response()->json(['message' => 'Boost supprimé.']);
+        Cache::forget("boost:status:{$ad->id}");
+
+        return response()->json(['message' => 'Boost annulé. Aucun remboursement de crédits.']);
     }
 }

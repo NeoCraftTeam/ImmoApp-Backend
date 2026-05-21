@@ -6,6 +6,7 @@ namespace App\Enums;
 
 enum PaymentGateway: string
 {
+    case GeniusPay = 'geniuspay';
     case Flutterwave = 'flutterwave';
     case Stripe = 'stripe';
 
@@ -15,7 +16,8 @@ enum PaymentGateway: string
     public function label(): string
     {
         return match ($this) {
-            self::Flutterwave => 'Flutterwave',
+            self::GeniusPay => 'GeniusPay',
+            self::Flutterwave => 'Flutterwave (legacy)',
             self::Stripe => 'Stripe',
         };
     }

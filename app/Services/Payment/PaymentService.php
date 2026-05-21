@@ -16,6 +16,7 @@ use App\Models\Payment;
 use App\Models\PointPackage;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
+use App\Support\PaymentTransactionLookup;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -98,7 +99,8 @@ final readonly class PaymentService
         $redirectUrl = is_string($redirectUrl) && $redirectUrl !== '' ? $redirectUrl : null;
 
         if ($redirectUrl === null) {
-            $configured = config('payment.gateways.flutterwave.redirect_url');
+            $configured = config('payment.gateways.geniuspay.redirect_url')
+                ?? config('payment.gateways.flutterwave.redirect_url');
             $redirectUrl = (is_string($configured) && $configured !== '')
                 ? $configured
                 : $this->defaultFrontendPaymentReturnUrl(
@@ -106,6 +108,8 @@ final readonly class PaymentService
                     self::stringOrNull($data['ad_id'] ?? null),
                 );
         }
+
+        $redirectUrl = self::appendTxRefToReturnUrl($redirectUrl, $txRef);
 
         $gatewayPayload = [
             'amount' => $data['amount'],
@@ -143,8 +147,8 @@ final readonly class PaymentService
 
         // Route to the gateway implied by the chosen `payment_method`. If
         // the method is unknown or its gateway isn't registered, we fall
-        // back to the legacy default (Flutterwave). Mobile money +
-        // Orange Money → Flutterwave; Card → Stripe.
+        // back to the legacy default (GeniusPay). Mobile money +
+        // Orange Money → GeniusPay; Card → Stripe.
         $primaryGateway = $this->resolveGatewayForMethod($data['payment_method'] ?? null);
 
         [$result, $usedGateway] = $this->initiateWithFallback($gatewayPayload, $primaryGateway);
@@ -166,6 +170,9 @@ final readonly class PaymentService
             $payment->status = $initialStatus;
             $payment->gateway = $usedGateway->getName();
             $payment->payment_link = $result['link'];
+            if (isset($result['raw'])) {
+                $payment->gateway_response = $result['raw'];
+            }
             $payment->phone_number = $data['phone_number'] ?? null;
             $payment->ad_id = $data['ad_id'] ?? null;
             $payment->agency_id = $data['agency_id'] ?? null;
@@ -225,9 +232,12 @@ final readonly class PaymentService
      *
      * Uses a DB lock to prevent race conditions with concurrent webhook processing.
      */
-    public function syncPaymentStatus(Payment $payment): Payment
+    public function syncPaymentStatus(Payment $payment, ?string $gatewayReferenceOverride = null): Payment
     {
-        if ($payment->isTerminal()) {
+        // Re-query GeniusPay when locally FAILED/CANCELLED — sandbox may have
+        // completed after an early verify (wrong ref or race). SUCCESS/REFUNDED
+        // are not re-opened here (webhook duplicate guard applies there).
+        if ($payment->isPaid() || $payment->isRefunded()) {
             return $payment;
         }
 
@@ -241,25 +251,49 @@ final readonly class PaymentService
         $gatewayName = (string) ($payment->gateway ?? $this->gateway->getName());
         $verifyingGateway = $this->resolveGateway($gatewayName);
 
-        // For Stripe, prefer the stored `payment_link` (clientSecret of the
-        // form `pi_xxx_secret_yyy`) over `transaction_id` so the gateway
-        // can call `paymentIntents.retrieve()` directly. Falling back to
-        // tx_ref forces a metadata search which has a ~1 min indexing lag
-        // on Stripe's side and would race the immediate post-confirm verify.
-        $reference = $gatewayName === 'stripe' && !empty($payment->payment_link)
-            ? (string) $payment->payment_link
-            : (string) $payment->transaction_id;
+        // For Stripe, prefer the stored `payment_link` so the gateway can
+        // retrieve the resource directly (instant, no indexing lag).
+        // Supported formats:
+        //   - `pi_xxx_secret_yyy`  (PaymentIntent)   → paymentIntents.retrieve()
+        //   - `cs_xxx_secret_yyy`  (CheckoutSession)  → checkout.sessions.retrieve()
+        // Falling back to tx_ref forces a paymentIntents.search() which has
+        // a ~1 min indexing lag on Stripe's side.
+        $reference = match ($gatewayName) {
+            'stripe' => !empty($payment->payment_link)
+                ? (string) $payment->payment_link
+                : (string) $payment->transaction_id,
+            'geniuspay' => self::resolveGeniusPayVerifyReference($payment, $gatewayReferenceOverride),
+            default => (string) $payment->transaction_id,
+        };
 
         $result = $verifyingGateway->verify($reference);
 
         $expectedCurrency = config('payment.default_currency', 'XAF');
 
-        return DB::transaction(function () use ($payment, $result, $expectedCurrency): Payment {
+        return DB::transaction(function () use ($payment, $result, $expectedCurrency, $gatewayName, $gatewayReferenceOverride): Payment {
             /** @var Payment $locked */
             $locked = Payment::where('id', $payment->id)->lockForUpdate()->first();
 
-            if ($locked->isTerminal()) {
+            if ($locked->isPaid() || $locked->isRefunded()) {
                 return $locked;
+            }
+
+            if ($locked->isTerminal()) {
+                $isOrphanDebit = $result['status'] === 'success'
+                    && in_array($locked->status, [PaymentStatus::CANCELLED, PaymentStatus::FAILED], true);
+
+                if (!$isOrphanDebit) {
+                    return $locked;
+                }
+
+                Log::critical('Verify: orphan debit detected — gateway succeeded after local terminal state', [
+                    'payment_id' => $locked->id,
+                    'tx_ref' => $locked->transaction_id,
+                    'gateway' => $gatewayName,
+                    'previous_status' => $locked->status->value,
+                    'gateway_amount' => $result['amount'],
+                    'gateway_currency' => $result['currency'],
+                ]);
             }
 
             if ($result['status'] === 'success') {
@@ -273,7 +307,8 @@ final readonly class PaymentService
                 // read it back precisely, so this tolerance is purely defensive
                 // (legacy rows / future gateways with similar precision quirks).
                 $allowedDelta = 10.0;
-                if (abs($paidAmount - (float) $locked->amount) > $allowedDelta || strcasecmp($paidCurrency, (string) $expectedCurrency) !== 0) {
+                if (abs($paidAmount - (float) $locked->amount) > $allowedDelta
+                    || !self::ledgerCurrencyMatches((string) $expectedCurrency, $paidCurrency, $gatewayName)) {
                     Log::critical('Payment amount/currency mismatch', [
                         'payment_id' => $locked->id,
                         'expected_amount' => $locked->amount,
@@ -292,9 +327,14 @@ final readonly class PaymentService
                     return $locked->fresh() ?? $locked;
                 }
 
+                $gatewayResponse = $result['raw'];
+                if ($gatewayName === 'geniuspay' && is_string($gatewayReferenceOverride) && $gatewayReferenceOverride !== '') {
+                    $gatewayResponse['genius_reference'] = $gatewayReferenceOverride;
+                }
+
                 $updateData = [
                     'status' => PaymentStatus::SUCCESS,
-                    'gateway_response' => $result['raw'],
+                    'gateway_response' => $gatewayResponse,
                 ];
 
                 // Update payment_method from gateway resolution (e.g. orange_money, mobile_money, card)
@@ -313,14 +353,14 @@ final readonly class PaymentService
                 ]);
 
                 PaymentSucceeded::dispatch($locked->fresh() ?? $locked);
-            } elseif ($result['status'] === 'cancelled') {
+            } elseif ($result['status'] === 'cancelled' && $locked->status === PaymentStatus::PENDING) {
                 $locked->forceFill([
                     'status' => PaymentStatus::CANCELLED,
                     'gateway_response' => $result['raw'],
                 ])->save();
 
                 PaymentFailed::dispatch($locked->fresh() ?? $locked);
-            } elseif ($result['status'] === 'failed') {
+            } elseif ($result['status'] === 'failed' && $locked->status === PaymentStatus::PENDING) {
                 $locked->forceFill([
                     'status' => PaymentStatus::FAILED,
                     'gateway_response' => $result['raw'],
@@ -408,7 +448,8 @@ final readonly class PaymentService
                 // comment there. Stripe round-trip XAF↔EUR cents loses up to
                 // ~7 XAF per transaction; we accept a 10 XAF window to keep
                 // legitimate charges from being marked FAILED.
-                if (abs($paidAmount - (float) $payment->amount) > 10.0 || strcasecmp($paidCurrency, (string) $expectedCurrency) !== 0) {
+                if (abs($paidAmount - (float) $payment->amount) > 10.0
+                    || !self::ledgerCurrencyMatches((string) $expectedCurrency, $paidCurrency, $gatewayName)) {
                     Log::critical('Webhook: amount/currency mismatch', [
                         'payment_id' => $payment->id,
                         'expected_amount' => $payment->amount,
@@ -533,7 +574,7 @@ final readonly class PaymentService
 
     /**
      * @param  array<string, mixed>  $payload
-     * @return array{0: array{link: string, tx_ref: string, status: string, gateway: string, stripe_flow?: string}, 1: PaymentGatewayInterface}
+     * @return array{0: array{link: string, tx_ref: string, status: string, gateway: string, stripe_flow?: string, raw?: array<string, mixed>}, 1: PaymentGatewayInterface}
      */
     private function initiateWithFallback(array $payload, ?PaymentGatewayInterface $primary = null): array
     {
@@ -546,7 +587,7 @@ final readonly class PaymentService
             // matches the orchestrator's primary (mobile money flow). For
             // Stripe card payments we propagate the error so the frontend
             // can offer a retry / alternative method instead of silently
-            // switching to Flutterwave.
+            // switching to another gateway.
             if ($this->fallbackGateway === null || $primary->getName() !== $this->gateway->getName()) {
                 throw $e;
             }
@@ -591,6 +632,7 @@ final readonly class PaymentService
         // path working when a webhook arrives before the registry was wired
         // (rare, but possible during deploys / artisan commands).
         return $this->registry[$name] ?? match ($name) {
+            'geniuspay' => app(GeniusPayPaymentService::class),
             'flutterwave' => app(FlutterwavePaymentService::class),
             'stripe' => app(StripePaymentService::class),
             default => throw new \InvalidArgumentException("Gateway [{$name}] not supported."),
@@ -598,9 +640,93 @@ final readonly class PaymentService
     }
 
     /**
-     * Default Flutterwave hosted-checkout return URL on the PWA.
+     * GeniusPay verify endpoint expects the MTX/SANDBOX reference, not our KH tx_ref.
      *
-     * Flutterwave only redirects after its own confirmation UI, appending
+     * Resolution order:
+     *  1. gateway_response['genius_reference'] or gateway_response['reference']
+     *  2. Last path segment of payment_link (e.g. SANDBOX_R2YUJPRMF62CQXYI)
+     */
+    private static function geniusPayReferenceFromPayment(Payment $payment): ?string
+    {
+        $response = $payment->gateway_response;
+        if (is_array($response)) {
+            $reference = $response['genius_reference'] ?? $response['reference'] ?? null;
+            if (is_string($reference) && $reference !== '') {
+                return $reference;
+            }
+        }
+
+        // Extract from checkout URL: https://pay.genius.ci/checkout/SANDBOX_R2YUJPRMF62CQXYI
+        $link = $payment->payment_link;
+        if (is_string($link) && $link !== '') {
+            $path = parse_url($link, PHP_URL_PATH);
+            if (is_string($path)) {
+                $ref = basename($path);
+                if (PaymentTransactionLookup::isGatewayReference($ref)) {
+                    return $ref;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolve the reference to pass to GeniusPay's verify endpoint.
+     *
+     * GeniusPay uses two distinct reference types:
+     *  - Checkout reference (SANDBOX_R…  / MTX-R…): assigned during initiate,
+     *    stored in gateway_response['genius_reference'] and payment_link.
+     *    This is what GET /payments/{ref} expects.
+     *  - Transaction reference (SANDBOX_N… / MTX-T…): appended to the redirect
+     *    URL after the customer completes checkout. Useful for display only.
+     *
+     * When the caller provides an explicit override (e.g. from the redirect
+     * callback), that value is fresher than what was stored at initiate time
+     * (sandbox may reassign the reference after the hosted-checkout flow).
+     * We therefore prefer the override, then the stored reference.
+     */
+    private static function resolveGeniusPayVerifyReference(Payment $payment, ?string $override): string
+    {
+        // 1. Explicit override from the redirect callback (fresher in sandbox flows).
+        if (is_string($override) && $override !== '' && PaymentTransactionLookup::isGatewayReference($override)) {
+            return $override;
+        }
+
+        // 2. Stored checkout reference recorded at initiate time.
+        $storedRef = self::geniusPayReferenceFromPayment($payment);
+        if ($storedRef !== null) {
+            return $storedRef;
+        }
+
+        return (string) $payment->transaction_id;
+    }
+
+    /**
+     * GeniusPay reports XOF while our ledger stores XAF — both are CFA francs at 1:1.
+     */
+    private static function ledgerCurrencyMatches(string $expected, string $paid, string $gatewayName): bool
+    {
+        $expected = strtoupper(trim($expected));
+        $paid = strtoupper(trim($paid));
+
+        if ($expected === $paid) {
+            return true;
+        }
+
+        if ($gatewayName !== 'geniuspay') {
+            return false;
+        }
+
+        $cfaFrancs = ['XAF', 'XOF'];
+
+        return in_array($expected, $cfaFrancs, true) && in_array($paid, $cfaFrancs, true);
+    }
+
+    /**
+     * Default hosted-checkout return URL on the PWA (GeniusPay / legacy Flutterwave).
+     *
+     * The gateway redirects after its own confirmation UI, appending
      * `status`, `tx_ref`, and related query parameters.
      */
     private function defaultFrontendPaymentReturnUrl(string $paymentType, ?string $adId): string
@@ -620,7 +746,10 @@ final readonly class PaymentService
             $query['ad_id'] = $adId;
         }
 
-        return $base.'/payment/return?'.http_build_query($query);
+        // Route through /payment/callback so Next.js issues a server-side 302
+        // to /payment/return.  A direct link to /payment/return from an external
+        // domain causes Next.js to return RSC wire format instead of full HTML.
+        return $base.'/payment/callback?'.http_build_query($query);
     }
 
     /**
@@ -637,5 +766,44 @@ final readonly class PaymentService
         }
 
         return $value === '' ? null : $value;
+    }
+
+    /**
+     * GeniusPay appends `reference` + `status` on redirect; preserve our KH tx_ref
+     * so the PWA can verify even when the gateway omits metadata in the query string.
+     */
+    private static function appendTxRefToReturnUrl(string $returnUrl, string $txRef): string
+    {
+        $fragment = '';
+        $urlWithoutFragment = $returnUrl;
+        $hashPos = strpos($returnUrl, '#');
+        if ($hashPos !== false) {
+            $fragment = substr($returnUrl, $hashPos);
+            $urlWithoutFragment = substr($returnUrl, 0, $hashPos);
+        }
+
+        $parts = parse_url($urlWithoutFragment);
+        if ($parts === false) {
+            return $returnUrl;
+        }
+
+        $query = [];
+        if (!empty($parts['query'])) {
+            parse_str($parts['query'], $query);
+        }
+
+        $query['tx_ref'] = $txRef;
+
+        $scheme = $parts['scheme'] ?? 'https';
+        $host = $parts['host'] ?? '';
+        $port = isset($parts['port']) ? ':'.$parts['port'] : '';
+        $path = $parts['path'] ?? '';
+        $user = $parts['user'] ?? '';
+        $pass = isset($parts['pass']) ? ':'.$parts['pass'] : '';
+        $auth = $user !== '' ? $user.$pass.'@' : '';
+
+        $rebuilt = $scheme.'://'.$auth.$host.$port.$path.'?'.http_build_query($query).$fragment;
+
+        return $rebuilt;
     }
 }

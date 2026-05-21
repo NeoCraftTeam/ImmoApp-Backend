@@ -59,18 +59,21 @@ class PointTransactionResource extends Resource
                                 PointTransactionType::UNLOCK => Heroicon::LockOpen,
                                 PointTransactionType::BONUS => Heroicon::Gift,
                                 PointTransactionType::REFUND => Heroicon::ArrowUturnLeft,
+                                PointTransactionType::BOOST => Heroicon::Bolt,
                             })
                             ->color(fn (PointTransactionType $state): string => match ($state) {
                                 PointTransactionType::PURCHASE => 'success',
                                 PointTransactionType::UNLOCK => 'warning',
                                 PointTransactionType::BONUS => 'info',
                                 PointTransactionType::REFUND => 'gray',
+                                PointTransactionType::BOOST => 'primary',
                             })
                             ->formatStateUsing(fn (PointTransactionType $state): string => match ($state) {
                                 PointTransactionType::PURCHASE => 'Achat de crédits',
                                 PointTransactionType::UNLOCK => 'Déblocage d\'annonce',
                                 PointTransactionType::BONUS => 'Bonus offert',
                                 PointTransactionType::REFUND => 'Remboursement',
+                                PointTransactionType::BOOST => 'Boost d\'annonce',
                             }),
                         TextEntry::make('points')
                             ->label('Mouvement')

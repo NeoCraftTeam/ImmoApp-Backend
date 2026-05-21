@@ -121,6 +121,17 @@ rector:
         - '**/*.php'
         - rector.php
 
+sast:
+  stage: quality
+  needs: [prepare_ci_image]
+  allow_failure: true
+  script:
+    - docker run --rm -v $(pwd):/src semgrep/semgrep semgrep --config=p/php --quiet --error /src
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        - '**/*.php'
+
 # --- ETAPE 2 : BUILD & PUSH (en parallèle avec tests) ---
 build_image:
   stage: build_and_test
@@ -148,6 +159,19 @@ build_image:
   retry:
     max: 2
     when: runner_system_failure
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
+
+trivy_scan:
+  stage: build_and_test
+  needs: [build_image]
+  allow_failure: true
+  script:
+    - docker run --rm
+        -v /var/run/docker.sock:/var/run/docker.sock
+        aquasec/trivy:latest image
+        --exit-code 0 --severity HIGH,CRITICAL --no-progress
+        $APP_IMAGE:$IMAGE_TAG
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
 

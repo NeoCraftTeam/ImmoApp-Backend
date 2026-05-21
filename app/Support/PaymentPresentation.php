@@ -91,6 +91,7 @@ final class PaymentPresentation
             'Carte bancaire' => 'Carte',
             'MTN Mobile Money' => 'MTN Money',
             'Autre · Flutterwave' => 'Autres',
+            'Autre · GeniusPay' => 'Autres',
             default => $trimmed,
         };
     }

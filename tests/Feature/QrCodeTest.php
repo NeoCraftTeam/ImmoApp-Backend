@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Ad;
 use App\Models\User;
-use App\Services\QrCodeService;
+use App\Services\AdUrlBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -47,7 +47,7 @@ it('returns qr meta json for the ad owner', function (): void {
 it('still builds utm-tracked listing urls when marketing callers opt in', function (): void {
     $owner = User::factory()->agents()->create();
     $ad = Ad::factory()->for($owner)->create();
-    $svc = app(QrCodeService::class);
+    $svc = app(AdUrlBuilder::class);
 
     $defaultClean = $svc->adListingUrl($ad);
     expect($defaultClean)->not->toContain('utm_');

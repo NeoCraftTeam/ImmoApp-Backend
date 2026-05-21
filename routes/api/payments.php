@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\PaymentMethodController;
 use App\Http\Controllers\Api\V1\PromoCodeController;
 use App\Http\Controllers\Api\V1\RefundController;
+use App\Http\Controllers\Api\V1\ResendWebhookController;
 use App\Http\Controllers\Api\V1\StripePaymentMethodController;
 use App\Http\Controllers\Api\V1\SubscriptionController;
 use Illuminate\Support\Facades\Route;
@@ -35,9 +36,9 @@ Route::get('/payments/{txRef}/public-status', [PaymentController::class, 'public
     ->middleware('throttle:60,1');
 
 // --- PAYMENTS — multi-gateway webhooks ---
-// Flutterwave: legacy `{gateway}` placeholder (constraint = flutterwave).
+// GeniusPay + legacy Flutterwave (`{gateway}` placeholder).
 Route::post('/webhooks/{gateway}', [PaymentController::class, 'handleWebhook'])
-    ->where('gateway', 'flutterwave')
+    ->where('gateway', 'geniuspay|flutterwave')
     ->middleware('throttle:payments.webhook');
 
 // Stripe: dedicated endpoint — verifies `Stripe-Signature` against the
@@ -45,6 +46,12 @@ Route::post('/webhooks/{gateway}', [PaymentController::class, 'handleWebhook'])
 // AppServiceProvider via `Cashier::ignoreRoutes()` so we own the URL.
 Route::post('/webhooks/stripe', [PaymentController::class, 'handleStripeWebhook'])
     ->middleware('throttle:payments.webhook');
+
+// E-2 : Resend — bounce and complaint webhook.
+// Verifies Svix HMAC signature (RESEND_WEBHOOK_SECRET). Populates
+// email_suppressions so suppressed addresses are never emailed again.
+Route::post('/webhooks/resend', [ResendWebhookController::class, 'handle'])
+    ->middleware('throttle:60,1');
 
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/payments/initialize/{ad}', [CreditController::class, 'unlock'])
@@ -62,6 +69,11 @@ Route::middleware('auth:sanctum')->group(function (): void {
         ->middleware('throttle:10,1');
     Route::get('/payments/export', [PaymentController::class, 'export'])
         ->middleware('throttle:10,1');
+    Route::get('/payments/refunds', [RefundController::class, 'userRefunds'])
+        ->middleware('throttle:30,1');
+    Route::post('/payments/{payment}/refund-request', [RefundController::class, 'requestRefund'])
+        ->whereUuid('payment')
+        ->middleware('throttle:5,1');
 
     // --- STRIPE SAVED CARDS ---
     // CRUD on the authenticated user's Stripe Customer payment methods.
@@ -79,6 +91,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
             ->middleware('throttle:30,1');
         Route::post('/setup-intent', [StripePaymentMethodController::class, 'setupIntent'])
             ->middleware('throttle:30,1');
+        Route::post('/payment-methods/notify-added', [StripePaymentMethodController::class, 'notifyCardAdded'])
+            ->middleware('throttle:10,1');
     });
 });
 

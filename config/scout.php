@@ -178,6 +178,10 @@ return [
                     'quarter',
                     'type',
                 ],
+                'faceting' => [
+                    'maxValuesPerFacet' => 100,
+                    'sortFacetValuesBy' => ['*' => 'count'],
+                ],
             ],
         ],
     ],

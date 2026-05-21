@@ -15,6 +15,7 @@ use App\Http\Controllers\PwaManifestController;
 use App\Http\Controllers\TourImageProxyController;
 use App\Http\Middleware\DynamicWebAuthnRelyingParty;
 use App\Models\User;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Laragear\WebAuthn\Http\Routes as WebAuthnRoutes;
@@ -111,6 +112,12 @@ Route::prefix('email')->group(function (): void {
     Route::get('/unsubscribe/{token}', [EmailPreferenceController::class, 'unsubscribe'])
         ->middleware('throttle:30,1')
         ->name('email.unsubscribe');
+    // RFC 8058 — one-click unsubscribe called by Gmail/Yahoo mail clients via POST.
+    // CSRF exempt: request originates from external mail client, no session.
+    Route::post('/unsubscribe/{token}', [EmailPreferenceController::class, 'unsubscribeOneClick'])
+        ->withoutMiddleware([VerifyCsrfToken::class])
+        ->middleware('throttle:30,1')
+        ->name('email.unsubscribe.one-click');
     Route::get('/preferences/{token}', [EmailPreferenceController::class, 'manage'])
         ->middleware('throttle:30,1')
         ->name('email.preferences');

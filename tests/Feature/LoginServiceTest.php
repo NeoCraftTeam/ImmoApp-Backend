@@ -78,7 +78,7 @@ it('returns 401 for invalid credentials', function (): void {
     ]);
 
     $response->assertUnauthorized();
-    expect($response->json('message'))->toBe('Identifiants incorrects ou accès non autorisé pour cette interface.');
+    expect($response->json('message'))->toBe('Identifiants incorrects');
 });
 
 it('returns 403 for inactive account', function (): void {
@@ -121,7 +121,7 @@ it('returns 401 for role context mismatch — customer as owner', function (): v
 
     $response->assertUnauthorized()
         ->assertJsonPath('code', 'PANEL_ACCESS_DENIED')
-        ->assertJsonPath('message', 'Identifiants incorrects ou accès non autorisé pour cette interface.');
+        ->assertJsonPath('message', 'Identifiants incorrects');
 });
 
 it('returns 401 for role context mismatch — agent as client', function (): void {

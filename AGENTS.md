@@ -65,7 +65,7 @@ php artisan test --filter="it can login with valid credentials"
 ```
 
 Tests require a PostgreSQL `testing` database (see `phpunit.xml`). Meilisearch driver is set to `null`
-in tests. Payment gateway uses fake Flutterwave keys. **Mail:** PHPUnit uses `tests/bootstrap.php` (see `phpunit.xml`) to force `MAIL_MAILER=array` and drop `RESEND_KEY` before Laravel loads, so `cp .env.example` in CI cannot call the real Resend API. `tests/TestCase::setUp()` also sets `mail.default=array` and `services.resend.key` empty after the app boots so sync-queue notification mail cannot resolve the HTTP Resend transport. GitHub Actions / GitLab additionally export `MAIL_MAILER=array` and `RESEND_KEY` empty where applicable.
+in tests. Payment gateway uses fake GeniusPay keys (`GENIUSPAY_*` in `phpunit.xml`); Flutterwave legacy tests keep `FLW_*` fakes. **Mail:** PHPUnit uses `tests/bootstrap.php` (see `phpunit.xml`) to force `MAIL_MAILER=array` and drop `RESEND_KEY` before Laravel loads, so `cp .env.example` in CI cannot call the real Resend API. `tests/TestCase::setUp()` also sets `mail.default=array` and `services.resend.key` empty after the app boots so sync-queue notification mail cannot resolve the HTTP Resend transport. GitHub Actions / GitLab additionally export `MAIL_MAILER=array` and `RESEND_KEY` empty where applicable.
 
 ### Parallel tests (`php artisan test --parallel`)
 
@@ -144,8 +144,8 @@ vendor/bin/rector process --dry-run
 - **Support** (`app/Support/`) — utility helpers (`ApiResponse`, `GeoLocation`, `PanelUrl`, `TourAssetToken`, etc.).
 
 ### Models (`app/Models/`)
-`Ad`, `AdInteraction`, `AdReport`, `AdType`, `Agency`, `AnonymousSurveyAnswer`, `AnonymousSurveyResponse`,
-`City`, `Document`, `EmailPreference`, `Expense`, `Invoice`, `LeaseContract`, `LeaseSignatureRequest`,
+`Ad`, `AdBoost`, `AdInteraction`, `AdReport`, `AdType`, `Agency`, `AnonymousSurveyAnswer`, `AnonymousSurveyResponse`,
+`BoostPack`, `City`, `Document`, `EmailPreference`, `Expense`, `Invoice`, `LeaseContract`, `LeaseSignatureRequest`,
 `LoginHistory`, `NewsletterCampaign`, `NewsletterSubscriber`, `NotificationPreference`, `Payment`,
 `PersonalAccessToken`, `PointPackage`, `PointTransaction`, `PromoCode`, `PromoCodeUsage`,
 `PropertyAttribute`, `PropertyAttributeCategory`, `PushSubscription`, `Quarter`, `QueueFailedJob`,
@@ -156,7 +156,7 @@ vendor/bin/rector process --dry-run
 - Scopes: `LandlordScope`.
 
 ### Contracts (`app/Contracts/`)
-- `PaymentGatewayInterface` — payment gateway abstraction. Two implementations: `FlutterwavePaymentService` (mobile money + orange money) and `StripePaymentService` (carte, EUR billing). Routed per-method via `PaymentMethod::gateway()` and the registry built in `AppServiceProvider`.
+- `PaymentGatewayInterface` — payment gateway abstraction. Primary: `GeniusPayPaymentService` (mobile money / Orange, Cameroun). Also `StripePaymentService` (carte) and `FlutterwavePaymentService` (legacy rows/webhooks). Routed per-method via `PaymentMethod::gateway()` and the registry in `AppServiceProvider`.
 - `AiSearchServiceInterface` — NLP/image search parsing contract (`parse`, `parseFromImage`).
 - `RecommendationEngineInterface` — ad recommendation contract (`recommend`).
 - `TrustScoreServiceInterface` — trust score computation contract (`compute`, `getOrCompute`, `invalidate`).
@@ -166,13 +166,15 @@ vendor/bin/rector process --dry-run
 - `UserProfileService` — public profile assembly, response-time computation, trust-score resolution, unlocked-ads retrieval. Extracted from `UserController` (SRP).
 - `LoginService`, `RegistrationService`, `TokenService`, `ClerkJwtService` — auth flows.
 - `Payment/PaymentService` — multi-gateway orchestrator. Accepts a primary gateway, optional cross-gateway fallback (mobile money only) and a `array<gateway-name, PaymentGatewayInterface>` registry built by `AppServiceProvider`. Routes each `createPayment()` call via `PaymentMethod::gateway()` lookup; webhook + verify dispatched to `$payment->gateway` for the right impl.
-- `Payment/FlutterwavePaymentService` — Flutterwave implementation (mobile money / orange money). Hosted-checkout redirect flow.
+- `Payment/GeniusPayPaymentService` — Genius Pay (mobile money / Orange, Cameroun). Hosted-checkout redirect, webhook HMAC, verify by `MTX-*` reference.
+- `Payment/FlutterwavePaymentService` — legacy (historical rows + webhook route only; no new MM routing).
 - `Payment/StripePaymentService` — Stripe via Cashier `\Laravel\Cashier\Cashier::stripe()`. PaymentIntent (no redirect, returns `clientSecret`), signed webhook (`Stripe-Signature` against raw body, `__raw` injected by controller), refund. Conversion XAF→EUR cents at the BEAC peg `1 EUR = 655.957 XAF` (config `services.stripe.xaf_to_eur_rate`). Idempotency keys: `kh_initiate:{tx_ref}` / `kh_refund:{intent}:{amount}`.
 - `Payment/PaymentMethodGateService` — admin-controlled per-method gating. Persisted in `Setting` (`payment_method:{value}:enabled`), cached 5 min, same pattern as `FeatureFlagService`. Methods: `isEnabled / enable / disable / reset / available / describeAvailable / describeAll`. Defaults via `match` (compile-time exhaustive). Consumed by `GET /api/v1/payments/methods` (public catalogue) and `FlutterwaveInitiateRequest::withValidator()` (rejects disabled methods at validation time with French error label).
 - `Payment/RefundService` — refund processing (gateway-agnostic via the registry).
 - `SubscriptionService` — plan management & renewals.
-- `PointService` — credit wallet operations.
-- `AdBoostService` — ad promotion logic.
+- `PointService` — credit wallet operations. `deduct()` accepts optional `PointTransactionType` param (defaults `UNLOCK`); add `type: PointTransactionType::BOOST` for landlord boost debits.
+- `BoostService` — credit-based boost orchestrator. `apply(User, Ad, BoostPack)` atomic: deducts credits, writes `AdBoost` record, calls `Ad::boost()`. `expireStale()` marks expired `ad_boosts` rows and calls `Ad::unboost()`.
+- `AdBoostService` — subscription-based ad promotion logic (legacy, still used by `ExpireBoostedAds` command for subscription-sourced boosts).
 - `AdReportService` — abuse reporting.
 - `AgencyService` — agency CRUD.
 - `ViewingScheduleService` / `ReservationService` — viewing calendar & booking. Slot validation uses `ViewingScheduleService::isOfferedBookableSlot()` (same duration/buffer as `GET /ads/{ad}/slots`), not Zap’s `Ad::isBookableAtTime()` which defaulted to 60-minute slots and disagreed with the public slot list. Client `POST /api/v1/ads/{ad}/reservations` uses RateLimiter **`viewings.reserve`** (default 20/min per authenticated user; `RL_VIEWINGS_RESERVE` / `config/rate_limiting.php`). **At most one active reservation** (`pending` or `confirmed`) per `(client, ad)` — enforced in `ReservationService::assertSlotIsAvailable()` + partial unique index `tr_unique_client_ad_active`; duplicate attempt returns **409** `CLIENT_ACTIVE_RESERVATION_EXISTS`. **Notifications** (mail + `database` + optional Web Push) for create / confirm / cancel / expire are sent from `TentativeReservationObserver`; reservation-related `Notification` classes call `$this->afterCommit()` so queued workers only process jobs after the `tentative_reservations` row is visible (avoids failed jobs when `QUEUE_CONNECTION` is Redis and the HTTP request still holds an open DB transaction). On create, the **client** and **landlord** each receive a **different** notification class (not a duplicate to the same inbox).
@@ -198,7 +200,7 @@ vendor/bin/rector process --dry-run
 - `Chat/AttachmentService` — upload files to Cloudflare R2 (`chat-attachments/` prefix). MIME/size validated (images: JPEG/PNG/WEBP/GIF ≤5 MB; files: PDF/doc ≤20 MB). Returns descriptor with `signed_url` (1-hour TTL). `getSignedUrl()` refreshes URLs.
 - `Chat/ConversationService` — find-or-create (gated on `UnlockedAd`), list (paginated), mark-as-read (broadcasts `MessageRead`), archive, unread count (Cache 30s TTL).
 - `Chat/MessageService` — send (encrypt + update `last_message_id` + broadcast + FCM push + email 5min delay), soft-delete (sender only, 24h window), cursor-paginated history.
-- `HealthCheckService` — enterprise health check service. 6 checks: Database, Redis, Queue, Storage, Meilisearch, Flutterwave. 3-tier status: `healthy` / `degraded` / `unhealthy`. Results cached 30 s (Redis). Critical checks: Database + Storage → failure = `unhealthy`. All others → `degraded`. Used by `GET /api/health` and `php artisan app:health-check --force`.
+- `HealthCheckService` — enterprise health check service. 6 checks: Database, Redis, Queue, Storage, Meilisearch, GeniusPay. 3-tier status: `healthy` / `degraded` / `unhealthy`. Results cached 30 s (Redis). Critical checks: Database + Storage → failure = `unhealthy`. All others → `degraded`. Used by `GET /api/health` and `php artisan app:health-check --force`.
 - `PropertyAttributeImportService` — bulk attribute import.
 - `UserAgentParser` — browser/device detection.
 - `Media/MediaPathGenerator` — Spatie media paths.
@@ -230,23 +232,25 @@ vendor/bin/rector process --dry-run
 - `Reservation/`: `ConfirmReservationAction`.
 
 ### Payment System
-- **Two gateways live: Flutterwave + Stripe.** `PaymentGateway` enum: `Flutterwave = 'flutterwave'`, `Stripe = 'stripe'` (each with `label()` for invoices/admin). Stripe was added in May 2026 alongside Laravel Cashier `^16.0`.
-- **Strategy pattern + registry.** `PaymentGatewayInterface` (`app/Contracts/`) implemented by `FlutterwavePaymentService` and `StripePaymentService`. `PaymentService` ctor accepts `(primary, ?fallback, registry)` — `AppServiceProvider` builds the registry indexed by `getName()` so `createPayment()` can route per-method without if/else.
-- **Routing.** `PaymentMethod::gateway()` is the single source of truth: `MOBILE_MONEY` + `ORANGE_MONEY` + `FLUTTERWAVE` (legacy umbrella) → Flutterwave ; `CARD` → Stripe. Adding a new method only requires a case + match arm in the enum.
+- **Gateways live: GeniusPay + Stripe (+ Flutterwave legacy).** `PaymentGateway` enum: `GeniusPay = 'geniuspay'`, `Flutterwave = 'flutterwave'` (legacy rows/webhook only), `Stripe = 'stripe'`. Stripe (carte, EUR via Cashier) unchanged since May 2026.
+- **Strategy pattern + registry.** `PaymentGatewayInterface` implemented by `GeniusPayPaymentService` (primary mobile money), `StripePaymentService`, and `FlutterwavePaymentService` (legacy). `AppServiceProvider` registers `geniuspay` as default + registry index `geniuspay|stripe|flutterwave`.
+- **Routing.** `PaymentMethod::gateway()` : `MOBILE_MONEY` + `ORANGE_MONEY` + legacy `FLUTTERWAVE` method → **GeniusPay** ; `CARD` → Stripe.
 - **Admin gating.** `PaymentMethodGateService` lets admins flip any of the four methods on/off at runtime (persisted in `Setting`, cached 5 min). Public consumer: `GET /api/v1/payments/methods`. Backend guard: `FlutterwaveInitiateRequest::withValidator()` rejects disabled methods with a localised French message before any gateway call.
 - **`Payment::gateway` column** stored as plain string (not enum cast) — Stripe rows coexist with legacy Flutterwave rows in the same table.
-- **Webhooks.** Flutterwave: `POST /api/v1/webhooks/{gateway}` (constraint `flutterwave`). Stripe: dedicated `POST /api/v1/webhooks/stripe` — Stripe requires the **raw body** for signature verification, controller passes `getContent()` and injects it as `__raw` so `StripePaymentService::handleWebhook()` can call `\Stripe\Webhook::constructEvent()`. `Cashier::ignoreRoutes()` is set in `AppServiceProvider::boot()` so Cashier's default `/stripe/webhook` does not collide.
+- **GeniusPay API** (doc crawl: `.firecrawl/geniuspay-docs.json`) : base `https://pay.genius.ci/api/v1/merchant`, auth headers `X-API-Key` / `X-API-Secret`, `POST /payments` → `checkout_url`, `GET /payments/{reference}` pour verify. `transaction_id` KeyHome reste `KH-*` ; référence marchand Genius (`MTX-*`) stockée dans `gateway_response.genius_reference`. Webhook `POST /api/v1/webhooks/geniuspay` : HMAC-SHA256 sur `timestamp + '.' + json_encode(payload)`, headers `X-Webhook-Signature`, `X-Webhook-Timestamp`, `X-Webhook-Event` ; événements `payment.success` / `payment.failed`. Cameroun : `payment_method` `mtn_money` / `orange_money`, `country` `CM`. Pas d’API refund documentée → `refund()` lève 501.
+- **Webhooks.** GeniusPay: `POST /api/v1/webhooks/geniuspay`. Flutterwave (legacy): `POST /api/v1/webhooks/flutterwave`. Stripe: dedicated `POST /api/v1/webhooks/stripe` — Stripe requires the **raw body** for signature verification, controller passes `getContent()` and injects it as `__raw` so `StripePaymentService::handleWebhook()` can call `\Stripe\Webhook::constructEvent()`. `Cashier::ignoreRoutes()` is set in `AppServiceProvider::boot()` so Cashier's default `/stripe/webhook` does not collide.
 - **Stripe currency: EUR pegged.** Stripe does not support XAF/XOF. `payments.amount` stays in XAF (canonical), Stripe is invoiced in EUR using `1 EUR = 655.957 XAF` (BEAC peg, config `services.stripe.xaf_to_eur_rate`). Both directions (XAF→cents and cents→XAF for refunds) use the same peg so receipts always reconcile. PaymentIntent metadata carries `xaf_amount` + `xaf_to_eur_rate` for audit. Visitor multi-currency display (`<Price>` / `CurrencySelector`) is unrelated to Stripe billing currency.
 - **Cashier scope.** `Laravel\Cashier\Billable` trait on `User`. Tables renamed to **`cashier_subscriptions`** + **`cashier_subscription_items`** to avoid collision with the existing business `subscriptions` table (`App\Models\Subscription`, agency plans). Custom models `App\Models\CashierSubscription` and `CashierSubscriptionItem` pin the table names; wired via `Cashier::useSubscriptionModel(...)` and `useSubscriptionItemModel(...)` in `AppServiceProvider::boot()`. UUID-safe migrations (`foreignUuid` because `users.id` is UUID via `HasUuids`).
 - **Single Stripe webhook secret** for both test and live (`STRIPE_WEBHOOK_SECRET`). Rotate the value in `.env` when switching environments — no `_TEST`/`_LIVE` split.
 - **Stripe env vars** : `STRIPE_KEY` (`pk_test_*` / `pk_live_*`), `STRIPE_SECRET` (`sk_*`), `STRIPE_WEBHOOK_SECRET` (`whsec_*`), optional `STRIPE_CURRENCY=eur`, `STRIPE_WEBHOOK_TOLERANCE=300`. All in `.env.example`.
 - Amounts resolved server-side from `PointPackage`/`SubscriptionPlan` — never trust client amounts.
 - DB locks (`lockForUpdate`) prevent double-spending on verification.
-- **Payment trace (`kh_payment_trace`).** Optional JSON blob under `gateway_response`, populated by Flutterwave and Stripe services with French-facing labels (PayPal, card brands, Apple/Google Pay, Orange/MTN hints). **`App\Support\PaymentPresentation`** is the single consumer for **`PaymentResource`** (`gateway_label`, `payment_method_label`, `payment_method_detail`), **`GET /payments/history`**, PDF `payment-history`, PWA tables, Filament Transactions/Refunds + Agency payments.
+- **Payment trace (`kh_payment_trace`).** Optional JSON blob under `gateway_response`, populated by GeniusPay, Flutterwave (legacy) and Stripe services with French-facing labels (PayPal, card brands, Apple/Google Pay, Orange/MTN hints). **`App\Support\PaymentPresentation`** is the single consumer for **`PaymentResource`** (`gateway_label`, `payment_method_label`, `payment_method_detail`), **`GET /payments/history`**, PDF `payment-history`, PWA tables, Filament Transactions/Refunds + Agency payments.
 - **Payment history API** uses Laravel `paginate()` on `GET /api/v1/payments/history` (`page`, `per_page` default **10**, max **50**); JSON includes `data` plus `meta` (`current_page`, `last_page`, `per_page`, `total`) and `links`. **`GET /api/v1/payments/{payment}/receipt`** (`auth:sanctum`, same user as the payment) streams a single-transaction PDF (DomPDF view `pdf.payment-receipt`).
 - Events: `PaymentInitiated`, `PaymentSucceeded`, `PaymentFailed`.
-- **Crédits (`POST /credits/purchase/{package}`)** — accepte `callback_url` optionnelle ; validée par `App\Support\FrontendRedirectGuard` (même politique d’hôte que OAuth / `FRONTEND_URL` + `OAUTH_ALLOWED_REDIRECT_HOSTS`). Passée à `PaymentService::createPayment` comme `redirect_url` vers Flutterwave.
-- **Frontend integration** (Phase 3, à venir) : `pnpm add @stripe/stripe-js @stripe/react-stripe-js` ; `PaymentModal.tsx` détecte `gateway === 'stripe'` dans la réponse de `/payments/initiate_payment` et utilise le `payment_link` retourné comme `clientSecret` pour `<Elements>` + `<PaymentElement>` ; pour Flutterwave (mobile money), comportement actuel inchangé (redirect hosted checkout).
+- **Crédits (`POST /credits/purchase/{package}`)** — accepte `callback_url` optionnelle ; validée par `FrontendRedirectGuard`. Passée à GeniusPay comme `success_url` / `error_url` (config `GENIUSPAY_REDIRECT_URL` ou callback client).
+- **Frontend** : `PaymentGateway` inclut `'geniuspay'` ; `usePayment` redirige vers hosted checkout pour tout gateway ≠ `stripe` (GeniusPay + legacy Flutterwave). Stripe : `<Elements>` + `clientSecret`.
+- **Env backend** : `GENIUSPAY_API_KEY`, `GENIUSPAY_API_SECRET`, `GENIUSPAY_WEBHOOK_SECRET`, optionnel `GENIUSPAY_BASE_URL`, `GENIUSPAY_REDIRECT_URL`, `GENIUSPAY_DEFAULT_COUNTRY=CM`, `PAYMENT_DEFAULT_GATEWAY=geniuspay`. Pas de clé publique frontend GeniusPay.
 
 ### Stripe — sauvegarde et réutilisation des cartes (Mai 2026)
 
@@ -438,8 +442,8 @@ Le paramètre `{paymentMethod}` est contraint au format `pm_*` via une regex pat
 ### Filament Panels
 - **Admin** (`app/Filament/Admin/`) — full platform management. Path: `/admin`.
   Provider: `app/Providers/Filament/AdminPanelProvider.php`.
-  Resources: `AcquisitionUsers`, `ActivityLogs`, `AdReports`, `AdTypes`, `Ads`, `Agencies`, `Cities`,
-  `NewsletterCampaigns`, `NewsletterSubscribers`, `Payments`, `PendingAds`, `PointPackages`,
+  Resources: `AcquisitionUsers`, `ActivityLogs`, `AdReports`, `AdTypes`, `Ads`, `Agencies`, `BoostPacks`,
+  `Cities`, `NewsletterCampaigns`, `NewsletterSubscribers`, `Payments`, `PendingAds`, `PointPackages`,
   `PointTransactions`, `PromoCodes`, `PropertyAttributeCategories`, `PropertyAttributes`, `Quarters`,
   `Refunds`, `Reviews`, `SiteVisits`, `SubscriptionPlans`, `SubscriptionResource`, `Surveys`,
   `UnlockedAds`, `Users`.
@@ -484,8 +488,8 @@ All prefixed `/api/v1/`: `auth.php`, `ads.php`, `payments.php`, `viewings.php`, 
 `SanitizeInput`, `SecurityHeaders`, `VerifyCsrfToken`.
 
 ### Enums (`app/Enums/`)
-`AdReportReason`, `AdReportScamReason`, `AdReportStatus`, `AdStatus`, `CancelledBy`,
-`PaymentGateway`, `PaymentMethod`, `PaymentStatus`, `PaymentType`, `PointTransactionType`,
+`AdBoostStatus` (Active/Expired/Cancelled), `AdReportReason`, `AdReportScamReason`, `AdReportStatus`, `AdStatus`, `CancelledBy`,
+`PaymentGateway`, `PaymentMethod`, `PaymentStatus`, `PaymentType`, `PointTransactionType` (PURCHASE/UNLOCK/BONUS/REFUND/**BOOST**),
 `PropertyAttribute`, `RefundStatus`, `ReservationStatus`, `SubscriptionStatus`,
 `SurveyAnonymousAudience`, `TransactionType`, `TrustScoreTier`, `UserRole`, `UserType`, `VerificationStatus`.
 

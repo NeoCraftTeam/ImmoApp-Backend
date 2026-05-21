@@ -180,10 +180,10 @@ it('verify-purchase with tx_ref targets the exact payment, not the latest', func
     // doesn't reach the real API. Returns "pending" so the assertion below
     // exercises the targeting logic without short-circuiting on success.
     Http::fake([
-        'api.flutterwave.com/*' => Http::response([
-            'status' => 'success',
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
             'data' => [
-                'tx_ref' => 'KH-IGNORED',
+                'reference' => 'MTX-PENDING',
                 'status' => 'pending',
                 'amount' => 2000,
                 'currency' => 'XAF',
@@ -219,10 +219,11 @@ it('verify-purchase with tx_ref targets the exact payment, not the latest', func
     // New pending purchase.
     Payment::factory()->pending()->create([
         'user_id' => $user->id,
-        'gateway' => 'flutterwave',
+        'gateway' => 'geniuspay',
         'amount' => 2000,
         'type' => PaymentType::CREDIT->value,
         'plan_id' => $package->id,
+        'gateway_response' => ['genius_reference' => 'MTX-PENDING'],
         'created_at' => now(),
     ]);
 

@@ -42,7 +42,7 @@
         /* Accent bar */
         .accent-bar {
             height: 4px;
-            background: #f43f5e;
+            background: #F6475F;
         }
 
         /* Header */

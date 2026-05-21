@@ -7,10 +7,12 @@ namespace App\Http\Controllers\Api\V1;
 use App\Contracts\StripeSavedCardServiceInterface;
 use App\Exceptions\PaymentGatewayException;
 use App\Http\Requests\Api\V1\StripePaymentMethodRequest;
+use App\Mail\CardAddedMail;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use OpenApi\Annotations as OA;
 
 /**
@@ -214,5 +216,66 @@ final class StripePaymentMethodController
                 'id' => $intent['id'],
             ],
         ]);
+    }
+
+    /**
+     * Send a card-added confirmation email to the authenticated user.
+     *
+     * Called by the frontend right after `stripe.confirmSetup` succeeds.
+     * The card brand and last4 are passed by the client from Stripe.js metadata.
+     *
+     * @OA\Post(
+     *     path="/api/v1/payments/stripe/payment-methods/notify-added",
+     *     summary="Envoyer l'email de confirmation d'ajout de carte",
+     *     tags={"💳 Cartes Stripe"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="brand", type="string", example="visa"),
+     *             @OA\Property(property="last4", type="string", example="4242")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=204, description="Email envoyé"),
+     *     @OA\Response(response=401, description="Non authentifié")
+     * )
+     */
+    public function notifyCardAdded(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $cardBrand = 'carte';
+        $cardLast4 = '****';
+
+        if ($user->hasStripeId()) {
+            try {
+                $cards = $this->stripe->listSavedCards((string) $user->stripe_id);
+                if (isset($cards[0])) {
+                    $cardBrand = (string) $cards[0]['brand'];
+                    $cardLast4 = (string) $cards[0]['last4'];
+                }
+            } catch (PaymentGatewayException $e) {
+                Log::warning('notifyCardAdded: could not retrieve card details', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        Mail::to($user->email, $user->firstname)
+            ->queue(new CardAddedMail($user, $cardBrand, $cardLast4));
+
+        Log::info('Card-added email queued', [
+            'user_id' => $user->id,
+            'brand' => $cardBrand,
+            'last4' => $cardLast4,
+        ]);
+
+        return response()->json(null, 204);
     }
 }

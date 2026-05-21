@@ -15,4 +15,10 @@ $_ENV['RESEND_KEY'] = '';
 $_SERVER['RESEND_KEY'] = '';
 putenv('RESEND_KEY=');
 
+// ConversationController resolves MessageService → EncryptionService on every chat route.
+// .env.example has no CHAT_ENCRYPTION_KEY; CI copies it to .env.testing.
+$_ENV['CHAT_ENCRYPTION_KEY'] = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+$_SERVER['CHAT_ENCRYPTION_KEY'] = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+putenv('CHAT_ENCRYPTION_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef');
+
 require dirname(__DIR__).'/vendor/autoload.php';

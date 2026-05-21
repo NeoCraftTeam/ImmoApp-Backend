@@ -10,6 +10,7 @@ use App\Filament\Resources\Ads\Concerns\SharedAdResource;
 use App\Mail\AdDeclinedMail;
 use App\Models\Ad;
 use App\Services\AiDescriptionEnhancer;
+use App\Support\AdScoutSync;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
@@ -133,7 +134,8 @@ class PendingAdResource extends Resource
                     ->modalHeading('Approuver cette annonce')
                     ->modalDescription(fn (Ad $record) => "L'annonce \"{$record->title}\" sera publiée et un email de confirmation sera envoyé à l'auteur.")
                     ->action(function (Ad $record): void {
-                        $record->forceFill(['status' => AdStatus::AVAILABLE])->save();
+                        Ad::withoutSyncingToSearch(fn () => $record->forceFill(['status' => AdStatus::AVAILABLE])->save());
+                        AdScoutSync::syncSearchIndexBestEffort($record->refresh());
 
                         Notification::make()
                             ->success()
@@ -204,7 +206,8 @@ class PendingAdResource extends Resource
                         }
 
                         $title = $record->title;
-                        $record->forceFill(['status' => AdStatus::DECLINED])->save();
+                        Ad::withoutSyncingToSearch(fn () => $record->forceFill(['status' => AdStatus::DECLINED])->save());
+                        AdScoutSync::syncSearchIndexBestEffort($record->refresh());
 
                         Notification::make()
                             ->warning()

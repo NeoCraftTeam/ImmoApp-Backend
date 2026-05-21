@@ -39,6 +39,7 @@ return [
 
     'resend' => [
         'key' => env('RESEND_KEY'),
+        'webhook_secret' => env('RESEND_WEBHOOK_SECRET'),
     ],
 
     'ses' => [

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Rules\VerifiedImageUpload;
 use App\Services\AiSearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -28,7 +29,15 @@ final readonly class AdImageSearchController
     public function __invoke(Request $request): JsonResponse
     {
         $request->validate([
-            'image' => ['required', 'file', 'image', 'max:5120', 'mimes:jpeg,jpg,png,webp'],
+            'image' => [
+                'required',
+                'file',
+                'image',
+                'max:5120',
+                'mimes:jpeg,jpg,png,webp',
+                'mimetypes:image/jpeg,image/png,image/webp',
+                new VerifiedImageUpload,
+            ],
         ]);
 
         $file = $request->file('image');

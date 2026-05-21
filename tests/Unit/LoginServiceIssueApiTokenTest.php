@@ -62,6 +62,9 @@ it('revokes prior tokens in the same context prefix when issuing again', functio
     $first = $loginService->issueApiTokenForLoginContext($user, 'client');
     $second = $loginService->issueApiTokenForLoginContext($user, 'client');
 
-    expect($user->tokens()->where('id', $first->accessToken->id)->exists())->toBeFalse();
-    expect($user->tokens()->where('id', $second->accessToken->id)->exists())->toBeTrue();
+    // First token soft-revoked (revoked_at set), still in DB for RTR compromise detection.
+    expect($user->tokens()->where('id', $first->accessToken->id)->whereNull('revoked_at')->exists())->toBeFalse();
+    expect($user->tokens()->where('id', $first->accessToken->id)->whereNotNull('revoked_at')->exists())->toBeTrue();
+    // Second token is active.
+    expect($user->tokens()->where('id', $second->accessToken->id)->whereNull('revoked_at')->exists())->toBeTrue();
 });

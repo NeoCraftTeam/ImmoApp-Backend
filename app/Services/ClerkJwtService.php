@@ -104,6 +104,25 @@ class ClerkJwtService
             return null;
         }
 
+        // Validate issuer against our configured JWKS domain to prevent tokens
+        // issued by another Clerk application from being accepted here.
+        $jwksUrl = config('clerk.jwks_url', '');
+        if ($jwksUrl !== '') {
+            $scheme = parse_url((string) $jwksUrl, PHP_URL_SCHEME) ?? 'https';
+            $host = parse_url((string) $jwksUrl, PHP_URL_HOST) ?? '';
+            $expectedIssuer = $scheme.'://'.$host;
+            $actualIssuer = (string) ($payload['iss'] ?? '');
+
+            if ($actualIssuer === '' || !str_starts_with($actualIssuer, $expectedIssuer)) {
+                Log::warning('Clerk JWT rejected: issuer mismatch', [
+                    'iss' => $actualIssuer,
+                    'expected_prefix' => $expectedIssuer,
+                ]);
+
+                return null;
+            }
+        }
+
         $now = time();
         if (isset($payload['exp']) && (int) $payload['exp'] < $now) {
             return null;

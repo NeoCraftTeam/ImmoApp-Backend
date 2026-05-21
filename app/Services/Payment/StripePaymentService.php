@@ -442,10 +442,15 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
         // would therefore systematically return empty, marking the local
         // Payment as FAILED before the webhook has a chance to land.
         //
-        // The caller passes the local `payment_link` for Stripe rows
-        // (a clientSecret of the form `pi_xxx_secret_yyy`) so we can
-        // extract the bare `pi_xxx` and call `retrieve()` — instant and
-        // strongly consistent.
+        // Two formats are supported:
+        //   - PaymentIntent clientSecret  (`pi_xxx_secret_yyy`) → extract pi_xxx
+        //   - CheckoutSession clientSecret (`cs_xxx_secret_yyy`) → extract cs_xxx,
+        //     then retrieve the session and delegate to its payment_intent.
+        $sessionId = $this->extractCheckoutSessionId($externalReference);
+        if ($sessionId !== null) {
+            return $this->verifyCheckoutSession($sessionId);
+        }
+
         $intentId = $this->extractIntentId($externalReference);
 
         try {
@@ -529,6 +534,68 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
         $idx = strpos($reference, '_secret_');
 
         return $idx === false ? $reference : substr($reference, 0, $idx);
+    }
+
+    /**
+     * Extract a Checkout Session id (`cs_xxx`) from a client secret
+     * of the form `cs_xxx_secret_yyy`.
+     */
+    private function extractCheckoutSessionId(string $reference): ?string
+    {
+        if (!str_starts_with($reference, 'cs_')) {
+            return null;
+        }
+        $idx = strpos($reference, '_secret_');
+
+        return $idx === false ? $reference : substr($reference, 0, $idx);
+    }
+
+    /**
+     * Verify a Checkout Session (ui_mode: 'custom') by retrieving it with
+     * its expanded PaymentIntent.
+     *
+     * Called by `verify()` when `payment_link` is a Checkout Session clientSecret
+     * (`cs_xxx_secret_yyy`). Immediately consistent — no indexing lag.
+     *
+     * @return array{status: string, amount: float, currency: string, payment_method: string|null, paid_at: string|null, raw: array<string, mixed>}
+     */
+    private function verifyCheckoutSession(string $sessionId): array
+    {
+        try {
+            /** @var CheckoutSession $session */
+            $session = $this->stripe->checkout->sessions->retrieve(
+                $sessionId,
+                ['expand' => ['payment_intent', 'payment_intent.latest_charge']],
+            );
+        } catch (ApiErrorException $e) {
+            Log::error('Stripe verify (checkout session) failed', [
+                'session_id' => $sessionId,
+                'message' => $e->getMessage(),
+            ]);
+
+            throw new PaymentGatewayException(
+                'Impossible de vérifier le paiement Stripe. Réessayez plus tard.',
+                previous: $e,
+            );
+        }
+
+        $intent = $session->payment_intent;
+        if ($intent instanceof PaymentIntent) {
+            return $this->normaliseIntent($intent);
+        }
+
+        // Session exists but PaymentIntent not yet attached (very rare —
+        // async payment methods before confirmation).
+        $paymentStatus = (string) ($session->payment_status ?? 'unpaid');
+
+        return [
+            'status' => $paymentStatus === 'paid' ? 'success' : 'pending',
+            'amount' => 0.0,
+            'currency' => (string) config('payment.default_currency', 'XAF'),
+            'payment_method' => null,
+            'paid_at' => null,
+            'raw' => ['session_payment_status' => $paymentStatus],
+        ];
     }
 
     /**

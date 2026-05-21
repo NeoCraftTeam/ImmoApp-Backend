@@ -13,6 +13,7 @@ use App\Http\Resources\AdResource as AdApiResource;
 use App\Models\Ad;
 use App\Models\AdInteraction;
 use App\Models\User;
+use App\Support\AdScoutSync;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -450,15 +451,21 @@ final class AdController
 
             $imagesCount = $ad->getMedia('images')->count();
 
-            if ($ad->trashed()) {
-                $ad->forceDelete();
-            } else {
-                $ad->delete();
-            }
+            Ad::withoutSyncingToSearch(function () use ($ad): void {
+                if ($ad->trashed()) {
+                    $ad->forceDelete();
+                } else {
+                    $ad->delete();
+                }
+            });
 
             $this->log->info('Ad deleted successfully with ID: '.$id);
 
             DB::commit();
+
+            // Best-effort: remove from search index after the DB write has succeeded.
+            // Meilisearch being down must not prevent a successful deletion.
+            AdScoutSync::removeFromSearchIndexBestEffort($ad);
 
             return response()->json([
                 'success' => true,

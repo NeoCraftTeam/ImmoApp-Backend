@@ -278,9 +278,9 @@ Route::prefix('v1')->group(function (): void {
         ->middleware('throttle:5,10');
     Route::get('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'unsubscribe']);
 
-    // --- BOOST (owner) ---
+    // --- BOOST ---
+    Route::get('/boost-packs', [BoostController::class, 'packs']); // public: browse packs
     Route::middleware('auth:sanctum')->group(function (): void {
-        Route::get('/my/boost-plans', [BoostController::class, 'plans']);
         Route::get('/my/ads/{ad}/boost-status', [BoostController::class, 'status']);
         Route::post('/my/ads/{ad}/boost', [BoostController::class, 'boost'])->middleware('throttle:10,1');
         Route::delete('/my/ads/{ad}/boost', [BoostController::class, 'unboost']);

@@ -30,4 +30,20 @@ final class AdScoutSync
             ]);
         }
     }
+
+    /**
+     * Remove the ad from the search index after a soft or force delete.
+     * Failures are logged and swallowed so a dead Meilisearch cannot block deletion.
+     */
+    public static function removeFromSearchIndexBestEffort(Ad $ad): void
+    {
+        try {
+            $ad->unsearchable();
+        } catch (Throwable $e) {
+            Log::warning('Scout index removal after delete failed; deletion itself succeeded.', [
+                'ad_id' => $ad->id,
+                'exception' => $e->getMessage(),
+            ]);
+        }
+    }
 }

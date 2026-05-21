@@ -41,6 +41,12 @@ final readonly class TrustScoreService implements TrustScoreServiceInterface
 {
     private const int CACHE_TTL = 3600; // 1 hour
 
+    /** Days of inactivity before score starts decaying. */
+    private const int DECAY_IDLE_THRESHOLD_DAYS = 90;
+
+    /** Maximum points deducted by inactivity decay. */
+    private const int DECAY_MAX_PENALTY = 25;
+
     /**
      * Maximum number of ads sampled per landlord when computing the avg KeyScore.
      * Sampling the top-N most recently updated ads keeps trust-score recompute
@@ -84,6 +90,7 @@ final readonly class TrustScoreService implements TrustScoreServiceInterface
             : $this->computeTenantScore($user);
 
         $total = min(100, (int) round(array_sum(array_column($breakdown, 'score'))));
+        $total = $this->applyInactivityDecay($total, $user);
         $tier = TrustScoreTier::fromScore($total);
 
         TrustScore::updateOrCreate(
@@ -457,6 +464,32 @@ final readonly class TrustScoreService implements TrustScoreServiceInterface
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────
+
+    /**
+     * Reduce score when user has been inactive for an extended period.
+     *
+     * Threshold: 90 days. Every additional 30-day period beyond the threshold
+     * subtracts 5 pts, capped at {@see DECAY_MAX_PENALTY} points total.
+     */
+    private function applyInactivityDecay(int $score, User $user): int
+    {
+        $lastActivity = $user->last_seen_at ?? $user->updated_at;
+
+        if ($lastActivity === null) {
+            return $score;
+        }
+
+        $daysIdle = (int) now()->diffInDays($lastActivity);
+
+        if ($daysIdle <= self::DECAY_IDLE_THRESHOLD_DAYS) {
+            return $score;
+        }
+
+        $periodsOver = (int) floor(($daysIdle - self::DECAY_IDLE_THRESHOLD_DAYS) / 30);
+        $decay = min(self::DECAY_MAX_PENALTY, $periodsOver * 5);
+
+        return max(0, $score - $decay);
+    }
 
     private function resolveRoleContext(User $user): string
     {

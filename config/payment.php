@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'default' => env('PAYMENT_DEFAULT_GATEWAY', 'flutterwave'),
+    'default' => env('PAYMENT_DEFAULT_GATEWAY', 'geniuspay'),
 
     /*
     |--------------------------------------------------------------------------
@@ -35,6 +35,16 @@ return [
 
     'gateways' => [
 
+        'geniuspay' => [
+            'api_key' => env('GENIUSPAY_API_KEY'),
+            'api_secret' => env('GENIUSPAY_API_SECRET'),
+            'webhook_secret' => env('GENIUSPAY_WEBHOOK_SECRET'),
+            'base_url' => env('GENIUSPAY_BASE_URL', 'https://pay.genius.ci/api/v1/merchant'),
+            'redirect_url' => env('GENIUSPAY_REDIRECT_URL'),
+            'default_country' => env('GENIUSPAY_DEFAULT_COUNTRY', 'CM'),
+        ],
+
+        // Legacy Flutterwave — kept for reference / unmigrated rows only (no longer routed).
         'flutterwave' => [
             'public_key' => env('FLW_PUBLIC_KEY'),
             'secret_key' => env('FLW_SECRET_KEY'),
@@ -84,11 +94,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Flutterwave Payment Options by Method
+    | GeniusPay payment_method codes (optional — omit for hosted checkout)
     |--------------------------------------------------------------------------
-    |
-    | Maps internal PaymentMethod enum values to Flutterwave payment_options strings.
-    |
+    */
+
+    'geniuspay_payment_methods' => [
+        'mobile_money' => 'mtn_money',
+        'orange_money' => 'orange_money',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Flutterwave Payment Options by Method (legacy — unmigrated installs only)
+    |--------------------------------------------------------------------------
     */
 
     'flutterwave_payment_options' => [

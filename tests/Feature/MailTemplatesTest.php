@@ -64,8 +64,9 @@ it('revokes existing api_token_* tokens on new login', function (): void {
         'password' => 'Password1!',
     ])->assertOk();
 
-    // After login, only 1 token should remain (the new one)
-    expect($user->fresh()?->tokens()->count())->toBe(1);
+    // After login, only 1 active (non-revoked) token should remain (the new one).
+    // Soft-revoked old tokens keep revoked_at set — they stay in DB for RTR audit.
+    expect($user->fresh()?->tokens()->whereNull('revoked_at')->count())->toBe(1);
 });
 
 // ── PasswordChangedMail ───────────────────────────────────────────────────────

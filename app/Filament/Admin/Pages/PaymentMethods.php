@@ -62,7 +62,7 @@ class PaymentMethods extends Page
         return $schema
             ->statePath('data')
             ->components([
-                Section::make('Paiement mobile (Flutterwave)')
+                Section::make('Paiement mobile (GeniusPay)')
                     ->description('Désactivez ces toggles pour bloquer immédiatement les paiements Mobile Money / Orange Money sur la plateforme. Les utilisateurs verront le moyen disparaître de la modale de paiement et toute tentative d\'initialisation sera rejetée par l\'API.')
                     ->icon(Heroicon::DevicePhoneMobile)
                     ->schema([
@@ -94,12 +94,12 @@ class PaymentMethods extends Page
                     ]),
 
                 Section::make('Avancé')
-                    ->description('Le moyen « Flutterwave » est un libellé générique historique (compatibilité avec d\'anciens paiements). Il n\'apparaît plus dans la sélection utilisateur — laissez-le activé sauf maintenance.')
+                    ->description('Le moyen « Autre · Mobile Money » est un libellé générique historique (compatibilité avec d\'anciens paiements). Il n\'apparaît plus dans la sélection utilisateur — laissez-le activé sauf maintenance.')
                     ->icon(Heroicon::WrenchScrewdriver)
                     ->collapsed()
                     ->schema([
                         Toggle::make('flutterwave')
-                            ->label('Flutterwave (legacy)')
+                            ->label('Autre mobile (legacy)')
                             ->helperText('Compatibilité historique. Désactiver bloquerait les retries de paiements existants — ne touchez que pour une maintenance.')
                             ->onColor('warning')
                             ->live()

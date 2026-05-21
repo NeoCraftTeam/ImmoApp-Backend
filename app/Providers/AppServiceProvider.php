@@ -13,12 +13,14 @@ use App\Enums\UserRole;
 use App\Enums\UserType;
 use App\Models\CashierSubscription;
 use App\Models\CashierSubscriptionItem;
+use App\Models\EmailSuppression;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
 use App\Services\AiSearchService;
 use App\Services\Contracts\ReservationServiceInterface;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
 use App\Services\Payment\FlutterwavePaymentService;
+use App\Services\Payment\GeniusPayPaymentService;
 use App\Services\Payment\PaymentMethodGateService;
 use App\Services\Payment\PaymentService;
 use App\Services\Payment\StripePaymentService;
@@ -83,7 +85,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(PaymentMethodGateService::class);
 
         $this->app->singleton(PaymentService::class, function ($app): PaymentService {
-            $defaultName = (string) config('payment.default', 'flutterwave');
+            $defaultName = (string) config('payment.default', 'geniuspay');
             $fallbackName = config('payment.fallback');
 
             $gateway = $this->resolvePaymentGateway($app, $defaultName);
@@ -100,9 +102,13 @@ class AppServiceProvider extends ServiceProvider
                 $registry[$fallback->getName()] = $fallback;
             }
             // Always register Stripe so card payments work even when the
-            // default gateway is Flutterwave.
+            // default gateway is GeniusPay.
             $stripe = $app->make(StripePaymentService::class);
             $registry[$stripe->getName()] = $stripe;
+
+            // Legacy Flutterwave rows may still exist in the database.
+            $flutterwave = $app->make(FlutterwavePaymentService::class);
+            $registry[$flutterwave->getName()] = $flutterwave;
 
             return new PaymentService($gateway, $fallback, $registry);
         });
@@ -169,6 +175,29 @@ class AppServiceProvider extends ServiceProvider
 
         View::composer(['emails.*', 'emails.reservation.*'], static function ($view) use ($emailViewData): void {
             $view->with($emailViewData);
+        });
+
+        // ── E-2 : Suppression guard ───────────────────────────────────────────
+        // Return false to cancel sending to any address in email_suppressions.
+        // Laravel's Mailer::sendNow() uses events->until(), so false stops the send.
+        Event::listen(MessageSending::class, static function (MessageSending $event): ?bool {
+            $recipients = array_keys(
+                array_merge(
+                    $event->message->getTo(),
+                    $event->message->getCc(),
+                    $event->message->getBcc(),
+                )
+            );
+
+            foreach ($recipients as $address) {
+                if (EmailSuppression::where('email', strtolower((string) $address))->exists()) {
+                    Log::info('mail.suppressed', ['email' => $address]);
+
+                    return false;
+                }
+            }
+
+            return null;
         });
 
         // ── Auto plain-text MIME part ─────────────────────────────────────────
@@ -243,6 +272,7 @@ class AppServiceProvider extends ServiceProvider
     private function resolvePaymentGateway(mixed $app, string $name): PaymentGatewayInterface
     {
         return match ($name) {
+            'geniuspay' => $app->make(GeniusPayPaymentService::class),
             'flutterwave' => $app->make(FlutterwavePaymentService::class),
             'stripe' => $app->make(StripePaymentService::class),
             default => throw new \InvalidArgumentException("Payment gateway [{$name}] not supported."),
