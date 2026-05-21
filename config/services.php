@@ -133,10 +133,39 @@ return [
         'providers' => env('AI_SEARCH_PROVIDERS', 'groq,openai,gemini'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | SMS — Orange SMS API (primary, Afrique) + Twilio (fallback)
+    |--------------------------------------------------------------------------
+    | Set SMS_PROVIDER=orange or SMS_PROVIDER=twilio.
+    | Both keys can coexist for automatic fallback.
+    */
+    'sms' => [
+        'enabled' => (bool) env('SMS_ENABLED', false),
+        'provider' => env('SMS_PROVIDER', 'orange'),
+
+        'orange' => [
+            'client_id' => env('ORANGE_SMS_CLIENT_ID'),
+            'client_secret' => env('ORANGE_SMS_CLIENT_SECRET'),
+            'sender_address' => env('ORANGE_SMS_SENDER', 'tel:+237XXXXXXXXX'),
+            'token_url' => 'https://api.orange.com/oauth/v3/token',
+            'api_url' => 'https://api.orange.com/smsmessaging/v1/outbound/{sender}/requests',
+        ],
+
+        'twilio' => [
+            'sid' => env('TWILIO_SID'),
+            'token' => env('TWILIO_TOKEN'),
+            'from' => env('TWILIO_FROM'),
+            'api_url' => 'https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json',
+        ],
+    ],
+
     'whatsapp' => [
-        'enabled' => env('WHATSAPP_ENABLED', false),
+        'enabled' => (bool) env('WHATSAPP_ENABLED', false),
         'token' => env('WHATSAPP_TOKEN'),
         'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
+        'api_version' => env('WHATSAPP_API_VERSION', 'v19.0'),
+        'api_url' => 'https://graph.facebook.com',
     ],
 
     'ors' => [

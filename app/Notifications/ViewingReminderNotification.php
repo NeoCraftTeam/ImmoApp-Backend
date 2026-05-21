@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
+use App\Channels\SmsChannel;
+use App\Channels\WhatsAppChannel;
 use App\Console\Commands\SendViewingReminders;
 use App\Models\TentativeReservation;
 use Illuminate\Bus\Queueable;
@@ -39,6 +41,14 @@ class ViewingReminderNotification extends Notification implements ShouldQueue
             $channels[] = WebPushChannel::class;
         }
 
+        if (config('services.sms.enabled', false) && filled($notifiable->phone_number)) {
+            $channels[] = SmsChannel::class;
+        }
+
+        if (config('services.whatsapp.enabled', false) && (bool) $notifiable->phone_is_whatsapp) {
+            $channels[] = WhatsAppChannel::class;
+        }
+
         return $channels;
     }
 
@@ -69,6 +79,28 @@ class ViewingReminderNotification extends Notification implements ShouldQueue
             ->body("Votre visite de « {$this->reservation->ad->title} » est demain {$date} à {$time}.")
             ->tag('viewing-reminder-'.$this->reservation->id)
             ->data(['url' => config('app.frontend_url').'/my/reservations']);
+    }
+
+    public function toSms(mixed $notifiable): string
+    {
+        $adTitle = $this->reservation->ad->title;
+        $date = $this->reservation->slot_date->translatedFormat('d/m/Y');
+        $time = substr((string) $this->reservation->slot_starts_at, 0, 5);
+
+        return "KeyHome — Rappel : votre visite de « {$adTitle} » est prévue demain {$date} à {$time}. En cas d'empêchement, prévenez le propriétaire.";
+    }
+
+    /** @return array{body: string} */
+    public function toWhatsApp(mixed $notifiable): array
+    {
+        $adTitle = $this->reservation->ad->title;
+        $date = $this->reservation->slot_date->translatedFormat('d/m/Y');
+        $time = substr((string) $this->reservation->slot_starts_at, 0, 5);
+        $url = config('app.frontend_url').'/my/reservations';
+
+        return [
+            'body' => "KeyHome — Rappel de visite\n\nBonjour {$notifiable->firstname} !\n\nVotre visite de « {$adTitle} » est prévue *demain {$date} à {$time}*.\n\nVoir votre réservation : {$url}",
+        ];
     }
 
     /** @return array<string, mixed> */

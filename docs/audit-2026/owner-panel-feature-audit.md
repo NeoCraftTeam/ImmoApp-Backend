@@ -440,8 +440,8 @@ En Afrique, la hiérarchie des canaux de notification :
 |---|---------|-----|--------|
 | 1 | **Bail** | Audit trail signature inexistant (illégal sans) | `LeaseSignatureAuditLog` table + middleware | ✅ **DONE** — migration + model + `LeaseAuditEvent` enum + `GET /{contract}/audit-log` + logging in store/show/download |
 | 2 | **Bail** | PDF signé non généré | Integration laravel-pdf ou gotenberg |
-| 3 | **Notifications** | SMS absent (canal #1 Afrique sub-saharienne) | Orange SMS API / Twilio |
-| 4 | **Notifications** | WhatsApp Business absent | 360dialog ou Meta Cloud API |
+| 3 | **Notifications** | SMS absent (canal #1 Afrique sub-saharienne) | Orange SMS API / Twilio | ✅ **DONE** — `SmsService` (Orange primary + Twilio fallback) + `SmsChannel` + `ViewingReminderNotification::toSms()` |
+| 4 | **Notifications** | WhatsApp Business absent | 360dialog ou Meta Cloud API | ✅ **DONE** — `WhatsAppService` (Meta Cloud API) + `WhatsAppChannel` refactored + `ViewingReminderNotification::toWhatsApp()` |
 | 5 | **Visites** | Pas de rappel automatique J-1 / H-2 | Queue job `SendViewingReminder` | ✅ **DONE** — `SendViewingReminders` command + `ViewingReminderNotification` + scheduled daily 08:00 |
 | 6 | **Trust Score** | Badge vérifié absent sur profil/annonces | Frontend uniquement | ✅ **DONE** — `is_verified`, `trust_score`, `trust_tier`, `trust_tier_label`, `trust_tier_hex_color` added to `UserResource` + inline owner in `AdResource` |
 | 7 | **Annonces** | Partage WhatsApp 1-clic absent | `<a href="https://wa.me/?text=...">` | ✅ **DONE** — `whatsapp_share_url` + `canonical_url` added to `AdResource` |
