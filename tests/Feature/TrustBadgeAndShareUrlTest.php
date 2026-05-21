@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use App\Enums\TrustScoreTier;
+use App\Http\Resources\UserResource;
 use App\Models\Ad;
 use App\Models\TrustScore;
 use App\Models\User;
+use Illuminate\Http\Request;
 use Laravel\Sanctum\Sanctum;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -28,8 +30,8 @@ it('UserResource is_verified reflects email_verified_at null correctly via resou
     // so we verify the resource logic via direct instantiation.
     $user = User::factory()->agents()->make(['email_verified_at' => null]);
 
-    $resource = new \App\Http\Resources\UserResource($user);
-    $data = $resource->resolve(new \Illuminate\Http\Request());
+    $resource = new UserResource($user);
+    $data = $resource->resolve(new Request);
 
     expect($data['is_verified'])->toBeFalse();
 });
@@ -129,7 +131,7 @@ it('AdResource exposes whatsapp_share_url containing wa.me', function (): void {
 
     expect($data['whatsapp_share_url'])
         ->toStartWith('https://wa.me/?text=')
-        ->and(urldecode($data['whatsapp_share_url']))
+        ->and(urldecode((string) $data['whatsapp_share_url']))
         ->toContain('KeyHome')
         ->toContain('Bel appartement');
 });

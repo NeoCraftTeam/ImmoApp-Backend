@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Log;
  */
 final readonly class IndexNowService
 {
-    private const ENDPOINT = 'https://api.indexnow.org/indexnow';
+    private const string ENDPOINT = 'https://api.indexnow.org/indexnow';
 
     public function ping(string|array $urls): void
     {

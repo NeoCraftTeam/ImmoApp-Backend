@@ -122,9 +122,11 @@ final class AdResource extends JsonResource
                 $this->draft_payload
             ),
 
-            // Item 7 — WhatsApp 1-click share
+            // SEO helpers — used by mobile apps and social sharing
             'canonical_url' => $this->buildCanonicalUrl(),
             'whatsapp_share_url' => $this->buildWhatsAppShareUrl(),
+            'seo_title' => $this->buildSeoTitle(),
+            'seo_description' => $this->buildSeoDescription(),
 
             // Item 11 — Prescreening questions (public — client reads before booking)
             'prescreening_questions' => $this->prescreening_questions ?? [],
@@ -172,6 +174,39 @@ final class AdResource extends JsonResource
             ]),
             'reviews' => ReviewResource::collection($this->whenLoaded('reviews')),
         ];
+    }
+
+    private function buildSeoTitle(): string
+    {
+        $parts = array_filter([
+            $this->title,
+            $this->relationLoaded('quarter') && $this->quarter
+                ? $this->quarter->name
+                : null,
+            $this->relationLoaded('quarter') && $this->quarter
+                ? ($this->quarter->city_name ?? null)
+                : null,
+        ]);
+
+        $title = implode(', ', $parts);
+        if ($this->price) {
+            $title .= ' — '.number_format((float) $this->price, 0, ',', ' ').' FCFA';
+        }
+
+        return $title ?: ($this->title ?? '');
+    }
+
+    private function buildSeoDescription(): string
+    {
+        $raw = $this->description ?? '';
+        if (mb_strlen($raw) <= 157) {
+            return $raw;
+        }
+
+        $truncated = mb_substr($raw, 0, 157);
+        $lastSpace = mb_strrpos($truncated, ' ');
+
+        return ($lastSpace !== false ? mb_substr($truncated, 0, $lastSpace) : $truncated).'…';
     }
 
     private function buildCanonicalUrl(): string

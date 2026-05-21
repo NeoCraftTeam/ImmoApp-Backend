@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Console\Commands\SendViewingReminders;
-use App\Enums\ReservationStatus;
 use App\Models\Ad;
 use App\Models\TentativeReservation;
 use App\Models\User;

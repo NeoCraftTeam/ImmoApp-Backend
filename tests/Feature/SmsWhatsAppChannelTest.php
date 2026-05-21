@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 use App\Channels\SmsChannel;
 use App\Channels\WhatsAppChannel;
+use App\Models\Ad;
 use App\Models\NotificationPreference;
 use App\Models\TentativeReservation;
 use App\Models\User;
 use App\Notifications\ViewingReminderNotification;
 use Carbon\Carbon;
+use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Http;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,8 +42,12 @@ it('SmsChannel skips send when SMS is disabled', function (): void {
     $user = User::factory()->create(['phone_number' => '+237699000001']);
     $channel = app(SmsChannel::class);
 
-    $notif = new class extends \Illuminate\Notifications\Notification {
-        public function toSms(mixed $notifiable): string { return 'Test SMS'; }
+    $notif = new class extends Notification
+    {
+        public function toSms(mixed $notifiable): string
+        {
+            return 'Test SMS';
+        }
     };
 
     $channel->send($user, $notif);
@@ -58,8 +64,12 @@ it('SmsChannel skips send when user has no phone number', function (): void {
     $user = User::factory()->create(['phone_number' => null]);
     $channel = app(SmsChannel::class);
 
-    $notif = new class extends \Illuminate\Notifications\Notification {
-        public function toSms(mixed $notifiable): string { return 'Test SMS'; }
+    $notif = new class extends Notification
+    {
+        public function toSms(mixed $notifiable): string
+        {
+            return 'Test SMS';
+        }
     };
 
     $channel->send($user, $notif);
@@ -78,8 +88,12 @@ it('SmsChannel skips send when user has sms_enabled=false', function (): void {
 
     $channel = app(SmsChannel::class);
 
-    $notif = new class extends \Illuminate\Notifications\Notification {
-        public function toSms(mixed $notifiable): string { return 'Test SMS'; }
+    $notif = new class extends Notification
+    {
+        public function toSms(mixed $notifiable): string
+        {
+            return 'Test SMS';
+        }
     };
 
     $channel->send($user, $notif);
@@ -101,14 +115,18 @@ it('SmsChannel sends via Twilio when enabled and user has phone', function (): v
     $user = User::factory()->create(['phone_number' => '+237699000003']);
     $channel = app(SmsChannel::class);
 
-    $notif = new class extends \Illuminate\Notifications\Notification {
-        public function toSms(mixed $notifiable): string { return 'Test SMS'; }
+    $notif = new class extends Notification
+    {
+        public function toSms(mixed $notifiable): string
+        {
+            return 'Test SMS';
+        }
     };
 
     $channel->send($user, $notif);
 
     Http::assertSentCount(1);
-    Http::assertSent(fn ($req) => str_contains($req->url(), 'twilio.com'));
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), 'twilio.com'));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -122,8 +140,12 @@ it('WhatsAppChannel skips send when WhatsApp is disabled', function (): void {
     $user = User::factory()->create(['phone_number' => '+237699000004', 'phone_is_whatsapp' => true]);
     $channel = app(WhatsAppChannel::class);
 
-    $notif = new class extends \Illuminate\Notifications\Notification {
-        public function toWhatsApp(mixed $notifiable): array { return ['body' => 'Hello WA']; }
+    $notif = new class extends Notification
+    {
+        public function toWhatsApp(mixed $notifiable): array
+        {
+            return ['body' => 'Hello WA'];
+        }
     };
 
     $channel->send($user, $notif);
@@ -138,8 +160,12 @@ it('WhatsAppChannel skips send when phone_is_whatsapp is false', function (): vo
     $user = User::factory()->create(['phone_number' => '+237699000005', 'phone_is_whatsapp' => false]);
     $channel = app(WhatsAppChannel::class);
 
-    $notif = new class extends \Illuminate\Notifications\Notification {
-        public function toWhatsApp(mixed $notifiable): array { return ['body' => 'Hello WA']; }
+    $notif = new class extends Notification
+    {
+        public function toWhatsApp(mixed $notifiable): array
+        {
+            return ['body' => 'Hello WA'];
+        }
     };
 
     $channel->send($user, $notif);
@@ -160,14 +186,18 @@ it('WhatsAppChannel sends text via Meta Graph API when enabled', function (): vo
     $user = User::factory()->create(['phone_number' => '+237699000006', 'phone_is_whatsapp' => true]);
     $channel = app(WhatsAppChannel::class);
 
-    $notif = new class extends \Illuminate\Notifications\Notification {
-        public function toWhatsApp(mixed $notifiable): array { return ['body' => 'Hello WA']; }
+    $notif = new class extends Notification
+    {
+        public function toWhatsApp(mixed $notifiable): array
+        {
+            return ['body' => 'Hello WA'];
+        }
     };
 
     $channel->send($user, $notif);
 
     Http::assertSentCount(1);
-    Http::assertSent(fn ($req) => str_contains($req->url(), 'graph.facebook.com'));
+    Http::assertSent(fn ($req) => str_contains((string) $req->url(), 'graph.facebook.com'));
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -185,8 +215,8 @@ it('ViewingReminderNotification includes SmsChannel when SMS enabled and user ha
     ]);
 
     $reservation = null;
-    \App\Models\Ad::withoutSyncingToSearch(function () use (&$reservation, $user): void {
-        $ad = \App\Models\Ad::factory()->create(['user_id' => $user->id]);
+    Ad::withoutSyncingToSearch(function () use (&$reservation, $user): void {
+        $ad = Ad::factory()->create(['user_id' => $user->id]);
         $reservation = TentativeReservation::factory()->create([
             'client_id' => $user->id,
             'ad_id' => $ad->id,
@@ -212,8 +242,8 @@ it('ViewingReminderNotification includes WhatsAppChannel when WA enabled and pho
     ]);
 
     $reservation = null;
-    \App\Models\Ad::withoutSyncingToSearch(function () use (&$reservation, $user): void {
-        $ad = \App\Models\Ad::factory()->create(['user_id' => $user->id]);
+    Ad::withoutSyncingToSearch(function () use (&$reservation, $user): void {
+        $ad = Ad::factory()->create(['user_id' => $user->id]);
         $reservation = TentativeReservation::factory()->create([
             'client_id' => $user->id,
             'ad_id' => $ad->id,
@@ -234,8 +264,8 @@ it('ViewingReminderNotification toSms returns a non-empty string', function (): 
     $user = User::factory()->create(['phone_number' => '+237699000010']);
 
     $reservation = null;
-    \App\Models\Ad::withoutSyncingToSearch(function () use (&$reservation, $user): void {
-        $ad = \App\Models\Ad::factory()->create(['user_id' => $user->id, 'title' => 'Villa Rose']);
+    Ad::withoutSyncingToSearch(function () use (&$reservation, $user): void {
+        $ad = Ad::factory()->create(['user_id' => $user->id, 'title' => 'Villa Rose']);
         $reservation = TentativeReservation::factory()->create([
             'client_id' => $user->id,
             'ad_id' => $ad->id,
@@ -243,7 +273,7 @@ it('ViewingReminderNotification toSms returns a non-empty string', function (): 
         ]);
     });
 
-    $sms = (new ViewingReminderNotification($reservation))->toSms($user);
+    $sms = new ViewingReminderNotification($reservation)->toSms($user);
 
     expect($sms)->toContain('KeyHome')
         ->toContain('Villa Rose')

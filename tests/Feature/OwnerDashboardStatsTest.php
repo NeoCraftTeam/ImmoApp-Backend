@@ -2,9 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Enums\ReservationStatus;
 use App\Models\Ad;
-use App\Models\AdBoost;
 use App\Models\Conversation;
 use App\Models\LeaseContract;
 use App\Models\TentativeReservation;
@@ -12,6 +10,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
@@ -105,7 +104,7 @@ it('counts active boosts correctly', function (): void {
     });
 
     // Active boost — must insert a valid boost_pack first (FK constraint)
-    $boostPackId = \Illuminate\Support\Str::uuid();
+    $boostPackId = Str::uuid();
     DB::table('boost_packs')->insert([
         'id' => $boostPackId,
         'name' => 'Test Pack',
@@ -118,7 +117,7 @@ it('counts active boosts correctly', function (): void {
         'updated_at' => now(),
     ]);
     DB::table('ad_boosts')->insert([
-        'id' => \Illuminate\Support\Str::uuid(),
+        'id' => Str::uuid(),
         'ad_id' => $ad->id,
         'user_id' => $owner->id,
         'boost_pack_id' => $boostPackId,

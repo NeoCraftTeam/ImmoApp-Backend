@@ -16,7 +16,7 @@ function insertBoostPackAndBoost(Ad $ad, User $owner, Carbon $startedAt, int $du
     DB::table('boost_packs')->insert([
         'id' => $packId,
         'name' => 'ROI Test Pack',
-        'slug' => 'roi-test-pack-' . Str::random(6),
+        'slug' => 'roi-test-pack-'.Str::random(6),
         'boost_score' => 5,
         'duration_days' => $durationDays,
         'price_credits' => 10,
