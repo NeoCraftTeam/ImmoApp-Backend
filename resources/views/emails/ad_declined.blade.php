@@ -2,6 +2,8 @@
 
 @section('title', 'Votre annonce n\'a pas été publiée')
 
+@section('preheader', 'Votre annonce n\'a pas pu être publiée — consultez le motif et resoumettez-la depuis votre espace bailleur.')
+
 @section('content')
 
     <h1>Votre annonce n'a pas été publiée</h1>
@@ -45,11 +47,12 @@
         resoumettre directement depuis votre espace bailleur.
     </p>
 
-    <div class="btn-wrapper">
-        <a href="{{ rtrim(config('app.frontend_url', config('app.url')), '/') . '/owner/ads' }}" class="btn">
-            Modifier et resoumettre mon annonce
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => rtrim(config('app.frontend_url', config('app.url')), '/') . '/owner/ads',
+        'label' => 'Modifier et resoumettre mon annonce',
+        'color' => '#0d9488',
+        'width' => 300,
+    ])
 
     <p class="text" style="margin-top: 32px;">
         Si vous pensez qu'il s'agit d'une erreur ou si vous avez des questions,

@@ -19,6 +19,7 @@ return [
     // Welcome
     'welcome' => [
         'subject' => 'Bienvenue sur :app',
+        'preheader' => 'Votre compte est activé — commencez à explorer des milliers d\'annonces immobilières vérifiées.',
         'heading' => 'Bienvenue, :name',
         'intro' => 'Votre compte <strong>:app</strong> est maintenant activé. Vous faites officiellement partie de la communauté !',
         'what_you_can_do' => 'Nous avons conçu cette plateforme pour vous simplifier la vie immobilière. Voici ce que vous pouvez faire dès maintenant :',

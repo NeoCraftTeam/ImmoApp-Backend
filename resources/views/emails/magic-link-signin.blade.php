@@ -3,6 +3,8 @@
 
 @section('title', 'Connexion à ' . config('app.name'))
 
+@section('preheader', 'Votre lien de connexion sécurisé à ' . config('app.name') . ' — valable ' . ($ttlMinutes ?? 60) . ' minutes.')
+
 @section('content')
 
     <h1>Connexion à {{ config('app.name') }}</h1>
@@ -12,9 +14,11 @@
         Ce lien expirera dans <strong>{{ $ttlMinutes }} minutes</strong>.
     </p>
 
-    <div class="btn-wrapper">
-        <a href="{{ $magicLink }}" class="btn">Se connecter</a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $magicLink,
+        'label' => 'Se connecter',
+        'width' => 200,
+    ])
 
     <p class="fallback" style="margin: 16px 0 64px 0;">
         Si le bouton ne fonctionne pas,

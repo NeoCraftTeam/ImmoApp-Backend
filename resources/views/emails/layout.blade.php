@@ -248,6 +248,10 @@
 </head>
 
 <body>
+    {{-- Hidden preheader / preview text (shown by inbox clients before subject) --}}
+    @hasSection('preheader')
+    <div style="display:none;font-size:1px;color:#f8fafc;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;" aria-hidden="true">@yield('preheader')&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>
+    @endif
     <div class="wrapper">
         <!--[if mso]>
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" align="center"><tr><td>
@@ -258,11 +262,12 @@
 
             <div class="header">
                 <a href="{{ $emailFrontendUrl ?? config('app.frontend_url', config('app.url')) }}" style="display: inline-block;">
-                    <img src="{{ $emailLogoUrl ?? asset('images/keyhomelogo_email.png') }}"
+                    <img src="{{ $emailLogoUrl ?? (rtrim((string) config('app.mail_asset_base_url', 'https://keyhome.app'), '/') . '/images/keyhomelogo_email.png') }}"
                         alt="{{ config('app.name') }}"
                         class="logo-img"
                         width="160"
                         height="40"
+                        border="0"
                         style="max-height:40px;height:auto;width:auto;max-width:160px;display:block;border:0;" />
                 </a>
             </div>

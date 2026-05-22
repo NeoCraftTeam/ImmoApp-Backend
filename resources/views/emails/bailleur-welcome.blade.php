@@ -2,6 +2,8 @@
 
 @section('title', 'Bienvenue Bailleur - ' . config('app.name'))
 
+@section('preheader', 'Votre espace bailleur KeyHome est prêt — publiez vos premières annonces dès maintenant.')
+
 @section('content')
 
     <h1>Bienvenue, {{ $user->firstname }}</h1>
@@ -45,11 +47,12 @@
         </tr>
     </table>
 
-    <div class="btn-wrapper">
-        <a href="{{ rtrim(config('app.frontend_url', config('app.url')), '/') . '/owner/dashboard' }}" class="btn">
-            Accéder à mon espace bailleur
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => rtrim(config('app.frontend_url', config('app.url')), '/') . '/owner/dashboard',
+        'label' => 'Accéder à mon espace bailleur',
+        'color' => '#0d9488',
+        'width' => 260,
+    ])
 
     <p class="fallback" style="margin-top: 24px;">
         Si vous avez des questions, contactez-nous à

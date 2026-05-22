@@ -2,6 +2,8 @@
 
 @section('title', 'Achat de crédits confirmé — ' . $package->name)
 
+@section('preheader', 'Votre achat de crédits est confirmé — vos crédits sont disponibles immédiatement dans votre compte.')
+
 @section('content')
     <style>
         .pack-card {

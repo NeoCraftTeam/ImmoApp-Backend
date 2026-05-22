@@ -2,6 +2,8 @@
 
 @section('title', __("emails.welcome_drip.day{$day}_subject", ['app' => config('app.name')]))
 
+@section('preheader', __("emails.welcome_drip.day{$day}_heading") . ' — ' . config('app.name') . ' vous accompagne dans votre recherche immobilière.')
+
 @section('content')
 
     <h1>{{ __("emails.welcome_drip.day{$day}_heading") }}</h1>
@@ -42,10 +44,10 @@
         </table>
     @endif
 
-    <div class="btn-wrapper">
-        <a href="{{ config('app.frontend_url', config('app.url')) }}/home" class="btn">
-            {{ __("emails.welcome_drip.day{$day}_cta") }}
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => config('app.frontend_url', config('app.url')) . '/home',
+        'label' => __("emails.welcome_drip.day{$day}_cta"),
+        'width' => 220,
+    ])
 
 @endsection

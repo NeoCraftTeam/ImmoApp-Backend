@@ -2,6 +2,8 @@
 
 @section('title', 'Bienvenue administrateur - ' . config('app.name'))
 
+@section('preheader', 'Votre compte administrateur KeyHome est activé — pensez à sécuriser votre accès dès la première connexion.')
+
 @section('content')
 
     <h1>Bienvenue, {{ $user->firstname }}</h1>
@@ -54,11 +56,11 @@
         $adminUrl = $domain ? 'https://' . $domain . '/login' : (config('app.url') . '/admin/login');
     @endphp
 
-    <div class="btn-wrapper">
-        <a href="{{ $adminUrl }}" class="btn">
-            Accéder au panneau d'administration
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $adminUrl,
+        'label' => "Accéder au panneau d'administration",
+        'width' => 280,
+    ])
 
     <p class="fallback" style="margin-top: 24px;">
         Si vous avez des questions, contactez l'équipe technique à

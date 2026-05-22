@@ -2,6 +2,8 @@
 
 @section('title', 'Renouvellement de votre abonnement — ' . config('app.name'))
 
+@section('preheader', 'Rappel de renouvellement — assurez la continuité de vos avantages sur KeyHome.')
+
 @section('content')
     <style>
         .renewal-badge {

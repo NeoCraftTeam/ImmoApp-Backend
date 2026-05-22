@@ -2,6 +2,8 @@
 
 @section('title', __('emails.digest.subject', ['app' => config('app.name')]))
 
+@section('preheader', 'Votre récapitulatif hebdomadaire — découvrez les nouveaux biens et alertes disponibles cette semaine.')
+
 @section('content')
 
     <h1>{{ __('emails.digest.heading') }}</h1>
@@ -38,10 +40,10 @@
         </p>
     @endif
 
-    <div class="btn-wrapper">
-        <a href="{{ config('app.frontend_url', config('app.url')) }}/search" class="btn">
-            {{ __('emails.digest.cta') }}
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => config('app.frontend_url', config('app.url')) . '/search',
+        'label' => __('emails.digest.cta'),
+        'width' => 220,
+    ])
 
 @endsection

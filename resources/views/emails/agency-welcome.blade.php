@@ -2,6 +2,8 @@
 
 @section('title', 'Bienvenue Agence - ' . config('app.name'))
 
+@section('preheader', 'Votre espace agence KeyHome est prêt — commencez à publier et gérer vos biens immobiliers.')
+
 @section('content')
 
     <h1>Bienvenue, {{ $user->firstname }}</h1>
@@ -50,11 +52,12 @@
         $agencyUrl = $domain ? 'https://' . $domain . '/login' : (config('app.url') . '/agency/login');
     @endphp
 
-    <div class="btn-wrapper">
-        <a href="{{ $agencyUrl }}" class="btn">
-            Accéder à l'espace agence
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $agencyUrl,
+        'label' => "Accéder à l'espace agence",
+        'color' => '#0d9488',
+        'width' => 260,
+    ])
 
     <p class="fallback" style="margin-top: 24px;">
         Si vous avez des questions, contactez-nous à

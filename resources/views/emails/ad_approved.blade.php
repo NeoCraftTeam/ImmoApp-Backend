@@ -2,6 +2,8 @@
 
 @section('title', 'Votre annonce est publiée')
 
+@section('preheader', 'Félicitations — votre annonce a été validée et est maintenant visible par tous les utilisateurs.')
+
 @section('content')
 
     <h1>Félicitations, votre annonce est en ligne !</h1>
@@ -65,11 +67,12 @@
         </tr>
     </table>
 
-    <div class="btn-wrapper">
-        <a href="{{ rtrim(config('app.frontend_url', config('app.url')), '/') . '/owner/ads' }}" class="btn">
-            Voir mes annonces
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => rtrim(config('app.frontend_url', config('app.url')), '/') . '/owner/ads',
+        'label' => 'Voir mes annonces',
+        'color' => '#0d9488',
+        'width' => 200,
+    ])
 
     <p class="text">
         Merci de votre confiance et bonne publication sur KeyHome.
