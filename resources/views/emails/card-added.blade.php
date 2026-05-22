@@ -2,6 +2,8 @@
 
 @section('title', 'Carte bancaire ajoutée — ' . config('app.name'))
 
+@section('preheader', 'Une carte bancaire a été associée à votre compte. Si vous n\'en êtes pas à l\'origine, contactez notre support.')
+
 @section('content')
 
     {{-- Security badge --}}

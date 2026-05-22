@@ -215,10 +215,23 @@ class AppServiceProvider extends ServiceProvider
                 return;
             }
 
+            // Preserve anchor href so links remain usable in plain-text clients.
+            $plain = (string) preg_replace_callback(
+                '/<a\s[^>]*href=["\']([^"\']+)["\'][^>]*>(.*?)<\/a>/is',
+                static function (array $m): string {
+                    $label = trim(strip_tags($m[2]));
+                    $url = trim($m[1]);
+
+                    return $label !== '' && $url !== $label
+                        ? "{$label} ( {$url} )"
+                        : $label;
+                },
+                $html
+            );
             $plain = (string) preg_replace(
                 ['/<br\s*\/?>/i', '/<\/(?:p|div|li|h[1-6]|tr)>/i'],
                 "\n",
-                $html
+                $plain
             );
             $plain = html_entity_decode(
                 strip_tags($plain),

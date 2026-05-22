@@ -2,6 +2,8 @@
 
 @section('title', $isActor ? 'Confirmation d\'action' : 'Alerte action admin')
 
+@section('preheader', $isActor ? 'Votre action a bien été enregistrée sur la plateforme KeyHome.' : 'Une action administrative a été effectuée — consultez les détails.')
+
 @section('content')
 
     <h1>{{ $isActor ? 'Confirmation — Action effectuée' : 'Alerte — Action administrateur' }}</h1>

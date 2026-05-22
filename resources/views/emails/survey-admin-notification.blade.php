@@ -2,6 +2,8 @@
 
 @section('title', 'Nouveau sondage reçu')
 
+@section('preheader', 'Un utilisateur vient de répondre à un sondage — consultez les réponses dans le panel admin.')
+
 @section('content')
 
     <h1>Nouveau sondage reçu</h1>

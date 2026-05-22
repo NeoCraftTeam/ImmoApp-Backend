@@ -3,6 +3,8 @@
 
 @section('title', 'Votre mot de passe ' . config('app.name') . ' a été modifié')
 
+@section('preheader', 'Modification confirmée. Si vous n\'êtes pas à l\'origine de ce changement, sécurisez votre compte immédiatement.')
+
 @section('content')
 
     <h1>Changement de mot de passe</h1>

@@ -2,6 +2,8 @@
 
 @section('title', 'Annonce reçue — en attente de validation')
 
+@section('preheader', 'Votre annonce est en cours d\'examen par notre équipe — nous vous notifierons dès la validation, généralement sous 24 h.')
+
 @section('content')
 
     <h1>Votre annonce a bien été reçue</h1>

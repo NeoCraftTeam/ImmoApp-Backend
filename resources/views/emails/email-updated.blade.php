@@ -3,6 +3,8 @@
 
 @section('title', 'Votre adresse email ' . config('app.name') . ' a été mise à jour')
 
+@section('preheader', 'Une vérification est requise pour activer votre nouvelle adresse. Si vous n\'en êtes pas à l\'origine, contactez-nous.')
+
 @section('content')
 
     <h1>Adresse email mise à jour</h1>

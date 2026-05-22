@@ -2,6 +2,8 @@
 
 @section('title', 'Connexion depuis un nouvel emplacement — ' . config('app.name'))
 
+@section('preheader', 'Connexion inhabituelle détectée sur votre compte. Vérifiez si cette activité est bien la vôtre.')
+
 @section('content')
 
     {{-- Security badge --}}

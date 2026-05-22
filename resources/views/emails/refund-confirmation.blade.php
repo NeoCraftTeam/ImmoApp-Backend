@@ -2,6 +2,8 @@
 
 @section('title', __('emails.refund.subject', ['amount' => number_format((float) $refund->amount, 0, ',', ' ')]))
 
+@section('preheader', 'Votre remboursement a été traité avec succès — crédité sous 5 à 10 jours ouvrés selon votre opérateur.')
+
 @section('content')
     <style>
         .refund-card {

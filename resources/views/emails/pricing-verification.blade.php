@@ -2,6 +2,8 @@
 
 @section('title', 'Vérification de sécurité — Tarification')
 
+@section('preheader', 'Votre code de vérification pour accéder à la tarification est valide quelques minutes seulement.')
+
 @section('content')
 
     <h1>Vérification de sécurité</h1>

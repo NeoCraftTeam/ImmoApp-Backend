@@ -2,6 +2,8 @@
 
 @section('title', 'Export de vos données personnelles — RGPD')
 
+@section('preheader', 'Votre archive de données personnelles est disponible. Téléchargez-la avant l\'expiration du lien sécurisé.')
+
 @section('content')
 
     <h1>Vos données personnelles</h1>

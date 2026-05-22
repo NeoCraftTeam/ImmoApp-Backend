@@ -2,6 +2,8 @@
 
 @section('title', 'Merci pour votre participation')
 
+@section('preheader', 'Votre avis a bien été enregistré — merci de contribuer à l\'amélioration de KeyHome.')
+
 @section('content')
 
     <h1>Merci d'avoir répondu au sondage&nbsp;!</h1>

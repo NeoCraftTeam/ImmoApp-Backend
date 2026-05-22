@@ -2,6 +2,8 @@
 
 @section('title', 'Nouvelle connexion à votre compte — ' . config('app.name'))
 
+@section('preheader', 'Une connexion depuis un appareil inconnu a été détectée. Si ce n\'est pas vous, sécurisez votre compte immédiatement.')
+
 @section('content')
 
     {{-- Security badge --}}

@@ -2,6 +2,8 @@
 
 @section('title', 'Confirmation de votre action')
 
+@section('preheader', 'Votre action a bien été enregistrée et est effective immédiatement sur la plateforme.')
+
 @section('content')
 
     <h1>Action effectuée avec succès</h1>
