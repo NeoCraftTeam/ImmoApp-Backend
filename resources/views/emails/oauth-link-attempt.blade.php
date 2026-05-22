@@ -3,6 +3,8 @@
 
 @section('title', 'Tentative de liaison de compte ' . ucfirst($provider))
 
+@section('preheader', 'Alerte sécurité — une tentative de liaison ' . ucfirst($provider) . ' a été détectée sur votre compte. Agissez maintenant si ce n\'est pas vous.')
+
 @section('content')
 
     <h1>Tentative de liaison de compte {{ ucfirst($provider) }}</h1>
@@ -36,11 +38,12 @@
         Pour sécuriser votre compte, changez votre mot de passe et révoquez les sessions actives.
     </p>
 
-    <div class="btn-wrapper">
-        <a href="{{ $secureAccountUrl }}" class="btn" style="background-color: #dc2626;">
-            Sécuriser mon compte
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $secureAccountUrl,
+        'label' => 'Sécuriser mon compte',
+        'color' => '#dc2626',
+        'width' => 240,
+    ])
 
     <p class="fallback">
         Si le bouton ne fonctionne pas,

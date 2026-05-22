@@ -2,6 +2,8 @@
 
 @section('title', __('emails.search_alert.subject', ['app' => config('app.name')]))
 
+@section('preheader', 'Une nouvelle annonce correspond à vos critères — consultez-la avant qu’elle ne soit louée.')
+
 @section('content')
 
     <h1>{{ __('emails.search_alert.heading', ['name' => $recipient->firstname]) }}</h1>
@@ -77,11 +79,11 @@
         </tr>
     </table>
 
-    <div class="btn-wrapper">
-        <a href="{{ $adUrl }}" class="btn">
-            {{ __('emails.search_alert.cta') }}
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $adUrl,
+        'label' => __('emails.search_alert.cta'),
+        'width' => 220,
+    ])
 
     <p class="text" style="margin-top: 24px; font-size: 13px; color: #94a3b8;">
         Cette notification provient de votre alerte

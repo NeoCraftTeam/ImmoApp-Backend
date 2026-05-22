@@ -2,6 +2,8 @@
 
 @section('title', 'Vos alertes immobilières — KeyHome')
 
+@section('preheader', 'Récapitulatif de vos alertes — de nouveaux biens ont été publiés correspondant à vos critères de recherche.')
+
 @section('content')
 
     <h1>Bonjour {{ $recipientFirstname }} 👋</h1>
@@ -118,11 +120,11 @@
     @endforeach
 
     {{-- Global CTA --}}
-    <div class="btn-wrapper" style="margin-top:32px;">
-        <a href="{{ config('app.frontend_url') }}/search-alerts" class="btn">
-            Gérer mes alertes
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => config('app.frontend_url') . '/search-alerts',
+        'label' => 'Gérer mes alertes',
+        'width' => 220,
+    ])
 
     <p class="text" style="margin-top:24px;font-size:12px;color:#94a3b8;text-align:center;">
         Vous recevez ce résumé car vous avez des alertes de recherche actives sur KeyHome.<br>

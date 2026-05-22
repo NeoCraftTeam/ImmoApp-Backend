@@ -2,6 +2,8 @@
 
 @section('title', 'Votre compte a été supprimé')
 
+@section('preheader', 'Votre compte bailleur ' . config('app.name') . ' a bien été supprimé. Toutes vos données ont été effacées.')
+
 @section('content')
 
     <h1>Votre compte a été supprimé</h1>
@@ -47,10 +49,11 @@
         sur KeyHome.
     </p>
 
-    <div class="btn-wrapper">
-        <a href="{{ rtrim(config('app.frontend_url', config('app.url')), '/') }}" class="btn">
-            Visiter KeyHome
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => rtrim(config('app.frontend_url', config('app.url')), '/'),
+        'label' => 'Visiter KeyHome',
+        'color' => '#0d9488',
+        'width' => 200,
+    ])
 
 @endsection

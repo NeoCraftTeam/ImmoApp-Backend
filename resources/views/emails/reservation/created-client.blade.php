@@ -2,6 +2,8 @@
 
 @section('title', 'Votre demande de visite a bien été reçue')
 
+@section('preheader', 'Votre demande de visite a été envoyée — le propriétaire dispose de 24h pour confirmer.')
+
 @section('content')
 
     <h1>Demande de visite envoyée ✓</h1>
@@ -104,11 +106,11 @@
     </table>
     @endif
 
-    <div class="btn-wrapper">
-        <a href="{{ config('app.frontend_url') }}/my/reservations" class="btn">
-            Voir mes visites
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => config('app.frontend_url') . '/my/reservations',
+        'label' => 'Voir mes visites',
+        'width' => 200,
+    ])
 
     <p class="text">
         Le propriétaire dispose de <strong>24 heures</strong> pour confirmer votre demande.

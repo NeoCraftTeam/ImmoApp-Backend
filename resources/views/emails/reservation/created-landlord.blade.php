@@ -2,6 +2,8 @@
 
 @section('title', 'Nouvelle demande de visite')
 
+@section('preheader', 'Nouvelle demande de visite reçue — confirmez ou refusez dans les 24h depuis votre espace bailleur.')
+
 @section('content')
 
     <h1>Nouvelle demande de visite</h1>
@@ -105,11 +107,12 @@
     </table>
     @endif
 
-    <div class="btn-wrapper">
-        <a href="{{ rtrim(config('app.frontend_url', config('app.url')), '/') }}/owner/viewings" class="btn">
-            Gérer la demande
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => rtrim(config('app.frontend_url', config('app.url')), '/') . '/owner/viewings',
+        'label' => 'Gérer la demande',
+        'color' => '#0d9488',
+        'width' => 220,
+    ])
 
     <p class="text">
         Si vous ne répondez pas dans les <strong>24 heures</strong>, la demande expirera automatiquement.

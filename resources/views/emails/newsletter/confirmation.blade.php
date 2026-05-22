@@ -2,6 +2,8 @@
 
 @section('title', 'Bienvenue sur la newsletter KeyHome')
 
+@section('preheader', 'Vous êtes inscrit à la newsletter KeyHome — recevez les meilleures annonces et actualités immobilières.')
+
 @section('content')
 
     <h1>Bienvenue sur la newsletter KeyHome{{ $name ? ', ' . $name : '' }} !</h1>
@@ -46,11 +48,11 @@
         </tr>
     </table>
 
-    <div class="btn-wrapper">
-        <a href="{{ config('app.frontend_url', config('app.url')) }}" class="btn">
-            Découvrir les annonces
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => config('app.frontend_url', config('app.url')),
+        'label' => 'Découvrir les annonces',
+        'width' => 240,
+    ])
 
     <p class="fallback" style="margin-top: 24px;">
         Vous pouvez vous désabonner à tout moment en cliquant

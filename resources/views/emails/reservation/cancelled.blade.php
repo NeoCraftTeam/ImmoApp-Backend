@@ -2,6 +2,8 @@
 
 @section('title', 'Visite annulée')
 
+@section('preheader', 'Votre visite a été annulée — découvrez d’autres biens disponibles sur KeyHome.')
+
 @section('content')
 
     <h1>Visite annulée</h1>
@@ -103,11 +105,11 @@
     </table>
     @endif
 
-    <div class="btn-wrapper">
-        <a href="{{ config('app.frontend_url') }}" class="btn">
-            Voir les annonces disponibles
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => config('app.frontend_url'),
+        'label' => 'Voir les annonces disponibles',
+        'width' => 260,
+    ])
 
     <p class="text">
         Vous pouvez chercher d'autres biens disponibles sur KeyHome et réserver un nouveau créneau de visite.

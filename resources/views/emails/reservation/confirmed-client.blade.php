@@ -2,6 +2,8 @@
 
 @section('title', 'Votre visite est confirmée')
 
+@section('preheader', 'Votre visite est confirmée — retrouvez tous les détails et conseils de préparation dans cet email.')
+
 @section('content')
 
     <h1>Votre visite est confirmée </h1>
@@ -118,11 +120,11 @@
         </tr>
     </table>
 
-    <div class="btn-wrapper">
-        <a href="{{ config('app.frontend_url') }}/my/reservations" class="btn">
-            Voir mes réservations
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => config('app.frontend_url') . '/my/reservations',
+        'label' => 'Voir mes réservations',
+        'width' => 240,
+    ])
 
     <p class="text">Merci de faire confiance à KeyHome !</p>
 

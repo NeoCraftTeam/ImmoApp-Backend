@@ -2,6 +2,8 @@
 
 @section('title', 'Nouvelle annonce à valider')
 
+@section('preheader', 'Nouvelle annonce en attente de validation — traitez-la depuis le panneau d’administration KeyHome.')
+
 @section('content')
 
     <h1>Nouvelle annonce à valider</h1>
@@ -96,11 +98,11 @@
         </tr>
     </table>
 
-    <div class="btn-wrapper">
-        <a href="{{ $url }}" class="btn">
-            Valider l'annonce dans le panneau admin
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $url,
+        'label' => 'Valider l’annonce dans le panneau admin',
+        'width' => 320,
+    ])
 
     <p class="text" style="font-size: 12px; color: #64748b;">
         Cet email est une notification automatique réservée aux administrateurs.

@@ -2,6 +2,8 @@
 
 @section('title', 'Coordonnées débloquées — ' . $ad->title)
 
+@section('preheader', 'Coordonnées débloquées — contactez directement le propriétaire pour organiser une visite.')
+
 @section('content')
     <style>
         .ad-card {
@@ -102,11 +104,11 @@
         </tr>
     </table>
 
-    <div class="btn-wrapper">
-        <a href="{{ config('app.frontend_url', config('app.url')) . '/ads/' . $ad->slug }}" class="btn">
-            Voir l'annonce
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => config('app.frontend_url', config('app.url')) . '/ads/' . $ad->slug,
+        'label' => 'Voir l\'annonce',
+        'width' => 200,
+    ])
 
     <p class="text" style="margin-top: 24px; font-size: 13px; color: #94a3b8;">
         Conservez cet email comme preuve de paiement. En cas de problème, contactez notre support en mentionnant la référence <strong>#{{ $payment->transaction_id }}</strong>.

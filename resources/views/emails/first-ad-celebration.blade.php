@@ -2,6 +2,8 @@
 
 @section('title', 'Bravo pour votre première annonce !')
 
+@section('preheader', 'Félicitations pour votre première annonce KeyHome — elle est maintenant visible par des milliers de visiteurs.')
+
 @section('content')
 
     {{-- Hero celebration banner --}}
@@ -181,11 +183,12 @@
     </table>
 
     {{-- CTA --}}
-    <div class="btn-wrapper">
-        <a href="{{ $panelUrl }}" class="btn">
-            Voir mon tableau de bord →
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $panelUrl,
+        'label' => 'Voir mon tableau de bord',
+        'color' => '#0d9488',
+        'width' => 240,
+    ])
 
     <p class="text" style="margin-top: 24px;">
         Merci de faire confiance à <strong>{{ config('app.name') }}</strong>.
