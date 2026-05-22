@@ -25,7 +25,7 @@ class AdReportReceivedMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'KeyHome - Nous avons bien recu votre signalement',
+            subject: 'Votre signalement a bien été reçu — '.config('app.name'),
         );
     }
 

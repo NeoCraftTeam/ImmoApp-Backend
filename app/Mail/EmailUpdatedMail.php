@@ -23,7 +23,7 @@ class EmailUpdatedMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Votre adresse email '.config('app.name').' a été mise à jour',
+            subject: 'Adresse email mise à jour — vérification requise sur '.config('app.name'),
         );
     }
 

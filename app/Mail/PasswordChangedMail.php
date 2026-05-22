@@ -24,7 +24,7 @@ class PasswordChangedMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Votre mot de passe '.config('app.name').' a été modifié',
+            subject: 'Confirmation — mot de passe '.config('app.name').' modifié',
         );
     }
 

@@ -24,7 +24,7 @@ class AdminWelcomeEmail extends Mailable implements ShouldQueue
     {
         return new Envelope(
             from: $this->senderFrom('admin'),
-            subject: 'Bienvenue sur le panneau d\'administration KeyHome',
+            subject: 'Votre accès administrateur '.config('app.name').' est configuré',
         );
     }
 

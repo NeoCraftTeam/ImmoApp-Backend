@@ -54,7 +54,7 @@ it('has both fr and en email translation files', function (): void {
     $fr = trans('emails.welcome.subject', ['app' => 'Test'], 'fr');
     $en = trans('emails.welcome.subject', ['app' => 'Test'], 'en');
 
-    expect($fr)->toBe('Bienvenue sur Test');
+    expect($fr)->toBe('Votre compte Test est activé — explorez dès maintenant');
     expect($en)->toBe('Welcome to Test');
 });
 
@@ -117,7 +117,7 @@ it('renders welcome email with French content for fr-locale user', function (): 
     $rendered = $mail->render();
 
     expect($rendered)->toContain('Bienvenue,');
-    expect($rendered)->toContain('Rechercher intelligemment');
+    expect($rendered)->toContain('Recherche avancée');
     expect($rendered)->toContain('Tous droits réservés.');
 });
 
@@ -132,7 +132,7 @@ it('renders verification code email in French by default', function (): void {
 
     $rendered = $mail->render();
 
-    expect($rendered)->toContain('Code de vérification');
+    expect($rendered)->toContain('Confirmez votre identité');
     expect($rendered)->toContain('123456');
 });
 
@@ -174,8 +174,8 @@ it('renders refund email in French for fr-locale user', function (): void {
     $mail = new RefundConfirmationMail($refund);
     $rendered = $mail->render();
 
-    expect($rendered)->toContain('Montant remboursé');
-    expect($rendered)->toContain('Référence paiement');
+    expect($rendered)->toContain('Remboursement traité');
+    expect($rendered)->toContain('Référence');
 });
 
 /*

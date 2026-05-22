@@ -22,7 +22,7 @@ class NewsletterConfirmationMail extends Mailable
     {
         return new Envelope(
             from: $this->senderFrom('marketing'),
-            subject: 'Bienvenue – Votre abonnement newsletter KeyHome est confirmé',
+            subject: 'Newsletter '.config('app.name').' confirmée — bienvenue !',
         );
     }
 

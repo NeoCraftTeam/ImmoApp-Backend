@@ -26,7 +26,7 @@ class MagicLinkSignUpMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Inscription à '.config('app.name'),
+            subject: 'Finalisez votre inscription sur '.config('app.name'),
         );
     }
 

@@ -30,7 +30,7 @@ class SubscriptionRenewalReminderMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Renouvellement de votre abonnement — Action requise',
+            subject: 'Action requise — renouvelez votre abonnement '.config('app.name'),
         );
     }
 

@@ -79,7 +79,7 @@ it('renders AdDeclinedMail without errors', function (): void {
     $rendered = $mail->render();
 
     expect($rendered)->toContain($ad->title);
-    expect($mail->envelope()->subject)->toContain('pas été approuvée');
+    expect($mail->envelope()->subject)->toContain('Action requise');
 });
 
 it('renders AdDeclinedMail with empty reason', function (): void {
@@ -100,7 +100,7 @@ it('renders AdSubmissionConfirmationMail without errors', function (): void {
     $rendered = $mail->render();
 
     expect($rendered)->toContain($ad->title);
-    expect($mail->envelope()->subject)->toContain('Confirmation');
+    expect($mail->envelope()->subject)->toContain('validation');
 });
 
 it('renders NewAdSubmissionMail without errors', function (): void {
@@ -151,7 +151,7 @@ it('renders WelcomeEmail without errors', function (): void {
     $rendered = $mail->render();
 
     expect($rendered)->toBeString();
-    expect($mail->envelope()->subject)->toBe('Bienvenue sur '.config('app.name'));
+    expect($mail->envelope()->subject)->toContain('activé');
 });
 
 it('renders AgencyWelcomeEmail without errors', function (): void {
@@ -161,7 +161,7 @@ it('renders AgencyWelcomeEmail without errors', function (): void {
     $rendered = $mail->render();
 
     expect($rendered)->toBeString();
-    expect($mail->envelope()->subject)->toContain('Agence');
+    expect($mail->envelope()->subject)->toContain('agence');
 });
 
 it('renders BailleurWelcomeEmail without errors', function (): void {
@@ -171,7 +171,7 @@ it('renders BailleurWelcomeEmail without errors', function (): void {
     $rendered = $mail->render();
 
     expect($rendered)->toBeString();
-    expect($mail->envelope()->subject)->toContain('Bailleur');
+    expect($mail->envelope()->subject)->toContain('bailleur');
 });
 
 // ── Auth & Security Emails ─────────────────────────────────────────────────────
@@ -286,7 +286,7 @@ it('renders AdminWelcomeEmail without errors', function (): void {
     $rendered = $mail->render();
 
     expect($rendered)->toBeString();
-    expect($mail->envelope()->subject)->toContain('Bienvenue');
+    expect($mail->envelope()->subject)->toContain('administrateur');
 });
 
 it('renders ResetPasswordMail without errors', function (): void {

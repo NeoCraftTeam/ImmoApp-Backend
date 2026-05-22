@@ -38,7 +38,7 @@ class AdSubmissionConfirmationMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Confirmation de réception de votre annonce : '.$this->ad->title,
+            subject: 'Annonce reçue — « '.$this->ad->title.' » en cours de validation',
         );
     }
 

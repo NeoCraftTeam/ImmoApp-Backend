@@ -1,21 +1,16 @@
 @extends('emails.owner-layout')
 
-@section('title', 'Votre annonce n\'a pas été publiée')
+@section('title', __('emails.ad_declined.heading'))
 
-@section('preheader', 'Votre annonce n\'a pas pu être publiée — consultez le motif et resoumettez-la depuis votre espace bailleur.')
+@section('preheader', 'Votre annonce nécessite des corrections avant publication — consultez le motif et resoumettez-la depuis votre espace bailleur.')
 
 @section('content')
 
-    <h1>Votre annonce n'a pas été publiée</h1>
+    <h1>{!! __('emails.ad_declined.heading') !!}</h1>
 
-    <p class="text">
-        Bonjour <strong>{{ $authorName }}</strong>,
-    </p>
+    <p class="text">{!! __('emails.ad_declined.greeting', ['name' => $authorName]) !!}</p>
 
-    <p class="text">
-        Nous vous informons que votre annonce <strong>« {{ $adTitle }} »</strong> n'a pas pu
-        être publiée à l'issue de notre processus de modération.
-    </p>
+    <p class="text">{!! __('emails.ad_declined.intro', ['title' => $adTitle]) !!}</p>
 
     @if($reasonHtml)
         {{-- Rejection reason box rendered from Markdown --}}
@@ -34,7 +29,7 @@
                         ">
                     <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: 700;
                                        text-transform: uppercase; letter-spacing: 0.8px; color: #92400e;">
-                        Motif communiqué par notre équipe
+                        {{ __('emails.ad_declined.reason_label') }}
                     </p>
                     {!! $reasonHtml !!}
                 </td>
@@ -42,22 +37,17 @@
         </table>
     @endif
 
-    <p class="text">
-        Vous pouvez corriger votre annonce en tenant compte de ces remarques et la
-        resoumettre directement depuis votre espace bailleur.
-    </p>
+    <p class="text">{{ __('emails.ad_declined.instructions') }}</p>
 
     @include('emails.partials.button', [
         'url'   => rtrim(config('app.frontend_url', config('app.url')), '/') . '/owner/ads',
-        'label' => 'Modifier et resoumettre mon annonce',
+        'label' => __('emails.ad_declined.cta'),
         'color' => '#0d9488',
-        'width' => 300,
+        'width' => 280,
     ])
 
-    <p class="text" style="margin-top: 32px;">
-        Si vous pensez qu'il s'agit d'une erreur ou si vous avez des questions,
-        n'hésitez pas à nous contacter en répondant à cet email.
-        Notre équipe se fera un plaisir de vous aider.
+    <p class="text" style="margin-top: 32px; font-size: 13px; color: #64748b;">
+        {{ __('emails.ad_declined.support_note') }}
     </p>
 
 @endsection

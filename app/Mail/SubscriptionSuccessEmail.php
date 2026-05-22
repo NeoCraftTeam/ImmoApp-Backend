@@ -26,7 +26,7 @@ class SubscriptionSuccessEmail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Confirmation de votre abonnement sur KeyHome',
+            subject: 'Abonnement activé — accès premium immédiat',
         );
     }
 
