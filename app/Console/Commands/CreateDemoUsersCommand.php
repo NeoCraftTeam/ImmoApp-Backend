@@ -84,16 +84,19 @@ class CreateDemoUsersCommand extends Command
             }
 
             try {
-                DB::transaction(function () use ($data, $agencyService, &$created): void {
-                    $user = $this->createUser($data, $agencyService);
-                    $this->verifyAndSendWelcome($user, $data);
-                    $created++;
-                    $this->info("  ✅ {$user->email} created (ID: {$user->id})");
-                });
+                $user = DB::transaction(fn (): User => $this->createUser($data, $agencyService));
+                $created++;
+                $this->info("  ✅ {$user->email} created (ID: {$user->id})");
             } catch (\Throwable $e) {
                 $this->error("  ❌ {$data['email']}: {$e->getMessage()}");
 
                 return self::FAILURE;
+            }
+
+            try {
+                $this->verifyAndSendWelcome($user, $data);
+            } catch (\Throwable $e) {
+                $this->warn("  ⚠️  {$data['email']}: welcome email failed — {$e->getMessage()}");
             }
         }
 
