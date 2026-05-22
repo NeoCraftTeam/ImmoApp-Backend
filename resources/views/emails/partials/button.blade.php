@@ -30,6 +30,6 @@
     <!--[if !mso]><!-->
     <a href="{{ $url }}"
        class="btn"
-       style="display:inline-block;background-color:{{ $btnColor }};color:#ffffff!important;font-size:15px;font-weight:600;text-decoration:none;padding:14px 28px;border-radius:8px;line-height:1;">{{ $label }}</a>
+       style="display:inline-block;background-color:{{ $btnColor }};color:#ffffff!important;font-size:15px;font-weight:700;text-decoration:none;padding:15px 32px;min-width:200px;text-align:center;border-radius:8px;line-height:1;">{{ $label }}</a>
     <!--<![endif]-->
 </div>

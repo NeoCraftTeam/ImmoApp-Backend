@@ -26,7 +26,7 @@
         pour proteger la communaute KeyHome.
     </p>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 22px;
         border-collapse: separate;
         border-spacing: 0;
@@ -54,7 +54,7 @@
         </tr>
     </table>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 16px;
         border-collapse: separate;
         border-spacing: 0;

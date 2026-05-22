@@ -24,7 +24,7 @@
     </p>
 
     {{-- Attempt info card --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px; border-collapse: collapse;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px; border-collapse: collapse;">
         <tr>
             <td style="background-color: #fef2f2; border-left: 4px solid #dc2626; padding: 16px; border-radius: 4px; font-size: 14px; color: #000000;">
                 <p style="margin: 0 0 8px 0;"><strong>Provider :</strong> {{ ucfirst($provider) }}</p>

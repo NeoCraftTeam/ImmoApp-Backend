@@ -12,7 +12,7 @@
         une verification dans le panel administrateur.
     </p>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 20px;
         border-collapse: collapse;
         background-color: #fff7ed;

@@ -18,7 +18,7 @@
     </p>
 
     {{-- Status badge --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px; border-collapse: collapse;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px; border-collapse: collapse;">
         <tr>
             <td align="center">
                 <span style="
@@ -37,7 +37,7 @@
     </table>
 
     {{-- Info card --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 24px;
         border-collapse: collapse;
         background-color: #f0fdf4;
@@ -50,7 +50,7 @@
                     text-transform: uppercase; letter-spacing: 1px; color: #166534;">
                     Récapitulatif confirmé
                 </p>
-                <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
                     <tr>
                         <td style="padding: 9px 0; font-size: 14px; color: #166534;
                             border-bottom: 1px solid #dcfce7; width: 110px;">Annonce</td>
@@ -77,7 +77,7 @@
     </table>
 
     @if($reservation->landlord_notes)
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 16px;
         border-collapse: collapse;
         background-color: #f8fafc;
@@ -99,7 +99,7 @@
     @endif
 
     {{-- Tips block --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 24px;
         border-collapse: collapse;
         background-color: #fefce8;

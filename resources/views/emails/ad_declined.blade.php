@@ -14,7 +14,7 @@
 
     @if($reasonHtml)
         {{-- Rejection reason box rendered from Markdown --}}
-        <table width="100%" cellpadding="0" cellspacing="0"
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
             style="margin-top: 24px; margin-bottom: 24px; border-collapse: collapse;">
             <tr>
                 <td style="

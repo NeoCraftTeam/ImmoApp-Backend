@@ -19,7 +19,7 @@
     </p>
 
     {{-- Attachment badge --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin-top: 24px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin-top: 24px;">
         <tr>
             <td style="
                 background-color: #f0fdfa;
@@ -27,7 +27,7 @@
                 border-radius: 10px;
                 padding: 16px 20px;
             ">
-                <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
                     <tr>
                         <td width="40" valign="middle">
                             <div style="font-size: 28px; line-height: 1;">📎</div>
@@ -51,7 +51,7 @@
         Ce fichier contient :
     </p>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
         @foreach ([
             ['📋', 'Informations de compte', 'Nom, email, téléphone, date d\'inscription'],
             ['🏠', 'Annonces publiées', 'Titre, statut, prix, date de création'],
@@ -73,7 +73,7 @@
     </table>
 
     {{-- RGPD rights info box --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         border-collapse: collapse;
         margin-top: 24px;
         background-color: #f8fafc;

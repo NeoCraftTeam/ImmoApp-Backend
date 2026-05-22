@@ -19,7 +19,7 @@
     </p>
 
     {{-- Status badge --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px; border-collapse: collapse;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px; border-collapse: collapse;">
         <tr>
             <td align="center">
                 <span style="
@@ -38,7 +38,7 @@
     </table>
 
     {{-- Steps tracker --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
             margin-top: 28px;
             border-collapse: collapse;
             background-color: #f8fafc;
@@ -49,7 +49,7 @@
             <td style="padding: 20px 24px;">
 
                 {{-- Step 1 : done --}}
-                <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin-bottom: 14px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin-bottom: 14px;">
                     <tr>
                         <td width="36" valign="top">
                             <div style="
@@ -72,7 +72,7 @@
                 </table>
 
                 {{-- Step 2 : in progress --}}
-                <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin-bottom: 14px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin-bottom: 14px;">
                     <tr>
                         <td width="36" valign="top">
                             <div style="
@@ -95,7 +95,7 @@
                 </table>
 
                 {{-- Step 3 : pending --}}
-                <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
                     <tr>
                         <td width="36" valign="top">
                             <div style="

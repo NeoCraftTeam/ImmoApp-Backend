@@ -23,7 +23,7 @@
     </div>
 
     {{-- Warning box --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 28px; border-collapse: collapse;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 28px; border-collapse: collapse;">
         <tr>
             <td style="
                 background-color: #fff1f2;

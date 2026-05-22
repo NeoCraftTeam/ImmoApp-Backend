@@ -21,7 +21,7 @@
     </p>
 
     {{-- Actor info --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 24px;
         border-collapse: collapse;
         background-color: {{ $isActor ? '#fef2f2' : '#eff6ff' }};
@@ -45,7 +45,7 @@
     </table>
 
     {{-- Event badge --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 20px; border-collapse: collapse;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 20px; border-collapse: collapse;">
         <tr>
             <td align="center">
                 @php
@@ -82,7 +82,7 @@
     </table>
 
     {{-- Details card --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 20px;
         border-collapse: collapse;
         background-color: #f8fafc;
@@ -95,7 +95,7 @@
                     text-transform: uppercase; letter-spacing: 1px; color: #64748b;">
                     Détails de l'action
                 </p>
-                <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
                     <tr>
                         <td style="padding: 8px 0; font-size: 14px; color: #64748b;
                             border-bottom: 1px solid #f1f5f9; width: 130px;">Action</td>
@@ -120,7 +120,7 @@
 
     @if(!empty($changes['old']) || !empty($changes['attributes']))
         {{-- Changes diff --}}
-        <table width="100%" cellpadding="0" cellspacing="0" style="
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
             margin-top: 16px;
             border-collapse: collapse;
             background-color: #fffbeb;

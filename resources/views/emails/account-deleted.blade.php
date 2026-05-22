@@ -17,7 +17,7 @@
         à votre demande.
     </p>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 24px;
         border-collapse: collapse;
         background-color: #fef2f2;

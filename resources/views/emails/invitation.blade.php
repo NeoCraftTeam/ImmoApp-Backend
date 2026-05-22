@@ -55,7 +55,7 @@
 
     <p class="fallback">
         Si le bouton ne fonctionne pas,
-        <a href="{{ $actionUrl }}" class="link">cliquez ici</a>.
+        <a href="{{ $actionUrl }}" class="link">accédez à votre invitation directement</a>.
     </p>
 
     <p class="text" style="margin-top: 28px; font-size: 13px; color: #94a3b8;">

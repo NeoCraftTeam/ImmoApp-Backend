@@ -87,16 +87,18 @@
             background-color: #F6475F;
             color: #ffffff !important;
             font-size: 15px;
-            font-weight: 600;
+            font-weight: 700;           /* stronger weight aids screen rendering contrast */
             text-decoration: none;
-            padding: 14px 28px;
+            padding: 15px 32px;         /* 15+15+15px = 45px height — WCAG 2.5.5 ≥44px touch target */
+            min-width: 200px;           /* Fitts' Law: wider target reduces acquisition time */
+            text-align: center;
             border-radius: 8px;
             line-height: 1;
         }
 
         .link {
-            color: #F6475F;
-            text-decoration: none;
+            color: #C73B52;             /* WCAG AA: ~4.95:1 contrast on white (was #F6475F: 3.65:1, failing) */
+            text-decoration: underline; /* WCAG 1.4.1: not color-only visual indicator */
         }
 
         .fallback {
@@ -169,6 +171,12 @@
                 font-size: 20px;
             }
 
+            /* Fitts' Law — full-width button on mobile maximises tap target */
+            .btn {
+                display: block !important;
+                text-align: center !important;
+            }
+
             .otp-code {
                 font-size: 36px;
                 letter-spacing: 6px;
@@ -231,7 +239,7 @@
         }
         /* Outlook 2016 fixes */
         .btn {
-            mso-padding-alt: 14px 28px;
+            mso-padding-alt: 15px 32px;
         }
         table {
             border-spacing: 0;
@@ -242,7 +250,7 @@
     <style type="text/css">
         body { width: 600px !important; margin: 0 auto; }
         .container { border: none !important; border-radius: 0 !important; }
-        .btn { background-color: #F6475F !important; padding: 14px 28px !important; }
+        .btn { background-color: #F6475F !important; padding: 15px 32px !important; min-width: 200px !important; }
     </style>
     <![endif]-->
 </head>

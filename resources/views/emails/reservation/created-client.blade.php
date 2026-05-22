@@ -18,7 +18,7 @@
     </p>
 
     {{-- Status badge --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px; border-collapse: collapse;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px; border-collapse: collapse;">
         <tr>
             <td align="center">
                 <span style="
@@ -37,7 +37,7 @@
     </table>
 
     {{-- Info card --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 24px;
         border-collapse: collapse;
         background-color: #f8fafc;
@@ -50,7 +50,7 @@
                     text-transform: uppercase; letter-spacing: 1px; color: #64748b;">
                     Détails de la visite
                 </p>
-                <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
                     <tr>
                         <td style="padding: 9px 0; font-size: 14px; color: #64748b;
                             border-bottom: 1px solid #f1f5f9; width: 110px;"> Annonce</td>
@@ -85,7 +85,7 @@
     </table>
 
     @if($reservation->client_message)
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 16px;
         border-collapse: collapse;
         background-color: #f8fafc;

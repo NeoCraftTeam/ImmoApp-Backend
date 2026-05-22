@@ -22,7 +22,7 @@
 
     <p class="fallback" style="margin: 16px 0 64px 0;">
         Si le bouton ne fonctionne pas,
-        <a href="{{ $magicLink }}" class="link">cliquez ici</a>.
+        <a href="{{ $magicLink }}" class="link">ouvrez le lien de connexion sécurisée</a>.
     </p>
 
     <p class="text" style="margin-top: 64px;"><strong>Vous n'avez pas fait cette demande ?</strong></p>
