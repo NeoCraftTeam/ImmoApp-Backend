@@ -668,11 +668,28 @@ Storybook, Vitest, Playwright.
 
 ### SEO, canonicals & GEO (frontend, May 2026)
 - **Centralisation** — `metadataBase`, canonicals, JSON-LD (`JsonLd`, annonces, villes, recherche, blog, comparaison), OG/Twitter images via `absoluteUrl` / `absoluteAssetUrl` pour éviter les URL relatives incorrectes sur crawl / partage. **Devise** : `BRAND_TAGLINE` / `BRAND_TITLE_WITH_TAGLINE` dans `src/lib/brand.ts` (métadonnées globales, JSON-LD Organization/WebSite, image OG dynamique, manifests PWA).
-- **Search Console / Bing** — Après déploiement sur l’URL canonique (`NEXT_PUBLIC_SITE_URL`), définir les env de vérification, redéployer, puis GSC → **Sitemaps** : `https://<domaine>/sitemap.xml` ; suivre couverture, requêtes et CWV. Opérationnel, pas une garantie de classement.
+- **Search Console / Bing** — Après déploiement sur l'URL canonique (`NEXT_PUBLIC_SITE_URL`), définir les env de vérification, redéployer, puis GSC → **Sitemaps** : `https://<domaine>/sitemap.xml` ; suivre couverture, requêtes et CWV. Opérationnel, pas une garantie de classement.
 - **Maillage interne** — Footer landing : colonne « Guides & villes » (`/immobilier/*`, `/type-bien/*`, `/comparaison`, `/nearby`) en complément des liens recherche.
-- **Sitemap** — `src/app/sitemap.ts` inclut notamment `/search`, `/login`, `/register` (entrées marketing indexables).
+- **Sitemap** — `src/app/sitemap.ts` : pages statiques (dont `/indices-loyers`), pages pays (priorité 0.9), pages villes (0.8), type-bien, comparaison, blog (0.75 weekly), annonces (0.8 daily), agences, bailleurs. Pages pays : `cameroun`, `cote-divoire`, `benin`, `togo`, `senegal`.
 - **GEO** — Pages annonce (`ads/[slug]`), hub ville (`immobilier/[ville]`) et recherche : coordonnées WGS84 quand disponibles ; métadonnées `geo.position` / `ICBM` et schémas `GeoCoordinates` / local business où pertinent.
-- **`robots.ts`** — Sitemap absolu ; disallow des zones privées owner/messages/my/credits ; `/home` et `/nearby` indexables pour invités.
+- **`robots.ts`** — Sitemap absolu ; disallow des zones privées owner/messages/my/credits, `/search?*`, `/home?*`, `/nearby?*` (query params paginés) ; `/home` et `/nearby` indexables pour invités.
+- **JSON-LD implémentés** :
+  - `WebSite`, `Organization`, `RealEstateAgent`, `SoftwareApplication` (avec `@id`) dans `JsonLd.tsx`
+  - `BlogPosting` (@id, dateModified, image, author Person, publisher, isPartOf, mainEntityOfPage) dans `blog/[slug]/page.tsx`
+  - `RealEstateListing` (@id, @type sous-type, numberOfBathroomsTotal, propertyType, dateModified) dans `ads/[slug]/page.tsx`
+  - `RealEstateAgent` + `AggregateRating` dans `agences/[id]/layout.tsx`
+  - `Person` (@id, name, url, jobTitle, image, address, aggregateRating, memberOf Organization) dans `bailleurs/[username]/layout.tsx`
+  - `RealEstateAgent` (pays ou ville) + `BreadcrumbList` dans `immobilier/[ville]/page.tsx`
+  - `Dataset` dans `indices-loyers/page.tsx`
+- **OG images dynamiques** — route edge `src/app/og/route.tsx` (`GET /og?title=&subtitle=&type=&image=`) — 1200×630 `ImageResponse` avec fond midnight + halo crimson, strip image pour les annonces. URL injectée dans les métadonnées des pages villes et pays.
+- **Annonces** — `og:image:secureUrl` + `type: image/jpeg` ; description tronquée à la limite de mot (157 chars + `…`) ; `revalidate: 300`.
+- **Blog** — `author` field sur `BlogPost` (`posts.ts`), microdata `itemProp="author"` visible + JSON-LD `Person.worksFor Organization`.
+- **Pages pays** — `immobilier/[ville]/page.tsx` gère aussi `cameroun`, `cote-divoire`, `benin`, `togo`, `senegal` via `COUNTRIES` map ; contenu dédié (h1, cities links, cross-country links, SEO text) ; hreflang pays.
+- **`/indices-loyers`** — Page publique de l'indice des loyers (`Dataset` JSON-LD, tableau prix par ville/quartier depuis `/price-index` API, fallback statique, breadcrumb, SEO text).
+- **Backend** — `AdResource` expose `seo_title` (titre + quartier + ville + prix FCFA) et `seo_description` (tronqué à la limite de mot en 157 chars).
+- **IndexNow** — `IndexNowService` + `AdObserver` pinge Bing/Yandex à chaque publication/mise à jour/suppression d'annonce. Env : `INDEXNOW_KEY`, `INDEXNOW_HOST`. CI : step post-deploy sitemap ping.
+- **`public/llms.txt`** — Guidance pour crawlers IA (GPTBot, Claude, Gemini).
+- **Preconnect** — `layout.tsx` : `preconnect` + `dns-prefetch` sur l'origine `NEXT_PUBLIC_API_URL` (LCP images) en plus de Mapbox et Clerk.
 
 ### Frontend ESLint Rules (notable)
 - `@typescript-eslint/no-explicit-any` — **error**. Never use `any`; use proper union types or `unknown`.

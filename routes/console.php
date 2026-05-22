@@ -28,6 +28,9 @@ Schedule::command('model:prune')->daily()->at('04:00');
 Schedule::command('app:auto-hide-stale-ads')->dailyAt('03:00');
 Schedule::command('app:send-post-viewing-thanks')->dailyAt('10:00');
 
+// — Viewing reminders J-1 (Audit Item 5) —
+Schedule::command('app:send-viewing-reminders')->dailyAt('08:00');
+
 // — GDPR data retention (P2-29) —
 // Step 1: anonymize personal data 30 days after soft-delete (Art. 17 RGPD — droit à l'oubli)
 Schedule::command('gdpr:anonymize-deleted')->dailyAt('03:15');

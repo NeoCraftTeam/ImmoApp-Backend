@@ -60,7 +60,7 @@ class AdminPanelProvider extends PanelProvider
                     ->brandName('KeyHome Admin'),
                 CacheEmailAuthentication::make()
                     ->codeExpiryMinutes(30),
-            ], isRequired: false)
+            ], isRequired: true)
             ->passwordReset()
             ->emailVerification()
             ->emailChangeVerification()
@@ -142,7 +142,13 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make('Analytique')
                     ->icon('heroicon-o-chart-pie')
                     ->collapsed(),
+                NavigationGroup::make('Contrats & Réservations')
+                    ->icon('heroicon-o-document-check')
+                    ->collapsed(),
                 // ── Admin ─────────────────────────────────────────────────────
+                NavigationGroup::make('Sécurité')
+                    ->icon('heroicon-o-lock-closed')
+                    ->collapsed(),
                 NavigationGroup::make('Audit')
                     ->icon('heroicon-o-shield-check')
                     ->collapsed(),

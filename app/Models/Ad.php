@@ -151,6 +151,7 @@ class Ad extends Model implements HasMedia
         'distance_school_m',
         'distance_hospital_m',
         'draft_payload',
+        'prescreening_questions',
     ];
 
     protected $hidden = [
@@ -186,6 +187,7 @@ class Ad extends Model implements HasMedia
         'tour_config' => 'array',
         'tour_published_at' => 'datetime',
         'draft_payload' => 'array',
+        'prescreening_questions' => 'array',
         'is_verified' => 'boolean',
         'verified_at' => 'datetime',
         'verification_status' => VerificationStatus::class,

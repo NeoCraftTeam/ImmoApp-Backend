@@ -36,6 +36,7 @@ final readonly class ReservationService implements ReservationServiceInterface
      *   slot_starts_at: string,
      *   slot_ends_at: string,
      *   client_message: string|null,
+     *   prescreening_answers: array<int, string|null>|null,
      * } $data
      *
      * @throws SelfReservationException
@@ -77,6 +78,7 @@ final readonly class ReservationService implements ReservationServiceInterface
                     'slot_ends_at' => $data['slot_ends_at'],
                     'status' => ReservationStatus::Pending,
                     'client_message' => $data['client_message'] ?? null,
+                    'prescreening_answers' => $data['prescreening_answers'] ?? null,
                     'expires_at' => now()->addHours((int) config('viewings.reservation_ttl_hours', 72)),
                 ]);
             });

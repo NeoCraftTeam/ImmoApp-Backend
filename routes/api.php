@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\V1\NaturalSearchController;
 use App\Http\Controllers\Api\V1\NewsletterController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\NotificationPreferenceController;
+use App\Http\Controllers\Api\V1\OwnerDashboardController;
 use App\Http\Controllers\Api\V1\PriceHeatmapController;
 use App\Http\Controllers\Api\V1\PropertyAttributeController;
 use App\Http\Controllers\Api\V1\PwaController;
@@ -213,7 +214,14 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/{leaseContract}', 'update')->name('lease-contracts.update');
         Route::post('/{ad}/generate', 'store')->name('lease-contracts.generate');
         Route::get('/{leaseContract}/download', 'download')->name('lease-contracts.download');
+        Route::get('/{leaseContract}/audit-log', 'auditLog')->name('lease-contracts.audit-log');
     });
+
+    // --- OWNER DASHBOARD STATS (Audit Item 9: occupancy rate, boosts, viewings, messages) ---
+    Route::middleware(['auth:sanctum', 'owner.role'])
+        ->get('/my/stats', [OwnerDashboardController::class, 'stats'])
+        ->name('owner.stats')
+        ->middleware('throttle:60,1');
 
     // --- MY REVIEWS (landlord — reviews on my ads) ---
     Route::middleware('auth:sanctum')->get('/my/reviews', [MyReviewsController::class, 'index']);
@@ -284,6 +292,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/my/ads/{ad}/boost-status', [BoostController::class, 'status']);
         Route::post('/my/ads/{ad}/boost', [BoostController::class, 'boost'])->middleware('throttle:10,1');
         Route::delete('/my/ads/{ad}/boost', [BoostController::class, 'unboost']);
+        Route::get('/my/ads/{ad}/boost/roi', [BoostController::class, 'boostRoi'])->name('boost.roi');
         Route::post('/my/ads/{ad}/duplicate', [DuplicateAdController::class, 'store']);
         Route::put('/my/ads/bulk-update', [BulkAdController::class, 'bulkUpdate']);
         Route::post('/my/ads/bulk-delete', [BulkAdController::class, 'bulkDelete']);

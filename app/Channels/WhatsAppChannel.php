@@ -4,97 +4,67 @@ declare(strict_types=1);
 
 namespace App\Channels;
 
+use App\Models\User;
+use App\Services\WhatsAppService;
 use Illuminate\Notifications\Notification;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 
-class WhatsAppChannel
+/**
+ * Laravel notification channel for WhatsApp Business (Meta Cloud API).
+ *
+ * Notifications that support this channel must implement:
+ *   toWhatsApp(object $notifiable): array{body: string, template?: string, params?: array<string, string>}
+ *
+ * Only sends if the notifiable has phone_is_whatsapp = true and the service is enabled.
+ */
+final readonly class WhatsAppChannel
 {
-    /**
-     * Send the given notification via WhatsApp Business API.
-     */
-    public function send(object $notifiable, Notification $notification): void
+    public function __construct(private WhatsAppService $whatsapp) {}
+
+    public function send(mixed $notifiable, Notification $notification): void
     {
         if (!method_exists($notification, 'toWhatsApp')) {
             return;
         }
 
-        $phone = $notifiable->phone ?? null;
-
-        if (!$phone || !($notifiable->phone_is_whatsapp ?? false)) {
+        if (!config('services.whatsapp.enabled', false)) {
             return;
         }
 
-        if (!config('services.whatsapp.enabled')) {
-            Log::info('WhatsApp notification skipped (disabled)', [
-                'notification' => $notification::class,
-                'phone' => $phone,
-            ]);
-
+        $phone = $this->resolvePhone($notifiable);
+        if (!$phone) {
             return;
         }
 
         /** @var array{body: string, template?: string, params?: array<string, string>} $message */
         $message = $notification->toWhatsApp($notifiable);
 
-        $this->sendMessage($phone, $message);
-    }
-
-    /**
-     * @param  array{body: string, template?: string, params?: array<string, string>}  $message
-     */
-    private function sendMessage(string $phone, array $message): void
-    {
-        $phone = $this->formatPhone($phone);
-
-        $token = config('services.whatsapp.token');
-        $phoneNumberId = config('services.whatsapp.phone_number_id');
-
-        if (!$token || !$phoneNumberId) {
-            Log::warning('WhatsApp credentials not configured');
-
-            return;
-        }
-
-        try {
-            $payload = isset($message['template'])
-                ? [
-                    'messaging_product' => 'whatsapp',
-                    'to' => $phone,
-                    'type' => 'template',
-                    'template' => [
-                        'name' => $message['template'],
-                        'language' => ['code' => 'fr'],
-                        'components' => $this->buildTemplateComponents($message['params'] ?? []),
-                    ],
-                ]
-                : [
-                    'messaging_product' => 'whatsapp',
-                    'to' => $phone,
-                    'type' => 'text',
-                    'text' => ['body' => $message['body']],
-                ];
-
-            Http::withToken($token)
-                ->post("https://graph.facebook.com/v21.0/{$phoneNumberId}/messages", $payload)
-                ->throw();
-        } catch (\Exception $e) {
-            Log::error('WhatsApp send failed', [
-                'phone' => $phone,
-                'error' => $e->getMessage(),
-            ]);
+        if (isset($message['template'])) {
+            $this->whatsapp->sendTemplate(
+                $phone,
+                $message['template'],
+                'fr',
+                $this->buildTemplateComponents($message['params'] ?? []),
+            );
+        } else {
+            $this->whatsapp->sendText($phone, $message['body']);
         }
     }
 
-    private function formatPhone(string $phone): string
+    private function resolvePhone(mixed $notifiable): ?string
     {
-        $phone = preg_replace('/[^0-9+]/', '', $phone);
+        $phone = null;
 
-        if (str_starts_with((string) $phone, '6') && strlen((string) $phone) === 9) {
-            return '237'.$phone;
+        if ($notifiable instanceof User) {
+            if (!(bool) $notifiable->phone_is_whatsapp) {
+                return null;
+            }
+
+            $phone = $notifiable->phone_number;
+        } elseif (method_exists($notifiable, 'routeNotificationForWhatsApp')) {
+            $phone = $notifiable->routeNotificationForWhatsApp();
         }
 
-        return ltrim((string) $phone, '+');
+        return filled($phone) ? (string) $phone : null;
     }
 
     /**

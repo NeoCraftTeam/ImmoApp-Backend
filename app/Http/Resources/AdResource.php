@@ -122,10 +122,22 @@ final class AdResource extends JsonResource
                 $this->draft_payload
             ),
 
+            // SEO helpers — used by mobile apps and social sharing
+            'canonical_url' => $this->buildCanonicalUrl(),
+            'whatsapp_share_url' => $this->buildWhatsAppShareUrl(),
+            'seo_title' => $this->buildSeoTitle(),
+            'seo_description' => $this->buildSeoDescription(),
+
+            // Item 11 — Prescreening questions (public — client reads before booking)
+            'prescreening_questions' => $this->prescreening_questions ?? [],
+
             'user' => $this->whenLoaded('user', function () use ($user) {
                 $owner = $this->user;
                 $isUnlocked = $this->isUnlockedFor($user);
                 $isOwnerOrAdmin = $user?->id === $owner->id || $user?->isAdmin();
+
+                // Item 6 — Trust badge: compute tier lazily from cached trust score
+                $trustScore = $owner->trustScores()->latest('computed_at')->first();
 
                 return [
                     'id' => $owner->id,
@@ -139,6 +151,12 @@ final class AdResource extends JsonResource
                     'phone_number' => ($isUnlocked || $isOwnerOrAdmin) ? $owner->phone_number : null,
                     'phone_is_whatsapp' => ($isUnlocked || $isOwnerOrAdmin) ? (bool) $owner->phone_is_whatsapp : null,
                     'email' => ($isUnlocked || $isOwnerOrAdmin) ? $owner->email : null,
+                    // Item 6 — Trust badge fields (always public)
+                    'is_verified' => $owner->email_verified_at !== null,
+                    'trust_score' => $trustScore !== null ? $trustScore->score : 0,
+                    'trust_tier' => $trustScore !== null ? $trustScore->tier->value : 'non_verifie',
+                    'trust_tier_label' => $trustScore !== null ? $trustScore->tier->label() : 'Non vérifié',
+                    'trust_tier_hex_color' => $trustScore !== null ? $trustScore->tier->hexColor() : '#9CA3AF',
                 ];
             }),
             'agency' => new AgencyResource($this->whenLoaded('agency')),
@@ -156,6 +174,65 @@ final class AdResource extends JsonResource
             ]),
             'reviews' => ReviewResource::collection($this->whenLoaded('reviews')),
         ];
+    }
+
+    private function buildSeoTitle(): string
+    {
+        $parts = array_filter([
+            $this->title,
+            $this->relationLoaded('quarter') && $this->quarter
+                ? $this->quarter->name
+                : null,
+            $this->relationLoaded('quarter') && $this->quarter
+                ? ($this->quarter->city_name ?? null)
+                : null,
+        ]);
+
+        $title = implode(', ', $parts);
+        if ($this->price) {
+            $title .= ' — '.number_format((float) $this->price, 0, ',', ' ').' FCFA';
+        }
+
+        return $title ?: ($this->title ?? '');
+    }
+
+    private function buildSeoDescription(): string
+    {
+        $raw = $this->description ?? '';
+        if (mb_strlen($raw) <= 157) {
+            return $raw;
+        }
+
+        $truncated = mb_substr($raw, 0, 157);
+        $lastSpace = mb_strrpos($truncated, ' ');
+
+        return ($lastSpace !== false ? mb_substr($truncated, 0, $lastSpace) : $truncated).'…';
+    }
+
+    private function buildCanonicalUrl(): string
+    {
+        $base = rtrim((string) config('app.frontend_url', config('app.url')), '/');
+
+        return $base.'/ads/'.($this->slug ?? $this->id);
+    }
+
+    private function buildWhatsAppShareUrl(): string
+    {
+        $adUrl = $this->buildCanonicalUrl();
+        $price = $this->price ? number_format((float) $this->price, 0, ',', ' ').' FCFA/mois' : '';
+        $quarter = $this->relationLoaded('quarter') && $this->quarter
+            ? ', '.$this->quarter->name
+            : '';
+
+        $text = sprintf(
+            "Découvrez ce bien sur KeyHome\u{A0}: %s%s — %s\n\n%s",
+            $this->title ?? 'Annonce immobilière',
+            $quarter,
+            $price,
+            $adUrl,
+        );
+
+        return 'https://wa.me/?text='.rawurlencode($text);
     }
 
     private function getAvatarUrl(?string $avatar): ?string
