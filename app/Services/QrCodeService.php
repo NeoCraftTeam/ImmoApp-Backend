@@ -159,11 +159,6 @@ final readonly class QrCodeService
         );
         $rings = $this->renderDecorativeRings($cx, $headCy, $qrSize, $targetUrl);
         $outline = $this->renderKeyOutline($cx, $headCy, $clipR, $stemX, $stemW, $stemTop, $stemBot);
-        $logo = $this->renderCenterLogo($cx, $headCy, $qrSize * 0.10);
-        $label = sprintf(
-            '<text x="%F" y="%F" text-anchor="middle" font-family="system-ui,Arial,sans-serif" font-size="44" font-weight="800" fill="%s" letter-spacing="6" opacity="0.80">KEYHOME.APP</text>',
-            $cx, $stemBot + 72.0, self::BRAND
-        );
 
         return sprintf(
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %F %F" width="%F" height="%F" preserveAspectRatio="xMidYMid meet" role="img" aria-label="QR Code KeyHome">'
@@ -173,8 +168,6 @@ final readonly class QrCodeService
                 .'<g clip-path="url(#%s)"><rect x="0" y="0" width="%F" height="%F" fill="#FFFFFF"/>'
                 .'<g transform="translate(%F %F) scale(%F %F)">%s</g></g>'
                 .'%s'
-                .'%s'
-                .'%s'
                 .'</svg>',
             $cw, $ch, $cw, $ch,
             $clipDef,
@@ -182,9 +175,7 @@ final readonly class QrCodeService
             $rings,
             $clipId, $cw, $ch,
             $tx, $ty, $scale, $scale, $inner,
-            $outline,
-            $logo,
-            $label
+            $outline
         );
     }
 
@@ -323,104 +314,6 @@ final readonly class QrCodeService
             sprintf('<path d="%s" fill="%s" fill-opacity="0.06"/>', $d, $brand)
             .sprintf('<path d="%s" fill="none" stroke="%s" stroke-width="4" stroke-linejoin="round" opacity="0.35"/>', $d, $brand)
             .sprintf('<circle cx="%.2f" cy="%.2f" r="%.2f" fill="none" stroke="%s" stroke-width="3.5" opacity="0.22"/>', $cx, $headCy, $clipR + 2.0, $brand);
-    }
-
-    /**
-     * White plate + optional subtle camera-glyph under the brand mark (TikTok-style
-     * cue) + embedded KeyHome PNG when available. Plate radius ~10% of matrix side.
-     */
-    private function renderCenterLogo(float $cx, float $cy, float $r): string
-    {
-        $disc = sprintf('<circle cx="%.2f" cy="%.2f" r="%.2f" fill="#FFFFFF"/>', $cx, $cy, $r);
-        $camera = $this->renderCameraGlyphAccent($cx, $cy, $r);
-
-        $logoUri = $this->logoDataUri();
-        if ($logoUri !== null) {
-            $size = $r * 1.55;
-
-            return $disc
-                .$camera
-                .sprintf(
-                    '<image x="%.2f" y="%.2f" width="%.2f" height="%.2f" href="%s" preserveAspectRatio="xMidYMid meet"/>',
-                    $cx - $size / 2, $cy - $size / 2, $size, $size, $logoUri
-                );
-        }
-
-        // Camera + keyhole fallback if logo file unreadable.
-        $brand = self::BRAND;
-        $keyR = $r * 0.28;
-        $keyCy = $cy - $r * 0.12;
-        $stemTop = $keyCy + $keyR * 0.55;
-        $stemBot = $cy + $r * 0.52;
-
-        return $disc
-            .$camera
-            .sprintf('<circle cx="%.2f" cy="%.2f" r="%.2f" fill="%s"/>', $cx, $keyCy, $keyR, $brand)
-            .sprintf(
-                '<path d="M %.2f %.2f L %.2f %.2f L %.2f %.2f L %.2f %.2f Z" fill="%s"/>',
-                $cx - $r * 0.10, $stemTop,
-                $cx + $r * 0.10, $stemTop,
-                $cx + $r * 0.18, $stemBot,
-                $cx - $r * 0.18, $stemBot,
-                $brand
-            );
-    }
-
-    /**
-     * Low-contrast line camera icon (body + lens + viewfinder bump) on the centre plate.
-     */
-    private function renderCameraGlyphAccent(float $cx, float $cy, float $r): string
-    {
-        $sw = max(1.8, $r * 0.14);
-        $bodyW = $r * 1.75;
-        $bodyH = $r * 1.2;
-        $rx = $r * 0.28;
-        $bx = $cx - $bodyW / 2;
-        $by = $cy - $bodyH / 2 - $r * 0.02;
-        $lensR = $r * 0.38;
-        $vfW = $r * 0.42;
-        $vfH = $r * 0.22;
-        $vfx = $cx + $bodyW * 0.22;
-        $vfy = $by - $vfH * 0.35;
-
-        return sprintf(
-            '<g aria-hidden="true" fill="none" stroke="#374151" stroke-width="%.2f" stroke-linecap="round" stroke-linejoin="round" opacity="0.38">'
-                .'<rect x="%.2f" y="%.2f" width="%.2f" height="%.2f" rx="%.2f"/>'
-                .'<circle cx="%.2f" cy="%.2f" r="%.2f" stroke="#111827" opacity="0.55"/>'
-                .'<rect x="%.2f" y="%.2f" width="%.2f" height="%.2f" rx="%.2f" opacity="0.7"/>'
-                .'</g>',
-            $sw,
-            $bx, $by, $bodyW, $bodyH, $rx,
-            $cx - $r * 0.08, $cy + $r * 0.04, $lensR,
-            $vfx, $vfy, $vfW, $vfH, $r * 0.1
-        );
-    }
-
-    private function logoDataUri(): ?string
-    {
-        static $cache = null;
-        if ($cache !== null) {
-            return $cache === '' ? null : $cache;
-        }
-
-        $candidates = [
-            base_path('keyhome-frontend-next/public/icons/icon-512x512.png'),
-            public_path('images/keyhomelogo_transparent.png'),
-            public_path('images/keyhomelogo.png'),
-        ];
-
-        foreach ($candidates as $path) {
-            if (is_file($path) && is_readable($path)) {
-                $bytes = @file_get_contents($path);
-                if ($bytes !== false && $bytes !== '') {
-                    return $cache = 'data:image/png;base64,'.base64_encode($bytes);
-                }
-            }
-        }
-
-        $cache = '';
-
-        return null;
     }
 
     private function extractViewBox(string $svg): ?string
