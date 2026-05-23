@@ -66,14 +66,41 @@ final readonly class QrCodeController
     {
         $this->authorize('update', $ad);
 
+        $pdf = $this->buildAdPlacardePdf($ad);
+
+        return $pdf->download('placarde-'.($ad->slug ?: $ad->id).'.pdf');
+    }
+
+    /**
+     * Inline PDF for browser preview (same document as {@see adPlacarde}).
+     */
+    public function adPlacardePreview(Request $request, Ad $ad): SymfonyResponse
+    {
+        $this->authorize('update', $ad);
+
+        $slug = $ad->slug ?: $ad->id;
+        $pdf = $this->buildAdPlacardePdf($ad);
+
+        return response($pdf->output(), 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="placarde-'.$slug.'.pdf"',
+            'Cache-Control' => 'private, max-age=60',
+        ]);
+    }
+
+    /**
+     * @return \Barryvdh\DomPDF\PDF
+     */
+    private function buildAdPlacardePdf(Ad $ad): \Barryvdh\DomPDF\PDF
+    {
         $ad->loadMissing(['quarter.city', 'ad_type', 'user', 'media']);
 
         $adUrl = $this->urlBuilder->adListingUrl($ad, 'qr', true);
 
-        $pdf = Pdf::loadView('pdf.ad-placarde', [
+        return Pdf::loadView('pdf.ad-placarde', [
             'ad' => $ad,
             'publicUrl' => $adUrl,
-            'qrDataUri' => $this->qrCodeService->pngDataUriForUrl($adUrl),
+            'qrDataUri' => $this->qrCodeService->plainPngDataUriForUrl($adUrl),
             'coverImage' => $this->loadAdCoverAsBase64($ad),
             'quarter' => $ad->quarter?->name,
             'city' => $ad->quarter?->city?->name,
@@ -85,8 +112,28 @@ final readonly class QrCodeController
                 'defaultFont' => 'DejaVu Sans',
                 'dpi' => 150,
             ]);
+    }
 
-        return $pdf->download('placarde-'.($ad->slug ?: $ad->id).'.pdf');
+    /**
+     * A5 portrait printable sign for the landlord public profile.
+     */
+    public function profilePlacarde(Request $request): Response
+    {
+        $user = $request->user();
+        abort_unless($user !== null, 403);
+
+        $payload = $this->buildBusinessCardPayload($user);
+
+        $pdf = Pdf::loadView('pdf.profile-placarde', $payload)
+            ->setPaper('a5', 'portrait')
+            ->setOptions([
+                'isHtml5ParserEnabled' => true,
+                'isRemoteEnabled' => false,
+                'defaultFont' => 'DejaVu Sans',
+                'dpi' => 150,
+            ]);
+
+        return $pdf->download('pancarte-profil-'.($user->username ?: $user->id).'.pdf');
     }
 
     // ─── Profile endpoints ─────────────────────────────────────────────────
@@ -197,13 +244,25 @@ final readonly class QrCodeController
 
     private function loadAdCoverAsBase64(Ad $ad): ?string
     {
-        $url = $ad->getFirstMediaUrl('images', 'thumb') ?: $ad->getFirstMediaUrl('images');
-        if ($url === '') {
+        $media = $ad->getFirstMedia('images');
+        if ($media === null) {
             return null;
         }
 
         try {
-            $bytes = @file_get_contents($url);
+            $path = $media->hasGeneratedConversion('large')
+                ? $media->getPath('large')
+                : $media->getPath();
+
+            if (! is_file($path)) {
+                $path = $media->getPath();
+            }
+
+            if (! is_file($path)) {
+                return null;
+            }
+
+            $bytes = file_get_contents($path);
             if ($bytes === false || $bytes === '') {
                 return null;
             }

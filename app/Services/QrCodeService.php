@@ -17,15 +17,11 @@ use Throwable;
  * URL construction lives in {@see AdUrlBuilder}. This class is responsible
  * only for visual QR rendering.
  *
- * TikTok/Snap-inspired circular-framed scannable QR PNGs for owner assets.
- *
- * Visual design:
- *   • Standard ISO QR matrix with ECC-H — data + quiet zone stay intact
- *   • Pure black modules on white inside the clip; finders stay square
- *   • Concentric dashed rings in black / grey sit **outside** the inscribed data
- *     circle (different radii + dash phases seeded by URL crc32) → 100% scannable
- *   • Centre white plate: subtle monochrome camera glyph under the KeyHome logo
- *     (≤ ~10% matrix width, within ECC-H budget)
+ * Visual design (owner panel — teal):
+ *   • Portrait key silhouette — decorative stem + dashed rings only
+ *   • Square ISO QR matrix — full quiet zone, never circle-clipped
+ *   • White scan plate behind the matrix for reliable phone decoding
+ *   • Teal palette (#0D9488) on pale mint background (#F0FDFA)
  *
  * Rasterisation chain (SVG → PNG): Imagick → rsvg-convert → plain chillerlan PNG.
  * DomPDF gets a clean PNG (it can't render our complex SVG with transforms +
@@ -35,7 +31,12 @@ final readonly class QrCodeService
 {
     public function __construct() {}
 
-    private const string BRAND = '#F6475F';
+    /** Owner-panel teal — matches brandAgent.primary in the PWA. */
+    private const string BRAND = '#0D9488';
+
+    private const string BRAND_LIGHT = '#14B8A6';
+
+    private const string BRAND_PALE = '#F0FDFA';
 
     private const string DARK = '#000000';
 
@@ -63,6 +64,23 @@ final readonly class QrCodeService
     }
 
     /**
+     * Plain square QR (black on white) for A5 placards — no key silhouette.
+     */
+    public function plainPngDataUriForUrl(string $targetUrl): string
+    {
+        $opts = new QROptions([
+            'outputType' => QROutputInterface::GDIMAGE_PNG,
+            'eccLevel' => EccLevel::H,
+            'scale' => 14,
+            'addQuietzone' => true,
+            'quietzoneSize' => 4,
+            'outputBase64' => false,
+        ]);
+
+        return 'data:image/png;base64,'.base64_encode(new QRCode($opts)->render($targetUrl));
+    }
+
+    /**
      * Render the full branded SVG (square matrix + decorative rings + logo)
      * then rasterise it to a high-resolution PNG.
      */
@@ -85,19 +103,20 @@ final readonly class QrCodeService
      */
     public function renderRichSvg(string $targetUrl): string
     {
-        $rawQrSvg = new QRCode($this->buildOptions())->render($targetUrl);
+        $rawQrSvg = new QRCode($this->buildRichOptions())->render($targetUrl);
 
         // ── Canvas (portrait key silhouette) ──────────────────────────────
-        $cw = 1000.0;
-        $ch = 1200.0;
-        $cx = $cw / 2.0;           // 500
+        $cw = 1100.0;
+        $ch = 1520.0;
+        $cx = $cw / 2.0;
 
-        // QR head sits in the upper portion of the canvas.
-        $headCy = 480.0;
-        $qrSize = $cw * 0.80;          // 800 — matrix side (larger = more readable)
-        $qrX = $cx - $qrSize / 2.0; // 100
-        $qrY = $headCy - $qrSize / 2.0; // 80
-        $clipR = $qrSize * 0.5;        // 400 — inscribed circle radius
+        $headCy = 490.0;
+        $qrSize = $cw * 0.62;
+        $qrX = $cx - $qrSize / 2.0;
+        $qrY = $headCy - $qrSize / 2.0;
+        // Decorative circle / rings only — must NOT clip the QR matrix.
+        $headR = $qrSize / 2.0;
+        $ringBaseR = $qrSize * M_SQRT2 / 2.0;
 
         // ── QR matrix transform ───────────────────────────────────────────
         $vb = $this->extractViewBox($rawQrSvg) ?? '0 0 100 100';
@@ -113,74 +132,88 @@ final readonly class QrCodeService
         $inner = preg_replace('#<\?xml[^>]+\?>\s*#', '', (string) $rawQrSvg) ?? $rawQrSvg;
         $inner = preg_replace('#</?svg[^>]*>#i', '', (string) $inner) ?? '';
 
-        // ── Finder-pattern preservation (QR scanners require these) ───────
-        $moduleSize = $qrSize / max($vbW, 1.0);
-        $quietzone = 4.0;
-        $finderModules = 7.0;
-        $finderSize = $finderModules * $moduleSize;
-        $finderInset = $quietzone * $moduleSize;
-        $pad = $moduleSize;
-
-        $tlX = $qrX + $finderInset - $pad;
-        $tlY = $qrY + $finderInset - $pad;
-        $trX = $qrX + $qrSize - $finderInset - $finderSize - $pad;
-        $trY = $qrY + $finderInset - $pad;
-        $blX = $qrX + $finderInset - $pad;
-        $blY = $qrY + $qrSize - $finderInset - $finderSize - $pad;
-        $fb = $finderSize + 2.0 * $pad;
-
-        // ── Key stem dimensions ───────────────────────────────────────────
+        // ── Key stem (pure decoration — no QR clipped into it) ────────────
         $stemW = 160.0;
-        $stemX = $cx - $stemW / 2.0;      // 420
-        $stemTop = $headCy + $clipR + 8.0;  // just below head circle (≈ 888)
-        $stemBot = 1130.0;
+        $stemX = $cx - $stemW / 2.0;
+        $stemTop = $headCy + $headR + 14.0;
+        $stemBot = 1410.0;
 
-        // ── Clip path: head circle + finder rects + stem rectangle ────────
-        $clipId = 'kh-key-clip';
-        $clipDef = sprintf(
-            '<defs><clipPath id="%s">'
-                .'<circle cx="%F" cy="%F" r="%F"/>'
-                .'<rect x="%F" y="%F" width="%F" height="%F"/>'
-                .'<rect x="%F" y="%F" width="%F" height="%F"/>'
-                .'<rect x="%F" y="%F" width="%F" height="%F"/>'
-                .'<rect x="%F" y="%F" width="%F" height="%F"/>'
-                .'</clipPath></defs>',
-            $clipId,
-            $cx, $headCy, $clipR,
-            $tlX, $tlY, $fb, $fb,
-            $trX, $trY, $fb, $fb,
-            $blX, $blY, $fb, $fb,
-            $stemX, $stemTop, $stemW, $stemBot - $stemTop
-        );
+        $platePad = 10.0;
+        $scanPlate = '<rect x="'.$this->svgFloat($qrX - $platePad).'" y="'.$this->svgFloat($qrY - $platePad)
+            .'" width="'.$this->svgFloat($qrSize + 2.0 * $platePad).'" height="'.$this->svgFloat($qrSize + 2.0 * $platePad)
+            .'" rx="28" ry="28" fill="'.self::LIGHT.'"/>';
 
-        $bg = sprintf(
-            '<rect x="12" y="12" width="%F" height="%F" rx="64" ry="64" fill="#FFF5F6"/>',
-            $cw - 24.0, $ch - 24.0
-        );
-        $rings = $this->renderDecorativeRings($cx, $headCy, $qrSize, $targetUrl);
-        $outline = $this->renderKeyOutline($cx, $headCy, $clipR, $stemX, $stemW, $stemTop, $stemBot);
+        // Never sprintf() the chillerlan matrix — it may contain '%' sequences.
+        $qrBlock = '<g>'.$scanPlate
+            .'<g transform="translate('.$this->svgFloat($tx).' '.$this->svgFloat($ty).') scale('
+            .$this->svgFloat($scale).' '.$this->svgFloat($scale).')">'
+            .$inner
+            .'</g></g>';
 
-        return sprintf(
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %F %F" width="%F" height="%F" preserveAspectRatio="xMidYMid meet" role="img" aria-label="QR Code KeyHome">'
-                .'%s'
-                .'%s'
-                .'%s'
-                .'<g clip-path="url(#%s)"><rect x="0" y="0" width="%F" height="%F" fill="#FFFFFF"/>'
-                .'<g transform="translate(%F %F) scale(%F %F)">%s</g></g>'
-                .'%s'
-                .'</svg>',
-            $cw, $ch, $cw, $ch,
-            $clipDef,
-            $bg,
-            $rings,
-            $clipId, $cw, $ch,
-            $tx, $ty, $scale, $scale, $inner,
-            $outline
-        );
+        $bg = '<rect x="8" y="8" width="'.$this->svgFloat($cw - 16.0).'" height="'.$this->svgFloat($ch - 16.0)
+            .'" rx="72" ry="72" fill="'.self::BRAND_PALE.'"/>';
+        $rings = $this->renderDecorativeRings($cx, $headCy, $ringBaseR, $targetUrl);
+        $outline = $this->renderKeyOutline($cx, $headCy, $ringBaseR, $stemX, $stemW, $stemTop, $stemBot);
+
+        return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '.$this->svgFloat($cw).' '.$this->svgFloat($ch)
+            .'" width="'.$this->svgFloat($cw).'" height="'.$this->svgFloat($ch)
+            .'" preserveAspectRatio="xMidYMid meet" role="img" aria-label="QR Code KeyHome">'
+            .$bg
+            .$rings
+            .$qrBlock
+            .$outline
+            .'</svg>';
+    }
+
+    private function svgFloat(float $value): string
+    {
+        $formatted = sprintf('%.3F', $value);
+
+        return rtrim(rtrim($formatted, '0'), '.');
     }
 
     /**
-     * Shared chillerlan options. Matrix is kept square + scannable.
+     * Rich branded QR — white quiet zone on a scan plate; square finders intact.
+     */
+    private function buildRichOptions(): QROptions
+    {
+        $dark = self::DARK;
+        $light = self::LIGHT;
+
+        return new QROptions([
+            'eccLevel' => EccLevel::H,
+            'outputType' => QROutputInterface::MARKUP_SVG,
+            'scale' => 10,
+            'addQuietzone' => true,
+            'quietzoneSize' => 4,
+            'svgAddXmlHeader' => false,
+            'svgUseFillAttributes' => true,
+            'connectPaths' => true,
+            'drawCircularModules' => false,
+            'keepAsSquare' => [
+                QRMatrix::M_FINDER_DARK,
+                QRMatrix::M_FINDER_DOT,
+                QRMatrix::M_ALIGNMENT_DARK,
+            ],
+            'cssClass' => 'kh-qr',
+            'outputBase64' => false,
+            'moduleValues' => [
+                QRMatrix::M_DATA_DARK => $dark,
+                QRMatrix::M_FINDER_DARK => $dark,
+                QRMatrix::M_ALIGNMENT_DARK => $dark,
+                QRMatrix::M_TIMING_DARK => $dark,
+                QRMatrix::M_FINDER_DOT => $dark,
+                QRMatrix::M_DARKMODULE => $dark,
+                QRMatrix::M_DATA => $light,
+                QRMatrix::M_FINDER => $light,
+                QRMatrix::M_ALIGNMENT => $light,
+                QRMatrix::M_TIMING => $light,
+            ],
+        ]);
+    }
+
+    /**
+     * Plain square QR options (placards, fallback PNG).
      */
     private function buildOptions(): QROptions
     {
@@ -224,22 +257,20 @@ final readonly class QrCodeService
     }
 
     /**
-     * Five concentric dashed rings outside the head circle.
-     * Brand-gradient palette: crimson → pink — creates a "glow" halo around
-     * the key head without competing with QR scan contrast.
+     * Five concentric dashed rings outside the head circle (circumscribed radius).
+     * Teal gradient halo — decorative only; QR matrix stays square + unscathed.
      */
-    private function renderDecorativeRings(float $cx, float $cy, float $qrSize, string $seed): string
+    private function renderDecorativeRings(float $cx, float $cy, float $headR, string $seed): string
     {
-        $clipR = $qrSize * 0.5;
         $h = crc32($seed);
 
         /** @var list<array{r: float, w: float, dash: string, color: string, offset: float}> $spec */
         $spec = [
-            ['r' => $clipR + 9,  'w' => 3.5, 'dash' => '5 12', 'color' => '#F6475F', 'offset' => (float) ($h % 13)],
-            ['r' => $clipR + 23, 'w' => 2.8, 'dash' => '3 10', 'color' => '#FF6B7A', 'offset' => (float) (($h >> 3) % 17)],
-            ['r' => $clipR + 37, 'w' => 3.2, 'dash' => '6 15', 'color' => '#FF8F9D', 'offset' => (float) (($h >> 6) % 11)],
-            ['r' => $clipR + 51, 'w' => 2.5, 'dash' => '2 11', 'color' => '#FFB3BB', 'offset' => (float) (($h >> 9) % 19)],
-            ['r' => $clipR + 65, 'w' => 2.8, 'dash' => '7 17', 'color' => '#FFD4D9', 'offset' => (float) (($h >> 12) % 15)],
+            ['r' => $headR + 8,  'w' => 3.5, 'dash' => '5 12', 'color' => self::BRAND, 'offset' => (float) ($h % 13)],
+            ['r' => $headR + 20, 'w' => 2.8, 'dash' => '3 10', 'color' => self::BRAND_LIGHT, 'offset' => (float) (($h >> 3) % 17)],
+            ['r' => $headR + 32, 'w' => 3.2, 'dash' => '6 15', 'color' => '#2DD4BF', 'offset' => (float) (($h >> 6) % 11)],
+            ['r' => $headR + 44, 'w' => 2.5, 'dash' => '2 11', 'color' => '#5EEAD4', 'offset' => (float) (($h >> 9) % 19)],
+            ['r' => $headR + 56, 'w' => 2.8, 'dash' => '7 17', 'color' => '#99F6E4', 'offset' => (float) (($h >> 12) % 15)],
         ];
 
         $out = '';
@@ -254,15 +285,15 @@ final readonly class QrCodeService
     }
 
     /**
-     * Decorative key outline drawn ON TOP of the clipped QR matrix:
+     * Decorative key outline (does not alter the QR matrix):
      *   • Subtle brand-tinted fill of the stem rectangle
      *   • Crisp stroke outline of the stem with 3 notch teeth on the right
-     *   • Thin ring border around the key head circle
+     *   • Thin ring border around the circumscribed head circle
      */
     private function renderKeyOutline(
         float $cx,
         float $headCy,
-        float $clipR,
+        float $headR,
         float $stemX,
         float $stemW,
         float $stemTop,
@@ -313,7 +344,7 @@ final readonly class QrCodeService
         return
             sprintf('<path d="%s" fill="%s" fill-opacity="0.06"/>', $d, $brand)
             .sprintf('<path d="%s" fill="none" stroke="%s" stroke-width="4" stroke-linejoin="round" opacity="0.35"/>', $d, $brand)
-            .sprintf('<circle cx="%.2f" cy="%.2f" r="%.2f" fill="none" stroke="%s" stroke-width="3.5" opacity="0.22"/>', $cx, $headCy, $clipR + 2.0, $brand);
+            .sprintf('<circle cx="%.2f" cy="%.2f" r="%.2f" fill="none" stroke="%s" stroke-width="3.5" opacity="0.28"/>', $cx, $headCy, $headR + 2.0, $brand);
     }
 
     private function extractViewBox(string $svg): ?string

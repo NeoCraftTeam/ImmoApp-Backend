@@ -236,6 +236,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/qr-code/image', 'profileQrImage')->middleware('throttle:60,1');
             Route::get('/business-card', 'businessCard')->middleware('throttle:20,1');
             Route::get('/business-card/preview', 'businessCardPreview')->middleware('throttle:20,1');
+            Route::get('/placarde', 'profilePlacarde')->middleware('throttle:20,1');
         });
 
     Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner', 'token.role:agent'])
@@ -245,6 +246,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/qr-code', 'adMeta')->middleware('throttle:60,1');
             Route::get('/qr-code/image', 'adQrImage')->middleware('throttle:60,1');
             Route::get('/placarde', 'adPlacarde')->middleware('throttle:20,1');
+            Route::get('/placarde/preview', 'adPlacardePreview')->middleware('throttle:20,1');
         });
 
     // --- PWA (Push Subscriptions & Session Validation) ---
