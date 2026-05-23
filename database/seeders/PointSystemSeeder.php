@@ -13,18 +13,22 @@ class PointSystemSeeder extends Seeder
     public function run(): void
     {
         // --- Default credit packages ---
+        // unlock_cost_points = 2  →  contacts débloqués = points_awarded / 2
+        // Starter : 10 crédits / 2 =  5 contacts →  200 FCFA/contact
+        // Pro     : 50 crédits / 2 = 25 contacts →  160 FCFA/contact (-20 %)
+        // Premium :120 crédits / 2 = 60 contacts → ~117 FCFA/contact (-42 %)
         $packages = [
             [
                 'name' => 'Pack Starter',
-                'description' => 'Trouvez votre premier logement — 10 contacts propriétaires directs, sans intermédiaire',
+                'description' => 'Testez KeyHome sans risque. Contactez 5 propriétaires vérifiés — numéro et WhatsApp inclus — sans passer par une agence.',
                 'badge' => null,
                 'price' => 1000,   // 1 000 FCFA
                 'points_awarded' => 10,
                 'features' => [
-                    '10 déverrouillages de contacts (100 FCFA/contact)',
-                    'Numéros & WhatsApp directs',
-                    'Aucune commission, aucun frais caché',
-                    'Valable 6 mois',
+                    '5 contacts propriétaires débloqués (2 crédits/contact)',
+                    'Appelez ou WhatsApp le propriétaire directement',
+                    'Annonces vérifiées — zéro commission, zéro frais cachés',
+                    '200 FCFA/contact · Crédits valables 6 mois',
                 ],
                 'is_active' => true,
                 'is_popular' => false,
@@ -32,16 +36,16 @@ class PointSystemSeeder extends Seeder
             ],
             [
                 'name' => 'Pack Pro',
-                'description' => 'Cherchez sans vous limiter — 50 contacts au meilleur prix, -20% vs Starter',
+                'description' => 'Le choix des chercheurs actifs. 25 propriétaires en accès direct — assez pour trouver votre logement avant vos concurrents.',
                 'badge' => 'Le + populaire',
                 'price' => 4000,   // 4 000 FCFA
                 'points_awarded' => 50,
                 'features' => [
-                    '50 déverrouillages de contacts (80 FCFA/contact)',
-                    'Numéros & WhatsApp directs',
-                    '-20% par contact vs Pack Starter',
-                    'Support prioritaire',
-                    'Valable 6 mois',
+                    '25 contacts propriétaires débloqués',
+                    '160 FCFA/contact — économisez 20 % vs Starter',
+                    'Appel + WhatsApp + messagerie KeyHome inclus',
+                    'Support prioritaire — réponse rapide garantie',
+                    'Crédits valables 6 mois',
                 ],
                 'is_active' => true,
                 'is_popular' => true,
@@ -49,16 +53,16 @@ class PointSystemSeeder extends Seeder
             ],
             [
                 'name' => 'Pack Premium',
-                'description' => 'Pour les familles et les professionnels en mobilité — 120 contacts, -42% vs Starter',
+                'description' => 'Pour les familles ambitieuses et les professionnels en mobilité. 60 contacts sur 12 mois — le meilleur coût par logement trouvé.',
                 'badge' => 'Meilleur rapport',
                 'price' => 7000,   // 7 000 FCFA
                 'points_awarded' => 120,
                 'features' => [
-                    '120 déverrouillages de contacts (~58 FCFA/contact)',
-                    'Numéros & WhatsApp directs',
-                    '-42% par contact vs Pack Starter',
+                    '60 contacts propriétaires débloqués',
+                    '~117 FCFA/contact — 42 % de réduction vs Starter',
+                    'Appel + WhatsApp + messagerie KeyHome inclus',
                     'Support prioritaire 24h/7j',
-                    'Valable 12 mois',
+                    'Crédits valables 12 mois · Idéal agences & équipes RH',
                 ],
                 'is_active' => true,
                 'is_popular' => false,
