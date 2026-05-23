@@ -31,15 +31,14 @@
 
 ### 1.4 "Vues récemment" Client
 
-- [ ] Hook `useRecentlyViewed` : sauvegarder les IDs d'annonces vues dans `localStorage` (max 10)
-- [ ] Composant `<RecentlyViewedAds />` : carousel horizontal sur homepage
-- [ ] Afficher dans la sidebar de la page search (desktop)
+- [x] Hook `useRecentlyViewed` : localStorage (max 10) + merge backend (`GET /my/recently-viewed`)
+- [x] Carousel "Récemment consultés" sur la homepage (client dashboard)
+- [x] `addRecentlyViewed(ad)` appelé dans `AdDetailClient` à chaque ouverture d'annonce
+- [x] Route `GET /api/v1/my/recently-viewed` enregistrée
 
-### 1.5 Alerte bailleur — Annonce débloquée
+### ~~1.5 Alerte bailleur — Annonce débloquée~~
 
-- [ ] Backend : event `AdUnlocked` → notification DB au propriétaire
-- [ ] Frontend owner dashboard : badge + toast `"Quelqu'un vient de débloquer votre annonce"`
-- [ ] Email notification (si préférence activée)
+> ❌ Annulé — décision produit : le bailleur n'a pas accès aux informations sur les déblocages de ses annonces.
 
 ---
 

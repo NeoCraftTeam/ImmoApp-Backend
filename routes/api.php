@@ -171,8 +171,9 @@ Route::prefix('v1')->group(function (): void {
             ->middleware('throttle:3,1');
     });
 
-    // --- MY FAVORITES ---
+    // --- MY FAVORITES / RECENTLY VIEWED ---
     Route::middleware('auth:sanctum')->get('/my/favorites', [AdInteractionController::class, 'favorites']);
+    Route::middleware('auth:sanctum')->get('/my/recently-viewed', [AdInteractionController::class, 'recentlyViewed']);
 
     // --- NOTIFICATIONS ---
     Route::middleware('auth:sanctum')->prefix('notifications')->controller(NotificationController::class)->group(function (): void {
