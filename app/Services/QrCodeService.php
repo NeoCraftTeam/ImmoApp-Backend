@@ -64,24 +64,32 @@ final readonly class QrCodeService
     }
 
     /**
-     * Build the branded SVG: chillerlan QR matrix injected directly into our
-     * outer 1000×1000 viewBox (no nested <svg>) with decorative rings around
-     * the matrix and an embedded logo at the centre.
+     * Build the branded SVG key-silhouette QR code:
+     *   • Portrait canvas  (1000 × 1380)
+     *   • Key head  = circular QR matrix (upper portion, ECC-H + circular dots)
+     *   • Key stem  = plain rectangle below the head (clip-path only)
+     *   • Key teeth = decorative notches on the right side of the stem outline
+     *   • Brand-gradient dashed rings outside the head circle
+     *   • KeyHome logo at the head centre
+     *   • KEYHOME.APP label at the bottom
      */
     public function renderRichSvg(string $targetUrl): string
     {
         $rawQrSvg = new QRCode($this->buildOptions())->render($targetUrl);
 
-        $canvas = 1000.0;
-        $cx = $canvas / 2;
-        $cy = $canvas / 2;
+        // ── Canvas (portrait key silhouette) ──────────────────────────────
+        $cw = 1000.0;
+        $ch = 1380.0;
+        $cx = $cw / 2.0;           // 500
 
-        // Matrix occupies 64 % of the canvas — large enough to dominate,
-        // small enough that the 2 decorative rings stay inside the canvas.
-        $qrSize = $canvas * 0.64;
-        $qrX = $cx - $qrSize / 2;
-        $qrY = $cy - $qrSize / 2;
+        // QR head sits in the upper portion of the canvas.
+        $headCy = 460.0;
+        $qrSize = $cw * 0.64;          // 640 — matrix side
+        $qrX = $cx - $qrSize / 2.0; // 180
+        $qrY = $headCy - $qrSize / 2.0; // 140
+        $clipR = $qrSize * 0.5;        // 320 — inscribed circle radius
 
+        // ── QR matrix transform ───────────────────────────────────────────
         $vb = $this->extractViewBox($rawQrSvg) ?? '0 0 100 100';
         $parts = array_map(floatval(...), preg_split('/\s+/', trim($vb)) ?: []);
         $vbX = $parts[0] ?? 0.0;
@@ -92,68 +100,81 @@ final readonly class QrCodeService
         $tx = $qrX - $vbX * $scale;
         $ty = $qrY - $vbY * $scale;
 
-        // Strip outer SVG and XML declaration wrappers from chillerlan output.
         $inner = preg_replace('#<\?xml[^>]+\?>\s*#', '', (string) $rawQrSvg) ?? $rawQrSvg;
         $inner = preg_replace('#</?svg[^>]*>#i', '', (string) $inner) ?? '';
 
-        $rings = $this->renderDecorativeRings($cx, $cy, $qrSize, $targetUrl);
-        $logo = $this->renderCenterLogo($cx, $cy, $qrSize * 0.10);
-
-        // Smart circular clip-path that:
-        //   1. Keeps a centred CIRCLE of data modules visible
-        //   2. Adds 3 RECTANGLES preserving the finder squares (TL/TR/BL)
-        //      — essential for scanner detection
-        //   3. Adds a SMALL square preserving the alignment pattern (BR)
-        // → visually circular silhouette but 100 % standard QR scannable.
-        // The clip-path uses union of all shapes (anything inside any shape
-        // remains visible after clipping).
-        $clipR = $qrSize * 0.5;            // inscribed circle (matrix sides)
+        // ── Finder-pattern preservation (QR scanners require these) ───────
         $moduleSize = $qrSize / max($vbW, 1.0);
         $quietzone = 4.0;
         $finderModules = 7.0;
         $finderSize = $finderModules * $moduleSize;
         $finderInset = $quietzone * $moduleSize;
-        // Pad the finder rects by 1 module so the white separator around
-        // each finder is also preserved (scanners need that quiet ring).
         $pad = $moduleSize;
+
         $tlX = $qrX + $finderInset - $pad;
         $tlY = $qrY + $finderInset - $pad;
         $trX = $qrX + $qrSize - $finderInset - $finderSize - $pad;
         $trY = $qrY + $finderInset - $pad;
         $blX = $qrX + $finderInset - $pad;
         $blY = $qrY + $qrSize - $finderInset - $finderSize - $pad;
-        $finderBox = $finderSize + 2 * $pad;
+        $fb = $finderSize + 2.0 * $pad;
 
-        $clipId = 'kh-qr-clip';
+        // ── Key stem dimensions ───────────────────────────────────────────
+        $stemW = 155.0;
+        $stemX = $cx - $stemW / 2.0;      // 422.5
+        $stemTop = $headCy + $clipR + 8.0;  // just below head circle (≈ 788)
+        $stemBot = 1258.0;
+
+        // ── Clip path: head circle + finder rects + stem rectangle ────────
+        $clipId = 'kh-key-clip';
         $clipDef = sprintf(
             '<defs><clipPath id="%s">'
                 .'<circle cx="%F" cy="%F" r="%F"/>'
                 .'<rect x="%F" y="%F" width="%F" height="%F"/>'
                 .'<rect x="%F" y="%F" width="%F" height="%F"/>'
                 .'<rect x="%F" y="%F" width="%F" height="%F"/>'
+                .'<rect x="%F" y="%F" width="%F" height="%F"/>'
                 .'</clipPath></defs>',
             $clipId,
-            $cx, $cy, $clipR,
-            $tlX, $tlY, $finderBox, $finderBox,
-            $trX, $trY, $finderBox, $finderBox,
-            $blX, $blY, $finderBox, $finderBox
+            $cx, $headCy, $clipR,
+            $tlX, $tlY, $fb, $fb,
+            $trX, $trY, $fb, $fb,
+            $blX, $blY, $fb, $fb,
+            $stemX, $stemTop, $stemW, $stemBot - $stemTop
+        );
+
+        $bg = sprintf(
+            '<rect x="12" y="12" width="%F" height="%F" rx="64" ry="64" fill="#FFF5F6"/>',
+            $cw - 24.0, $ch - 24.0
+        );
+        $rings = $this->renderDecorativeRings($cx, $headCy, $qrSize, $targetUrl);
+        $outline = $this->renderKeyOutline($cx, $headCy, $clipR, $stemX, $stemW, $stemTop, $stemBot);
+        $logo = $this->renderCenterLogo($cx, $headCy, $qrSize * 0.10);
+        $label = sprintf(
+            '<text x="%F" y="%F" text-anchor="middle" font-family="system-ui,Arial,sans-serif" font-size="44" font-weight="800" fill="%s" letter-spacing="6" opacity="0.80">KEYHOME.APP</text>',
+            $cx, $stemBot + 72.0, self::BRAND
         );
 
         return sprintf(
             '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %F %F" width="%F" height="%F" preserveAspectRatio="xMidYMid meet" role="img" aria-label="QR Code KeyHome">'
                 .'%s'
-                .'<rect x="0" y="0" width="%F" height="%F" rx="80" ry="80" fill="#FFF5F6"/>'
                 .'%s'
-                .'<g clip-path="url(#%s)"><g transform="translate(%F %F) scale(%F %F)">%s</g></g>'
+                .'%s'
+                .'<g clip-path="url(#%s)"><rect x="0" y="0" width="%F" height="%F" fill="#FFFFFF"/>'
+                .'<g transform="translate(%F %F) scale(%F %F)">%s</g></g>'
+                .'%s'
+                .'%s'
                 .'%s'
                 .'</svg>',
-            $canvas, $canvas, $canvas, $canvas,
+            $cw, $ch, $cw, $ch,
             $clipDef,
-            $canvas, $canvas,
+            $bg,
             $rings,
-            $clipId,
+            $clipId, $cw, $ch,
             $tx, $ty, $scale, $scale, $inner,
-            $logo
+            $outline,
+            $logo,
+            $label
         );
     }
 
@@ -202,46 +223,96 @@ final readonly class QrCodeService
     }
 
     /**
-     * Five concentric dashed circles **outside** the inscribed data circle (same
-     * radius as the clip-path circle). Black + cool greys only on the rings so
-     * they never compete with scan contrast. Dash phases vary deterministically
-     * with the target URL string (crc32) for a stable per-link look.
+     * Five concentric dashed rings outside the head circle.
+     * Brand-gradient palette: crimson → pink — creates a "glow" halo around
+     * the key head without competing with QR scan contrast.
      */
     private function renderDecorativeRings(float $cx, float $cy, float $qrSize, string $seed): string
     {
-        $dark = self::DARK;
-        $g1 = '#1F2937';
-        $g2 = '#4B5563';
-        $g3 = '#6B7280';
-        $g4 = '#9CA3AF';
-
         $clipR = $qrSize * 0.5;
         $h = crc32($seed);
 
         /** @var list<array{r: float, w: float, dash: string, color: string, offset: float}> $spec */
         $spec = [
-            ['r' => $clipR + 9, 'w' => 3.2, 'dash' => '4 11', 'color' => $dark, 'offset' => (float) ($h % 13)],
-            ['r' => $clipR + 22, 'w' => 2.6, 'dash' => '3 9', 'color' => $g1, 'offset' => (float) (($h >> 3) % 17)],
-            ['r' => $clipR + 35, 'w' => 3.0, 'dash' => '5 14', 'color' => $g2, 'offset' => (float) (($h >> 6) % 11)],
-            ['r' => $clipR + 48, 'w' => 2.4, 'dash' => '2 10', 'color' => $g3, 'offset' => (float) (($h >> 9) % 19)],
-            ['r' => $clipR + 62, 'w' => 2.8, 'dash' => '6 16', 'color' => $g4, 'offset' => (float) (($h >> 12) % 15)],
+            ['r' => $clipR + 9,  'w' => 3.5, 'dash' => '5 12', 'color' => '#F6475F', 'offset' => (float) ($h % 13)],
+            ['r' => $clipR + 23, 'w' => 2.8, 'dash' => '3 10', 'color' => '#FF6B7A', 'offset' => (float) (($h >> 3) % 17)],
+            ['r' => $clipR + 37, 'w' => 3.2, 'dash' => '6 15', 'color' => '#FF8F9D', 'offset' => (float) (($h >> 6) % 11)],
+            ['r' => $clipR + 51, 'w' => 2.5, 'dash' => '2 11', 'color' => '#FFB3BB', 'offset' => (float) (($h >> 9) % 19)],
+            ['r' => $clipR + 65, 'w' => 2.8, 'dash' => '7 17', 'color' => '#FFD4D9', 'offset' => (float) (($h >> 12) % 15)],
         ];
 
         $out = '';
         foreach ($spec as $ring) {
             $out .= sprintf(
-                '<circle cx="%.2f" cy="%.2f" r="%.2f" fill="none" stroke="%s" stroke-width="%.2f" stroke-dasharray="%s" stroke-dashoffset="%.2f" stroke-linecap="round" opacity="0.92"/>',
-                $cx,
-                $cy,
-                $ring['r'],
-                $ring['color'],
-                $ring['w'],
-                $ring['dash'],
-                $ring['offset']
+                '<circle cx="%.2f" cy="%.2f" r="%.2f" fill="none" stroke="%s" stroke-width="%.2f" stroke-dasharray="%s" stroke-dashoffset="%.2f" stroke-linecap="round" opacity="0.90"/>',
+                $cx, $cy, $ring['r'], $ring['color'], $ring['w'], $ring['dash'], $ring['offset']
             );
         }
 
         return $out;
+    }
+
+    /**
+     * Decorative key outline drawn ON TOP of the clipped QR matrix:
+     *   • Subtle brand-tinted fill of the stem rectangle
+     *   • Crisp stroke outline of the stem with 3 notch teeth on the right
+     *   • Thin ring border around the key head circle
+     */
+    private function renderKeyOutline(
+        float $cx,
+        float $headCy,
+        float $clipR,
+        float $stemX,
+        float $stemW,
+        float $stemTop,
+        float $stemBot
+    ): string {
+        $brand = self::BRAND;
+        $stemRight = $stemX + $stemW;
+        $rx = 14.0;
+        $span = $stemBot - $stemTop;
+        $toothD = 62.0;
+        $toothH = 68.0;
+
+        $t1Y = $stemTop + $span * 0.20;
+        $t2Y = $stemTop + $span * 0.48;
+        $t3Y = $stemTop + $span * 0.72;
+
+        // Stem outline path — clockwise from top-left, teeth on right side.
+        $d = sprintf(
+            'M %.2f %.2f '
+            .'L %.2f %.2f '
+            .'Q %.2f %.2f %.2f %.2f '
+            .'L %.2f %.2f '
+            .'Q %.2f %.2f %.2f %.2f '
+            .'L %.2f %.2f L %.2f %.2f L %.2f %.2f L %.2f %.2f '
+            .'L %.2f %.2f L %.2f %.2f L %.2f %.2f L %.2f %.2f '
+            .'L %.2f %.2f L %.2f %.2f L %.2f %.2f L %.2f %.2f '
+            .'L %.2f %.2f Z',
+            $stemX, $stemTop,
+            $stemX, $stemBot - $rx,
+            $stemX, $stemBot, $stemX + $rx, $stemBot,
+            $stemRight - $rx, $stemBot,
+            $stemRight, $stemBot, $stemRight, $stemBot - $rx,
+            $stemRight, $t3Y + $toothH,
+            $stemRight + $toothD, $t3Y + $toothH,
+            $stemRight + $toothD, $t3Y,
+            $stemRight, $t3Y,
+            $stemRight, $t2Y + $toothH,
+            $stemRight + $toothD, $t2Y + $toothH,
+            $stemRight + $toothD, $t2Y,
+            $stemRight, $t2Y,
+            $stemRight, $t1Y + $toothH,
+            $stemRight + $toothD, $t1Y + $toothH,
+            $stemRight + $toothD, $t1Y,
+            $stemRight, $t1Y,
+            $stemRight, $stemTop
+        );
+
+        return
+            sprintf('<path d="%s" fill="%s" fill-opacity="0.06"/>', $d, $brand)
+            .sprintf('<path d="%s" fill="none" stroke="%s" stroke-width="4" stroke-linejoin="round" opacity="0.35"/>', $d, $brand)
+            .sprintf('<circle cx="%.2f" cy="%.2f" r="%.2f" fill="none" stroke="%s" stroke-width="3.5" opacity="0.22"/>', $cx, $headCy, $clipR + 2.0, $brand);
     }
 
     /**

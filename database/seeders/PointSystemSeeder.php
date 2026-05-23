@@ -25,7 +25,7 @@ class PointSystemSeeder extends Seeder
                 'price' => 1000,   // 1 000 FCFA
                 'points_awarded' => 10,
                 'features' => [
-                    '5 contacts propriétaires débloqués (2 crédits/contact)',
+                    '5 annonces propriétaires débloqués',
                     'Appelez ou WhatsApp le propriétaire directement',
                     'Annonces vérifiées — zéro commission, zéro frais cachés',
                     '200 FCFA/contact · Crédits valables 6 mois',
