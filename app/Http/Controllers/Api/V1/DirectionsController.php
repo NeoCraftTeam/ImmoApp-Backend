@@ -12,7 +12,7 @@ use OpenApi\Attributes as OA;
 #[OA\Get(
     path: '/api/v1/directions',
     summary: 'Calcul d\'itinéraire entre deux points',
-    description: 'Retourne un itinéraire GeoJSON avec résumé (distance, durée) entre deux coordonnées GPS. Profiles : voiture, pied, vélo, fauteuil roulant. Nécessite ORS_API_KEY. Mis en cache 1 h.',
+    description: 'Retourne un itinéraire GeoJSON avec résumé (distance, durée) entre deux coordonnées GPS. Profiles : voiture, pied, vélo, fauteuil roulant. Nécessite ORS_API_KEY. Mis en cache 24 h.',
     tags: ['🗺️ Géo'],
     parameters: [
         new OA\Parameter(name: 'from_lat', in: 'query', required: true, schema: new OA\Schema(type: 'number')),

@@ -34,6 +34,16 @@ class SyncMeilisearchSettings extends Command
                 'price', 'surface_area', 'created_at', 'boost_score', 'reviews_avg_rating', 'views_count',
             ]);
 
+            $this->info('🔤 Mise à jour des synonymes FR-CM...');
+            $index->updateSynonyms($this->buildSynonyms());
+
+            $this->info('🛑 Mise à jour des stop words FR...');
+            $index->updateStopWords([
+                'le', 'la', 'les', 'l', 'de', 'du', 'des', 'un', 'une',
+                'et', 'en', 'à', 'au', 'aux', 'sur', 'par', 'pour', 'avec',
+                'dans', 'qui', 'que', 'je', 'est', 'pas', 'plus', 'très',
+            ]);
+
             $this->info('✅ Configuration Meilisearch synchronisée avec succès !');
 
             return CommandAlias::SUCCESS;
@@ -42,5 +52,61 @@ class SyncMeilisearchSettings extends Command
 
             return CommandAlias::FAILURE;
         }
+    }
+
+    /**
+     * Expand synonym groups into Meilisearch bidirectional format.
+     *
+     * Each group is a list of equivalent words; every word maps to all others.
+     *
+     * @return array<string, string[]>
+     */
+    private function buildSynonyms(): array
+    {
+        $groups = [
+            // Property types
+            ['studio', 'garçonnière', 'chambre garçonnière'],
+            ['appartement', 'appart', 'flat', 'logement'],
+            ['villa', 'maison', 'pavillon', 'bungalow', 'maison individuelle'],
+            ['terrain', 'parcelle', 'lot', 'foncier'],
+            ['bureau', 'local commercial', 'commerce', 'boutique'],
+            ['duplex', 'maisonette'],
+            // Amenities
+            ['parking', 'garage', 'stationnement', 'place de parking'],
+            ['meublé', 'meuble', 'équipé', 'avec meubles'],
+            ['climatisation', 'clim', 'climatiseur'],
+            ['wc', 'toilettes', 'sanitaires'],
+            ['gardien', 'vigile', 'sécurité', 'concierge'],
+            ['ascenseur', 'elevator'],
+            ['balcon', 'terrasse', 'véranda'],
+            ['piscine', 'pool'],
+            ['clôture', 'enceinte', 'mur de clôture'],
+            // Transaction types
+            ['location', 'louer', 'loue', 'en location', 'à louer'],
+            ['vente', 'à vendre', 'achat', 'acheter'],
+            // Quarters / cities (alternate spellings)
+            ['biyem-assi', 'biyem assi', 'biyemassi'],
+            ['omnisport', 'stade omnisport'],
+            ['akwa', 'akwa nord'],
+            ['bonapriso', 'bonamoussadi'],
+            ['bastos', 'quartier bastos'],
+            ['douala', 'dla'],
+            ['yaoundé', 'yaounde', 'yde'],
+            ['abidjan', 'abidjan city'],
+            // Rooms / features
+            ['chambre', 'pièce', 'room'],
+            ['salle de bain', 'douche', 'sdb', 'salle d\'eau'],
+            ['cuisine', 'kitchenette'],
+            ['salon', 'séjour', 'living'],
+        ];
+
+        $synonyms = [];
+        foreach ($groups as $group) {
+            foreach ($group as $word) {
+                $synonyms[$word] = array_values(array_filter($group, fn (string $w): bool => $w !== $word));
+            }
+        }
+
+        return $synonyms;
     }
 }
