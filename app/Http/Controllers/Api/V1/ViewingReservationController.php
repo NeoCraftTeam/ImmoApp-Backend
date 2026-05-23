@@ -133,7 +133,26 @@ final readonly class ViewingReservationController
             'Vous devez débloquer cette annonce avant de pouvoir réserver une visite.'
         );
 
+        $idempotencyKey = $request->header('X-Idempotency-Key');
+        if ($idempotencyKey) {
+            $cacheKey = "reservation_idempotency:{$request->user()->id}:{$idempotencyKey}";
+            $existing = cache()->get($cacheKey);
+            if ($existing) {
+                $cached = TentativeReservation::find($existing);
+                if ($cached) {
+                    return response()->json([
+                        'data' => new TentativeReservationResource($cached->load('ad')),
+                        'message' => 'Votre réservation provisoire a bien été enregistrée.',
+                    ], 200);
+                }
+            }
+        }
+
         $reservation = $this->reservationService->reserve($ad, $request->user(), $request->validated());
+
+        if ($idempotencyKey) {
+            cache()->put("reservation_idempotency:{$request->user()->id}:{$idempotencyKey}", $reservation->id, now()->addHours(24));
+        }
 
         ViewingSlotsResponseCache::bumpGeneration($ad);
 
@@ -242,6 +261,31 @@ final readonly class ViewingReservationController
         $paginator = $this->reservationService->listForClient($request->user(), $request->only(['status', 'ad_id']));
 
         return TentativeReservationResource::collection($paginator);
+    }
+
+    /**
+     * Mark a confirmed reservation as no-show (landlord only).
+     */
+    public function noShow(Request $request, TentativeReservation $reservation): JsonResponse
+    {
+        abort_unless(
+            $reservation->isOwnedByLandlord($request->user()),
+            403,
+            'Seul le propriétaire peut marquer une réservation comme absence.'
+        );
+
+        abort_unless(
+            $reservation->status === ReservationStatus::Confirmed,
+            422,
+            'Seules les réservations confirmées peuvent être marquées comme absences.'
+        );
+
+        $updated = $this->reservationService->markNoShow($reservation);
+
+        return response()->json([
+            'data' => new TentativeReservationResource($updated->load('ad')),
+            'message' => 'Réservation marquée comme absence.',
+        ]);
     }
 
     /**

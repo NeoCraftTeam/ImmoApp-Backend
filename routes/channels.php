@@ -25,6 +25,17 @@ Broadcast::channel('conversation.{uuid}', function (User $user, string $uuid): b
 
 /*
 |--------------------------------------------------------------------------
+| User private channel — reservations & notifications
+|--------------------------------------------------------------------------
+| Each authenticated user subscribes to their own private channel.
+| Used by ReservationStatusChanged and future per-user events.
+*/
+Broadcast::channel('user.{userId}', function (User $user, string $userId): bool {
+    return $user->id === $userId;
+});
+
+/*
+|--------------------------------------------------------------------------
 | Chat — Presence Channel (online/offline status)
 |--------------------------------------------------------------------------
 */

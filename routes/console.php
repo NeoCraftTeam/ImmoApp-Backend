@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Jobs\CompleteStaleReservationsJob;
 use App\Jobs\ExpireStaleReservationsJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -19,6 +20,7 @@ Schedule::command('app:send-monthly-report')->monthlyOn(1, '08:00');
 Schedule::command('app:send-engagement-emails')->dailyAt('08:00');
 Schedule::command('app:check-lease-expirations')->dailyAt('09:00');
 Schedule::job(ExpireStaleReservationsJob::class)->everyThirtyMinutes();
+Schedule::job(CompleteStaleReservationsJob::class)->hourly();
 
 Schedule::command('backup:clean')->daily()->at('01:00');
 Schedule::command('backup:run')->daily()->at('02:00');

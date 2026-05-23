@@ -3,15 +3,23 @@
 declare(strict_types=1);
 
 use App\Enums\ReservationStatus;
+use App\Events\Reservation\ReservationStatusChanged;
+use App\Events\Reservation\SlotAvailabilityChanged;
 use App\Models\Ad;
 use App\Models\TentativeReservation;
 use App\Models\UnlockedAd;
 use App\Models\User;
 use App\Notifications\ReservationConfirmedClientNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    Event::fake([ReservationStatusChanged::class, SlotAvailabilityChanged::class]);
+    Notification::fake();
+});
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -6,6 +6,8 @@ namespace App\Services;
 
 use App\Enums\CancelledBy;
 use App\Enums\ReservationStatus;
+use App\Events\Reservation\ReservationStatusChanged;
+use App\Events\Reservation\SlotAvailabilityChanged;
 use App\Exceptions\Viewing\ClientHasActiveReservationForAdException;
 use App\Exceptions\Viewing\ScheduleHasActiveReservationsException;
 use App\Exceptions\Viewing\SelfReservationException;
@@ -90,6 +92,13 @@ final readonly class ReservationService implements ReservationServiceInterface
             throw new SlotAlreadyReservedException;
         }
 
+        SlotAvailabilityChanged::dispatch(
+            $ad->id,
+            $data['slot_date'],
+            $data['slot_starts_at'],
+            false,
+        );
+
         return $reservation;
     }
 
@@ -101,6 +110,11 @@ final readonly class ReservationService implements ReservationServiceInterface
         $cancelledBy = $reservation->isOwnedByClient($actor)
             ? CancelledBy::Client
             : CancelledBy::Landlord;
+
+        $previous = $reservation->status->value;
+        $adId = $reservation->ad_id;
+        $slotDate = $reservation->slot_date->toDateString();
+        $slotStartsAt = $reservation->slot_starts_at;
 
         DB::transaction(function () use ($reservation, $cancelledBy, $reason): void {
             $reservation->update([
@@ -115,7 +129,12 @@ final readonly class ReservationService implements ReservationServiceInterface
             }
         });
 
-        return $reservation->fresh() ?? $reservation;
+        $fresh = $reservation->fresh(['ad']) ?? $reservation;
+
+        ReservationStatusChanged::dispatch($fresh, $previous);
+        SlotAvailabilityChanged::dispatch($adId, $slotDate, $slotStartsAt, true);
+
+        return $fresh;
     }
 
     /**
@@ -140,10 +159,46 @@ final readonly class ReservationService implements ReservationServiceInterface
                 if ($reservation->appointmentSchedule) {
                     $this->viewingScheduleService->releaseSlot($reservation->appointmentSchedule);
                 }
+
+                ReservationStatusChanged::dispatch($reservation, ReservationStatus::Pending->value);
+                SlotAvailabilityChanged::dispatch(
+                    $reservation->ad_id,
+                    $reservation->slot_date->toDateString(),
+                    $reservation->slot_starts_at,
+                    true,
+                );
             }
         });
 
         return $stale->count();
+    }
+
+    /**
+     * Mark a confirmed reservation as completed (called after slot_ends_at has passed).
+     */
+    public function complete(TentativeReservation $reservation): TentativeReservation
+    {
+        $previous = $reservation->status->value;
+
+        $reservation->update(['status' => ReservationStatus::Completed]);
+
+        ReservationStatusChanged::dispatch($reservation->load('ad'), $previous);
+
+        return $reservation->fresh() ?? $reservation;
+    }
+
+    /**
+     * Mark a confirmed reservation as no-show (landlord action).
+     */
+    public function markNoShow(TentativeReservation $reservation): TentativeReservation
+    {
+        $previous = $reservation->status->value;
+
+        $reservation->update(['status' => ReservationStatus::NoShow]);
+
+        ReservationStatusChanged::dispatch($reservation->load('ad'), $previous);
+
+        return $reservation->fresh() ?? $reservation;
     }
 
     /**

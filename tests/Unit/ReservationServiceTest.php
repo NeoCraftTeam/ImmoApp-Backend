@@ -12,12 +12,14 @@ use App\Models\Zap\Schedule;
 use App\Services\Contracts\ViewingScheduleServiceInterface;
 use App\Services\ReservationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
     Notification::fake();
+    Event::fake();
 });
 
 // ---------------------------------------------------------------------------
