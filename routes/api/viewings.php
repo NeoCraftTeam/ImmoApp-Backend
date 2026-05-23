@@ -24,13 +24,20 @@ Route::middleware('auth:sanctum')->prefix('ads/{ad}')->group(function (): void {
     Route::get('/reservations', [ViewingAvailabilityController::class, 'reservations']);
 });
 
-// Calendar .ics feed — signed URL, no auth middleware (user/{user} param validated via signature)
+// Calendar .ics feeds — signed URLs, no auth middleware (user/{user} param validated via signature)
 Route::get('/users/{user}/calendar.ics', [CalendarExportController::class, 'ics'])
     ->name('calendar.ics')
     ->middleware('throttle:30,1');
 
-// Generate signed .ics URL (authenticated)
+Route::get('/users/{user}/landlord-calendar.ics', [CalendarExportController::class, 'landlordIcs'])
+    ->name('calendar.landlord-ics')
+    ->middleware('throttle:30,1');
+
+// Generate signed .ics URLs (authenticated)
 Route::middleware('auth:sanctum')->get('/my/calendar-url', [CalendarExportController::class, 'calendarUrl']);
+
+Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner', 'token.role:agent'])
+    ->get('/my/landlord-calendar-url', [CalendarExportController::class, 'landlordCalendarUrl']);
 
 // Reservations (client)
 Route::middleware('auth:sanctum')->group(function (): void {

@@ -8,10 +8,13 @@ use App\Enums\CancelledBy;
 use App\Enums\ReservationStatus;
 use App\Models\TentativeReservation;
 use App\Notifications\ReservationCancelledNotification;
+use App\Notifications\ReservationCompletedClientNotification;
 use App\Notifications\ReservationConfirmedClientNotification;
+use App\Notifications\ReservationConfirmedLandlordNotification;
 use App\Notifications\ReservationCreatedClientNotification;
 use App\Notifications\ReservationCreatedLandlordNotification;
 use App\Notifications\ReservationExpiredNotification;
+use App\Notifications\ReservationNoShowLandlordNotification;
 use Illuminate\Support\Facades\Cache;
 
 class TentativeReservationObserver
@@ -36,11 +39,19 @@ class TentativeReservationObserver
         $this->invalidateTrustScores($reservation);
 
         match ($reservation->status) {
-            ReservationStatus::Confirmed => $reservation->client->notify(new ReservationConfirmedClientNotification($reservation)),
+            ReservationStatus::Confirmed => $this->notifyConfirmation($reservation),
             ReservationStatus::Cancelled => $this->notifyCancellation($reservation),
             ReservationStatus::Expired => $this->notifyExpiration($reservation),
+            ReservationStatus::Completed => $reservation->client->notify(new ReservationCompletedClientNotification($reservation)),
+            ReservationStatus::NoShow => $reservation->ad->user->notify(new ReservationNoShowLandlordNotification($reservation)),
             default => null,
         };
+    }
+
+    private function notifyConfirmation(TentativeReservation $reservation): void
+    {
+        $reservation->client->notify(new ReservationConfirmedClientNotification($reservation));
+        $reservation->ad->user->notify(new ReservationConfirmedLandlordNotification($reservation));
     }
 
     private function notifyCancellation(TentativeReservation $reservation): void
