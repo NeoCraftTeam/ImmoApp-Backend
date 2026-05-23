@@ -44,7 +44,7 @@ final readonly class QrCodeController
             'data' => [
                 'ad_url' => $adUrl,
                 'profile_url' => $profileUrl,
-                'qr_data_uri' => $this->qrCodeService->pngDataUriForUrl($adUrl),
+                'qr_data_uri' => $this->qrCodeService->svgDataUriForUrl($adUrl),
             ],
         ]);
     }
@@ -101,7 +101,7 @@ final readonly class QrCodeController
         return response()->json([
             'data' => [
                 'profile_url' => $profileUrl,
-                'qr_data_uri' => $this->qrCodeService->pngDataUriForUrl($profileUrl),
+                'qr_data_uri' => $this->qrCodeService->svgDataUriForUrl($profileUrl),
             ],
         ]);
     }

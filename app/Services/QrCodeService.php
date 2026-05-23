@@ -44,6 +44,16 @@ final readonly class QrCodeService
     // ─── QR rendering ──────────────────────────────────────────────────────
 
     /**
+     * Returns a data URI (image/svg+xml;base64,...) for browser <img src>.
+     * SVG is rendered natively by all modern browsers — no Imagick/rsvg needed.
+     * Use this for JSON API responses displayed in the owner dialog.
+     */
+    public function svgDataUriForUrl(string $targetUrl): string
+    {
+        return 'data:image/svg+xml;base64,'.base64_encode($this->renderRichSvg($targetUrl));
+    }
+
+    /**
      * Returns a data URI (image/png;base64,...) suitable for DomPDF <img src>
      * and JSON APIs. The image is the branded Apple-style QR.
      */
