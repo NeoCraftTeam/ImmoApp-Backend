@@ -110,7 +110,7 @@ class LeaseContractService
 
         $data = [
             'landlord_name' => trim("{$landlord->firstname} {$landlord->lastname}"),
-            'landlord_phone' => $landlord->phone ?? '',
+            'landlord_phone' => (string) ($landlord->phone_number ?? ''),
             'landlord_email' => $landlord->email,
             'tenant_name' => $tenantData['tenant_name'],
             'tenant_phone' => $tenantData['tenant_phone'],

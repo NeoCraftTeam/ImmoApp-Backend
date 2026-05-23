@@ -175,13 +175,13 @@
         @endif
     </div>
 
-    <div class="status-pill">À LOUER</div>
+    <div class="status-pill">{{ $ad->transaction_type === 'vente' ? 'À VENDRE' : 'À LOUER' }}</div>
 
     <div class="info">
         <div class="title">{{ \Illuminate\Support\Str::limit($ad->title, 60) }}</div>
 
         <div class="price-row">
-            <span class="price">{{ number_format((float) $ad->price, 0, ',', ' ') }} FCFA</span><span class="price-suffix">/ mois</span>
+            <span class="price">{{ number_format((float) $ad->price, 0, ',', ' ') }} FCFA</span>@if($ad->transaction_type !== 'vente')<span class="price-suffix">/ mois</span>@endif
         </div>
 
         <div class="meta">
