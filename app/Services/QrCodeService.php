@@ -89,15 +89,15 @@ final readonly class QrCodeService
 
         // ── Canvas (portrait key silhouette) ──────────────────────────────
         $cw = 1000.0;
-        $ch = 1380.0;
+        $ch = 1200.0;
         $cx = $cw / 2.0;           // 500
 
         // QR head sits in the upper portion of the canvas.
-        $headCy = 460.0;
-        $qrSize = $cw * 0.64;          // 640 — matrix side
-        $qrX = $cx - $qrSize / 2.0; // 180
-        $qrY = $headCy - $qrSize / 2.0; // 140
-        $clipR = $qrSize * 0.5;        // 320 — inscribed circle radius
+        $headCy = 480.0;
+        $qrSize = $cw * 0.80;          // 800 — matrix side (larger = more readable)
+        $qrX = $cx - $qrSize / 2.0; // 100
+        $qrY = $headCy - $qrSize / 2.0; // 80
+        $clipR = $qrSize * 0.5;        // 400 — inscribed circle radius
 
         // ── QR matrix transform ───────────────────────────────────────────
         $vb = $this->extractViewBox($rawQrSvg) ?? '0 0 100 100';
@@ -130,10 +130,10 @@ final readonly class QrCodeService
         $fb = $finderSize + 2.0 * $pad;
 
         // ── Key stem dimensions ───────────────────────────────────────────
-        $stemW = 155.0;
-        $stemX = $cx - $stemW / 2.0;      // 422.5
-        $stemTop = $headCy + $clipR + 8.0;  // just below head circle (≈ 788)
-        $stemBot = 1258.0;
+        $stemW = 160.0;
+        $stemX = $cx - $stemW / 2.0;      // 420
+        $stemTop = $headCy + $clipR + 8.0;  // just below head circle (≈ 888)
+        $stemBot = 1130.0;
 
         // ── Clip path: head circle + finder rects + stem rectangle ────────
         $clipId = 'kh-key-clip';
