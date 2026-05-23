@@ -41,7 +41,7 @@ it('returns qr meta json for the ad owner', function (): void {
         ->and($prof)->toContain('utm_campaign=owner_share')
         ->and($prof)->toContain('utm_content=profile_'.$owner->id);
 
-    expect($response->json('data.qr_data_uri'))->toStartWith('data:image/png;base64,');
+    expect($response->json('data.qr_data_uri'))->toStartWith('data:image/svg+xml;base64,');
 });
 
 it('still builds utm-tracked listing urls when marketing callers opt in', function (): void {
@@ -145,7 +145,7 @@ it('returns profile qr meta for an agent', function (): void {
         ->and($profileUrl)->toContain('utm_medium=qr')
         ->and($profileUrl)->toContain('utm_campaign=owner_share')
         ->and($profileUrl)->toContain('utm_content=profile_'.$owner->id);
-    expect($response->json('data.qr_data_uri'))->toStartWith('data:image/png;base64,');
+    expect($response->json('data.qr_data_uri'))->toStartWith('data:image/svg+xml;base64,');
 });
 
 it('forbids profile qr for a customer', function (): void {

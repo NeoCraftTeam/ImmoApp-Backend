@@ -213,50 +213,6 @@ final readonly class QrCodeService
     }
 
     /**
-     * Plain square QR options (placards, fallback PNG).
-     */
-    private function buildOptions(): QROptions
-    {
-        $dark = self::DARK;
-        $light = self::LIGHT;
-
-        return new QROptions([
-            'eccLevel' => EccLevel::H,
-            'outputType' => QROutputInterface::MARKUP_SVG,
-            'scale' => 10,
-            'addQuietzone' => true,
-            // ISO-required 4-module quiet zone — going below breaks scanners.
-            'quietzoneSize' => 4,
-            'svgAddXmlHeader' => false,
-            'svgUseFillAttributes' => true,
-            'connectPaths' => false,
-            'drawCircularModules' => true,
-            // 0.5 = circles touch their neighbours → visually rounded but
-            // virtually identical to square modules for scanners.
-            'circleRadius' => 0.5,
-            'keepAsSquare' => [
-                QRMatrix::M_FINDER_DARK,
-                QRMatrix::M_FINDER_DOT,
-                QRMatrix::M_ALIGNMENT_DARK,
-            ],
-            'cssClass' => 'kh-qr',
-            'outputBase64' => false,
-            'moduleValues' => [
-                QRMatrix::M_DATA_DARK => $dark,
-                QRMatrix::M_FINDER_DARK => $dark,
-                QRMatrix::M_ALIGNMENT_DARK => $dark,
-                QRMatrix::M_TIMING_DARK => $dark,
-                QRMatrix::M_FINDER_DOT => $dark,
-                QRMatrix::M_DARKMODULE => $dark,
-                QRMatrix::M_DATA => $light,
-                QRMatrix::M_FINDER => $light,
-                QRMatrix::M_ALIGNMENT => $light,
-                QRMatrix::M_TIMING => $light,
-            ],
-        ]);
-    }
-
-    /**
      * Five concentric dashed rings outside the head circle (circumscribed radius).
      * Teal gradient halo — decorative only; QR matrix stays square + unscathed.
      */

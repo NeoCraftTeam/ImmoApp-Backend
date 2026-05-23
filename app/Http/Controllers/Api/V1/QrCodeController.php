@@ -88,9 +88,6 @@ final readonly class QrCodeController
         ]);
     }
 
-    /**
-     * @return \Barryvdh\DomPDF\PDF
-     */
     private function buildAdPlacardePdf(Ad $ad): \Barryvdh\DomPDF\PDF
     {
         $ad->loadMissing(['quarter.city', 'ad_type', 'user', 'media']);
