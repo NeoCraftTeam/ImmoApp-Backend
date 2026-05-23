@@ -52,7 +52,7 @@ return [
         '/^https:\/\/(staging|preprod|preview(-[a-z0-9-]+)?)\.keyhome\.neocraft\.de$/',
     ],
 
-    'allowed_headers' => ['Accept', 'Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token', 'X-Inertia', 'X-WebAuthn-Token', 'X-Socket-Id', 'X-Request-ID', 'X-Correlation-ID'],
+    'allowed_headers' => ['Accept', 'Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token', 'X-Inertia', 'X-WebAuthn-Token', 'X-Socket-Id', 'X-Request-ID', 'X-Correlation-ID', 'X-Idempotency-Key'],
 
     'exposed_headers' => ['X-WebAuthn-Token', 'X-Request-ID', 'X-Correlation-ID'],
 
