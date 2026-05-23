@@ -42,7 +42,7 @@ class ReservationCompletedClientNotification extends Notification implements Sho
     public function toMail(mixed $notifiable): MailMessage
     {
         $adTitle = $this->reservation->ad->title;
-        $date    = $this->reservation->slot_date->translatedFormat('l d F Y');
+        $date = $this->reservation->slot_date->translatedFormat('l d F Y');
 
         return (new MailMessage)
             ->subject("Visite terminée — {$adTitle}")
@@ -70,13 +70,13 @@ class ReservationCompletedClientNotification extends Notification implements Sho
     public function toDatabase(mixed $notifiable): array
     {
         return [
-            'type'           => 'viewing_reservation_completed',
+            'type' => 'viewing_reservation_completed',
             'reservation_id' => $this->reservation->id,
-            'ad_id'          => $this->reservation->ad_id,
-            'ad_title'       => $this->reservation->ad->title,
-            'slot_date'      => $this->reservation->slot_date->toDateString(),
+            'ad_id' => $this->reservation->ad_id,
+            'ad_title' => $this->reservation->ad->title,
+            'slot_date' => $this->reservation->slot_date->toDateString(),
             'slot_starts_at' => $this->reservation->slot_starts_at,
-            'message'        => "Votre visite pour « {$this->reservation->ad->title} » du {$this->reservation->slot_date->toDateString()} est terminée.",
+            'message' => "Votre visite pour « {$this->reservation->ad->title} » du {$this->reservation->slot_date->toDateString()} est terminée.",
         ];
     }
 }

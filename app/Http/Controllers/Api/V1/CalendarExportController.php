@@ -28,7 +28,7 @@ use Spatie\IcalendarGenerator\Enums\EventStatus;
  */
 final class CalendarExportController
 {
-    private const TIMEZONE = 'Africa/Douala';
+    private const string TIMEZONE = 'Africa/Douala';
 
     // ── Client feed ────────────────────────────────────────────────────────────
 

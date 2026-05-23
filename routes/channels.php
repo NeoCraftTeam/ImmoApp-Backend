@@ -30,9 +30,7 @@ Broadcast::channel('conversation.{uuid}', function (User $user, string $uuid): b
 | Each authenticated user subscribes to their own private channel.
 | Used by ReservationStatusChanged and future per-user events.
 */
-Broadcast::channel('user.{userId}', function (User $user, string $userId): bool {
-    return $user->id === $userId;
-});
+Broadcast::channel('user.{userId}', fn (User $user, string $userId): bool => $user->id === $userId);
 
 /*
 |--------------------------------------------------------------------------

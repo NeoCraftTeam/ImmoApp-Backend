@@ -23,6 +23,7 @@ use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 final readonly class ReservationService implements ReservationServiceInterface
 {
@@ -279,17 +280,39 @@ final readonly class ReservationService implements ReservationServiceInterface
     {
         // Full slot instant must not be in the past (same calendar as app TZ).
         $slotStartsAt = Carbon::parse($data['slot_date'].' '.$data['slot_starts_at']);
+
+        Log::debug('[SLOT_DEBUG] assertSlotIsAvailable', [
+            'ad_id' => $ad->id,
+            'slot_date' => $data['slot_date'],
+            'slot_starts_at' => $data['slot_starts_at'],
+            'slot_ends_at' => $data['slot_ends_at'],
+            'parsed_start' => $slotStartsAt->toIso8601String(),
+            'now' => now()->toIso8601String(),
+            'is_past' => $slotStartsAt->isPast(),
+            'app_tz' => config('app.timezone'),
+        ]);
+
         if ($slotStartsAt->isPast()) {
+            Log::debug('[SLOT_DEBUG] REJECTED: isPast');
             throw new SlotNotAvailableException;
         }
 
-        // Must match GET /slots: use schedule metadata (duration + buffer), not Zap defaults.
-        if (!$this->viewingScheduleService->isOfferedBookableSlot(
+        $rawSlots = $this->viewingScheduleService->getBookableSlotsForDate($ad, $data['slot_date']);
+        $offered = $this->viewingScheduleService->isOfferedBookableSlot(
             $ad,
             $data['slot_date'],
             $data['slot_starts_at'],
             $data['slot_ends_at'],
-        )) {
+        );
+
+        Log::debug('[SLOT_DEBUG] isOfferedBookableSlot', [
+            'offered' => $offered,
+            'raw_slots' => $rawSlots,
+        ]);
+
+        // Must match GET /slots: use schedule metadata (duration + buffer), not Zap defaults.
+        if (!$offered) {
+            Log::debug('[SLOT_DEBUG] REJECTED: not offered by schedule');
             throw new SlotNotAvailableException;
         }
 

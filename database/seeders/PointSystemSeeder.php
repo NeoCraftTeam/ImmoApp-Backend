@@ -16,14 +16,15 @@ class PointSystemSeeder extends Seeder
         $packages = [
             [
                 'name' => 'Pack Starter',
-                'description' => 'Parfait pour débloquer vos premiers contacts propriétaires',
+                'description' => 'Trouvez votre premier logement — 10 contacts propriétaires directs, sans intermédiaire',
                 'badge' => null,
                 'price' => 1000,   // 1 000 FCFA
                 'points_awarded' => 10,
                 'features' => [
-                    '10 déverrouillages de contacts',
-                    'Accès direct aux numéros et WhatsApp',
-                    'Historique des annonces déverrouillées',
+                    '10 déverrouillages de contacts (100 FCFA/contact)',
+                    'Numéros & WhatsApp directs',
+                    'Aucune commission, aucun frais caché',
+                    'Valable 6 mois',
                 ],
                 'is_active' => true,
                 'is_popular' => false,
@@ -31,15 +32,16 @@ class PointSystemSeeder extends Seeder
             ],
             [
                 'name' => 'Pack Pro',
-                'description' => 'Le meilleur ratio pour accélérer votre recherche immobilière',
+                'description' => 'Cherchez sans vous limiter — 50 contacts au meilleur prix, -20% vs Starter',
                 'badge' => 'Le + populaire',
                 'price' => 4000,   // 4 000 FCFA
                 'points_awarded' => 50,
                 'features' => [
-                    '50 déverrouillages de contacts',
-                    'Accès direct aux numéros et WhatsApp',
+                    '50 déverrouillages de contacts (80 FCFA/contact)',
+                    'Numéros & WhatsApp directs',
+                    '-20% par contact vs Pack Starter',
                     'Support prioritaire',
-                    'Meilleur coût par contact',
+                    'Valable 6 mois',
                 ],
                 'is_active' => true,
                 'is_popular' => true,
@@ -47,15 +49,16 @@ class PointSystemSeeder extends Seeder
             ],
             [
                 'name' => 'Pack Premium',
-                'description' => 'Conçu pour les pros et les recherches à fort volume',
+                'description' => 'Pour les familles et les professionnels en mobilité — 120 contacts, -42% vs Starter',
                 'badge' => 'Meilleur rapport',
                 'price' => 7000,   // 7 000 FCFA
                 'points_awarded' => 120,
                 'features' => [
-                    '120 déverrouillages de contacts',
-                    'Accès direct aux numéros et WhatsApp',
+                    '120 déverrouillages de contacts (~58 FCFA/contact)',
+                    'Numéros & WhatsApp directs',
+                    '-42% par contact vs Pack Starter',
                     'Support prioritaire 24h/7j',
-                    'Volume optimisé pour équipes',
+                    'Valable 12 mois',
                 ],
                 'is_active' => true,
                 'is_popular' => false,
