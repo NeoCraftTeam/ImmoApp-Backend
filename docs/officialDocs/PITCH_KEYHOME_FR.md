@@ -137,7 +137,11 @@ Avant même de commencer sa recherche, le locataire peut utiliser notre **outil 
 
 ### 10. Prendre rendez-vous directement depuis l'application
 
-Quand un bailleur a configuré ses créneaux de disponibilité pour les visites, le locataire peut **réserver une visite physique directement depuis l'application**, sans avoir à appeler ou envoyer un message. Il consulte le calendrier de disponibilité du bailleur, sélectionne une date et un créneau horaire qui lui convient, confirme sa réservation, et reçoit une **confirmation automatique par notification**. Le bailleur est également notifié en temps réel.
+Quand un bailleur a configuré ses créneaux de disponibilité pour les visites, le locataire peut **réserver une visite physique directement depuis l'application**, sans avoir à appeler ou envoyer un message. Il consulte le calendrier de disponibilité du bailleur, sélectionne une date et un créneau horaire qui lui convient, confirme sa réservation, et reçoit une **confirmation automatique par notification** (email + push). Le bailleur est également notifié en temps réel par email, avec des liens directs pour ajouter le rendez-vous à Google Calendar, Outlook ou Apple Calendar.
+
+Une fois la visite **confirmée**, le locataire voit apparaître un bouton **« Ajouter au calendrier »** directement sur sa réservation (Apple Calendar, Google Calendar, Outlook, iCal) — avec l'adresse du bien pré-remplie comme lieu de l'événement.
+
+La veille du rendez-vous, le locataire reçoit un **rappel automatique J-1** par email et notification push — un filet de sécurité qui réduit drastiquement les rendez-vous manqués.
 
 Plus de va-et-vient fastidieux par téléphone, plus de rendez-vous manqués parce que l'heure n'avait pas été confirmée. Tout est géré, tracé et confirmé automatiquement par KeyHome.
 
@@ -323,6 +327,15 @@ Le bailleur peut **gérer son agenda de visites** directement depuis son dashboa
 
 Les locataires intéressés voient ces disponibilités et réservent un créneau en un clic. Le bailleur reçoit une **notification instantanée** pour chaque réservation, avec les informations du locataire et l'heure du rendez-vous. Il peut confirmer, refuser ou proposer un autre créneau directement depuis l'application. **Plus aucun rendez-vous improvisé, plus de coordination par téléphone** — tout est géré, tracé et confirmé automatiquement.
 
+**Pour chaque visite confirmée**, le bailleur bénéficie de :
+
+- Un **email de confirmation** avec les coordonnées du locataire et des liens « Ajouter à Google Calendar / Outlook / Apple Calendar » directement dans l'email.
+- Un bouton **« Ajouter au calendrier »** dans son espace de gestion des visites (Apple, Google, Outlook, iCal), pré-rempli avec les informations du visiteur et du bien.
+- Un **rappel automatique J-1** par email et push — envoyé indépendamment de celui du locataire, pour que les deux parties soient systématiquement rappelées la veille.
+- En cas d'absence du locataire, le bailleur peut **signaler un no-show en un clic** depuis la liste des visites — le créneau est libéré et une notification est envoyée automatiquement.
+
+**Abonnement calendrier .ics** : le bailleur peut copier son lien d'abonnement personnel (flux `.ics` signé, valable 1 an) depuis son espace visites et le coller dans Google Calendar, Apple Calendar ou Outlook. Son calendrier de visites **se synchronise alors automatiquement et en permanence** — toutes les visites confirmées apparaissent dans son calendrier avec rappel 30 minutes avant, sans aucune action de sa part.
+
 ---
 
 ### 10. Mettre une annonce en avant — Le système de boost
@@ -439,6 +452,9 @@ KeyHome n'est pas juste une énième plateforme d'annonces immobilières en lign
 | Recherche manuelle fastidieuse | IA en langage naturel + recherche par photo + recherche vocale |
 | Arnaques et faux profils | Modération + signalement communautaire |
 | Gestion désorganisée des visites | Calendrier de réservation intégré |
+| Rendez-vous oubliés (client ou bailleur) | Rappels J-1 automatiques des deux côtés + abonnement calendrier .ics avec VALARM |
+| Locataire absent sans prévenir | Bouton « No-show » bailleur → créneau libéré + notification automatique |
+| Visite confirmée absente du calendrier | « Ajouter au calendrier » (Apple/Google/Outlook/iCal) sur chaque réservation confirmée |
 | Contrats de bail approximatifs | Génération PDF automatisée |
 | Manque de visibilité pour les bailleurs | Dashboard analytique + système de boost |
 | Communications dispersées (WhatsApp, SMS, appels) | Messagerie chiffrée intégrée (AES-256) |
