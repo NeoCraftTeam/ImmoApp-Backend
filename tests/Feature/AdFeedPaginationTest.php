@@ -184,6 +184,43 @@ describe('GET /api/v1/ads/feed — cursor pagination', function (): void {
         expect(collect($response->json('data'))->pluck('id'))->not->toContain($excluded);
     });
 
+    it('includes total_approximate in the response', function (): void {
+        Ad::withoutSyncingToSearch(fn () => Ad::factory(4)->create([
+            'status' => 'available',
+            'is_visible' => true,
+        ]));
+
+        $response = $this->getJson('/api/v1/ads/feed?per_page=2')->assertOk();
+
+        expect($response->json('total_approximate'))->toBeInt()->toBeGreaterThanOrEqual(4);
+    });
+
+    it('sorts by price ascending when sort=price_asc', function (): void {
+        Ad::withoutSyncingToSearch(function (): void {
+            Ad::factory()->create(['status' => 'available', 'is_visible' => true, 'price' => 300000]);
+            Ad::factory()->create(['status' => 'available', 'is_visible' => true, 'price' => 100000]);
+            Ad::factory()->create(['status' => 'available', 'is_visible' => true, 'price' => 200000]);
+        });
+
+        $response = $this->getJson('/api/v1/ads/feed?per_page=10&sort=price_asc')->assertOk();
+        $prices = collect($response->json('data'))->pluck('price')->map(fn ($p) => (int) $p)->values()->all();
+
+        expect($prices)->toBe(collect($prices)->sort()->values()->all());
+    });
+
+    it('sorts by price descending when sort=price_desc', function (): void {
+        Ad::withoutSyncingToSearch(function (): void {
+            Ad::factory()->create(['status' => 'available', 'is_visible' => true, 'price' => 100000]);
+            Ad::factory()->create(['status' => 'available', 'is_visible' => true, 'price' => 300000]);
+            Ad::factory()->create(['status' => 'available', 'is_visible' => true, 'price' => 200000]);
+        });
+
+        $response = $this->getJson('/api/v1/ads/feed?per_page=10&sort=price_desc')->assertOk();
+        $prices = collect($response->json('data'))->pluck('price')->map(fn ($p) => (int) $p)->values()->all();
+
+        expect($prices)->toBe(collect($prices)->sortDesc()->values()->all());
+    });
+
     it('orders boosted ads before non-boosted ones (stable tiebreaker)', function (): void {
         $boosted = null;
         Ad::withoutSyncingToSearch(function () use (&$boosted): void {
