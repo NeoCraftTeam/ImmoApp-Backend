@@ -52,3 +52,9 @@ Schedule::command('app:expire-boosted-ads')->hourly();
 
 // — Trust Score nightly recomputation —
 Schedule::command('trustscore:recompute')->dailyAt('02:30');
+
+// — Behavioral relevance-score refresh (Sprint 4.3) —
+// Re-syncs ads whose interaction counts changed in the last 25h to Meilisearch.
+Schedule::command('ads:update-relevance-scores --hours=25')->dailyAt('03:00');
+// Full reindex on Sundays (ensures no stale scores accumulate)
+Schedule::command('ads:update-relevance-scores --all')->weeklyOn(0, '03:00');
