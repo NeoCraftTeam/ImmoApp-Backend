@@ -211,6 +211,8 @@ Route::prefix('v1')->group(function (): void {
         // bounded even for legitimate agents.
         Route::post('/ai/enhance-conditions', 'enhanceConditions')
             ->middleware('throttle:10,1');
+        Route::post('/ai/summarize', 'summarize')
+            ->middleware('throttle:10,1');
         Route::get('/{leaseContract}', 'show')->name('lease-contracts.show');
         Route::put('/{leaseContract}', 'update')->name('lease-contracts.update');
         Route::post('/{ad}/generate', 'store')->name('lease-contracts.generate');

@@ -137,6 +137,40 @@ class AiDescriptionEnhancer
     }
 
     /**
+     * Summarize a lease contract in plain language for the tenant.
+     * Returns 5-8 bullet points covering obligations, key dates, and costs.
+     *
+     * @param  array<string, mixed>  $contract  Keys: monthly_rent, deposit_amount,
+     *                                          start_date, duration_months, special_conditions
+     */
+    public function summarizeLeaseContract(array $contract): string
+    {
+        $lines = [];
+
+        if (!empty($contract['monthly_rent'])) {
+            $lines[] = 'Loyer mensuel : '.number_format((float) $contract['monthly_rent'], 0, ',', ' ').' FCFA';
+        }
+        if (!empty($contract['deposit_amount'])) {
+            $lines[] = 'Caution : '.number_format((float) $contract['deposit_amount'], 0, ',', ' ').' FCFA';
+        }
+        if (!empty($contract['start_date'])) {
+            $lines[] = 'Date de début : '.$contract['start_date'];
+        }
+        if (!empty($contract['duration_months'])) {
+            $lines[] = 'Durée : '.$contract['duration_months'].' mois';
+        }
+        if (!empty($contract['special_conditions'])) {
+            $lines[] = 'Conditions particulières : '.$contract['special_conditions'];
+        }
+
+        if ($lines === []) {
+            return '';
+        }
+
+        return $this->callWithPrompt(implode("\n", $lines), $this->leaseContractSummaryPrompt());
+    }
+
+    /**
      * Enhance a newsletter campaign body to be engaging and professional.
      *
      * Preserves a SAFE subset of HTML formatting and sanitises the LLM output via
@@ -185,6 +219,112 @@ class AiDescriptionEnhancer
             ->forceAttribute('a', 'target', '_blank');
 
         return new HtmlSanitizer($config)->sanitize($html);
+    }
+
+    /**
+     * Stream the enhanced description token-by-token via SSE.
+     *
+     * Calls `$onChunk` with each text delta as it arrives from the first
+     * available OpenAI-compatible provider (stream:true). Falls back to the
+     * non-streaming path if no streaming-capable provider is available or if
+     * the stream errors — in that case `$onChunk` is called once with the
+     * full result.
+     *
+     * @param  callable(string): void  $onChunk
+     */
+    public function streamEnhance(string $rawDescription, callable $onChunk): void
+    {
+        if (empty(trim($rawDescription))) {
+            $onChunk($rawDescription);
+
+            return;
+        }
+
+        $systemPrompt = $this->systemPrompt();
+
+        $order = array_values(array_unique(array_filter([
+            $this->activeProvider,
+            ...array_keys($this->providers),
+        ])));
+
+        foreach ($order as $name) {
+            $cfg = $this->providers[$name] ?? null;
+            if ($cfg === null || !$this->isValidKey($cfg['api_key'])) {
+                continue;
+            }
+
+            if ($name === 'gemini') {
+                continue; // Gemini streaming differs — skip to fallback
+            }
+
+            $streamed = $this->streamOpenAiCompatible($rawDescription, $cfg, $systemPrompt, $name, $onChunk);
+
+            if ($streamed) {
+                return;
+            }
+        }
+
+        // Fallback: non-streaming, emit full result in one chunk
+        $result = $this->callWithPrompt($rawDescription, $systemPrompt);
+        $onChunk($result);
+    }
+
+    /**
+     * Stream tokens from an OpenAI-compatible endpoint using `stream: true`.
+     * Returns true on success, false on transient failure (caller tries next provider).
+     *
+     * @param  array{api_key: string, model: string, base_url: string}  $config
+     * @param  callable(string): void  $onChunk
+     */
+    private function streamOpenAiCompatible(string $text, array $config, string $systemPrompt, string $providerName, callable $onChunk): bool
+    {
+        try {
+            $response = Http::withToken($config['api_key'])
+                ->timeout(60)
+                ->withOptions(['stream' => true])
+                ->post($config['base_url'], [
+                    'model' => $config['model'],
+                    'messages' => [
+                        ['role' => 'system', 'content' => $systemPrompt],
+                        ['role' => 'user',   'content' => $text],
+                    ],
+                    'max_tokens' => 700,
+                    'temperature' => 0.7,
+                    'stream' => true,
+                ]);
+
+            if ($response->failed()) {
+                Log::warning('AI ('.$providerName.') stream failed', ['status' => $response->status()]);
+
+                return false;
+            }
+
+            foreach (explode("\n", $response->body()) as $line) {
+                $line = trim($line);
+
+                if (!str_starts_with($line, 'data: ')) {
+                    continue;
+                }
+
+                $data = substr($line, 6);
+
+                if ($data === '[DONE]') {
+                    break;
+                }
+
+                $delta = json_decode($data, true)['choices'][0]['delta']['content'] ?? null;
+
+                if ($delta !== null && $delta !== '') {
+                    $onChunk($delta);
+                }
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('AI ('.$providerName.') stream exception: '.$e->getMessage());
+
+            return false;
+        }
     }
 
     /**
@@ -504,6 +644,27 @@ RÈGLES STRICTES :
 - Ne jamais être vague : cite des éléments précis de l'annonce analysée.
 - Longueur : 80 à 180 mots au total.
 - Renvoie UNIQUEMENT le motif de refus, sans titre, sans introduction type "Voici mon analyse :", sans commentaire.
+PROMPT;
+    }
+
+    private function leaseContractSummaryPrompt(): string
+    {
+        return <<<'PROMPT'
+Tu es un assistant juridique expert en droit immobilier pour la plateforme KeyHome (Afrique centrale, principalement Cameroun).
+
+TON UNIQUE RÔLE : à partir des données chiffrées d'un contrat de bail, rédiger un résumé clair et compréhensible destiné au locataire, en langage courant (non juridique).
+
+STRUCTURE ATTENDUE :
+- Produis exactement 5 à 8 points sous forme de liste.
+- Chaque point commence par un emoji pertinent suivi d'un espace, puis une phrase courte (15 mots max).
+- Couvre obligatoirement : montant du loyer, caution, durée, date d'entrée, règles importantes des conditions particulières.
+
+RÈGLES STRICTES :
+- Rédige UNIQUEMENT en français courant, accessible à tous.
+- N'invente AUCUNE information absente des données fournies.
+- N'utilise pas de jargon juridique (pas de "bailliage", "locataire susmentionné", etc.).
+- Renvoie UNIQUEMENT la liste, sans titre, sans introduction, sans conclusion.
+- N'utilise PAS de Markdown (pas de **, *, #) — juste les emojis et le texte.
 PROMPT;
     }
 

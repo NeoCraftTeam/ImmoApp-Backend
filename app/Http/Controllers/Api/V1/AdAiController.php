@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Services\AiDescriptionEnhancer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class AdAiController
 {
@@ -134,5 +135,38 @@ final class AdAiController
         $enhanced = app(AiDescriptionEnhancer::class)->enhanceTitle($data['title'], $context);
 
         return response()->json(['enhanced' => $enhanced]);
+    }
+
+    /**
+     * Stream the AI-enhanced description as Server-Sent Events.
+     * Each SSE event carries a `delta` key with the next token chunk.
+     * A final `event: done` signals end-of-stream.
+     */
+    public function stream(Request $request): StreamedResponse
+    {
+        $request->validate([
+            'description' => ['required', 'string', 'max:10000'],
+        ]);
+
+        $description = $request->input('description');
+
+        return response()->stream(function () use ($description): void {
+            app(AiDescriptionEnhancer::class)->streamEnhance(
+                $description,
+                function (string $chunk): void {
+                    echo 'data: '.json_encode(['delta' => $chunk])."\n\n";
+                    ob_flush();
+                    flush();
+                }
+            );
+
+            echo "event: done\ndata: {}\n\n";
+            ob_flush();
+            flush();
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'X-Accel-Buffering' => 'no',
+        ]);
     }
 }

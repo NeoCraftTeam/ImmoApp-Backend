@@ -50,6 +50,8 @@ Route::prefix('ads')->middleware('optional.auth')->group(function (): void {
             ->middleware('throttle:10,1');
         Route::post('/ai/enhance-title', [AdAiController::class, 'enhanceTitle'])
             ->middleware('throttle:20,1');
+        Route::post('/ai/stream-enhance', [AdAiController::class, 'stream'])
+            ->middleware('throttle:10,1');
 
         // Geo proximity — authenticated
         Route::get('/{user}/nearby', [AdGeoController::class, 'ads_nearby_user']);

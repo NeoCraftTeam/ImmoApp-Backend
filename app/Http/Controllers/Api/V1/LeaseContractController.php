@@ -104,6 +104,26 @@ final class LeaseContractController
         return response()->json(['enhanced' => $enhanced]);
     }
 
+    /**
+     * Summarize a lease contract in plain language for the tenant.
+     */
+    public function summarize(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'monthly_rent' => ['nullable', 'numeric', 'min:0'],
+            'deposit_amount' => ['nullable', 'numeric', 'min:0'],
+            'start_date' => ['nullable', 'string', 'max:30'],
+            'duration_months' => ['nullable', 'integer', 'min:1'],
+            'special_conditions' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $summary = app(AiDescriptionEnhancer::class)->summarizeLeaseContract(
+            array_filter($data, fn ($v) => $v !== null)
+        );
+
+        return response()->json(['summary' => $summary]);
+    }
+
     public function store(GenerateLeaseContractRequest $request, Ad $ad): JsonResponse
     {
         if ($ad->user_id !== auth()->id()) {
