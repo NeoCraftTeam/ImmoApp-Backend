@@ -10,8 +10,10 @@ use App\Http\Controllers\Api\V1\AdGeoController;
 use App\Http\Controllers\Api\V1\AdImageSearchController;
 use App\Http\Controllers\Api\V1\AdInteractionController;
 use App\Http\Controllers\Api\V1\AdPdfController;
+use App\Http\Controllers\Api\V1\AdRankEstimateController;
 use App\Http\Controllers\Api\V1\AdReportController;
 use App\Http\Controllers\Api\V1\AdSearchController;
+use App\Http\Controllers\Api\V1\AdSimilarController;
 use App\Http\Controllers\Api\V1\AdStatusController;
 use App\Http\Controllers\Api\V1\KeyScoreController;
 use App\Http\Controllers\Api\V1\MyAdsController;
@@ -141,6 +143,14 @@ Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner', 'token.role
 // KeyScore
 Route::get('/ads/{ad}/keyscore', [KeyScoreController::class, 'show'])
     ->middleware('throttle:60,1');
+
+// Rank estimate — owner/admin only (auth enforced in controller)
+Route::get('/ads/{ad}/rank-estimate', AdRankEstimateController::class)
+    ->middleware(['auth:sanctum', 'throttle:30,1']);
+
+// Similar ads (public — roadmap 3.3)
+Route::get('/ads/{ad}/similar', AdSimilarController::class)
+    ->middleware(['optional.auth', 'throttle:60,1', 'cdn.cache:300']);
 
 // Neighborhood scorecard (OSM Overpass — cached 7d server-side, also CDN-cached
 // 1h at the edge for guests so concurrent visits don't hit Overpass at all).

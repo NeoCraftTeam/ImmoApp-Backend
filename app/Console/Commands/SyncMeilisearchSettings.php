@@ -10,7 +10,7 @@ use Symfony\Component\Console\Command\Command as CommandAlias;
 
 class SyncMeilisearchSettings extends Command
 {
-    protected $signature = 'meilisearch:sync-settings';
+    protected $signature = 'meilisearch:sync-settings {--skip-embedder : Skip embedder update (faster for attribute-only syncs)}';
 
     protected $description = 'Synchronize Meilisearch filterable and sortable attributes';
 
@@ -24,8 +24,10 @@ class SyncMeilisearchSettings extends Command
             $this->info('🔧 Mise à jour des attributs filtrables...');
             $index->updateFilterableAttributes([
                 'status', 'is_visible', 'city', 'type', 'type_id', 'quarter_id',
+                'city_id', 'transaction_type',
                 'bedrooms', 'bathrooms', 'price', 'surface_area',
                 'has_parking', 'has_3d_tour', 'is_verified', 'is_boosted',
+                'relevance_score',
                 '_geo', 'attributes',
             ]);
 
@@ -55,6 +57,38 @@ class SyncMeilisearchSettings extends Command
                 'et', 'en', 'à', 'au', 'aux', 'sur', 'par', 'pour', 'avec',
                 'dans', 'qui', 'que', 'je', 'est', 'pas', 'plus', 'très',
             ]);
+
+            // ── 3.1 Embedder multilingue (Cohere embed-multilingual-v3.0) ────────
+            // Only configured when COHERE_API_KEY is set in .env.
+            // Use --skip-embedder to avoid touching this during routine re-syncs.
+            if (!$this->option('skip-embedder')) {
+                $cohereKey = (string) config('services.cohere.api_key', '');
+
+                if ($cohereKey !== '') {
+                    $this->info('🤖 Configuration de l\'embedder multilingue (Cohere)...');
+
+                    $index->updateEmbedders([
+                        'default' => [
+                            'source' => 'rest',
+                            'url' => 'https://api.cohere.ai/v1/embed',
+                            'apiKey' => $cohereKey,
+                            'dimensions' => 1024,
+                            'inputType' => 'search_document',
+                            'documentTemplate' => 'Annonce à {{doc.quarter_name}}, {{doc.city_name}} : {{doc.title}}. {{doc.description}} Type: {{doc.ad_type_name}}. Prix: {{doc.price}} FCFA. Transaction: {{doc.transaction_type}}.',
+                            'request' => [
+                                'texts' => ['{{text}}'],
+                                'model' => 'embed-multilingual-v3.0',
+                                'input_type' => 'search_document',
+                            ],
+                            'response' => [
+                                'embeddings' => ['{{embeddings[0]}}'],
+                            ],
+                        ],
+                    ]);
+                } else {
+                    $this->line('ℹ️  COHERE_API_KEY non défini — embedder ignoré. Définissez-le pour activer la recherche hybride.');
+                }
+            }
 
             $this->info('✅ Configuration Meilisearch synchronisée avec succès !');
 

@@ -135,6 +135,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Cohere — Embedder multilingue pour la recherche hybride Meilisearch (3.1)
+    |--------------------------------------------------------------------------
+    | Set COHERE_API_KEY to enable hybrid semantic search via
+    | embed-multilingual-v3.0. When empty, AdSearchController falls back to
+    | keyword-only search and meilisearch:sync-settings skips the embedder.
+    */
+    'cohere' => [
+        'api_key' => env('COHERE_API_KEY', ''),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | SMS — Orange SMS API (primary, Afrique) + Twilio (fallback)
     |--------------------------------------------------------------------------
     | Set SMS_PROVIDER=orange or SMS_PROVIDER=twilio.
