@@ -46,6 +46,10 @@ Route::prefix('ads')->middleware('optional.auth')->group(function (): void {
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/ai/enhance-description', AdAiController::class)
             ->middleware('throttle:10,1');
+        Route::post('/ai/generate-from-attributes', [AdAiController::class, 'generateFromAttributes'])
+            ->middleware('throttle:10,1');
+        Route::post('/ai/enhance-title', [AdAiController::class, 'enhanceTitle'])
+            ->middleware('throttle:20,1');
 
         // Geo proximity — authenticated
         Route::get('/{user}/nearby', [AdGeoController::class, 'ads_nearby_user']);

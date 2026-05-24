@@ -76,6 +76,67 @@ class AiDescriptionEnhancer
     }
 
     /**
+     * Generate a real-estate ad description from property attributes (no existing text needed).
+     *
+     * @param  array<string, mixed>  $attributes  Keys: type, city, quarter, bedrooms, surface,
+     *                                            price, transaction_type, notes (optional free text)
+     */
+    public function generateFromAttributes(array $attributes): string
+    {
+        $context = $this->buildAttributesContext($attributes);
+
+        if (trim($context) === '') {
+            return '';
+        }
+
+        return $this->callWithPrompt($context, $this->generateFromAttributesPrompt());
+    }
+
+    /**
+     * Enhance a short ad title to be concise, catchy and factual (6-12 words).
+     *
+     * @param  array<string, mixed>  $context  Optional metadata: type, city, transaction_type
+     */
+    public function enhanceTitle(string $rawTitle, array $context = []): string
+    {
+        if (trim($rawTitle) === '') {
+            return $rawTitle;
+        }
+
+        $contextLine = '';
+        if (!empty($context)) {
+            $parts = [];
+            if (!empty($context['type'])) {
+                $parts[] = 'Type : '.$context['type'];
+            }
+            if (!empty($context['city'])) {
+                $parts[] = 'Ville : '.$context['city'];
+            }
+            if (!empty($context['transaction_type'])) {
+                $parts[] = 'Transaction : '.$context['transaction_type'];
+            }
+            if ($parts !== []) {
+                $contextLine = "\nContexte : ".implode(' | ', $parts);
+            }
+        }
+
+        return $this->callWithPrompt($rawTitle.$contextLine, $this->titlePrompt());
+    }
+
+    /**
+     * Diagnose an ad and propose a structured rejection reason (admin helper).
+     * The AI reads the ad content and returns a ready-to-send rejection message.
+     *
+     * @param  array<string, mixed>  $ad  Keys: title, description, price, photos_count, type
+     */
+    public function diagnoseAdForRejection(array $ad): string
+    {
+        $summary = $this->buildAdSummaryForDiagnosis($ad);
+
+        return $this->callWithPrompt($summary, $this->diagnosisPrompt());
+    }
+
+    /**
      * Enhance a newsletter campaign body to be engaging and professional.
      *
      * Preserves a SAFE subset of HTML formatting and sanitises the LLM output via
@@ -383,5 +444,111 @@ RÈGLES STRICTES :
 - N'ajoute PAS de clauses types ou standards non mentionnées par le propriétaire.
 - N'utilise PAS de hashtags, d'emojis ou de mise en forme spéciale.
 PROMPT;
+    }
+
+    private function generateFromAttributesPrompt(): string
+    {
+        return <<<'PROMPT'
+Tu es un rédacteur expert UNIQUEMENT en annonces immobilières pour la plateforme KeyHome (Afrique centrale, principalement Cameroun).
+
+TON UNIQUE RÔLE : générer une description d'annonce immobilière professionnelle à partir des caractéristiques techniques d'un bien fournies par le propriétaire.
+
+STRUCTURE ATTENDUE (très importante) :
+- Produis 2 à 3 PARAGRAPHES distincts, séparés par UNE ligne vide.
+- 1er paragraphe — VUE D'ENSEMBLE : le bien, sa nature, sa localisation telle que fournie, en 2 à 4 phrases.
+- 2e paragraphe — INTÉRIEUR & ESPACES : pièces, surface, agencement, équipements mentionnés, en 3 à 5 phrases.
+- 3e paragraphe (si assez d'éléments) — ENVIRONNEMENT & ATOUTS : accessibilité, voisinage, public cible, en 2 à 3 phrases.
+
+RÈGLES STRICTES :
+- Rédige UNIQUEMENT en français, naturel, chaleureux et professionnel.
+- N'INVENTE JAMAIS de détails absents de la liste fournie. Si une information n'est pas fournie, ne la mentionne pas.
+- Utilise 100 % des attributs fournis.
+- Longueur : 150 à 280 mots au total.
+- Renvoie UNIQUEMENT le texte généré, sans titres de section, sans introduction, sans commentaire.
+- N'utilise PAS d'emojis, de hashtags, de listes à puces ni de balisage Markdown/HTML.
+PROMPT;
+    }
+
+    private function titlePrompt(): string
+    {
+        return <<<'PROMPT'
+Tu es un rédacteur expert UNIQUEMENT en titres d'annonces immobilières pour la plateforme KeyHome (Afrique centrale, principalement Cameroun).
+
+TON UNIQUE RÔLE : améliorer ou générer un titre d'annonce immobilière concis, accrocheur et factuel.
+
+RÈGLES STRICTES :
+- Produis UN SEUL titre, de 6 à 12 mots maximum.
+- Le titre doit mentionner au minimum : le type de bien + un atout différenciant (quartier, surface, vue, équipement clé).
+- Ne jamais commencer par "Beau", "Magnifique", "Superbe", "Exceptionnel" (clichés).
+- Préfère les titres directs et informatifs : "Appartement F3 meublé – Bastos, Yaoundé" est meilleur que "Magnifique appartement à saisir".
+- Rédige UNIQUEMENT en français.
+- Renvoie UNIQUEMENT le titre amélioré, sans guillemets, sans ponctuation finale, sans explication.
+- Conserve les faits fournis (type, ville, surface, etc.) ; n'invente rien.
+PROMPT;
+    }
+
+    private function diagnosisPrompt(): string
+    {
+        return <<<'PROMPT'
+Tu es un modérateur expert en annonces immobilières pour la plateforme KeyHome (Afrique centrale, principalement Cameroun).
+
+TON UNIQUE RÔLE : analyser le contenu d'une annonce soumise pour modération et rédiger un motif de refus structuré, professionnel et constructif à destination du propriétaire.
+
+STRUCTURE ATTENDUE :
+- 1er paragraphe : Indique clairement et poliment les raisons du refus (1 à 3 raisons maximum).
+- 2e paragraphe : Explique ce que le propriétaire doit corriger ou compléter pour que l'annonce soit acceptée.
+
+RÈGLES STRICTES :
+- Rédige UNIQUEMENT en français, avec un ton professionnel, bienveillant et constructif.
+- Base ton analyse UNIQUEMENT sur les informations de l'annonce fournies. Ne suppose rien.
+- Ne jamais être vague : cite des éléments précis de l'annonce analysée.
+- Longueur : 80 à 180 mots au total.
+- Renvoie UNIQUEMENT le motif de refus, sans titre, sans introduction type "Voici mon analyse :", sans commentaire.
+PROMPT;
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function buildAttributesContext(array $attributes): string
+    {
+        $lines = [];
+
+        $map = [
+            'transaction_type' => 'Transaction',
+            'type' => 'Type de bien',
+            'city' => 'Ville',
+            'quarter' => 'Quartier',
+            'bedrooms' => 'Chambres',
+            'surface' => 'Surface (m²)',
+            'price' => 'Prix (FCFA)',
+            'notes' => 'Notes libres du propriétaire',
+        ];
+
+        foreach ($map as $key => $label) {
+            $value = $attributes[$key] ?? null;
+            if ($value !== null && $value !== '') {
+                $lines[] = $label.' : '.$value;
+            }
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array<string, mixed>  $ad
+     */
+    private function buildAdSummaryForDiagnosis(array $ad): string
+    {
+        $lines = [
+            'ANNONCE À ANALYSER :',
+            'Titre : '.($ad['title'] ?? '(absent)'),
+            'Type de bien : '.($ad['type'] ?? '(absent)'),
+            'Description : '.($ad['description'] ?? '(absente)'),
+            'Prix indiqué : '.($ad['price'] ?? '(absent)'),
+            'Nombre de photos : '.($ad['photos_count'] ?? '0'),
+        ];
+
+        return implode("\n", $lines);
     }
 }
