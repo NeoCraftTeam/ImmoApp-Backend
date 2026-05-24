@@ -39,8 +39,10 @@ Schedule::command('gdpr:anonymize-deleted')->dailyAt('03:15');
 // Step 2: hard-delete anonymized records after 2-year retention threshold
 Schedule::command('app:purge-expired-data')->dailyAt('03:30');
 
-// — Smart notification digests —
-Schedule::command('app:send-search-alert-digests')->twiceDaily(8, 18);
+// — Smart notification digests (frequency-aware) —
+Schedule::command('app:send-search-alert-digests --frequency=immediate')->twiceDaily(8, 18);
+Schedule::command('app:send-search-alert-digests --frequency=daily')->dailyAt('08:00');
+Schedule::command('app:send-search-alert-digests --frequency=weekly')->weeklyOn(1, '08:00');
 
 // — Behavioral retention push notifications —
 Schedule::command('app:send-retention-pushes')->twiceDaily(9, 18);

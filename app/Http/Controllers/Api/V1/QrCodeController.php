@@ -251,11 +251,11 @@ final readonly class QrCodeController
                 ? $media->getPath('large')
                 : $media->getPath();
 
-            if (! is_file($path)) {
+            if (!is_file($path)) {
                 $path = $media->getPath();
             }
 
-            if (! is_file($path)) {
+            if (!is_file($path)) {
                 return null;
             }
 

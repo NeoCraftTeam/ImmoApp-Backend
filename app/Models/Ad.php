@@ -338,6 +338,9 @@ class Ad extends Model implements HasMedia
             // Fallback to 0 if the withAvg/withCount was not applied (e.g. single-model scout index).
             'reviews_avg_rating' => (float) ($this->reviews_avg_rating ?? 0),
             'views_count' => (int) ($this->views_count ?? 0),
+            'unlocked_count' => (int) ($this->unlocked_count ?? 0),
+            'contact_count' => (int) ($this->contact_count ?? 0),
+            'relevance_score' => $this->computeRelevanceScore(),
 
             // Boost
             'is_boosted' => (bool) $this->is_boosted,
@@ -547,6 +550,8 @@ class Ad extends Model implements HasMedia
             ->withAvg('reviews', 'rating')
             ->withCount([
                 'interactions as views_count' => fn (Builder $q) => $q->where('type', 'view'),
+                'interactions as unlocked_count' => fn (Builder $q) => $q->where('type', 'unlock'),
+                'interactions as contact_count' => fn (Builder $q) => $q->whereIn('type', ['contact', 'whatsapp']),
             ]);
     }
 
@@ -652,6 +657,37 @@ class Ad extends Model implements HasMedia
             'boost_score' => 0,
             'boost_expires_at' => null,
         ])->save();
+    }
+
+    /**
+     * Relevance score for Meilisearch custom ranking (0–100).
+     *
+     * Formula:
+     *   CTR      = unlocked_count / max(views_count, 1)       → weight 40
+     *   Rating   = reviews_avg_rating / 5                     → weight 30
+     *   Boost    = ×1.5 multiplier if currently boosted       → weight 30
+     *   Behavior = (contact_count / max(views_count, 1)) × 10 → bonus up to 10
+     *
+     * Scores are clamped to [0, 100].
+     */
+    public function computeRelevanceScore(): int
+    {
+        $views = max((int) ($this->views_count ?? 0), 1);
+        $unlocks = (int) ($this->unlocked_count ?? 0);
+        $rating = (float) ($this->reviews_avg_rating ?? 0);
+        $contacts = (int) ($this->contact_count ?? 0);
+
+        $ctr = min($unlocks / $views, 1.0);
+        $ratingN = min($rating / 5.0, 1.0);
+        $behavior = min($contacts / $views, 1.0);
+
+        $base = $ctr * 40 + $ratingN * 30 + $behavior * 10;
+
+        if ($this->isBoosted()) {
+            $base *= 1.5;
+        }
+
+        return (int) min(round($base), 100);
     }
 
     /**

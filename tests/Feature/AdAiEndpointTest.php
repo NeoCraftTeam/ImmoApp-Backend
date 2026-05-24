@@ -13,8 +13,8 @@ uses(RefreshDatabase::class);
 function makeOwner(): User
 {
     return User::factory()->agents()->create([
-        'is_active'          => true,
-        'email_verified_at'  => now(),
+        'is_active' => true,
+        'email_verified_at' => now(),
     ]);
 }
 
@@ -76,9 +76,9 @@ it('enhance-title returns enhanced title', function (): void {
 
     $this->actingAs($owner, 'sanctum')
         ->postJson('/api/v1/ads/ai/enhance-title', [
-            'title'            => 'Appart meublé bastos',
-            'type'             => 'Appartement',
-            'city'             => 'Yaoundé',
+            'title' => 'Appart meublé bastos',
+            'type' => 'Appartement',
+            'city' => 'Yaoundé',
             'transaction_type' => 'location',
         ])
         ->assertOk()
@@ -108,12 +108,12 @@ it('generate-from-attributes returns generated description', function (): void {
 
     $this->actingAs($owner, 'sanctum')
         ->postJson('/api/v1/ads/ai/generate-from-attributes', [
-            'type'             => 'Villa',
-            'city'             => 'Douala',
-            'quarter'          => 'Bonamoussadi',
-            'bedrooms'         => 4,
-            'surface'          => 200,
-            'price'            => 500000,
+            'type' => 'Villa',
+            'city' => 'Douala',
+            'quarter' => 'Bonamoussadi',
+            'bedrooms' => 4,
+            'surface' => 200,
+            'price' => 500000,
             'transaction_type' => 'location',
         ])
         ->assertOk()

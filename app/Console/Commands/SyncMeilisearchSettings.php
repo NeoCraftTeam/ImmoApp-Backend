@@ -31,7 +31,19 @@ class SyncMeilisearchSettings extends Command
 
             $this->info('📊 Mise à jour des attributs triables...');
             $index->updateSortableAttributes([
-                'price', 'surface_area', 'created_at', 'boost_score', 'reviews_avg_rating', 'views_count',
+                'price', 'surface_area', 'created_at', 'boost_score',
+                'reviews_avg_rating', 'views_count', 'relevance_score',
+            ]);
+
+            $this->info('🏆 Mise à jour du ranking personnalisé...');
+            $index->updateRankingRules([
+                'words',
+                'typo',
+                'proximity',
+                'attribute',
+                'sort',
+                'exactness',
+                'desc(relevance_score)',
             ]);
 
             $this->info('🔤 Mise à jour des synonymes FR-CM...');

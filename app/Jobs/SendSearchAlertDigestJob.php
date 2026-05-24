@@ -36,14 +36,18 @@ final class SendSearchAlertDigestJob implements ShouldQueue
 
     public int $timeout = 60;
 
-    public function __construct(public readonly User $user) {}
+    public function __construct(
+        public readonly User $user,
+        public readonly string $frequency = 'immediate',
+    ) {}
 
     public function handle(AiDigestService $aiDigest): void
     {
-        // Load pending matches with their relationships in one query.
+        // Load pending matches for this user + frequency in one query.
         $matches = SearchAlertMatch::query()
             ->pending()
             ->where('user_id', $this->user->id)
+            ->whereHas('searchAlert', fn ($q) => $q->where('frequency', $this->frequency))
             ->with(['searchAlert', 'ad.quarter.city'])
             ->orderBy('matched_at')
             ->get();

@@ -270,6 +270,7 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('auth:sanctum')->prefix('search-alerts')->group(function (): void {
         Route::get('/', [SearchAlertController::class, 'index']);
         Route::post('/', [SearchAlertController::class, 'store'])->middleware('throttle:20,1');
+        Route::post('/preview-count', [SearchAlertController::class, 'previewCount'])->middleware('throttle:30,1');
         Route::put('/{searchAlert}', [SearchAlertController::class, 'update']);
         Route::delete('/{searchAlert}', [SearchAlertController::class, 'destroy']);
     });

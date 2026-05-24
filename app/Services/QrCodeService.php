@@ -77,7 +77,7 @@ final readonly class QrCodeService
             'outputBase64' => false,
         ]);
 
-        return 'data:image/png;base64,'.base64_encode(new QRCode($opts)->render($targetUrl));
+        return 'data:image/png;base64,'.base64_encode((string) new QRCode($opts)->render($targetUrl));
     }
 
     /**

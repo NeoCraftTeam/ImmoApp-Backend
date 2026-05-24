@@ -28,6 +28,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property bool $is_active
  * @property bool $notify_email
  * @property bool $notify_push
+ * @property string $frequency immediate|daily|weekly
  * @property Carbon|null $last_notified_at
  * @property Carbon $created_at
  * @property Carbon $updated_at
@@ -53,6 +54,7 @@ final class SearchAlert extends Model
         'is_active',
         'notify_email',
         'notify_push',
+        'frequency',
         'last_notified_at',
     ];
 

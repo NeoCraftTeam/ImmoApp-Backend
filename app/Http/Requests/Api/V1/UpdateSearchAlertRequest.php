@@ -32,6 +32,7 @@ final class UpdateSearchAlertRequest extends FormRequest
             'is_active' => ['nullable', 'boolean'],
             'notify_email' => ['nullable', 'boolean'],
             'notify_push' => ['nullable', 'boolean'],
+            'frequency' => ['nullable', 'string', 'in:immediate,daily,weekly'],
         ];
     }
 }
