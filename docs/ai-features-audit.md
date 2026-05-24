@@ -11,9 +11,9 @@ et modération proactive. 6 améliorations haute priorité identifiées.
 
 | Feature | État actuel | Score percutance |
 |---------|------------|-----------------|
-| AI Enhancer (annonces) | ✅ Description seule, pas de titre, pas d'undo, pas de génération à froid | 4/10 |
-| AI Rejection (admin) | ✅ Reformule le texte admin, mais pas de diagnostic proactif ni templates | 5/10 |
-| AI Bail (contrats) | ✅ Améliore les conditions, pas de templates camerounais, pas de résumé | 5/10 |
+| AI Enhancer (annonces) | ✅ Titre, description, génération à froid, undo, streaming SSE | 9/10 |
+| AI Rejection (admin) | ✅ Diagnostic proactif, templates de refus rapides | 9/10 |
+| AI Bail (contrats) | ✅ Templates clauses, résumé locataire, undo | 9/10 |
 
 ---
 
@@ -145,8 +145,8 @@ pour que le locataire comprenne ses obligations avant de signer.
 | 4 | Admin: chips refus rapides | Rejection | 🔴 Critique | 1h | ✅ Implémenté |
 | 5 | Admin: `diagnoseAdForRejection()` | Rejection | 🔴 Critique | 2h | ✅ Implémenté |
 | 6 | Contrats: clause templates chips | Bail | 🔴 Critique | 1h | ✅ Implémenté |
-| 7 | `summarizeLeaseContract()` | Bail | 🟡 Moyen | 2h | 🕐 V2 |
-| 8 | Streaming SSE pour enhance | Annonces | 🟡 Moyen | 4h | 🕐 V2 |
+| 7 | `summarizeLeaseContract()` | Bail | 🟡 Moyen | 2h | ✅ Implémenté |
+| 8 | Streaming SSE pour enhance | Annonces | 🟡 Moyen | 4h | ✅ Implémenté |
 | 9 | Analyse photos → description | Annonces | 🟢 Nice-to-have | 6h | 🕐 V3 |
 | 10 | Score confiance modération | Rejection | 🟡 Moyen | 8h | 🕐 V2 |
 
