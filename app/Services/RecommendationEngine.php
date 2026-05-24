@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Contracts\RecommendationEngineInterface;
 use App\Enums\AdStatus;
+use App\Http\Controllers\Api\V1\AdController;
 use App\Http\Controllers\Api\V1\RecommendationController;
 use App\Models\Ad;
 use App\Models\AdInteraction;
@@ -29,7 +30,12 @@ use Illuminate\Support\Facades\Cache;
  *   - Boosted ads
  *   - Latest ads
  *
+ * Feed re-ranking: scoreCandidates() + getUserProfile() are public so that
+ * AdController::feed() can apply two-stage ranking (SQL candidate fetch →
+ * in-memory re-score) for authenticated users without loading the full catalog.
+ *
  * @see RecommendationController
+ * @see AdController::feed()
  */
 final class RecommendationEngine implements RecommendationEngineInterface
 {
@@ -104,7 +110,103 @@ final class RecommendationEngine implements RecommendationEngineInterface
     }
 
     // ══════════════════════════════════════════════════════════════════
-    // USER PROFILE
+    // PUBLIC HELPERS (reused by AdController::feed two-stage ranking)
+    // ══════════════════════════════════════════════════════════════════
+
+    /**
+     * Return the user's preference profile (or null for cold-start users).
+     *
+     * Public so AdController::feed() can call it for two-stage ranking
+     * without duplicating the profile-building logic.
+     *
+     * @return array{
+     *   type_weights: array<int|string, float>,
+     *   city_weights: array<int|string, float>,
+     *   avg_price: float,
+     *   min_price: float,
+     *   max_price: float,
+     *   seen_ad_ids: array<int, int|string>
+     * }|null
+     */
+    public function getUserProfile(User $user): ?array
+    {
+        return $this->buildUserProfile($user);
+    }
+
+    /**
+     * Re-score a candidate collection using the user's profile and return
+     * them sorted by descending relevance score.
+     *
+     * Designed for two-stage feed ranking:
+     *   Stage 1 — SQL fetches N candidates ordered by boost+date
+     *   Stage 2 — this method re-ranks them by personalised score
+     *
+     * Falls back to the original collection order when $profile is null
+     * (guest or cold-start user).
+     *
+     * @param  Collection<int, Ad>  $candidates
+     * @param  array<string, mixed>|null  $profile  from getUserProfile()
+     * @return \Illuminate\Support\Collection<int, Ad>
+     */
+    public function scoreCandidates(Collection $candidates, ?array $profile): \Illuminate\Support\Collection
+    {
+        if ($profile === null || $candidates->isEmpty()) {
+            return $candidates;
+        }
+
+        $popularityMap = $this->getPopularityMap();
+
+        $maxTypeWeight = max($profile['type_weights'] ?: [1]);
+        $maxCityWeight = max($profile['city_weights'] ?: [1]);
+        $maxPopularity = max($popularityMap ?: [1]);
+
+        $freshestDate = $candidates->max('created_at') ?? now();
+        $oldestDate = $candidates->min('created_at') ?? now()->subMonth();
+        $dateRange = max(1, $freshestDate->diffInSeconds($oldestDate));
+
+        $scored = $candidates->map(function (Ad $ad) use ($profile, $popularityMap, $maxTypeWeight, $maxCityWeight, $maxPopularity, $freshestDate, $dateRange): array {
+            $score = 0.0;
+
+            // 1. Type match (0–40)
+            $typeWeight = $profile['type_weights'][$ad->type_id] ?? 0;
+            $score += self::W_TYPE * ($typeWeight / $maxTypeWeight);
+
+            // 2. City match (0–25)
+            $cityId = $ad->quarter?->city_id;
+            $cityWeight = $cityId ? ($profile['city_weights'][$cityId] ?? 0) : 0;
+            $score += self::W_CITY * ($cityWeight / $maxCityWeight);
+
+            // 3. Budget fit (0–20): gaussian curve centered on avg_price
+            $price = (float) $ad->price;
+            if ($price > 0 && $profile['avg_price'] > 0) {
+                $sigma = ($profile['max_price'] - $profile['min_price']) / 4;
+                $diff = abs($price - $profile['avg_price']);
+                $score += self::W_BUDGET * exp(-0.5 * ($diff / max($sigma, 1)) ** 2);
+            }
+
+            // 4. Freshness (0–10)
+            $ageSeconds = max(0, $freshestDate->diffInSeconds($ad->created_at));
+            $score += self::W_FRESHNESS * (1 - $ageSeconds / $dateRange);
+
+            // 5. Popularity (0–5)
+            $score += self::W_POPULARITY * (($popularityMap[$ad->id] ?? 0) / max($maxPopularity, 1));
+
+            // Boost bonus
+            if ($ad->isBoosted()) {
+                $score += self::BOOST_BONUS;
+            }
+
+            return ['ad' => $ad, 'score' => round($score, 2)];
+        });
+
+        return $scored
+            ->sortByDesc('score')
+            ->pluck('ad')
+            ->values();
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // USER PROFILE (private implementation)
     // ══════════════════════════════════════════════════════════════════
 
     /**

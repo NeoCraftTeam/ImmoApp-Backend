@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use App\Models\Ad;
+use App\Models\AdInteraction;
+use App\Models\AdType;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 
@@ -182,6 +185,56 @@ describe('GET /api/v1/ads/feed — cursor pagination', function (): void {
             ->assertOk();
 
         expect(collect($response->json('data'))->pluck('id'))->not->toContain($excluded);
+    });
+
+    it('re-ranks feed by user profile when authenticated with interaction history', function (): void {
+        $user = User::factory()->create();
+        $type1 = AdType::factory()->create();
+        $type2 = AdType::factory()->create();
+
+        $type1Ads = $type2Ads = null;
+
+        Ad::withoutSyncingToSearch(function () use ($type1, $type2, &$type1Ads, &$type2Ads): void {
+            // type1 ads — older, would normally come later in date-DESC feed
+            $type1Ads = Ad::factory(3)->create([
+                'status' => 'available',
+                'is_visible' => true,
+                'type_id' => $type1->id,
+                'created_at' => now()->subMinutes(10),
+            ]);
+            // type2 ads — newer
+            $type2Ads = Ad::factory(3)->create([
+                'status' => 'available',
+                'is_visible' => true,
+                'type_id' => $type2->id,
+                'created_at' => now()->subMinutes(5),
+            ]);
+        });
+
+        // Strong type1 preference signal so re-ranking reverses the date order
+        $type1Ads->each(function (Ad $ad) use ($user): void {
+            AdInteraction::create([
+                'user_id' => $user->id,
+                'ad_id' => $ad->id,
+                'type' => AdInteraction::TYPE_FAVORITE,
+                'created_at' => now(),
+            ]);
+        });
+
+        $response = $this->actingAs($user)->getJson('/api/v1/ads/feed?per_page=10')->assertOk();
+
+        $returnedIds = collect($response->json('data'))->pluck('id')->values()->all();
+        $type1Ids = $type1Ads->pluck('id')->all();
+        $type2Ids = $type2Ads->pluck('id')->all();
+
+        // First returned ad must be a type1 ad (highest profile score)
+        expect($type1Ids)->toContain($returnedIds[0]);
+
+        // All type1 ads must appear before any type2 ad
+        $firstType2Pos = collect($returnedIds)->search(fn ($id) => in_array($id, $type2Ids, true));
+        $lastType1Pos = collect($returnedIds)->map(fn ($id, $idx) => in_array($id, $type1Ids, true) ? $idx : -1)->max();
+
+        expect($lastType1Pos)->toBeLessThan($firstType2Pos);
     });
 
     it('includes total_approximate in the response', function (): void {

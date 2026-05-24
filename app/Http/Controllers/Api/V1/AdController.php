@@ -13,6 +13,7 @@ use App\Http\Resources\AdResource as AdApiResource;
 use App\Models\Ad;
 use App\Models\AdInteraction;
 use App\Models\User;
+use App\Services\RecommendationEngine;
 use App\Support\AdScoutSync;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -41,6 +42,7 @@ final class AdController
         private LoggerInterface $log,
         private CreateAd $createAdAction,
         private UpdateAd $updateAdAction,
+        private RecommendationEngine $engine,
     ) {}
 
     /**
@@ -174,9 +176,26 @@ final class AdController
             return $ordered->cursorPaginate($perPage);
         };
 
-        $ads = $isFirstPageGuest
+        $paginator = $isFirstPageGuest
             ? Cache::remember("ads:feed:guest:first:pp={$perPage}", 300, $build)
             : $build();
+
+        // Two-stage re-ranking for authenticated users.
+        // Only applied when using the default sort (explicit price sorts take priority
+        // over personalization — the user chose that order intentionally).
+        if (auth()->check() && $sort === 'newest') {
+            /** @var User $authUser */
+            $authUser = auth()->user();
+            $profile = $this->engine->getUserProfile($authUser);
+
+            if ($profile !== null) {
+                $reranked = $this->engine->scoreCandidates(
+                    $paginator->getCollection(),
+                    $profile,
+                );
+                $paginator->setCollection($reranked);
+            }
+        }
 
         /** @var int $total */
         $total = Cache::remember(
@@ -192,7 +211,7 @@ final class AdController
             }
         );
 
-        return AdApiResource::collection($ads)
+        return AdApiResource::collection($paginator)
             ->additional(['total_approximate' => $total]);
     }
 
