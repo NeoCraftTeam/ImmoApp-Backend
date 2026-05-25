@@ -20,6 +20,27 @@ use Illuminate\Http\Request;
  *   1. PATCH  /ads/{ad}/edit-draft           → save()    — store changes in draft_payload
  *   2. POST   /ads/{ad}/edit-draft/apply     → apply()   — promote draft_payload → live ad fields
  *   3. DELETE /ads/{ad}/edit-draft           → discard() — clear draft_payload without publishing
+ *
+ * @OA\Schema(
+ *     schema="DraftPayload",
+ *     type="object",
+ *     description="Champs modifiables en attente de publication. Tous les champs sont optionnels.",
+ *
+ *     @OA\Property(property="title", type="string", example="Appartement F3 Bastos"),
+ *     @OA\Property(property="description", type="string"),
+ *     @OA\Property(property="price", type="number", example=150000),
+ *     @OA\Property(property="price_period", type="string", enum={"mois","jour"}),
+ *     @OA\Property(property="bedrooms", type="integer"),
+ *     @OA\Property(property="bathrooms", type="integer"),
+ *     @OA\Property(property="surface_area", type="number"),
+ *     @OA\Property(property="has_parking", type="boolean"),
+ *     @OA\Property(property="quarter_id", type="string", format="uuid"),
+ *     @OA\Property(property="type_id", type="string", format="uuid"),
+ *     @OA\Property(property="transaction_type", type="string", enum={"location","vente"}),
+ *     @OA\Property(property="latitude", type="number"),
+ *     @OA\Property(property="longitude", type="number"),
+ *     @OA\Property(property="attributes", type="array", @OA\Items(type="string"))
+ * )
  */
 final class AdDraftEditController
 {
@@ -58,6 +79,30 @@ final class AdDraftEditController
 
     /**
      * Save (merge) incoming fields into draft_payload without touching the live ad.
+     *
+     * @OA\Patch(
+     *     path="/api/v1/ads/{ad}/edit-draft",
+     *     summary="Sauvegarder des modifications en brouillon",
+     *     description="Fusionne les champs envoyés dans `draft_payload` sans toucher à l'annonce publiée. Peut être appelé plusieurs fois (merge cumulatif).",
+     *     operationId="saveAdEditDraft",
+     *     tags={"🔄 Brouillons"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, description="UUID de l'annonce", @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\RequestBody(required=true, @OA\JsonContent(ref="#/components/schemas/DraftPayload")),
+     *
+     *     @OA\Response(response=200, description="Brouillon sauvegardé", @OA\JsonContent(
+     *
+     *         @OA\Property(property="success", type="boolean", example=true),
+     *         @OA\Property(property="data", type="object",
+     *             @OA\Property(property="draft_payload", ref="#/components/schemas/DraftPayload")
+     *         )
+     *     )),
+     *
+     *     @OA\Response(response=403, description="Accès refusé"),
+     *     @OA\Response(response=422, description="L'annonce est un brouillon — utilisez le flux standard")
+     * )
      */
     public function save(Request $request, Ad $ad): JsonResponse
     {
@@ -85,6 +130,21 @@ final class AdDraftEditController
 
     /**
      * Promote draft_payload fields to the live ad record.
+     *
+     * @OA\Post(
+     *     path="/api/v1/ads/{ad}/edit-draft/apply",
+     *     summary="Appliquer les modifications brouillon",
+     *     description="Promeut le `draft_payload` sur l'annonce publiée et vide le brouillon. L'annonce est re-validée avant application.",
+     *     operationId="applyAdEditDraft",
+     *     tags={"🔄 Brouillons"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=200, description="Modifications appliquées"),
+     *     @OA\Response(response=422, description="Aucune modification en attente ou données invalides"),
+     *     @OA\Response(response=403, description="Accès refusé")
+     * )
      */
     public function apply(Request $request, Ad $ad): JsonResponse
     {
@@ -133,6 +193,20 @@ final class AdDraftEditController
 
     /**
      * Discard draft_payload without modifying the live ad.
+     *
+     * @OA\Delete(
+     *     path="/api/v1/ads/{ad}/edit-draft",
+     *     summary="Annuler les modifications brouillon",
+     *     description="Vide `draft_payload` sans toucher à l'annonce publiée.",
+     *     operationId="discardAdEditDraft",
+     *     tags={"🔄 Brouillons"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=200, description="Brouillon annulé"),
+     *     @OA\Response(response=403, description="Accès refusé")
+     * )
      */
     public function discard(Request $request, Ad $ad): JsonResponse
     {

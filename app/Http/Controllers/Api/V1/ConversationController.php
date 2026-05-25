@@ -36,6 +36,8 @@ use Illuminate\Http\UploadedFile;
  *  - All methods return 404 (not 403) for conversations belonging to other users (IDOR prevention).
  *  - Encrypted body, body_iv, and sender PII are never returned.
  *  - Rate limiting applied per action (see routes/api.php).
+ *
+ * @OA\Tag(name="💬 Messagerie", description="Chat locataire-bailleur : conversations, messages, pièces jointes, E2EE")
  */
 final readonly class ConversationController
 {
@@ -48,6 +50,18 @@ final readonly class ConversationController
     /**
      * GET /api/v1/conversations
      * Return paginated conversation list for the authenticated user.
+     *
+     * @OA\Get(
+     *     path="/api/v1/conversations",
+     *     summary="Lister mes conversations",
+     *     description="Retourne la liste paginée des conversations de l'utilisateur connecté (en tant que locataire ou bailleur). Triées par dernier message.",
+     *     operationId="listConversations",
+     *     tags={"💬 Messagerie"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Response(response=200, description="Liste des conversations"),
+     *     @OA\Response(response=401, description="Non authentifié")
+     * )
      */
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -62,6 +76,26 @@ final readonly class ConversationController
      * POST /api/v1/conversations
      * Find or create a conversation after the tenant has unlocked an ad.
      * Returns 200 for existing conversations, 201 for new ones.
+     *
+     * @OA\Post(
+     *     path="/api/v1/conversations",
+     *     summary="Créer ou retrouver une conversation",
+     *     description="Crée une nouvelle conversation locataire-bailleur sur une annonce, ou retourne l'existante. Le locataire doit avoir débloqué l'annonce. Retourne 201 si nouvelle, 200 si existante.",
+     *     operationId="storeConversation",
+     *     tags={"💬 Messagerie"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\RequestBody(required=true, @OA\JsonContent(
+     *         required={"ad_id"},
+     *
+     *         @OA\Property(property="ad_id", type="string", format="uuid", description="UUID de l'annonce concernée")
+     *     )),
+     *
+     *     @OA\Response(response=200, description="Conversation existante retrouvée"),
+     *     @OA\Response(response=201, description="Nouvelle conversation créée"),
+     *     @OA\Response(response=403, description="Accès non autorisé (annonce non débloquée)"),
+     *     @OA\Response(response=404, description="Annonce introuvable")
+     * )
      */
     public function store(StoreConversationRequest $request): JsonResponse
     {
@@ -98,6 +132,20 @@ final readonly class ConversationController
     /**
      * GET /api/v1/conversations/{uuid}
      * Return a single conversation detail (404 for non-participants).
+     *
+     * @OA\Get(
+     *     path="/api/v1/conversations/{uuid}",
+     *     summary="Détail d'une conversation",
+     *     description="Retourne le détail d'une conversation avec les profils des participants. Retourne 404 si l'utilisateur n'est pas participant (prévention IDOR).",
+     *     operationId="showConversation",
+     *     tags={"💬 Messagerie"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="uuid", in="path", required=true, description="UUID de la conversation", @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=200, description="Détail de la conversation"),
+     *     @OA\Response(response=404, description="Conversation introuvable ou accès non autorisé")
+     * )
      */
     public function show(Request $request, string $uuid): JsonResponse
     {
@@ -116,6 +164,27 @@ final readonly class ConversationController
      * GET /api/v1/conversations/{uuid}/messages
      * Return cursor-paginated message history (newest first).
      * Automatically marks messages as read.
+     *
+     * @OA\Get(
+     *     path="/api/v1/conversations/{uuid}/messages",
+     *     summary="Historique des messages",
+     *     description="Retourne les messages d'une conversation en pagination par curseur (newest first). Marque automatiquement les messages comme lus à la première page.",
+     *     operationId="conversationMessages",
+     *     tags={"💬 Messagerie"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="uuid", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *     @OA\Parameter(name="cursor", in="query", description="Curseur pour la pagination (retourné dans next_cursor)", @OA\Schema(type="string")),
+     *
+     *     @OA\Response(response=200, description="Messages avec curseur de pagination", @OA\JsonContent(
+     *
+     *         @OA\Property(property="data", type="array", @OA\Items(type="object")),
+     *         @OA\Property(property="next_cursor", type="string", nullable=true),
+     *         @OA\Property(property="has_more", type="boolean")
+     *     )),
+     *
+     *     @OA\Response(response=404, description="Conversation introuvable ou non-participant")
+     * )
      */
     public function messages(Request $request, string $uuid): JsonResponse
     {
@@ -145,6 +214,32 @@ final readonly class ConversationController
     /**
      * POST /api/v1/conversations/{uuid}/messages
      * Send a message in the conversation.
+     *
+     * @OA\Post(
+     *     path="/api/v1/conversations/{uuid}/messages",
+     *     summary="Envoyer un message",
+     *     description="Envoie un message texte ou chiffré E2EE dans une conversation. Supporte les types text, image, file et les pièces jointes pré-uploadées.",
+     *     operationId="sendMessage",
+     *     tags={"💬 Messagerie"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="uuid", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\RequestBody(required=true, @OA\JsonContent(
+     *
+     *         @OA\Property(property="body", type="string", nullable=true, description="Corps du message (vide pour les messages chiffrés)"),
+     *         @OA\Property(property="type", type="string", enum={"text","image","file"}, default="text"),
+     *         @OA\Property(property="reply_to_id", type="string", format="uuid", nullable=true),
+     *         @OA\Property(property="attachments", type="array", nullable=true, @OA\Items(type="object")),
+     *         @OA\Property(property="is_client_sealed", type="boolean", default=false, description="true si le message est chiffré côté client (E2EE)"),
+     *         @OA\Property(property="e2ee_ciphertext_b64", type="string", nullable=true),
+     *         @OA\Property(property="e2ee_iv_b64", type="string", nullable=true)
+     *     )),
+     *
+     *     @OA\Response(response=201, description="Message envoyé"),
+     *     @OA\Response(response=404, description="Conversation introuvable ou non-participant"),
+     *     @OA\Response(response=422, description="Données invalides")
+     * )
      */
     public function sendMessage(SendMessageRequest $request, string $uuid): JsonResponse
     {
@@ -182,6 +277,30 @@ final readonly class ConversationController
      * POST /api/v1/conversations/{uuid}/attachments
      * Upload a file attachment. Returns a descriptor with a signed URL.
      * Client calls this first, then sends the message with the attachment data.
+     *
+     * @OA\Post(
+     *     path="/api/v1/conversations/{uuid}/attachments",
+     *     summary="Téléverser une pièce jointe",
+     *     description="Upload un fichier dans la conversation. Retourne un descripteur avec URL signée. À appeler avant `sendMessage` pour inclure la pièce jointe.",
+     *     operationId="uploadConversationAttachment",
+     *     tags={"💬 Messagerie"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="uuid", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\RequestBody(required=true, @OA\MediaType(
+     *         mediaType="multipart/form-data",
+     *
+     *         @OA\Schema(required={"file"},
+     *
+     *             @OA\Property(property="file", type="string", format="binary", description="Fichier (image, PDF, etc., max 20 Mo)")
+     *         )
+     *     )),
+     *
+     *     @OA\Response(response=201, description="Descripteur de pièce jointe avec URL signée"),
+     *     @OA\Response(response=422, description="Type ou taille invalide"),
+     *     @OA\Response(response=404, description="Conversation introuvable")
+     * )
      */
     public function uploadAttachment(UploadAttachmentRequest $request, string $uuid): JsonResponse
     {
@@ -210,6 +329,24 @@ final readonly class ConversationController
     /**
      * PATCH /api/v1/conversations/{uuid}/read
      * Mark all messages in the conversation as read for the authenticated user.
+     *
+     * @OA\Patch(
+     *     path="/api/v1/conversations/{uuid}/read",
+     *     summary="Marquer une conversation comme lue",
+     *     operationId="markConversationAsRead",
+     *     tags={"💬 Messagerie"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="uuid", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=200, description="Timestamps de lecture mis à jour", @OA\JsonContent(
+     *
+     *         @OA\Property(property="tenant_last_read_at", type="string", format="date-time", nullable=true),
+     *         @OA\Property(property="landlord_last_read_at", type="string", format="date-time", nullable=true)
+     *     )),
+     *
+     *     @OA\Response(response=404, description="Conversation introuvable")
+     * )
      */
     public function markAsRead(Request $request, string $uuid): JsonResponse
     {
@@ -233,6 +370,25 @@ final readonly class ConversationController
      * POST /api/v1/conversations/{uuid}/typing
      * Broadcast a typing indicator. No DB write — ephemeral.
      * Returns 204 No Content.
+     *
+     * @OA\Post(
+     *     path="/api/v1/conversations/{uuid}/typing",
+     *     summary="Indicateur de frappe (typing indicator)",
+     *     description="Diffuse un événement WebSocket éphémère indiquant que l'utilisateur est en train d'écrire. Aucune écriture en base.",
+     *     operationId="setTyping",
+     *     tags={"💬 Messagerie"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="uuid", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\RequestBody(required=true, @OA\JsonContent(
+     *         required={"is_typing"},
+     *
+     *         @OA\Property(property="is_typing", type="boolean")
+     *     )),
+     *
+     *     @OA\Response(response=204, description="Événement diffusé (pas de contenu)")
+     * )
      */
     public function setTyping(SetTypingRequest $request, string $uuid): Response
     {
@@ -256,6 +412,23 @@ final readonly class ConversationController
     /**
      * PATCH /api/v1/conversations/{uuid}/archive
      * Archive a conversation. Only the authenticated participant may archive.
+     *
+     * @OA\Patch(
+     *     path="/api/v1/conversations/{uuid}/archive",
+     *     summary="Archiver une conversation",
+     *     operationId="archiveConversation",
+     *     tags={"💬 Messagerie"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="uuid", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=200, description="Conversation archivée", @OA\JsonContent(
+     *
+     *         @OA\Property(property="status", type="string", example="archived")
+     *     )),
+     *
+     *     @OA\Response(response=404, description="Conversation introuvable")
+     * )
      */
     public function archive(Request $request, string $uuid): JsonResponse
     {
@@ -271,6 +444,19 @@ final readonly class ConversationController
     /**
      * PATCH /api/v1/conversations/{uuid}/unarchive
      * Restore an archived conversation. Only participants.
+     *
+     * @OA\Patch(
+     *     path="/api/v1/conversations/{uuid}/unarchive",
+     *     summary="Désarchiver une conversation",
+     *     operationId="unarchiveConversation",
+     *     tags={"💬 Messagerie"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="uuid", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=200, description="Conversation désarchivée"),
+     *     @OA\Response(response=404, description="Conversation introuvable")
+     * )
      */
     public function unarchive(Request $request, string $uuid): JsonResponse
     {
@@ -293,6 +479,21 @@ final readonly class ConversationController
     /**
      * GET /api/v1/conversations/unread-count
      * Return total unread count and per-conversation breakdown (Redis-cached 30s).
+     *
+     * @OA\Get(
+     *     path="/api/v1/conversations/unread-count",
+     *     summary="Nombre de messages non lus",
+     *     description="Retourne le total de messages non lus et le détail par conversation. Résultat mis en cache Redis 30 secondes.",
+     *     operationId="conversationsUnreadCount",
+     *     tags={"💬 Messagerie"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Response(response=200, description="Compteurs non lus", @OA\JsonContent(
+     *
+     *         @OA\Property(property="total", type="integer", example=5),
+     *         @OA\Property(property="by_conversation", type="object")
+     *     ))
+     * )
      */
     public function unreadCount(Request $request): JsonResponse
     {

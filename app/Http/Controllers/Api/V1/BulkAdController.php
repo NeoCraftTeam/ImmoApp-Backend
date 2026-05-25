@@ -22,6 +22,32 @@ final class BulkAdController
      * Bulk update the status of multiple owned ads.
      *
      * @param  Request  $request  { ids: string[], status: AdStatus }
+     *
+     * @OA\Patch(
+     *     path="/api/v1/ads/bulk/status",
+     *     summary="Mise à jour de statut en masse",
+     *     description="Change le statut de plusieurs annonces en une seule requête (max 50). Les propriétaires sont limités aux statuts safe (draft, pending, rent, sold). Les admins peuvent utiliser tous les statuts.",
+     *     operationId="bulkUpdateAdStatus",
+     *     tags={"🏠 Annonces"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\RequestBody(required=true, @OA\JsonContent(
+     *         required={"ids","status"},
+     *
+     *         @OA\Property(property="ids", type="array", maxItems=50, @OA\Items(type="string", format="uuid")),
+     *         @OA\Property(property="status", type="string", enum={"draft","pending","available","rent","sold","declined"})
+     *     )),
+     *
+     *     @OA\Response(response=200, description="Résultat de l'opération", @OA\JsonContent(
+     *
+     *         @OA\Property(property="message", type="string", example="3 annonce(s) mise(s) à jour."),
+     *         @OA\Property(property="updated", type="integer"),
+     *         @OA\Property(property="failed", type="array", @OA\Items(type="string", format="uuid"))
+     *     )),
+     *
+     *     @OA\Response(response=403, description="Statut non autorisé pour les propriétaires"),
+     *     @OA\Response(response=422, description="Données invalides")
+     * )
      */
     public function bulkUpdate(Request $request): JsonResponse
     {
@@ -73,6 +99,29 @@ final class BulkAdController
      * Bulk soft-delete multiple owned ads.
      *
      * @param  Request  $request  { ids: string[] }
+     *
+     * @OA\Delete(
+     *     path="/api/v1/ads/bulk",
+     *     summary="Suppression en masse d'annonces",
+     *     description="Supprime (soft delete) jusqu'à 50 annonces appartenant à l'utilisateur connecté en une seule requête.",
+     *     operationId="bulkDeleteAds",
+     *     tags={"🏠 Annonces"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\RequestBody(required=true, @OA\JsonContent(
+     *         required={"ids"},
+     *
+     *         @OA\Property(property="ids", type="array", maxItems=50, @OA\Items(type="string", format="uuid"))
+     *     )),
+     *
+     *     @OA\Response(response=200, description="Résultat de la suppression", @OA\JsonContent(
+     *
+     *         @OA\Property(property="message", type="string", example="5 annonce(s) supprimée(s)."),
+     *         @OA\Property(property="deleted", type="integer")
+     *     )),
+     *
+     *     @OA\Response(response=422, description="Données invalides")
+     * )
      */
     public function bulkDelete(Request $request): JsonResponse
     {

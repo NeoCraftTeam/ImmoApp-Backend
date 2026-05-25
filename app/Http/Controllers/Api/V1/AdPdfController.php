@@ -16,6 +16,26 @@ use Illuminate\Http\Response;
  */
 final class AdPdfController
 {
+    /**
+     * @OA\Get(
+     *     path="/api/v1/ads/{ad}/pdf",
+     *     summary="Télécharger la fiche PDF d'une annonce",
+     *     description="Génère et retourne une fiche A4 imprimable de l'annonce au format PDF. Les annonces publiques sont accessibles sans authentification. Le propriétaire/admin peut télécharger n'importe quel statut.",
+     *     operationId="downloadAdPdf",
+     *     tags={"📄 PDF / QR Code"},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, description="UUID de l'annonce", @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Fichier PDF (application/pdf)",
+     *
+     *         @OA\MediaType(mediaType="application/pdf", @OA\Schema(type="string", format="binary"))
+     *     ),
+     *
+     *     @OA\Response(response=404, description="Annonce introuvable ou accès refusé")
+     * )
+     */
     public function download(Request $request, Ad $ad): Response
     {
         $user = $request->user();

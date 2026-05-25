@@ -24,6 +24,28 @@ final readonly class TourController
     /**
      * GET /api/v1/ads/{ad}/tour
      * Public — returns the tour config so the customer viewer can render it.
+     *
+     * @OA\Get(
+     *     path="/api/v1/ads/{ad}/tour",
+     *     summary="Configuration du tour 3D",
+     *     description="Retourne la configuration du tour 3D (scènes, URLs signées, hotspots) pour le viewer côté client. Accessible uniquement aux utilisateurs ayant débloqué l'annonce ou aux admins.",
+     *     operationId="getTour",
+     *     tags={"🏡 Tour 3D"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, description="UUID de l'annonce", @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=200, description="Configuration du tour 3D", @OA\JsonContent(
+     *
+     *         @OA\Property(property="has_tour", type="boolean"),
+     *         @OA\Property(property="scenes_count", type="integer"),
+     *         @OA\Property(property="tour_published_at", type="string", format="date-time", nullable=true),
+     *         @OA\Property(property="config", type="object")
+     *     )),
+     *
+     *     @OA\Response(response=403, description="Accès refusé (annonce non débloquée)"),
+     *     @OA\Response(response=404, description="Aucun tour 3D pour cette annonce")
+     * )
      */
     public function show(Request $request, Ad $ad): JsonResponse
     {
@@ -50,6 +72,40 @@ final readonly class TourController
     /**
      * POST /api/v1/ads/{ad}/tour/scenes
      * Owner only — upload 360° scene images and publish the tour.
+     *
+     * @OA\Post(
+     *     path="/api/v1/ads/{ad}/tour/scenes",
+     *     summary="Uploader les scènes 360° du tour",
+     *     description="Upload des images équirectangulaires 360° (JPEG/WebP, max 30 Mo chacune). Configure les hotspots de navigation. Max 20 scènes par annonce.",
+     *     operationId="uploadTourScenes",
+     *     tags={"🏡 Tour 3D"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\RequestBody(required=true, @OA\MediaType(
+     *         mediaType="multipart/form-data",
+     *
+     *         @OA\Schema(
+     *             required={"scenes"},
+     *
+     *             @OA\Property(property="scenes", type="array", maxItems=20,
+     *
+     *                 @OA\Items(type="object",
+     *
+     *                     @OA\Property(property="image", type="string", format="binary"),
+     *                     @OA\Property(property="title", type="string"),
+     *                     @OA\Property(property="client_id", type="string", nullable=true),
+     *                     @OA\Property(property="hotspots", type="array", nullable=true, @OA\Items(type="object"))
+     *                 )
+     *             )
+     *         )
+     *     )),
+     *
+     *     @OA\Response(response=200, description="Tour créé / mis à jour"),
+     *     @OA\Response(response=403, description="Accès refusé"),
+     *     @OA\Response(response=422, description="Fichier invalide ou quota dépassé")
+     * )
      */
     public function uploadScenes(Request $request, Ad $ad): JsonResponse
     {
@@ -157,6 +213,34 @@ final readonly class TourController
     /**
      * PATCH /api/v1/ads/{ad}/tour/scenes/{sceneId}/hotspots
      * Owner only — update hotspots for one scene.
+     *
+     * @OA\Patch(
+     *     path="/api/v1/ads/{ad}/tour/scenes/{sceneId}/hotspots",
+     *     summary="Mettre à jour les hotspots d'une scène",
+     *     description="Remplace la liste des hotspots d'une scène du tour 3D (liens de navigation entre scènes).",
+     *     operationId="updateTourHotspots",
+     *     tags={"🏡 Tour 3D"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *     @OA\Parameter(name="sceneId", in="path", required=true, description="UUID de la scène", @OA\Schema(type="string")),
+     *
+     *     @OA\RequestBody(required=true, @OA\JsonContent(
+     *         required={"hotspots"},
+     *
+     *         @OA\Property(property="hotspots", type="array", @OA\Items(
+     *             type="object",
+     *             @OA\Property(property="pitch", type="number"),
+     *             @OA\Property(property="yaw", type="number"),
+     *             @OA\Property(property="target_scene", type="string"),
+     *             @OA\Property(property="label", type="string")
+     *         ))
+     *     )),
+     *
+     *     @OA\Response(response=200, description="Hotspots mis à jour"),
+     *     @OA\Response(response=403, description="Accès refusé"),
+     *     @OA\Response(response=404, description="Scène introuvable")
+     * )
      */
     public function updateHotspots(Request $request, Ad $ad, string $sceneId): JsonResponse
     {
@@ -197,6 +281,20 @@ final readonly class TourController
     /**
      * DELETE /api/v1/ads/{ad}/tour
      * Owner only — delete all scenes from S3 and reset tour fields.
+     *
+     * @OA\Delete(
+     *     path="/api/v1/ads/{ad}/tour",
+     *     summary="Supprimer le tour 3D",
+     *     description="Supprime toutes les scènes du stockage (S3/R2) et réinitialise les champs du tour sur l'annonce.",
+     *     operationId="destroyTour",
+     *     tags={"🏡 Tour 3D"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=200, description="Tour supprimé"),
+     *     @OA\Response(response=403, description="Accès refusé")
+     * )
      */
     public function destroy(Ad $ad): JsonResponse
     {

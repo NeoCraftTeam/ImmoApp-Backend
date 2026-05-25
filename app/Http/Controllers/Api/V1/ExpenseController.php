@@ -14,6 +14,22 @@ use Illuminate\Http\JsonResponse;
  */
 final class ExpenseController
 {
+    /**
+     * @OA\Get(
+     *     path="/api/v1/ads/{ad}/expenses",
+     *     summary="Lister les dépenses d'un bien",
+     *     description="Retourne les dépenses (maintenance, travaux, charges) liées à l'annonce du bailleur, triées par date.",
+     *     operationId="listExpenses",
+     *     tags={"📊 Dépenses"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *     @OA\Parameter(name="page", in="query", @OA\Schema(type="integer", default=1)),
+     *
+     *     @OA\Response(response=200, description="Liste paginée de dépenses avec meta et links"),
+     *     @OA\Response(response=403, description="Accès refusé (pas votre bien)")
+     * )
+     */
     public function index(Ad $ad): JsonResponse
     {
         if ($ad->user_id !== auth()->id()) {
@@ -47,6 +63,30 @@ final class ExpenseController
         ]);
     }
 
+    /**
+     * @OA\Post(
+     *     path="/api/v1/ads/{ad}/expenses",
+     *     summary="Enregistrer une dépense",
+     *     operationId="storeExpense",
+     *     tags={"📊 Dépenses"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\RequestBody(required=true, @OA\JsonContent(
+     *         required={"category","amount","expense_date"},
+     *
+     *         @OA\Property(property="category", type="string", example="maintenance", description="Catégorie (maintenance, travaux, charges, assurance, other)"),
+     *         @OA\Property(property="amount", type="number", example=25000, description="Montant en XAF"),
+     *         @OA\Property(property="expense_date", type="string", format="date", example="2026-01-15"),
+     *         @OA\Property(property="description", type="string", nullable=true, example="Réparation toiture")
+     *     )),
+     *
+     *     @OA\Response(response=201, description="Dépense enregistrée"),
+     *     @OA\Response(response=403, description="Accès refusé"),
+     *     @OA\Response(response=422, description="Données invalides")
+     * )
+     */
     public function store(StoreExpenseRequest $request, Ad $ad): JsonResponse
     {
         if ($ad->user_id !== auth()->id()) {
@@ -63,6 +103,20 @@ final class ExpenseController
         return response()->json(['data' => $expense], 201);
     }
 
+    /**
+     * @OA\Delete(
+     *     path="/api/v1/expenses/{expense}",
+     *     summary="Supprimer une dépense",
+     *     operationId="destroyExpense",
+     *     tags={"📊 Dépenses"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="expense", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=200, description="Dépense supprimée"),
+     *     @OA\Response(response=403, description="Accès refusé")
+     * )
+     */
     public function destroy(Expense $expense): JsonResponse
     {
         if ($expense->user_id !== auth()->id()) {
@@ -76,6 +130,29 @@ final class ExpenseController
 
     /**
      * Returns revenue vs expense (profit/loss) summary for an ad.
+     *
+     * @OA\Get(
+     *     path="/api/v1/ads/{ad}/expenses/profit-loss",
+     *     summary="Bilan recettes / dépenses",
+     *     description="Retourne le total des dépenses, les revenus issus des contrats de bail et le résultat net pour un bien.",
+     *     operationId="profitLoss",
+     *     tags={"📊 Dépenses"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="ad", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=200, description="Bilan financier", @OA\JsonContent(
+     *
+     *         @OA\Property(property="data", type="object",
+     *             @OA\Property(property="total_expenses", type="number", example=125000),
+     *             @OA\Property(property="contract_revenue", type="number", example=300000),
+     *             @OA\Property(property="net_income", type="number", example=175000),
+     *             @OA\Property(property="expenses_by_category", type="object")
+     *         )
+     *     )),
+     *
+     *     @OA\Response(response=403, description="Accès refusé")
+     * )
      */
     public function profitLoss(Ad $ad): JsonResponse
     {
