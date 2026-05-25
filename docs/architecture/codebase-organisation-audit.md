@@ -331,18 +331,22 @@ Le seul point faible SOLID est **SRP** sur quelques gros controllers.
 Ce qu'un nouveau dev doit trouver en < 5 minutes :
 
 ```
-□ README.md racine          → existe ✅
-□ AGENTS.md (conventions)   → existe ✅
-□ docs/architecture/        → existe ✅ (5 fichiers)
-□ Comment lancer le projet  → AGENTS.md § Build & Run ✅
-□ Comment lancer les tests  → AGENTS.md § Testing ✅
-□ Comment faire un commit   → AGENTS.md (convention git) ✅
-□ Où sont les services ?    → app/Services/ (partiellement groupés) ⚠️
-□ Où sont les types API ?   → app/Http/Resources/ ✅
-□ Où sont les contrats ?    → app/Contracts/ ✅
-□ src/README.md frontend    → MANQUANT ❌
-□ Conventions frontend      → aucun fichier dédié ❌
+✅ README.md racine          → existe
+✅ AGENTS.md (conventions)   → existe (backend : lancer, tester, committer)
+✅ docs/architecture/        → 6 fichiers (overview, layers, auth, payment, SESSION_ISOLATION, org-audit)
+✅ Comment lancer le projet  → AGENTS.md § Build & Run
+✅ Comment lancer les tests  → AGENTS.md § Testing
+✅ Comment faire un commit   → AGENTS.md (convention git + Pint→PHPStan→Rector→tests)
+✅ Où sont les services ?    → app/Services/ groupés : Ai/ Auth/ Notification/ Geo/ Chat/ Payment/ Admin/ Media/ WebAuthn/
+✅ Où sont les types API ?   → app/Http/Resources/
+✅ Où sont les contrats ?    → app/Contracts/
+✅ src/README.md frontend    → keyhome-frontend-next/src/README.md (créé 25/05/2026)
+✅ Conventions frontend      → src/README.md (structure, conventions, flux auth, tests)
+✅ lib/ organisée            → sous-dossiers auth/ chat/ payment/ tour/ owner/ geo/ seo/
+✅ docs/ centralisés         → docs/audit/ docs/architecture/ docs/product/ docs/operations/ docs/research/
 ```
+
+**Résultat :** un nouveau développeur peut comprendre les deux codebases en < 30 minutes.
 
 ---
 
