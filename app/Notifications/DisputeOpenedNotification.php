@@ -29,7 +29,7 @@ class DisputeOpenedNotification extends Notification implements ShouldQueue
     public function toMail(object $notifiable): Mailable
     {
         /** @var User $notifiable */
-        return (new DisputeOpenedMail($this->dispute, $notifiable))
+        return new DisputeOpenedMail($this->dispute, $notifiable)
             ->to($notifiable->email, $notifiable->firstname.' '.$notifiable->lastname);
     }
 

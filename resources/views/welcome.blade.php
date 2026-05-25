@@ -117,7 +117,7 @@
 
         <h1>Votre patrimoine immobilier en poche.</h1>
 
-        <p>La plateforme de référence pour trouver, gérer et valoriser votre bien immobilier en Afrique francophone.</p>
+        <p>La plateforme de référence pour trouver, gérer et valoriser votre bien immobilier</p>
     </section>
 
     <span class="wordmark">keyhome.app</span>

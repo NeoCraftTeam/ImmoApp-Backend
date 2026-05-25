@@ -34,7 +34,7 @@ class DisputeStatusChangedNotification extends Notification implements ShouldQue
     public function toMail(object $notifiable): Mailable
     {
         /** @var User $notifiable */
-        return (new DisputeStatusChangedMail($this->dispute, $notifiable))
+        return new DisputeStatusChangedMail($this->dispute, $notifiable)
             ->to($notifiable->email, $notifiable->firstname.' '.$notifiable->lastname);
     }
 
