@@ -11,7 +11,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Importe les villes et leurs quartiers depuis l'API Overpass (OpenStreetMap).
+ * Importe les villes et leurs quartiers depuis Overpass (OpenStreetMap).
+ * Stratégie : Nominatim → bounding-box → Overpass → upsert BD.
  * Gratuit, sans clé API, coordonnées GPS incluses.
  *
  * Usage :
@@ -27,30 +28,19 @@ final class ImportGeoFromOverpass extends Command
                             {--city=    : Limiter à une ville (ex: Douala)}
                             {--dry-run  : Afficher sans enregistrer}';
 
-    protected $description = 'Importe villes + quartiers avec coordonnées GPS depuis Overpass API (OpenStreetMap)';
+    protected $description = 'Importe villes + quartiers avec coordonnées GPS depuis Overpass/Nominatim (OpenStreetMap)';
 
-    private const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
+    private const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
+
+    /** Miroirs Overpass testés dans l'ordre */
+    private const OVERPASS_MIRRORS = [
+        'https://overpass.kumi.systems/api/interpreter',
+        'https://overpass-api.de/api/interpreter',
+    ];
 
     private const PLACE_TYPES = 'suburb|quarter|neighbourhood|village|hamlet';
 
-    /** @var array<string,string> Nom KeyHome => Nom OSM pour les grandes villes */
-    private const CITY_OSM_MAP = [
-        'Douala' => 'Douala',
-        'Yaoundé' => 'Yaoundé',
-        'Libreville' => 'Libreville',
-        'Brazzaville' => 'Brazzaville',
-        'Bangui' => 'Bangui',
-        "N'Djamena" => "N'Djamena",
-        'Malabo' => 'Malabo',
-        'Abidjan' => 'Abidjan',
-        'Dakar' => 'Dakar',
-        'Bamako' => 'Bamako',
-        'Ouagadougou' => 'Ouagadougou',
-        'Lomé' => 'Lomé',
-        'Cotonou' => 'Cotonou',
-        'Niamey' => 'Niamey',
-        'Bissau' => 'Bissau',
-    ];
+    private const UA = 'KeyHome/1.0 (contact@keyhome.app)';
 
     public function handle(): int
     {
@@ -68,7 +58,7 @@ final class ImportGeoFromOverpass extends Command
             ->get();
 
         if ($cities->isEmpty()) {
-            $this->error('Aucune ville trouvée. Lancez d\'abord: php artisan db:seed --class=CityQuarterCameroonSeeder');
+            $this->error("Aucune ville trouvée. Lancez d'abord: php artisan db:seed --class=CityQuarterCameroonSeeder");
 
             return self::FAILURE;
         }
@@ -81,30 +71,27 @@ final class ImportGeoFromOverpass extends Command
         $skipped = 0;
 
         foreach ($cities as $city) {
-            $osmName = self::CITY_OSM_MAP[$city->name] ?? $city->name;
-
             try {
-                $data = $this->queryOverpass($osmName);
+                // 1. Nominatim → centre + bounding box de la ville
+                $geo = $this->nominatimLookup($city->name, $city->country);
 
-                if (empty($data)) {
+                if (!$geo) {
                     $skipped++;
                     $bar->advance();
+                    usleep(1_100_000);
 
                     continue;
                 }
 
-                // Coordonnées du centre-ville (1er élément de type city/town/village)
-                $cityCoords = $this->extractCityCoords($data, $osmName);
-                if ($cityCoords && !$dryRun) {
-                    $city->update([
-                        'latitude' => $cityCoords['lat'],
-                        'longitude' => $cityCoords['lng'],
-                    ]);
+                // 2. Mise à jour coordonnées de la ville
+                if (!$dryRun) {
+                    $city->update(['latitude' => $geo['lat'], 'longitude' => $geo['lng']]);
                 }
 
-                // Quartiers
-                $quarters = $this->extractQuarters($data);
-                foreach ($quarters as $q) {
+                // 3. Overpass dans la bbox
+                $elements = $this->queryOverpass($geo['bbox']);
+
+                foreach ($elements as $q) {
                     $imported++;
                     if (!$dryRun) {
                         Quarter::updateOrCreate(
@@ -120,67 +107,93 @@ final class ImportGeoFromOverpass extends Command
             }
 
             $bar->advance();
-            // Respecter le rate-limit Overpass (1 req/s recommandé)
-            usleep(1_100_000);
+            usleep(1_100_000); // rate-limit Nominatim + Overpass (1 req/s)
         }
 
         $bar->finish();
         $this->newLine();
-        $this->info("Terminé — {$imported} quartiers importés/mis à jour, {$skipped} villes ignorées (pas de données OSM).");
+        $this->info("Terminé — {$imported} quartiers importés/mis à jour, {$skipped} villes ignorées.");
 
         return self::SUCCESS;
     }
 
     /**
-     * Construit et exécute la requête Overpass QL.
+     * Requête Nominatim pour récupérer lat/lng + bbox de la ville.
      *
-     * @return list<array<string,mixed>>
+     * @return array{lat:float,lng:float,bbox:array{float,float,float,float}}|null
      */
-    private function queryOverpass(string $cityName): array
+    private function nominatimLookup(string $cityName, ?string $country): ?array
     {
-        $types = self::PLACE_TYPES;
+        $params = [
+            'q' => $country ? "{$cityName}, {$country}" : $cityName,
+            'format' => 'json',
+            'limit' => 1,
+            'addressdetails' => 0,
+            'featuretype' => 'city',
+        ];
 
-        $query = <<<OVERPASS
-[out:json][timeout:30];
-area["name"="{$cityName}"]["place"~"city|town"]["boundary"!~"."]->.city;
-(
-  node["place"~"{$types}"](area.city);
-  way["place"~"{$types}"](area.city);
-  relation["place"~"{$types}"](area.city);
-  node["name"="{$cityName}"]["place"~"city|town"];
-);
-out center;
-OVERPASS;
-
-        $response = Http::timeout(35)
-            ->withHeaders(['User-Agent' => 'KeyHome/1.0 (contact@keyhome.app)'])
-            ->post(self::OVERPASS_URL, ['data' => $query]);
+        $response = Http::timeout(15)
+            ->withHeaders(['User-Agent' => self::UA])
+            ->get(self::NOMINATIM_URL, $params);
 
         if (!$response->ok()) {
-            return [];
+            return null;
         }
 
-        return $response->json('elements', []);
+        $results = $response->json();
+        if (empty($results)) {
+            return null;
+        }
+
+        $r = $results[0];
+        $bb = $r['boundingbox'] ?? null; // [south, north, west, east]
+
+        if (!$bb || count($bb) < 4) {
+            return null;
+        }
+
+        return [
+            'lat' => (float) $r['lat'],
+            'lng' => (float) $r['lon'],
+            'bbox' => [(float) $bb[0], (float) $bb[2], (float) $bb[1], (float) $bb[3]], // S,W,N,E
+        ];
     }
 
     /**
-     * @param  list<array<string,mixed>>  $elements
-     * @return array{lat:float,lng:float}|null
+     * Requête Overpass dans la bounding box — essaie les miroirs dans l'ordre.
+     *
+     * @param  array{float,float,float,float}  $bbox  [south, west, north, east]
+     * @return list<array{name:string,lat:float,lng:float}>
      */
-    private function extractCityCoords(array $elements, string $cityName): ?array
+    private function queryOverpass(array $bbox): array
     {
-        foreach ($elements as $el) {
-            $name = $el['tags']['name'] ?? '';
-            if (strtolower($name) === strtolower($cityName)) {
-                $lat = (float) ($el['lat'] ?? $el['center']['lat'] ?? 0);
-                $lng = (float) ($el['lon'] ?? $el['center']['lon'] ?? 0);
-                if ($lat && $lng) {
-                    return ['lat' => $lat, 'lng' => $lng];
+        [$s, $w, $n, $e] = $bbox;
+        $types = self::PLACE_TYPES;
+
+        $query = "[out:json][timeout:30];\n"
+            ."(\n"
+            ."  node[\"place\"~\"{$types}\"]({$s},{$w},{$n},{$e});\n"
+            ."  way[\"place\"~\"{$types}\"]({$s},{$w},{$n},{$e});\n"
+            ."  relation[\"place\"~\"{$types}\"]({$s},{$w},{$n},{$e});\n"
+            .");\n"
+            .'out center;';
+
+        foreach (self::OVERPASS_MIRRORS as $url) {
+            try {
+                $response = Http::timeout(35)
+                    ->withHeaders(['User-Agent' => self::UA])
+                    ->asForm()
+                    ->post($url, ['data' => $query]);
+
+                if ($response->ok()) {
+                    return $this->extractQuarters($response->json('elements', []));
                 }
+            } catch (\Throwable) {
+                // essayer le miroir suivant
             }
         }
 
-        return null;
+        return [];
     }
 
     /**
