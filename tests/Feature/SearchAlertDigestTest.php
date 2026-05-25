@@ -11,7 +11,7 @@ use App\Models\SearchAlert;
 use App\Models\SearchAlertMatch;
 use App\Models\User;
 use App\Notifications\SearchAlertDigestNotification;
-use App\Services\AiDigestService;
+use App\Services\Ai\AiDigestService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;

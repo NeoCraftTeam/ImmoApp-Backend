@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Services\RetentionPushService;
+use App\Services\Notification\RetentionPushService;
 use Illuminate\Console\Command;
 
 /**

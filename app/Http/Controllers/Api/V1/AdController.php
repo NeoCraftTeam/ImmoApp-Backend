@@ -13,7 +13,7 @@ use App\Http\Resources\AdResource as AdApiResource;
 use App\Models\Ad;
 use App\Models\AdInteraction;
 use App\Models\User;
-use App\Services\RecommendationEngine;
+use App\Services\Ai\RecommendationEngine;
 use App\Support\AdScoutSync;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;

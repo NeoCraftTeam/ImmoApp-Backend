@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Channels;
 
 use App\Models\User;
-use App\Services\WhatsAppService;
+use App\Services\Notification\WhatsAppService;
 use Illuminate\Notifications\Notification;
 
 /**

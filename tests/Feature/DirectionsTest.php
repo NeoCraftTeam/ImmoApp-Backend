@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Services\DirectionsService;
+use App\Services\Geo\DirectionsService;
 use GuzzleHttp\Psr7\Response as Psr7Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Factory as HttpFactory;

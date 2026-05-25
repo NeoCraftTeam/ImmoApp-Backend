@@ -9,7 +9,7 @@ use App\Models\SearchAlert;
 use App\Models\SearchAlertMatch;
 use App\Models\User;
 use App\Notifications\SearchAlertDigestNotification;
-use App\Services\AiDigestService;
+use App\Services\Ai\AiDigestService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;

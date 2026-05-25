@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Services\Auth;
 
 use App\DTOs\LoginResult;
 use App\Exceptions\AccountInactiveException;
@@ -13,6 +13,8 @@ use App\Mail\NewDeviceSignInMail;
 use App\Mail\NewLocationSignInMail;
 use App\Models\LoginHistory;
 use App\Models\User;
+use App\Services\TurnstileService;
+use App\Services\UserAgentParser;
 use App\Support\AuthError;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;

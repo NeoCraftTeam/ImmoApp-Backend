@@ -9,7 +9,7 @@ use App\Filament\Admin\Resources\NewsletterCampaigns\Pages\ManageNewsletterCampa
 use App\Jobs\SendNewsletterCampaignJob;
 use App\Models\NewsletterCampaign;
 use App\Models\NewsletterSubscriber;
-use App\Services\AiDescriptionEnhancer;
+use App\Services\Ai\AiDescriptionEnhancer;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;

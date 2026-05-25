@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Services\IsochroneService;
+use App\Services\Geo\IsochroneService;
 use GuzzleHttp\Psr7\Response as Psr7Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Factory as HttpFactory;

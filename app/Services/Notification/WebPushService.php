@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Services\Notification;
 
 use App\Models\PushSubscription;
 use App\Models\User;

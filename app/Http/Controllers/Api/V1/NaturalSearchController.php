@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Services\AiSearchService;
+use App\Services\Ai\AiSearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

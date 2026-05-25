@@ -8,7 +8,7 @@ use App\Enums\AdStatus;
 use App\Jobs\ProcessTourSceneJob;
 use App\Models\Ad;
 use App\Models\PropertyAttribute;
-use App\Services\AiDescriptionEnhancer;
+use App\Services\Ai\AiDescriptionEnhancer;
 use Carbon\Carbon;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Dotswan\MapPicker\Fields\Map;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Services\Ai;
 
 use App\Models\Ad;
 use App\Models\SearchAlert;

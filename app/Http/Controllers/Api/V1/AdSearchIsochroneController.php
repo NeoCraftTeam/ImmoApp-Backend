@@ -6,7 +6,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Resources\AdResource;
 use App\Models\Ad;
-use App\Services\IsochroneService;
+use App\Services\Geo\IsochroneService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Laravel\Scout\Builder;

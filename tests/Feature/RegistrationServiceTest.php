@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\DTOs\RegistrationResult;
 use App\Exceptions\RegistrationEmailTakenException;
 use App\Models\User;
-use App\Services\RegistrationService;
+use App\Services\Auth\RegistrationService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\App;

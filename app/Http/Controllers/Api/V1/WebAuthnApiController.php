@@ -8,7 +8,7 @@ use App\Exceptions\RoleContextMismatchException;
 use App\Http\Resources\UserResource;
 use App\Mail\PasskeyNotificationMail;
 use App\Models\User;
-use App\Services\LoginService;
+use App\Services\Auth\LoginService;
 use App\Support\ApiResponse;
 use App\Support\AuthError;
 use Illuminate\Auth\SessionGuard;

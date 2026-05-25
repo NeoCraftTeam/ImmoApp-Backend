@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Services\Auth;
 
 use App\DTOs\RegistrationResult;
 use App\Exceptions\RegistrationEmailTakenException;
 use App\Models\User;
+use App\Services\TurnstileService;
+use App\Services\UtmAttributionService;
 use App\Support\GeoLocation;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Foundation\Http\FormRequest;

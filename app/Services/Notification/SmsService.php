@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Services\Notification;
 
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;

@@ -9,7 +9,7 @@ use App\Filament\Admin\Resources\PendingAds\Pages\ManagePendingAds;
 use App\Filament\Resources\Ads\Concerns\SharedAdResource;
 use App\Mail\AdDeclinedMail;
 use App\Models\Ad;
-use App\Services\AiDescriptionEnhancer;
+use App\Services\Ai\AiDescriptionEnhancer;
 use App\Support\AdScoutSync;
 use BackedEnum;
 use Filament\Actions\Action;

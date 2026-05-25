@@ -12,7 +12,7 @@ use App\Http\Resources\LeaseContractResource;
 use App\Models\Ad;
 use App\Models\LeaseContract;
 use App\Models\LeaseSignatureAuditLog;
-use App\Services\AiDescriptionEnhancer;
+use App\Services\Ai\AiDescriptionEnhancer;
 use App\Services\LeaseContractService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

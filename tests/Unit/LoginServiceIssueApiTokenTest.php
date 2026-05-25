@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Exceptions\RoleContextMismatchException;
 use App\Models\User;
-use App\Services\LoginService;
+use App\Services\Auth\LoginService;
 use App\Support\AuthError;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 

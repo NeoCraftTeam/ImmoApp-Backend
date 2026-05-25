@@ -9,7 +9,7 @@ use App\Exceptions\RegistrationEmailTakenException;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
-use App\Services\RegistrationService;
+use App\Services\Auth\RegistrationService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

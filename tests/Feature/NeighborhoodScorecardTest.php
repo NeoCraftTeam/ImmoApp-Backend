@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Ad;
 use App\Models\User;
-use App\Services\NeighborhoodScorecardService;
+use App\Services\Geo\NeighborhoodScorecardService;
 use Clickbar\Magellan\Data\Geometries\Point;
 use GuzzleHttp\Psr7\Response as Psr7Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;

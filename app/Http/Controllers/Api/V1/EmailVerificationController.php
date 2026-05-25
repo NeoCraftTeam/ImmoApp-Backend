@@ -7,7 +7,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\UserRole;
 use App\Http\Resources\UserResource;
 use App\Models\User;
-use App\Services\TokenService;
+use App\Services\Auth\TokenService;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
