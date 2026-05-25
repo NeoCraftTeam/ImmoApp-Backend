@@ -6,7 +6,7 @@
 
 @section('content')
 
-    <h1>{{ __('emails.welcome.heading', ['name' => $user->lastname]) }}</h1>
+    <h1>{{ __('emails.welcome.heading', ['name' => $user->firstname]) }}</h1>
 
     <p class="text">
         {!! __('emails.welcome.intro', ['app' => config('app.name')]) !!}
