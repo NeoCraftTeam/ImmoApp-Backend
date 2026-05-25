@@ -32,6 +32,8 @@ default:
 # re-run when composer.lock changes — not on every commit.
 prepare_ci_image:
   stage: prepare
+  variables:
+    DOCKER_BUILDKIT: "1"
   script:
     - |
       # Only push the CI image to the registry on protected branches (main / preprod).
