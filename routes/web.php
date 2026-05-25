@@ -135,7 +135,7 @@ Route::get('/newsletter/unsubscribe/{token}', NewsletterWebController::class)
 Route::middleware(['auth'])->prefix('panel-api/v1')->group(function (): void {
     Route::post('/ads/{ad}/tour/scenes', [TourController::class, 'uploadScenes'])
         ->middleware('throttle:10,1');
-    Route::match(['patch', 'post'], '/ads/{ad}/tour/scenes/{sceneId}/hotspots', [TourController::class, 'updateHotspots']);
+    Route::patch('/ads/{ad}/tour/scenes/{sceneId}/hotspots', [TourController::class, 'updateHotspots']);
     Route::delete('/ads/{ad}/tour', [TourController::class, 'destroy']);
 });
 

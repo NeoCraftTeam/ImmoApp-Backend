@@ -184,13 +184,13 @@ return [
 
     // Inactivity Warning
     'inactivity' => [
-        'subject'          => ':name, de nouvelles annonces vous attendent sur :app',
-        'subject_early'    => ':name, :count biens publiés depuis votre dernière visite — :app',
-        'subject_winback'  => ':name, votre prochain chez-vous vous attend toujours sur :app',
-        'heading'          => 'Du nouveau depuis votre dernière visite',
-        'intro'            => ':name, <strong>:count nouvelles annonces</strong> correspondant à votre profil ont été publiées depuis votre dernière connexion sur <strong>:app</strong>.',
-        'stats'            => ':count annonces publiées depuis votre dernière visite.',
-        'cta'              => 'Voir les nouveautés',
+        'subject' => ':name, de nouvelles annonces vous attendent sur :app',
+        'subject_early' => ':name, :count biens publiés depuis votre dernière visite — :app',
+        'subject_winback' => ':name, votre prochain chez-vous vous attend toujours sur :app',
+        'heading' => 'Du nouveau depuis votre dernière visite',
+        'intro' => ':name, <strong>:count nouvelles annonces</strong> correspondant à votre profil ont été publiées depuis votre dernière connexion sur <strong>:app</strong>.',
+        'stats' => ':count annonces publiées depuis votre dernière visite.',
+        'cta' => 'Voir les nouveautés',
     ],
 
     // Failed Payment Retry
