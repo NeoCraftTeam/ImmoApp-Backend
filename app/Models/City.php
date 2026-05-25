@@ -21,6 +21,8 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property string $id
  * @property string $name
  * @property string|null $country
+ * @property float|null $latitude
+ * @property float|null $longitude
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
@@ -54,6 +56,8 @@ class City extends Model
     protected $fillable = [
         'name',
         'country',
+        'latitude',
+        'longitude',
     ];
 
     protected $hidden = [

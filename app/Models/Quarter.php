@@ -20,6 +20,8 @@ use Spatie\Activitylog\Traits\LogsActivity;
 /**
  * @property string $id
  * @property string $name
+ * @property float|null $latitude
+ * @property float|null $longitude
  * @property string $city_id
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -51,6 +53,8 @@ class Quarter extends Model
     protected $fillable = [
         'name',
         'city_id',
+        'latitude',
+        'longitude',
         'avg_price',
         'avg_price_per_sqm',
         'active_ads_count',
