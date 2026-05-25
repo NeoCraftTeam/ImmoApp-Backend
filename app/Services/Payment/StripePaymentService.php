@@ -13,10 +13,12 @@ use App\Exceptions\PaymentGatewayException;
 use App\Support\XafEurConverter;
 use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Cashier;
+use Stripe\ApiRequestor;
 use Stripe\Charge;
 use Stripe\Checkout\Session as CheckoutSession;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Exception\SignatureVerificationException;
+use Stripe\HttpClient\CurlClient as StripeCurlClient;
 use Stripe\PaymentIntent;
 use Stripe\Refund;
 use Stripe\StripeClient;
@@ -41,12 +43,18 @@ use Stripe\Webhook;
  */
 final readonly class StripePaymentService implements PaymentGatewayInterface, StripeSavedCardServiceInterface
 {
-    // The Stripe PHP SDK does not accept a per-request timeout option — the
-    // RequestOptions whitelist only allows api_key, idempotency_key,
-    // stripe_account, stripe_version, stripe_context. To enforce a timeout we
-    // would need to inject a custom CurlClient via Stripe::setHttpClient(...)
-    // at boot. Default 80s is acceptable for our endpoints (PaymentIntent
-    // create is well under that).
+    // Network timeout for all Stripe API calls made by this service.
+    // The Stripe PHP SDK default is 80 s (connect 30 s). nginx's
+    // fastcgi_read_timeout on the VPS is typically 60 s, so without an
+    // explicit override nginx terminates the connection first and returns
+    // its own raw 502 page — without CORS headers — causing the browser
+    // to reject the response entirely. Keeping these values below nginx's
+    // timeout ensures ApiConnectionException propagates back through PHP,
+    // Laravel catches it as PaymentGatewayException, and the client
+    // receives a proper JSON 502 response with Access-Control-Allow-Origin.
+    private const int STRIPE_TIMEOUT_S = 20;
+
+    private const int STRIPE_CONNECT_TIMEOUT_S = 5;
 
     private StripeClient $stripe;
 
@@ -72,6 +80,11 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
         // stripe_version, stripe_context, api_base, connect_base, files_base) —
         // passing `api_version` throws `InvalidArgumentException`. We rely on
         // Cashier's pinned `stripe_version` (set via Cashier::STRIPE_VERSION).
+        $curlClient = StripeCurlClient::instance();
+        $curlClient->setTimeout(self::STRIPE_TIMEOUT_S);
+        $curlClient->setConnectTimeout(self::STRIPE_CONNECT_TIMEOUT_S);
+        ApiRequestor::setHttpClient($curlClient);
+
         $this->stripe = Cashier::stripe(['api_key' => $secret]);
     }
 
