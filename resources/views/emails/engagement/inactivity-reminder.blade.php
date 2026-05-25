@@ -11,6 +11,21 @@
     ? 'Des biens correspondant à votre recherche ont été publiés — ' . $newAdsCount . ' nouvelles annonces vous attendent.'
     : 'Cela fait ' . $daysSinceLogin . ' jours. Vos critères sont toujours actifs — ' . $newAdsCount . ' biens vous attendent sur ' . config('app.name') . '.')
 
+@section('hero')
+    @include('emails.partials.hero', [
+        'heroBg'      => $isDeep
+            ? 'linear-gradient(135deg, #0f172a 0%, #C73B52 100%)'
+            : ($isEarly
+                ? 'linear-gradient(135deg, #1e293b 0%, #C73B52 100%)'
+                : 'linear-gradient(135deg, #1e293b 0%, #7f1d1d 100%)'),
+        'heroEyebrow' => $isEarly ? 'Nouvelles annonces' : ($isDeep ? 'On vous a gardé une place' : 'Des biens vous attendent'),
+        'heroText'    => $isEarly
+            ? $newAdsCount . ' bien' . ($newAdsCount > 1 ? 's' : '') . ' publié' . ($newAdsCount > 1 ? 's' : '') . ' depuis votre dernière visite'
+            : ($isDeep ? 'Votre recherche vous attend encore' : 'Du nouveau depuis votre dernière visite'),
+        'heroSub'     => config('app.name') . ' — ' . ($isEarly ? 'les meilleures offres partent vite' : 'vos critères sont toujours actifs'),
+    ])
+@endsection
+
 @section('content')
 
     @if($isEarly)

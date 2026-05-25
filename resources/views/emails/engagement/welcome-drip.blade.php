@@ -4,8 +4,27 @@
 
 @section('preheader', __("emails.welcome_drip.day{$day}_heading") . ' — ' . config('app.name') . ' vous accompagne dans votre recherche immobilière.')
 
+@php
+    $heroLabels = [1 => 'Jour 1 — Démarrage', 3 => 'Jour 3 — Alertes', 7 => 'Jour 7 — Résultats'];
+    $heroSubs   = [
+        1 => '3 fonctionnalités à activer pour trouver votre bien plus vite',
+        3 => 'Ne ratez aucune annonce — activez votre première alerte',
+        7 => 'Votre prochain chez-vous est peut-être déjà en ligne',
+    ];
+@endphp
+
+@section('hero')
+    @include('emails.partials.hero', [
+        'heroBg'      => 'linear-gradient(135deg, #1e293b 0%, #C73B52 100%)',
+        'heroEyebrow' => $heroLabels[$day] ?? ('Jour ' . $day),
+        'heroText'    => __("emails.welcome_drip.day{$day}_heading"),
+        'heroSub'     => $heroSubs[$day] ?? config('app.name'),
+    ])
+@endsection
+
 @section('content')
 
+    <span class="eyebrow">{{ $heroLabels[$day] ?? ('Jour ' . $day) }}</span>
     <h1>{{ __("emails.welcome_drip.day{$day}_heading") }}</h1>
 
     <p class="text" style="margin-top: 16px;">

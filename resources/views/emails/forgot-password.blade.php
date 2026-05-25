@@ -5,8 +5,20 @@
 
 @section('preheader', 'Réinitialisez votre mot de passe — ce lien expire dans ' . ($ttlMinutes ?? 60) . ' minutes.')
 
+@section('hero')
+    @include('emails.partials.hero', [
+        'heroBg'      => !empty($isOwner)
+            ? 'linear-gradient(135deg, #042f2e 0%, #164e63 100%)'
+            : 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%)',
+        'heroEyebrow' => 'Sécurité du compte',
+        'heroText'    => 'Réinitialisation de mot de passe',
+        'heroSub'     => 'Lien valide ' . ($ttlMinutes ?? 60) . ' minutes — ne le partagez jamais',
+    ])
+@endsection
+
 @section('content')
 
+    <span class="eyebrow">{{ !empty($isOwner) ? 'Espace Bailleur' : 'Votre compte' }}</span>
     <h1>{{ __('emails.forgot_password.heading') }}</h1>
 
     @if(!empty($isOwner))
