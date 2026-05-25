@@ -157,7 +157,7 @@
             Aucune passkey enregistrée. Ajoutez-en une pour vous connecter sans mot de passe.
         </p>
         <p class="text-sm text-amber-600 dark:text-amber-400" x-show="!supported">
-            Votre navigateur ne supporte pas les passkeys (WebAuthn).
+            Votre navigateur ne supporte pas les passkeys.
         </p>
     @endif
 

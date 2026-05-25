@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\AdReportController;
 use App\Http\Controllers\Api\V1\AdSearchController;
 use App\Http\Controllers\Api\V1\AdSimilarController;
 use App\Http\Controllers\Api\V1\AdStatusController;
+use App\Http\Controllers\Api\V1\BulkAdController;
 use App\Http\Controllers\Api\V1\KeyScoreController;
 use App\Http\Controllers\Api\V1\MyAdsController;
 use App\Http\Controllers\Api\V1\NeighborhoodScorecardController;
@@ -73,6 +74,12 @@ Route::prefix('ads')->middleware('optional.auth')->group(function (): void {
         Route::patch('/{ad}/edit-draft', [AdDraftEditController::class, 'save'])->middleware('throttle:60,1');
         Route::post('/{ad}/edit-draft/apply', [AdDraftEditController::class, 'apply'])->middleware('throttle:20,1');
         Route::delete('/{ad}/edit-draft', [AdDraftEditController::class, 'discard'])->middleware('throttle:20,1');
+    });
+
+    // Bulk operations — registered before /{id} catch-alls to prevent wildcard shadowing
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::patch('/bulk/status', [BulkAdController::class, 'bulkUpdate']);
+        Route::delete('/bulk', [BulkAdController::class, 'bulkDelete']);
     });
 
     // Ad update/delete — AdPolicy: admin (any ad) or agent (own ad); not owner-panel scoped
@@ -138,6 +145,7 @@ Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner', 'token.role
         ->middleware('throttle:30,1');
     Route::delete('/{ad}/prescreening', [PrescreeningController::class, 'destroy'])
         ->middleware('throttle:30,1');
+    Route::get('/{ad}/placarde/preview', [QrCodeController::class, 'adPlacardePreview'])->middleware('throttle:20,1');
 });
 
 // KeyScore
@@ -171,6 +179,6 @@ Route::get('/ads/{ad}/tour', [TourController::class, 'show'])->middleware('optio
 Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner', 'token.role:agent'])->group(function (): void {
     Route::post('/ads/{ad}/tour/scenes', [TourController::class, 'uploadScenes'])
         ->middleware('throttle:10,1');
-    Route::match(['patch', 'post'], '/ads/{ad}/tour/scenes/{sceneId}/hotspots', [TourController::class, 'updateHotspots']);
+    Route::patch('/ads/{ad}/tour/scenes/{sceneId}/hotspots', [TourController::class, 'updateHotspots']);
     Route::delete('/ads/{ad}/tour', [TourController::class, 'destroy']);
 });

@@ -7,7 +7,6 @@ use App\Http\Controllers\Api\V1\AdTypeController;
 use App\Http\Controllers\Api\V1\AgencyController;
 use App\Http\Controllers\Api\V1\BailleurFollowController;
 use App\Http\Controllers\Api\V1\BoostController;
-use App\Http\Controllers\Api\V1\BulkAdController;
 use App\Http\Controllers\Api\V1\ChatE2eeIdentityController;
 use App\Http\Controllers\Api\V1\CityController;
 use App\Http\Controllers\Api\V1\ClerkWebhookController;
@@ -174,7 +173,6 @@ Route::prefix('v1')->group(function (): void {
 
     // --- MY FAVORITES / RECENTLY VIEWED ---
     Route::middleware('auth:sanctum')->get('/my/favorites', [AdInteractionController::class, 'favorites']);
-    Route::middleware('auth:sanctum')->get('/my/recently-viewed', [AdInteractionController::class, 'recentlyViewed']);
 
     // --- NOTIFICATIONS ---
     Route::middleware('auth:sanctum')->prefix('notifications')->controller(NotificationController::class)->group(function (): void {
@@ -242,16 +240,6 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/placarde', 'profilePlacarde')->middleware('throttle:20,1');
         });
 
-    Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner', 'token.role:agent'])
-        ->prefix('my/ads/{ad}')
-        ->controller(QrCodeController::class)
-        ->group(function (): void {
-            Route::get('/qr-code', 'adMeta')->middleware('throttle:60,1');
-            Route::get('/qr-code/image', 'adQrImage')->middleware('throttle:60,1');
-            Route::get('/placarde', 'adPlacarde')->middleware('throttle:20,1');
-            Route::get('/placarde/preview', 'adPlacardePreview')->middleware('throttle:20,1');
-        });
-
     // --- PWA (Push Subscriptions & Session Validation) ---
     Route::prefix('pwa')->middleware('web')->group(function (): void {
         Route::middleware('auth:web,sanctum')->group(function (): void {
@@ -301,8 +289,6 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/my/ads/{ad}/boost', [BoostController::class, 'unboost']);
         Route::get('/my/ads/{ad}/boost/roi', [BoostController::class, 'boostRoi'])->name('boost.roi');
         Route::post('/my/ads/{ad}/duplicate', [DuplicateAdController::class, 'store']);
-        Route::put('/my/ads/bulk-update', [BulkAdController::class, 'bulkUpdate']);
-        Route::post('/my/ads/bulk-delete', [BulkAdController::class, 'bulkDelete']);
     });
 
     // --- TENANTS (owner) ---

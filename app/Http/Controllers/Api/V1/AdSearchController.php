@@ -13,6 +13,7 @@ use App\Models\AdType;
 use App\Models\City;
 use App\Models\Quarter;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Meilisearch\Endpoints\Indexes;
 use Meilisearch\Exceptions\ApiException;
@@ -403,35 +404,41 @@ final readonly class AdSearchController
             $likeOperator = $driver === 'pgsql' ? 'ilike' : 'like';
             $prefix = $q !== '' ? ($q.'%') : '%';
 
-            $publicStatuses = array_map(fn (AdStatus $s) => $s->value, Ad::PUBLIC_STATUSES);
+            // Cache autocomplete for 5 min per (field, prefix) combination.
+            // These JOIN+GROUP BY queries were firing on every keystroke — now a single
+            // Redis GET after the first call for the same prefix.
+            $cacheKey = 'ads:autocomplete:'.$field.':'.strtolower($q);
+            $rows = Cache::remember($cacheKey, 300, function () use ($field, $q, $likeOperator, $prefix): mixed {
+                $publicStatuses = array_map(fn (AdStatus $s) => $s->value, Ad::PUBLIC_STATUSES);
 
-            if ($field === 'city') {
-                $rows = City::query()
-                    ->join('quarter', 'quarter.city_id', '=', 'city.id')
-                    ->join('ad', function ($join) use ($publicStatuses): void {
-                        $join->on('ad.quarter_id', '=', 'quarter.id')
-                            ->whereIn('ad.status', $publicStatuses);
-                    })
-                    ->when($q !== '', fn ($query) => $query->where('city.name', $likeOperator, $prefix))
-                    ->groupBy('city.name')
-                    ->selectRaw('city.name as value, COUNT(ad.id) as count')
-                    ->orderByDesc('count')
-                    ->limit(10)
-                    ->get();
-            } elseif ($field === 'type') {
-                $rows = AdType::query()
-                    ->join('ad', function ($join) use ($publicStatuses): void {
-                        $join->on('ad.type_id', '=', 'ad_type.id')
-                            ->whereIn('ad.status', $publicStatuses);
-                    })
-                    ->when($q !== '', fn ($query) => $query->where('ad_type.name', $likeOperator, $prefix))
-                    ->groupBy('ad_type.name')
-                    ->selectRaw('ad_type.name as value, COUNT(ad.id) as count')
-                    ->orderByDesc('count')
-                    ->limit(10)
-                    ->get();
-            } else {
-                $rows = Quarter::query()
+                if ($field === 'city') {
+                    return City::query()
+                        ->join('quarter', 'quarter.city_id', '=', 'city.id')
+                        ->join('ad', function ($join) use ($publicStatuses): void {
+                            $join->on('ad.quarter_id', '=', 'quarter.id')
+                                ->whereIn('ad.status', $publicStatuses);
+                        })
+                        ->when($q !== '', fn ($query) => $query->where('city.name', $likeOperator, $prefix))
+                        ->groupBy('city.name')
+                        ->selectRaw('city.name as value, COUNT(ad.id) as count')
+                        ->orderByDesc('count')
+                        ->limit(10)
+                        ->get();
+                } elseif ($field === 'type') {
+                    return AdType::query()
+                        ->join('ad', function ($join) use ($publicStatuses): void {
+                            $join->on('ad.type_id', '=', 'ad_type.id')
+                                ->whereIn('ad.status', $publicStatuses);
+                        })
+                        ->when($q !== '', fn ($query) => $query->where('ad_type.name', $likeOperator, $prefix))
+                        ->groupBy('ad_type.name')
+                        ->selectRaw('ad_type.name as value, COUNT(ad.id) as count')
+                        ->orderByDesc('count')
+                        ->limit(10)
+                        ->get();
+                }
+
+                return Quarter::query()
                     ->join('ad', function ($join) use ($publicStatuses): void {
                         $join->on('ad.quarter_id', '=', 'quarter.id')
                             ->whereIn('ad.status', $publicStatuses);
@@ -442,7 +449,7 @@ final readonly class AdSearchController
                     ->orderByDesc('count')
                     ->limit(10)
                     ->get();
-            }
+            });
 
             return response()->json([
                 'success' => true,
@@ -480,64 +487,66 @@ final readonly class AdSearchController
                 default => 'CAST(bedrooms as signed)',
             };
 
-            $publicStatuses = array_map(fn (AdStatus $s) => $s->value, Ad::PUBLIC_STATUSES);
+            // Cache for 10 min: 7 heavy GROUP-BY/COUNT/MIN/MAX queries become a single
+            // Redis GET. Facet counts tolerate slight staleness; TTL keeps them fresh
+            // enough for UX. Invalidated automatically when ads change status (TTL roll-off).
+            $data = Cache::remember('ads:facets:'.$driver, 600, function () use ($bedroomsCast): array {
+                $publicStatuses = array_map(fn (AdStatus $s) => $s->value, Ad::PUBLIC_STATUSES);
 
-            $cities = Ad::query()
-                ->join('quarter', 'ad.quarter_id', '=', 'quarter.id')
-                ->join('city', 'quarter.city_id', '=', 'city.id')
-                ->whereIn('ad.status', $publicStatuses)
-                ->whereNotNull('city.name')
-                ->groupBy('city.name')
-                ->selectRaw('city.name as name, COUNT(*) as count')
-                ->orderByDesc('count')
-                ->limit(20)
-                ->get();
+                $cities = Ad::query()
+                    ->join('quarter', 'ad.quarter_id', '=', 'quarter.id')
+                    ->join('city', 'quarter.city_id', '=', 'city.id')
+                    ->whereIn('ad.status', $publicStatuses)
+                    ->whereNotNull('city.name')
+                    ->groupBy('city.name')
+                    ->selectRaw('city.name as name, COUNT(*) as count')
+                    ->orderByDesc('count')
+                    ->limit(20)
+                    ->get();
 
-            $types = Ad::query()
-                ->join('ad_type', 'ad.type_id', '=', 'ad_type.id')
-                ->whereIn('ad.status', $publicStatuses)
-                ->whereNotNull('ad_type.name')
-                ->groupBy('ad_type.name')
-                ->selectRaw('ad_type.name as name, COUNT(*) as count')
-                ->orderByDesc('count')
-                ->limit(20)
-                ->get();
+                $types = Ad::query()
+                    ->join('ad_type', 'ad.type_id', '=', 'ad_type.id')
+                    ->whereIn('ad.status', $publicStatuses)
+                    ->whereNotNull('ad_type.name')
+                    ->groupBy('ad_type.name')
+                    ->selectRaw('ad_type.name as name, COUNT(*) as count')
+                    ->orderByDesc('count')
+                    ->limit(20)
+                    ->get();
 
-            $bedrooms = Ad::query()
-                ->whereIn('status', $publicStatuses)
-                ->whereNotNull('bedrooms')
-                ->groupBy('bedrooms')
-                ->selectRaw($bedroomsCast.' as value, COUNT(*) as count')
-                ->orderBy('value')
-                ->get();
+                $bedrooms = Ad::query()
+                    ->whereIn('status', $publicStatuses)
+                    ->whereNotNull('bedrooms')
+                    ->groupBy('bedrooms')
+                    ->selectRaw($bedroomsCast.' as value, COUNT(*) as count')
+                    ->orderBy('value')
+                    ->get();
 
-            /** @var object{min: string|null, max: string|null}|null $priceRange */
-            $priceRange = Ad::query()
-                ->whereIn('status', $publicStatuses)
-                ->whereNotNull('price')
-                ->selectRaw('MIN(price) as min, MAX(price) as max')
-                ->first();
+                /** @var object{min: string|null, max: string|null}|null $priceRange */
+                $priceRange = Ad::query()
+                    ->whereIn('status', $publicStatuses)
+                    ->whereNotNull('price')
+                    ->selectRaw('MIN(price) as min, MAX(price) as max')
+                    ->first();
 
-            /** @var object{min: string|null, max: string|null}|null $surfaceRange */
-            $surfaceRange = Ad::query()
-                ->whereIn('status', $publicStatuses)
-                ->whereNotNull('surface_area')
-                ->selectRaw('MIN(surface_area) as min, MAX(surface_area) as max')
-                ->first();
+                /** @var object{min: string|null, max: string|null}|null $surfaceRange */
+                $surfaceRange = Ad::query()
+                    ->whereIn('status', $publicStatuses)
+                    ->whereNotNull('surface_area')
+                    ->selectRaw('MIN(surface_area) as min, MAX(surface_area) as max')
+                    ->first();
 
-            $withParking = Ad::query()
-                ->whereIn('status', $publicStatuses)
-                ->where('has_parking', true)
-                ->count();
+                $withParking = Ad::query()
+                    ->whereIn('status', $publicStatuses)
+                    ->where('has_parking', true)
+                    ->count();
 
-            $withoutParking = Ad::query()
-                ->whereIn('status', $publicStatuses)
-                ->where('has_parking', false)
-                ->count();
+                $withoutParking = Ad::query()
+                    ->whereIn('status', $publicStatuses)
+                    ->where('has_parking', false)
+                    ->count();
 
-            return response()->json([
-                'success' => true,
-                'data' => [
+                return [
                     'cities' => $cities,
                     'types' => $types,
                     'bedrooms' => $bedrooms,
@@ -553,8 +562,10 @@ final readonly class AdSearchController
                         'with_parking' => $withParking,
                         'without_parking' => $withoutParking,
                     ],
-                ],
-            ]);
+                ];
+            });
+
+            return response()->json(['success' => true, 'data' => $data]);
         } catch (Throwable $e) {
             $this->log->error('Facets error', [
                 'exception' => $e->getMessage(),

@@ -1,23 +1,33 @@
 {
     "openapi": "3.0.0",
     "info": {
-        "title": "KeyHome api",
-        "description": "Documentation complète de KeyHome api",
-        "license": {
-            "name": "MIT",
-            "url": "https://opensource.org/licenses/MIT"
+        "title": "KeyHome API",
+        "description": "Documentation complète de l'API KeyHome — plateforme immobilière multi-tenant pour l'Afrique subsaharienne francophone (Cameroun / CEMAC / UEMOA). Monnaie : XOF/XAF.",
+        "contact": {
+            "name": "Équipe KeyHome",
+            "email": "dev@keyhome.app"
         },
-        "version": "v1"
+        "license": {
+            "name": "Propriétaire — NéoCraft",
+            "url": "https://keyhome.app"
+        },
+        "version": "1.0.0"
     },
+    "servers": [
+        {
+            "url": "http://localhost:8000",
+            "description": "Serveur local (développement)"
+        }
+    ],
     "paths": {
-        "/api/v1/ads/enhance-description": {
+        "/api/v1/ads/ai/enhance-description": {
             "post": {
                 "tags": [
                     "🏠 Annonces"
                 ],
                 "summary": "Améliorer une description d'annonce via IA",
                 "description": "Utilise l'IA pour améliorer la description d'une annonce immobilière.",
-                "operationId": "c4a352a2751be7d69a9894dd8ce42fe4",
+                "operationId": "78eae690e28df31d7ae51adebc859810",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -40,6 +50,123 @@
                 "responses": {
                     "200": {
                         "description": "Description améliorée"
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "422": {
+                        "description": "Validation échouée"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/ai/generate-from-attributes": {
+            "post": {
+                "tags": [
+                    "🏠 Annonces"
+                ],
+                "summary": "Générer une description à partir des attributs du bien",
+                "description": "Génère une description immobilière professionnelle à partir des caractéristiques du bien (type, ville, surface, etc.).",
+                "operationId": "4bf00e5992126bf360416db9e671ac3f",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "type": {
+                                        "type": "string"
+                                    },
+                                    "city": {
+                                        "type": "string"
+                                    },
+                                    "quarter": {
+                                        "type": "string"
+                                    },
+                                    "bedrooms": {
+                                        "type": "integer"
+                                    },
+                                    "surface": {
+                                        "type": "number"
+                                    },
+                                    "price": {
+                                        "type": "number"
+                                    },
+                                    "transaction_type": {
+                                        "type": "string"
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "maxLength": 2000
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Description générée"
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "422": {
+                        "description": "Validation échouée"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/ai/enhance-title": {
+            "post": {
+                "tags": [
+                    "🏠 Annonces"
+                ],
+                "summary": "Améliorer le titre d'une annonce via IA",
+                "description": "Génère un titre concis, accrocheur et factuel pour une annonce immobilière.",
+                "operationId": "570c38b2287d9b09b9f0f2ef74272c6c",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "title"
+                                ],
+                                "properties": {
+                                    "title": {
+                                        "type": "string",
+                                        "maxLength": 500
+                                    },
+                                    "type": {
+                                        "type": "string"
+                                    },
+                                    "city": {
+                                        "type": "string"
+                                    },
+                                    "transaction_type": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Titre amélioré"
                     },
                     "401": {
                         "description": "Non authentifié"
@@ -400,6 +527,144 @@
                     },
                     "422": {
                         "description": "Erreur lors de la suppression"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/edit-draft": {
+            "delete": {
+                "tags": [
+                    "🔄 Brouillons"
+                ],
+                "summary": "Annuler les modifications brouillon",
+                "description": "Vide `draft_payload` sans toucher à l'annonce publiée.",
+                "operationId": "discardAdEditDraft",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Brouillon annulé"
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "tags": [
+                    "🔄 Brouillons"
+                ],
+                "summary": "Sauvegarder des modifications en brouillon",
+                "description": "Fusionne les champs envoyés dans `draft_payload` sans toucher à l'annonce publiée. Peut être appelé plusieurs fois (merge cumulatif).",
+                "operationId": "saveAdEditDraft",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "description": "UUID de l'annonce",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/DraftPayload"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Brouillon sauvegardé",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "draft_payload": {
+                                                    "$ref": "#/components/schemas/DraftPayload"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    },
+                    "422": {
+                        "description": "L'annonce est un brouillon — utilisez le flux standard"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/edit-draft/apply": {
+            "post": {
+                "tags": [
+                    "🔄 Brouillons"
+                ],
+                "summary": "Appliquer les modifications brouillon",
+                "description": "Promeut le `draft_payload` sur l'annonce publiée et vide le brouillon. L'annonce est re-validée avant application.",
+                "operationId": "applyAdEditDraft",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Modifications appliquées"
+                    },
+                    "422": {
+                        "description": "Aucune modification en attente ou données invalides"
+                    },
+                    "403": {
+                        "description": "Accès refusé"
                     }
                 },
                 "security": [
@@ -777,6 +1042,81 @@
                 ]
             }
         },
+        "/api/v1/ads/{ad}/pdf": {
+            "get": {
+                "tags": [
+                    "📄 PDF / QR Code"
+                ],
+                "summary": "Télécharger la fiche PDF d'une annonce",
+                "description": "Génère et retourne une fiche A4 imprimable de l'annonce au format PDF. Les annonces publiques sont accessibles sans authentification. Le propriétaire/admin peut télécharger n'importe quel statut.",
+                "operationId": "downloadAdPdf",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "description": "UUID de l'annonce",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Fichier PDF (application/pdf)",
+                        "content": {
+                            "application/pdf": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Annonce introuvable ou accès refusé"
+                    }
+                }
+            }
+        },
+        "/api/v1/ads/{ad}/rank-estimate": {
+            "get": {
+                "tags": [
+                    "🏠 Annonces"
+                ],
+                "summary": "Classement estimé dans les résultats de recherche",
+                "description": "Retourne la position estimée d'une annonce dans les résultats Meilisearch pour le même segment marché (ville + type + transaction). Le propriétaire voit son classement et le score de pertinence.",
+                "operationId": "208db879733bacc57ec40a803b74aeb1",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Rank data"
+                    },
+                    "403": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Annonce introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/api/v1/ads/{ad}/reports": {
             "post": {
                 "tags": [
@@ -1021,6 +1361,111 @@
                     },
                     "500": {
                         "description": "Erreur serveur"
+                    }
+                }
+            }
+        },
+        "/api/v1/search/isochrone": {
+            "post": {
+                "tags": [
+                    "🗺️ Géo"
+                ],
+                "summary": "Annonces dans un rayon de trajet",
+                "description": "Retourne les annonces accessibles en moins de N minutes depuis un point. Utilise ORS pour le calcul isochrone et Meilisearch _geoPolygon pour le filtrage.",
+                "operationId": "2df7e5e6c7a995d12e729e033519452d",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "lat",
+                                    "lng"
+                                ],
+                                "properties": {
+                                    "lat": {
+                                        "description": "Latitude du point de départ",
+                                        "type": "number"
+                                    },
+                                    "lng": {
+                                        "description": "Longitude du point de départ",
+                                        "type": "number"
+                                    },
+                                    "max_minutes": {
+                                        "type": "integer",
+                                        "default": 15,
+                                        "maximum": 60,
+                                        "minimum": 5
+                                    },
+                                    "mode": {
+                                        "type": "string",
+                                        "default": "driving-car",
+                                        "enum": [
+                                            "foot-walking",
+                                            "driving-car",
+                                            "cycling-regular"
+                                        ]
+                                    },
+                                    "per_page": {
+                                        "type": "integer",
+                                        "default": 30,
+                                        "maximum": 100,
+                                        "minimum": 1
+                                    },
+                                    "transaction_type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "location",
+                                            "vente"
+                                        ]
+                                    },
+                                    "type_id": {
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Annonces + polygone GeoJSON"
+                    },
+                    "422": {
+                        "description": "Paramètres invalides"
+                    },
+                    "503": {
+                        "description": "ORS non configuré ou indisponible"
+                    }
+                }
+            }
+        },
+        "/api/v1/ads/{ad}/similar": {
+            "get": {
+                "tags": [
+                    "🏠 Annonces"
+                ],
+                "summary": "Annonces similaires",
+                "description": "Retourne jusqu'à 6 annonces similaires (même type + ville + fourchette de prix ±30%). Triées par score de pertinence Meilisearch.",
+                "operationId": "253b149dc79f96756c28b7f3544f93f9",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste d'annonces similaires"
+                    },
+                    "404": {
+                        "description": "Annonce introuvable"
                     }
                 }
             }
@@ -1910,6 +2355,189 @@
                 ]
             }
         },
+        "/api/v1/ads/{ad}/boost/roi": {
+            "get": {
+                "tags": [
+                    "🚀 Boosts"
+                ],
+                "summary": "📈 ROI d'un boost d'annonce",
+                "description": "Compare les interactions (vues, contacts, favoris…) avant, pendant et après le boost le plus récent de l'annonce. Retourne des deltas en valeur absolue et en pourcentage.",
+                "operationId": "16a3c0a59e3f5403e6bc3e612768aafd",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Stats ROI du boost"
+                    },
+                    "403": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Aucun boost trouvé pour cette annonce"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/bulk/status": {
+            "patch": {
+                "tags": [
+                    "🏠 Annonces"
+                ],
+                "summary": "Mise à jour de statut en masse",
+                "description": "Change le statut de plusieurs annonces en une seule requête (max 50). Les propriétaires sont limités aux statuts safe (draft, pending, rent, sold). Les admins peuvent utiliser tous les statuts.",
+                "operationId": "bulkUpdateAdStatus",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "ids",
+                                    "status"
+                                ],
+                                "properties": {
+                                    "ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
+                                        "maxItems": 50
+                                    },
+                                    "status": {
+                                        "type": "string",
+                                        "enum": [
+                                            "draft",
+                                            "pending",
+                                            "available",
+                                            "rent",
+                                            "sold",
+                                            "declined"
+                                        ]
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Résultat de l'opération",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "3 annonce(s) mise(s) à jour."
+                                        },
+                                        "updated": {
+                                            "type": "integer"
+                                        },
+                                        "failed": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string",
+                                                "format": "uuid"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Statut non autorisé pour les propriétaires"
+                    },
+                    "422": {
+                        "description": "Données invalides"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/bulk": {
+            "delete": {
+                "tags": [
+                    "🏠 Annonces"
+                ],
+                "summary": "Suppression en masse d'annonces",
+                "description": "Supprime (soft delete) jusqu'à 50 annonces appartenant à l'utilisateur connecté en une seule requête.",
+                "operationId": "bulkDeleteAds",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "ids"
+                                ],
+                                "properties": {
+                                    "ids": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "string",
+                                            "format": "uuid"
+                                        },
+                                        "maxItems": 50
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Résultat de la suppression",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "5 annonce(s) supprimée(s)."
+                                        },
+                                        "deleted": {
+                                            "type": "integer"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Données invalides"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/cities": {
             "get": {
                 "tags": [
@@ -2234,6 +2862,537 @@
                 }
             }
         },
+        "/api/v1/conversations": {
+            "get": {
+                "tags": [
+                    "💬 Messagerie"
+                ],
+                "summary": "Lister mes conversations",
+                "description": "Retourne la liste paginée des conversations de l'utilisateur connecté (en tant que locataire ou bailleur). Triées par dernier message.",
+                "operationId": "listConversations",
+                "responses": {
+                    "200": {
+                        "description": "Liste des conversations"
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "💬 Messagerie"
+                ],
+                "summary": "Créer ou retrouver une conversation",
+                "description": "Crée une nouvelle conversation locataire-bailleur sur une annonce, ou retourne l'existante. Le locataire doit avoir débloqué l'annonce. Retourne 201 si nouvelle, 200 si existante.",
+                "operationId": "storeConversation",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "ad_id"
+                                ],
+                                "properties": {
+                                    "ad_id": {
+                                        "description": "UUID de l'annonce concernée",
+                                        "type": "string",
+                                        "format": "uuid"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Conversation existante retrouvée"
+                    },
+                    "201": {
+                        "description": "Nouvelle conversation créée"
+                    },
+                    "403": {
+                        "description": "Accès non autorisé (annonce non débloquée)"
+                    },
+                    "404": {
+                        "description": "Annonce introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/conversations/{uuid}": {
+            "get": {
+                "tags": [
+                    "💬 Messagerie"
+                ],
+                "summary": "Détail d'une conversation",
+                "description": "Retourne le détail d'une conversation avec les profils des participants. Retourne 404 si l'utilisateur n'est pas participant (prévention IDOR).",
+                "operationId": "showConversation",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "description": "UUID de la conversation",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Détail de la conversation"
+                    },
+                    "404": {
+                        "description": "Conversation introuvable ou accès non autorisé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/conversations/{uuid}/messages": {
+            "get": {
+                "tags": [
+                    "💬 Messagerie"
+                ],
+                "summary": "Historique des messages",
+                "description": "Retourne les messages d'une conversation en pagination par curseur (newest first). Marque automatiquement les messages comme lus à la première page.",
+                "operationId": "conversationMessages",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "description": "Curseur pour la pagination (retourné dans next_cursor)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Messages avec curseur de pagination",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        },
+                                        "next_cursor": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "has_more": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Conversation introuvable ou non-participant"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "💬 Messagerie"
+                ],
+                "summary": "Envoyer un message",
+                "description": "Envoie un message texte ou chiffré E2EE dans une conversation. Supporte les types text, image, file et les pièces jointes pré-uploadées.",
+                "operationId": "sendMessage",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "body": {
+                                        "description": "Corps du message (vide pour les messages chiffrés)",
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "type": {
+                                        "type": "string",
+                                        "default": "text",
+                                        "enum": [
+                                            "text",
+                                            "image",
+                                            "file"
+                                        ]
+                                    },
+                                    "reply_to_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "nullable": true
+                                    },
+                                    "attachments": {
+                                        "type": "array",
+                                        "items": {
+                                            "type": "object"
+                                        },
+                                        "nullable": true
+                                    },
+                                    "is_client_sealed": {
+                                        "description": "true si le message est chiffré côté client (E2EE)",
+                                        "type": "boolean",
+                                        "default": false
+                                    },
+                                    "e2ee_ciphertext_b64": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "e2ee_iv_b64": {
+                                        "type": "string",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Message envoyé"
+                    },
+                    "404": {
+                        "description": "Conversation introuvable ou non-participant"
+                    },
+                    "422": {
+                        "description": "Données invalides"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/conversations/{uuid}/attachments": {
+            "post": {
+                "tags": [
+                    "💬 Messagerie"
+                ],
+                "summary": "Téléverser une pièce jointe",
+                "description": "Upload un fichier dans la conversation. Retourne un descripteur avec URL signée. À appeler avant `sendMessage` pour inclure la pièce jointe.",
+                "operationId": "uploadConversationAttachment",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "required": [
+                                    "file"
+                                ],
+                                "properties": {
+                                    "file": {
+                                        "description": "Fichier (image, PDF, etc., max 20 Mo)",
+                                        "type": "string",
+                                        "format": "binary"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Descripteur de pièce jointe avec URL signée"
+                    },
+                    "422": {
+                        "description": "Type ou taille invalide"
+                    },
+                    "404": {
+                        "description": "Conversation introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/conversations/{uuid}/read": {
+            "patch": {
+                "tags": [
+                    "💬 Messagerie"
+                ],
+                "summary": "Marquer une conversation comme lue",
+                "description": "PATCH /api/v1/conversations/{uuid}/read\nMark all messages in the conversation as read for the authenticated user.",
+                "operationId": "markConversationAsRead",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Timestamps de lecture mis à jour",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "tenant_last_read_at": {
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "nullable": true
+                                        },
+                                        "landlord_last_read_at": {
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "nullable": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Conversation introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/conversations/{uuid}/typing": {
+            "post": {
+                "tags": [
+                    "💬 Messagerie"
+                ],
+                "summary": "Indicateur de frappe (typing indicator)",
+                "description": "Diffuse un événement WebSocket éphémère indiquant que l'utilisateur est en train d'écrire. Aucune écriture en base.",
+                "operationId": "setTyping",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "is_typing"
+                                ],
+                                "properties": {
+                                    "is_typing": {
+                                        "type": "boolean"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "204": {
+                        "description": "Événement diffusé (pas de contenu)"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/conversations/{uuid}/archive": {
+            "patch": {
+                "tags": [
+                    "💬 Messagerie"
+                ],
+                "summary": "Archiver une conversation",
+                "description": "PATCH /api/v1/conversations/{uuid}/archive\nArchive a conversation. Only the authenticated participant may archive.",
+                "operationId": "archiveConversation",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Conversation archivée",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "archived"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Conversation introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/conversations/{uuid}/unarchive": {
+            "patch": {
+                "tags": [
+                    "💬 Messagerie"
+                ],
+                "summary": "Désarchiver une conversation",
+                "description": "PATCH /api/v1/conversations/{uuid}/unarchive\nRestore an archived conversation. Only participants.",
+                "operationId": "unarchiveConversation",
+                "parameters": [
+                    {
+                        "name": "uuid",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Conversation désarchivée"
+                    },
+                    "404": {
+                        "description": "Conversation introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/conversations/unread-count": {
+            "get": {
+                "tags": [
+                    "💬 Messagerie"
+                ],
+                "summary": "Nombre de messages non lus",
+                "description": "Retourne le total de messages non lus et le détail par conversation. Résultat mis en cache Redis 30 secondes.",
+                "operationId": "conversationsUnreadCount",
+                "responses": {
+                    "200": {
+                        "description": "Compteurs non lus",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "total": {
+                                            "type": "integer",
+                                            "example": 5
+                                        },
+                                        "by_conversation": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/credits/packages": {
             "get": {
                 "tags": [
@@ -2463,7 +3622,7 @@
                     "🗺️ Géo"
                 ],
                 "summary": "Calcul d'itinéraire entre deux points",
-                "description": "Retourne un itinéraire GeoJSON avec résumé (distance, durée) entre deux coordonnées GPS. Profiles : voiture, pied, vélo, fauteuil roulant. Nécessite ORS_API_KEY. Mis en cache 1 h.",
+                "description": "Retourne un itinéraire GeoJSON avec résumé (distance, durée) entre deux coordonnées GPS. Profiles : voiture, pied, vélo, fauteuil roulant. Nécessite ORS_API_KEY. Mis en cache 24 h.",
                 "operationId": "791ff845edcf091d4011ccd65c65026f",
                 "parameters": [
                     {
@@ -2527,6 +3686,352 @@
                 }
             }
         },
+        "/api/v1/disputes": {
+            "get": {
+                "tags": [
+                    "⚖️ Litiges"
+                ],
+                "summary": "Lister les litiges",
+                "description": "Retourne les litiges de l'utilisateur connecté. Les admins voient tous les litiges. Filtrable par `status` et `open_only`.",
+                "operationId": "listDisputes",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filtrer par statut (open, in_review, resolved, closed)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "open_only",
+                        "in": "query",
+                        "description": "Si true, retourne uniquement les litiges ouverts",
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste paginée de litiges",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        },
+                                        "meta": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "⚖️ Litiges"
+                ],
+                "summary": "Ouvrir un litige",
+                "description": "Crée un nouveau litige entre deux parties sur une annonce.",
+                "operationId": "openDispute",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "ad_id",
+                                    "respondent_id",
+                                    "reason"
+                                ],
+                                "properties": {
+                                    "ad_id": {
+                                        "description": "UUID de l'annonce concernée",
+                                        "type": "string",
+                                        "format": "uuid"
+                                    },
+                                    "respondent_id": {
+                                        "description": "UUID de l'utilisateur mis en cause",
+                                        "type": "string",
+                                        "format": "uuid"
+                                    },
+                                    "reason": {
+                                        "description": "Motif du litige",
+                                        "type": "string"
+                                    },
+                                    "description": {
+                                        "description": "Description détaillée",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Litige ouvert avec succès"
+                    },
+                    "422": {
+                        "description": "Données invalides"
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/disputes/{dispute}": {
+            "get": {
+                "tags": [
+                    "⚖️ Litiges"
+                ],
+                "summary": "Détail d'un litige",
+                "description": "Retourne le litige avec ses messages, preuves et parties impliquées.",
+                "operationId": "showDispute",
+                "parameters": [
+                    {
+                        "name": "dispute",
+                        "in": "path",
+                        "description": "UUID du litige",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Litige avec messages et preuves"
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    },
+                    "404": {
+                        "description": "Litige introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/disputes/{dispute}/messages": {
+            "post": {
+                "tags": [
+                    "⚖️ Litiges"
+                ],
+                "summary": "Ajouter un message à un litige",
+                "description": "Envoie un message dans le fil de discussion du litige. Les admins peuvent envoyer des messages internes.",
+                "operationId": "storeDisputeMessage",
+                "parameters": [
+                    {
+                        "name": "dispute",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "body"
+                                ],
+                                "properties": {
+                                    "body": {
+                                        "description": "Contenu du message",
+                                        "type": "string"
+                                    },
+                                    "is_internal": {
+                                        "description": "Message interne admin uniquement",
+                                        "type": "boolean"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Message envoyé"
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    },
+                    "404": {
+                        "description": "Litige introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/disputes/{dispute}/evidence": {
+            "post": {
+                "tags": [
+                    "⚖️ Litiges"
+                ],
+                "summary": "Téléverser une preuve",
+                "description": "Ajoute un fichier (image, PDF) comme preuve dans un litige.",
+                "operationId": "uploadDisputeEvidence",
+                "parameters": [
+                    {
+                        "name": "dispute",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "required": [
+                                    "file",
+                                    "type"
+                                ],
+                                "properties": {
+                                    "file": {
+                                        "description": "Fichier preuve (image ou PDF, max 10 Mo)",
+                                        "type": "string",
+                                        "format": "binary"
+                                    },
+                                    "type": {
+                                        "description": "Type de preuve (photo, document, receipt, other)",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Preuve ajoutée"
+                    },
+                    "422": {
+                        "description": "Fichier invalide"
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/disputes/{dispute}/transition": {
+            "patch": {
+                "tags": [
+                    "⚖️ Litiges"
+                ],
+                "summary": "Changer le statut d'un litige",
+                "description": "Transition d'état d'un litige (admin uniquement pour plupart des transitions). Statuts possibles : in_review, resolved, closed.",
+                "operationId": "transitionDispute",
+                "parameters": [
+                    {
+                        "name": "dispute",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "status"
+                                ],
+                                "properties": {
+                                    "status": {
+                                        "description": "Nouveau statut cible",
+                                        "type": "string",
+                                        "enum": [
+                                            "in_review",
+                                            "resolved",
+                                            "closed"
+                                        ]
+                                    },
+                                    "resolution_note": {
+                                        "description": "Note de résolution (recommandée pour resolved/closed)",
+                                        "type": "string"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Statut mis à jour"
+                    },
+                    "422": {
+                        "description": "Transition invalide"
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/auth/verifyEmail": {
             "post": {
                 "tags": [
@@ -2582,6 +4087,215 @@
                         "description": "Trop de demandes"
                     }
                 }
+            }
+        },
+        "/api/v1/ads/{ad}/expenses": {
+            "get": {
+                "tags": [
+                    "📊 Dépenses"
+                ],
+                "summary": "Lister les dépenses d'un bien",
+                "description": "Retourne les dépenses (maintenance, travaux, charges) liées à l'annonce du bailleur, triées par date.",
+                "operationId": "listExpenses",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "schema": {
+                            "type": "integer",
+                            "default": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste paginée de dépenses avec meta et links"
+                    },
+                    "403": {
+                        "description": "Accès refusé (pas votre bien)"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "📊 Dépenses"
+                ],
+                "summary": "Enregistrer une dépense",
+                "operationId": "storeExpense",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "category",
+                                    "amount",
+                                    "expense_date"
+                                ],
+                                "properties": {
+                                    "category": {
+                                        "description": "Catégorie (maintenance, travaux, charges, assurance, other)",
+                                        "type": "string",
+                                        "example": "maintenance"
+                                    },
+                                    "amount": {
+                                        "description": "Montant en XAF",
+                                        "type": "number",
+                                        "example": 25000
+                                    },
+                                    "expense_date": {
+                                        "type": "string",
+                                        "format": "date",
+                                        "example": "2026-01-15"
+                                    },
+                                    "description": {
+                                        "type": "string",
+                                        "example": "Réparation toiture",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Dépense enregistrée"
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    },
+                    "422": {
+                        "description": "Données invalides"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/expenses/{expense}": {
+            "delete": {
+                "tags": [
+                    "📊 Dépenses"
+                ],
+                "summary": "Supprimer une dépense",
+                "operationId": "destroyExpense",
+                "parameters": [
+                    {
+                        "name": "expense",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Dépense supprimée"
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/expenses/profit-loss": {
+            "get": {
+                "tags": [
+                    "📊 Dépenses"
+                ],
+                "summary": "Bilan recettes / dépenses",
+                "description": "Retourne le total des dépenses, les revenus issus des contrats de bail et le résultat net pour un bien.",
+                "operationId": "profitLoss",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Bilan financier",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "total_expenses": {
+                                                    "type": "number",
+                                                    "example": 125000
+                                                },
+                                                "contract_revenue": {
+                                                    "type": "number",
+                                                    "example": 300000
+                                                },
+                                                "net_income": {
+                                                    "type": "number",
+                                                    "example": 175000
+                                                },
+                                                "expenses_by_category": {
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/v1/my/data-export": {
@@ -2954,6 +4668,43 @@
                 ]
             }
         },
+        "/api/v1/lease-contracts/{leaseContract}/audit-log": {
+            "get": {
+                "tags": [
+                    "📄 Contrats de bail"
+                ],
+                "summary": "Journal d'audit d'un contrat de bail",
+                "description": "Retourne le journal chronologique des événements du contrat : génération, consultation, téléchargement, signature.",
+                "operationId": "5f09df777e07e29cefa376fc765f5918",
+                "parameters": [
+                    {
+                        "name": "leaseContract",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Journal d'audit"
+                    },
+                    "403": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Contrat introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/api/v1/my/ads": {
             "get": {
                 "tags": [
@@ -3246,6 +4997,75 @@
                 ]
             }
         },
+        "/api/v1/my/stats": {
+            "get": {
+                "tags": [
+                    "📊 Statistics"
+                ],
+                "summary": "📊 Dashboard KPIs bailleur",
+                "description": "Retourne les indicateurs clés du tableau de bord du bailleur authentifié :\n     *\n     *     - **active_ads_count** : annonces publiées (AVAILABLE + RESERVED)\n     *     - **active_leases_count** : baux actifs (lease_end >= aujourd'hui)\n     *     - **occupancy_rate** : taux d'occupation (leases actifs / annonces publiées, %)\n     *     - **monthly_rent_total_xaf** : somme des loyers mensuels des baux actifs (XAF)\n     *     - **pending_viewings_count** : visites en attente de confirmation\n     *     - **confirmed_viewings_count** : visites confirmées à venir\n     *     - **active_boosts_count** : boosts en cours\n     *     - **unread_conversations_count** : conversations avec des messages non lus",
+                "operationId": "728dd7676f81241feba3f8e4ca507c00",
+                "responses": {
+                    "200": {
+                        "description": "KPIs du dashboard",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "properties": {
+                                                "active_ads_count": {
+                                                    "type": "integer",
+                                                    "example": 5
+                                                },
+                                                "active_leases_count": {
+                                                    "type": "integer",
+                                                    "example": 3
+                                                },
+                                                "occupancy_rate": {
+                                                    "type": "number",
+                                                    "example": 60
+                                                },
+                                                "monthly_rent_total_xaf": {
+                                                    "type": "number",
+                                                    "example": 750000
+                                                },
+                                                "pending_viewings_count": {
+                                                    "type": "integer",
+                                                    "example": 2
+                                                },
+                                                "confirmed_viewings_count": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "active_boosts_count": {
+                                                    "type": "integer",
+                                                    "example": 1
+                                                },
+                                                "unread_conversations_count": {
+                                                    "type": "integer",
+                                                    "example": 4
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/auth/forgot-password": {
             "post": {
                 "tags": [
@@ -3395,6 +5215,32 @@
                 ]
             }
         },
+        "/api/v1/payments/{txRef}/public-status": {
+            "get": {
+                "tags": [
+                    "💰 Paiements"
+                ],
+                "summary": "Statut public d'un paiement (sans auth)",
+                "description": "Public payment status — minimal payload, no authentication required.\n\nReturns ONLY the status (`pending` | `success` | `failed` | `cancelled`)\nfor a given `tx_ref`. Designed for the post-checkout callback page\n(`/payment/return`, `/credits/callback`, `/payment-success`) where the user's session\ncookie may have been lost during the cross-origin Flutterwave redirect.\n\nSecurity:\n - The `tx_ref` is opaque (`KH-XXXXXXXXXXXX`, ~62-bit entropy) and acts\n   as a one-time capability — knowing it grants ONLY the right to read\n   the payment status, never to modify it or read PII.\n - No user info, amount, payment method, gateway response, or any\n   other detail is returned. Defense-in-depth against ID-enumeration.\n - Rate-limited (60/min per IP) to prevent brute-force of `tx_ref` space.\n - Always returns 200 with `status: 'unknown'` on miss to avoid\n   distinguishing \"exists\" from \"not exists\" via HTTP status codes.",
+                "operationId": "bff6ac897dde859c327369166c530502",
+                "parameters": [
+                    {
+                        "name": "txRef",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "KH-ABCDEF123456"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Statut du paiement (jamais de PII)"
+                    }
+                }
+            }
+        },
         "/api/v1/payments/flutterwave/cancel": {
             "post": {
                 "tags": [
@@ -3511,6 +5357,32 @@
                     },
                     "401": {
                         "description": "Non authentifié"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/payments/{payment}/receipt": {
+            "get": {
+                "tags": [
+                    "💰 Paiements"
+                ],
+                "summary": "Reçu PDF d'une transaction",
+                "description": "Export a single payment as a printable PDF receipt (same auth as history/export).",
+                "operationId": "9fd6ac5510d3dc9b231fd998c5ad1377",
+                "responses": {
+                    "200": {
+                        "description": "PDF"
+                    },
+                    "403": {
+                        "description": "Interdit"
+                    },
+                    "404": {
+                        "description": "Introuvable"
                     }
                 },
                 "security": [
@@ -4781,6 +6653,80 @@
                 ]
             }
         },
+        "/api/v1/payments/{payment}/refund-request": {
+            "post": {
+                "tags": [
+                    "Payments"
+                ],
+                "summary": "Self-service refund request (user-facing). Creates a Pending refund for admin review.",
+                "operationId": "af11721ef85bd8d127ed4b65abe4beb2",
+                "parameters": [
+                    {
+                        "name": "payment",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "reason"
+                                ],
+                                "properties": {
+                                    "reason": {
+                                        "type": "string",
+                                        "example": "Service non rendu"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Refund request created"
+                    },
+                    "403": {
+                        "description": "Payment does not belong to user"
+                    },
+                    "422": {
+                        "description": "Already has a pending or completed refund"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/payments/refunds": {
+            "get": {
+                "tags": [
+                    "Payments"
+                ],
+                "summary": "List authenticated user's own refunds",
+                "operationId": "8ffd0187c162db24dbb4329b8ced173a",
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of refunds"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
         "/api/v1/admin/payments/{payment}/refunds": {
             "get": {
                 "tags": [
@@ -4855,6 +6801,41 @@
                         "description": "Trop de tentatives"
                     }
                 }
+            }
+        },
+        "/api/v1/auth/registerAdmin": {
+            "post": {
+                "tags": [
+                    "🔐 Authentification"
+                ],
+                "summary": "Inscription d'un nouvel administrateur (admin uniquement)",
+                "description": "Bootstrap a new administrator account. Reachable ONLY by an existing\nauthenticated admin (route guarded by `auth:sanctum` + `mfa.admin` +\n`can:admin-access`). The controller itself stays role-agnostic — the\nthree-middleware stack is the authority; we just forward to the\nshared registration handler with `role = admin`.",
+                "operationId": "registerAdmin",
+                "responses": {
+                    "201": {
+                        "description": "Admin créé"
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "403": {
+                        "description": "Accès admin requis (ou MFA manquant)"
+                    },
+                    "409": {
+                        "description": "Email déjà utilisé"
+                    },
+                    "422": {
+                        "description": "Erreur de validation"
+                    },
+                    "429": {
+                        "description": "Trop de tentatives"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
             }
         },
         "/api/v1/auth/check-email": {
@@ -5122,13 +7103,13 @@
                 ]
             }
         },
-        "/api/v1/my/search-alerts": {
+        "/api/v1/search-alerts": {
             "get": {
                 "tags": [
                     "🔔 Alertes"
                 ],
                 "summary": "Lister mes alertes de recherche",
-                "operationId": "e4b78de715aad80b02d6735736dae961",
+                "operationId": "5877e0e312a2052102d1cd1a920edaf3",
                 "responses": {
                     "200": {
                         "description": "Liste des alertes"
@@ -5142,6 +7123,272 @@
                         "sanctum": []
                     }
                 ]
+            },
+            "post": {
+                "tags": [
+                    "🔔 Alertes"
+                ],
+                "summary": "Créer une alerte de recherche",
+                "description": "Crée une nouvelle alerte. Un utilisateur peut avoir au maximum 10 alertes actives.",
+                "operationId": "storeSearchAlert",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "city_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "nullable": true
+                                    },
+                                    "city_name": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "type_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "nullable": true
+                                    },
+                                    "quarter_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "nullable": true
+                                    },
+                                    "price_min": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "price_max": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "bedrooms_min": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "surface_min": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "has_parking": {
+                                        "type": "boolean",
+                                        "nullable": true
+                                    },
+                                    "frequency": {
+                                        "type": "string",
+                                        "default": "daily",
+                                        "enum": [
+                                            "instant",
+                                            "daily",
+                                            "weekly"
+                                        ]
+                                    },
+                                    "is_active": {
+                                        "type": "boolean",
+                                        "default": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Alerte créée"
+                    },
+                    "422": {
+                        "description": "Limite de 10 alertes atteinte ou données invalides"
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/search-alerts/{searchAlert}": {
+            "put": {
+                "tags": [
+                    "🔔 Alertes"
+                ],
+                "summary": "Modifier une alerte",
+                "description": "Met à jour les critères ou la fréquence d'une alerte de recherche.",
+                "operationId": "updateSearchAlert",
+                "parameters": [
+                    {
+                        "name": "searchAlert",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "is_active": {
+                                        "type": "boolean"
+                                    },
+                                    "frequency": {
+                                        "type": "string",
+                                        "enum": [
+                                            "instant",
+                                            "daily",
+                                            "weekly"
+                                        ]
+                                    },
+                                    "price_min": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "price_max": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Alerte mise à jour"
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    },
+                    "404": {
+                        "description": "Alerte introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "🔔 Alertes"
+                ],
+                "summary": "Supprimer une alerte",
+                "operationId": "destroySearchAlert",
+                "parameters": [
+                    {
+                        "name": "searchAlert",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Alerte supprimée"
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/search-alerts/preview-count": {
+            "post": {
+                "tags": [
+                    "🔔 Alertes"
+                ],
+                "summary": "Compter les annonces correspondant à des critères d'alerte",
+                "description": "Retourne le nombre d'annonces actives correspondant aux critères fournis. Utilisé pour afficher 'X annonces correspondent' au moment de la création.",
+                "operationId": "searchAlertPreviewCount",
+                "requestBody": {
+                    "required": false,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "city_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "nullable": true
+                                    },
+                                    "city_name": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "type_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "nullable": true
+                                    },
+                                    "quarter_id": {
+                                        "type": "string",
+                                        "format": "uuid",
+                                        "nullable": true
+                                    },
+                                    "price_min": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "price_max": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "bedrooms_min": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "surface_min": {
+                                        "type": "integer",
+                                        "nullable": true
+                                    },
+                                    "has_parking": {
+                                        "type": "boolean",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Nombre d'annonces correspondantes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "count": {
+                                            "type": "integer",
+                                            "example": 42
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/v1/auth/oauth/{provider}": {
@@ -5447,6 +7694,178 @@
                         "description": "Recent high-rating reviews + aggregate rating"
                     }
                 }
+            }
+        },
+        "/api/v1/payments/stripe/payment-methods": {
+            "get": {
+                "tags": [
+                    "💳 Cartes Stripe"
+                ],
+                "summary": "Lister les cartes Stripe enregistrées",
+                "description": "List the saved cards on the authenticated user's Stripe Customer.\n\nReturns an empty array when the user has no Stripe Customer yet —\nthis is the expected baseline state and not an error.",
+                "operationId": "1c84a45b269892df5aac226fe2c1a0fe",
+                "responses": {
+                    "200": {
+                        "description": "Liste des cartes"
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/payments/stripe/payment-methods/{paymentMethod}": {
+            "delete": {
+                "tags": [
+                    "💳 Cartes Stripe"
+                ],
+                "summary": "Supprimer une carte enregistrée",
+                "description": "Detach a saved card from the authenticated user's Stripe Customer.",
+                "operationId": "4e8581e634b4057ead82f9738e4765a5",
+                "parameters": [
+                    {
+                        "name": "paymentMethod",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "pm_xxx"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Carte supprimée"
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "404": {
+                        "description": "Aucune carte enregistrée"
+                    },
+                    "422": {
+                        "description": "Identifiant invalide"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/payments/stripe/payment-methods/{paymentMethod}/set-default": {
+            "post": {
+                "tags": [
+                    "💳 Cartes Stripe"
+                ],
+                "summary": "Définir une carte comme moyen par défaut",
+                "description": "Mark a saved card as the user's default for off-session charges\n(and Cashier subscription invoicing).",
+                "operationId": "7e2076b5fbe376201d95b24f3ddfce70",
+                "parameters": [
+                    {
+                        "name": "paymentMethod",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "pm_xxx"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Carte définie par défaut"
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "404": {
+                        "description": "Aucune carte enregistrée"
+                    },
+                    "422": {
+                        "description": "Identifiant invalide"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/payments/stripe/setup-intent": {
+            "post": {
+                "tags": [
+                    "💳 Cartes Stripe"
+                ],
+                "summary": "Obtenir un SetupIntent Stripe",
+                "description": "Return a SetupIntent client secret so the frontend can collect a\nnew card (no charge) and attach it to the Customer. Used by the\n« Ajouter une carte » flow in the profile screen.",
+                "operationId": "794e85d1d49084b1f4d345e990e0f5fb",
+                "responses": {
+                    "200": {
+                        "description": "Client secret retourné"
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    },
+                    "502": {
+                        "description": "Erreur Stripe"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/payments/stripe/payment-methods/notify-added": {
+            "post": {
+                "tags": [
+                    "💳 Cartes Stripe"
+                ],
+                "summary": "Envoyer l'email de confirmation d'ajout de carte",
+                "description": "Send a card-added confirmation email to the authenticated user.\n\nCalled by the frontend right after `stripe.confirmSetup` succeeds.\nThe card brand and last4 are passed by the client from Stripe.js metadata.",
+                "operationId": "e3910d6b33c00ffe89525df3d1b1342f",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "brand": {
+                                        "type": "string",
+                                        "example": "visa"
+                                    },
+                                    "last4": {
+                                        "type": "string",
+                                        "example": "4242"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "204": {
+                        "description": "Email envoyé"
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    }
+                },
+                "security": [
+                    {
+                        "sanctum": []
+                    }
+                ]
             }
         },
         "/api/v1/subscriptions/plans": {
@@ -6358,6 +8777,470 @@
                 "security": [
                     {
                         "sanctum": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/tenants": {
+            "get": {
+                "tags": [
+                    "👥 Locataires"
+                ],
+                "summary": "Lister mes locataires",
+                "description": "Retourne les locataires enregistrés par le bailleur connecté, avec le nombre de contrats.",
+                "operationId": "listTenants",
+                "responses": {
+                    "200": {
+                        "description": "Liste paginée de locataires"
+                    },
+                    "401": {
+                        "description": "Non authentifié"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "tags": [
+                    "👥 Locataires"
+                ],
+                "summary": "Ajouter un locataire",
+                "operationId": "storeTenant",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "first_name",
+                                    "last_name"
+                                ],
+                                "properties": {
+                                    "first_name": {
+                                        "type": "string"
+                                    },
+                                    "last_name": {
+                                        "type": "string"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "nullable": true
+                                    },
+                                    "phone": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "id_number": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Locataire créé"
+                    },
+                    "422": {
+                        "description": "Données invalides"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/tenants/{tenant}": {
+            "get": {
+                "tags": [
+                    "👥 Locataires"
+                ],
+                "summary": "Détail d'un locataire",
+                "operationId": "showTenant",
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Locataire avec ses contrats"
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    },
+                    "404": {
+                        "description": "Locataire introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "tags": [
+                    "👥 Locataires"
+                ],
+                "summary": "Modifier un locataire",
+                "operationId": "updateTenant",
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "first_name": {
+                                        "type": "string"
+                                    },
+                                    "last_name": {
+                                        "type": "string"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "nullable": true
+                                    },
+                                    "phone": {
+                                        "type": "string",
+                                        "nullable": true
+                                    },
+                                    "notes": {
+                                        "type": "string",
+                                        "nullable": true
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Locataire mis à jour"
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "👥 Locataires"
+                ],
+                "summary": "Supprimer un locataire",
+                "operationId": "destroyTenant",
+                "parameters": [
+                    {
+                        "name": "tenant",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Locataire supprimé"
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/tour": {
+            "get": {
+                "tags": [
+                    "🏡 Tour 3D"
+                ],
+                "summary": "Configuration du tour 3D",
+                "description": "Retourne la configuration du tour 3D (scènes, URLs signées, hotspots) pour le viewer côté client. Accessible uniquement aux utilisateurs ayant débloqué l'annonce ou aux admins.",
+                "operationId": "getTour",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "description": "UUID de l'annonce",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Configuration du tour 3D",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "has_tour": {
+                                            "type": "boolean"
+                                        },
+                                        "scenes_count": {
+                                            "type": "integer"
+                                        },
+                                        "tour_published_at": {
+                                            "type": "string",
+                                            "format": "date-time",
+                                            "nullable": true
+                                        },
+                                        "config": {
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Accès refusé (annonce non débloquée)"
+                    },
+                    "404": {
+                        "description": "Aucun tour 3D pour cette annonce"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "delete": {
+                "tags": [
+                    "🏡 Tour 3D"
+                ],
+                "summary": "Supprimer le tour 3D",
+                "description": "Supprime toutes les scènes du stockage (S3/R2) et réinitialise les champs du tour sur l'annonce.",
+                "operationId": "destroyTour",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Tour supprimé"
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/tour/scenes": {
+            "post": {
+                "tags": [
+                    "🏡 Tour 3D"
+                ],
+                "summary": "Uploader les scènes 360° du tour",
+                "description": "Upload des images équirectangulaires 360° (JPEG/WebP, max 30 Mo chacune). Configure les hotspots de navigation. Max 20 scènes par annonce.",
+                "operationId": "uploadTourScenes",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "multipart/form-data": {
+                            "schema": {
+                                "required": [
+                                    "scenes"
+                                ],
+                                "properties": {
+                                    "scenes": {
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "image": {
+                                                    "type": "string",
+                                                    "format": "binary"
+                                                },
+                                                "title": {
+                                                    "type": "string"
+                                                },
+                                                "client_id": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "hotspots": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object"
+                                                    },
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        "maxItems": 20
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Tour créé / mis à jour"
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    },
+                    "422": {
+                        "description": "Fichier invalide ou quota dépassé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/ads/{ad}/tour/scenes/{sceneId}/hotspots": {
+            "patch": {
+                "tags": [
+                    "🏡 Tour 3D"
+                ],
+                "summary": "Mettre à jour les hotspots d'une scène",
+                "description": "Remplace la liste des hotspots d'une scène du tour 3D (liens de navigation entre scènes).",
+                "operationId": "updateTourHotspots",
+                "parameters": [
+                    {
+                        "name": "ad",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "sceneId",
+                        "in": "path",
+                        "description": "UUID de la scène",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "hotspots"
+                                ],
+                                "properties": {
+                                    "hotspots": {
+                                        "type": "array",
+                                        "items": {
+                                            "properties": {
+                                                "pitch": {
+                                                    "type": "number"
+                                                },
+                                                "yaw": {
+                                                    "type": "number"
+                                                },
+                                                "target_scene": {
+                                                    "type": "string"
+                                                },
+                                                "label": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Hotspots mis à jour"
+                    },
+                    "403": {
+                        "description": "Accès refusé"
+                    },
+                    "404": {
+                        "description": "Scène introuvable"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
                     }
                 ]
             }
@@ -7692,6 +10575,70 @@
     },
     "components": {
         "schemas": {
+            "DraftPayload": {
+                "description": "Champs modifiables en attente de publication. Tous les champs sont optionnels.",
+                "properties": {
+                    "title": {
+                        "description": "Manages a pending-edit draft payload for existing (non-DRAFT) ads.\n\nFlow:\n  1. PATCH  /ads/{ad}/edit-draft           → save()    — store changes in draft_payload\n  2. POST   /ads/{ad}/edit-draft/apply     → apply()   — promote draft_payload → live ad fields\n  3. DELETE /ads/{ad}/edit-draft           → discard() — clear draft_payload without publishing",
+                        "type": "string",
+                        "example": "Appartement F3 Bastos"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "price": {
+                        "type": "number",
+                        "example": 150000
+                    },
+                    "price_period": {
+                        "type": "string",
+                        "enum": [
+                            "mois",
+                            "jour"
+                        ]
+                    },
+                    "bedrooms": {
+                        "type": "integer"
+                    },
+                    "bathrooms": {
+                        "type": "integer"
+                    },
+                    "surface_area": {
+                        "type": "number"
+                    },
+                    "has_parking": {
+                        "type": "boolean"
+                    },
+                    "quarter_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "type_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "transaction_type": {
+                        "type": "string",
+                        "enum": [
+                            "location",
+                            "vente"
+                        ]
+                    },
+                    "latitude": {
+                        "type": "number"
+                    },
+                    "longitude": {
+                        "type": "number"
+                    },
+                    "attributes": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "type": "object"
+            },
             "RegisterRequest": {
                 "required": [
                     "firstname",
@@ -8733,6 +11680,15 @@
         "securitySchemes": {
             "bearerAuth": {
                 "type": "http",
+                "description": "Token JWT issu de Clerk ou Sanctum. Format : Bearer {token}",
+                "name": "Authorization",
+                "in": "header",
+                "bearerFormat": "JWT",
+                "scheme": "bearer"
+            },
+            "sanctum": {
+                "type": "http",
+                "description": "Token Sanctum (Personal Access Token). Format : Bearer {token}",
                 "name": "Authorization",
                 "in": "header",
                 "bearerFormat": "JWT",
@@ -8750,48 +11706,92 @@
             "description": "Points d'entrée pour les webhooks externes"
         },
         {
+            "name": "💬 Messagerie",
+            "description": "Conversations locataire-bailleur, messages, pièces jointes, E2EE"
+        },
+        {
             "name": "🎯 Crédits / Points",
             "description": "Gestion des packs de points et achats"
         },
         {
-            "name": "🏷️ Type d'annonce",
-            "description": "Gestion des types d'annonces"
-        },
-        {
-            "name": "🏙️ Ville",
-            "description": "Gestion des villes"
-        },
-        {
-            "name": "🔐 Authentification",
-            "description": "Gestion de l'authentification"
-        },
-        {
-            "name": "👤 Utilisateur",
-            "description": "Gestion des utilisateurs"
-        },
-        {
-            "name": "📍 Quartier",
-            "description": "Gestion des quartiers"
-        },
-        {
-            "name": "🏠 Annonces",
-            "description": "Gestion des annonces"
+            "name": "🔄 Brouillons",
+            "description": "Modifications en attente (draft_payload) sur annonces publiées"
         },
         {
             "name": "🔍 Filtre",
-            "description": "Filtrer les annonces"
+            "description": "Recherche, filtres, facettes, autocomplete"
         },
         {
-            "name": "💰 Paiements",
-            "description": "Gestion des paiements"
+            "name": "🗺️ Géo",
+            "description": "Recherche isochrone, heatmap prix, directions, geocoding"
         },
         {
-            "name": "⭐ Recommandations",
-            "description": "Gestion des recommandations"
+            "name": "📄 PDF / QR Code",
+            "description": "Génération de pancarte PDF et QR code d'annonce"
+        },
+        {
+            "name": "📊 Interactions",
+            "description": "Vues, impressions, favoris, partages, clics téléphone"
+        },
+        {
+            "name": "👥 Locataires",
+            "description": "Gestion du carnet de locataires du bailleur"
+        },
+        {
+            "name": "📊 Dépenses",
+            "description": "Suivi des dépenses par bien (maintenance, charges, etc.)"
+        },
+        {
+            "name": "🗓️ Réservations",
+            "description": "Réservations provisoires de créneaux de visite (clients)"
+        },
+        {
+            "name": "📅 Disponibilités",
+            "description": "Gestion des disponibilités de visite (propriétaires)"
+        },
+        {
+            "name": "🔐 Authentification",
+            "description": "Login, logout, refresh token, MFA, Clerk JWT"
+        },
+        {
+            "name": "👤 Utilisateur",
+            "description": "Profil, préférences, avatar, historique connexions"
         },
         {
             "name": "🔒 GDPR",
             "description": "GDPR data export and account deletion"
+        },
+        {
+            "name": "⚖️ Litiges",
+            "description": "Ouverture de litiges, messages, preuves, transitions de statut"
+        },
+        {
+            "name": "🏷️ Type d'annonce",
+            "description": "Référentiel des types de biens (appartement, villa, bureau…)"
+        },
+        {
+            "name": "🏙️ Ville",
+            "description": "Référentiel des villes disponibles sur la plateforme"
+        },
+        {
+            "name": "📍 Quartier",
+            "description": "Référentiel des quartiers par ville"
+        },
+        {
+            "name": "🏡 Tour 3D",
+            "description": "Upload scènes 360°, configuration hotspots, suppression tour"
+        },
+        {
+            "name": "Notifications",
+            "description": "Notifications in-app : liste, lecture, suppression"
+        },
+        {
+            "name": "⭐ Recommandations",
+            "description": "Annonces recommandées pour l'utilisateur"
+        },
+        {
+            "name": "⭐ Avis",
+            "description": "Gestion des avis sur les annonces"
         },
         {
             "name": "🧾 Factures",
@@ -8806,12 +11806,12 @@
             "description": "Push notifications et validation de session PWA"
         },
         {
-            "name": "⭐ Avis",
-            "description": "Gestion des avis sur les annonces"
-        },
-        {
             "name": "OAuth",
             "description": "Social authentication endpoints"
+        },
+        {
+            "name": "💳 Cartes Stripe",
+            "description": "Gestion des moyens de paiement Stripe sauvegardés"
         },
         {
             "name": "📦 Abonnements Agences",
@@ -8822,20 +11822,12 @@
             "description": "Sondages de satisfaction (utilisateurs authentifiés)"
         },
         {
-            "name": "📅 Disponibilités",
-            "description": "Gestion des disponibilités de visite (propriétaires)"
-        },
-        {
-            "name": "🗓️ Réservations",
-            "description": "Réservations provisoires de créneaux de visite (clients)"
+            "name": "🏠 Annonces",
+            "description": "🏠 Annonces"
         },
         {
             "name": "📊 Analytics",
             "description": "📊 Analytics"
-        },
-        {
-            "name": "📊 Interactions",
-            "description": "📊 Interactions"
         },
         {
             "name": "🏢 Agence",
@@ -8846,8 +11838,8 @@
             "description": "👤 Bailleurs"
         },
         {
-            "name": "🗺️ Géo",
-            "description": "🗺️ Géo"
+            "name": "🚀 Boosts",
+            "description": "🚀 Boosts"
         },
         {
             "name": "System",
@@ -8858,20 +11850,24 @@
             "description": "📄 Contrats de bail"
         },
         {
-            "name": "Notifications",
-            "description": "Notifications"
+            "name": "📊 Statistics",
+            "description": "📊 Statistics"
+        },
+        {
+            "name": "💰 Paiements",
+            "description": "💰 Paiements"
         },
         {
             "name": "Admin - Payments",
             "description": "Admin - Payments"
         },
         {
-            "name": "🔔 Alertes",
-            "description": "🔔 Alertes"
+            "name": "Payments",
+            "description": "Payments"
         },
         {
-            "name": "📊 Statistics",
-            "description": "📊 Statistics"
+            "name": "🔔 Alertes",
+            "description": "🔔 Alertes"
         },
         {
             "name": "📩 Support",

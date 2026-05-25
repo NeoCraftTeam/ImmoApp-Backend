@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
+use App\Mail\DisputeOpenedMail;
 use App\Models\Dispute;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Mail\Mailable;
 use Illuminate\Notifications\Notification;
 
 class DisputeOpenedNotification extends Notification implements ShouldQueue
@@ -20,7 +23,14 @@ class DisputeOpenedNotification extends Notification implements ShouldQueue
      */
     public function via(object $notifiable): array
     {
-        return ['database'];
+        return ['database', 'mail'];
+    }
+
+    public function toMail(object $notifiable): Mailable
+    {
+        /** @var User $notifiable */
+        return new DisputeOpenedMail($this->dispute, $notifiable)
+            ->to($notifiable->email, $notifiable->firstname.' '.$notifiable->lastname);
     }
 
     /**

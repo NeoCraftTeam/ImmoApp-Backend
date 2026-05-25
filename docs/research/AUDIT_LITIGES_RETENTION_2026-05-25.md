@@ -176,12 +176,13 @@ class DisputeStatus extends State
 | `NewsletterSubscriber` + `NewsletterCampaign` | ✅ | Email marketing |
 | `PointTransaction` + `point_balance` | ✅ | Crédits gamifiés |
 | `TrustScore` | ✅ | Score de confiance |
-| **Re-engagement D7/D30 automatisé** | ❌ | Absent |
+| **Re-engagement D7/D14/D30 automatisé (email)** | ✅ | Client D7/14/30/60/90 + Owner D7/14/30 — `SendEngagementEmails` |
+| **Lifecycle emails — Client** | ✅ | Welcome → Drip D1/3/7 → First unlock congrats → Inactivity D7/14/30/60/90 |
+| **Lifecycle emails — Owner** | ✅ | Welcome → Drip D1/3/7 → Profile completed → First ad celebration → Re-engagement D7/14/30 |
 | **Streaks (connexion/visite quotidienne)** | ❌ | Absent |
 | **Badges / achievements** | ❌ | Absent |
 | **WhatsApp re-engagement** | ❌ | Absent — critique Afrique |
 | **Cohort analytics D1/D7/D30** | ❌ | Absent |
-| **Lifecycle emails (onboarding, inactive)** | ❌ | Partiels |
 | **"Nouvelles annonces près de chez vous"** | ⚠️ | SearchAlert existe mais non géolocalisé |
 | **In-app messaging contextuel** | ❌ | Absent (notifications génériques) |
 | **A/B testing engagement** | ❌ | Absent |
@@ -213,7 +214,16 @@ class DisputeStatus extends State
 
 #### AXE 2 — Re-engagement automatisé (impact D7/D30)
 
-**Gap :** aucun système de détection d'inactivité.
+**Status :** ✅ Implémenté (`SendEngagementEmails` — `--type=inactivity` / `--type=owner-reengagement`).
+
+**Segments actifs :**
+- **Client D7/D14** : `InactivityReminderMail` (early re-engagement avec compteur nouvelles annonces)
+- **Client D30/60/90** : `InactivityReminderMail` (win-back progressif)
+- **Owner D7** (pas d'annonce) : `OwnerReEngagementMail` — urgence publication
+- **Owner D14** : `OwnerReEngagementMail` — tips mise à jour annonces
+- **Owner D30** : `OwnerReEngagementMail` — win-back + 5 crédits offerts
+
+~~**Gap :** aucun système de détection d'inactivité.~~
 
 **Actions :**
 
@@ -357,7 +367,7 @@ class VonageWhatsAppChannel
 
 | # | Gap | Sévérité | Effort estimé |
 |---|-----|----------|---------------|
-| R1 | Re-engagement D7/D30 job | 🔴 Critique | 1j |
+| R1 | Re-engagement D7/D30 job | ✅ Implémenté | — |
 | R2 | Badges / achievements | 🟡 Moyen | 2j |
 | R3 | Streaks quotidiens | 🟡 Moyen | 4h |
 | R4 | Push géolocalisé (rayon) | 🟡 Moyen | 4h |
@@ -375,7 +385,7 @@ class VonageWhatsAppChannel
 |---|--------|--------|----------|--------|-------|
 | 1 | Migration + Modèle `Dispute` + State machine Spatie | litiges | 🔴 Critique | 2j | backend |
 | 2 | CRUD API `/disputes` + policy IDOR | litiges | 🔴 Critique | 1j | backend |
-| 3 | Job `ReEngagementJob` D7/D14/D30 | rétention | 🔴 Critique | 1j | backend |
+| 3 | ~~Job `ReEngagementJob` D7/D14/D30~~ → `SendEngagementEmails` (client+owner lifecycle) | rétention | ✅ Fait | — | backend |
 | 4 | `DisputeMessages` + `DisputeEvidences` + R2 upload | litiges | 🔴 Critique | 1j | backend |
 | 5 | Panel Filament litiges (liste + dossier + actions) | litiges | 🟡 Moyen | 1j | backend |
 | 6 | Notifications FCM litige (status change, new message) | litiges | 🟡 Moyen | 4h | backend |

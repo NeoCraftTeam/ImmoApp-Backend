@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Enums\PaymentStatus;
+use App\Enums\UserRole;
 use App\Mail\FailedPaymentRetryMail;
 use App\Mail\InactivityReminderMail;
+use App\Mail\OwnerReEngagementMail;
+use App\Mail\OwnerWelcomeDripMail;
 use App\Mail\WeeklyDigestMail;
 use App\Mail\WelcomeDripMail;
 use App\Models\Ad;
@@ -21,9 +24,9 @@ use Illuminate\Support\Facades\Mail;
 class SendEngagementEmails extends Command
 {
     protected $signature = 'app:send-engagement-emails
-                            {--type=all : Type of engagement email to send (all|drip|inactivity|failed-payment|digest)}';
+                            {--type=all : Type of engagement email to send (all|drip|owner-drip|inactivity|owner-reengagement|failed-payment|digest)}';
 
-    protected $description = 'Send engagement emails: welcome drip series, inactivity reminders, failed payment retries, weekly digest';
+    protected $description = 'Send lifecycle engagement emails: client drip D1/3/7, owner drip D1/3/7, client inactivity D7/14/30/60/90, owner re-engagement D7/14/30, failed-payment retries, weekly digest';
 
     public function handle(): int
     {
@@ -33,8 +36,16 @@ class SendEngagementEmails extends Command
             $this->sendWelcomeDrip();
         }
 
+        if ($type === 'all' || $type === 'owner-drip') {
+            $this->sendOwnerWelcomeDrip();
+        }
+
         if ($type === 'all' || $type === 'inactivity') {
             $this->sendInactivityReminders();
+        }
+
+        if ($type === 'all' || $type === 'owner-reengagement') {
+            $this->sendOwnerReEngagement();
         }
 
         if ($type === 'all' || $type === 'failed-payment') {
@@ -52,6 +63,7 @@ class SendEngagementEmails extends Command
     {
         foreach ([1, 3, 7] as $day) {
             $users = User::query()
+                ->where('role', UserRole::CUSTOMER)
                 ->whereBetween('created_at', [
                     now()->subDays($day + 1),
                     now()->subDays($day),
@@ -73,10 +85,37 @@ class SendEngagementEmails extends Command
         }
     }
 
+    private function sendOwnerWelcomeDrip(): void
+    {
+        foreach ([1, 3, 7] as $day) {
+            $owners = User::query()
+                ->where('role', UserRole::AGENT)
+                ->whereBetween('created_at', [
+                    now()->subDays($day + 1),
+                    now()->subDays($day),
+                ])
+                ->get();
+
+            foreach ($owners as $owner) {
+                if (!$this->isEligible($owner, 'engagement_emails')) {
+                    continue;
+                }
+
+                try {
+                    Mail::to($owner->email, $owner->firstname)->queue(new OwnerWelcomeDripMail($owner, $day));
+                    $this->info("Owner drip day {$day} queued for {$owner->email}");
+                } catch (\Throwable $e) {
+                    Log::error("OwnerWelcomeDrip D{$day} failed for user {$owner->id}", ['error' => $e->getMessage()]);
+                }
+            }
+        }
+    }
+
     private function sendInactivityReminders(): void
     {
-        foreach ([30, 60, 90] as $days) {
+        foreach ([7, 14, 30, 60, 90] as $days) {
             $users = User::query()
+                ->where('role', UserRole::CUSTOMER)
                 ->where(function ($q) use ($days): void {
                     $q->whereBetween('last_home_visit_at', [
                         now()->subDays($days + 1),
@@ -105,6 +144,52 @@ class SendEngagementEmails extends Command
                     $this->info("Inactivity ({$days}d) queued for {$user->email}");
                 } catch (\Throwable $e) {
                     Log::error("InactivityReminder failed for user {$user->id}", ['error' => $e->getMessage()]);
+                }
+            }
+        }
+    }
+
+    private function sendOwnerReEngagement(): void
+    {
+        foreach ([7, 14, 30] as $days) {
+            $owners = User::query()
+                ->where('role', UserRole::AGENT)
+                ->where(function ($q) use ($days): void {
+                    $q->whereBetween('last_seen_at', [
+                        now()->subDays($days + 1),
+                        now()->subDays($days),
+                    ])->orWhere(function ($q2) use ($days): void {
+                        $q2->whereNull('last_seen_at')
+                            ->whereBetween('created_at', [
+                                now()->subDays($days + 1),
+                                now()->subDays($days),
+                            ]);
+                    });
+                })
+                ->withCount(['ads as active_ads_count' => fn ($q) => $q->whereIn('status', ['available', 'pending'])])
+                ->get();
+
+            foreach ($owners as $owner) {
+                if (!$this->isEligible($owner, 'engagement_emails')) {
+                    continue;
+                }
+
+                $activeAdsCount = (int) $owner->getAttribute('active_ads_count');
+                $hasPublishedAd = $activeAdsCount > 0
+                    || Ad::where('user_id', $owner->id)->exists();
+
+                try {
+                    Mail::to($owner->email, $owner->firstname)->queue(
+                        new OwnerReEngagementMail(
+                            user: $owner,
+                            daysSinceActivity: $days,
+                            hasPublishedAd: $hasPublishedAd,
+                            activeAdsCount: $activeAdsCount,
+                        )
+                    );
+                    $this->info("OwnerReEngagement ({$days}d) queued for {$owner->email}");
+                } catch (\Throwable $e) {
+                    Log::error("OwnerReEngagement D{$days} failed for user {$owner->id}", ['error' => $e->getMessage()]);
                 }
             }
         }

@@ -101,7 +101,7 @@ final class AdSimilarController
                 ->whereHas('quarter', fn ($q) => $q->where('city_id', $cityId))
                 ->orderByDesc('created_at')
                 ->limit(self::LIMIT)
-                ->with(['quarter.city', 'type', 'media'])
+                ->with(['quarter.city', 'ad_type', 'media'])
                 ->get();
 
             return response()->json([
@@ -112,7 +112,7 @@ final class AdSimilarController
 
         // Load full models for the resource
         $ids = $results->pluck('id');
-        $fullAds = Ad::with(['quarter.city', 'type', 'media'])
+        $fullAds = Ad::with(['quarter.city', 'ad_type', 'media'])
             ->whereIn('id', $ids)
             ->get()
             ->keyBy('id');

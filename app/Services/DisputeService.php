@@ -8,9 +8,12 @@ use App\Enums\DisputeEvidenceType;
 use App\Enums\DisputeStatus;
 use App\Enums\DisputeType;
 use App\Enums\UserRole;
+use App\Models\Ad;
 use App\Models\Dispute;
 use App\Models\DisputeEvidence;
 use App\Models\DisputeMessage;
+use App\Models\LeaseContract;
+use App\Models\Payment;
 use App\Models\User;
 use App\Notifications\DisputeMessageReceivedNotification;
 use App\Notifications\DisputeOpenedNotification;
@@ -33,7 +36,7 @@ class DisputeService
     /**
      * @param  array{
      *     type: DisputeType|string,
-     *     respondent_id: string,
+     *     respondent_id?: string|null,
      *     title: string,
      *     description: string,
      *     amount_claimed?: int|null,
@@ -44,7 +47,19 @@ class DisputeService
      */
     public function open(User $initiator, array $payload): Dispute
     {
-        if ($initiator->id === $payload['respondent_id']) {
+        $respondentId = $payload['respondent_id'] ?? null;
+
+        if ($respondentId === null) {
+            $respondentId = $this->resolveRespondentFromContext($initiator, $payload);
+        }
+
+        if ($respondentId === null) {
+            throw ValidationException::withMessages([
+                'respondent_id' => "Impossible d'identifier la partie adverse à partir du contexte fourni.",
+            ]);
+        }
+
+        if ($initiator->id === $respondentId) {
             throw ValidationException::withMessages([
                 'respondent_id' => 'Vous ne pouvez pas ouvrir un litige contre vous-même.',
             ]);
@@ -60,7 +75,7 @@ class DisputeService
             'type' => $type,
             'status' => DisputeStatus::OPEN,
             'initiator_id' => $initiator->id,
-            'respondent_id' => $payload['respondent_id'],
+            'respondent_id' => $respondentId,
             'ad_id' => $payload['ad_id'] ?? null,
             'lease_id' => $payload['lease_id'] ?? null,
             'payment_id' => $payload['payment_id'] ?? null,
@@ -180,6 +195,59 @@ class DisputeService
 
             return $dispute;
         });
+    }
+
+    /**
+     * Resolve the counterparty user id from the dispute context.
+     *
+     * - ad_id      → the ad owner (`ad.user_id`)
+     * - lease_id   → the other party (tenant ↔ landlord)
+     * - payment_id → the payment receiver (`payment.user_id`)
+     *
+     * Returns null when no context is provided or none can be resolved.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function resolveRespondentFromContext(User $initiator, array $payload): ?string
+    {
+        // 1) Ad owner — most common KeyHome case (renter ↔ landlord on a listing).
+        if (!empty($payload['ad_id'])) {
+            $ad = Ad::query()->find($payload['ad_id']);
+            if ($ad !== null && $ad->user_id !== $initiator->id) {
+                return $ad->user_id;
+            }
+        }
+
+        // 2) Lease — tenant ↔ landlord (whichever is NOT the initiator).
+        if (!empty($payload['lease_id'])) {
+            $lease = LeaseContract::query()->find($payload['lease_id']);
+            if ($lease !== null) {
+                $other = $lease->user_id === $initiator->id
+                    ? $lease->tenant_id
+                    : $lease->user_id;
+                if ($other !== null && $other !== $initiator->id) {
+                    return $other;
+                }
+            }
+        }
+
+        // 3) Payment — the recipient (current owner of the underlying ad/agency)
+        //    is approximated by the payment's user_id when it is not the initiator.
+        if (!empty($payload['payment_id'])) {
+            $payment = Payment::query()->find($payload['payment_id']);
+            if ($payment !== null && $payment->user_id !== $initiator->id) {
+                return $payment->user_id;
+            }
+            // Fallback: payment is initiator's own → look up the related ad's owner.
+            if ($payment !== null && !empty($payment->ad_id)) {
+                $ad = Ad::query()->find($payment->ad_id);
+                if ($ad !== null && $ad->user_id !== $initiator->id) {
+                    return $ad->user_id;
+                }
+            }
+        }
+
+        return null;
     }
 
     private function generateReference(): string

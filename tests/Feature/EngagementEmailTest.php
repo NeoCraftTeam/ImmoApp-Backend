@@ -3,6 +3,8 @@
 use App\Console\Commands\SendEngagementEmails;
 use App\Mail\FailedPaymentRetryMail;
 use App\Mail\InactivityReminderMail;
+use App\Mail\OwnerReEngagementMail;
+use App\Mail\OwnerWelcomeDripMail;
 use App\Mail\WeeklyDigestMail;
 use App\Mail\WelcomeDripMail;
 use App\Models\EmailPreference;
@@ -20,7 +22,7 @@ use Illuminate\Support\Facades\Mail;
 it('queues a day-1 welcome drip email for users created 1 day ago', function (): void {
     Mail::fake();
 
-    $user = User::factory()->create([
+    $user = User::factory()->customers()->create([
         'created_at' => now()->subDays(1)->subHours(2),
     ]);
     EmailPreference::getOrCreateForUser($user);
@@ -34,7 +36,7 @@ it('queues a day-1 welcome drip email for users created 1 day ago', function ():
 it('queues a day-3 welcome drip email for users created 3 days ago', function (): void {
     Mail::fake();
 
-    $user = User::factory()->create([
+    $user = User::factory()->customers()->create([
         'created_at' => now()->subDays(3)->subHours(2),
     ]);
     EmailPreference::getOrCreateForUser($user);
@@ -48,7 +50,7 @@ it('queues a day-3 welcome drip email for users created 3 days ago', function ()
 it('queues a day-7 welcome drip email for users created 7 days ago', function (): void {
     Mail::fake();
 
-    $user = User::factory()->create([
+    $user = User::factory()->customers()->create([
         'created_at' => now()->subDays(7)->subHours(2),
     ]);
     EmailPreference::getOrCreateForUser($user);
@@ -62,7 +64,7 @@ it('queues a day-7 welcome drip email for users created 7 days ago', function ()
 it('does not send welcome drip when engagement_emails preference is disabled', function (): void {
     Mail::fake();
 
-    $user = User::factory()->create([
+    $user = User::factory()->customers()->create([
         'created_at' => now()->subDays(1)->subHours(2),
     ]);
     $pref = EmailPreference::getOrCreateForUser($user);
@@ -95,7 +97,7 @@ it('does not send welcome drip for users created at a non-matching time', functi
 it('queues an inactivity reminder for users inactive for 30 days', function (): void {
     Mail::fake();
 
-    $user = User::factory()->create([
+    $user = User::factory()->customers()->create([
         'last_home_visit_at' => now()->subDays(30)->subHours(2),
     ]);
     EmailPreference::getOrCreateForUser($user);
@@ -109,7 +111,7 @@ it('queues an inactivity reminder for users inactive for 30 days', function (): 
 it('queues an inactivity reminder for users with no last_home_visit_at created 30 days ago', function (): void {
     Mail::fake();
 
-    $user = User::factory()->create([
+    $user = User::factory()->customers()->create([
         'last_home_visit_at' => null,
         'created_at' => now()->subDays(30)->subHours(2),
     ]);
@@ -124,7 +126,7 @@ it('queues an inactivity reminder for users with no last_home_visit_at created 3
 it('does not send inactivity reminder when engagement_emails preference is disabled', function (): void {
     Mail::fake();
 
-    $user = User::factory()->create([
+    $user = User::factory()->customers()->create([
         'last_home_visit_at' => now()->subDays(30)->subHours(2),
     ]);
     $pref = EmailPreference::getOrCreateForUser($user);
@@ -264,4 +266,70 @@ it('does not send weekly digest for users without active search alerts', functio
         ->assertSuccessful();
 
     Mail::assertNotQueued(WeeklyDigestMail::class);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Owner Welcome Drip Emails
+|--------------------------------------------------------------------------
+*/
+
+it('queues a day-1 owner welcome drip for owners created 1 day ago', function (): void {
+    Mail::fake();
+
+    $owner = User::factory()->agents()->create([
+        'created_at' => now()->subDays(1)->subHours(2),
+    ]);
+    EmailPreference::getOrCreateForUser($owner);
+
+    $this->artisan(SendEngagementEmails::class, ['--type' => 'owner-drip'])
+        ->assertSuccessful();
+
+    Mail::assertQueued(OwnerWelcomeDripMail::class, fn ($mail) => $mail->user->id === $owner->id && $mail->day === 1);
+});
+
+it('does not send owner drip to customer role users', function (): void {
+    Mail::fake();
+
+    User::factory()->customers()->create([
+        'created_at' => now()->subDays(1)->subHours(2),
+    ]);
+
+    $this->artisan(SendEngagementEmails::class, ['--type' => 'owner-drip'])
+        ->assertSuccessful();
+
+    Mail::assertNotQueued(OwnerWelcomeDripMail::class);
+});
+
+/*
+|--------------------------------------------------------------------------
+| Owner Re-engagement Emails
+|--------------------------------------------------------------------------
+*/
+
+it('queues an owner re-engagement email for inactive owner at D7 with no ad', function (): void {
+    Mail::fake();
+
+    $owner = User::factory()->agents()->create([
+        'last_seen_at' => now()->subDays(7)->subHours(2),
+    ]);
+    EmailPreference::getOrCreateForUser($owner);
+
+    $this->artisan(SendEngagementEmails::class, ['--type' => 'owner-reengagement'])
+        ->assertSuccessful();
+
+    Mail::assertQueued(OwnerReEngagementMail::class, fn ($mail) => $mail->user->id === $owner->id && $mail->daysSinceActivity === 7);
+});
+
+it('does not send owner re-engagement to customer role users', function (): void {
+    Mail::fake();
+
+    User::factory()->customers()->create([
+        'last_seen_at' => now()->subDays(7)->subHours(2),
+    ]);
+
+    $this->artisan(SendEngagementEmails::class, ['--type' => 'owner-reengagement'])
+        ->assertSuccessful();
+
+    Mail::assertNotQueued(OwnerReEngagementMail::class);
 });

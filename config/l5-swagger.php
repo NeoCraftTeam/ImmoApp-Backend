@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\LocalEnvironmentOnly;
 use L5Swagger\Generator;
 use OpenApi\scan;
 
@@ -8,7 +9,7 @@ return [
     'documentations' => [
         'default' => [
             'api' => [
-                'title' => 'L5 Swagger UI',
+                'title' => 'KeyHome API — Documentation',
             ],
 
             'routes' => [
@@ -68,9 +69,11 @@ return [
              * Middleware allows to prevent unexpected access to API documentation
              */
             'middleware' => [
-                'api' => ['web'],
-                'asset' => [],
-                'docs' => [],
+                // LocalEnvironmentOnly blocks access on staging/production.
+                // Remove it if you want a password-protected public docs instance.
+                'api' => ['web', LocalEnvironmentOnly::class],
+                'asset' => [LocalEnvironmentOnly::class],
+                'docs' => [LocalEnvironmentOnly::class],
                 'oauth2_callback' => [],
             ],
 

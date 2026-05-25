@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\UserRole;
+use App\Mail\OwnerProfileCompletedMail;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
 
 final class UserPreferenceController
 {
@@ -21,6 +24,10 @@ final class UserPreferenceController
         if (!$user->onboarding_completed_at) {
             $user->onboarding_completed_at = now();
             $user->save();
+
+            if ($user->role === UserRole::AGENT && $user->email && !str_ends_with($user->email, '@clerk.local')) {
+                Mail::to($user->email, $user->firstname)->queue(new OwnerProfileCompletedMail($user));
+            }
         }
 
         return response()->json(['message' => 'Onboarding complété.']);

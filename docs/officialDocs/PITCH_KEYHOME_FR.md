@@ -235,6 +235,24 @@ Si une annonce semble suspecte — photos manifestement volées sur internet, pr
 
 ---
 
+### 21 bis. Le Centre de Résolution — Ouvrir un litige en toute sécurité
+
+Quand un problème survient après une transaction — caution non restituée, bien non conforme à l'annonce, accès au logement refusé, impayé, résiliation abusive — le locataire dispose d'un **Centre de Résolution intégré**, inspiré des meilleures pratiques des plateformes de confiance comme PayPal et Airbnb.
+
+**Le flux est entièrement contextuel.** Le locataire n'a pas besoin de chercher un numéro ou un identifiant de l'autre partie. Il clique sur **« Signaler un problème »** directement sur la page de l'annonce concernée, ou ouvre un litige depuis son tableau de bord en sélectionnant l'annonce ou la conversation impliquée. KeyHome **identifie automatiquement** la partie adverse à partir du contexte (propriétaire de l'annonce, partenaire du bail, bénéficiaire du paiement).
+
+**Le processus structuré :**
+
+1. **Ouverture du litige** — Le locataire choisit la nature du problème (caution, réparations, résiliation, paiement, accès refusé, annonce non conforme, autre), rédige un titre et une description précise, et peut indiquer un montant réclamé en FCFA.
+2. **Notification immédiate** — La partie adverse et l'équipe KeyHome sont notifiées instantanément. Un **numéro de référence unique** (ex. `KH-LITIGE-2025-A3B4C2`) est généré pour chaque litige.
+3. **Échange sécurisé** — Les deux parties peuvent s'exprimer via une **messagerie interne dédiée au litige**, consultable par les deux parties et les modérateurs. Des **preuves** (photos, documents, captures d'écran, contrats, reçus) peuvent être jointes à tout moment.
+4. **Escalade et médiation** — Si aucun accord amiable n'est trouvé, le litige est escaladé vers l'équipe de médiation KeyHome. Un **délai SLA** garantit qu'un administrateur prend en charge le dossier sous 7 jours.
+5. **Résolution** — L'administrateur peut clôturer le litige en faveur de l'initiateur, du défendeur, ou constater un accord amiable. Une **note de résolution** officielle est versée au dossier et visible par les deux parties.
+
+**Sécurité et équité :** Il est impossible d'ouvrir un litige contre soi-même, de voir les litiges d'autres utilisateurs, ou d'interagir avec un dossier clôturé. Les messages internes de médiation sont visibles uniquement par les administrateurs.
+
+---
+
 ### 22. Consulter le profil public du bailleur — La transparence comme principe
 
 Chaque bailleur inscrit sur KeyHome dispose d'une **page de profil publique et vérifiable**. Le locataire peut y consulter : toutes les annonces actives du bailleur, les avis laissés par les locataires précédents, la note moyenne obtenue, le badge de vérification d'identité (KYC), l'ancienneté sur la plateforme, et son historique de réactivité. La transparence est un principe fondateur de KeyHome — plus de bailleurs anonymes, plus de zones d'ombre, plus d'inégalité d'information entre locataires et propriétaires.

@@ -36,6 +36,39 @@ final class SearchAlertController
         return JsonResource::collection($alerts);
     }
 
+    /**
+     * @OA\Post(
+     *     path="/api/v1/search-alerts",
+     *     summary="Créer une alerte de recherche",
+     *     description="Crée une nouvelle alerte. Un utilisateur peut avoir au maximum 10 alertes actives.",
+     *     operationId="storeSearchAlert",
+     *     tags={"🔔 Alertes"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="city_id", type="string", format="uuid", nullable=true),
+     *             @OA\Property(property="city_name", type="string", nullable=true),
+     *             @OA\Property(property="type_id", type="string", format="uuid", nullable=true),
+     *             @OA\Property(property="quarter_id", type="string", format="uuid", nullable=true),
+     *             @OA\Property(property="price_min", type="integer", nullable=true),
+     *             @OA\Property(property="price_max", type="integer", nullable=true),
+     *             @OA\Property(property="bedrooms_min", type="integer", nullable=true),
+     *             @OA\Property(property="surface_min", type="integer", nullable=true),
+     *             @OA\Property(property="has_parking", type="boolean", nullable=true),
+     *             @OA\Property(property="frequency", type="string", enum={"instant","daily","weekly"}, default="daily"),
+     *             @OA\Property(property="is_active", type="boolean", default=true)
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=201, description="Alerte créée"),
+     *     @OA\Response(response=422, description="Limite de 10 alertes atteinte ou données invalides"),
+     *     @OA\Response(response=401, description="Non authentifié")
+     * )
+     */
     public function store(StoreSearchAlertRequest $request): JsonResponse
     {
         $data = $request->validated();
@@ -51,6 +84,30 @@ final class SearchAlertController
         return response()->json(new JsonResource($alert), 201);
     }
 
+    /**
+     * @OA\Put(
+     *     path="/api/v1/search-alerts/{searchAlert}",
+     *     summary="Modifier une alerte",
+     *     description="Met à jour les critères ou la fréquence d'une alerte de recherche.",
+     *     operationId="updateSearchAlert",
+     *     tags={"🔔 Alertes"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Parameter(name="searchAlert", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\RequestBody(required=true, @OA\JsonContent(
+     *
+     *         @OA\Property(property="is_active", type="boolean"),
+     *         @OA\Property(property="frequency", type="string", enum={"instant","daily","weekly"}),
+     *         @OA\Property(property="price_min", type="integer", nullable=true),
+     *         @OA\Property(property="price_max", type="integer", nullable=true)
+     *     )),
+     *
+     *     @OA\Response(response=200, description="Alerte mise à jour"),
+     *     @OA\Response(response=403, description="Accès refusé"),
+     *     @OA\Response(response=404, description="Alerte introuvable")
+     * )
+     */
     public function update(UpdateSearchAlertRequest $request, SearchAlert $searchAlert): JsonResponse
     {
         $this->authorizeAlert($request, $searchAlert);
@@ -62,6 +119,20 @@ final class SearchAlertController
         return response()->json(new JsonResource($searchAlert));
     }
 
+    /**
+     * @OA\Delete(
+     *     path="/api/v1/search-alerts/{searchAlert}",
+     *     summary="Supprimer une alerte",
+     *     operationId="destroySearchAlert",
+     *     tags={"🔔 Alertes"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Parameter(name="searchAlert", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\Response(response=200, description="Alerte supprimée"),
+     *     @OA\Response(response=403, description="Accès refusé")
+     * )
+     */
     public function destroy(Request $request, SearchAlert $searchAlert): JsonResponse
     {
         $this->authorizeAlert($request, $searchAlert);
@@ -75,6 +146,36 @@ final class SearchAlertController
      * Used by the frontend to show "X annonces correspondent" at creation time.
      *
      * POST /search-alerts/preview-count
+     *
+     * @OA\Post(
+     *     path="/api/v1/search-alerts/preview-count",
+     *     summary="Compter les annonces correspondant à des critères d'alerte",
+     *     description="Retourne le nombre d'annonces actives correspondant aux critères fournis. Utilisé pour afficher 'X annonces correspondent' au moment de la création.",
+     *     operationId="searchAlertPreviewCount",
+     *     tags={"🔔 Alertes"},
+     *
+     *     @OA\RequestBody(
+     *         required=false,
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="city_id", type="string", format="uuid", nullable=true),
+     *             @OA\Property(property="city_name", type="string", nullable=true),
+     *             @OA\Property(property="type_id", type="string", format="uuid", nullable=true),
+     *             @OA\Property(property="quarter_id", type="string", format="uuid", nullable=true),
+     *             @OA\Property(property="price_min", type="integer", nullable=true),
+     *             @OA\Property(property="price_max", type="integer", nullable=true),
+     *             @OA\Property(property="bedrooms_min", type="integer", nullable=true),
+     *             @OA\Property(property="surface_min", type="integer", nullable=true),
+     *             @OA\Property(property="has_parking", type="boolean", nullable=true)
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=200, description="Nombre d'annonces correspondantes", @OA\JsonContent(
+     *
+     *         @OA\Property(property="count", type="integer", example=42)
+     *     ))
+     * )
      */
     public function previewCount(Request $request): JsonResponse
     {

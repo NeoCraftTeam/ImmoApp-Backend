@@ -2,10 +2,20 @@
 
 @section('title', 'Votre espace bailleur est prêt — ' . config('app.name'))
 
+@section('hero')
+    @include('emails.partials.hero', [
+        'heroBg'      => 'linear-gradient(135deg, #042f2e 0%, #0d9488 100%)',
+        'heroEyebrow' => 'Espace Bailleur',
+        'heroText'    => 'Votre tableau de bord est prêt',
+        'heroSub'     => 'Publiez, gérez et développez votre patrimoine sur ' . config('app.name'),
+    ])
+@endsection
+
 @section('preheader', 'Publiez vos premières annonces, recevez des demandes de visite et gérez vos biens immobiliers — le tout depuis un seul tableau de bord.')
 
 @section('content')
 
+    <span class="eyebrow">Tableau de bord bailleur</span>
     <h1>Bienvenue, {{ $user->firstname }}</h1>
 
     <p class="text">

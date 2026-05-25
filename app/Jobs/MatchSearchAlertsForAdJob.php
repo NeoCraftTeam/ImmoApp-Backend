@@ -38,11 +38,23 @@ class MatchSearchAlertsForAdJob implements ShouldQueue
         $bufferedCount = 0;
         $now = now();
 
+        $cityId = $ad->quarter?->city_id;
+        $typeId = $ad->type_id;
+        $quarterId = $ad->quarter_id;
+        $price = $ad->price !== null ? (float) $ad->price : null;
+
         SearchAlert::query()
             ->where('is_active', true)
             ->where('user_id', '!=', $ad->user_id)
+            // DB-level pre-filter: only load alerts whose city/type/quarter match the ad
+            // (NULL means "any", so we keep NULLs too). Reduces PHP-side work dramatically.
+            ->when($cityId, fn ($q) => $q->where(fn ($q2) => $q2->whereNull('city_id')->orWhere('city_id', $cityId)))
+            ->when($typeId, fn ($q) => $q->where(fn ($q2) => $q2->whereNull('type_id')->orWhere('type_id', $typeId)))
+            ->when($quarterId, fn ($q) => $q->where(fn ($q2) => $q2->whereNull('quarter_id')->orWhere('quarter_id', $quarterId)))
+            ->when($price !== null, fn ($q) => $q->where(fn ($q2) => $q2->whereNull('price_max')->orWhere('price_max', '>=', $price)))
+            ->when($price !== null, fn ($q) => $q->where(fn ($q2) => $q2->whereNull('price_min')->orWhere('price_min', '<=', $price)))
             ->with('user')
-            ->chunkById(500, function ($alerts) use ($ad, $now, &$bufferedCount): void {
+            ->chunkById(200, function ($alerts) use ($ad, $now, &$bufferedCount): void {
                 foreach ($alerts as $alert) {
                     if (!$alert->matchesAd($ad)) {
                         continue;

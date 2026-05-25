@@ -4,9 +4,19 @@
 
 @section('preheader', __('emails.welcome.preheader', ['app' => config('app.name')]))
 
+@section('hero')
+    @include('emails.partials.hero', [
+        'heroBg'      => 'linear-gradient(135deg, #1e293b 0%, #C73B52 100%)',
+        'heroEyebrow' => 'Compte activé',
+        'heroText'    => 'Bienvenue sur ' . config('app.name'),
+        'heroSub'     => '« Votre patrimoine immobilier en poche »',
+    ])
+@endsection
+
 @section('content')
 
-    <h1>{{ __('emails.welcome.heading', ['name' => $user->lastname]) }}</h1>
+    <span class="eyebrow">Votre compte est prêt</span>
+    <h1>{{ __('emails.welcome.heading', ['name' => $user->firstname]) }}</h1>
 
     <p class="text">
         {!! __('emails.welcome.intro', ['app' => config('app.name')]) !!}

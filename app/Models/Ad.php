@@ -464,17 +464,32 @@ class Ad extends Model implements HasMedia
             return in_array($this->id, $preloadedFavoritedIds, true);
         }
 
-        $favorites = AdInteraction::where('user_id', $user->id)
-            ->where('ad_id', $this->id)
-            ->where('type', AdInteraction::TYPE_FAVORITE)
-            ->count();
+        // Per-request static batch loader: first call for a given user fires ONE
+        // GROUP BY query loading all their favorites, then every subsequent ad in
+        // the same request hits the in-memory cache. Eliminates the 2N query N+1.
+        /** @var array<string, array<string, array<string, int>>> $requestCache */
+        static $requestCache = [];
 
-        $unfavorites = AdInteraction::where('user_id', $user->id)
-            ->where('ad_id', $this->id)
-            ->where('type', AdInteraction::TYPE_UNFAVORITE)
-            ->count();
+        if (!array_key_exists($user->id, $requestCache)) {
+            $rows = AdInteraction::where('user_id', $user->id)
+                ->whereIn('type', [AdInteraction::TYPE_FAVORITE, AdInteraction::TYPE_UNFAVORITE])
+                ->selectRaw('ad_id, type, COUNT(*) as cnt')
+                ->groupBy('ad_id', 'type')
+                ->get();
 
-        return $favorites > $unfavorites;
+            $byAd = [];
+            foreach ($rows as $row) {
+                /** @var object{ad_id: string, type: string, cnt: int|string} $row */
+                $byAd[$row->ad_id][$row->type] = (int) $row->cnt;
+            }
+
+            $requestCache[$user->id] = $byAd;
+        }
+
+        $byAd = $requestCache[$user->id];
+
+        return ($byAd[$this->id][AdInteraction::TYPE_FAVORITE] ?? 0)
+            > ($byAd[$this->id][AdInteraction::TYPE_UNFAVORITE] ?? 0);
     }
 
     /**

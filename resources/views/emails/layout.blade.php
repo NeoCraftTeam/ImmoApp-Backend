@@ -64,10 +64,21 @@
         }
 
         h1 {
-            font-size: 22px;
-            font-weight: 700;
+            font-size: 26px;
+            font-weight: 800;
             color: #0f172a;
-            line-height: 1.3;
+            line-height: 1.25;
+            letter-spacing: -0.3px;
+        }
+
+        .eyebrow {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            color: #C73B52;
+            text-transform: uppercase;
+            letter-spacing: 1.4px;
+            margin-bottom: 8px;
         }
 
         .text {
@@ -168,7 +179,8 @@
             }
 
             h1 {
-                font-size: 20px;
+                font-size: 22px;
+                letter-spacing: -0.2px;
             }
 
             /* Fitts' Law — full-width button on mobile maximises tap target */
@@ -223,6 +235,12 @@
             }
             .link {
                 color: #ff6b6b !important;
+            }
+            .eyebrow {
+                color: #ff8a9b !important;
+            }
+            h1 {
+                color: #f1f5f9 !important;
             }
             .fallback {
                 color: #64748b !important;
@@ -280,6 +298,10 @@
                 </a>
             </div>
 
+            @hasSection('hero')
+            @yield('hero')
+            @endif
+
             <div class="block">
                 @yield('content')
             </div>
@@ -298,6 +320,13 @@
                         @endisset
                     </p>
                 @endisset
+                <p style="margin-top: 10px;">
+                    <a href="https://facebook.com/keyhomeapp" style="color:#64748b;text-decoration:none;">Facebook</a>
+                    &nbsp;·&nbsp;
+                    <a href="https://instagram.com/keyhomeapp" style="color:#64748b;text-decoration:none;">Instagram</a>
+                    &nbsp;·&nbsp;
+                    <a href="{{ rtrim(config('app.frontend_url', 'https://keyhome.app'), '/') }}" style="color:#C73B52;text-decoration:none;font-weight:600;">keyhome.app</a>
+                </p>
             </div>
 
         </div>
