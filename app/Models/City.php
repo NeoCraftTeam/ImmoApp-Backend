@@ -20,6 +20,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 /**
  * @property string $id
  * @property string $name
+ * @property string|null $country
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
@@ -52,6 +53,7 @@ class City extends Model
 
     protected $fillable = [
         'name',
+        'country',
     ];
 
     protected $hidden = [
@@ -85,7 +87,7 @@ class City extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name'])
+            ->logOnly(['name', 'country'])
             ->logOnlyDirty()
             ->setDescriptionForEvent(fn (string $eventName): string => "Ville {$eventName}");
     }
