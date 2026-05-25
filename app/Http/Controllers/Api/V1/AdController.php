@@ -164,7 +164,7 @@ final class AdController
             }
 
             if ($type !== null) {
-                $query->whereHas('ad_type', fn ($q) => $q->where('slug', $type));
+                $query->whereHas('ad_type', fn ($q) => $q->where('name', 'ilike', "%{$type}%"));
             }
 
             $ordered = match ($sort) {
@@ -204,7 +204,7 @@ final class AdController
             function () use ($type): int {
                 $q = Ad::query()->visible()->publiclyListed();
                 if ($type !== null) {
-                    $q->whereHas('ad_type', fn ($q2) => $q2->where('slug', $type));
+                    $q->whereHas('ad_type', fn ($q2) => $q2->where('name', 'ilike', "%{$type}%"));
                 }
 
                 return $q->count();
