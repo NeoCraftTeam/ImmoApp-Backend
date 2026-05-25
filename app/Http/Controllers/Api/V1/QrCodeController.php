@@ -247,6 +247,7 @@ final readonly class QrCodeController
         }
 
         try {
+            // Try local filesystem first (local driver or already-downloaded conversion).
             $path = $media->hasGeneratedConversion('large')
                 ? $media->getPath('large')
                 : $media->getPath();
@@ -255,11 +256,23 @@ final readonly class QrCodeController
                 $path = $media->getPath();
             }
 
-            if (!is_file($path)) {
+            if (is_file($path)) {
+                $bytes = file_get_contents($path);
+                if ($bytes !== false && $bytes !== '') {
+                    return 'data:'.$this->detectMime($bytes).';base64,'.base64_encode($bytes);
+                }
+            }
+
+            // Fallback: media is on remote storage (R2/S3) — fetch via HTTP URL.
+            $url = $media->hasGeneratedConversion('large')
+                ? $media->getUrl('large')
+                : $media->getUrl();
+
+            if ($url === '') {
                 return null;
             }
 
-            $bytes = file_get_contents($path);
+            $bytes = @file_get_contents($url);
             if ($bytes === false || $bytes === '') {
                 return null;
             }
