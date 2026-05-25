@@ -135,7 +135,7 @@ fi
 # ─── 5. Tests ──────────────────────────────────────────────
 if $RUN_TESTS; then
     echo -e "${YELLOW}▸ [5/6] Tests${NC}"
-    php artisan test 2>&1
+    MallocNanoZone=0 php artisan test 2>&1
     if [[ $? -eq 0 ]]; then
         echo -e "${GREEN}  ✅ Tests — tous passés${NC}"; PASS=$((PASS + 1))
     else
