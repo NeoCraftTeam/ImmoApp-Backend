@@ -2,6 +2,8 @@
 
 @section('title', 'Nouveau sondage reçu')
 
+@section('preheader', 'Un utilisateur vient de répondre à un sondage — consultez les réponses dans le panel admin.')
+
 @section('content')
 
     <h1>Nouveau sondage reçu</h1>
@@ -11,7 +13,7 @@
     </p>
 
     {{-- Respondent card --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 20px;
         border-collapse: collapse;
         background-color: #f8fafc;
@@ -29,7 +31,7 @@
 
     {{-- Answers recap --}}
     @if (!empty($formattedAnswers))
-        <table width="100%" cellpadding="0" cellspacing="0" style="
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
             margin-top: 20px;
             border-collapse: collapse;
             border: 1px solid #e2e8f0;

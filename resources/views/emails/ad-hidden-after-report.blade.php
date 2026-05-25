@@ -2,6 +2,8 @@
 
 @section('title', 'Votre annonce a été masquée')
 
+@section('preheader', 'Votre annonce a été temporairement masquée suite à un signalement — vous pouvez la modifier et la resoumettre.')
+
 @section('content')
 
     <h1>Votre annonce a été masquée</h1>
@@ -17,7 +19,7 @@
     </p>
 
     {{-- Reason box --}}
-    <table width="100%" cellpadding="0" cellspacing="0"
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
         style="margin-top: 24px; margin-bottom: 24px; border-collapse: collapse;">
         <tr>
             <td style="
@@ -44,11 +46,12 @@
         Une fois les modifications apportées, votre annonce repassera en validation.
     </p>
 
-    <div class="btn-wrapper">
-        <a href="{{ $manageUrl }}" class="btn">
-            Modifier mon annonce
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $manageUrl,
+        'label' => 'Modifier mon annonce',
+        'color' => '#0d9488',
+        'width' => 240,
+    ])
 
     <p class="text" style="margin-top: 32px;">
         Si vous pensez qu'il s'agit d'une erreur ou si vous avez des questions,

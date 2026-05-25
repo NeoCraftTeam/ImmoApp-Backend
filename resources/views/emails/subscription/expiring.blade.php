@@ -2,6 +2,8 @@
 
 @section('title', 'Votre abonnement expire bientôt — ' . config('app.name'))
 
+@section('preheader', 'Votre abonnement expire bientôt — renouvelez maintenant pour conserver votre visibilité et vos avantages.')
+
 @section('content')
     <style>
         .countdown-badge {
@@ -151,9 +153,12 @@
         <li>Votre badge agence et votre score de réputation</li>
     </ul>
 
-    <div class="btn-wrapper">
-        <a href="{{ $renewalUrl }}" class="btn">Renouveler mon abonnement {{ $planName }}</a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $renewalUrl,
+        'label' => 'Renouveler mon abonnement ' . $planName,
+        'color' => '#0d9488',
+        'width' => 300,
+    ])
 
     <div class="info-box">
         <strong>Que se passe-t-il après expiration ?</strong><br>

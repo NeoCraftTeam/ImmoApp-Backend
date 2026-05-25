@@ -157,7 +157,16 @@ final readonly class AdSearchController
             $latitude = isset($validated['latitude']) ? (float) $validated['latitude'] : null;
             $longitude = isset($validated['longitude']) ? (float) $validated['longitude'] : null;
 
-            $builder = Ad::search($q, function (Indexes $index, string $query, array $options) use ($filters, $sortBy, $sortOrder, $allowedSorts, $latitude, $longitude) {
+            // 3.2 — Hybrid search: semanticRatio adaptatif selon la nature de la requête.
+            // Activé uniquement si un embedder Cohere est configuré (COHERE_API_KEY non vide).
+            $hybridEnabled = config('services.cohere.api_key', '') !== '';
+            $semanticRatio = match (true) {
+                mb_strlen($q) > 20 => 0.8,  // requête longue / intent sémantique
+                (bool) preg_match('/\d/', $q) => 0.2,  // chiffres → intent facet/prix
+                default => 0.5,
+            };
+
+            $builder = Ad::search($q, function (Indexes $index, string $query, array $options) use ($filters, $sortBy, $sortOrder, $allowedSorts, $latitude, $longitude, $hybridEnabled, $semanticRatio) {
                 $options['filter'] = implode(' AND ', $filters);
 
                 if ($sortBy === '_geoPoint' && $latitude !== null && $longitude !== null) {
@@ -173,6 +182,14 @@ final readonly class AdSearchController
                     // Boost premium: every standard sort lifts active boosted ads to
                     // the top first, then secondary sorts within each tier.
                     $options['sort'] = ['boost_score:desc', sprintf('%s:%s', $sortBy, $sortOrder)];
+                }
+
+                // Inject hybrid config when embedder is ready (3.2)
+                if ($hybridEnabled && $query !== '') {
+                    $options['hybrid'] = [
+                        'semanticRatio' => $semanticRatio,
+                        'embedder' => 'default',
+                    ];
                 }
 
                 return $index->search($query, $options);

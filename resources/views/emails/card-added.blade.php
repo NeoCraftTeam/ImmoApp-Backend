@@ -2,10 +2,12 @@
 
 @section('title', 'Carte bancaire ajoutée — ' . config('app.name'))
 
+@section('preheader', 'Une carte bancaire a été associée à votre compte. Si vous n\'en êtes pas à l\'origine, contactez notre support.')
+
 @section('content')
 
     {{-- Security badge --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 6px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 6px;">
         <tr>
             <td style="text-align: center; padding: 8px 0 2px 0;">
                 <span style="
@@ -31,7 +33,7 @@
     </p>
 
     {{-- Card details --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin: 0 0 24px 0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin: 0 0 24px 0;">
         <tr>
             <td style="
                 background-color: #f8fafc;
@@ -41,7 +43,7 @@
                 padding: 0;
                 overflow: hidden;
             ">
-                <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
                     <tr>
                         <td colspan="2" style="
                             padding: 12px 20px 10px 20px;
@@ -67,7 +69,7 @@
     </table>
 
     {{-- Not you? --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin-bottom: 24px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse; margin-bottom: 24px;">
         <tr>
             <td style="background-color: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; padding: 14px 18px;">
                 <p style="margin: 0; font-size: 14px; color: #9f1239;">

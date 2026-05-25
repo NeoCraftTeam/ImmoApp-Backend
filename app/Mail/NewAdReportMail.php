@@ -26,7 +26,7 @@ class NewAdReportMail extends Mailable
     {
         return new Envelope(
             from: $this->senderFrom('admin'),
-            subject: 'KeyHome - Nouveau signalement d\'annonce a traiter',
+            subject: 'Nouveau signalement à traiter — '.config('app.name'),
         );
     }
 

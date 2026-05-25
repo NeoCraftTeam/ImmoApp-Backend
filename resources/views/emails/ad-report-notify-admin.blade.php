@@ -2,6 +2,8 @@
 
 @section('title', 'Nouveau signalement annonce')
 
+@section('preheader', 'Un nouveau signalement d\'annonce est en attente de traitement dans le panneau d\'administration.')
+
 @section('content')
     <h1>Nouveau signalement annonce</h1>
 
@@ -10,7 +12,7 @@
         une verification dans le panel administrateur.
     </p>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 20px;
         border-collapse: collapse;
         background-color: #fff7ed;
@@ -41,8 +43,10 @@
         </tr>
     </table>
 
-    <div class="btn-wrapper">
-        <a href="{{ $reviewUrl }}" class="btn">Traiter le signalement</a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $reviewUrl,
+        'label' => 'Traiter le signalement',
+        'width' => 240,
+    ])
 @endsection
 

@@ -155,15 +155,79 @@ class PendingAdResource extends Resource
                     ->modalHeading('Motif de refus de l\'annonce')
                     ->modalDescription(fn (Ad $record) => "Rédigez un motif clair et professionnel pour l'auteur de \"".$record->title.'".')
                     ->form([
+                        SchemaActions::make([
+                            Action::make('tpl_photos')
+                                ->label('📷 Photos insuffisantes')
+                                ->color('gray')
+                                ->size('sm')
+                                ->action(function ($get, $set): void {
+                                    $current = (string) ($get('reason') ?? '');
+                                    $set('reason', trim($current."\n".'Photos insuffisantes ou de mauvaise qualité.'));
+                                }),
+                            Action::make('tpl_description')
+                                ->label('📝 Description trop courte')
+                                ->color('gray')
+                                ->size('sm')
+                                ->action(function ($get, $set): void {
+                                    $current = (string) ($get('reason') ?? '');
+                                    $set('reason', trim($current."\n".'Description trop courte ou incomplète.'));
+                                }),
+                            Action::make('tpl_price')
+                                ->label('💰 Prix incohérent')
+                                ->color('gray')
+                                ->size('sm')
+                                ->action(function ($get, $set): void {
+                                    $current = (string) ($get('reason') ?? '');
+                                    $set('reason', trim($current."\n".'Prix manquant ou incohérent par rapport au marché local.'));
+                                }),
+                            Action::make('tpl_documents')
+                                ->label('📋 Documents requis manquants')
+                                ->color('gray')
+                                ->size('sm')
+                                ->action(function ($get, $set): void {
+                                    $current = (string) ($get('reason') ?? '');
+                                    $set('reason', trim($current."\n".'Documents justificatifs requis non fournis.'));
+                                }),
+                            Action::make('tpl_misleading')
+                                ->label('⚠️ Informations trompeuses')
+                                ->color('gray')
+                                ->size('sm')
+                                ->action(function ($get, $set): void {
+                                    $current = (string) ($get('reason') ?? '');
+                                    $set('reason', trim($current."\n".'Informations incorrectes ou trompeuses détectées.'));
+                                }),
+                        ])->columnSpanFull(),
                         MarkdownEditor::make('reason')
                             ->label('Motif du refus')
-                            ->placeholder('Décrivez les raisons du refus : photos insuffisantes, description incomplète, prix incohérent…')
+                            ->placeholder('Cliquez sur un modèle ci-dessus ou rédigez le motif…')
                             ->helperText('L\'auteur recevra ce message mis en forme dans son email.')
                             ->toolbarButtons(['bold', 'italic', 'bulletList', 'orderedList', 'undo', 'redo'])
                             ->required()
                             ->minLength(20)
                             ->columnSpanFull(),
                         SchemaActions::make([
+                            Action::make('diagnose_with_ai')
+                                ->label('Diagnostiquer avec l\'IA')
+                                ->icon(Heroicon::MagnifyingGlass)
+                                ->color('warning')
+                                ->size('sm')
+                                ->tooltip('L\'IA analyse l\'annonce et propose un motif de refus adapté')
+                                ->action(function (Ad $record, $set): void {
+                                    $diagnosed = app(AiDescriptionEnhancer::class)->diagnoseAdForRejection([
+                                        'title' => $record->title,
+                                        'description' => $record->description,
+                                        'price' => $record->price,
+                                        'photos_count' => $record->getMedia('images')->count(),
+                                        'type' => $record->ad_type->name ?? '',
+                                    ]);
+                                    $set('reason', $diagnosed);
+
+                                    Notification::make()
+                                        ->title('Diagnostic généré ✨')
+                                        ->body('Vérifiez et adaptez le motif si nécessaire avant d\'envoyer.')
+                                        ->success()
+                                        ->send();
+                                }),
                             Action::make('enhance_reason_with_ai')
                                 ->label('Améliorer avec l\'IA')
                                 ->icon(Heroicon::Sparkles)

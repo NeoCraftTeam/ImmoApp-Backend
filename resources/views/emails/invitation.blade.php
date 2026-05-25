@@ -3,6 +3,8 @@
 
 @section('title', 'Votre invitation sur ' . config('app.name'))
 
+@section('preheader', 'Vous avez été invité à rejoindre ' . config('app.name') . ' — acceptez votre invitation et découvrez la plateforme.')
+
 @section('content')
 
     <h1>Vous avez été invité sur {{ config('app.name') }}</h1>
@@ -45,13 +47,15 @@
         </tr>
     </table>
 
-    <div class="btn-wrapper">
-        <a href="{{ $actionUrl }}" class="btn">Accepter l'invitation</a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $actionUrl,
+        'label' => 'Accepter l\'invitation',
+        'width' => 240,
+    ])
 
     <p class="fallback">
         Si le bouton ne fonctionne pas,
-        <a href="{{ $actionUrl }}" class="link">cliquez ici</a>.
+        <a href="{{ $actionUrl }}" class="link">accédez à votre invitation directement</a>.
     </p>
 
     <p class="text" style="margin-top: 28px; font-size: 13px; color: #94a3b8;">

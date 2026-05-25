@@ -2,6 +2,8 @@
 
 @section('title', __('emails.appointment_reminder.subject', ['app' => config('app.name')]))
 
+@section('preheader', 'Rappel de visite — votre rendez-vous immobilier approche, vérifiez les détails.')
+
 @section('content')
 
     <h1>{{ __('emails.appointment_reminder.heading') }}</h1>
@@ -23,9 +25,11 @@
         </table>
     </div>
 
-    <div class="btn-wrapper">
-        <a href="{{ $detailsUrl }}" class="btn">{{ __('emails.appointment_reminder.cta') }}</a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $detailsUrl,
+        'label' => __('emails.appointment_reminder.cta'),
+        'width' => 220,
+    ])
 
     <p class="text" style="font-size: 13px; color: #94a3b8; margin-top: 24px;">
         {{ __('emails.appointment_reminder.cancel_note') }}

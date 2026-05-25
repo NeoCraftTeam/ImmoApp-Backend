@@ -27,7 +27,7 @@ class AgencyWelcomeEmail extends Mailable implements ShouldQueue
     {
         return new Envelope(
             from: $this->senderFrom('bailleurs'),
-            subject: 'Bienvenue sur KeyHome - Espace Agence',
+            subject: 'Votre espace agence est prêt — '.config('app.name'),
         );
     }
 

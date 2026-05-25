@@ -35,7 +35,7 @@ class FirstAdCelebrationMail extends Mailable implements ShouldQueue
     {
         return new Envelope(
             from: $this->senderFrom('notifications'),
-            subject: 'Bravo pour votre première annonce sur '.config('app.name').' !',
+            subject: 'Votre première annonce est en ligne sur '.config('app.name'),
         );
     }
 

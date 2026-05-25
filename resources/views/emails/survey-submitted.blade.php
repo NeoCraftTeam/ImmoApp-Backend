@@ -2,6 +2,8 @@
 
 @section('title', 'Merci pour votre participation')
 
+@section('preheader', 'Votre avis a bien été enregistré — merci de contribuer à l\'amélioration de KeyHome.')
+
 @section('content')
 
     <h1>Merci d'avoir répondu au sondage&nbsp;!</h1>
@@ -16,7 +18,7 @@
         Votre avis nous aide à améliorer notre service et nous vous en remercions chaleureusement.
     </p>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px; border-collapse: collapse;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px; border-collapse: collapse;">
         <tr>
             <td align="center">
                 <span style="

@@ -27,7 +27,7 @@ class BailleurWelcomeEmail extends Mailable implements ShouldQueue
     {
         return new Envelope(
             from: $this->senderFrom('bailleurs'),
-            subject: 'Bienvenue sur KeyHome - Espace Bailleur',
+            subject: 'Votre espace bailleur est prêt — '.config('app.name'),
         );
     }
 

@@ -33,6 +33,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $cancellation_reason
  * @property Carbon $expires_at
  * @property Carbon|null $notified_at
+ * @property Carbon|null $landlord_notified_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
@@ -72,6 +73,7 @@ class TentativeReservation extends Model
         'cancellation_reason',
         'expires_at',
         'notified_at',
+        'landlord_notified_at',
         'prescreening_answers',
     ];
 
@@ -84,6 +86,7 @@ class TentativeReservation extends Model
             'slot_date' => 'date',
             'expires_at' => 'datetime',
             'notified_at' => 'datetime',
+            'landlord_notified_at' => 'datetime',
             'status' => ReservationStatus::class,
             'cancelled_by' => CancelledBy::class,
             'prescreening_answers' => 'array',

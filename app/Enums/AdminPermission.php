@@ -26,6 +26,7 @@ enum AdminPermission: string implements HasLabel
     case AdsView = 'ads.view';
     case AdsModerate = 'ads.moderate';
     case AdReportsManage = 'ad_reports.manage';
+    case DisputesManage = 'disputes.manage';
 
     // ── Finance / Paiements ─────────────────────────────────────────
     case PaymentsView = 'payments.view';
@@ -63,6 +64,7 @@ enum AdminPermission: string implements HasLabel
             self::AdsView => 'Voir les annonces',
             self::AdsModerate => 'Modérer les annonces (approuver / masquer)',
             self::AdReportsManage => 'Traiter les signalements',
+            self::DisputesManage => 'Gérer les litiges',
 
             self::PaymentsView => 'Voir les paiements',
             self::PaymentsRefund => 'Émettre des remboursements',
@@ -96,7 +98,8 @@ enum AdminPermission: string implements HasLabel
         return match ($this) {
             self::UsersView, self::UsersManage, self::UsersBan => 'Utilisateurs',
 
-            self::AdsView, self::AdsModerate, self::AdReportsManage => 'Annonces & modération',
+            self::AdsView, self::AdsModerate, self::AdReportsManage,
+            self::DisputesManage => 'Annonces & modération',
 
             self::PaymentsView, self::PaymentsRefund, self::CreditsManage,
             self::SubscriptionsManage => 'Finance',
@@ -155,6 +158,7 @@ enum AdminPermission: string implements HasLabel
             self::AdsView,
             self::AdsModerate,
             self::AdReportsManage,
+            self::DisputesManage,
             self::ReviewsManage,
         ];
     }

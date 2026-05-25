@@ -15,8 +15,8 @@ class BoostPackSeeder extends Seeder
             [
                 'name' => 'Pack Starter',
                 'slug' => 'pack-starter',
-                'description' => 'Idéal pour donner un coup de pouce à votre annonce. Votre bien apparaît en tête des résultats pendant 7 jours.',
-                'reach_description' => 'Touche jusqu\'à 500 personnes',
+                'description' => 'Donnez un coup de pouce à votre annonce — passez en tête des résultats pendant 7 jours et multipliez vos visites.',
+                'reach_description' => 'Jusqu\'à 500 locataires potentiels',
                 'duration_days' => 7,
                 'boost_score' => 30,
                 'price_credits' => 10,
@@ -27,8 +27,8 @@ class BoostPackSeeder extends Seeder
             [
                 'name' => 'Pack Pro',
                 'slug' => 'pack-pro',
-                'description' => 'Pour maximiser la visibilité de votre annonce. Mise en avant prioritaire sur le fil principal et les résultats de recherche pendant 7 jours.',
-                'reach_description' => 'Touche jusqu\'à 2 000 personnes',
+                'description' => 'Visibilité prioritaire sur le fil principal et les recherches pendant 7 jours — 4× plus de portée que le Starter.',
+                'reach_description' => 'Jusqu\'à 2 000 locataires potentiels',
                 'duration_days' => 7,
                 'boost_score' => 60,
                 'price_credits' => 20,
@@ -39,8 +39,8 @@ class BoostPackSeeder extends Seeder
             [
                 'name' => 'Pack Premium',
                 'slug' => 'pack-premium',
-                'description' => 'Visibilité maximale pendant tout un mois. Votre annonce reste en tête du fil, des recherches et des recommandations pendant 30 jours.',
-                'reach_description' => 'Touche jusqu\'à 10 000 personnes',
+                'description' => 'Louez en moins de 30 jours — un mois entier en tête du fil, des recherches et des recommandations KeyHome.',
+                'reach_description' => 'Jusqu\'à 10 000 locataires potentiels',
                 'duration_days' => 30,
                 'boost_score' => 100,
                 'price_credits' => 60,

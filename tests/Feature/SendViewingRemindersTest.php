@@ -82,6 +82,7 @@ it('does not send a reminder if already notified', function (): void {
         'client_id' => $client->id,
         'slot_date' => '2026-06-02',
         'notified_at' => now()->subHour(),
+        'landlord_notified_at' => now()->subHour(),
     ]);
 
     // Fake AFTER factory setup so observer notifications are not intercepted

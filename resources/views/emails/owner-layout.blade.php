@@ -87,16 +87,18 @@
             background-color: #0d9488;
             color: #ffffff !important;
             font-size: 15px;
-            font-weight: 600;
+            font-weight: 700;           /* stronger weight aids screen rendering contrast */
             text-decoration: none;
-            padding: 14px 28px;
+            padding: 15px 32px;         /* 15+15+15px = 45px height — WCAG 2.5.5 ≥44px touch target */
+            min-width: 200px;           /* Fitts' Law: wider target reduces acquisition time */
+            text-align: center;
             border-radius: 8px;
             line-height: 1;
         }
 
         .link {
-            color: #0d9488;
-            text-decoration: none;
+            color: #0F766E;             /* WCAG AA: ~5.1:1 contrast on white (was #0d9488: 3.66:1, failing) */
+            text-decoration: underline; /* WCAG 1.4.1: not color-only visual indicator */
         }
 
         .fallback {
@@ -178,6 +180,12 @@
                 font-size: 20px;
             }
 
+            /* Fitts' Law — full-width button on mobile maximises tap target */
+            .btn {
+                display: block !important;
+                text-align: center !important;
+            }
+
             .otp-code {
                 font-size: 36px;
                 letter-spacing: 6px;
@@ -243,7 +251,7 @@
         }
         /* Outlook 2016 fixes */
         .btn {
-            mso-padding-alt: 14px 28px;
+            mso-padding-alt: 15px 32px;
         }
         table {
             border-spacing: 0;
@@ -254,12 +262,16 @@
     <style type="text/css">
         body { width: 600px !important; margin: 0 auto; }
         .container { border: none !important; border-radius: 0 !important; }
-        .btn { background-color: #0D9488 !important; padding: 14px 28px !important; }
+        .btn { background-color: #0D9488 !important; padding: 15px 32px !important; min-width: 200px !important; }
     </style>
     <![endif]-->
 </head>
 
 <body>
+    {{-- Hidden preheader / preview text --}}
+    @hasSection('preheader')
+    <div style="display:none;font-size:1px;color:#f0fdfa;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;" aria-hidden="true">@yield('preheader')&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>
+    @endif
     <div class="wrapper">
         <!--[if mso]>
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" align="center"><tr><td>
@@ -270,11 +282,12 @@
 
             <div class="header">
                 <a href="{{ $emailFrontendUrl ?? (rtrim(config('app.frontend_url', config('app.url')), '/') . '/owner') }}" style="display: inline-block;">
-                    <img src="{{ $emailOwnerLogoUrl ?? asset('images/logo-teal.png') }}"
+                    <img src="{{ $emailOwnerLogoUrl ?? (rtrim((string) config('app.mail_asset_base_url', 'https://keyhome.app'), '/') . '/images/logo-teal.png') }}"
                         alt="{{ config('app.name') }}"
                         class="logo-img"
                         width="160"
                         height="40"
+                        border="0"
                         style="max-height:40px;height:auto;width:auto;max-width:160px;display:block;border:0;" />
                 </a>
             </div>

@@ -2,6 +2,8 @@
 
 @section('title', 'Bravo pour votre premier déblocage')
 
+@section('preheader', 'Félicitations pour votre premier déblocage de coordonnées — contactez le propriétaire et organisez votre visite.')
+
 @section('content')
 
     <h1>Félicitations, {{ $firstName }} !</h1>
@@ -11,7 +13,7 @@
         {{ config('app.name') }} — une belle étape pour avancer dans votre recherche immobilière.
     </p>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
             margin-top: 24px;
             border-collapse: collapse;
             background-color: #fff1f2;
@@ -32,9 +34,11 @@
         questions directement. Pensez à préparer vos critères et vos questions avant l’échange pour gagner du temps.
     </p>
 
-    <div class="btn-wrapper">
-        <a href="{{ $adUrl }}" class="btn">Revoir l’annonce</a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $adUrl,
+        'label' => 'Revoir l’annonce',
+        'width' => 200,
+    ])
 
     <p class="text" style="margin-top: 8px;">
         <a href="{{ $searchUrl }}" style="color: #F6475F; font-weight: 600;">Continuer à explorer les annonces →</a>

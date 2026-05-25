@@ -13,6 +13,7 @@ use App\Http\Resources\AdResource as AdApiResource;
 use App\Models\Ad;
 use App\Models\AdInteraction;
 use App\Models\User;
+use App\Services\RecommendationEngine;
 use App\Support\AdScoutSync;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -41,6 +42,7 @@ final class AdController
         private LoggerInterface $log,
         private CreateAd $createAdAction,
         private UpdateAd $updateAdAction,
+        private RecommendationEngine $engine,
     ) {}
 
     /**
@@ -137,12 +139,16 @@ final class AdController
         $this->authorize('viewAny', Ad::class);
 
         $perPage = min(max((int) $request->integer('per_page', config('pagination.per_page', 15)), 1), 50);
+        $type = filled($request->input('type')) ? (string) $request->input('type') : null;
+        $sort = filled($request->input('sort')) ? (string) $request->input('sort') : 'newest';
 
         $isFirstPageGuest = !auth()->check()
             && !$request->filled('cursor')
-            && !$request->filled('exclude_ids');
+            && !$request->filled('exclude_ids')
+            && $type === null
+            && $sort === 'newest';
 
-        $build = function () use ($request, $perPage) {
+        $build = function () use ($request, $perPage, $type, $sort) {
             $query = Ad::query()
                 ->with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')
                 ->withAvg('reviews', 'rating')
@@ -157,18 +163,56 @@ final class AdController
                 }
             }
 
-            return $query
-                ->orderByDesc('boost_score')
-                ->orderByDesc('created_at')
-                ->orderByDesc('id')
-                ->cursorPaginate($perPage);
+            if ($type !== null) {
+                $query->whereHas('ad_type', fn ($q) => $q->where('slug', $type));
+            }
+
+            $ordered = match ($sort) {
+                'price_asc' => $query->orderBy('price')->orderByDesc('id'),
+                'price_desc' => $query->orderByDesc('price')->orderByDesc('id'),
+                default => $query->orderByDesc('boost_score')->orderByDesc('created_at')->orderByDesc('id'),
+            };
+
+            return $ordered->cursorPaginate($perPage);
         };
 
-        $ads = $isFirstPageGuest
+        $paginator = $isFirstPageGuest
             ? Cache::remember("ads:feed:guest:first:pp={$perPage}", 300, $build)
             : $build();
 
-        return AdApiResource::collection($ads);
+        // Two-stage re-ranking for authenticated users.
+        // Only applied when using the default sort (explicit price sorts take priority
+        // over personalization — the user chose that order intentionally).
+        if (auth()->check() && $sort === 'newest') {
+            /** @var User $authUser */
+            $authUser = auth()->user();
+            $profile = $this->engine->getUserProfile($authUser);
+
+            if ($profile !== null) {
+                $reranked = $this->engine->scoreCandidates(
+                    $paginator->getCollection(),
+                    $profile,
+                );
+                $paginator->setCollection($reranked);
+            }
+        }
+
+        /** @var int $total */
+        $total = Cache::remember(
+            'ads:feed:total:'.($type ?? 'all'),
+            600,
+            function () use ($type): int {
+                $q = Ad::query()->visible()->publiclyListed();
+                if ($type !== null) {
+                    $q->whereHas('ad_type', fn ($q2) => $q2->where('slug', $type));
+                }
+
+                return $q->count();
+            }
+        );
+
+        return AdApiResource::collection($paginator)
+            ->additional(['total_approximate' => $total]);
     }
 
     /**

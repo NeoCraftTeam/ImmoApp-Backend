@@ -2,6 +2,8 @@
 
 @section('title', 'Votre demande de visite a bien été reçue')
 
+@section('preheader', 'Votre demande de visite a été envoyée — le propriétaire dispose de 24h pour confirmer.')
+
 @section('content')
 
     <h1>Demande de visite envoyée ✓</h1>
@@ -16,7 +18,7 @@
     </p>
 
     {{-- Status badge --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px; border-collapse: collapse;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px; border-collapse: collapse;">
         <tr>
             <td align="center">
                 <span style="
@@ -35,7 +37,7 @@
     </table>
 
     {{-- Info card --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 24px;
         border-collapse: collapse;
         background-color: #f8fafc;
@@ -48,7 +50,7 @@
                     text-transform: uppercase; letter-spacing: 1px; color: #64748b;">
                     Détails de la visite
                 </p>
-                <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
                     <tr>
                         <td style="padding: 9px 0; font-size: 14px; color: #64748b;
                             border-bottom: 1px solid #f1f5f9; width: 110px;"> Annonce</td>
@@ -83,7 +85,7 @@
     </table>
 
     @if($reservation->client_message)
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 16px;
         border-collapse: collapse;
         background-color: #f8fafc;
@@ -104,11 +106,11 @@
     </table>
     @endif
 
-    <div class="btn-wrapper">
-        <a href="{{ config('app.frontend_url') }}/my/reservations" class="btn">
-            Voir mes visites
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => config('app.frontend_url') . '/my/reservations',
+        'label' => 'Voir mes visites',
+        'width' => 200,
+    ])
 
     <p class="text">
         Le propriétaire dispose de <strong>24 heures</strong> pour confirmer votre demande.

@@ -2,6 +2,8 @@
 
 @section('title', 'Signalement recu')
 
+@section('preheader', 'Votre signalement a été enregistré — nous l\'analysons et vous tiendrons informé.')
+
 @section('content')
     <p style="
         margin: 0 0 10px 0;
@@ -24,7 +26,7 @@
         pour proteger la communaute KeyHome.
     </p>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 22px;
         border-collapse: separate;
         border-spacing: 0;
@@ -52,7 +54,7 @@
         </tr>
     </table>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 16px;
         border-collapse: separate;
         border-spacing: 0;
@@ -74,9 +76,11 @@
         </tr>
     </table>
 
-    <div class="btn-wrapper" style="margin-top: 24px;">
-        <a href="{{ config('app.url') }}" class="btn">Retourner sur KeyHome</a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => config('app.frontend_url', config('app.url')),
+        'label' => 'Retourner sur KeyHome',
+        'width' => 220,
+    ])
 
     <p class="fallback" style="margin-top: 16px;">
         Besoin d'aide ? Ecrivez-nous a

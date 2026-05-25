@@ -77,6 +77,8 @@ final class TentativeReservationResource extends Resource
                                 ReservationStatus::Confirmed => 'success',
                                 ReservationStatus::Cancelled => 'danger',
                                 ReservationStatus::Expired => 'gray',
+                                ReservationStatus::Completed => 'info',
+                                ReservationStatus::NoShow => 'danger',
                             })
                             ->formatStateUsing(fn (ReservationStatus $state): string => $state->label()),
                         TextEntry::make('slot_date')
@@ -126,6 +128,8 @@ final class TentativeReservationResource extends Resource
                         ReservationStatus::Confirmed => 'success',
                         ReservationStatus::Cancelled => 'danger',
                         ReservationStatus::Expired => 'gray',
+                        ReservationStatus::Completed => 'info',
+                        ReservationStatus::NoShow => 'danger',
                     })
                     ->formatStateUsing(fn (ReservationStatus $state): string => $state->label()),
                 TextColumn::make('expires_at')

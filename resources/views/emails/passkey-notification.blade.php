@@ -3,6 +3,8 @@
 
 @section('title', 'Passkey ' . $actionLabel . ' — ' . config('app.name'))
 
+@section('preheader', 'Notification de sécurité — une passkey a été ' . $actionLabel . ' sur votre compte ' . config('app.name') . '.')
+
 @section('content')
 
     {{-- Shield icon + heading --}}
@@ -172,11 +174,11 @@
     </table>
 
     {{-- CTA --}}
-    <div class="btn-wrapper" style="text-align: center; margin-top: 32px;">
-        <a href="{{ $securityUrl }}" class="btn">
-            Gérer mes passkeys
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $securityUrl,
+        'label' => 'Gérer mes passkeys',
+        'width' => 220,
+    ])
 
     {{-- Security warning --}}
     <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%"

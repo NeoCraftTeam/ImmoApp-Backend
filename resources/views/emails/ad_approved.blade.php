@@ -2,6 +2,8 @@
 
 @section('title', 'Votre annonce est publiée')
 
+@section('preheader', 'Félicitations — votre annonce a été validée et est maintenant visible par tous les utilisateurs.')
+
 @section('content')
 
     <h1>Félicitations, votre annonce est en ligne !</h1>
@@ -16,7 +18,7 @@
     </p>
 
     {{-- Status badge --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px; border-collapse: collapse;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px; border-collapse: collapse;">
         <tr>
             <td align="center">
                 <span style="
@@ -35,7 +37,7 @@
     </table>
 
     {{-- Ad recap card --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
             margin-top: 24px;
             border-collapse: collapse;
             background-color: #f8fafc;
@@ -48,7 +50,7 @@
                                text-transform: uppercase; letter-spacing: 1px; color: #64748b;">
                     Récapitulatif
                 </p>
-                <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
                     <tr>
                         <td style="padding: 8px 0; font-size: 14px; color: #64748b;
                                        border-bottom: 1px solid #f1f5f9; width: 80px;">Titre</td>
@@ -65,11 +67,12 @@
         </tr>
     </table>
 
-    <div class="btn-wrapper">
-        <a href="{{ rtrim(config('app.frontend_url', config('app.url')), '/') . '/owner/ads' }}" class="btn">
-            Voir mes annonces
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => rtrim(config('app.frontend_url', config('app.url')), '/') . '/owner/ads',
+        'label' => 'Voir mes annonces',
+        'color' => '#0d9488',
+        'width' => 200,
+    ])
 
     <p class="text">
         Merci de votre confiance et bonne publication sur KeyHome.

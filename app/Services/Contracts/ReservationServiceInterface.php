@@ -30,6 +30,16 @@ interface ReservationServiceInterface
     public function expireStale(): int;
 
     /**
+     * Mark a confirmed reservation as completed (post-visit).
+     */
+    public function complete(TentativeReservation $reservation): TentativeReservation;
+
+    /**
+     * Mark a confirmed reservation as no-show (landlord action).
+     */
+    public function markNoShow(TentativeReservation $reservation): TentativeReservation;
+
+    /**
      * Guard against availability schedule modifications when active reservations exist.
      */
     public function assertNoActiveReservationsForSchedule(Schedule $schedule): void;

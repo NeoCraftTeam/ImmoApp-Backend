@@ -2,6 +2,8 @@
 
 @section('title', __('emails.subscription_success.title', ['app' => config('app.name')]))
 
+@section('preheader', 'Votre abonnement est actif — accédez à toutes les fonctionnalités de votre espace professionnel.')
+
 @section('content')
     <style>
         .status-badge {
@@ -110,9 +112,12 @@
         </table>
     </div>
 
-    <div class="btn-wrapper">
-        <a href="{{ config('app.url') . '/agency' }}" class="btn">{{ __('emails.subscription_success.dashboard_cta') }}</a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => rtrim(config('app.frontend_url', config('app.url')), '/') . '/agency',
+        'label' => __('emails.subscription_success.dashboard_cta'),
+        'color' => '#0d9488',
+        'width' => 240,
+    ])
 
     <p class="text">{{ __('emails.subscription_success.closing', ['app' => config('app.name')]) }}</p>
 @endsection

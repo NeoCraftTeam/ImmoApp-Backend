@@ -39,7 +39,7 @@ class NewDeviceSignInMail extends Mailable implements ShouldQueue
     {
         return new Envelope(
             from: $this->senderFrom('notifications'),
-            subject: 'Nouvelle connexion à votre compte — '.config('app.name'),
+            subject: 'Connexion depuis un nouvel appareil — '.config('app.name'),
         );
     }
 

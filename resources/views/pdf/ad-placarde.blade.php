@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Pancarte — {{ $ad->title }}</title>
+    <title>Pancarte Keyhome — {{ $ad->title }}</title>
     {{--
         A5 placarde — single-page, edge-to-edge design.
 
@@ -62,11 +62,11 @@
         }
         .bottom-bar strong { font-weight: 800; letter-spacing: 2px; }
 
-        /* === Hero photo === */
+        /* === Hero photo (enlarged) === */
         .photo {
             position: absolute;
             top: 14mm; left: 8mm; right: 8mm;
-            height: 45mm;
+            height: 72mm;
             background: #F1F5F9;
             border: 0.5pt solid #E2E8F0;
             border-radius: 2mm;
@@ -76,12 +76,12 @@
         .photo-placeholder {
             text-align: center; color: #CBD5E1;
             font-size: 9.5pt; font-weight: 600;
-            padding-top: 19mm;
+            padding-top: 32mm;
         }
 
         .status-pill {
             position: absolute;
-            top: 18mm; right: 12mm;
+            top: 20mm; right: 12mm;
             background: #F6475F; color: #FFFFFF;
             padding: 1.5mm 4mm;
             border-radius: 10mm;
@@ -89,12 +89,12 @@
             letter-spacing: 1.5px; text-transform: uppercase;
         }
 
-        /* === Title + price + meta + features === */
+        /* === Title + price + meta + features (pushed below larger photo) === */
         .info {
             position: absolute;
-            top: 65mm;
+            top: 92mm;
             left: 8mm; right: 8mm;
-            height: 60mm;
+            height: 48mm;
         }
         .title {
             font-size: 14pt; font-weight: 800;
@@ -175,13 +175,13 @@
         @endif
     </div>
 
-    <div class="status-pill">À LOUER</div>
+    <div class="status-pill">{{ $ad->transaction_type === 'vente' ? 'À VENDRE' : 'À LOUER' }}</div>
 
     <div class="info">
         <div class="title">{{ \Illuminate\Support\Str::limit($ad->title, 60) }}</div>
 
         <div class="price-row">
-            <span class="price">{{ number_format((float) $ad->price, 0, ',', ' ') }} FCFA</span><span class="price-suffix">/ mois</span>
+            <span class="price">{{ number_format((float) $ad->price, 0, ',', ' ') }} FCFA</span>@if($ad->transaction_type !== 'vente')<span class="price-suffix">/ mois</span>@endif
         </div>
 
         <div class="meta">
@@ -215,7 +215,6 @@
                 <td class="qr-text">
                     <div class="qr-cta">Scannez pour <span class="accent">visiter</span></div>
                     <div class="qr-instruction">
-                        Photos HD · Visite 360°<br>
                         Contact direct du bailleur<br>
                         sur <strong>keyhome.app</strong>
                     </div>

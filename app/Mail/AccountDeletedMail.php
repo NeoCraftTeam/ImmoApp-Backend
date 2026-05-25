@@ -29,7 +29,7 @@ final class AccountDeletedMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Votre compte KeyHome a été supprimé',
+            subject: 'Compte supprimé — confirmation '.config('app.name'),
         );
     }
 

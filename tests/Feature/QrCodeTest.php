@@ -41,7 +41,7 @@ it('returns qr meta json for the ad owner', function (): void {
         ->and($prof)->toContain('utm_campaign=owner_share')
         ->and($prof)->toContain('utm_content=profile_'.$owner->id);
 
-    expect($response->json('data.qr_data_uri'))->toStartWith('data:image/png;base64,');
+    expect($response->json('data.qr_data_uri'))->toStartWith('data:image/svg+xml;base64,');
 });
 
 it('still builds utm-tracked listing urls when marketing callers opt in', function (): void {
@@ -89,6 +89,20 @@ it('returns a png for ad qr image', function (): void {
         ->assertHeader('content-type', 'image/png');
 });
 
+it('streams an inline placarde pdf preview', function (): void {
+    $owner = User::factory()->agents()->create([
+        'is_active' => true,
+        'email_verified_at' => now(),
+    ]);
+    $ad = Ad::factory()->for($owner)->create();
+
+    $this->actingAs($owner, 'sanctum')
+        ->get("/api/v1/my/ads/{$ad->id}/placarde/preview")
+        ->assertOk()
+        ->assertHeader('content-type', 'application/pdf')
+        ->assertHeader('content-disposition', 'inline; filename="placarde-'.($ad->slug ?: $ad->id).'.pdf"');
+});
+
 it('downloads a placarde pdf', function (): void {
     $owner = User::factory()->agents()->create([
         'is_active' => true,
@@ -98,6 +112,18 @@ it('downloads a placarde pdf', function (): void {
 
     $this->actingAs($owner, 'sanctum')
         ->get("/api/v1/my/ads/{$ad->id}/placarde")
+        ->assertOk()
+        ->assertHeader('content-type', 'application/pdf');
+});
+
+it('downloads a profile placarde pdf', function (): void {
+    $owner = User::factory()->agents()->create([
+        'is_active' => true,
+        'email_verified_at' => now(),
+    ]);
+
+    $this->actingAs($owner, 'sanctum')
+        ->get('/api/v1/my/profile/placarde')
         ->assertOk()
         ->assertHeader('content-type', 'application/pdf');
 });
@@ -119,7 +145,7 @@ it('returns profile qr meta for an agent', function (): void {
         ->and($profileUrl)->toContain('utm_medium=qr')
         ->and($profileUrl)->toContain('utm_campaign=owner_share')
         ->and($profileUrl)->toContain('utm_content=profile_'.$owner->id);
-    expect($response->json('data.qr_data_uri'))->toStartWith('data:image/png;base64,');
+    expect($response->json('data.qr_data_uri'))->toStartWith('data:image/svg+xml;base64,');
 });
 
 it('forbids profile qr for a customer', function (): void {

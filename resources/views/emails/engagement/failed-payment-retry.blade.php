@@ -2,6 +2,8 @@
 
 @section('title', __('emails.failed_payment.subject', ['app' => config('app.name')]))
 
+@section('preheader', 'Votre paiement n\'a pas abouti — relancez la transaction en quelques secondes.')
+
 @section('content')
 
     <h1>{{ __('emails.failed_payment.heading') }}</h1>
@@ -21,11 +23,11 @@
         </p>
     </div>
 
-    <div class="btn-wrapper">
-        <a href="{{ config('app.frontend_url', config('app.url')) }}/pricing" class="btn">
-            {{ __('emails.failed_payment.cta') }}
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => config('app.frontend_url', config('app.url')) . '/pricing',
+        'label' => __('emails.failed_payment.cta'),
+        'width' => 220,
+    ])
 
     <p class="fallback" style="margin-top: 24px;">
         {{ __('emails.failed_payment.help') }}

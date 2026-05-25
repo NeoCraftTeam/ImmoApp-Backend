@@ -3,6 +3,8 @@
 
 @section('title', __('emails.verification_code.subject', ['code' => $otpCode, 'app' => config('app.name')]))
 
+@section('preheader', 'Votre code expire dans 10 minutes — ne le partagez jamais, même avec notre équipe.')
+
 @section('content')
 
     <h1>{{ __('emails.verification_code.heading') }}</h1>

@@ -3,6 +3,8 @@
 
 @section('title', 'Votre clé d\'accès ' . config('app.name') . ' a été ' . ($action === 'added' ? 'ajoutée' : 'supprimée'))
 
+@section('preheader', 'Votre passkey a été mise à jour. Si vous n\'en êtes pas à l\'origine, sécurisez votre compte sans attendre.')
+
 @section('content')
 
     <h1>Clé d'accès {{ $action === 'added' ? 'ajoutée' : 'supprimée' }}</h1>

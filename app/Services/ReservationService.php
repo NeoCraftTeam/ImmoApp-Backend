@@ -6,6 +6,8 @@ namespace App\Services;
 
 use App\Enums\CancelledBy;
 use App\Enums\ReservationStatus;
+use App\Events\Reservation\ReservationStatusChanged;
+use App\Events\Reservation\SlotAvailabilityChanged;
 use App\Exceptions\Viewing\ClientHasActiveReservationForAdException;
 use App\Exceptions\Viewing\ScheduleHasActiveReservationsException;
 use App\Exceptions\Viewing\SelfReservationException;
@@ -21,6 +23,7 @@ use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 final readonly class ReservationService implements ReservationServiceInterface
 {
@@ -90,6 +93,13 @@ final readonly class ReservationService implements ReservationServiceInterface
             throw new SlotAlreadyReservedException;
         }
 
+        SlotAvailabilityChanged::dispatch(
+            $ad->id,
+            $data['slot_date'],
+            $data['slot_starts_at'],
+            false,
+        );
+
         return $reservation;
     }
 
@@ -101,6 +111,11 @@ final readonly class ReservationService implements ReservationServiceInterface
         $cancelledBy = $reservation->isOwnedByClient($actor)
             ? CancelledBy::Client
             : CancelledBy::Landlord;
+
+        $previous = $reservation->status->value;
+        $adId = $reservation->ad_id;
+        $slotDate = $reservation->slot_date->toDateString();
+        $slotStartsAt = $reservation->slot_starts_at;
 
         DB::transaction(function () use ($reservation, $cancelledBy, $reason): void {
             $reservation->update([
@@ -115,7 +130,12 @@ final readonly class ReservationService implements ReservationServiceInterface
             }
         });
 
-        return $reservation->fresh() ?? $reservation;
+        $fresh = $reservation->fresh(['ad']) ?? $reservation;
+
+        ReservationStatusChanged::dispatch($fresh, $previous);
+        SlotAvailabilityChanged::dispatch($adId, $slotDate, $slotStartsAt, true);
+
+        return $fresh;
     }
 
     /**
@@ -140,10 +160,46 @@ final readonly class ReservationService implements ReservationServiceInterface
                 if ($reservation->appointmentSchedule) {
                     $this->viewingScheduleService->releaseSlot($reservation->appointmentSchedule);
                 }
+
+                ReservationStatusChanged::dispatch($reservation, ReservationStatus::Pending->value);
+                SlotAvailabilityChanged::dispatch(
+                    $reservation->ad_id,
+                    $reservation->slot_date->toDateString(),
+                    $reservation->slot_starts_at,
+                    true,
+                );
             }
         });
 
         return $stale->count();
+    }
+
+    /**
+     * Mark a confirmed reservation as completed (called after slot_ends_at has passed).
+     */
+    public function complete(TentativeReservation $reservation): TentativeReservation
+    {
+        $previous = $reservation->status->value;
+
+        $reservation->update(['status' => ReservationStatus::Completed]);
+
+        ReservationStatusChanged::dispatch($reservation->load('ad'), $previous);
+
+        return $reservation->fresh() ?? $reservation;
+    }
+
+    /**
+     * Mark a confirmed reservation as no-show (landlord action).
+     */
+    public function markNoShow(TentativeReservation $reservation): TentativeReservation
+    {
+        $previous = $reservation->status->value;
+
+        $reservation->update(['status' => ReservationStatus::NoShow]);
+
+        ReservationStatusChanged::dispatch($reservation->load('ad'), $previous);
+
+        return $reservation->fresh() ?? $reservation;
     }
 
     /**
@@ -224,17 +280,39 @@ final readonly class ReservationService implements ReservationServiceInterface
     {
         // Full slot instant must not be in the past (same calendar as app TZ).
         $slotStartsAt = Carbon::parse($data['slot_date'].' '.$data['slot_starts_at']);
+
+        Log::debug('[SLOT_DEBUG] assertSlotIsAvailable', [
+            'ad_id' => $ad->id,
+            'slot_date' => $data['slot_date'],
+            'slot_starts_at' => $data['slot_starts_at'],
+            'slot_ends_at' => $data['slot_ends_at'],
+            'parsed_start' => $slotStartsAt->toIso8601String(),
+            'now' => now()->toIso8601String(),
+            'is_past' => $slotStartsAt->isPast(),
+            'app_tz' => config('app.timezone'),
+        ]);
+
         if ($slotStartsAt->isPast()) {
+            Log::debug('[SLOT_DEBUG] REJECTED: isPast');
             throw new SlotNotAvailableException;
         }
 
-        // Must match GET /slots: use schedule metadata (duration + buffer), not Zap defaults.
-        if (!$this->viewingScheduleService->isOfferedBookableSlot(
+        $rawSlots = $this->viewingScheduleService->getBookableSlotsForDate($ad, $data['slot_date']);
+        $offered = $this->viewingScheduleService->isOfferedBookableSlot(
             $ad,
             $data['slot_date'],
             $data['slot_starts_at'],
             $data['slot_ends_at'],
-        )) {
+        );
+
+        Log::debug('[SLOT_DEBUG] isOfferedBookableSlot', [
+            'offered' => $offered,
+            'raw_slots' => $rawSlots,
+        ]);
+
+        // Must match GET /slots: use schedule metadata (duration + buffer), not Zap defaults.
+        if (!$offered) {
+            Log::debug('[SLOT_DEBUG] REJECTED: not offered by schedule');
             throw new SlotNotAvailableException;
         }
 

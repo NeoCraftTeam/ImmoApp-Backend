@@ -2,10 +2,12 @@
 
 @section('title', 'Bravo pour votre première annonce !')
 
+@section('preheader', 'Félicitations pour votre première annonce KeyHome — elle est maintenant visible par des milliers de visiteurs.')
+
 @section('content')
 
     {{-- Hero celebration banner --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin-bottom: 28px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin-bottom: 28px;">
         <tr>
             <td align="center" style="
                 background: linear-gradient(135deg, #0f766e 0%, #0d9488 50%, #14b8a6 100%);
@@ -30,7 +32,7 @@
     </p>
 
     {{-- Ad status card --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         border-collapse: collapse;
         margin-top: 24px;
         background-color: #f0fdfa;
@@ -44,7 +46,7 @@
                 <p style="margin: 0; font-size: 16px; font-weight: 700; color: #0f172a;">
                     {{ $adTitle }}
                 </p>
-                <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin-top: 14px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin-top: 14px;">
                     <tr>
                         <td>
                             <span style="
@@ -71,7 +73,7 @@
     </p>
 
     {{-- Step 1 --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin-bottom: 12px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin-bottom: 12px;">
         <tr>
             <td width="44" valign="top">
                 <div style="
@@ -96,7 +98,7 @@
     </table>
 
     {{-- Connector --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin-bottom: 12px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin-bottom: 12px;">
         <tr>
             <td width="44" align="center">
                 <div style="width: 2px; height: 20px; background-color: #99f6e4; margin: 0 auto;"></div>
@@ -106,7 +108,7 @@
     </table>
 
     {{-- Step 2 --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin-bottom: 12px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin-bottom: 12px;">
         <tr>
             <td width="44" valign="top">
                 <div style="
@@ -128,7 +130,7 @@
     </table>
 
     {{-- Connector --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin-bottom: 12px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin-bottom: 12px;">
         <tr>
             <td width="44" align="center">
                 <div style="width: 2px; height: 20px; background-color: #e2e8f0; margin: 0 auto;"></div>
@@ -138,7 +140,7 @@
     </table>
 
     {{-- Step 3 --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin-bottom: 28px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; margin-bottom: 28px;">
         <tr>
             <td width="44" valign="top">
                 <div style="
@@ -160,7 +162,7 @@
     </table>
 
     {{-- Tips box --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         border-collapse: collapse;
         background-color: #f0fdfa;
         border-left: 4px solid #0d9488;
@@ -181,11 +183,12 @@
     </table>
 
     {{-- CTA --}}
-    <div class="btn-wrapper">
-        <a href="{{ $panelUrl }}" class="btn">
-            Voir mon tableau de bord →
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $panelUrl,
+        'label' => 'Voir mon tableau de bord',
+        'color' => '#0d9488',
+        'width' => 240,
+    ])
 
     <p class="text" style="margin-top: 24px;">
         Merci de faire confiance à <strong>{{ config('app.name') }}</strong>.

@@ -3,6 +3,8 @@
 
 @section('title', __('emails.forgot_password.subject', ['app' => config('app.name')]))
 
+@section('preheader', 'Réinitialisez votre mot de passe — ce lien expire dans ' . ($ttlMinutes ?? 60) . ' minutes.')
+
 @section('content')
 
     <h1>{{ __('emails.forgot_password.heading') }}</h1>
@@ -21,9 +23,12 @@
         {!! __('emails.forgot_password.click_below') !!}
     </p>
 
-    <div class="btn-wrapper">
-        <a href="{{ $resetUrl }}" class="btn">{{ __('emails.forgot_password.cta') }}</a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $resetUrl,
+        'label' => __('emails.forgot_password.cta'),
+        'color' => !empty($isOwner) ? '#0d9488' : '#F6475F',
+        'width' => 240,
+    ])
 
     <p class="fallback" style="margin-top: 24px;">
         {{ __('emails.forgot_password.fallback') }}<br>

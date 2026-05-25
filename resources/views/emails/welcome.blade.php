@@ -2,6 +2,8 @@
 
 @section('title', __('emails.welcome.subject', ['app' => config('app.name')]))
 
+@section('preheader', __('emails.welcome.preheader', ['app' => config('app.name')]))
+
 @section('content')
 
     <h1>{{ __('emails.welcome.heading', ['name' => $user->lastname]) }}</h1>
@@ -45,11 +47,10 @@
         </tr>
     </table>
 
-    <div class="btn-wrapper">
-        <a href="{{ config('app.frontend_url', config('app.url')) }}/home" class="btn">
-            {{ __('emails.welcome.cta') }}
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => rtrim(config('app.frontend_url', config('app.url')), '/') . '/home',
+        'label' => __('emails.welcome.cta'),
+    ])
 
     <p class="fallback" style="margin-top: 24px;">
         {{ __('emails.welcome.help') }}

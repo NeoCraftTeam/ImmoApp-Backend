@@ -34,7 +34,7 @@ class OAuthLinkAttemptMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Tentative de liaison de compte '.ucfirst($this->provider).' — '.config('app.name'),
+            subject: 'Alerte sécurité — tentative de liaison '.ucfirst($this->provider).' sur votre compte',
         );
     }
 

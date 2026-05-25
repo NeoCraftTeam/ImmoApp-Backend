@@ -3,6 +3,8 @@
 
 @section('title', $otpCode . ' est votre code de réinitialisation ' . config('app.name'))
 
+@section('preheader', 'Ce code expire dans 10 minutes — ne le communiquez à personne, même à notre équipe.')
+
 @section('content')
 
     <h1>Code de réinitialisation du mot de passe</h1>

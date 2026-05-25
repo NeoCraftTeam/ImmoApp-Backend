@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Events\Reservation\ReservationStatusChanged;
+use App\Events\Reservation\SlotAvailabilityChanged;
 use App\Models\Ad;
 use App\Models\UnlockedAd;
 use App\Models\User;
@@ -9,10 +11,15 @@ use App\Notifications\ReservationCreatedClientNotification;
 use App\Notifications\ReservationCreatedLandlordNotification;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
+
+beforeEach(function (): void {
+    Event::fake([ReservationStatusChanged::class, SlotAvailabilityChanged::class]);
+});
 
 afterEach(function (): void {
     Carbon::setTestNow(null);

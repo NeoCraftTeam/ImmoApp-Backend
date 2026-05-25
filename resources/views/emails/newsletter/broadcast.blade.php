@@ -2,6 +2,8 @@
 
 @section('title', $body ? Str::limit(strip_tags($body), 60) : 'Newsletter KeyHome')
 
+@section('preheader', $subject ?? 'La newsletter KeyHome — actualités et meilleures annonces immobilières de la semaine.')
+
 @section('content')
 
     @if($name)
@@ -14,11 +16,11 @@
         {!! $body !!}
     </div>
 
-    <div class="btn-wrapper" style="margin-top: 32px;">
-        <a href="{{ config('app.frontend_url', config('app.url')) }}" class="btn">
-            Voir les annonces sur KeyHome
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => config('app.frontend_url', config('app.url')),
+        'label' => 'Voir les annonces sur KeyHome',
+        'width' => 260,
+    ])
 
     <p class="fallback" style="margin-top: 32px;">
         Vous recevez cet email car vous êtes abonné à la newsletter KeyHome.<br>

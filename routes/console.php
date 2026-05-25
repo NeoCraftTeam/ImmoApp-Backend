@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Jobs\CompleteStaleReservationsJob;
 use App\Jobs\ExpireStaleReservationsJob;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -19,6 +20,7 @@ Schedule::command('app:send-monthly-report')->monthlyOn(1, '08:00');
 Schedule::command('app:send-engagement-emails')->dailyAt('08:00');
 Schedule::command('app:check-lease-expirations')->dailyAt('09:00');
 Schedule::job(ExpireStaleReservationsJob::class)->everyThirtyMinutes();
+Schedule::job(CompleteStaleReservationsJob::class)->hourly();
 
 Schedule::command('backup:clean')->daily()->at('01:00');
 Schedule::command('backup:run')->daily()->at('02:00');
@@ -37,8 +39,10 @@ Schedule::command('gdpr:anonymize-deleted')->dailyAt('03:15');
 // Step 2: hard-delete anonymized records after 2-year retention threshold
 Schedule::command('app:purge-expired-data')->dailyAt('03:30');
 
-// — Smart notification digests —
-Schedule::command('app:send-search-alert-digests')->twiceDaily(8, 18);
+// — Smart notification digests (frequency-aware) —
+Schedule::command('app:send-search-alert-digests --frequency=immediate')->twiceDaily(8, 18);
+Schedule::command('app:send-search-alert-digests --frequency=daily')->dailyAt('08:00');
+Schedule::command('app:send-search-alert-digests --frequency=weekly')->weeklyOn(1, '08:00');
 
 // — Behavioral retention push notifications —
 Schedule::command('app:send-retention-pushes')->twiceDaily(9, 18);
@@ -48,3 +52,9 @@ Schedule::command('app:expire-boosted-ads')->hourly();
 
 // — Trust Score nightly recomputation —
 Schedule::command('trustscore:recompute')->dailyAt('02:30');
+
+// — Behavioral relevance-score refresh (Sprint 4.3) —
+// Re-syncs ads whose interaction counts changed in the last 25h to Meilisearch.
+Schedule::command('ads:update-relevance-scores --hours=25')->dailyAt('03:00');
+// Full reindex on Sundays (ensures no stale scores accumulate)
+Schedule::command('ads:update-relevance-scores --all')->weeklyOn(0, '03:00');

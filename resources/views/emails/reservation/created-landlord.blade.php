@@ -2,6 +2,8 @@
 
 @section('title', 'Nouvelle demande de visite')
 
+@section('preheader', 'Nouvelle demande de visite reçue — confirmez ou refusez dans les 24h depuis votre espace bailleur.')
+
 @section('content')
 
     <h1>Nouvelle demande de visite</h1>
@@ -17,7 +19,7 @@
     </p>
 
     {{-- Status badge --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px; border-collapse: collapse;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px; border-collapse: collapse;">
         <tr>
             <td align="center">
                 <span style="
@@ -36,7 +38,7 @@
     </table>
 
     {{-- Visite details card --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 24px;
         border-collapse: collapse;
         background-color: #f8fafc;
@@ -49,7 +51,7 @@
                     text-transform: uppercase; letter-spacing: 1px; color: #64748b;">
                     Détails de la demande
                 </p>
-                <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
                     <tr>
                         <td style="padding: 9px 0; font-size: 14px; color: #64748b;
                             border-bottom: 1px solid #f1f5f9; width: 110px;"> Annonce</td>
@@ -84,7 +86,7 @@
     </table>
 
     @if($reservation->client_message)
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 16px;
         border-collapse: collapse;
         background-color: #f8fafc;
@@ -105,11 +107,12 @@
     </table>
     @endif
 
-    <div class="btn-wrapper">
-        <a href="{{ rtrim(config('app.frontend_url', config('app.url')), '/') }}/owner/viewings" class="btn">
-            Gérer la demande
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => rtrim(config('app.frontend_url', config('app.url')), '/') . '/owner/viewings',
+        'label' => 'Gérer la demande',
+        'color' => '#0d9488',
+        'width' => 220,
+    ])
 
     <p class="text">
         Si vous ne répondez pas dans les <strong>24 heures</strong>, la demande expirera automatiquement.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Reservation;
 
 use App\Enums\ReservationStatus;
+use App\Events\Reservation\ReservationStatusChanged;
 use App\Models\TentativeReservation;
 use Illuminate\Support\Facades\Log;
 
@@ -19,9 +20,13 @@ final class ConfirmReservationAction
 {
     public function execute(TentativeReservation $reservation): TentativeReservation
     {
+        $previous = $reservation->status->value;
+
         $reservation->update(['status' => ReservationStatus::Confirmed]);
 
         Log::info('Réservation #'.$reservation->id.' confirmée par le propriétaire.');
+
+        ReservationStatusChanged::dispatch($reservation->load('ad'), $previous);
 
         return $reservation;
     }

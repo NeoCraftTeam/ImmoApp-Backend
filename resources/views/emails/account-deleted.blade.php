@@ -2,6 +2,8 @@
 
 @section('title', 'Votre compte a été supprimé')
 
+@section('preheader', 'Votre compte ' . config('app.name') . ' a bien été supprimé. Toutes vos données ont été effacées conformément à notre politique.')
+
 @section('content')
 
     <h1>Votre compte a été supprimé</h1>
@@ -15,7 +17,7 @@
         à votre demande.
     </p>
 
-    <table width="100%" cellpadding="0" cellspacing="0" style="
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="
         margin-top: 24px;
         border-collapse: collapse;
         background-color: #fef2f2;
@@ -47,10 +49,10 @@
         sur KeyHome.
     </p>
 
-    <div class="btn-wrapper">
-        <a href="{{ rtrim(config('app.frontend_url', config('app.url')), '/') }}" class="btn">
-            Visiter KeyHome
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => rtrim(config('app.frontend_url', config('app.url')), '/'),
+        'label' => 'Visiter KeyHome',
+        'width' => 200,
+    ])
 
 @endsection

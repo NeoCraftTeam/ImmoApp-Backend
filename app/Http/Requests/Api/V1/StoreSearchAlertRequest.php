@@ -31,6 +31,7 @@ final class StoreSearchAlertRequest extends FormRequest
             'query' => ['nullable', 'string', 'max:200'],
             'notify_email' => ['nullable', 'boolean'],
             'notify_push' => ['nullable', 'boolean'],
+            'frequency' => ['nullable', 'string', 'in:immediate,daily,weekly'],
         ];
     }
 }

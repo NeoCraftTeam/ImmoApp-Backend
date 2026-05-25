@@ -75,6 +75,7 @@ Route::prefix('v1')->group(function (): void {
     require __DIR__.'/api/viewings.php';
     require __DIR__.'/api/surveys.php';
     require __DIR__.'/api/geo.php';
+    require __DIR__.'/api/disputes.php';
 
     // --- AD TYPES ---
     Route::controller(AdTypeController::class)->group(function (): void {
@@ -171,8 +172,9 @@ Route::prefix('v1')->group(function (): void {
             ->middleware('throttle:3,1');
     });
 
-    // --- MY FAVORITES ---
+    // --- MY FAVORITES / RECENTLY VIEWED ---
     Route::middleware('auth:sanctum')->get('/my/favorites', [AdInteractionController::class, 'favorites']);
+    Route::middleware('auth:sanctum')->get('/my/recently-viewed', [AdInteractionController::class, 'recentlyViewed']);
 
     // --- NOTIFICATIONS ---
     Route::middleware('auth:sanctum')->prefix('notifications')->controller(NotificationController::class)->group(function (): void {
@@ -210,6 +212,8 @@ Route::prefix('v1')->group(function (): void {
         // bounded even for legitimate agents.
         Route::post('/ai/enhance-conditions', 'enhanceConditions')
             ->middleware('throttle:10,1');
+        Route::post('/ai/summarize', 'summarize')
+            ->middleware('throttle:10,1');
         Route::get('/{leaseContract}', 'show')->name('lease-contracts.show');
         Route::put('/{leaseContract}', 'update')->name('lease-contracts.update');
         Route::post('/{ad}/generate', 'store')->name('lease-contracts.generate');
@@ -235,6 +239,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/qr-code/image', 'profileQrImage')->middleware('throttle:60,1');
             Route::get('/business-card', 'businessCard')->middleware('throttle:20,1');
             Route::get('/business-card/preview', 'businessCardPreview')->middleware('throttle:20,1');
+            Route::get('/placarde', 'profilePlacarde')->middleware('throttle:20,1');
         });
 
     Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner', 'token.role:agent'])
@@ -244,6 +249,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/qr-code', 'adMeta')->middleware('throttle:60,1');
             Route::get('/qr-code/image', 'adQrImage')->middleware('throttle:60,1');
             Route::get('/placarde', 'adPlacarde')->middleware('throttle:20,1');
+            Route::get('/placarde/preview', 'adPlacardePreview')->middleware('throttle:20,1');
         });
 
     // --- PWA (Push Subscriptions & Session Validation) ---
@@ -265,6 +271,7 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('auth:sanctum')->prefix('search-alerts')->group(function (): void {
         Route::get('/', [SearchAlertController::class, 'index']);
         Route::post('/', [SearchAlertController::class, 'store'])->middleware('throttle:20,1');
+        Route::post('/preview-count', [SearchAlertController::class, 'previewCount'])->middleware('throttle:30,1');
         Route::put('/{searchAlert}', [SearchAlertController::class, 'update']);
         Route::delete('/{searchAlert}', [SearchAlertController::class, 'destroy']);
     });

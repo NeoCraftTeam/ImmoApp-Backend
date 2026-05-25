@@ -2,6 +2,8 @@
 
 @section('title', 'Renouvellement de votre abonnement — ' . config('app.name'))
 
+@section('preheader', 'Rappel de renouvellement — assurez la continuité de vos avantages sur KeyHome.')
+
 @section('content')
     <style>
         .renewal-badge {
@@ -123,9 +125,12 @@
         </table>
     </div>
 
-    <div class="btn-wrapper">
-        <a href="{{ $paymentUrl }}" class="btn">Renouveler maintenant — {{ $planPrice }} FCFA</a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $paymentUrl,
+        'label' => 'Renouveler maintenant — ' . $planPrice . ' FCFA',
+        'color' => '#0d9488',
+        'width' => 300,
+    ])
 
     <p class="text" style="font-size: 14px; color: #64748b;">En renouvelant, vous conservez :</p>
     <ul class="benefits-list">

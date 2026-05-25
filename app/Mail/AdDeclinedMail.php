@@ -40,7 +40,7 @@ class AdDeclinedMail extends Mailable implements ShouldQueue
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Votre annonce KeyHome n\'a pas été approuvée : '.$this->ad->title,
+            subject: 'Action requise — modifications sur « '.$this->ad->title.' »',
         );
     }
 

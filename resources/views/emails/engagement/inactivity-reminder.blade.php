@@ -2,6 +2,8 @@
 
 @section('title', __('emails.inactivity.subject', ['name' => $user->firstname, 'app' => config('app.name')]))
 
+@section('preheader', 'De nouvelles annonces vous attendent — revenez découvrir les biens publiés depuis votre dernière visite.')
+
 @section('content')
 
     <h1>{{ __('emails.inactivity.heading') }}</h1>
@@ -19,10 +21,10 @@
         </div>
     @endif
 
-    <div class="btn-wrapper">
-        <a href="{{ config('app.frontend_url', config('app.url')) }}/home" class="btn">
-            {{ __('emails.inactivity.cta') }}
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => config('app.frontend_url', config('app.url')) . '/home',
+        'label' => __('emails.inactivity.cta'),
+        'width' => 220,
+    ])
 
 @endsection

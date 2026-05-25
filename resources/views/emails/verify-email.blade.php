@@ -3,6 +3,8 @@
 
 @section('title', 'Vérifiez votre adresse email - ' . config('app.name'))
 
+@section('preheader', 'Confirmez votre adresse email pour activer votre compte — lien valable ' . ($ttlMinutes ?? 60) . ' minutes.')
+
 @section('content')
 
     <h1>Vérifiez votre adresse email</h1>
@@ -12,9 +14,11 @@
         Ce lien expirera dans <strong>{{ $ttlMinutes }} minutes</strong>.
     </p>
 
-    <div class="btn-wrapper">
-        <a href="{{ $magicLink }}" class="btn">Vérifier mon adresse email</a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $magicLink,
+        'label' => 'Vérifier mon adresse email',
+        'width' => 260,
+    ])
 
     <p class="fallback" style="margin: 16px 0 64px 0;">
         Si le bouton ne fonctionne pas, <a href="{{ $magicLink }}" class="link">cliquez ici</a>.

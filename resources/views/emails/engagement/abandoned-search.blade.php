@@ -2,6 +2,8 @@
 
 @section('title', __('emails.abandoned_search.subject', ['app' => config('app.name')]))
 
+@section('preheader', 'Des biens correspondent encore à votre recherche — retrouvez vos annonces sauvegardées.')
+
 @section('content')
 
     <h1>{{ __('emails.abandoned_search.heading') }}</h1>
@@ -19,9 +21,11 @@
         </div>
     @endif
 
-    <div class="btn-wrapper">
-        <a href="{{ $searchUrl }}" class="btn">{{ __('emails.abandoned_search.cta') }}</a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => $searchUrl,
+        'label' => __('emails.abandoned_search.cta'),
+        'width' => 220,
+    ])
 
     <p class="text" style="font-size: 13px; color: #94a3b8; margin-top: 24px;">
         {{ __('emails.abandoned_search.alert_tip') }}

@@ -145,7 +145,7 @@ vendor/bin/rector process --dry-run
 
 ### Models (`app/Models/`)
 `Ad`, `AdBoost`, `AdInteraction`, `AdReport`, `AdType`, `Agency`, `AnonymousSurveyAnswer`, `AnonymousSurveyResponse`,
-`BoostPack`, `City`, `Document`, `EmailPreference`, `Expense`, `Invoice`, `LeaseContract`, `LeaseSignatureRequest`,
+`BoostPack`, `City`, `Dispute`, `DisputeEvidence`, `DisputeMessage`, `Document`, `EmailPreference`, `Expense`, `Invoice`, `LeaseContract`, `LeaseSignatureRequest`,
 `LoginHistory`, `NewsletterCampaign`, `NewsletterSubscriber`, `NotificationPreference`, `Payment`,
 `PersonalAccessToken`, `PointPackage`, `PointTransaction`, `PromoCode`, `PromoCodeUsage`,
 `PropertyAttribute`, `PropertyAttributeCategory`, `PushSubscription`, `Quarter`, `QueueFailedJob`,
@@ -176,8 +176,22 @@ vendor/bin/rector process --dry-run
 - `BoostService` — credit-based boost orchestrator. `apply(User, Ad, BoostPack)` atomic: deducts credits, writes `AdBoost` record, calls `Ad::boost()`. `expireStale()` marks expired `ad_boosts` rows and calls `Ad::unboost()`.
 - `AdBoostService` — subscription-based ad promotion logic (legacy, still used by `ExpireBoostedAds` command for subscription-sourced boosts).
 - `AdReportService` — abuse reporting.
+- `DisputeService` — landlord/tenant dispute orchestrator. `open()` (generates `KH-LITIGE-YYYY-XXXXXX` reference, SLA `+7d`, blocks self-dispute), `addMessage()` (coerces `is_internal` to false for non-admins), `uploadEvidence()` (stores on default disk under `disputes/{id}/`), `transition()` (validates against `DisputeStatus::canTransitionTo()`, sets `resolved_at` + `admin_id` on terminal states). All transitions notify both parties via `DisputeStatusChangedNotification`; `open()` also notifies admins. **State machine** lives on the `DisputeStatus` enum: `open → under_review → mediation → resolved_initiator | resolved_respondent | resolved_amicably`, with `rejected` reachable from `open` or `under_review`. Routes: `/api/v1/disputes` (auth:sanctum) for parties + admin; admin-only `PATCH /disputes/{id}/status`. Filament resource at `Annonces → Litiges` (badge = open count). Permission `AdminPermission::DisputesManage` (added to moderator preset). Policy `DisputePolicy` is IDOR-proof (initiator/respondent/admin only) and blocks reply/upload on closed disputes at the policy level (returns 403, not 422).
 - `AgencyService` — agency CRUD.
-- `ViewingScheduleService` / `ReservationService` — viewing calendar & booking. Slot validation uses `ViewingScheduleService::isOfferedBookableSlot()` (same duration/buffer as `GET /ads/{ad}/slots`), not Zap’s `Ad::isBookableAtTime()` which defaulted to 60-minute slots and disagreed with the public slot list. Client `POST /api/v1/ads/{ad}/reservations` uses RateLimiter **`viewings.reserve`** (default 20/min per authenticated user; `RL_VIEWINGS_RESERVE` / `config/rate_limiting.php`). **At most one active reservation** (`pending` or `confirmed`) per `(client, ad)` — enforced in `ReservationService::assertSlotIsAvailable()` + partial unique index `tr_unique_client_ad_active`; duplicate attempt returns **409** `CLIENT_ACTIVE_RESERVATION_EXISTS`. **Notifications** (mail + `database` + optional Web Push) for create / confirm / cancel / expire are sent from `TentativeReservationObserver`; reservation-related `Notification` classes call `$this->afterCommit()` so queued workers only process jobs after the `tentative_reservations` row is visible (avoids failed jobs when `QUEUE_CONNECTION` is Redis and the HTTP request still holds an open DB transaction). On create, the **client** and **landlord** each receive a **different** notification class (not a duplicate to the same inbox).
+- `ViewingScheduleService` / `ReservationService` — viewing calendar & booking. Slot validation uses `ViewingScheduleService::isOfferedBookableSlot()` (same duration/buffer as `GET /ads/{ad}/slots`), not Zap's `Ad::isBookableAtTime()` which defaulted to 60-minute slots and disagreed with the public slot list. Client `POST /api/v1/ads/{ad}/reservations` uses RateLimiter **`viewings.reserve`** (default 20/min per authenticated user; `RL_VIEWINGS_RESERVE` / `config/rate_limiting.php`). **At most one active reservation** (`pending` or `confirmed`) per `(client, ad)` — enforced in `ReservationService::assertSlotIsAvailable()` + partial unique index `tr_unique_client_ad_active`; duplicate attempt returns **409** `CLIENT_ACTIVE_RESERVATION_EXISTS`. **Notifications** (mail + `database` + optional Web Push) for create / confirm / cancel / expire / completed / no-show are sent from `TentativeReservationObserver`; reservation-related `Notification` classes call `$this->afterCommit()` so queued workers only process jobs after the `tentative_reservations` row is visible (avoids failed jobs when `QUEUE_CONNECTION` is Redis and the HTTP request still holds an open DB transaction). On create, the **client** and **landlord** each receive a **different** notification class (not a duplicate to the same inbox).
+  - **Notification classes** (all under `app/Notifications/`):
+    - Client: `ReservationCreatedClientNotification`, `ReservationConfirmedClientNotification`, `ReservationCancelledClientNotification`, `ReservationExpiredClientNotification`, `ReservationCompletedClientNotification`, `ViewingReminderNotification` (J-1).
+    - Landlord: `ReservationCreatedLandlordNotification`, `ReservationConfirmedLandlordNotification`, `ReservationCancelledLandlordNotification`, `ReservationNoShowLandlordNotification`, `ViewingReminderLandlordNotification` (J-1).
+  - **J-1 reminders**: `SendViewingReminders` command (daily 08:00) sends to both client (`notified_at`) and landlord (`landlord_notified_at`) independently — each tracked to avoid duplicates. Migration `2026_05_23_..._add_landlord_notified_at` adds `landlord_notified_at` nullable timestamp to `tentative_reservations`.
+  - **ICS calendar feeds** (`CalendarExportController`):
+    - Client: `GET /api/v1/my/calendar.ics` (signed, 1yr TTL) + `GET /api/v1/my/calendar-url` (returns signed URL).
+    - Landlord: `GET /api/v1/my/landlord-calendar.ics` (signed, 1yr TTL) + `GET /api/v1/my/landlord-calendar-url` (returns signed URL). Owner-role middleware.
+    - Both feeds include **VALARM 30 minutes before** each event (`Alert::minutesBeforeStart(30, ...)`), VEVENT status, and sequence from `updated_at` timestamp.
+    - Uses `spatie/icalendar-generator ^3` — correct API: `Alert::minutesBeforeStart(int $minutes, ?string $description)`.
+  - **Frontend** (`keyhome-frontend-next/`):
+    - `ViewingBookingPanel`: `AddToCalendarButton` (add-to-calendar-button-react) on booking success step and on confirmed reservations in list. `adLocation` prop passed as ICS `location`.
+    - `owner/viewings/page.tsx`: STATUS_CONFIG includes `completed` + `no_show`; **"Absence" button** (DoNotDisturb icon) + confirmation dialog for confirmed reservations → `POST /reservations/{id}/no-show`; `AddToCalendarButton` on confirmed reservation cards; **calendar subscription section** with copy-to-clipboard signed `.ics` URL from `/my/landlord-calendar-url`.
+    - `owner-reviews.service.ts`: `noShowReservation()` + `getLandlordCalendarUrl()` methods added.
 - `LeaseContractService` — lease management.
 - `TourService` / `PanoramaProcessor` — 360° virtual tours.
 - `AiDescriptionEnhancer`, `AiDigestService`, `AiSearchService` — AI-powered features.
@@ -513,7 +527,7 @@ All prefixed `/api/v1/`: `auth.php`, `ads.php`, `payments.php`, `viewings.php`, 
 `CreateAdminCommand`, `CreateDemoUsersCommand`, `DiagnoseMailCommand`, `GenerateUtmLinkCommand`,
 `HealthCheckCommand`, `MigrateAdImagesToSpatie`, `ProcessSubscriptionRenewals`, `PurgeExpiredData`,
 `RecalculateQuarterPricing`, `RecomputeTrustScores`, `ResetUserOnboardingCommand`, `SendEngagementEmails`, `SendMonthlyReport`,
-`SendPostViewingThanks`, `SendSearchAlertDigests`, `SendTestPush`, `SyncMeilisearchSettings`,
+`SendPostViewingThanks`, `SendSearchAlertDigests`, `SendTestPush`, `SendViewingReminders`, `SyncMeilisearchSettings`,
 `TestMultiTenancyFlow`, `UploadAttributesCommand`.
 
 ### Notifications & Mail
@@ -551,6 +565,7 @@ All prefixed `/api/v1/`: `auth.php`, `ads.php`, `payments.php`, `viewings.php`, 
 - `spatie/laravel-backup ^10` — S3 backups.
 - `clickbar/laravel-magellan ^2` — PostGIS helpers.
 - `laraveljutsu/zap ^1.14` — viewing schedule engine (`app/Models/Zap/`).
+- `spatie/icalendar-generator ^3` — ICS/iCalendar feed generation. Correct API: `Alert::minutesBeforeStart(int, ?string)` (not `minutesBefore`).
 - `laravel/scout + meilisearch/meilisearch-php` — full-text search.
 - `laravel/sanctum ^4`, `laravel/socialite ^5`, `dutchcodingcompany/filament-socialite`, `laragear/webauthn ^5`.
 - `laravel/pulse ^1`, `laravel/telescope ^5`, `laravel/nightwatch ^1` — observability.

@@ -10,6 +10,8 @@ enum ReservationStatus: string
     case Confirmed = 'confirmed';
     case Cancelled = 'cancelled';
     case Expired = 'expired';
+    case Completed = 'completed';
+    case NoShow = 'no_show';
 
     public function label(): string
     {
@@ -18,6 +20,8 @@ enum ReservationStatus: string
             self::Confirmed => 'Confirmée',
             self::Cancelled => 'Annulée',
             self::Expired => 'Expirée',
+            self::Completed => 'Terminée',
+            self::NoShow => 'Absent',
         };
     }
 
@@ -25,6 +29,14 @@ enum ReservationStatus: string
     {
         return match ($this) {
             self::Pending, self::Confirmed => true,
+            default => false,
+        };
+    }
+
+    public function isTerminal(): bool
+    {
+        return match ($this) {
+            self::Cancelled, self::Expired, self::Completed, self::NoShow => true,
             default => false,
         };
     }

@@ -3,6 +3,8 @@
 
 @section('title', '[Contact] ' . $contactSubject)
 
+@section('preheader', 'Nouveau message de ' . $contactName . ' — ' . Str::limit($contactMessage, 80))
+
 @section('content')
 
     <h1>Nouveau message de contact</h1>
@@ -23,11 +25,11 @@
     <h2 style="margin-top: 32px; font-size: 16px; font-weight: 700; color: #0f172a;">Message</h2>
     <div style="margin-top: 12px; padding: 20px; background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; white-space: pre-wrap; word-wrap: break-word;">{{ $contactMessage }}</div>
 
-    <div class="btn-wrapper" style="margin-top: 32px;">
-        <a href="mailto:{{ $contactEmail }}?subject={{ rawurlencode('Re: ' . $contactSubject) }}" class="btn">
-            Répondre à {{ $contactName }}
-        </a>
-    </div>
+    @include('emails.partials.button', [
+        'url'   => 'mailto:' . $contactEmail . '?subject=' . rawurlencode('Re: ' . $contactSubject),
+        'label' => 'Répondre à ' . $contactName,
+        'width' => 260,
+    ])
 
     @if(!empty($sourceIp) || !empty($userAgent) || !empty($sourceUrl))
         <hr style="margin-top: 40px; border: none; border-top: 1px solid #e2e8f0;">

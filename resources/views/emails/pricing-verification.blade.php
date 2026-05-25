@@ -2,6 +2,8 @@
 
 @section('title', 'Vérification de sécurité — Tarification')
 
+@section('preheader', 'Votre code de vérification pour accéder à la tarification est valide quelques minutes seulement.')
+
 @section('content')
 
     <h1>Vérification de sécurité</h1>
@@ -21,7 +23,7 @@
     </div>
 
     {{-- Warning box --}}
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 28px; border-collapse: collapse;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 28px; border-collapse: collapse;">
         <tr>
             <td style="
                 background-color: #fff1f2;
