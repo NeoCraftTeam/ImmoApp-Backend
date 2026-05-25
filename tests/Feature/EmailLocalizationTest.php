@@ -96,7 +96,7 @@ it('renders welcome email with French subject for fr-locale user', function (): 
 
     $rendered = $mail->render();
 
-    expect($rendered)->toContain(__('emails.welcome.heading', ['name' => $user->lastname], 'fr'));
+    expect($rendered)->toContain(__('emails.welcome.heading', ['name' => $user->firstname], 'fr'));
 });
 
 it('renders welcome email with English content for en-locale user', function (): void {
