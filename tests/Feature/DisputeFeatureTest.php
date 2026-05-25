@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\DisputeStatus;
 use App\Enums\DisputeType;
+use App\Models\Ad;
 use App\Models\Dispute;
 use App\Models\DisputeMessage;
 use App\Models\User;
@@ -50,6 +51,59 @@ it('rejects a dispute against oneself', function (): void {
             'respondent_id' => $user->id,
             'title' => 'Self dispute',
             'description' => 'Je dépose un litige contre moi-même pour test.',
+        ])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['respondent_id']);
+});
+
+it('auto-derives the respondent from ad_id when respondent_id is omitted', function (): void {
+    Notification::fake();
+
+    $owner = User::factory()->agents()->create();
+    $renter = User::factory()->customers()->create();
+    $ad = Ad::factory()->create(['user_id' => $owner->id]);
+    User::factory()->admin()->create();
+
+    $response = $this
+        ->actingAs($renter, 'sanctum')
+        ->postJson('/api/v1/disputes', [
+            'type' => DisputeType::MISREPRESENTATION->value,
+            'ad_id' => $ad->id,
+            'title' => 'Annonce non conforme',
+            'description' => 'Le bien visité ne correspond pas à la description publiée sur la plateforme.',
+        ]);
+
+    $response->assertCreated()
+        ->assertJsonPath('data.initiator.id', $renter->id)
+        ->assertJsonPath('data.respondent.id', $owner->id)
+        ->assertJsonPath('data.ad_id', $ad->id);
+
+    Notification::assertSentTo($owner, DisputeOpenedNotification::class);
+});
+
+it('rejects a dispute when neither respondent_id nor any context is provided', function (): void {
+    $user = User::factory()->customers()->create();
+
+    $this->actingAs($user, 'sanctum')
+        ->postJson('/api/v1/disputes', [
+            'type' => DisputeType::OTHER->value,
+            'title' => 'Litige sans contexte',
+            'description' => 'Je tente de créer un litige sans aucun contexte ni partie adverse.',
+        ])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['respondent_id']);
+});
+
+it('rejects auto-derive when the ad belongs to the initiator (no self-dispute via context)', function (): void {
+    $owner = User::factory()->agents()->create();
+    $ad = Ad::factory()->create(['user_id' => $owner->id]);
+
+    $this->actingAs($owner, 'sanctum')
+        ->postJson('/api/v1/disputes', [
+            'type' => DisputeType::OTHER->value,
+            'ad_id' => $ad->id,
+            'title' => 'Litige contre soi-même via annonce',
+            'description' => 'Tentative de contourner la règle anti-auto-litige via le contexte annonce.',
         ])
         ->assertStatus(422)
         ->assertJsonValidationErrors(['respondent_id']);
