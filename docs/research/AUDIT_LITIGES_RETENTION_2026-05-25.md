@@ -17,18 +17,25 @@
 
 ### 1.1 État actuel KeyHome
 
+> **Mise à jour 25 mai 2026 — commit `6f88767`** : module litiges entièrement livré.
+
 | Composant | Présent | Notes |
 |-----------|---------|-------|
 | `AdReport` (signalement annonce) | ✅ | Status: PENDING → REVIEWING → RESOLVED, admin_notes, resolved_by |
 | `Review` (avis locataire sur annonce) | ✅ | owner_response, owner_responded_at |
 | `Refund` (remboursement paiement) | ✅ | Lié au Payment |
 | `LeaseContract` + signatures | ✅ | PDF DomPDF, signatures Reverb |
-| **`Dispute` (litige bailleur-locataire)** | ❌ | **Absent** |
-| Workflow ODR (médiation en ligne) | ❌ | Absent |
-| Messagerie de litige | ❌ | Absent (chat existe mais non spécialisé) |
-| Escalade automatique admin | ❌ | Absent |
-| SLA et délais de réponse | ❌ | Absent |
-| Historique timeline litige | ❌ | Absent |
+| **`Dispute` (litige bailleur-locataire)** | ✅ | `disputes` table, `DisputeStatus` state machine (7 états), `DisputeService`, `DisputePolicy` IDOR-proof |
+| Workflow ODR (médiation en ligne) | ✅ | open → under_review → mediation → resolved_*/rejected, transitions admin via Filament |
+| Messagerie de litige | ✅ | `dispute_messages` + `POST /disputes/{id}/messages`, `is_internal` admin-only |
+| Upload de preuves | ✅ | `dispute_evidences` + `POST /disputes/{id}/evidences`, MIME + 10 MB validés |
+| Notifications (database) | ✅ | `DisputeOpenedNotification`, `DisputeMessageReceivedNotification`, `DisputeStatusChangedNotification` |
+| SLA stocké (`sla_deadline +7j`) | ✅ | Colonne `sla_deadline` settée à création |
+| Historique timeline litige | ✅ | `LogsActivity` Spatie sur `Dispute` (status, admin_id, resolution_note, resolved_at) |
+| Panel admin Filament | ✅ | `Annonces → Litiges` avec badge open count + 6 transition actions |
+| **Notifications FCM push** | ⚠️ | Database faite; canal FCM via `PushSubscription` à câbler (`via()` retourne `['database']` aujourd'hui) |
+| **Job d'escalade SLA dépassé** | ❌ | Pas de scheduled job qui notifie admin quand `sla_deadline < now()` et statut encore `OPEN` |
+| **Clause médiation contrat (LeaseContract)** | ❌ | Pas de section opt-in dans le contrat PDF |
 
 ### 1.2 Bonnes pratiques expertes trouvées
 
