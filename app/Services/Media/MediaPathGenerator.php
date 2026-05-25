@@ -16,7 +16,7 @@ use Spatie\MediaLibrary\Support\PathGenerator\PathGenerator;
  *   avatars/{userId}/{mediaId}/avatar.webp           ← User "avatars" collection
  *   {model_type}s/{modelId}/{collection}/{mediaId}/ ← anything else (safe default)
  */
-class MediaPathGenerator implements PathGenerator
+final class MediaPathGenerator implements PathGenerator
 {
     public function getPath(Media $media): string
     {

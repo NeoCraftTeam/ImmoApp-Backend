@@ -8,7 +8,7 @@ use App\Models\Agency;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
-use App\Services\SubscriptionService;
+use App\Services\Monetization\SubscriptionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;

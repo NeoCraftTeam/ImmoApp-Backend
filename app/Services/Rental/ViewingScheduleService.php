@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Services\Rental;
 
+use App\Contracts\ViewingScheduleServiceInterface;
 use App\Models\Ad;
 use App\Models\Zap\Schedule;
-use App\Services\Contracts\ViewingScheduleServiceInterface;
 use Carbon\Carbon;
 use Zap\Data\WeeklyFrequencyConfig\AbstractWeeklyFrequencyConfig;
 use Zap\Facades\Zap;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Services\Tour;
 
 use App\Models\Ad;
 use App\Support\AdScoutSync;
@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
-class TourService
+final class TourService
 {
     private const int EXIFTOOL_TIMEOUT_SECONDS = 10;
 

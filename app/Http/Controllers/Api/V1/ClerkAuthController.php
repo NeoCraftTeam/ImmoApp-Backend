@@ -14,7 +14,7 @@ use App\Models\User;
 use App\Services\Auth\ClerkJwtService;
 use App\Services\Auth\LoginService;
 use App\Services\Auth\TokenService;
-use App\Services\UserWelcomeService;
+use App\Services\User\UserWelcomeService;
 use App\Services\UtmAttributionService;
 use App\Support\AuthError;
 use Illuminate\Database\UniqueConstraintViolationException;

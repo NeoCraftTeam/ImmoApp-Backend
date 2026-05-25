@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Contracts\ReservationServiceInterface;
+use App\Contracts\ViewingScheduleServiceInterface;
 use App\Exceptions\Viewing\ScheduleHasActiveReservationsException;
 use App\Models\Ad;
 use App\Models\TentativeReservation;
 use App\Models\User;
 use App\Models\Zap\Schedule;
-use App\Services\Contracts\ReservationServiceInterface;
-use App\Services\Contracts\ViewingScheduleServiceInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;

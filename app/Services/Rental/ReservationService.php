@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Services\Rental;
 
+use App\Contracts\ReservationServiceInterface;
+use App\Contracts\ViewingScheduleServiceInterface;
 use App\Enums\CancelledBy;
 use App\Enums\ReservationStatus;
 use App\Events\Reservation\ReservationStatusChanged;
@@ -17,8 +19,6 @@ use App\Models\Ad;
 use App\Models\TentativeReservation;
 use App\Models\User;
 use App\Models\Zap\Schedule;
-use App\Services\Contracts\ReservationServiceInterface;
-use App\Services\Contracts\ViewingScheduleServiceInterface;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Pagination\LengthAwarePaginator;

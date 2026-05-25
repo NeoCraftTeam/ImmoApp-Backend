@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Services\Monetization;
 
 use App\Enums\AdStatus;
 use App\Enums\PaymentType;
@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
-class SubscriptionService
+final class SubscriptionService
 {
     /** Days before expiry to send renewal reminder and generate payment link. */
     private const int RENEWAL_REMINDER_DAYS = 3;

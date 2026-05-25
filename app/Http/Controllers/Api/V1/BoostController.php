@@ -10,7 +10,7 @@ use App\Models\AdBoost;
 use App\Models\AdInteraction;
 use App\Models\BoostPack;
 use App\Models\User;
-use App\Services\BoostService;
+use App\Services\Monetization\BoostService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

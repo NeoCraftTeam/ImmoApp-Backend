@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Contracts\ReservationServiceInterface;
+use App\Contracts\ViewingScheduleServiceInterface;
 use App\Http\Requests\Viewing\StoreAvailabilityRequest;
 use App\Http\Requests\Viewing\UpdateAvailabilityRequest;
 use App\Http\Resources\AvailabilitySlotResource;
@@ -12,8 +14,6 @@ use App\Models\Ad;
 use App\Models\TentativeReservation;
 use App\Models\Zap\Schedule;
 use App\Policies\ViewingAvailabilityPolicy;
-use App\Services\Contracts\ReservationServiceInterface;
-use App\Services\Contracts\ViewingScheduleServiceInterface;
 use App\Support\ViewingSlotsResponseCache;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;

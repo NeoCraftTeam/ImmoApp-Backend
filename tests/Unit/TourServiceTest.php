@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Services\TourService;
+use App\Services\Tour\TourService;
 
 it('returns default metadata for a non-existent file', function (): void {
     $service = new TourService;

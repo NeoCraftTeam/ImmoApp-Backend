@@ -10,7 +10,7 @@ declare(strict_types=1);
  */
 use App\Models\Ad;
 use App\Models\User;
-use App\Services\QrCodeService;
+use App\Services\Tour\QrCodeService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\Console\Kernel;
 

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Services\User;
 
 /**
  * Lightweight user-agent parser with no external dependencies.
@@ -13,7 +13,7 @@ namespace App\Services;
  *     operating_system: string,
  * }
  */
-class UserAgentParser
+final class UserAgentParser
 {
     /**
      * Parse a User-Agent string and return device, browser, and OS information.

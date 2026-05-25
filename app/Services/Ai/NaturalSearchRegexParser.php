@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Cache;
  * Regex-based natural language search parser.
  * Used as fallback when AI parsing is unavailable.
  */
-class NaturalSearchRegexParser
+final class NaturalSearchRegexParser
 {
     /**
      * @return array<string, mixed>

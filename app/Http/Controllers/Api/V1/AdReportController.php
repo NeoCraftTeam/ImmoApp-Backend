@@ -6,7 +6,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Requests\ReportAdListingRequest;
 use App\Models\Ad;
-use App\Services\AdReportService;
+use App\Services\Ad\AdReportService;
 use Illuminate\Http\JsonResponse;
 use OpenApi\Annotations as OA;
 

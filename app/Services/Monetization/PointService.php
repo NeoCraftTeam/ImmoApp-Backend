@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Services\Monetization;
 
 use App\Enums\PointTransactionType;
 use App\Models\PointTransaction;
@@ -10,7 +10,7 @@ use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
-class PointService
+final class PointService
 {
     /** Return the current cost in points to unlock an ad contact. */
     public function unlockCost(): int

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Services\Ad;
 
 use App\Enums\AdReportStatus;
 use App\Enums\UserRole;
@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
-class AdReportService
+final class AdReportService
 {
     /**
      * @param  array<string, mixed>  $payload

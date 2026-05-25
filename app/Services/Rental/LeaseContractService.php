@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Services\Rental;
 
 use App\Models\Ad;
 use App\Models\LeaseContract;
@@ -11,7 +11,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
-class LeaseContractService
+final class LeaseContractService
 {
     /**
      * Re-render the contract PDF using the contract's own current data plus

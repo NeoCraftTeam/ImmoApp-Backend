@@ -7,7 +7,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Models\Ad;
 use App\Models\User;
 use App\Rules\VerifiedImageUpload;
-use App\Services\TourService;
+use App\Services\Tour\TourService;
 use App\Support\PanoramaAngles;
 use App\Support\TourAssetToken;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;

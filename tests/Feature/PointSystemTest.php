@@ -9,7 +9,7 @@ use App\Models\PointPackage;
 use App\Models\PointTransaction;
 use App\Models\Setting;
 use App\Models\User;
-use App\Services\PointService;
+use App\Services\Monetization\PointService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

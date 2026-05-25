@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Cache;
  * Checks runtime overrides (from the settings table) first,
  * then falls back to config/features.php (env-driven).
  */
-class FeatureFlagService
+final class FeatureFlagService
 {
     /**
      * Check if a feature is enabled.

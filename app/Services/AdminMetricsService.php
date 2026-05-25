@@ -20,7 +20,7 @@ use App\Services\Admin\RevenueMetricsService;
  * constructor. Callers that already depend on this class continue to work
  * without any changes — all public method signatures are preserved.
  */
-class AdminMetricsService
+final class AdminMetricsService
 {
     public function __construct(
         private readonly AcquisitionMetricsService $acquisition,

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Actions\Reservation\ConfirmReservationAction;
+use App\Contracts\ReservationServiceInterface;
+use App\Contracts\ViewingScheduleServiceInterface;
 use App\Enums\ReservationStatus;
 use App\Http\Requests\Viewing\CancelReservationRequest;
 use App\Http\Requests\Viewing\StoreTentativeReservationRequest;
@@ -12,8 +14,6 @@ use App\Http\Resources\TentativeReservationResource;
 use App\Models\Ad;
 use App\Models\TentativeReservation;
 use App\Policies\TentativeReservationPolicy;
-use App\Services\Contracts\ReservationServiceInterface;
-use App\Services\Contracts\ViewingScheduleServiceInterface;
 use App\Support\ViewingSlotsResponseCache;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;

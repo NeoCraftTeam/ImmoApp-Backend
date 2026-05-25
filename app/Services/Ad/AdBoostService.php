@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Services\Ad;
 
 use App\Enums\AdStatus;
 use App\Models\Ad;
 use App\Models\Agency;
 use App\Models\User;
 
-class AdBoostService
+final class AdBoostService
 {
     /**
      * Auto-boost an ad if the user's agency has an active subscription

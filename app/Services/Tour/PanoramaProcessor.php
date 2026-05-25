@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Services;
+namespace App\Services\Tour;
 
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;

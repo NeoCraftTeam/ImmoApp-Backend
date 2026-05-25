@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Services\SubscriptionService;
+use App\Services\Monetization\SubscriptionService;
 use Illuminate\Console\Command;
 
 class ProcessSubscriptionRenewals extends Command

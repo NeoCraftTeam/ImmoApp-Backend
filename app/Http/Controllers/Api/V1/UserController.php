@@ -9,7 +9,7 @@ use App\Http\Resources\AdResource;
 use App\Http\Resources\UserResource;
 use App\Mail\EmailUpdatedMail;
 use App\Models\User;
-use App\Services\UserProfileService;
+use App\Services\User\UserProfileService;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;

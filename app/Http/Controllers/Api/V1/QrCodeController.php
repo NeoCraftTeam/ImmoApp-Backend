@@ -6,8 +6,8 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Models\Ad;
 use App\Models\User;
-use App\Services\AdUrlBuilder;
-use App\Services\QrCodeService;
+use App\Services\Ad\AdUrlBuilder;
+use App\Services\Tour\QrCodeService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;

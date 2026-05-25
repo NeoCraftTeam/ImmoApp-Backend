@@ -14,7 +14,7 @@ use App\Mail\NewLocationSignInMail;
 use App\Models\LoginHistory;
 use App\Models\User;
 use App\Services\TurnstileService;
-use App\Services\UserAgentParser;
+use App\Services\User\UserAgentParser;
 use App\Support\AuthError;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;

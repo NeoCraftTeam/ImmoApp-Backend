@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Exceptions\TrustScoreConsentMissingException;
 use App\Models\User;
-use App\Services\TrustScoreService;
+use App\Services\Trust\TrustScoreService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

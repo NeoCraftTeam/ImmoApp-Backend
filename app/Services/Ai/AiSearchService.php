@@ -22,7 +22,7 @@ use Illuminate\Support\Facades\Log;
  * Falls back to regex-based parsing only when ALL providers fail or are unavailable.
  * Results are cached for 24 hours per query.
  */
-class AiSearchService implements AiSearchServiceInterface
+final class AiSearchService implements AiSearchServiceInterface
 {
     private readonly AiCircuitBreaker $circuitBreaker;
 

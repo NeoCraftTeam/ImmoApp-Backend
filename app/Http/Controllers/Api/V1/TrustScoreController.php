@@ -7,7 +7,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\UserRole;
 use App\Http\Resources\TrustScoreResource;
 use App\Models\User;
-use App\Services\TrustScoreService;
+use App\Services\Trust\TrustScoreService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 

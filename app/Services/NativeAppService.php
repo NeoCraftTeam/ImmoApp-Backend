@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Log;
  * - Déclencher des actions natives (géolocalisation, caméra, etc.)
  * - Gérer les événements de l'application native
  */
-class NativeAppService
+final class NativeAppService
 {
     /**
      * Envoyer un message à l'application native via WebView.

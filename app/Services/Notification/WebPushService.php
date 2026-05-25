@@ -16,7 +16,7 @@ use Minishlink\WebPush\WebPush;
  * Uses minishlink/web-push for proper VAPID authentication.
  * Reads VAPID config from config/webpush.php (published from the package).
  */
-class WebPushService
+final class WebPushService
 {
     private ?WebPush $webPush = null;
 

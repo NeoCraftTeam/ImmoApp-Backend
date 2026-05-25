@@ -6,7 +6,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Models\Ad;
 use App\Models\AdInteraction;
-use App\Services\KeyScoreService;
+use App\Services\Trust\KeyScoreService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Cache;
 use OpenApi\Attributes as OA;

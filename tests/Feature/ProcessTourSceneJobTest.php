@@ -5,7 +5,7 @@ declare(strict_types=1);
 use App\Jobs\ProcessTourSceneJob;
 use App\Models\Ad;
 use App\Models\User;
-use App\Services\PanoramaProcessor;
+use App\Services\Tour\PanoramaProcessor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 
