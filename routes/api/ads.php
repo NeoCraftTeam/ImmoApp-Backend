@@ -2,27 +2,27 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Api\V1\AdAiController;
-use App\Http\Controllers\Api\V1\AdAnalyticsController;
-use App\Http\Controllers\Api\V1\AdController;
-use App\Http\Controllers\Api\V1\AdDraftEditController;
-use App\Http\Controllers\Api\V1\AdGeoController;
-use App\Http\Controllers\Api\V1\AdImageSearchController;
-use App\Http\Controllers\Api\V1\AdInteractionController;
-use App\Http\Controllers\Api\V1\AdPdfController;
-use App\Http\Controllers\Api\V1\AdRankEstimateController;
-use App\Http\Controllers\Api\V1\AdReportController;
-use App\Http\Controllers\Api\V1\AdSearchController;
-use App\Http\Controllers\Api\V1\AdSimilarController;
-use App\Http\Controllers\Api\V1\AdStatusController;
-use App\Http\Controllers\Api\V1\BulkAdController;
-use App\Http\Controllers\Api\V1\KeyScoreController;
-use App\Http\Controllers\Api\V1\MyAdsController;
-use App\Http\Controllers\Api\V1\NeighborhoodScorecardController;
+use App\Http\Controllers\Api\V1\Ad\AdAiController;
+use App\Http\Controllers\Api\V1\Ad\AdAnalyticsController;
+use App\Http\Controllers\Api\V1\Ad\AdController;
+use App\Http\Controllers\Api\V1\Ad\AdDraftEditController;
+use App\Http\Controllers\Api\V1\Ad\AdGeoController;
+use App\Http\Controllers\Api\V1\Ad\AdImageSearchController;
+use App\Http\Controllers\Api\V1\Ad\AdInteractionController;
+use App\Http\Controllers\Api\V1\Ad\AdPdfController;
+use App\Http\Controllers\Api\V1\Ad\AdRankEstimateController;
+use App\Http\Controllers\Api\V1\Ad\AdReportController;
+use App\Http\Controllers\Api\V1\Ad\AdSearchController;
+use App\Http\Controllers\Api\V1\Ad\AdSimilarController;
+use App\Http\Controllers\Api\V1\Ad\AdStatusController;
+use App\Http\Controllers\Api\V1\Ad\BulkAdController;
+use App\Http\Controllers\Api\V1\Ad\MyAdsController;
+use App\Http\Controllers\Api\V1\Geo\NeighborhoodScorecardController;
 use App\Http\Controllers\Api\V1\PrescreeningController;
 use App\Http\Controllers\Api\V1\QrCodeController;
-use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\TourController;
+use App\Http\Controllers\Api\V1\User\KeyScoreController;
+use App\Http\Controllers\Api\V1\User\ReviewController;
 use App\Models\Review;
 use Illuminate\Support\Facades\Route;
 

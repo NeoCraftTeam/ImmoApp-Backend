@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Api\V1\AdSearchIsochroneController;
-use App\Http\Controllers\Api\V1\DirectionsController;
-use App\Http\Controllers\Api\V1\IsochroneController;
+use App\Http\Controllers\Api\V1\Ad\AdSearchIsochroneController;
+use App\Http\Controllers\Api\V1\Geo\DirectionsController;
+use App\Http\Controllers\Api\V1\Geo\IsochroneController;
 use Illuminate\Support\Facades\Route;
 
 // Isochrones — zone accessible en X minutes depuis un point (ORS, cached 24h)

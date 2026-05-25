@@ -3,8 +3,8 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\CalendarExportController;
-use App\Http\Controllers\Api\V1\ViewingAvailabilityController;
-use App\Http\Controllers\Api\V1\ViewingReservationController;
+use App\Http\Controllers\Api\V1\Lease\ViewingAvailabilityController;
+use App\Http\Controllers\Api\V1\Lease\ViewingReservationController;
 use Illuminate\Support\Facades\Route;
 
 // Viewing slots (public)

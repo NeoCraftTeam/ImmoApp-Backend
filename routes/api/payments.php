@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Api\V1\CreditController;
-use App\Http\Controllers\Api\V1\InvoiceController;
-use App\Http\Controllers\Api\V1\PaymentController;
-use App\Http\Controllers\Api\V1\PaymentMethodController;
-use App\Http\Controllers\Api\V1\PromoCodeController;
-use App\Http\Controllers\Api\V1\RefundController;
+use App\Http\Controllers\Api\V1\Payment\CreditController;
+use App\Http\Controllers\Api\V1\Payment\InvoiceController;
+use App\Http\Controllers\Api\V1\Payment\PaymentController;
+use App\Http\Controllers\Api\V1\Payment\PaymentMethodController;
+use App\Http\Controllers\Api\V1\Payment\PromoCodeController;
+use App\Http\Controllers\Api\V1\Payment\RefundController;
+use App\Http\Controllers\Api\V1\Payment\StripePaymentMethodController;
+use App\Http\Controllers\Api\V1\Payment\SubscriptionController;
 use App\Http\Controllers\Api\V1\ResendWebhookController;
-use App\Http\Controllers\Api\V1\StripePaymentMethodController;
-use App\Http\Controllers\Api\V1\SubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 // --- PAYMENT METHODS CATALOGUE (public) ---

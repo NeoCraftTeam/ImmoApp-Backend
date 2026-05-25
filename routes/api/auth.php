@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Api\V1\ApiMfaController;
-use App\Http\Controllers\Api\V1\AuthController;
-use App\Http\Controllers\Api\V1\ClerkAuthController;
+use App\Http\Controllers\Api\V1\Auth\ApiMfaController;
+use App\Http\Controllers\Api\V1\Auth\AuthController;
+use App\Http\Controllers\Api\V1\Auth\ClerkAuthController;
+use App\Http\Controllers\Api\V1\Auth\PasswordController;
+use App\Http\Controllers\Api\V1\Auth\RegistrationController;
+use App\Http\Controllers\Api\V1\Auth\SocialAuthController;
 use App\Http\Controllers\Api\V1\EmailVerificationController;
-use App\Http\Controllers\Api\V1\PasswordController;
-use App\Http\Controllers\Api\V1\RegistrationController;
-use App\Http\Controllers\Api\V1\SocialAuthController;
-use App\Http\Controllers\Api\V1\UserPreferenceController;
-use App\Http\Controllers\Api\V1\WebAuthnApiController;
+use App\Http\Controllers\Api\V1\User\UserPreferenceController;
+use App\Http\Controllers\Api\V1\User\WebAuthnApiController;
 use App\Http\Controllers\EmailPreferenceController;
 use App\Http\Middleware\DynamicWebAuthnRelyingParty;
 use Illuminate\Support\Facades\Route;

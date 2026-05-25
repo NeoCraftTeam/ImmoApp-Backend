@@ -6,7 +6,7 @@ namespace App\Services\Ai;
 
 use App\Contracts\RecommendationEngineInterface;
 use App\Enums\AdStatus;
-use App\Http\Controllers\Api\V1\AdController;
+use App\Http\Controllers\Api\V1\Ad\AdController;
 use App\Http\Controllers\Api\V1\RecommendationController;
 use App\Models\Ad;
 use App\Models\AdInteraction;
