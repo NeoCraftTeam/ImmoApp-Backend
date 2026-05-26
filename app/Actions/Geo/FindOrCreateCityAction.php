@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Cherche une ville par nom (insensible à la casse).
- * Si absente, la crée et enrichit avec les coordonnées GPS via Nominatim.
+ * Si absente, valide via Nominatim avant de créer.
+ * Lance InvalidArgumentException si la ville est introuvable sur OSM.
  */
 final class FindOrCreateCityAction
 {
@@ -18,13 +19,15 @@ final class FindOrCreateCityAction
 
     /**
      * @param  array{name: string, country?: string|null}  $data
+     *
+     * @throws \InvalidArgumentException si introuvable sur OpenStreetMap
      */
     public function handle(array $data): City
     {
         $name = trim($data['name']);
         $country = isset($data['country']) ? trim((string) $data['country']) : null;
 
-        // 1. Recherche insensible à la casse
+        // 1. Déjà en base → retourner directement
         $existing = City::query()
             ->where('name', 'ilike', $name)
             ->when($country, fn ($q) => $q->where('country', $country))
@@ -34,20 +37,30 @@ final class FindOrCreateCityAction
             return $existing;
         }
 
-        // 2. Geocoding Nominatim pour lat/lng
-        $coords = $this->geocode($name, $country);
+        // 2. Validation Nominatim — refuse les noms fantaisistes
+        $geo = $this->nominatimValidate($name, $country);
 
-        // 3. Création
+        if ($geo === null) {
+            throw new \InvalidArgumentException(
+                "Ville introuvable : \u00ab {$name} \u00bb n'est pas reconnue sur OpenStreetMap."
+            );
+        }
+
+        // 3. Créer avec le nom canonique OSM + GPS
         return City::create([
-            'name' => $name,
+            'name' => $geo['canonical'],
             'country' => $country,
-            'latitude' => $coords['lat'] ?? null,
-            'longitude' => $coords['lng'] ?? null,
+            'latitude' => $geo['lat'],
+            'longitude' => $geo['lng'],
         ]);
     }
 
-    /** @return array{lat:float,lng:float}|array{} */
-    private function geocode(string $city, ?string $country): array
+    /**
+     * Appelle Nominatim et retourne nom canonique + coords si trouvé, null sinon.
+     *
+     * @return array{canonical:string,lat:float,lng:float}|null
+     */
+    private function nominatimValidate(string $city, ?string $country): ?array
     {
         try {
             $q = $country ? "{$city}, {$country}" : $city;
@@ -63,12 +76,16 @@ final class FindOrCreateCityAction
             $results = $response->ok() ? $response->json() : [];
 
             if (!empty($results)) {
-                return ['lat' => (float) $results[0]['lat'], 'lng' => (float) $results[0]['lon']];
+                return [
+                    'canonical' => (string) ($results[0]['name'] ?? $city),
+                    'lat' => (float) $results[0]['lat'],
+                    'lng' => (float) $results[0]['lon'],
+                ];
             }
         } catch (\Throwable $e) {
-            Log::warning("FindOrCreateCityAction geocode: {$e->getMessage()}");
+            Log::warning("FindOrCreateCityAction nominatim: {$e->getMessage()}");
         }
 
-        return [];
+        return null;
     }
 }

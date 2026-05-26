@@ -37,7 +37,11 @@ final class GeoFindOrCreateController extends Controller
             'country' => ['nullable', 'string', 'max:100'],
         ]);
 
-        $city = $this->findOrCreateCity->handle($data);
+        try {
+            $city = $this->findOrCreateCity->handle($data);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         Cache::forget('cities:list:'.md5(':50'));
         Cache::forget('cities:list:'.md5(':100'));
