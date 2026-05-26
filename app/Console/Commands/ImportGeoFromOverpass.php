@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Models\City;
 use App\Models\Quarter;
+use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -83,9 +84,14 @@ final class ImportGeoFromOverpass extends Command
                     continue;
                 }
 
-                // 2. Mise à jour coordonnées de la ville
+                // 2. Mise à jour coordonnées de la ville (décimal + Point Magellan)
                 if (!$dryRun) {
-                    $city->update(['latitude' => $geo['lat'], 'longitude' => $geo['lng']]);
+                    $city->update([
+                        'latitude' => $geo['lat'],
+                        'longitude' => $geo['lng'],
+                        'location' => Point::makeGeodetic($geo['lat'], $geo['lng']),
+                        'country' => $city->country ?? ($geo['country'] ?? null),
+                    ]);
                 }
 
                 // 3. Overpass dans la bbox
@@ -96,7 +102,11 @@ final class ImportGeoFromOverpass extends Command
                     if (!$dryRun) {
                         Quarter::updateOrCreate(
                             ['name' => $q['name'], 'city_id' => $city->id],
-                            ['latitude' => $q['lat'], 'longitude' => $q['lng']],
+                            [
+                                'latitude' => $q['lat'],
+                                'longitude' => $q['lng'],
+                                'location' => Point::makeGeodetic($q['lat'], $q['lng']),
+                            ],
                         );
                     } else {
                         $this->line("  [dry] {$city->name} / {$q['name']} ({$q['lat']}, {$q['lng']})");
@@ -118,9 +128,9 @@ final class ImportGeoFromOverpass extends Command
     }
 
     /**
-     * Requête Nominatim pour récupérer lat/lng + bbox de la ville.
+     * Requête Nominatim pour récupérer lat/lng + bbox + pays de la ville.
      *
-     * @return array{lat:float,lng:float,bbox:array{float,float,float,float}}|null
+     * @return array{lat:float,lng:float,bbox:array{float,float,float,float},country:string|null}|null
      */
     private function nominatimLookup(string $cityName, ?string $country): ?array
     {
@@ -128,8 +138,7 @@ final class ImportGeoFromOverpass extends Command
             'q' => $country ? "{$cityName}, {$country}" : $cityName,
             'format' => 'json',
             'limit' => 1,
-            'addressdetails' => 0,
-            'featuretype' => 'city',
+            'addressdetails' => 1,
         ];
 
         $response = Http::timeout(15)
@@ -152,10 +161,13 @@ final class ImportGeoFromOverpass extends Command
             return null;
         }
 
+        $address = $r['address'] ?? [];
+
         return [
             'lat' => (float) $r['lat'],
             'lng' => (float) $r['lon'],
             'bbox' => [(float) $bb[0], (float) $bb[2], (float) $bb[1], (float) $bb[3]], // S,W,N,E
+            'country' => $address['country'] ?? null,
         ];
     }
 
