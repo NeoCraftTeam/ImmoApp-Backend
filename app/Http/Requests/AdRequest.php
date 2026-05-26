@@ -73,6 +73,7 @@ final class AdRequest extends FormRequest
 
                 // Filtres
                 'city' => ['nullable', 'string', 'max:100'],
+                'country' => ['nullable', 'string', 'max:100'],
                 'type' => ['nullable', 'string', 'max:100'],
                 'quarter' => ['nullable', 'string', 'max:100'],
                 'transaction_type' => ['nullable', 'string', 'in:location,vente'],
