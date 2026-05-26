@@ -16,16 +16,19 @@ use PragmaRX\Google2FAQRCode\Google2FA;
 /**
  * API Multi-Factor Authentication controller.
  *
- * Allows admin users to satisfy the RequireApiMfa middleware by verifying
- * their configured MFA method (TOTP app or email OTP) once per session.
+ * Allows any authenticated user to verify their configured MFA method
+ * (TOTP app or email OTP) once per session. Admin users are forced to verify
+ * by `RequireApiMfa` on admin routes; non-admin users may opt-in via the
+ * `step.up.mfa` middleware on sensitive routes (password change, account
+ * deletion, etc.) or by calling `/auth/mfa/verify` proactively.
  *
  * Flow:
- *  1. Admin logs in via POST /auth/login → receives Sanctum token
- *  2. Admin accesses protected admin route → 403 MFA_REQUIRED
- *  3. Admin calls GET /auth/mfa/status to discover available methods
- *  4. Admin calls POST /auth/mfa/verify with TOTP code or email OTP
+ *  1. User logs in via POST /auth/login → receives Sanctum token
+ *  2. User accesses protected route → 403 MFA_REQUIRED (if applicable)
+ *  3. User calls GET /auth/mfa/status to discover configured methods
+ *  4. User calls POST /auth/mfa/verify with TOTP code or email OTP
  *  5. Token is marked MFA-verified in cache for MFA_API_SESSION_LIFETIME minutes
- *  6. Admin retries protected route → granted
+ *  6. User retries protected route → granted
  */
 final class ApiMfaController
 {
@@ -59,7 +62,10 @@ final class ApiMfaController
         $hasMfaConfigured = $hasTotpConfigured || $hasEmailConfigured;
 
         return response()->json([
+            // Admins are forced to verify on admin routes (RequireApiMfa).
+            // Non-admin users may still opt-in via `step.up.mfa` on sensitive routes.
             'mfa_required' => $user->isAdmin() && $hasMfaConfigured,
+            'mfa_configured' => $hasMfaConfigured,
             'mfa_verified' => $cacheKey !== null && Cache::has($cacheKey),
             'methods' => array_filter([
                 $hasTotpConfigured ? 'totp' : null,
@@ -83,8 +89,18 @@ final class ApiMfaController
             return response()->json(['message' => 'Non authentifié.'], 401);
         }
 
-        if (!$user->isAdmin()) {
-            return response()->json(['message' => 'Réservé aux administrateurs.'], 403);
+        // MFA verification is available to any user who has a method configured.
+        // Admins are forced into this flow by RequireApiMfa; non-admins opt in by
+        // setting up TOTP/email via /auth/mfa/setup or by hitting a `step.up.mfa`
+        // gated route.
+        $hasMfaConfigured = $user->getAppAuthenticationSecret() !== null
+            || $user->hasEmailAuthentication();
+
+        if (!$hasMfaConfigured) {
+            return response()->json([
+                'message' => 'Aucune méthode MFA configurée pour ce compte.',
+                'code' => 'MFA_NOT_CONFIGURED',
+            ], 422);
         }
 
         $request->validate([

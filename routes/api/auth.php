@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\Auth\ClerkAuthController;
 use App\Http\Controllers\Api\V1\Auth\PasswordController;
 use App\Http\Controllers\Api\V1\Auth\RegistrationController;
 use App\Http\Controllers\Api\V1\Auth\SocialAuthController;
+use App\Http\Controllers\Api\V1\Auth\UserMfaSetupController;
 use App\Http\Controllers\Api\V1\EmailVerificationController;
 use App\Http\Controllers\Api\V1\User\UserPreferenceController;
 use App\Http\Controllers\Api\V1\User\WebAuthnApiController;
@@ -85,10 +86,24 @@ Route::prefix('auth')->group(function (): void {
             ->middleware('throttle:20,1');
     });
 
-    // MFA for admin API access
-    Route::middleware('auth:sanctum')->prefix('mfa')->controller(ApiMfaController::class)->group(function (): void {
-        Route::get('/status', 'status')->middleware('throttle:60,1');
-        Route::post('/verify', 'verify')->middleware('throttle:10,1');
+    // MFA for admin API access (verification only).
+    // Setup endpoints (TOTP / Email enrol) sit under /mfa/setup and are
+    // open to any authenticated user — customers can opt in to step-up MFA.
+    Route::middleware('auth:sanctum')->prefix('mfa')->group(function (): void {
+        Route::get('/status', [ApiMfaController::class, 'status'])->middleware('throttle:60,1');
+        Route::post('/verify', [ApiMfaController::class, 'verify'])->middleware('throttle:10,1');
+
+        Route::prefix('setup')->controller(UserMfaSetupController::class)->group(function (): void {
+            // TOTP enrol flow — start -> confirm -> (optional) disable
+            Route::post('/totp/start', 'startTotp')->middleware('throttle:5,1');
+            Route::post('/totp/confirm', 'confirmTotp')->middleware('throttle:10,1');
+            Route::post('/totp/disable', 'disableTotp')->middleware('throttle:5,1');
+
+            // Email MFA enrol flow — enable -> confirm -> (optional) disable
+            Route::post('/email/enable', 'enableEmail')->middleware('throttle:5,1');
+            Route::post('/email/confirm', 'confirmEmail')->middleware('throttle:10,1');
+            Route::post('/email/disable', 'disableEmail')->middleware('throttle:5,1');
+        });
     });
 
     // ── WebAuthn / Passkeys (API) ─────────────────────────────────

@@ -23,5 +23,9 @@ Route::middleware(['auth:sanctum'])->controller(DisputeController::class)->group
         ->middleware('throttle:30,1');
 
     // Admin-only state transition. Policy enforces role + permission.
-    Route::patch('/disputes/{dispute}/status', 'transition');
+    // OWASP A05 — align with the rest of the admin write surface (refunds,
+    // user CRUD, ad-types/cities/quarters CRUD). `mfa.admin` is a no-op for
+    // non-admin users, but enforces MFA for admins who have it configured.
+    Route::patch('/disputes/{dispute}/status', 'transition')
+        ->middleware('mfa.admin');
 });

@@ -240,16 +240,18 @@ final readonly class AuthController
             // Preserve the login-context prefix so a client-context refresh
             // does not accidentally produce an owner-prefixed token.
             // TransientToken (Clerk JWT exchange) has no $name property — default to role-based prefix.
-            $prefix = ($currentToken instanceof PersonalAccessToken && str_starts_with((string) $currentToken->name, 'owner_'))
+            $isDbToken = $currentToken instanceof PersonalAccessToken;
+            $prefix = ($isDbToken && str_starts_with((string) $currentToken->name, 'owner_'))
                 ? 'owner'
                 : 'client';
 
-            $newToken = $this->tokenService->createForUser($user, 'refreshed', $prefix);
-
-            // TransientToken has no delete() — only revoke DB-backed tokens.
-            if ($currentToken instanceof PersonalAccessToken) {
-                $currentToken->delete();
-            }
+            // AUTH-5: Use rotateForUser() for DB-backed tokens so the family_id
+            // propagates and the old token is soft-revoked (not hard-deleted).
+            // This enables compromise detection in TokenService.
+            // TransientToken (Clerk JWT) has no DB row — create a fresh token.
+            $newToken = $isDbToken
+                ? $this->tokenService->rotateForUser($user, 'refreshed', "{$prefix}_token_%", $prefix)
+                : $this->tokenService->createForUser($user, 'refreshed', $prefix);
 
             return response()->json([
                 'access_token' => $newToken->plainTextToken,
