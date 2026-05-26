@@ -20,6 +20,8 @@ final class QuarterResource extends JsonResource
             'name' => $this->name,
             'city_id' => $this->city_id,
             'city_name' => $this->city->name,
+            'latitude' => $this->latitude !== null ? (float) $this->latitude : null,
+            'longitude' => $this->longitude !== null ? (float) $this->longitude : null,
         ];
     }
 }

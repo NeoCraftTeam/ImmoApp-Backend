@@ -15,6 +15,9 @@ class CityFactory extends Factory
     {
         return [
             'name' => fake()->city(),
+            'country' => fake()->country(),
+            'latitude' => fake()->latitude(-90, 90),
+            'longitude' => fake()->longitude(-180, 180),
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
         ];

@@ -16,6 +16,8 @@ class QuarterFactory extends Factory
     {
         return [
             'name' => fake()->streetName(),
+            'latitude' => fake()->latitude(-90, 90),
+            'longitude' => fake()->longitude(-180, 180),
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
 

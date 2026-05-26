@@ -319,6 +319,8 @@ class Ad extends Model implements HasMedia
 
             // Relations — vérifier qu'elles existent
             'city' => $this->quarter?->city?->name,
+            'city_id' => $this->quarter?->city_id,
+            'country' => $this->quarter?->city?->country,
             'quarter' => $this->quarter?->name,
             'type' => $this->ad_type?->name,
             'type_id' => $this->type_id,

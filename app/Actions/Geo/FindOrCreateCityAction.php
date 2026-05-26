@@ -30,14 +30,14 @@ final class FindOrCreateCityAction
         // 1. Déjà en base → retourner directement
         $existing = City::query()
             ->where('name', 'ilike', $name)
-            ->when($country, fn ($q) => $q->where('country', $country))
+            ->when($country, fn ($q) => $q->where('country', 'ilike', $country))
             ->first();
 
         if ($existing !== null) {
             return $existing;
         }
 
-        // 2. Validation Nominatim — refuse les noms fantaisistes
+        // 2. Validation Nominatim — refuse les noms fantaisistes (aucune restriction géographique)
         $geo = $this->nominatimValidate($name, $country);
 
         if ($geo === null) {
@@ -46,19 +46,20 @@ final class FindOrCreateCityAction
             );
         }
 
-        // 3. Créer avec le nom canonique OSM + GPS
+        // 3. Créer avec le nom canonique OSM + GPS + pays extrait de Nominatim
         return City::create([
             'name' => $geo['canonical'],
-            'country' => $country,
+            'country' => $geo['country'] ?? $country,
             'latitude' => $geo['lat'],
             'longitude' => $geo['lng'],
         ]);
     }
 
     /**
-     * Appelle Nominatim et retourne nom canonique + coords si trouvé, null sinon.
+     * Appelle Nominatim et retourne nom canonique + coords + pays si trouvé, null sinon.
+     * Fonctionne pour toute ville dans le monde (aucune restriction géographique).
      *
-     * @return array{canonical:string,lat:float,lng:float}|null
+     * @return array{canonical:string,lat:float,lng:float,country:string|null}|null
      */
     private function nominatimValidate(string $city, ?string $country): ?array
     {
@@ -70,16 +71,20 @@ final class FindOrCreateCityAction
                     'q' => $q,
                     'format' => 'json',
                     'limit' => 1,
-                    'featuretype' => 'city',
+                    'addressdetails' => 1,
                 ]);
 
             $results = $response->ok() ? $response->json() : [];
 
             if (!empty($results)) {
+                $hit = $results[0];
+                $address = $hit['address'] ?? [];
+
                 return [
-                    'canonical' => (string) ($results[0]['name'] ?? $city),
-                    'lat' => (float) $results[0]['lat'],
-                    'lng' => (float) $results[0]['lon'],
+                    'canonical' => (string) ($hit['name'] ?? $address['city'] ?? $address['town'] ?? $address['village'] ?? $city),
+                    'lat' => (float) $hit['lat'],
+                    'lng' => (float) $hit['lon'],
+                    'country' => $address['country'] ?? null,
                 ];
             }
         } catch (\Throwable $e) {

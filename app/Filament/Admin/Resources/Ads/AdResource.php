@@ -114,6 +114,12 @@ class AdResource extends Resource
                     ->searchable()
                     ->preload()
                     ->native(false),
+                SelectFilter::make('city')
+                    ->label('Ville')
+                    ->relationship('quarter.city', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->native(false),
                 SelectFilter::make('quarter')
                     ->label('Quartier')
                     ->relationship('quarter', 'name')

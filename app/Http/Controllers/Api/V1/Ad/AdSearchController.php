@@ -68,6 +68,7 @@ final readonly class AdSearchController
 
             $q = (string) ($validated['q'] ?? '');
             $city = $validated['city'] ?? null;
+            $country = $validated['country'] ?? null;
             $type = $validated['type'] ?? null;
             $typeId = $validated['type_id'] ?? null;
             $quarterId = $validated['quarter_id'] ?? null;
@@ -96,6 +97,9 @@ final readonly class AdSearchController
 
             if (!empty($city)) {
                 $filters[] = sprintf("city = '%s'", str_replace("'", "\\'", $city));
+            }
+            if (!empty($country)) {
+                $filters[] = sprintf("country = '%s'", str_replace("'", "\\'", $country));
             }
             if (!empty($type)) {
                 $filters[] = sprintf("type = '%s'", str_replace("'", "\\'", $type));
@@ -231,6 +235,7 @@ final readonly class AdSearchController
     {
         $q = (string) ($validated['q'] ?? '');
         $city = $validated['city'] ?? null;
+        $country = $validated['country'] ?? null;
         $type = $validated['type'] ?? null;
         $typeId = $validated['type_id'] ?? null;
         $quarterId = $validated['quarter_id'] ?? null;
@@ -274,8 +279,15 @@ final readonly class AdSearchController
             $query->where('quarter_id', $quarterId);
         } elseif ($quarterName) {
             $query->whereHas('quarter', fn ($qb) => $qb->where('name', 'ilike', $quarterName));
-        } elseif ($city) {
-            $query->whereHas('quarter.city', fn ($qb) => $qb->where('name', 'ilike', "%{$city}%"));
+        } elseif ($city || $country) {
+            $query->whereHas('quarter.city', function ($qb) use ($city, $country): void {
+                if ($city) {
+                    $qb->where('name', 'ilike', "%{$city}%");
+                }
+                if ($country) {
+                    $qb->where('country', 'ilike', "%{$country}%");
+                }
+            });
         }
 
         if ($minBedrooms !== null) {

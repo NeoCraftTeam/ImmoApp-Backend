@@ -231,9 +231,10 @@ final class QuarterController
         $this->authorize('create', Quarter::class);
         $data = $request->validated();
 
-        if (Quarter::where('name', $data['name'])->exists()) {
+        // Doublons case-insensitive scoped à la même ville
+        if (Quarter::where('city_id', $data['city_id'])->where('name', 'ilike', $data['name'])->exists()) {
             return response()->json([
-                'message' => 'Cette ce quartier existe déjà.',
+                'message' => 'Ce quartier existe déjà dans cette ville.',
             ], 409);
         }
 

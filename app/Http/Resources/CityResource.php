@@ -18,6 +18,8 @@ final class CityResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'country' => $this->country,
+            'latitude' => $this->latitude !== null ? (float) $this->latitude : null,
+            'longitude' => $this->longitude !== null ? (float) $this->longitude : null,
         ];
     }
 }

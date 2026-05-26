@@ -24,7 +24,7 @@ class SyncMeilisearchSettings extends Command
             $this->info('🔧 Mise à jour des attributs filtrables...');
             $index->updateFilterableAttributes([
                 'status', 'is_visible', 'city', 'type', 'type_id', 'quarter_id',
-                'city_id', 'transaction_type',
+                'city_id', 'country', 'transaction_type',
                 'bedrooms', 'bathrooms', 'price', 'surface_area',
                 'has_parking', 'has_3d_tour', 'is_verified', 'is_boosted',
                 'relevance_score',
