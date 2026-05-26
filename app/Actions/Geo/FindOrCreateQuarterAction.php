@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Geo;
 
 use App\Models\Quarter;
+use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -37,12 +38,18 @@ final class FindOrCreateQuarterAction
         // 2. Geocoding Nominatim (quartier + ville + pays pour plus de précision)
         $coords = $this->geocode($name, $data['city_name'] ?? null, $data['country'] ?? null);
 
-        // 3. Création
+        // 3. Création avec décimal + Point Magellan
+        $lat = $coords['lat'] ?? null;
+        $lng = $coords['lng'] ?? null;
+
         return Quarter::create([
             'name' => $name,
             'city_id' => $cityId,
-            'latitude' => $coords['lat'] ?? null,
-            'longitude' => $coords['lng'] ?? null,
+            'latitude' => $lat,
+            'longitude' => $lng,
+            'location' => ($lat !== null && $lng !== null)
+                ? Point::makeGeodetic($lat, $lng)
+                : null,
         ]);
     }
 

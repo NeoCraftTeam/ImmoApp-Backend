@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\CityFactory;
 use Eloquent;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,6 +24,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property string|null $country
  * @property float|null $latitude
  * @property float|null $longitude
+ * @property Point|null $location
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
@@ -58,6 +60,7 @@ class City extends Model
         'country',
         'latitude',
         'longitude',
+        'location',
     ];
 
     protected $hidden = [
@@ -86,6 +89,14 @@ class City extends Model
     public function users(): HasMany
     {
         return $this->hasMany(User::class);
+    }
+
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'location' => Point::class,
+        ];
     }
 
     public function getActivitylogOptions(): LogOptions

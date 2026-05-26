@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Geo;
 
 use App\Models\City;
+use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -46,12 +47,13 @@ final class FindOrCreateCityAction
             );
         }
 
-        // 3. Créer avec le nom canonique OSM + GPS + pays extrait de Nominatim
+        // 3. Créer avec le nom canonique OSM + GPS (décimal + Point Magellan) + pays extrait de Nominatim
         return City::create([
             'name' => $geo['canonical'],
             'country' => $geo['country'] ?? $country,
             'latitude' => $geo['lat'],
             'longitude' => $geo['lng'],
+            'location' => Point::makeGeodetic($geo['lat'], $geo['lng']),
         ]);
     }
 

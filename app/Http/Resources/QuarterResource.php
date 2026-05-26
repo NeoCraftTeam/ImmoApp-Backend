@@ -15,13 +15,16 @@ final class QuarterResource extends JsonResource
     public function toArray(Request $request): array
     {
 
+        $lat = $this->location?->getY() ?? ($this->latitude !== null ? (float) $this->latitude : null);
+        $lng = $this->location?->getX() ?? ($this->longitude !== null ? (float) $this->longitude : null);
+
         return [
             'id' => $this->id,
             'name' => $this->name,
             'city_id' => $this->city_id,
             'city_name' => $this->city->name,
-            'latitude' => $this->latitude !== null ? (float) $this->latitude : null,
-            'longitude' => $this->longitude !== null ? (float) $this->longitude : null,
+            'latitude' => $lat,
+            'longitude' => $lng,
         ];
     }
 }
