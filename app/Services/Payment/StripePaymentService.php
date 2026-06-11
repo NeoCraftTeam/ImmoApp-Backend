@@ -33,7 +33,7 @@ use Stripe\Webhook;
  * (stored in `payments.amount`), the EUR equivalent travels with the
  * PaymentIntent metadata for receipt reconciliation.
  *
- * Unlike Flutterwave, Stripe is NOT redirect-based: `initiate()` returns
+ * Unlike GeniusPay (which uses hosted checkout), Stripe is NOT redirect-based: `initiate()` returns
  * a `clientSecret` (in the `link` field for interface symmetry) which the
  * frontend hands to `<PaymentElement>` for in-page card collection.
  *
@@ -483,7 +483,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
 
             // Legacy fallback: only the local `tx_ref` is known. Use the
             // metadata search and accept the indexing latency. This path
-            // is exercised by the Flutterwave-style callback page when no
+            // is exercised by the hosted-checkout callback page when no
             // `pi_xxx` is available.
             $list = $this->stripe->paymentIntents->search([
                 'query' => sprintf('metadata[\'tx_ref\']:\'%s\'', addslashes($externalReference)),

@@ -31,19 +31,19 @@ uses(RefreshDatabase::class);
 // ── Helper ────────────────────────────────────────────────────────────────────
 
 /**
- * Mock Flutterwave verify endpoint to return a successful transaction.
+ * Mock the GeniusPay verify endpoint to return a successful transaction.
  */
-function mockFlutterwaveApproved(): void
+function mockGeniusPayApproved(): void
 {
     Http::fake([
-        'api.flutterwave.com/v3/transactions/verify_by_reference*' => Http::response([
-            'status' => 'success',
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
             'data' => [
-                'status' => 'successful',
+                'status' => 'completed',
                 'amount' => 1000,
                 'currency' => 'XAF',
-                'tx_ref' => 'test-ref',
-                'payment_type' => 'mobilemoneycameroon',
+                'reference' => 'test-ref',
+                'payment_method' => 'mtn_mobile_money',
                 'created_at' => now()->toIso8601String(),
             ],
         ], 200),
@@ -82,7 +82,7 @@ it('the point_transactions table rejects two rows with the same payment_id', fun
 
 it('verify-purchase does not re-credit points when the webhook already processed the payment', function (): void {
     Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
-    mockFlutterwaveApproved();
+    mockGeniusPayApproved();
 
     $user = User::factory()->create(['point_balance' => 0]);
     $package = PointPackage::factory()->create(['price' => 1000, 'points_awarded' => 10]);
@@ -92,8 +92,8 @@ it('verify-purchase does not re-credit points when the webhook already processed
         'transaction_id' => 'txn-already-webhook-processed',
         'status' => PaymentStatus::SUCCESS,
         'type' => PaymentType::CREDIT,
-        'payment_method' => PaymentMethod::FLUTTERWAVE,
-        'gateway' => 'flutterwave',
+        'payment_method' => PaymentMethod::MOBILE_MONEY,
+        'gateway' => 'geniuspay',
         'amount' => $package->price,
     ]);
 
@@ -121,7 +121,7 @@ it('verify-purchase does not re-credit points when the webhook already processed
 
 it('verify-purchase credits points exactly once even when called twice for a pending payment', function (): void {
     Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
-    mockFlutterwaveApproved();
+    mockGeniusPayApproved();
 
     $user = User::factory()->create(['point_balance' => 0]);
     $package = PointPackage::factory()->create(['price' => 1000, 'points_awarded' => 10]);
@@ -131,8 +131,8 @@ it('verify-purchase credits points exactly once even when called twice for a pen
         'transaction_id' => 'txn-verify-idempotent',
         'status' => PaymentStatus::PENDING,
         'type' => PaymentType::CREDIT,
-        'payment_method' => PaymentMethod::FLUTTERWAVE,
-        'gateway' => 'flutterwave',
+        'payment_method' => PaymentMethod::MOBILE_MONEY,
+        'gateway' => 'geniuspay',
         'amount' => $package->price,
     ]);
 
@@ -158,7 +158,7 @@ it('verify-purchase credits points exactly once even when called twice for a pen
 
 it('Pack Starter at 1000 FCFA awards exactly 10 credits via verify-purchase', function (): void {
     Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
-    mockFlutterwaveApproved();
+    mockGeniusPayApproved();
 
     $user = User::factory()->create(['point_balance' => 0]);
     $packStarter = PointPackage::factory()->create([
@@ -173,8 +173,8 @@ it('Pack Starter at 1000 FCFA awards exactly 10 credits via verify-purchase', fu
         'transaction_id' => 'txn-pack-starter',
         'status' => PaymentStatus::PENDING,
         'type' => PaymentType::CREDIT,
-        'payment_method' => PaymentMethod::FLUTTERWAVE,
-        'gateway' => 'flutterwave',
+        'payment_method' => PaymentMethod::MOBILE_MONEY,
+        'gateway' => 'geniuspay',
         'amount' => $packStarter->price,
     ]);
 
@@ -191,9 +191,11 @@ it('Pack Starter at 1000 FCFA awards exactly 10 credits via verify-purchase', fu
 
 it('webhook followed by verify-purchase results in exactly one credit of 10 points', function (): void {
     Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
-    $secret = 'test-webhook-secret';
-    config()->set('payment.gateways.flutterwave.webhook_secret', $secret);
-    config()->set('payment.gateways.flutterwave.secret_key', 'FLWSECK_TEST-fake');
+    $secret = 'whsec_sandbox_test_secret_123';
+    config()->set('payment.default', 'geniuspay');
+    config()->set('payment.gateways.geniuspay.api_key', 'pk_sandbox_test_fake');
+    config()->set('payment.gateways.geniuspay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.geniuspay.webhook_secret', $secret);
 
     $user = User::factory()->create(['point_balance' => 0]);
     $package = PointPackage::factory()->create(['price' => 1000, 'points_awarded' => 10]);
@@ -203,27 +205,33 @@ it('webhook followed by verify-purchase results in exactly one credit of 10 poin
         'transaction_id' => 'KH-WHTHENVERIFY',
         'status' => PaymentStatus::PENDING,
         'type' => PaymentType::CREDIT,
-        'payment_method' => PaymentMethod::FLUTTERWAVE,
-        'gateway' => 'flutterwave',
+        'payment_method' => PaymentMethod::MOBILE_MONEY,
+        'gateway' => 'geniuspay',
         'amount' => $package->price,
         'plan_id' => $package->id,
     ]);
 
-    $payload = json_encode([
-        'event' => 'charge.completed',
+    $timestamp = time();
+    $payload = [
+        'event' => 'payment.success',
         'data' => [
-            'status' => 'successful',
-            'tx_ref' => 'KH-WHTHENVERIFY',
+            'status' => 'completed',
+            'reference' => 'MTX-WHTHENVERIFY',
             'amount' => 1000,
             'currency' => 'XAF',
-            'meta' => ['package_id' => $package->id],
+            'metadata' => ['tx_ref' => 'KH-WHTHENVERIFY', 'package_id' => $package->id],
         ],
-    ]);
+    ];
+    $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    $signature = hash_hmac('sha256', $timestamp.'.'.$encoded, $secret);
+    $body = json_encode($payload, JSON_THROW_ON_ERROR);
 
-    $this->call('POST', '/api/v1/webhooks/flutterwave', [], [], [], [
+    $this->call('POST', '/api/v1/webhooks/geniuspay', [], [], [], [
         'CONTENT_TYPE' => 'application/json',
-        'HTTP_VERIF_HASH' => $secret,
-    ], $payload)->assertOk();
+        'HTTP_X_WEBHOOK_SIGNATURE' => $signature,
+        'HTTP_X_WEBHOOK_TIMESTAMP' => (string) $timestamp,
+        'HTTP_X_WEBHOOK_EVENT' => 'payment.success',
+    ], $body)->assertOk();
 
     expect($user->fresh()->point_balance)->toBe(10);
 

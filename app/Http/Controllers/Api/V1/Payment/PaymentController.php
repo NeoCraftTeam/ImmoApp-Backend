@@ -9,12 +9,12 @@ use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
 use App\Exceptions\InvalidWebhookSignatureException;
 use App\Exceptions\PaymentGatewayException;
-use App\Http\Requests\Api\V1\FlutterwaveInitiateRequest;
-use App\Http\Requests\Api\V1\FlutterwaveVerifyRequest;
+use App\Http\Requests\Api\V1\InitiatePaymentRequest;
 use App\Http\Requests\Api\V1\PaymentHistoryRequest;
 use App\Http\Requests\Api\V1\PaymentReceiptPdfRequest;
+use App\Http\Requests\Api\V1\VerifyPaymentRequest;
 use App\Http\Resources\PaymentResource;
-use App\Jobs\ProcessFlutterwaveWebhookJob;
+use App\Jobs\ProcessPaymentWebhookJob;
 use App\Models\Payment;
 use App\Models\PromoCode;
 use App\Models\PromoCodeUsage;
@@ -61,14 +61,14 @@ final class PaymentController
     ) {}
 
     /**
-     * Initiate a Flutterwave payment.
+     * Initiate a payment via the configured gateway.
      *
      * Intended for: subscription, credit purchases.
      * Returns a hosted checkout link to redirect the user.
      *
      * @OA\Post(
-     *     path="/api/v1/payments/flutterwave/initiate",
-     *     summary="Initier un paiement Flutterwave",
+     *     path="/api/v1/payments/initiate_payment",
+     *     summary="Initier un paiement",
      *     tags={"💰 Paiements"},
      *     security={{"sanctum":{}}},
      *
@@ -89,7 +89,7 @@ final class PaymentController
      *     @OA\Response(response=422, description="Validation échouée")
      * )
      */
-    public function initiate(FlutterwaveInitiateRequest $request): JsonResponse
+    public function initiate(InitiatePaymentRequest $request): JsonResponse
     {
         $validated = $request->validated();
 
@@ -131,7 +131,7 @@ final class PaymentController
             $result = $this->paymentService->createPayment($user, [
                 'amount' => $finalAmount,
                 'type' => $type,
-                'payment_method' => $validated['payment_method'] ?? 'flutterwave',
+                'payment_method' => $validated['payment_method'] ?? 'mobile_money',
                 'phone_number' => $validated['phone_number'] ?? null,
 
                 'agency_id' => $validated['agency_id'] ?? null,
@@ -176,11 +176,11 @@ final class PaymentController
     }
 
     /**
-     * Verify a Flutterwave payment after the user returns from checkout.
+     * Verify a payment after the user returns from checkout.
      *
      * @OA\Post(
-     *     path="/api/v1/payments/flutterwave/verify",
-     *     summary="Vérifier un paiement Flutterwave",
+     *     path="/api/v1/payments/verify_payment",
+     *     summary="Vérifier un paiement",
      *     tags={"💰 Paiements"},
      *     security={{"sanctum":{}}},
      *
@@ -197,7 +197,7 @@ final class PaymentController
      *     @OA\Response(response=404, description="Paiement introuvable")
      * )
      */
-    public function verify(FlutterwaveVerifyRequest $request): JsonResponse
+    public function verify(VerifyPaymentRequest $request): JsonResponse
     {
         $validated = $request->validated();
 
@@ -241,7 +241,7 @@ final class PaymentController
      * Returns ONLY the status (`pending` | `success` | `failed` | `cancelled`)
      * for a given `tx_ref`. Designed for the post-checkout callback page
      * (`/payment/return`, `/credits/callback`, `/payment-success`) where the user's session
-     * cookie may have been lost during the cross-origin Flutterwave redirect.
+     * cookie may have been lost during the cross-origin GeniusPay redirect.
      *
      * Security:
      *  - The `tx_ref` is opaque (`KH-XXXXXXXXXXXX`, ~62-bit entropy) and acts
@@ -280,11 +280,11 @@ final class PaymentController
     }
 
     /**
-     * Cancel a pending Flutterwave payment on user request.
+     * Cancel a pending payment on user request.
      *
      * @OA\Post(
-     *     path="/api/v1/payments/flutterwave/cancel",
-     *     summary="Annuler un paiement Flutterwave en attente",
+     *     path="/api/v1/payments/cancel_payment",
+     *     summary="Annuler un paiement en attente",
      *     tags={"💰 Paiements"},
      *     security={{"sanctum":{}}},
      *
@@ -351,7 +351,7 @@ final class PaymentController
      *     summary="Webhook passerelle de paiement",
      *     tags={"💰 Paiements"},
      *
-     *     @OA\Parameter(name="gateway", in="path", required=true, @OA\Schema(type="string", enum={"geniuspay", "flutterwave"})),
+     *     @OA\Parameter(name="gateway", in="path", required=true, @OA\Schema(type="string", enum={"geniuspay"})),
      *
      *     @OA\Response(response=200, description="Webhook traité"),
      *     @OA\Response(response=401, description="Signature invalide")
@@ -426,7 +426,7 @@ final class PaymentController
             'checkout.session.completed',
             'checkout.session.async_payment_succeeded',
         ], true)) {
-            ProcessFlutterwaveWebhookJob::dispatch(
+            ProcessPaymentWebhookJob::dispatch(
                 $txRef,
                 'stripe',
                 (array) ($data['raw'] ?? []),
@@ -442,42 +442,13 @@ final class PaymentController
     {
         Log::info("--- WEBHOOK {$gateway} START ---");
 
+        // The `{gateway}` route is constrained to `geniuspay`; Stripe has its
+        // own dedicated webhook endpoint (`handleStripeWebhook`).
         if ($gateway === 'geniuspay') {
             return $this->handleGeniusPayWebhook($request);
         }
 
-        $payload = $request->all();
-        $headers = [
-            'verif-hash' => (string) $request->header('verif-hash', ''),
-            'HTTP_VERIF_HASH' => (string) $request->header('verif-hash', ''),
-            'flutterwave-signature' => (string) $request->header('flutterwave-signature', ''),
-        ];
-
-        // 1. Verify signature synchronously — fast hash check, must reply quickly.
-        try {
-            $data = $this->paymentService->processWebhook($payload, $headers, $gateway);
-            $txRef = (string) ($data['tx_ref'] ?? '');
-        } catch (InvalidWebhookSignatureException) {
-            return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
-        } catch (PaymentGatewayException|\Exception $e) {
-            Log::error("{$gateway} webhook signature/parse error: ".$e->getMessage());
-
-            return response()->json(['status' => 'error'], 500);
-        }
-
-        // 2. Dispatch heavy DB work + post-payment actions to the queue.
-        //    PHP-FPM worker is released immediately; Flutterwave gets its 200 in < 200 ms.
-        if ($txRef !== '') {
-            ProcessFlutterwaveWebhookJob::dispatch(
-                $txRef,
-                $gateway,
-                (array) ($data['raw'] ?? []),
-                $request->header('X-Request-ID'),
-                $request->header('X-Correlation-ID'),
-            );
-        }
-
-        return response()->json(['status' => 'ok']);
+        return response()->json(['status' => 'error', 'message' => 'Unsupported gateway'], 404);
     }
 
     private function handleGeniusPayWebhook(Request $request): JsonResponse
@@ -511,7 +482,7 @@ final class PaymentController
         }
 
         if ($txRef !== '' && in_array((string) ($data['event'] ?? ''), ['payment.success'], true)) {
-            ProcessFlutterwaveWebhookJob::dispatch(
+            ProcessPaymentWebhookJob::dispatch(
                 $txRef,
                 'geniuspay',
                 (array) ($data['raw'] ?? []),

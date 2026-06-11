@@ -104,8 +104,9 @@ it('approved webhook for CREDIT payment credits points to the user', function ()
     Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
 
     $secret = 'test-webhook-secret';
-    config()->set('payment.gateways.flutterwave.webhook_secret', $secret);
-    config()->set('payment.gateways.flutterwave.secret_key', 'FLWSECK_TEST-fake');
+    config()->set('payment.default', 'geniuspay');
+    config()->set('payment.gateways.geniuspay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.geniuspay.webhook_secret', $secret);
 
     $user = User::factory()->create(['point_balance' => 0]);
     $package = PointPackage::factory()->create(['points_awarded' => 50, 'price' => 5000]);
@@ -115,27 +116,35 @@ it('approved webhook for CREDIT payment credits points to the user', function ()
         'transaction_id' => 'KH-CREDITAPPROVED',
         'status' => PaymentStatus::PENDING,
         'type' => PaymentType::CREDIT,
-        'payment_method' => PaymentMethod::FLUTTERWAVE,
-        'gateway' => 'flutterwave',
+        'payment_method' => PaymentMethod::MOBILE_MONEY,
+        'gateway' => 'geniuspay',
         'amount' => 5000,
         'plan_id' => $package->id,
     ]);
 
-    $payload = json_encode([
-        'event' => 'charge.completed',
+    $timestamp = time();
+    $payload = [
+        'event' => 'payment.success',
         'data' => [
-            'status' => 'successful',
-            'tx_ref' => 'KH-CREDITAPPROVED',
+            'reference' => 'MTX-CREDITAPPROVED',
+            'status' => 'completed',
             'amount' => 5000,
             'currency' => 'XAF',
-            'meta' => ['package_id' => $package->id],
+            'metadata' => [
+                'tx_ref' => 'KH-CREDITAPPROVED',
+                'package_id' => $package->id,
+            ],
         ],
-    ]);
+    ];
+    $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    $signature = hash_hmac('sha256', $timestamp.'.'.$encoded, $secret);
 
-    $this->call('POST', '/api/v1/webhooks/flutterwave', [], [], [], [
+    $this->call('POST', '/api/v1/webhooks/geniuspay', [], [], [], [
         'CONTENT_TYPE' => 'application/json',
-        'HTTP_VERIF_HASH' => $secret,
-    ], $payload)->assertOk();
+        'HTTP_X_WEBHOOK_SIGNATURE' => $signature,
+        'HTTP_X_WEBHOOK_TIMESTAMP' => (string) $timestamp,
+        'HTTP_X_WEBHOOK_EVENT' => 'payment.success',
+    ], $encoded)->assertOk();
 
     expect($user->fresh()->point_balance)->toBe(50);
 
@@ -159,7 +168,7 @@ it('verify-purchase returns completed when credit payment is already successful'
         'transaction_id' => 'txn-verify-completed',
         'status' => PaymentStatus::SUCCESS,
         'type' => PaymentType::CREDIT,
-        'payment_method' => PaymentMethod::FLUTTERWAVE,
+        'payment_method' => PaymentMethod::MOBILE_MONEY,
         'gateway' => 'flutterwave',
     ]);
 

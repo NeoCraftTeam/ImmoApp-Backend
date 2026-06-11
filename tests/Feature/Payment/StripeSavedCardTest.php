@@ -175,9 +175,9 @@ function bindStripeService(PaymentGatewayInterface $stub): PaymentGatewayInterfa
 }
 
 beforeEach(function (): void {
-    config()->set('payment.default', 'flutterwave');
-    config()->set('payment.gateways.flutterwave.secret_key', 'FLWSECK_TEST-fake');
-    config()->set('payment.gateways.flutterwave.webhook_secret', 'test_webhook_secret_123');
+    config()->set('payment.default', 'geniuspay');
+    config()->set('payment.gateways.geniuspay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.geniuspay.webhook_secret', 'test_webhook_secret_123');
     config()->set('services.stripe.secret', 'sk_test_fake_FOR_TESTS_ONLY');
 });
 
@@ -224,7 +224,7 @@ it('surfaces a 502 when Stripe is unreachable on list', function (): void {
     $this->actingAs($user)
         ->getJson('/api/v1/payments/stripe/payment-methods')
         ->assertStatus(502)
-        ->assertJsonPath('message', 'Stripe list failed.');
+        ->assertJsonPath('message', 'Impossible de récupérer vos cartes. Veuillez réessayer.');
 });
 
 it('rejects unauthenticated access to the saved-cards endpoints', function (): void {

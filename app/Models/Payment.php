@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Enums\PaymentGateway;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
@@ -210,14 +209,6 @@ class Payment extends Model
     public function isBoosted(): bool
     {
         return $this->type === PaymentType::BOOST;
-    }
-
-    /**
-     * Returns true if the payment was processed via Flutterwave.
-     */
-    public function isFlutterwave(): bool
-    {
-        return $this->gateway === PaymentGateway::Flutterwave->value;
     }
 
     public function getActivitylogOptions(): LogOptions

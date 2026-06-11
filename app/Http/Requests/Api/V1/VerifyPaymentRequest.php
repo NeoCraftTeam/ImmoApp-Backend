@@ -6,7 +6,11 @@ namespace App\Http\Requests\Api\V1;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class FlutterwaveVerifyRequest extends FormRequest
+/**
+ * Validates a payment-verification request — accepts the KeyHome `KH-*`
+ * transaction reference and/or the gateway reference (e.g. GeniusPay `MTX-*`).
+ */
+class VerifyPaymentRequest extends FormRequest
 {
     public function authorize(): bool
     {

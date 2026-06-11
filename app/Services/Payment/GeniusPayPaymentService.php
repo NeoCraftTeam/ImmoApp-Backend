@@ -319,7 +319,7 @@ final readonly class GeniusPayPaymentService implements PaymentGatewayInterface
         return match ($paymentMethod) {
             'orange_money' => 'orange_money',
             'mobile_money' => 'mtn_money',
-            'flutterwave', 'card' => null,
+            'card' => null,
             default => null,
         };
     }

@@ -44,7 +44,7 @@ interface PaymentGatewayInterface
     public function handleWebhook(array $payload, array $headers): array;
 
     /**
-     * Return the unique gateway identifier (e.g. 'flutterwave').
+     * Return the unique gateway identifier (e.g. 'geniuspay', 'stripe').
      */
     public function getName(): string;
 

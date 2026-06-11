@@ -11,7 +11,7 @@ use Laravel\Cashier\Subscription as CashierBase;
  *
  * Pinned to the `cashier_subscriptions` table to avoid colliding with the
  * KeyHome business `subscriptions` table (App\Models\Subscription — agency
- * plans, billed in XAF via Flutterwave). Wired in the container through
+ * plans, billed in XAF). Wired in the container through
  * `Cashier::useSubscriptionModel(CashierSubscription::class)` in
  * `AppServiceProvider::register()`.
  *

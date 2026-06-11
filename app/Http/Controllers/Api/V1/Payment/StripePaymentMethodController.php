@@ -68,7 +68,7 @@ final class StripePaymentMethodController
             ]);
 
             return response()->json([
-                'message' => $e->getMessage(),
+                'message' => 'Impossible de récupérer vos cartes. Veuillez réessayer.',
             ], 502);
         }
 
@@ -115,7 +115,7 @@ final class StripePaymentMethodController
             ]);
 
             return response()->json([
-                'message' => $e->getMessage(),
+                'message' => 'Impossible de supprimer cette carte. Veuillez réessayer.',
             ], 422);
         }
 
@@ -161,7 +161,7 @@ final class StripePaymentMethodController
             ]);
 
             return response()->json([
-                'message' => $e->getMessage(),
+                'message' => 'Impossible de définir cette carte par défaut. Veuillez réessayer.',
             ], 422);
         }
 
@@ -206,7 +206,7 @@ final class StripePaymentMethodController
             ]);
 
             return response()->json([
-                'message' => $e->getMessage(),
+                'message' => 'Impossible de préparer l\'ajout de carte. Veuillez réessayer.',
             ], 502);
         }
 

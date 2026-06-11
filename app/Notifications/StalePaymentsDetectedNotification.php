@@ -32,7 +32,6 @@ class StalePaymentsDetectedNotification extends Notification implements ShouldQu
             ->subject("⚠ {$this->count} paiements bloqués détectés")
             ->greeting('Alerte Paiements')
             ->line("{$this->count} paiement(s) en statut PENDING depuis plus de {$this->hours}h ont été marqués comme échoués.")
-            ->line('Vérifiez le tableau de bord Flutterwave pour confirmer.')
             ->action('Voir les paiements', url('/admin/payments'));
     }
 

@@ -22,7 +22,7 @@ use UnitEnum;
  * Each toggle persists immediately to the `settings` table via
  * `PaymentMethodGateService` (cached 5 min) and is consumed by:
  *   - `GET /api/v1/payments/methods` — public catalogue
- *   - `FlutterwaveInitiateRequest::withValidator()` — rejects disabled methods
+ *   - `InitiatePaymentRequest::withValidator()` — rejects disabled methods
  *
  * No email OTP confirmation : a disabled method is the desired safe default
  * (rejecting payments) — the blast radius is bounded compared to pricing.
@@ -53,7 +53,6 @@ class PaymentMethods extends Page
             'mobile_money' => $gate->isEnabled(PaymentMethod::MOBILE_MONEY),
             'orange_money' => $gate->isEnabled(PaymentMethod::ORANGE_MONEY),
             'card' => $gate->isEnabled(PaymentMethod::CARD),
-            'flutterwave' => $gate->isEnabled(PaymentMethod::FLUTTERWAVE),
         ]);
     }
 
@@ -91,19 +90,6 @@ class PaymentMethods extends Page
                             ->onColor('success')
                             ->live()
                             ->afterStateUpdated(fn (bool $state) => $this->persistToggle(PaymentMethod::CARD, $state)),
-                    ]),
-
-                Section::make('Avancé')
-                    ->description('Le moyen « Autre · Mobile Money » est un libellé générique historique (compatibilité avec d\'anciens paiements). Il n\'apparaît plus dans la sélection utilisateur — laissez-le activé sauf maintenance.')
-                    ->icon(Heroicon::WrenchScrewdriver)
-                    ->collapsed()
-                    ->schema([
-                        Toggle::make('flutterwave')
-                            ->label('Autre mobile (legacy)')
-                            ->helperText('Compatibilité historique. Désactiver bloquerait les retries de paiements existants — ne touchez que pour une maintenance.')
-                            ->onColor('warning')
-                            ->live()
-                            ->afterStateUpdated(fn (bool $state) => $this->persistToggle(PaymentMethod::FLUTTERWAVE, $state)),
                     ]),
             ]);
     }

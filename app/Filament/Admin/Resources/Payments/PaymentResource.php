@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\Payments;
 
+use App\Enums\AdminPermission;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Filament\Admin\Resources\Payments\Pages\ManagePayments;
@@ -39,6 +40,12 @@ class PaymentResource extends Resource
     protected static ?string $model = Payment::class;
 
     protected static bool $isScopedToTenant = false;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::PaymentsView) ?? false;
+    }
 
     protected static string|null|\UnitEnum $navigationGroup = 'Finances';
 

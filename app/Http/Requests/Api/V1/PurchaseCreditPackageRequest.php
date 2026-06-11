@@ -15,8 +15,8 @@ use Illuminate\Foundation\Http\FormRequest;
  *
  * Accepts two distinct sub-flows that both ultimately route to a
  * `PaymentGatewayInterface::initiate()` call:
- *  - Flutterwave hosted-checkout: requires `payment_method` ∈ mobile money
- *    family (or unset → default `flutterwave`).
+ *  - Mobile-money hosted-checkout: requires `payment_method` ∈ mobile money
+ *    family (or unset → default `mobile_money`).
  *  - Stripe in-page Elements / saved-card reuse: `payment_method=card`,
  *    optionally with `save_payment_method=true` and/or `payment_method_id`.
  *
@@ -38,7 +38,7 @@ class PurchaseCreditPackageRequest extends FormRequest
     {
         return [
             'callback_url' => ['nullable', 'string', 'url', 'max:2048'],
-            'payment_method' => ['nullable', 'string', 'in:mobile_money,orange_money,flutterwave,card'],
+            'payment_method' => ['nullable', 'string', 'in:mobile_money,orange_money,card'],
             'save_payment_method' => ['nullable', 'boolean'],
             'payment_method_id' => ['nullable', 'string', 'regex:/^pm_[A-Za-z0-9_]+$/', 'max:255'],
             'turnstile_token' => ['nullable', 'string', 'max:2048'],
@@ -46,8 +46,7 @@ class PurchaseCreditPackageRequest extends FormRequest
     }
 
     /**
-     * Reject payment methods that an admin has disabled via Filament,
-     * mirroring `FlutterwaveInitiateRequest::withValidator()`.
+     * Reject payment methods that an admin has disabled via Filament.
      */
     public function withValidator(Validator $validator): void
     {

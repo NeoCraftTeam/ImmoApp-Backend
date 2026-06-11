@@ -20,7 +20,6 @@ use App\Models\PersonalAccessToken;
 use App\Models\User;
 use App\Services\Ai\AiSearchService;
 use App\Services\Ai\RecommendationEngine;
-use App\Services\Payment\FlutterwavePaymentService;
 use App\Services\Payment\GeniusPayPaymentService;
 use App\Services\Payment\PaymentMethodGateService;
 use App\Services\Payment\PaymentService;
@@ -105,10 +104,6 @@ class AppServiceProvider extends ServiceProvider
             // default gateway is GeniusPay.
             $stripe = $app->make(StripePaymentService::class);
             $registry[$stripe->getName()] = $stripe;
-
-            // Legacy Flutterwave rows may still exist in the database.
-            $flutterwave = $app->make(FlutterwavePaymentService::class);
-            $registry[$flutterwave->getName()] = $flutterwave;
 
             return new PaymentService($gateway, $fallback, $registry);
         });
@@ -286,7 +281,6 @@ class AppServiceProvider extends ServiceProvider
     {
         return match ($name) {
             'geniuspay' => $app->make(GeniusPayPaymentService::class),
-            'flutterwave' => $app->make(FlutterwavePaymentService::class),
             'stripe' => $app->make(StripePaymentService::class),
             default => throw new \InvalidArgumentException("Payment gateway [{$name}] not supported."),
         };

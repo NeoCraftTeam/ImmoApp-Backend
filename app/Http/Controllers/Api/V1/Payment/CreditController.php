@@ -155,10 +155,10 @@ final class CreditController
         }
 
         $user = $request->user();
-        // Default to the legacy Flutterwave hosted-checkout when the client
+        // Default to the mobile-money hosted-checkout when the client
         // doesn't specify ; the Stripe Elements flow is opted in via
         // `payment_method=card`.
-        $paymentMethod = (string) ($validated['payment_method'] ?? 'flutterwave');
+        $paymentMethod = (string) ($validated['payment_method'] ?? 'mobile_money');
         $savePaymentMethod = (bool) ($validated['save_payment_method'] ?? false);
         $paymentMethodId = isset($validated['payment_method_id']) && is_string($validated['payment_method_id']) && $validated['payment_method_id'] !== ''
             ? $validated['payment_method_id']
@@ -187,7 +187,7 @@ final class CreditController
             }
 
             return response()->json([
-                'message' => $e->getMessage(),
+                'message' => 'Le paiement n\'a pas pu être initié. Veuillez réessayer.',
                 'code' => $status === 422 ? 'PAYMENT_VALIDATION_ERROR' : 'PAYMENT_GATEWAY_ERROR',
                 'error' => config('app.debug') ? $e->getMessage() : null,
             ], $status);

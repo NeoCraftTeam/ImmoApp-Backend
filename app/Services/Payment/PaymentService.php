@@ -99,8 +99,7 @@ final readonly class PaymentService
         $redirectUrl = is_string($redirectUrl) && $redirectUrl !== '' ? $redirectUrl : null;
 
         if ($redirectUrl === null) {
-            $configured = config('payment.gateways.geniuspay.redirect_url')
-                ?? config('payment.gateways.flutterwave.redirect_url');
+            $configured = config('payment.gateways.geniuspay.redirect_url');
             $redirectUrl = (is_string($configured) && $configured !== '')
                 ? $configured
                 : $this->defaultFrontendPaymentReturnUrl(
@@ -120,7 +119,7 @@ final readonly class PaymentService
             'tx_ref' => $txRef,
             'redirect_url' => $redirectUrl,
             'description' => $data['description'] ?? 'Paiement KeyHome',
-            'payment_method' => $data['payment_method'] ?? 'flutterwave',
+            'payment_method' => $data['payment_method'] ?? 'mobile_money',
             'meta' => $meta,
         ];
 
@@ -165,7 +164,7 @@ final readonly class PaymentService
             $payment->type = PaymentType::from((string) $data['type']);
             $payment->amount = (int) round((float) $data['amount']);
             $payment->transaction_id = $txRef;
-            $payment->payment_method = PaymentMethod::from((string) ($data['payment_method'] ?? 'flutterwave'));
+            $payment->payment_method = PaymentMethod::from((string) ($data['payment_method'] ?? 'mobile_money'));
             $payment->user_id = $user->id;
             $payment->status = $initialStatus;
             $payment->gateway = $usedGateway->getName();
@@ -221,7 +220,7 @@ final readonly class PaymentService
     {
         // No gateway constraint here — a tx_ref is unique per Payment, and
         // restricting by `$this->gateway->getName()` would break verification
-        // for Stripe-issued payments when Flutterwave is the default gateway.
+        // for Stripe-issued payments when GeniusPay is the default gateway.
         $payment = Payment::where('transaction_id', $txRef)->firstOrFail();
 
         return $this->syncPaymentStatus($payment);
@@ -247,7 +246,7 @@ final readonly class PaymentService
 
         // Verify with the gateway that originally handled the payment, not
         // the default one. This is critical now that we run multiple
-        // gateways simultaneously (Flutterwave + Stripe).
+        // gateways simultaneously (GeniusPay + Stripe).
         $gatewayName = (string) ($payment->gateway ?? $this->gateway->getName());
         $verifyingGateway = $this->resolveGateway($gatewayName);
 
@@ -628,12 +627,11 @@ final readonly class PaymentService
 
     private function resolveGateway(string $name): PaymentGatewayInterface
     {
-        // Final-resort container resolution — keeps the legacy Flutterwave
-        // path working when a webhook arrives before the registry was wired
-        // (rare, but possible during deploys / artisan commands).
+        // Final-resort container resolution — covers a webhook that arrives
+        // before the registry was wired (rare, but possible during deploys /
+        // artisan commands).
         return $this->registry[$name] ?? match ($name) {
             'geniuspay' => app(GeniusPayPaymentService::class),
-            'flutterwave' => app(FlutterwavePaymentService::class),
             'stripe' => app(StripePaymentService::class),
             default => throw new \InvalidArgumentException("Gateway [{$name}] not supported."),
         };
@@ -724,7 +722,7 @@ final readonly class PaymentService
     }
 
     /**
-     * Default hosted-checkout return URL on the PWA (GeniusPay / legacy Flutterwave).
+     * Default hosted-checkout return URL on the PWA (GeniusPay).
      *
      * The gateway redirects after its own confirmation UI, appending
      * `status`, `tx_ref`, and related query parameters.

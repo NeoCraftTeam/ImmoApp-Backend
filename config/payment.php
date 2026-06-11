@@ -44,17 +44,6 @@ return [
             'default_country' => env('GENIUSPAY_DEFAULT_COUNTRY', 'CM'),
         ],
 
-        // Legacy Flutterwave — kept for reference / unmigrated rows only (no longer routed).
-        'flutterwave' => [
-            'public_key' => env('FLW_PUBLIC_KEY'),
-            'secret_key' => env('FLW_SECRET_KEY'),
-            'encryption_key' => env('FLW_ENCRYPTION_KEY'),
-            'webhook_secret' => env('FLW_WEBHOOK_SECRET'),
-            'base_url' => env('FLW_BASE_URL', 'https://api.flutterwave.com/v3'),
-            'redirect_url' => env('FLW_REDIRECT_URL'),
-            'logo' => env('APP_LOGO_URL'),
-        ],
-
     ],
 
     /*
@@ -101,19 +90,6 @@ return [
     'geniuspay_payment_methods' => [
         'mobile_money' => 'mtn_money',
         'orange_money' => 'orange_money',
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Flutterwave Payment Options by Method (legacy — unmigrated installs only)
-    |--------------------------------------------------------------------------
-    */
-
-    'flutterwave_payment_options' => [
-        'mobile_money' => 'mobilemoneycameroon',
-        'orange_money' => 'mobilemoneycameroon',
-        'flutterwave' => 'card,mobilemoneycameroon,mobilemoneyfranco',
-        'card' => 'card',
     ],
 
 ];

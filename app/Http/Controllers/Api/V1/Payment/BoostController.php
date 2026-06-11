@@ -15,6 +15,7 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Owner ad boost endpoints (credit-based, no subscription required).
@@ -94,8 +95,10 @@ final readonly class BoostController
         try {
             $boost = $this->boostService->apply($user, $ad, $pack);
         } catch (\RuntimeException $e) {
+            Log::warning('Boost application failed', ['ad_id' => $ad->id, 'error' => $e->getMessage()]);
+
             return response()->json([
-                'message' => $e->getMessage(),
+                'message' => 'Le boost n\'a pas pu être appliqué. Veuillez réessayer.',
                 'code' => 'BOOST_FAILED',
             ], 422);
         }

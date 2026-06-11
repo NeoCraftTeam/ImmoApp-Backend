@@ -6,7 +6,7 @@ use App\Actions\HandlePostPaymentActions;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
 use App\Enums\PointTransactionType;
-use App\Jobs\ProcessFlutterwaveWebhookJob;
+use App\Jobs\ProcessPaymentWebhookJob;
 use App\Models\Payment;
 use App\Models\PointPackage;
 use App\Models\PointTransaction;
@@ -20,18 +20,39 @@ use Illuminate\Support\Facades\Mail;
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
-    config()->set('payment.default', 'flutterwave');
-    config()->set('payment.gateways.flutterwave.secret_key', 'FLWSECK_TEST-fake');
-    config()->set('payment.gateways.flutterwave.webhook_secret', 'test_webhook_secret_456');
+    config()->set('payment.default', 'geniuspay');
+    config()->set('payment.gateways.geniuspay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.geniuspay.webhook_secret', 'test_webhook_secret_456');
     Mail::fake();
 });
 
+/**
+ * Build the headers + body for a signed GeniusPay webhook.
+ *
+ * @param  array<string, mixed>  $payload
+ * @return array{0: array<string, string>, 1: string}
+ */
+function signedGeniusPayWebhook(string $secret, array $payload, ?string $event = null): array
+{
+    $timestamp = time();
+    $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    $signature = hash_hmac('sha256', $timestamp.'.'.$encoded, $secret);
+    $headers = [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_X_WEBHOOK_SIGNATURE' => $signature,
+        'HTTP_X_WEBHOOK_TIMESTAMP' => (string) $timestamp,
+        'HTTP_X_WEBHOOK_EVENT' => $event ?? (string) ($payload['event'] ?? 'payment.success'),
+    ];
+
+    return [$headers, $encoded];
+}
+
 // ─── WEBHOOK CREDITS UN PAIEMENT ─────────────────────────────────────────
 
-it('credits the user balance when a Flutterwave webhook confirms a credit purchase', function (): void {
+it('credits the user balance when a GeniusPay webhook confirms a credit purchase', function (): void {
     Event::fake();
     Bus::fake();
-    $secret = config('payment.gateways.flutterwave.webhook_secret');
+    $secret = (string) config('payment.gateways.geniuspay.webhook_secret');
 
     $user = User::factory()->create(['point_balance' => 0]);
     $package = PointPackage::factory()->create([
@@ -41,26 +62,25 @@ it('credits the user balance when a Flutterwave webhook confirms a credit purcha
     ]);
     $payment = Payment::factory()->pending()->create([
         'user_id' => $user->id,
-        'gateway' => 'flutterwave',
+        'gateway' => 'geniuspay',
         'amount' => 5000,
         'type' => PaymentType::CREDIT->value,
         'plan_id' => $package->id,
     ]);
 
-    $payload = json_encode([
-        'event' => 'charge.completed',
+    [$headers, $body] = signedGeniusPayWebhook($secret, [
+        'event' => 'payment.success',
         'data' => [
-            'tx_ref' => $payment->transaction_id,
-            'status' => 'successful',
+            'reference' => 'MTX-CREDIT-OK',
+            'status' => 'completed',
             'amount' => 5000,
             'currency' => 'XAF',
+            'metadata' => ['tx_ref' => $payment->transaction_id],
         ],
-    ], JSON_THROW_ON_ERROR);
+    ]);
 
-    $this->call('POST', '/api/v1/webhooks/flutterwave', [], [], [], [
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_VERIF_HASH' => $secret,
-    ], $payload)->assertSuccessful();
+    $this->call('POST', '/api/v1/webhooks/geniuspay', [], [], [], $headers, $body)
+        ->assertSuccessful();
 
     // The webhook controller marks Payment as SUCCESS synchronously, then
     // dispatches a job for post-payment fulfilment. With Bus::fake the job
@@ -69,7 +89,7 @@ it('credits the user balance when a Flutterwave webhook confirms a credit purcha
     $payment->refresh();
     expect($payment->status)->toBe(PaymentStatus::SUCCESS);
 
-    Bus::assertDispatched(ProcessFlutterwaveWebhookJob::class);
+    Bus::assertDispatched(ProcessPaymentWebhookJob::class);
 
     app(HandlePostPaymentActions::class)->execute($payment);
 
@@ -97,7 +117,7 @@ it('does not double-credit when the post-payment action runs twice for the same 
     ]);
     $payment = Payment::factory()->success()->create([
         'user_id' => $user->id,
-        'gateway' => 'flutterwave',
+        'gateway' => 'geniuspay',
         'amount' => 8000,
         'type' => PaymentType::CREDIT->value,
         'plan_id' => $package->id,
@@ -119,7 +139,7 @@ it('does not double-credit when the post-payment action runs twice for the same 
 
 it('verify-purchase does not double-credit when called after the webhook already credited', function (): void {
     Event::fake();
-    $secret = config('payment.gateways.flutterwave.webhook_secret');
+    $secret = (string) config('payment.gateways.geniuspay.webhook_secret');
 
     $user = User::factory()->create(['point_balance' => 0]);
     $package = PointPackage::factory()->create([
@@ -129,34 +149,33 @@ it('verify-purchase does not double-credit when called after the webhook already
     ]);
     $payment = Payment::factory()->pending()->create([
         'user_id' => $user->id,
-        'gateway' => 'flutterwave',
+        'gateway' => 'geniuspay',
         'amount' => 3000,
         'type' => PaymentType::CREDIT->value,
         'plan_id' => $package->id,
     ]);
 
     // 1) Webhook lands first → Payment SUCCESS + job dispatched
-    $payload = json_encode([
-        'event' => 'charge.completed',
+    [$headers, $body] = signedGeniusPayWebhook($secret, [
+        'event' => 'payment.success',
         'data' => [
-            'tx_ref' => $payment->transaction_id,
-            'status' => 'successful',
+            'reference' => 'MTX-VERIFY-IDEM',
+            'status' => 'completed',
             'amount' => 3000,
             'currency' => 'XAF',
+            'metadata' => ['tx_ref' => $payment->transaction_id],
         ],
-    ], JSON_THROW_ON_ERROR);
+    ]);
 
-    $this->call('POST', '/api/v1/webhooks/flutterwave', [], [], [], [
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_VERIF_HASH' => $secret,
-    ], $payload)->assertSuccessful();
+    $this->call('POST', '/api/v1/webhooks/geniuspay', [], [], [], $headers, $body)
+        ->assertSuccessful();
 
     // Simulate the queue worker draining the webhook job (which calls execute()).
     app(HandlePostPaymentActions::class)->execute($payment->fresh());
 
     expect($user->fresh()->point_balance)->toBe(25);
 
-    // 2) User comes back from Flutterwave → /credits/verify-purchase fires
+    // 2) User comes back from GeniusPay → /credits/verify-purchase fires
     //    with the same tx_ref. The endpoint must short-circuit on the
     //    already-SUCCESS status without re-crediting.
     $this->actingAs($user)
@@ -176,7 +195,7 @@ it('verify-purchase does not double-credit when called after the webhook already
 // ─── VERIFY-PURCHASE TARGETING — PARAM tx_ref ───────────────────────────
 
 it('verify-purchase with tx_ref targets the exact payment, not the latest', function (): void {
-    // Stub the Flutterwave verify call so the "latest pending payment" branch
+    // Stub the GeniusPay verify call so the "latest pending payment" branch
     // doesn't reach the real API. Returns "pending" so the assertion below
     // exercises the targeting logic without short-circuiting on success.
     Http::fake([
@@ -201,7 +220,7 @@ it('verify-purchase with tx_ref targets the exact payment, not the latest', func
     // Older successful purchase (already credited).
     $oldPayment = Payment::factory()->success()->create([
         'user_id' => $user->id,
-        'gateway' => 'flutterwave',
+        'gateway' => 'geniuspay',
         'amount' => 2000,
         'type' => PaymentType::CREDIT->value,
         'plan_id' => $package->id,
@@ -252,7 +271,7 @@ it('verify-purchase requires authentication (401 for guests)', function (): void
 
 it('public-status returns the payment status without authentication', function (): void {
     $payment = Payment::factory()->success()->create([
-        'gateway' => 'flutterwave',
+        'gateway' => 'geniuspay',
         'transaction_id' => 'KH-PUBSTAT01',
     ]);
 
@@ -278,7 +297,7 @@ it('public-status never leaks PII even on a real payment', function (): void {
     $user = User::factory()->create(['email' => 'sensitive@example.com']);
     $payment = Payment::factory()->success()->create([
         'user_id' => $user->id,
-        'gateway' => 'flutterwave',
+        'gateway' => 'geniuspay',
         'amount' => 99999,
         'phone_number' => '+237699111222',
         'transaction_id' => 'KH-LEAKCHECK1',

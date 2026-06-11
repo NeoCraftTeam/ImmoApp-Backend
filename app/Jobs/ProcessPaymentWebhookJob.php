@@ -15,13 +15,14 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Processes a verified Flutterwave webhook payload asynchronously.
+ * Processes a verified payment-gateway webhook payload asynchronously.
  *
  * The webhook controller verifies the signature and extracts the tx_ref
- * synchronously (fast), then hands off to this job so PHP-FPM workers
- * are freed immediately and Flutterwave always receives a timely 200.
+ * synchronously (fast), then hands off to this job so PHP-FPM workers are
+ * freed immediately and the gateway (GeniusPay / Stripe) always receives a
+ * timely 200.
  */
-final class ProcessFlutterwaveWebhookJob implements ShouldQueue
+final class ProcessPaymentWebhookJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -31,6 +32,9 @@ final class ProcessFlutterwaveWebhookJob implements ShouldQueue
     /** @var array<int, int> */
     public array $backoff = [60, 120, 240];
 
+    /**
+     * @param  array<string, mixed>  $rawPayload
+     */
     public function __construct(
         public readonly string $txRef,
         public readonly string $gateway,
@@ -73,7 +77,7 @@ final class ProcessFlutterwaveWebhookJob implements ShouldQueue
 
     public function failed(\Throwable $exception): void
     {
-        Log::error('[Webhook] ProcessFlutterwaveWebhookJob failed', [
+        Log::error('[Webhook] ProcessPaymentWebhookJob failed', [
             'tx_ref' => $this->txRef,
             'gateway' => $this->gateway,
             'request_id' => $this->ingestRequestId,

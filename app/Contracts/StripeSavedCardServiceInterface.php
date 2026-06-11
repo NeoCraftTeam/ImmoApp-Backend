@@ -9,7 +9,7 @@ namespace App\Contracts;
  * authenticated user's Customer record.
  *
  * Decoupled from {@see PaymentGatewayInterface} on purpose: only the
- * Stripe gateway exposes saved-card features (Flutterwave doesn't have an
+ * Stripe gateway exposes saved-card features (the mobile-money gateway doesn't have an
  * equivalent persistent vault). Pulling these methods into a dedicated
  * contract keeps {@see PaymentGatewayInterface} generic and lets us
  * mock the saved-card surface without touching the rest of the gateway.

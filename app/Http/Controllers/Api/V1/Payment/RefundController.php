@@ -10,6 +10,7 @@ use App\Models\Refund;
 use App\Services\Payment\RefundService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 final readonly class RefundController
 {
@@ -60,7 +61,9 @@ final readonly class RefundController
                 ],
             ]);
         } catch (\InvalidArgumentException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
+            Log::warning('Refund rejected', ['error' => $e->getMessage()]);
+
+            return response()->json(['message' => 'Le remboursement n\'a pas pu être traité. Vérifiez les conditions requises.'], 422);
         }
     }
 

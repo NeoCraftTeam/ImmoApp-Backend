@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\Refunds;
 
+use App\Enums\AdminPermission;
 use App\Enums\RefundStatus;
 use App\Filament\Admin\Resources\Refunds\Pages\ManageRefunds;
 use App\Models\Payment;
@@ -25,6 +26,12 @@ final class RefundResource extends Resource
     protected static ?string $model = Refund::class;
 
     protected static bool $isScopedToTenant = false;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::PaymentsView) ?? false;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::ArrowUturnLeft;
 

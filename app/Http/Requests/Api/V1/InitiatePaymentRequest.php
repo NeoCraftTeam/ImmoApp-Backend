@@ -10,7 +10,13 @@ use App\Services\Payment\PaymentMethodGateService;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
-class FlutterwaveInitiateRequest extends FormRequest
+/**
+ * Validates a payment-initiation request for any gateway.
+ *
+ * Mobile money (Mobile Money / Orange Money) routes to GeniusPay hosted
+ * checkout; `card` routes to Stripe in-page Elements / saved-card reuse.
+ */
+class InitiatePaymentRequest extends FormRequest
 {
     use EnsuresCreditPurchasePassesTurnstile;
 
@@ -24,7 +30,7 @@ class FlutterwaveInitiateRequest extends FormRequest
     {
         return [
             'type' => ['required', 'string', 'in:subscription,credit'],
-            'payment_method' => ['nullable', 'string', 'in:mobile_money,orange_money,flutterwave,card'],
+            'payment_method' => ['nullable', 'string', 'in:mobile_money,orange_money,card'],
             'phone_number' => ['nullable', 'string', 'regex:/^\\+?[0-9\\s\\-]{7,20}$/'],
             'agency_id' => ['required_if:type,subscription', 'nullable', 'uuid', 'exists:agency,id'],
             'plan_id' => [

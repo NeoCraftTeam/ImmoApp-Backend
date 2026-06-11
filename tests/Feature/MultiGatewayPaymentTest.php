@@ -43,7 +43,7 @@ it('uses primary gateway when it succeeds', function (): void {
         'amount' => 5000,
         'currency' => 'XAF',
         'type' => 'credit',
-        'payment_method' => 'flutterwave',
+        'payment_method' => 'mobile_money',
     ]);
 
     expect($result['gateway'])->toBe('geniuspay')
@@ -73,7 +73,7 @@ it('falls back to secondary gateway when primary fails', function (): void {
         'amount' => 5000,
         'currency' => 'XAF',
         'type' => 'credit',
-        'payment_method' => 'flutterwave',
+        'payment_method' => 'mobile_money',
     ]);
 
     expect($result['gateway'])->toBe('wave')
@@ -98,13 +98,13 @@ it('throws exception when both primary and fallback gateways fail', function ():
         'amount' => 5000,
         'currency' => 'XAF',
         'type' => 'credit',
-        'payment_method' => 'flutterwave',
+        'payment_method' => 'mobile_money',
     ]))->toThrow(PaymentGatewayException::class, 'Wave: service indisponible.');
 });
 
 it('propagates primary exception when no fallback is configured', function (): void {
     $primaryMock = makeGatewayMock(
-        PaymentGateway::Flutterwave->value,
+        PaymentGateway::GeniusPay->value,
         new PaymentGatewayException('GeniusPay: cle API invalide.')
     );
 
@@ -118,6 +118,6 @@ it('propagates primary exception when no fallback is configured', function (): v
         'amount' => 5000,
         'currency' => 'XAF',
         'type' => 'credit',
-        'payment_method' => 'flutterwave',
+        'payment_method' => 'mobile_money',
     ]))->toThrow(PaymentGatewayException::class, 'GeniusPay: cle API invalide.');
 });

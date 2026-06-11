@@ -90,7 +90,6 @@ final class PaymentPresentation
         return match ($trimmed) {
             'Carte bancaire' => 'Carte',
             'MTN Mobile Money' => 'MTN Money',
-            'Autre · Flutterwave' => 'Autres',
             'Autre · GeniusPay' => 'Autres',
             default => $trimmed,
         };
@@ -119,7 +118,6 @@ final class PaymentPresentation
                 PaymentMethod::ORANGE_MONEY => 'Orange Money',
                 PaymentMethod::MOBILE_MONEY => 'MTN Money',
                 PaymentMethod::CARD => 'Carte',
-                PaymentMethod::FLUTTERWAVE => 'Autres',
             };
         }
 
