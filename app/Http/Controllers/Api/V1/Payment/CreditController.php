@@ -328,36 +328,23 @@ final class CreditController
             ], 422);
         }
 
-        // GeniusPay sandbox: the verify API returns TRANSACTION_NOT_FOUND (→ pending)
-        // but the hosted-checkout redirect already confirmed status=completed.
-        // Safe guard: we only trust the redirect when the API is *silent* (pending),
-        // never when it explicitly says failed/cancelled (handled above).
-        $redirectStatus = strtolower((string) ($validated['gateway_redirect_status'] ?? ''));
-        $redirectConfirmed = in_array($redirectStatus, ['completed', 'successful', 'success', 'paid'], true);
-        $isGeniusPay = $synced->gateway === 'geniuspay';
-        $hasCheckoutLink = is_string($synced->payment_link) && $synced->payment_link !== '';
-
-        if ($synced->status === PaymentStatus::PENDING && $redirectConfirmed && $isGeniusPay && $hasCheckoutLink) {
-            Log::info('GeniusPay: trusting redirect status while verify API is silent', [
-                'payment_id' => $synced->id,
-                'tx_ref' => $synced->transaction_id,
-                'redirect_status' => $redirectStatus,
-            ]);
-            $synced->forceFill(['status' => PaymentStatus::SUCCESS])->save();
-            $this->postPaymentActions->execute($synced, (array) ($synced->gateway_response ?? []));
-
-            return response()->json([
-                'status' => 'completed',
-                'message' => 'Achat de crédits confirmé.',
-                'point_balance' => (int) $user->fresh()->point_balance,
-            ]);
-        }
+        // PENDING — keep pending. The legitimate confirmation path is the
+        // signed GeniusPay webhook (PaymentService::processWebhook, HMAC-verified),
+        // not a client-supplied hint. The previous build trusted the
+        // `gateway_redirect_status` query string returned by the hosted-checkout
+        // redirect to force-promote pending → success when the gateway's verify
+        // API was silent, but that string is fully attacker-controlled — any
+        // authenticated user could mint free credits by initiating a purchase
+        // and immediately POSTing `gateway_redirect_status=completed` without
+        // ever paying. The field is still accepted by validation for backwards
+        // compatibility with already-deployed clients but is otherwise ignored.
+        unset($validated['gateway_redirect_status']);
 
         return response()->json([
             'status' => 'pending',
             'message' => 'Le paiement est en cours de confirmation.',
             'point_balance' => (int) $user->point_balance,
-        ]);
+        ], 202);
     }
 
     /**

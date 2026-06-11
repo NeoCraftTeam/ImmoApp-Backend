@@ -423,3 +423,54 @@ it('verify is idempotent: already-success payment skips gateway API call', funct
     Http::assertNothingSent();
     Event::assertNotDispatched(PaymentSucceeded::class);
 });
+
+/**
+ * Regression: client-supplied `gateway_redirect_status=completed` MUST NOT
+ * force a pending credit purchase to SUCCESS when the gateway verify API
+ * still reports pending. Prior to the fix, that flow let any authenticated
+ * user mint free credits by creating a payment and immediately calling
+ * verify-purchase with a forged redirect hint, never actually paying.
+ */
+it('rejects free-credit bypass via gateway_redirect_status hint', function (): void {
+    Event::fake();
+    geniusPayFeatureConfig();
+
+    $user = User::factory()->create(['point_balance' => 0]);
+    $package = PointPackage::factory()->create(['price' => 5000, 'points_awarded' => 50, 'is_active' => true]);
+
+    $payment = Payment::factory()->pending()->create([
+        'user_id' => $user->id,
+        'type' => PaymentType::CREDIT,
+        'plan_id' => $package->id,
+        'gateway' => 'geniuspay',
+        'amount' => 5000,
+        'transaction_id' => 'KH-BYPASSATTEMPT01',
+        'payment_link' => 'https://pay.genius.ci/checkout/MTX-BYPASS',
+        'gateway_response' => ['genius_reference' => 'MTX-BYPASS'],
+    ]);
+
+    // Gateway verify API is silent (sandbox returns "transaction not found"
+    // shape → mapped to pending by the gateway service).
+    Http::fake([
+        'pay.genius.ci/*' => Http::response([
+            'success' => false,
+            'data' => ['reference' => 'MTX-BYPASS', 'status' => 'pending'],
+        ], 200),
+    ]);
+
+    $response = $this->actingAs($user)
+        ->postJson('/api/v1/credits/verify-purchase', [
+            'tx_ref' => 'KH-BYPASSATTEMPT01',
+            'reference' => 'MTX-BYPASS',
+            // The malicious hint: prior code would honour this and force SUCCESS.
+            'gateway_redirect_status' => 'completed',
+        ]);
+
+    $response->assertStatus(202)
+        ->assertJsonPath('status', 'pending')
+        ->assertJsonPath('point_balance', 0);
+
+    expect($payment->fresh()?->status)->toBe(PaymentStatus::PENDING);
+    expect($user->fresh()?->point_balance)->toBe(0);
+    Event::assertNotDispatched(PaymentSucceeded::class);
+});
