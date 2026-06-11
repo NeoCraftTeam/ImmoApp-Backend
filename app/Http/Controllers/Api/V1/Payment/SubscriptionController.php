@@ -381,6 +381,15 @@ final class SubscriptionController
             ], 403);
         }
 
+        // OWASP A01 — only the agency owner may cancel the agency's
+        // subscription. A viewer/manager shouldn't be able to disrupt
+        // billing on the company's behalf.
+        if ($agency->owner_id !== $user->id) {
+            return response()->json([
+                'message' => 'Seul le propriétaire de l\'agence peut annuler l\'abonnement.',
+            ], 403);
+        }
+
         $subscription = $agency->getCurrentSubscription();
 
         if (!$subscription) {
@@ -585,6 +594,15 @@ final class SubscriptionController
             ], 403);
         }
 
+        // OWASP A01 — only the agency owner may engage agency funds on a
+        // renewal. Symmetric with `subscribe()`. Without this gate any
+        // agency member could trigger a payment on the owner's behalf.
+        if ($agency->owner_id !== $user->id) {
+            return response()->json([
+                'message' => 'Seul le propriétaire de l\'agence peut renouveler l\'abonnement.',
+            ], 403);
+        }
+
         /** @var Subscription|null $subscription */
         $subscription = $agency->subscriptions()->latest()->first();
 
@@ -600,12 +618,58 @@ final class SubscriptionController
             ], 422);
         }
 
-        $subscription->renew();
+        $plan = $subscription->plan;
+        if (!$plan || !$plan->is_active) {
+            return response()->json([
+                'message' => 'Le plan associé à votre abonnement n\'est plus disponible.',
+            ], 422);
+        }
 
-        return response()->json([
-            'message' => 'Abonnement renouvelé avec succès.',
-            'subscription' => new SubscriptionResource($subscription->fresh()->load('plan')),
-        ]);
+        $period = $subscription->billing_period ?? 'monthly';
+        $amount = $period === 'yearly' ? (int) $plan->price_yearly : (int) $plan->price;
+
+        if ($amount <= 0) {
+            return response()->json([
+                'message' => 'Tarification indisponible pour cette période.',
+            ], 422);
+        }
+
+        // SECURITY: the state mutation (Subscription::renew()) used to happen
+        // inline here, free of charge. It now runs from
+        // HandlePostPaymentActions::activateSubscription() ONLY after a signed
+        // gateway webhook confirms payment. We only create the payment row
+        // and hand back the gateway link here.
+        try {
+            $result = $this->paymentService->createPayment($user, [
+                'amount' => (float) $amount,
+                'type' => PaymentType::SUBSCRIPTION->value,
+                'payment_method' => 'orange_money',
+                'agency_id' => $agency->id,
+                'plan_id' => $plan->id,
+                'period' => $period,
+                'description' => "Renouvellement {$plan->name} ({$period})",
+                'meta' => [
+                    'payment_type' => 'subscription',
+                    'action' => 'renew',
+                    'agency_id' => $agency->id,
+                    'plan_id' => $plan->id,
+                    'subscription_id' => $subscription->id,
+                    'period' => $period,
+                ],
+            ]);
+
+            return response()->json([
+                'payment_url' => $result['link'],
+                'message' => 'Redirigez l\'utilisateur vers cette URL pour finaliser le renouvellement.',
+            ], 202);
+        } catch (\Exception $e) {
+            Log::error('Erreur création paiement renouvellement: '.$e->getMessage());
+
+            return response()->json([
+                'message' => 'Erreur technique lors de l\'initialisation.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
     }
 
     /**
@@ -664,6 +728,14 @@ final class SubscriptionController
             ], 403);
         }
 
+        // OWASP A01 — only the agency owner may engage agency funds on an
+        // upgrade. Symmetric with `subscribe()`.
+        if ($agency->owner_id !== $user->id) {
+            return response()->json([
+                'message' => 'Seul le propriétaire de l\'agence peut mettre à niveau l\'abonnement.',
+            ], 403);
+        }
+
         $subscription = $agency->getCurrentSubscription();
 
         if (!$subscription) {
@@ -686,12 +758,54 @@ final class SubscriptionController
             ], 422);
         }
 
-        $subscription->upgradeTo($newPlan, $validated['billing_period']);
+        $period = $validated['billing_period'];
+        $amount = $period === 'yearly' ? (int) $newPlan->price_yearly : (int) $newPlan->price;
 
-        return response()->json([
-            'message' => 'Abonnement mis à niveau avec succès.',
-            'subscription' => new SubscriptionResource($subscription->fresh()->load('plan')),
-        ]);
+        if ($amount <= 0) {
+            return response()->json([
+                'message' => 'Tarification indisponible pour cette période.',
+            ], 422);
+        }
+
+        // SECURITY: the state mutation (Subscription::upgradeTo()) used to
+        // happen inline here, free of charge — any agency member could call
+        // this endpoint with a higher-tier plan_id and receive premium
+        // service without paying. The mutation now runs from
+        // HandlePostPaymentActions::activateSubscription() ONLY after a
+        // signed gateway webhook confirms payment for the new plan's full
+        // period. We only create the payment row here and hand back the
+        // gateway checkout link.
+        try {
+            $result = $this->paymentService->createPayment($user, [
+                'amount' => (float) $amount,
+                'type' => PaymentType::SUBSCRIPTION->value,
+                'payment_method' => 'orange_money',
+                'agency_id' => $agency->id,
+                'plan_id' => $newPlan->id,
+                'period' => $period,
+                'description' => "Mise à niveau vers {$newPlan->name} ({$period})",
+                'meta' => [
+                    'payment_type' => 'subscription',
+                    'action' => 'upgrade',
+                    'agency_id' => $agency->id,
+                    'plan_id' => $newPlan->id,
+                    'subscription_id' => $subscription->id,
+                    'period' => $period,
+                ],
+            ]);
+
+            return response()->json([
+                'payment_url' => $result['link'],
+                'message' => 'Redirigez l\'utilisateur vers cette URL pour finaliser la mise à niveau.',
+            ], 202);
+        } catch (\Exception $e) {
+            Log::error('Erreur création paiement upgrade: '.$e->getMessage());
+
+            return response()->json([
+                'message' => 'Erreur technique lors de l\'initialisation.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
     }
 
     /**
@@ -747,6 +861,13 @@ final class SubscriptionController
         if (!$agency) {
             return response()->json([
                 'message' => 'Vous n\'appartenez à aucune agence.',
+            ], 403);
+        }
+
+        // OWASP A01 — only the agency owner may schedule a plan change.
+        if ($agency->owner_id !== $user->id) {
+            return response()->json([
+                'message' => 'Seul le propriétaire de l\'agence peut rétrograder l\'abonnement.',
             ], 403);
         }
 

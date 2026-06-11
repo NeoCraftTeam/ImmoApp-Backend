@@ -55,9 +55,76 @@ final readonly class HandlePostPaymentActions
      */
     private function activateSubscription(Payment $payment, array $metadata): void
     {
-        // Idempotency guard: a subscription already linked to this payment means
-        // a previous job/webhook already handled it. Prevents duplicate subscriptions
-        // when webhook retries or jobs are re-processed.
+        // The controller stamps `action` in the payment metadata so we can
+        // route fulfilment to the matching subscription mutator. Default to
+        // 'subscribe' (legacy) for backwards compatibility with rows that
+        // pre-date the upgrade/renew flows.
+        $action = (string) ($metadata['action'] ?? $payment->getAttribute('action') ?? 'subscribe');
+
+        $agencyId = $payment->agency_id ?? ($metadata['agency_id'] ?? null);
+        $planId = $payment->plan_id ?? ($metadata['plan_id'] ?? null);
+        $period = $payment->period ?? ($metadata['period'] ?? 'monthly');
+
+        if (!$agencyId) {
+            return;
+        }
+
+        $agency = Agency::find($agencyId);
+
+        if (!$agency) {
+            return;
+        }
+
+        if ($action === 'upgrade' || $action === 'renew') {
+            $subscription = $agency->getCurrentSubscription();
+
+            if (!$subscription) {
+                Log::warning('Subscription mutation paid but no active subscription found', [
+                    'payment_id' => $payment->id,
+                    'agency_id' => $agency->id,
+                    'action' => $action,
+                ]);
+
+                return;
+            }
+
+            // Idempotency: detect replayed webhook by checking the payment_id
+            // marker on the subscription's audit columns.
+            if ($subscription->payment_id === $payment->id) {
+                Log::info('Subscription mutation already applied for this payment, skip', [
+                    'payment_id' => $payment->id,
+                    'subscription_id' => $subscription->id,
+                    'action' => $action,
+                ]);
+
+                return;
+            }
+
+            if ($action === 'upgrade') {
+                if (!$planId) {
+                    return;
+                }
+                $plan = SubscriptionPlan::find($planId);
+                if (!$plan) {
+                    return;
+                }
+                $subscription->upgradeTo($plan, $period);
+            } else {
+                $subscription->renew();
+            }
+
+            // Stamp the payment so a webhook replay no-ops on the next pass.
+            $subscription->forceFill(['payment_id' => $payment->id])->saveQuietly();
+
+            Log::info("Abonnement {$action} via paiement {$payment->id}", [
+                'subscription_id' => $subscription->id,
+                'agency_id' => $agency->id,
+            ]);
+
+            return;
+        }
+
+        // SUBSCRIBE — create the initial subscription row.
         if (Subscription::where('payment_id', $payment->id)->exists()) {
             Log::info('Abonnement déjà activé pour ce paiement, skip', [
                 'payment_id' => $payment->id,
@@ -66,18 +133,13 @@ final readonly class HandlePostPaymentActions
             return;
         }
 
-        $agencyId = $payment->agency_id ?? ($metadata['agency_id'] ?? null);
-        $planId = $payment->plan_id ?? ($metadata['plan_id'] ?? null);
-        $period = $payment->period ?? ($metadata['period'] ?? 'monthly');
-
-        if (!$agencyId || !$planId) {
+        if (!$planId) {
             return;
         }
 
-        $agency = Agency::find($agencyId);
         $plan = SubscriptionPlan::find($planId);
 
-        if (!$agency || !$plan) {
+        if (!$plan) {
             return;
         }
 

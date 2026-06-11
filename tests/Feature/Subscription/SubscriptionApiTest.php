@@ -2,14 +2,44 @@
 
 declare(strict_types=1);
 
+use App\Actions\HandlePostPaymentActions;
+use App\Enums\PaymentStatus;
+use App\Enums\PaymentType;
 use App\Enums\SubscriptionStatus;
 use App\Models\Agency;
+use App\Models\Payment;
 use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 
 uses(RefreshDatabase::class);
+
+/**
+ * Stub the GeniusPay gateway so subscribe()/upgrade()/renew() can produce a
+ * checkout link without hitting the network. Tests for the state-mutation
+ * contract should not depend on real gateway connectivity.
+ */
+function stubGeniusPayCheckout(): void
+{
+    config()->set('payment.default', 'geniuspay');
+    config()->set('payment.gateways.geniuspay.api_key', 'pk_sandbox_test_fake');
+    config()->set('payment.gateways.geniuspay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.geniuspay.webhook_secret', 'whsec_sandbox_test_secret_123');
+    config()->set('payment.gateways.geniuspay.redirect_url', 'https://test.app/payment/callback');
+
+    Http::fake([
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'MTX-SUB-TEST',
+                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-SUB-TEST',
+                'status' => 'pending',
+            ],
+        ], 201),
+    ]);
+}
 
 beforeEach(function (): void {
     $this->agency = Agency::factory()->create();
@@ -156,7 +186,9 @@ it('can view subscription history', function (): void {
         ]);
 });
 
-it('can renew expired subscription', function (): void {
+it('renew creates a payment and does not mutate state until webhook succeeds', function (): void {
+    stubGeniusPayCheckout();
+
     $plan = SubscriptionPlan::factory()->premium()->create(['duration_days' => 30]);
     $subscription = Subscription::factory()->expired()->create([
         'agency_id' => $this->agency->id,
@@ -166,16 +198,15 @@ it('can renew expired subscription', function (): void {
     $response = $this->actingAs($this->user)
         ->postJson('/api/v1/subscriptions/renew');
 
-    $response->assertSuccessful()
-        ->assertJsonStructure([
-            'message',
-            'subscription',
-        ]);
+    $response->assertStatus(202)
+        ->assertJsonStructure(['payment_url', 'message']);
 
+    // State must NOT have advanced — the old build called Subscription::renew()
+    // inline here for free; the new build requires a signed webhook.
     expect($subscription->fresh())
-        ->status->toBe(SubscriptionStatus::ACTIVE)
-        ->renewed_at->not->toBeNull()
-        ->renewal_count->toBe(1);
+        ->status->toBe(SubscriptionStatus::EXPIRED)
+        ->renewed_at->toBeNull()
+        ->renewal_count->toBe(0);
 });
 
 it('cannot renew active subscription', function (): void {
@@ -194,7 +225,9 @@ it('cannot renew active subscription', function (): void {
         ]);
 });
 
-it('can upgrade subscription', function (): void {
+it('upgrade creates a payment and does not flip plan until webhook succeeds', function (): void {
+    stubGeniusPayCheckout();
+
     $basicPlan = SubscriptionPlan::factory()->basic()->create();
     $premiumPlan = SubscriptionPlan::factory()->premium()->create();
 
@@ -210,15 +243,49 @@ it('can upgrade subscription', function (): void {
             'billing_period' => 'monthly',
         ]);
 
-    $response->assertSuccessful()
-        ->assertJsonStructure([
-            'message',
-            'subscription',
-        ]);
+    $response->assertStatus(202)
+        ->assertJsonStructure(['payment_url', 'message']);
 
+    // Plan must NOT flip on the inline call — the old build called
+    // Subscription::upgradeTo() here for free, letting any agency member
+    // mint a premium tier without paying. The mutation now happens only
+    // from HandlePostPaymentActions on a verified webhook.
     expect($subscription->fresh())
-        ->subscription_plan_id->toBe($premiumPlan->id)
-        ->previous_plan_id->toBe($basicPlan->id);
+        ->subscription_plan_id->toBe($basicPlan->id)
+        ->previous_plan_id->toBeNull();
+});
+
+it('non-owner agency member cannot trigger upgrade / renew / downgrade / cancel', function (): void {
+    $basicPlan = SubscriptionPlan::factory()->basic()->create();
+    $premiumPlan = SubscriptionPlan::factory()->premium()->create();
+
+    Subscription::factory()->active()->create([
+        'agency_id' => $this->agency->id,
+        'subscription_plan_id' => $basicPlan->id,
+        'billing_period' => 'monthly',
+    ]);
+
+    // Second agency member — joined the agency, but is not the owner.
+    $member = User::factory()->create(['agency_id' => $this->agency->id]);
+
+    $upgrade = $this->actingAs($member)->postJson('/api/v1/subscriptions/upgrade', [
+        'plan_id' => $premiumPlan->id,
+        'billing_period' => 'monthly',
+    ]);
+    $upgrade->assertForbidden()
+        ->assertJsonPath('message', 'Seul le propriétaire de l\'agence peut mettre à niveau l\'abonnement.');
+
+    $renew = $this->actingAs($member)->postJson('/api/v1/subscriptions/renew');
+    $renew->assertForbidden();
+
+    $downgrade = $this->actingAs($member)->postJson('/api/v1/subscriptions/downgrade', [
+        'plan_id' => $basicPlan->id,
+        'billing_period' => 'monthly',
+    ]);
+    $downgrade->assertForbidden();
+
+    $cancel = $this->actingAs($member)->postJson('/api/v1/subscriptions/cancel');
+    $cancel->assertForbidden();
 });
 
 it('can downgrade subscription', function (): void {
@@ -284,4 +351,82 @@ it('requires agency membership', function (): void {
         ->assertJson([
             'message' => 'Vous n\'appartenez à aucune agence.',
         ]);
+});
+
+it('post-payment fulfilment upgrades subscription only after webhook succeeds', function (): void {
+    $basicPlan = SubscriptionPlan::factory()->basic()->create(['duration_days' => 30]);
+    $premiumPlan = SubscriptionPlan::factory()->premium()->create(['duration_days' => 30]);
+
+    $subscription = Subscription::factory()->active()->create([
+        'agency_id' => $this->agency->id,
+        'subscription_plan_id' => $basicPlan->id,
+        'billing_period' => 'monthly',
+    ]);
+
+    $payment = Payment::factory()->create([
+        'user_id' => $this->user->id,
+        'agency_id' => $this->agency->id,
+        'plan_id' => $premiumPlan->id,
+        'period' => 'monthly',
+        'type' => PaymentType::SUBSCRIPTION,
+        'status' => PaymentStatus::SUCCESS,
+        'amount' => (int) $premiumPlan->price,
+    ]);
+
+    app(HandlePostPaymentActions::class)->execute($payment, [
+        'meta' => [
+            'action' => 'upgrade',
+            'agency_id' => $this->agency->id,
+            'plan_id' => $premiumPlan->id,
+            'subscription_id' => $subscription->id,
+            'period' => 'monthly',
+        ],
+    ]);
+
+    expect($subscription->fresh())
+        ->subscription_plan_id->toBe($premiumPlan->id)
+        ->previous_plan_id->toBe($basicPlan->id);
+});
+
+it('post-payment fulfilment is idempotent for upgrade replays', function (): void {
+    $basicPlan = SubscriptionPlan::factory()->basic()->create(['duration_days' => 30]);
+    $premiumPlan = SubscriptionPlan::factory()->premium()->create(['duration_days' => 30]);
+
+    $subscription = Subscription::factory()->active()->create([
+        'agency_id' => $this->agency->id,
+        'subscription_plan_id' => $basicPlan->id,
+        'billing_period' => 'monthly',
+    ]);
+
+    $payment = Payment::factory()->create([
+        'user_id' => $this->user->id,
+        'agency_id' => $this->agency->id,
+        'plan_id' => $premiumPlan->id,
+        'period' => 'monthly',
+        'type' => PaymentType::SUBSCRIPTION,
+        'status' => PaymentStatus::SUCCESS,
+        'amount' => (int) $premiumPlan->price,
+    ]);
+
+    $meta = [
+        'meta' => [
+            'action' => 'upgrade',
+            'agency_id' => $this->agency->id,
+            'plan_id' => $premiumPlan->id,
+            'subscription_id' => $subscription->id,
+            'period' => 'monthly',
+        ],
+    ];
+
+    // Fire the same webhook twice — second call must no-op.
+    app(HandlePostPaymentActions::class)->execute($payment, $meta);
+    $afterFirst = $subscription->fresh();
+
+    app(HandlePostPaymentActions::class)->execute($payment, $meta);
+    $afterSecond = $subscription->fresh();
+
+    expect($afterSecond->subscription_plan_id)->toBe($premiumPlan->id);
+    // ends_at should not advance on the second call — that would create
+    // a free extra period for any replayed webhook.
+    expect($afterSecond->ends_at->timestamp)->toBe($afterFirst->ends_at->timestamp);
 });
