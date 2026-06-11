@@ -10,9 +10,7 @@ use Illuminate\Support\Facades\Http;
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
-    config()->set('payment.default', 'flutterwave');
-    config()->set('payment.gateways.flutterwave.secret_key', 'FLWSECK_TEST-fake');
-    config()->set('payment.gateways.flutterwave.webhook_secret', 'test_webhook_secret_123');
+    config()->set('payment.default', 'geniuspay');
 });
 
 // ─── ISOLATION DONNÉES UTILISATEURS ─────────────────────────────────────
@@ -21,8 +19,8 @@ it('should return only authenticated user payments in history', function (): voi
     $userA = User::factory()->create();
     $userB = User::factory()->create();
 
-    Payment::factory()->count(3)->create(['user_id' => $userA->id, 'gateway' => 'flutterwave']);
-    Payment::factory()->count(5)->create(['user_id' => $userB->id, 'gateway' => 'flutterwave']);
+    Payment::factory()->count(3)->create(['user_id' => $userA->id, 'gateway' => 'geniuspay']);
+    Payment::factory()->count(5)->create(['user_id' => $userB->id, 'gateway' => 'geniuspay']);
 
     $response = $this->actingAs($userA)->getJson('/api/v1/payments/history');
 
@@ -36,7 +34,7 @@ it('should return 404 when user tries to verify another users payment', function
     $userB = User::factory()->create();
     $payment = Payment::factory()->pending()->create([
         'user_id' => $userB->id,
-        'gateway' => 'flutterwave',
+        'gateway' => 'geniuspay',
     ]);
 
     $response = $this->actingAs($userA)->postJson('/api/v1/payments/verify_payment', [
@@ -50,9 +48,12 @@ it('should return 404 when user tries to verify another users payment', function
 
 it('should ignore gateway field sent by client', function (): void {
     Http::fake([
-        'api.flutterwave.com/*' => Http::response([
-            'status' => 'success',
-            'data' => ['link' => 'https://test'],
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'checkout_url' => 'https://pay.genius.ci/checkout/test',
+                'reference' => 'MTX-TEST-IGNOREGW',
+            ],
         ], 200),
     ]);
 
@@ -68,14 +69,17 @@ it('should ignore gateway field sent by client', function (): void {
     ]);
 
     $response->assertSuccessful();
-    $this->assertDatabaseHas('payments', ['gateway' => 'flutterwave']);
+    $this->assertDatabaseHas('payments', ['gateway' => 'geniuspay']);
 });
 
 it('should ignore status field sent by client', function (): void {
     Http::fake([
-        'api.flutterwave.com/*' => Http::response([
-            'status' => 'success',
-            'data' => ['link' => 'https://test'],
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'checkout_url' => 'https://pay.genius.ci/checkout/test',
+                'reference' => 'MTX-TEST-IGNORESTATUS',
+            ],
         ], 200),
     ]);
 
@@ -104,16 +108,16 @@ it('should reject sql injection attempt in reference field', function (): void {
 
 // ─── EXPOSITION DE DONNÉES SENSIBLES ─────────────────────────────────────
 
-it('should never expose flutterwave secret key in api response', function (): void {
+it('should never expose geniuspay secret key in api response', function (): void {
     $user = User::factory()->create();
-    Payment::factory()->count(2)->create(['user_id' => $user->id, 'gateway' => 'flutterwave']);
+    Payment::factory()->count(2)->create(['user_id' => $user->id, 'gateway' => 'geniuspay']);
 
     $response = $this->actingAs($user)->getJson('/api/v1/payments/history');
     $content = $response->getContent();
 
     expect($content)
-        ->not->toContain('FLWSECK')
-        ->not->toContain('FLW_SECRET')
+        ->not->toContain('api_secret')
+        ->not->toContain('GENIUSPAY_API_SECRET')
         ->not->toContain('webhook_secret');
 });
 
@@ -121,12 +125,12 @@ it('should never expose raw gateway response in api response', function (): void
     $user = User::factory()->create();
     Payment::factory()->create([
         'user_id' => $user->id,
-        'gateway' => 'flutterwave',
-        'gateway_response' => ['flw_ref' => 'SECRET-FLW-REF-123', 'processor_response' => 'Approved'],
+        'gateway' => 'geniuspay',
+        'gateway_response' => ['genius_reference' => 'SECRET-MTX-REF-123', 'processor_response' => 'Approved'],
     ]);
 
     $response = $this->actingAs($user)->getJson('/api/v1/payments/history');
     $content = $response->getContent();
 
-    expect($content)->not->toContain('SECRET-FLW-REF-123');
+    expect($content)->not->toContain('SECRET-MTX-REF-123');
 });

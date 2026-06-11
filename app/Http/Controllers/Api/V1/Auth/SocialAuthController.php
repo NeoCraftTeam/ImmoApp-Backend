@@ -154,8 +154,7 @@ final class SocialAuthController
             ]);
 
             return response()->json([
-                'message' => 'Échec de l\'authentification OAuth',
-                'error' => config('app.debug') ? $e->getMessage() : 'Une erreur est survenue',
+                'message' => 'Échec de l\'authentification. Veuillez réessayer.',
             ], 401);
         }
     }

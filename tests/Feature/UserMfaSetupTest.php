@@ -107,6 +107,57 @@ it('confirms TOTP setup, persists secret, returns recovery codes', function (): 
     expect(Cache::has('mfa_pending_totp:'.$customer->id))->toBeFalse();
 });
 
+// ---------------------------------------------------------------------------
+// /auth/mfa/setup/totp/recovery-codes/regenerate
+// ---------------------------------------------------------------------------
+
+it('regenerates recovery codes with a valid TOTP code and discards the old set', function (): void {
+    $google2fa = app(Google2FA::class);
+    $customer = User::factory()->customers()->create();
+    $secret = $google2fa->generateSecretKey(32);
+    $customer->saveAppAuthenticationSecret($secret);
+    $customer->saveAppAuthenticationRecoveryCodes(['OLD1-OLD1', 'OLD2-OLD2']);
+    Sanctum::actingAs($customer);
+
+    $response = $this->postJson('/api/v1/auth/mfa/setup/totp/recovery-codes/regenerate', [
+        'code' => $google2fa->getCurrentOtp($secret),
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('mfa_method', 'totp')
+        ->assertJsonStructure(['recovery_codes']);
+
+    expect($response->json('recovery_codes'))->toHaveCount(8);
+
+    $fresh = $customer->fresh()->getAppAuthenticationRecoveryCodes();
+    expect($fresh)->toHaveCount(8)
+        ->and($fresh)->not->toContain('OLD1-OLD1');
+});
+
+it('rejects recovery-code regeneration with an invalid code (old codes preserved)', function (): void {
+    $google2fa = app(Google2FA::class);
+    $customer = User::factory()->customers()->create();
+    $customer->saveAppAuthenticationSecret($google2fa->generateSecretKey(32));
+    $customer->saveAppAuthenticationRecoveryCodes(['OLD1-OLD1']);
+    Sanctum::actingAs($customer);
+
+    $response = $this->postJson('/api/v1/auth/mfa/setup/totp/recovery-codes/regenerate', [
+        'code' => '000000',
+    ]);
+
+    $response->assertStatus(422)->assertJsonPath('code', 'MFA_INVALID_CODE');
+    expect($customer->fresh()->getAppAuthenticationRecoveryCodes())->toBe(['OLD1-OLD1']);
+});
+
+it('rejects recovery-code regeneration when TOTP is not enabled', function (): void {
+    $customer = User::factory()->customers()->create();
+    Sanctum::actingAs($customer);
+
+    $this->postJson('/api/v1/auth/mfa/setup/totp/recovery-codes/regenerate', [
+        'code' => '123456',
+    ])->assertStatus(422)->assertJsonPath('code', 'MFA_TOTP_NOT_ENABLED');
+});
+
 it('rejects TOTP confirm with no active enrolment', function (): void {
     $customer = User::factory()->customers()->create();
     Sanctum::actingAs($customer);

@@ -39,9 +39,9 @@ use PragmaRX\Google2FAQRCode\Google2FA;
  */
 final class UserMfaSetupController
 {
-    private const PENDING_TOTP_TTL_MIN = 10;
+    private const int PENDING_TOTP_TTL_MIN = 10;
 
-    private const RECOVERY_CODES_COUNT = 8;
+    private const int RECOVERY_CODES_COUNT = 8;
 
     /**
      * Step 1 — generate a TOTP secret + QR otpauth URL.
@@ -216,6 +216,62 @@ final class UserMfaSetupController
             'message' => 'TOTP désactivé.',
             'mfa_method' => 'totp',
             'disabled' => true,
+        ]);
+    }
+
+    /**
+     * Regenerate the single-use recovery codes for an enrolled user.
+     *
+     * Requires a current valid TOTP code (or an existing recovery code) — same
+     * guard as `disableTotp` — so a stolen Sanctum token alone cannot silently
+     * rotate (and thereby invalidate) the legitimate owner's codes. The fresh
+     * codes are returned **once**; the previous set is discarded immediately.
+     */
+    public function regenerateRecoveryCodes(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user === null) {
+            return response()->json(['message' => 'Non authentifié.'], 401);
+        }
+
+        $rateKey = $this->rateKey('setup-totp-recovery-regenerate', $user->id);
+
+        if (RateLimiter::tooManyAttempts($rateKey, 10)) {
+            return $this->rateLimited($rateKey);
+        }
+
+        $secret = $user->getAppAuthenticationSecret();
+
+        if ($secret === null) {
+            return response()->json([
+                'message' => 'TOTP n\'est pas activé sur ce compte.',
+                'code' => 'MFA_TOTP_NOT_ENABLED',
+            ], 422);
+        }
+
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'min:6', 'max:20'],
+        ]);
+
+        if (!$this->verifyTotpOrRecoveryCode($user, $secret, $validated['code'])) {
+            RateLimiter::hit($rateKey, 300);
+
+            return response()->json([
+                'message' => 'Code invalide.',
+                'code' => 'MFA_INVALID_CODE',
+            ], 422);
+        }
+
+        $recoveryCodes = $this->generateRecoveryCodes();
+        $user->saveAppAuthenticationRecoveryCodes($recoveryCodes);
+        RateLimiter::clear($rateKey);
+
+        return response()->json([
+            'message' => 'Nouveaux codes de récupération générés. Conservez-les en lieu sûr — les anciens ne sont plus valides.',
+            'mfa_method' => 'totp',
+            // Plaintext recovery codes are returned **once**.
+            'recovery_codes' => $recoveryCodes,
         ]);
     }
 
