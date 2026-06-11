@@ -108,12 +108,17 @@ return [
 
     'gemini' => [
         'api_key' => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-2.0-flash'),
+        // gemini-2.0-flash retires 2026-06-01. gemini-2.5-flash-lite is the same
+        // price ($0.10/$0.40 per 1M) drop-in replacement; gemini-2.5-flash gives
+        // higher quality at $0.30/$2.50 but requires thinking_budget=0 to keep
+        // the cost close to 2.0 Flash. See docs/audits/AUDIT_NLP_SEARCH_2026-05-26.md.
+        'model' => env('GEMINI_MODEL', 'gemini-2.5-flash-lite'),
     ],
 
     'together' => [
         'api_key' => env('TOGETHER_API_KEY'),
-        'model' => env('TOGETHER_MODEL', 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo'),
+        // Bumped from Llama 3.1 70B → Llama 3.3 70B (May 2026) for parity with Groq's primary.
+        'model' => env('TOGETHER_MODEL', 'meta-llama/Llama-3.3-70B-Instruct-Turbo'),
     ],
 
     'mistral' => [
@@ -200,7 +205,7 @@ return [
     |--------------------------------------------------------------------------
     | Stripe handles every PaymentMethod whose `gateway()` returns
     | PaymentGateway::Stripe — currently `card` only. Mobile money methods
-    | continue to flow through Flutterwave.
+    | continue to flow through GeniusPay.
     |
     | Stripe does NOT support XAF/XOF as a settlement currency, so KeyHome
     | bills Stripe in EUR using the official CFA peg : 1 EUR = 655.957 XAF.

@@ -36,9 +36,9 @@ it('throws InvalidArgumentException when nominatim returns empty', function (): 
 it('creates city from valid nominatim response', function (): void {
     Http::fake([
         '*nominatim*' => Http::response([[
-            'name'    => 'Bafoussam',
-            'lat'     => '5.4737',
-            'lon'     => '10.4179',
+            'name' => 'Bafoussam',
+            'lat' => '5.4737',
+            'lon' => '10.4179',
             'address' => ['country' => 'Cameroun'],
         ]], 200),
     ]);
@@ -54,9 +54,9 @@ it('creates city from valid nominatim response', function (): void {
 it('creates a non-african city (Geneva) with correct coords from nominatim', function (): void {
     Http::fake([
         '*nominatim*' => Http::response([[
-            'name'    => 'Genf',
-            'lat'     => '46.2017',
-            'lon'     => '6.1469',
+            'name' => 'Genf',
+            'lat' => '46.2017',
+            'lon' => '6.1469',
             'address' => ['country' => 'Switzerland'],
         ]], 200),
     ]);
@@ -94,7 +94,7 @@ it('POST /geo/city returns 200 for existing city', function (): void {
 // ─── FindOrCreateQuarterAction ────────────────────────────────────────────────
 
 it('FindOrCreateQuarterAction finds existing quarter case-insensitively', function (): void {
-    $city    = City::factory()->create();
+    $city = City::factory()->create();
     $quarter = Quarter::factory()->create(['name' => 'Akwa', 'city_id' => $city->id]);
 
     $result = (new FindOrCreateQuarterAction)->handle(['name' => 'akwa', 'city_id' => $city->id]);

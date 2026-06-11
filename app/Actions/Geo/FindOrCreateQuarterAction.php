@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Log;
  */
 final class FindOrCreateQuarterAction
 {
-    private const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
+    private const string NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
 
     /**
      * @param  array{name: string, city_id: string, city_name?: string|null, country?: string|null}  $data

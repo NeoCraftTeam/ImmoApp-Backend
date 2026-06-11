@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Ad;
 
 use App\Enums\AdStatus;
+use App\Enums\PropertyAttribute;
 use App\Http\Resources\AdResource as AdApiResource;
 use App\Models\Ad;
+use App\Models\City;
 use Illuminate\Database\Connection;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Str;
@@ -77,18 +79,69 @@ final class MyAdsController
 
         if ($typeId = request('type_id')) {
             $query->where('type_id', $typeId);
+        } elseif ($typeName = request('type_name')) {
+            $query->whereHas('ad_type', fn ($qb) => $qb->where('name', 'ilike', (string) $typeName));
         }
 
         if ($cityId = request('city_id')) {
             $query->whereHas('quarter', fn ($q) => $q->where('city_id', $cityId));
+        } elseif ($cityName = request('city_name')) {
+            $cityRow = City::query()->where('name', 'ilike', (string) $cityName)->first();
+            if ($cityRow !== null) {
+                $query->whereHas('quarter', fn ($q) => $q->where('city_id', $cityRow->id));
+            }
         }
 
         if ($quarterId = request('quarter_id')) {
             $query->where('quarter_id', $quarterId);
+        } elseif ($quarterName = request('quarter_name')) {
+            $query->whereHas('quarter', fn ($qb) => $qb->where('name', 'ilike', (string) $quarterName));
         }
 
-        if (request()->boolean('is_boosted')) {
+        // boost_status from the owner-NLP parser. Falls back to the legacy
+        // `is_boosted=true` truthy flag for backward compatibility.
+        $boostStatus = request('boost_status');
+        if ($boostStatus === 'boosted' || request()->boolean('is_boosted')) {
             $query->where('is_boosted', true)->where('boost_expires_at', '>', now());
+        } elseif ($boostStatus === 'not_boosted') {
+            $query->where(function ($qb): void {
+                $qb->where('is_boosted', false)
+                    ->orWhereNull('boost_expires_at')
+                    ->orWhere('boost_expires_at', '<=', now());
+            });
+        }
+
+        if (request()->has('is_visible')) {
+            $query->where('is_visible', request()->boolean('is_visible'));
+        }
+
+        if ($transactionType = request('transaction_type')) {
+            if (in_array($transactionType, ['location', 'vente'], true)) {
+                $query->where('transaction_type', $transactionType);
+            }
+        }
+
+        if ($bedrooms = request('bedrooms')) {
+            $query->where('bedrooms', '>=', (int) $bedrooms);
+        }
+
+        if ($surfaceMin = request('surface_min')) {
+            $query->where('surface_area', '>=', (float) $surfaceMin);
+        }
+
+        if (request()->boolean('furnished')) {
+            $furnishedAttr = PropertyAttribute::Furnished->value;
+            $query->where(function ($qb) use ($furnishedAttr): void {
+                $qb->where('is_furnished', true)
+                    ->orWhereJsonContains('attributes', $furnishedAttr);
+            });
+        }
+
+        if ($viewsMin = request('views_min')) {
+            $query->where('views_count', '>=', (int) $viewsMin);
+        }
+        if ($viewsMax = request('views_max')) {
+            $query->where('views_count', '<=', (int) $viewsMax);
         }
 
         if ($minPrice = request('price_min')) {

@@ -13,6 +13,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Permet aux bailleurs de créer une ville ou un quartier manquant
@@ -40,7 +41,9 @@ final class GeoFindOrCreateController extends Controller
         try {
             $city = $this->findOrCreateCity->handle($data);
         } catch (\InvalidArgumentException $e) {
-            return response()->json(['message' => $e->getMessage()], 422);
+            Log::warning('Geo find-or-create rejected', ['error' => $e->getMessage()]);
+
+            return response()->json(['message' => 'Impossible de créer ou trouver cette ville. Vérifiez les données saisies.'], 422);
         }
 
         Cache::forget('cities:list:'.md5(':50'));

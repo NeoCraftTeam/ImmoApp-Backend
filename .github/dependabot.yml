@@ -1,0 +1,48 @@
+# Automated dependency updates. PRs land weekly with grouped minor/patch
+# bumps and individual majors so a CRITICAL advisory never lingers.
+#
+# Dependabot reads `pnpm-lock.yaml` natively for the `npm` ecosystem — no
+# extra config needed beyond pointing at the keyhome-frontend-next dir.
+version: 2
+updates:
+  # Laravel / backend Composer dependencies
+  - package-ecosystem: composer
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - backend
+    groups:
+      patch-minor:
+        update-types:
+          - patch
+          - minor
+
+  # Next.js / frontend (pnpm-lock.yaml resolved automatically)
+  - package-ecosystem: npm
+    directory: /keyhome-frontend-next
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - frontend
+    groups:
+      patch-minor:
+        update-types:
+          - patch
+          - minor
+
+  # GitHub Actions versions
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+      - ci

@@ -7,7 +7,6 @@ use App\Http\Controllers\Api\V1\Ad\AdAnalyticsController;
 use App\Http\Controllers\Api\V1\Ad\AdController;
 use App\Http\Controllers\Api\V1\Ad\AdDraftEditController;
 use App\Http\Controllers\Api\V1\Ad\AdGeoController;
-use App\Http\Controllers\Api\V1\Ad\AdImageSearchController;
 use App\Http\Controllers\Api\V1\Ad\AdInteractionController;
 use App\Http\Controllers\Api\V1\Ad\AdPdfController;
 use App\Http\Controllers\Api\V1\Ad\AdRankEstimateController;
@@ -42,9 +41,6 @@ Route::prefix('ads')->middleware('optional.auth')->group(function (): void {
     Route::get('/search', [AdSearchController::class, 'search'])->name('ads.search')->middleware('throttle:60,1');
     Route::get('/autocomplete', [AdSearchController::class, 'autocomplete'])->name('ads.autocomplete')->middleware('throttle:60,1');
     Route::get('/facets', [AdSearchController::class, 'facets'])->name('ads.facets')->middleware('throttle:60,1');
-
-    // Image search — vision LLM (GPT-4o / Gemini Vision). Throttled tightly: vision calls are expensive.
-    Route::post('/search/image', AdImageSearchController::class)->middleware('throttle:20,1');
 
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/ai/enhance-description', AdAiController::class)

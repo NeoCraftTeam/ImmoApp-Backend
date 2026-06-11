@@ -116,11 +116,6 @@ final readonly class ConversationService
     {
         $userId = $user->id;
 
-        // Build last-read expression using the known userId (safe: from authenticated User model, always UUID).
-        $lastReadExpr = DB::raw(
-            "CASE WHEN conversations.tenant_id = '{$userId}' THEN conversations.tenant_last_read_at ELSE conversations.landlord_last_read_at END"
-        );
-
         $paginator = Conversation::forUser($userId)
             ->with([
                 'ad' => function ($query): void {
@@ -145,12 +140,18 @@ final readonly class ConversationService
                         }]);
                 },
             ])
-            ->withCount(['messages as computed_unread_count' => function ($q) use ($userId, $lastReadExpr): void {
+            ->withCount(['messages as computed_unread_count' => function ($q) use ($userId): void {
+                // "My" last-read timestamp depends on whether I'm the tenant or the
+                // landlord on each row; bind $userId rather than interpolate it.
+                $lastReadCase = 'CASE WHEN conversations.tenant_id = ? '
+                    .'THEN conversations.tenant_last_read_at '
+                    .'ELSE conversations.landlord_last_read_at END';
+
                 $q->where('sender_id', '!=', $userId)
-                    ->where(function ($sub) use ($lastReadExpr): void {
-                        $sub->whereNull($lastReadExpr)
-                            ->orWhereColumn('messages.created_at', '>', $lastReadExpr);
-                    });
+                    ->whereRaw(
+                        "({$lastReadCase} IS NULL OR messages.created_at > {$lastReadCase})",
+                        [$userId, $userId],
+                    );
             }])
             ->orderByDesc('last_message_at')
             ->paginate($perPage);

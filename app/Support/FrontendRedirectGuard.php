@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Support;
 
 /**
- * Validates absolute URLs used as post-payment redirects (Flutterwave callback_url).
+ * Validates absolute URLs used as post-payment redirects (hosted-checkout callback_url).
  *
  * Host must match {@see config('app.frontend_url')} and optional
  * {@see config('app.oauth_allowed_redirect_hosts')} entries — same policy as OAuth redirects.

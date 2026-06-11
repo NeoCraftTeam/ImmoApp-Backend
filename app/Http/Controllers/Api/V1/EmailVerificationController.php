@@ -106,7 +106,7 @@ final readonly class EmailVerificationController
 
         } catch (\Throwable $e) {
             Log::error('Email verification failed', [
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
+                'error' => $e->getMessage(),
                 'user_id' => $id,
             ]);
 

@@ -65,6 +65,10 @@ return [
 
     'mail_asset_base_url' => env('MAIL_ASSET_BASE_URL', env('APP_URL', 'http://localhost')),
 
+    // Physical mailing address shown in email footers (CAN-SPAM / RGPD compliance).
+    // Example: "KeyHome SARL · 12 rue de la République, 75001 Paris, France"
+    'company_address' => env('MAIL_COMPANY_ADDRESS', ''),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

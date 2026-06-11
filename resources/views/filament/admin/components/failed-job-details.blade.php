@@ -5,6 +5,20 @@
     $timeout = $payloadDecoded['timeout'] ?? null;
     $jobId = $payloadDecoded['id'] ?? null;
     $exception = (string) $record->exception;
+
+    // Redact sensitive keys from payload before display.
+    $sensitiveKeys = ['password', 'token', 'secret', 'api_key', 'apiKey', 'credit_card', 'card_number', 'cvv', 'authorization', 'webhook_secret', 'stripe_secret', 'private_key'];
+    $redactPayload = function (array $data) use (&$redactPayload, $sensitiveKeys): array {
+        foreach ($data as $key => $value) {
+            if (is_string($key) && collect($sensitiveKeys)->contains(fn ($s) => str_contains(strtolower($key), $s))) {
+                $data[$key] = '██ REDACTED ██';
+            } elseif (is_array($value)) {
+                $data[$key] = $redactPayload($value);
+            }
+        }
+        return $data;
+    };
+    $safePayload = $redactPayload($payloadDecoded);
 @endphp
 
 <div class="space-y-5">
@@ -57,6 +71,6 @@
         <summary class="cursor-pointer px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-900/40 rounded-xl">
             Payload complet (JSON)
         </summary>
-        <pre class="px-4 pb-4 text-xs leading-relaxed text-gray-700 dark:text-gray-300 overflow-x-auto whitespace-pre-wrap break-all max-h-72">{{ json_encode($payloadDecoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
+        <pre class="px-4 pb-4 text-xs leading-relaxed text-gray-700 dark:text-gray-300 overflow-x-auto whitespace-pre-wrap break-all max-h-72">{{ json_encode($safePayload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
     </details>
 </div>

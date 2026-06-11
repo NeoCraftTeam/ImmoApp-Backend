@@ -109,19 +109,8 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
-            $raw = $e->getMessage();
-
-            if (str_starts_with($raw, 'No query results for model')) {
-                return response()->json([
-                    'message' => 'Ressource introuvable.',
-                    'code' => 'NOT_FOUND',
-                ], 404);
-            }
-
-            $message = trim($raw) !== '' ? $raw : 'Ressource introuvable.';
-
             return response()->json([
-                'message' => $message,
+                'message' => 'Ressource introuvable.',
                 'code' => 'NOT_FOUND',
             ], 404);
         });
@@ -215,7 +204,7 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             return response()->json([
-                'message' => $e->getMessage(),
+                'message' => 'Une erreur est survenue lors du traitement du paiement.',
                 'code' => $status === 422 ? 'PAYMENT_VALIDATION_ERROR' : 'PAYMENT_GATEWAY_ERROR',
             ], $status);
         });

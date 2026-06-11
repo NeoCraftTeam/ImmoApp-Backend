@@ -183,7 +183,20 @@ final readonly class SurveyController
                 'uuid',
                 Rule::exists('survey_questions', 'id')->where('survey_id', $survey->id),
             ],
-            'answers.*.answer' => ['required'],
+            'answers.*.answer' => [
+                'required',
+                // Bound the stored answer (string, number, or array of choices) so a
+                // single submission can't bloat the DB — mirrors the public endpoint.
+                function (string $attribute, mixed $value, \Closure $fail): void {
+                    $serialized = is_array($value) ? (string) json_encode($value) : (string) $value;
+                    if (mb_strlen($serialized) > 1000) {
+                        $fail('La réponse est trop longue (1000 caractères maximum).');
+                    }
+                    if (is_array($value) && count($value) > 50) {
+                        $fail('Trop d\'options sélectionnées.');
+                    }
+                },
+            ],
             'anonymous' => ['sometimes', 'boolean'],
         ]);
 

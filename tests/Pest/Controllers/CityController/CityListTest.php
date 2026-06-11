@@ -15,7 +15,7 @@ it('returns city list', function (): void {
     $this->actingAs($this->admin)
         ->getJson('/api/v1/cities')
         ->assertOk()
-        ->assertJsonStructure(['data' => [['id', 'name']]]);    
+        ->assertJsonStructure(['data' => [['id', 'name']]]);
 });
 
 it('filters cities by name ilike', function (): void {
@@ -30,9 +30,9 @@ it('filters cities by name ilike', function (): void {
 
 it('exposes country and coordinates in city resource', function (): void {
     City::factory()->create([
-        'name'      => 'Kribi',
-        'country'   => 'Cameroun',
-        'latitude'  => 2.9395,
+        'name' => 'Kribi',
+        'country' => 'Cameroun',
+        'latitude' => 2.9395,
         'longitude' => 9.9086,
     ]);
 

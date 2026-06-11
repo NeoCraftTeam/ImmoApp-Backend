@@ -8,7 +8,7 @@ use App\Models\User;
 
 beforeEach(function (): void {
     $this->admin = User::factory()->admin()->create();
-    $this->city  = City::factory()->create(['name' => 'Douala']);
+    $this->city = City::factory()->create(['name' => 'Douala']);
 });
 
 it('rejects duplicate quarter in same city (case-insensitive)', function (): void {

@@ -311,6 +311,9 @@
                 <p style="margin-top: 6px;">
                     {{ __('emails.layout.receiving_reason', ['app' => config('app.name')]) }}
                 </p>
+                @if (filled(config('app.company_address')))
+                    <p style="margin-top: 6px; color: #94a3b8;">{{ config('app.company_address') }}</p>
+                @endif
                 @isset($unsubscribeUrl)
                     <p style="margin-top: 8px;">
                         <a href="{{ $unsubscribeUrl }}">{{ __('emails.layout.unsubscribe') }}</a>

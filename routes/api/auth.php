@@ -98,6 +98,7 @@ Route::prefix('auth')->group(function (): void {
             Route::post('/totp/start', 'startTotp')->middleware('throttle:5,1');
             Route::post('/totp/confirm', 'confirmTotp')->middleware('throttle:10,1');
             Route::post('/totp/disable', 'disableTotp')->middleware('throttle:5,1');
+            Route::post('/totp/recovery-codes/regenerate', 'regenerateRecoveryCodes')->middleware('throttle:5,1');
 
             // Email MFA enrol flow — enable -> confirm -> (optional) disable
             Route::post('/email/enable', 'enableEmail')->middleware('throttle:5,1');

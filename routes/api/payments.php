@@ -36,9 +36,9 @@ Route::get('/payments/{txRef}/public-status', [PaymentController::class, 'public
     ->middleware('throttle:60,1');
 
 // --- PAYMENTS — multi-gateway webhooks ---
-// GeniusPay + legacy Flutterwave (`{gateway}` placeholder).
+// GeniusPay mobile-money hosted-checkout webhook (`{gateway}` placeholder).
 Route::post('/webhooks/{gateway}', [PaymentController::class, 'handleWebhook'])
-    ->where('gateway', 'geniuspay|flutterwave')
+    ->where('gateway', 'geniuspay')
     ->middleware('throttle:payments.webhook');
 
 // Stripe: dedicated endpoint — verifies `Stripe-Signature` against the
@@ -118,6 +118,12 @@ Route::middleware('auth:sanctum')->prefix('subscriptions')->group(function (): v
     Route::post('/subscribe', [SubscriptionController::class, 'subscribe'])
         ->middleware('throttle:5,1');
     Route::post('/cancel', [SubscriptionController::class, 'cancel'])
+        ->middleware('throttle:5,1');
+    Route::post('/renew', [SubscriptionController::class, 'renew'])
+        ->middleware('throttle:5,1');
+    Route::post('/upgrade', [SubscriptionController::class, 'upgrade'])
+        ->middleware('throttle:5,1');
+    Route::post('/downgrade', [SubscriptionController::class, 'downgrade'])
         ->middleware('throttle:5,1');
     Route::patch('/auto-renew', [SubscriptionController::class, 'toggleAutoRenew'])
         ->middleware('throttle:10,1');

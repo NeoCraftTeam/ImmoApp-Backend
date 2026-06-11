@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\Ad\AdTypeController;
 use App\Http\Controllers\Api\V1\Ad\DuplicateAdController;
 use App\Http\Controllers\Api\V1\Auth\ClerkWebhookController;
 use App\Http\Controllers\Api\V1\Auth\LoginHistoryController;
+use App\Http\Controllers\Api\V1\Auth\SessionController;
 use App\Http\Controllers\Api\V1\Chat\ChatE2eeIdentityController;
 use App\Http\Controllers\Api\V1\Chat\ConversationController;
 use App\Http\Controllers\Api\V1\Chat\MessageController;
@@ -20,8 +21,10 @@ use App\Http\Controllers\Api\V1\Geo\QuarterController;
 use App\Http\Controllers\Api\V1\Geo\RentEstimatorController;
 use App\Http\Controllers\Api\V1\HealthCheckController;
 use App\Http\Controllers\Api\V1\Lease\LeaseContractController;
+use App\Http\Controllers\Api\V1\Lease\RentPaymentController;
 use App\Http\Controllers\Api\V1\Lease\SignatureController;
 use App\Http\Controllers\Api\V1\Lease\TenantController;
+use App\Http\Controllers\Api\V1\Lease\TenantScreeningController;
 use App\Http\Controllers\Api\V1\NaturalSearchController;
 use App\Http\Controllers\Api\V1\NewsletterController;
 use App\Http\Controllers\Api\V1\NotificationController;
@@ -217,6 +220,18 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/{ad}/generate', 'store')->name('lease-contracts.generate');
         Route::get('/{leaseContract}/download', 'download')->name('lease-contracts.download');
         Route::get('/{leaseContract}/audit-log', 'auditLog')->name('lease-contracts.audit-log');
+
+        // Lifecycle — renew / terminate / archive. Throttled because
+        // they mutate financial state (rent, occupancy KPI).
+        Route::post('/{leaseContract}/renew', 'renew')
+            ->middleware('throttle:20,1')
+            ->name('lease-contracts.renew');
+        Route::post('/{leaseContract}/terminate', 'terminate')
+            ->middleware('throttle:20,1')
+            ->name('lease-contracts.terminate');
+        Route::post('/{leaseContract}/archive', 'archive')
+            ->middleware('throttle:20,1')
+            ->name('lease-contracts.archive');
     });
 
     // --- OWNER DASHBOARD STATS (Audit Item 9: occupancy rate, boosts, viewings, messages) ---
@@ -273,8 +288,16 @@ Route::prefix('v1')->group(function (): void {
         ->middleware(['throttle:30,1', 'cdn.cache:1800']);
 
     // --- NATURAL LANGUAGE SEARCH ---
+    // OWASP LLM10:2025 — stack per-minute + per-day + global-hour limiters
+    // so a botnet of IPs cannot drain LLM credits. The route is intentionally
+    // unauthenticated for the customer surface; owner_context=true forces a
+    // 403 unless the user is AGENT/ADMIN (FormRequest::authorize()).
     Route::post('/search/parse', [NaturalSearchController::class, 'parse'])
-        ->middleware('throttle:30,1');
+        ->middleware([
+            'throttle:ai_search.parse.minute',
+            'throttle:ai_search.parse.day',
+            'throttle:ai_search.parse.hourly_global',
+        ]);
 
     // --- NEWSLETTER ---
     Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])
@@ -308,6 +331,17 @@ Route::prefix('v1')->group(function (): void {
         Route::delete('/my/expenses/{expense}', [ExpenseController::class, 'destroy']);
     });
 
+    // --- RENT PAYMENTS (owner, per lease contract) ---
+    // Manual ledger for out-of-band rent collection (cash / mobile money /
+    // bank transfer). Distinct from `/payments` (Stripe + GeniusPay for
+    // platform fees) — see App\Models\RentPayment for the rationale.
+    Route::middleware(['auth:sanctum', 'owner.role'])->group(function (): void {
+        Route::get('/my/lease-contracts/{leaseContract}/rent-payments', [RentPaymentController::class, 'index']);
+        Route::post('/my/lease-contracts/{leaseContract}/rent-payments', [RentPaymentController::class, 'store'])->middleware('throttle:30,1');
+        Route::put('/my/rent-payments/{rentPayment}', [RentPaymentController::class, 'update'])->middleware('throttle:30,1');
+        Route::delete('/my/rent-payments/{rentPayment}', [RentPaymentController::class, 'destroy']);
+    });
+
     // --- DOCUMENTS (owner, per property) ---
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/my/ads/{ad}/documents', [DocumentController::class, 'index']);
@@ -326,6 +360,13 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::get('/my/login-history', [LoginHistoryController::class, 'index']);
         Route::delete('/my/login-history', [LoginHistoryController::class, 'destroy']);
+    });
+
+    // --- ACTIVE SESSIONS (all authenticated users) ---
+    Route::middleware('auth:sanctum')->group(function (): void {
+        Route::get('/my/sessions', [SessionController::class, 'index']);
+        Route::delete('/my/sessions', [SessionController::class, 'destroyOthers']);
+        Route::delete('/my/sessions/{id}', [SessionController::class, 'destroy'])->whereUuid('id');
     });
 
     // --- TEAM MANAGEMENT (agency owners) ---
@@ -348,6 +389,19 @@ Route::prefix('v1')->group(function (): void {
     Route::post('/signatures/{token}/send-otp', [SignatureController::class, 'sendSignOtp'])->middleware('throttle:10,1');
     Route::post('/signatures/{token}/sign', [SignatureController::class, 'sign'])->middleware('throttle:10,1');
     Route::post('/signatures/{token}/decline', [SignatureController::class, 'decline'])->middleware('throttle:10,1');
+
+    // --- TENANT SCREENING (owner) ---
+    Route::middleware(['auth:sanctum', 'owner.role'])->group(function (): void {
+        Route::get('/my/lease-contracts/{leaseContract}/screening', [TenantScreeningController::class, 'index']);
+        Route::post('/my/lease-contracts/{leaseContract}/screening', [TenantScreeningController::class, 'store'])->middleware('throttle:10,1');
+        Route::get('/my/lease-contracts/{leaseContract}/screening/{screening}', [TenantScreeningController::class, 'show']);
+        Route::post('/my/lease-contracts/{leaseContract}/screening/{screening}/review', [TenantScreeningController::class, 'review'])->middleware('throttle:20,1');
+    });
+
+    // --- TENANT SCREENING (public — no auth required, token-based) ---
+    Route::get('/screening/{token}', [TenantScreeningController::class, 'publicShow']);
+    Route::post('/screening/{token}/upload', [TenantScreeningController::class, 'publicUpload'])->middleware('throttle:20,1');
+    Route::post('/screening/{token}/submit', [TenantScreeningController::class, 'publicSubmit'])->middleware('throttle:10,1');
 
     // ─── BROADCASTING AUTH (Sanctum Bearer token) ──────────────────────────
     // The default /broadcasting/auth route uses the 'web' middleware (session auth).

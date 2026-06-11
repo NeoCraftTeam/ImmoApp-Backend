@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Log;
  */
 final class FindOrCreateCityAction
 {
-    private const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
+    private const string NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
 
     /**
      * @param  array{name: string, country?: string|null}  $data
@@ -26,7 +26,7 @@ final class FindOrCreateCityAction
     public function handle(array $data): City
     {
         $name = trim($data['name']);
-        $country = isset($data['country']) ? trim((string) $data['country']) : null;
+        $country = isset($data['country']) ? trim($data['country']) : null;
 
         // 1. Déjà en base → retourner directement
         $existing = City::query()

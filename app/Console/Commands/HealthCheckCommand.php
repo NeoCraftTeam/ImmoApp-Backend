@@ -21,7 +21,7 @@ class HealthCheckCommand extends Command
 {
     protected $signature = 'app:health-check {--force : Bypass the result cache and re-run all checks}';
 
-    protected $description = 'Run comprehensive system health checks (DB, Redis, Queue, Storage, Meilisearch, Flutterwave)';
+    protected $description = 'Run comprehensive system health checks (DB, Redis, Queue, Storage, Meilisearch)';
 
     public function __construct(private readonly HealthCheckService $health)
     {

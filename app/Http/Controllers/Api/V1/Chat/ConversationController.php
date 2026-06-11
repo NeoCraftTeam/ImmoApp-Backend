@@ -28,6 +28,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Chat conversation and message endpoints.
@@ -124,8 +125,8 @@ final readonly class ConversationController
             return new ConversationResource($conv)
                 ->response()
                 ->setStatusCode($status);
-        } catch (ConversationNotAllowedException $e) {
-            return ApiResponse::error($e->getMessage(), 403);
+        } catch (ConversationNotAllowedException) {
+            return ApiResponse::error('Vous devez débloquer cette annonce avant de démarrer une conversation.', 403);
         }
     }
 
@@ -320,7 +321,9 @@ final readonly class ConversationController
         try {
             $descriptor = $this->attachments->upload($file, $conv);
         } catch (\InvalidArgumentException $e) {
-            return ApiResponse::error($e->getMessage(), 422);
+            Log::warning('Chat attachment upload rejected', ['error' => $e->getMessage()]);
+
+            return ApiResponse::error('Le fichier n\'a pas pu être téléversé. Vérifiez le format et la taille.', 422);
         }
 
         return response()->json(['data' => $descriptor], 201);

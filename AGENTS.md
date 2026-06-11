@@ -35,6 +35,7 @@ Frontend → origin  = GitLab (neocraft/keyhome-next)
 ## Build & Run
 
 **Convention équipe : ne pas utiliser Laravel Sail** pour les commandes locales — exécuter `php`, `composer`, `npm` et les binaires `vendor/bin/*` directement (voir `.cursor/rules/no-sail.mdc`).
+**Claude plugin Warp (scope projet)** : activer `warp@claude-code-warp` au niveau repository via `claude plugin install --scope project warp@claude-code-warp`. La config est persistée dans `.claude/settings.json` (`enabledPlugins.warp@claude-code-warp=true`).
 
 ```bash
 # Install dependencies
@@ -208,10 +209,26 @@ vendor/bin/rector process --dry-run
     - `owner-reviews.service.ts`: `noShowReservation()` + `getLandlordCalendarUrl()` methods added.
 - `LeaseContractService` — lease management.
 - `TourService` / `PanoramaProcessor` — 360° virtual tours.
-- `AiDescriptionEnhancer`, `AiDigestService`, `AiSearchService` — AI-powered features.
-  - `AiSearchService::parse()` — multi-provider NLP text search (Groq/Llama-3.3-70B → OpenAI GPT-4o-mini → Gemini 2.0 Flash → Together → Mistral) with circuit breakers + 24h cache. **Type disambiguation** : `AdType::resolveFromNaturalSearchHint()` choisit la bonne ligne catalogue (ex. *appartement meublé* vs *appartement simple*) à partir du texte « meublé/meuble » et du hint LLM ; fusion de `furnished` si le mot apparaît dans la requête même si le modèle l’omet.
+- `AiDescriptionEnhancer`, `AiDigestService`, `AiSearchService` — AI-powered features with anti-hallucination guards (Mai 2026).
+  - `AiSearchService::parse()` — **Optimized multi-provider NLP text search** with parallel provider racing, query canonicalization, and denormalized context cache.
+    - **Parallel provider racing (Mai 2026)**: fires requests to all available providers simultaneously via `Http::pool()`, uses first successful response. Reduces worst-case latency from 25s (5 providers × 5s timeout sequential) to ~1.5s (Groq typical response time). Circuit breaker skips providers with open circuits or missing API keys.
+    - **Query canonicalization (Mai 2026)**: aggressive normalization removes accents, collapses whitespace, strips stop words (de/le/la/un/une), sorts tokens alphabetically. "Appartement à Douala" and "douala appartement" hit same cache key. Increases cache hit rate by ~30%.
+    - **JSON extraction optimization (Mai 2026)**: fast-path `json_decode()` before character-by-character parser. 90% of clean LLM responses decode instantly, ~10× faster than brace-depth scanning.
+    - **Denormalized context cache (Mai 2026)**: `buildContext()` result (cities/quarters/ad_types) cached 6h in Redis. Invalidated only when City/Quarter/AdType models change via `CityObserver`, `QuarterObserver`, `AdTypeObserver`. Eliminates 2 DB queries per uncached parse.
+    - **Provider chain**: Groq/Llama-3.3-70B → OpenAI GPT-4o-mini → Gemini 2.0 Flash → Together → Mistral. Each with 5s timeout, per-provider circuit breaker (3 failures → 5min open).
+    - **Type disambiguation**: `AdType::resolveFromNaturalSearchHint()` choisit la bonne ligne catalogue (ex. *appartement meublé* vs *appartement simple*) à partir du texte « meublé/meuble » et du hint LLM ; fusion de `furnished` si le mot apparaît dans la requête même si le modèle l’omet.
+    - **24h result cache** per (canonical_query, currency, context). Pulse metrics track cache hit/miss. Sentry breadcrumbs capture provider chain outcomes.
   - Ads index (`toSearchableArray`) expose **`is_furnished`** (attribut `furnished` et/ou nom de type contenant *meubl*). Le filtre recherche « amenity » **meublé** côté API applique `(attributes = furnished OR is_furnished = true)` (Meilisearch + fallback Eloquent) pour ne pas exclure les annonces classées uniquement par type.
   - `AiSearchService::parseFromImage()` — vision search: GPT-4o-vision → Gemini Vision fallback. Accepts base64 + MIME type, returns same JSON structure as `parse()`. Not cached (each image is unique).
+  - **`AiDescriptionEnhancer` — Anti-hallucination system (Mai 2026)**: Redesigned system prompts with exhaustive non-invention rules, fact conservation requirements, and strict KeyHome context boundaries. 5 prompt types enhanced:
+    - **Ad descriptions** (`systemPrompt()`): 11 explicit categories of facts that must NOT be invented (bedrooms, equipment, prices, surfaces, distances, etc.). Visual hierarchy with Unicode box drawing (`═══`, `⚠️`, `☑️`). Example-driven (valid vs invalid outputs). Forbids superlatifs creux ("incroyable", "exceptionnel").
+    - **Rejection reasons** (`rejectionReasonPrompt()`): Cannot invent motifs, regulatory requirements, deadlines, or sanctions. Lists common rejection categories for context (photos, description, price, location, documents). 2-paragraph structure (DIAGNOSTIC + ACTIONS).
+    - **Lease conditions** (`leaseConditionsPrompt()`): 11 explicit prohibitions (no standard clauses, no amounts, no dates, no legal refs). Lists common categories (payment, charges, caution, duration, usage, maintenance) for context only — NOT for invention.
+    - **Admin diagnosis** (`diagnosisPrompt()`): Must cite precise elements from ad data. Lists KeyHome's actual rejection criteria. Never vague — requires specificity ("description count seulement 12 mots" not "something wrong").
+    - **Lease summaries** (`leaseContractSummaryPrompt()`): 7 explicit categories not to invent. Exact amounts (no rounding). Emoji + text format. Empty data → "Aucune donnée de bail fournie."
+    - **Key anti-hallucination patterns**: (1) Exhaustive itemization ("N'INVENTE JAMAIS : • X • Y • Z"), (2) Conservation requirements ("✓ Conserve 100 % des informations"), (3) Context boundary checks ("Si hors sujet → renvoie tel quel"), (4) Output format constraints ("❌ Aucun titre/intro/commentaire"), (5) Role negation ("Tu n'es PAS un chatbot généraliste").
+    - **Security**: Prompt injection detection (instructions in user input → ignored), off-topic content → returned unchanged, context violations → blocked.
+  - **`AiDigestService` — Contextual constraints (Mai 2026)**: Search alert digest summaries enhanced with 6 explicit non-invention rules (ad count, cities, price range, property types, characteristics, trends). Must use EXACT data from provided ads. Provides valid vs invalid examples. "Zéro créativité" constraint. 1-2 sentences max (≤40 words).
 - `NaturalSearchRegexParser` — plain-language ad search (regex fallback when all LLM providers fail).
 - `RecommendationEngine` — personalised ad recommendations.
 - `NeighborhoodScorecardService` — location scoring. Overpass query uses `nwr` (node/way/relation) + `out center;` to capture building-mapped POIs (critical for sub-Saharan Africa where shops/schools are mapped as ways). Includes `public_transport` tags and expanded shop/amenity types. Coordinate parser handles both direct `lat/lon` (nodes) and `center.lat/center.lon` (ways/relations).

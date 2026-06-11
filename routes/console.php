@@ -19,6 +19,9 @@ Schedule::command('app:cleanup-stale-payments')->daily();
 Schedule::command('app:send-monthly-report')->monthlyOn(1, '08:00');
 Schedule::command('app:send-engagement-emails')->dailyAt('08:00');
 Schedule::command('app:check-lease-expirations')->dailyAt('09:00');
+// Lifecycle sweep — flip Active leases past their lease_end to Expired
+// so the dashboard occupancy KPI stays accurate without owner action.
+Schedule::command('app:expire-overdue-leases')->dailyAt('03:45');
 Schedule::job(ExpireStaleReservationsJob::class)->everyThirtyMinutes();
 Schedule::job(CompleteStaleReservationsJob::class)->hourly();
 

@@ -31,17 +31,17 @@ final class ImportGeoFromOverpass extends Command
 
     protected $description = 'Importe villes + quartiers avec coordonnées GPS depuis Overpass/Nominatim (OpenStreetMap)';
 
-    private const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
+    private const string NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
 
     /** Miroirs Overpass testés dans l'ordre */
-    private const OVERPASS_MIRRORS = [
+    private const array OVERPASS_MIRRORS = [
         'https://overpass.kumi.systems/api/interpreter',
         'https://overpass-api.de/api/interpreter',
     ];
 
-    private const PLACE_TYPES = 'suburb|quarter|neighbourhood|village|hamlet';
+    private const string PLACE_TYPES = 'suburb|quarter|neighbourhood|village|hamlet';
 
-    private const UA = 'KeyHome/1.0 (contact@keyhome.app)';
+    private const string UA = 'KeyHome/1.0 (contact@keyhome.app)';
 
     public function handle(): int
     {
