@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Lease;
 
 use App\Enums\LeaseAuditEvent;
+use App\Enums\LeaseStatus;
 use App\Http\Requests\Api\V1\EnhanceLeaseConditionsRequest;
 use App\Http\Requests\Api\V1\GenerateLeaseContractRequest;
+use App\Http\Requests\Api\V1\RenewLeaseContractRequest;
+use App\Http\Requests\Api\V1\TerminateLeaseContractRequest;
 use App\Http\Requests\Api\V1\UpdateLeaseContractRequest;
 use App\Http\Resources\LeaseContractResource;
 use App\Models\Ad;
@@ -17,6 +20,7 @@ use App\Services\Rental\LeaseContractService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -213,5 +217,211 @@ final class LeaseContractController
             ->get(['id', 'lease_contract_id', 'user_id', 'event', 'ip_address', 'metadata', 'occurred_at']);
 
         return response()->json(['data' => $logs]);
+    }
+
+    /**
+     * Renew the lease — extends `lease_end` by N months, optionally
+     * updates `monthly_rent`, and resets status to Active so an
+     * already-expired lease can be brought back without recreating it.
+     *
+     * @OA\Post(
+     *     path="/api/v1/my/lease-contracts/{leaseContract}/renew",
+     *     summary="Renouveler un contrat de bail",
+     *     tags={"📄 Contrats de bail"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Parameter(name="leaseContract", in="path", required=true, @OA\Schema(type="string", format="uuid")),
+     *
+     *     @OA\RequestBody(required=true, @OA\JsonContent(
+     *         required={"extend_months"},
+     *
+     *         @OA\Property(property="extend_months", type="integer", example=12, description="Nombre de mois à ajouter à la fin du bail (1–120)."),
+     *         @OA\Property(property="monthly_rent", type="number", example=180000, description="Nouveau loyer mensuel (XAF). Optionnel.")
+     *     )),
+     *
+     *     @OA\Response(response=200, description="Bail renouvelé"),
+     *     @OA\Response(response=403, description="Non autorisé"),
+     *     @OA\Response(response=409, description="Bail résilié ou archivé — renouvellement impossible")
+     * )
+     */
+    public function renew(RenewLeaseContractRequest $request, LeaseContract $leaseContract): JsonResponse
+    {
+        if ($leaseContract->user_id !== auth()->id()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        if ($leaseContract->status->isTerminal()) {
+            return response()->json([
+                'message' => 'Un bail résilié ou archivé ne peut pas être renouvelé.',
+            ], 409);
+        }
+
+        $validated = $request->validated();
+        $extendMonths = (int) $validated['extend_months'];
+
+        // Anchor renewal off the existing `lease_end` so back-to-back
+        // renewals stack cleanly. If the lease has already expired
+        // (lease_end < today), anchor off today instead — otherwise the
+        // "renewed" lease would already be in the past.
+        $today = Carbon::today();
+        $anchor = $leaseContract->lease_end && $leaseContract->lease_end->greaterThan($today)
+            ? $leaseContract->lease_end->copy()
+            : $today;
+
+        // `addMonthsNoOverflow` clamps the result to the source's month
+        // end (so Dec 31 + 6 months → Jun 30, not Jul 1) which matches
+        // the human expectation of "renew through the end of June".
+        $newEnd = $anchor->copy()->addMonthsNoOverflow($extendMonths);
+
+        $updates = [
+            'lease_end' => $newEnd->toDateString(),
+            'lease_duration_months' => $leaseContract->lease_duration_months + $extendMonths,
+            'status' => LeaseStatus::Active->value,
+        ];
+
+        if (array_key_exists('monthly_rent', $validated)) {
+            $updates['monthly_rent'] = $validated['monthly_rent'];
+        }
+
+        $leaseContract->update($updates);
+
+        LeaseSignatureAuditLog::record(
+            leaseContractId: $leaseContract->id,
+            event: LeaseAuditEvent::Renewed,
+            userId: auth()->id(),
+            ipAddress: $request->ip(),
+            userAgent: $request->userAgent(),
+            metadata: [
+                'extend_months' => $extendMonths,
+                'new_lease_end' => $newEnd->toDateString(),
+                'monthly_rent' => $updates['monthly_rent'] ?? null,
+            ],
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => "Contrat {$leaseContract->contract_number} renouvelé jusqu'au {$newEnd->toDateString()}.",
+            'data' => new LeaseContractResource(
+                $leaseContract->fresh(['ad', 'ad.media', 'ad.ad_type', 'ad.quarter.city'])
+            ),
+        ]);
+    }
+
+    /**
+     * Terminate the lease early. Sets status to Terminated, records the
+     * reason, and stamps `terminated_at`. Reversible by archiving and
+     * re-generating from the ad if needed.
+     *
+     * @OA\Post(
+     *     path="/api/v1/my/lease-contracts/{leaseContract}/terminate",
+     *     summary="Résilier un contrat de bail",
+     *     tags={"📄 Contrats de bail"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\RequestBody(required=true, @OA\JsonContent(
+     *         required={"reason"},
+     *
+     *         @OA\Property(property="reason", type="string", example="Départ du locataire après préavis", description="Motif de la résiliation (3–1000 caractères).")
+     *     )),
+     *
+     *     @OA\Response(response=200, description="Bail résilié"),
+     *     @OA\Response(response=403, description="Non autorisé"),
+     *     @OA\Response(response=409, description="Bail déjà résilié ou archivé")
+     * )
+     */
+    public function terminate(TerminateLeaseContractRequest $request, LeaseContract $leaseContract): JsonResponse
+    {
+        if ($leaseContract->user_id !== auth()->id()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        if ($leaseContract->status->isTerminal()) {
+            return response()->json([
+                'message' => 'Ce bail est déjà résilié ou archivé.',
+            ], 409);
+        }
+
+        $reason = (string) $request->validated('reason');
+
+        $leaseContract->update([
+            'status' => LeaseStatus::Terminated->value,
+            'terminated_at' => now(),
+            'termination_reason' => $reason,
+        ]);
+
+        LeaseSignatureAuditLog::record(
+            leaseContractId: $leaseContract->id,
+            event: LeaseAuditEvent::Terminated,
+            userId: auth()->id(),
+            ipAddress: $request->ip(),
+            userAgent: $request->userAgent(),
+            metadata: ['reason' => $reason],
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => "Contrat {$leaseContract->contract_number} résilié.",
+            'data' => new LeaseContractResource(
+                $leaseContract->fresh(['ad', 'ad.media', 'ad.ad_type', 'ad.quarter.city'])
+            ),
+        ]);
+    }
+
+    /**
+     * Archive the lease — hides it from active dashboards while keeping
+     * the row for accounting / audit. The lease must already be in a
+     * non-Active state (Expired or Terminated) before it can be
+     * archived. Archived leases are not deleted and the rent-collection
+     * ledger remains queryable via the lease's history.
+     *
+     * @OA\Post(
+     *     path="/api/v1/my/lease-contracts/{leaseContract}/archive",
+     *     summary="Archiver un contrat de bail",
+     *     tags={"📄 Contrats de bail"},
+     *     security={{"bearerAuth":{}}},
+     *
+     *     @OA\Response(response=200, description="Bail archivé"),
+     *     @OA\Response(response=403, description="Non autorisé"),
+     *     @OA\Response(response=409, description="Bail encore actif — résiliez-le ou attendez son expiration")
+     * )
+     */
+    public function archive(Request $request, LeaseContract $leaseContract): JsonResponse
+    {
+        if ($leaseContract->user_id !== auth()->id()) {
+            return response()->json(['message' => 'Non autorisé'], 403);
+        }
+
+        if ($leaseContract->status === LeaseStatus::Archived) {
+            return response()->json([
+                'message' => 'Ce bail est déjà archivé.',
+            ], 409);
+        }
+
+        if ($leaseContract->status === LeaseStatus::Active || $leaseContract->status === LeaseStatus::Draft) {
+            return response()->json([
+                'message' => 'Le bail doit être expiré ou résilié avant archivage.',
+            ], 409);
+        }
+
+        $leaseContract->update([
+            'status' => LeaseStatus::Archived->value,
+            'archived_at' => now(),
+        ]);
+
+        LeaseSignatureAuditLog::record(
+            leaseContractId: $leaseContract->id,
+            event: LeaseAuditEvent::Archived,
+            userId: auth()->id(),
+            ipAddress: $request->ip(),
+            userAgent: $request->userAgent(),
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => "Contrat {$leaseContract->contract_number} archivé.",
+            'data' => new LeaseContractResource(
+                $leaseContract->fresh(['ad', 'ad.media', 'ad.ad_type', 'ad.quarter.city'])
+            ),
+        ]);
     }
 }

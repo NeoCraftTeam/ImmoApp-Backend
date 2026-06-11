@@ -16,6 +16,7 @@ final class LeaseContractResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'ad_id' => $this->ad_id,
             'contract_number' => $this->contract_number,
             'unit_reference' => $this->unit_reference,
             'tenant_name' => $this->tenant_name,
@@ -28,6 +29,11 @@ final class LeaseContractResource extends JsonResource
             'monthly_rent' => (float) $this->monthly_rent,
             'deposit_amount' => $this->deposit_amount ? (float) $this->deposit_amount : null,
             'special_conditions' => $this->special_conditions,
+            'status' => $this->status->value,
+            'status_label' => $this->status->label(),
+            'terminated_at' => $this->terminated_at?->toIso8601String(),
+            'termination_reason' => $this->termination_reason,
+            'archived_at' => $this->archived_at?->toIso8601String(),
             'created_at' => $this->created_at?->toIso8601String(),
 
             'ad' => new AdResource($this->whenLoaded('ad')),

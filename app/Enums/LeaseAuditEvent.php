@@ -12,4 +12,8 @@ enum LeaseAuditEvent: string
     case Signed = 'signed';
     case Sent = 'sent';
     case Countersigned = 'countersigned';
+    case Renewed = 'renewed';
+    case Terminated = 'terminated';
+    case Archived = 'archived';
+    case Expired = 'expired';
 }
