@@ -206,8 +206,35 @@ test('agent can cancel active subscription', function (): void {
         'reason' => 'Je n\'en ai plus besoin',
     ]);
 
+    // Grace: the subscription stays ACTIVE (paid access runs until ends_at) but
+    // auto-renew is turned off and the cancellation is recorded.
     $response->assertSuccessful()
-        ->assertJsonFragment(['status' => 'cancelled']);
+        ->assertJsonPath('subscription.status', 'active')
+        ->assertJsonPath('subscription.is_active', true)
+        ->assertJsonPath('subscription.auto_renew', false);
+
+    $sub = Subscription::where('agency_id', $this->agency->id)->firstOrFail();
+    expect($sub->status)->toBe(SubscriptionStatus::ACTIVE)
+        ->and($sub->auto_renew)->toBeFalse()
+        ->and($sub->cancelled_at)->not->toBeNull();
+});
+
+test('cancelling immediately revokes access (refund / plan replacement)', function (): void {
+    $sub = Subscription::create([
+        'agency_id' => $this->agency->id,
+        'subscription_plan_id' => $this->plan->id,
+        'billing_period' => 'monthly',
+        'status' => SubscriptionStatus::ACTIVE,
+        'amount_paid' => 35000,
+        'starts_at' => now(),
+        'ends_at' => now()->addDays(30),
+    ]);
+
+    $sub->cancel('Remboursement', immediate: true);
+
+    expect($sub->refresh()->status)->toBe(SubscriptionStatus::CANCELLED)
+        ->and($sub->isActive())->toBeFalse()
+        ->and($this->agency->refresh()->hasActiveSubscription())->toBeFalse();
 });
 
 test('cancel returns 404 if no active subscription', function (): void {

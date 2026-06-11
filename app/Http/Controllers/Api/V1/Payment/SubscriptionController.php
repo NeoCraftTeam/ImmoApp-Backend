@@ -9,6 +9,7 @@ use App\Http\Requests\Api\V1\SubscribeRequest;
 use App\Http\Resources\SubscriptionPlanResource;
 use App\Http\Resources\SubscriptionResource;
 use App\Models\Agency;
+use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\Monetization\SubscriptionService;
@@ -18,12 +19,13 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 use OpenApi\Annotations as OA;
 
 /**
  * @OA\Tag(
  *     name="📦 Abonnements Agences",
- *     description="Gestion des abonnements pour les agences immobilières. Permet de consulter les plans disponibles, souscrire via Flutterwave, consulter l'abonnement actif, l'annuler et voir l'historique. Les agences reçoivent une facture par email à chaque souscription."
+ *     description="Gestion des abonnements pour les agences immobilières. Permet de consulter les plans disponibles, souscrire via la passerelle configurée, consulter l'abonnement actif, l'annuler et voir l'historique. Les agences reçoivent une facture par email à chaque souscription."
  * )
  */
 final class SubscriptionController
@@ -200,7 +202,7 @@ final class SubscriptionController
      *
      *         @OA\JsonContent(
      *
-     *             @OA\Property(property="payment_url", type="string", description="URL vers laquelle rediriger l'utilisateur pour payer", example="https://checkout.flutterwave.com/pay/abc123"),
+     *             @OA\Property(property="payment_url", type="string", description="URL vers laquelle rediriger l'utilisateur pour payer", example="https://pay.genius.ci/checkout/..."),
      *             @OA\Property(property="message", type="string", example="Redirigez l'utilisateur vers cette URL pour payer.")
      *         )
      *     ),
@@ -524,6 +526,257 @@ final class SubscriptionController
                 : 'Le renouvellement automatique est désactivé.',
             'auto_renew' => $subscription->auto_renew,
             'subscription' => new SubscriptionResource($subscription->load('plan')),
+        ]);
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/v1/subscriptions/renew",
+     *     operationId="renewSubscription",
+     *     summary="Renouveler un abonnement expiré",
+     *     description="Permet de renouveler manuellement un abonnement expiré. Cette action réactive immédiatement l'abonnement pour une nouvelle période de facturation. Le paiement doit être effectué séparément via le système de paiement.",
+     *     tags={"📦 Abonnements Agences"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Abonnement renouvelé avec succès",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="Abonnement renouvelé avec succès."),
+     *             @OA\Property(property="subscription", type="object", description="Détails de l'abonnement renouvelé")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Non authentifié"),
+     *     @OA\Response(
+     *         response=403,
+     *         description="L'utilisateur n'appartient à aucune agence",
+     *
+     *         @OA\JsonContent(@OA\Property(property="message", type="string", example="Vous n'appartenez à aucune agence."))
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=404,
+     *         description="Aucun abonnement trouvé",
+     *
+     *         @OA\JsonContent(@OA\Property(property="message", type="string", example="Aucun abonnement trouvé."))
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=422,
+     *         description="L'abonnement est déjà actif",
+     *
+     *         @OA\JsonContent(@OA\Property(property="message", type="string", example="L'abonnement est déjà actif."))
+     *     )
+     * )
+     */
+    public function renew(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        /** @var Agency|null $agency */
+        $agency = $user->agency;
+
+        if (!$agency) {
+            return response()->json([
+                'message' => 'Vous n\'appartenez à aucune agence.',
+            ], 403);
+        }
+
+        /** @var Subscription|null $subscription */
+        $subscription = $agency->subscriptions()->latest()->first();
+
+        if (!$subscription) {
+            return response()->json([
+                'message' => 'Aucun abonnement trouvé.',
+            ], 404);
+        }
+
+        if ($subscription->isActive() && !$subscription->isExpired()) {
+            return response()->json([
+                'message' => 'L\'abonnement est déjà actif.',
+            ], 422);
+        }
+
+        $subscription->renew();
+
+        return response()->json([
+            'message' => 'Abonnement renouvelé avec succès.',
+            'subscription' => new SubscriptionResource($subscription->fresh()->load('plan')),
+        ]);
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/v1/subscriptions/upgrade",
+     *     operationId="upgradeSubscription",
+     *     summary="Mettre à niveau vers un plan supérieur",
+     *     description="Permet de passer à un plan d'abonnement supérieur. La mise à niveau prend effet **immédiatement** et le nouveau plan s'applique pour la période restante. Un paiement proportionnel sera requis pour la différence de prix.",
+     *     tags={"📦 Abonnements Agences"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Détails de la mise à niveau",
+     *
+     *         @OA\JsonContent(
+     *             required={"plan_id", "billing_period"},
+     *
+     *             @OA\Property(property="plan_id", type="string", format="uuid", description="UUID du nouveau plan", example="9e2f3a4b-5c6d-7e8f-9a0b-1c2d3e4f5a6b"),
+     *             @OA\Property(property="billing_period", type="string", enum={"monthly", "yearly"}, description="Période de facturation", example="monthly")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Abonnement mis à niveau avec succès",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="Abonnement mis à niveau avec succès."),
+     *             @OA\Property(property="subscription", type="object", description="Détails du nouvel abonnement")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Non authentifié"),
+     *     @OA\Response(response=403, description="Non autorisé"),
+     *     @OA\Response(response=404, description="Aucun abonnement actif"),
+     *     @OA\Response(response=422, description="Plan invalide ou déjà souscrit")
+     * )
+     */
+    public function upgrade(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'plan_id' => ['required', 'string', 'exists:subscription_plans,id'],
+            'billing_period' => ['required', 'string', Rule::in(['monthly', 'yearly'])],
+        ]);
+
+        /** @var User $user */
+        $user = $request->user();
+        /** @var Agency|null $agency */
+        $agency = $user->agency;
+
+        if (!$agency) {
+            return response()->json([
+                'message' => 'Vous n\'appartenez à aucune agence.',
+            ], 403);
+        }
+
+        $subscription = $agency->getCurrentSubscription();
+
+        if (!$subscription) {
+            return response()->json([
+                'message' => 'Aucun abonnement actif.',
+            ], 404);
+        }
+
+        $newPlan = SubscriptionPlan::findOrFail($validated['plan_id']);
+
+        if (!$newPlan->is_active) {
+            return response()->json([
+                'message' => 'Ce plan n\'est plus disponible.',
+            ], 422);
+        }
+
+        if ($newPlan->id === $subscription->subscription_plan_id) {
+            return response()->json([
+                'message' => 'Vous êtes déjà abonné à ce plan.',
+            ], 422);
+        }
+
+        $subscription->upgradeTo($newPlan, $validated['billing_period']);
+
+        return response()->json([
+            'message' => 'Abonnement mis à niveau avec succès.',
+            'subscription' => new SubscriptionResource($subscription->fresh()->load('plan')),
+        ]);
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/v1/subscriptions/downgrade",
+     *     operationId="downgradeSubscription",
+     *     summary="Rétrograder vers un plan inférieur",
+     *     description="Permet de passer à un plan d'abonnement inférieur. La rétrogradation prendra effet **à la fin de la période de facturation actuelle**, permettant à l'agence de continuer à bénéficier du plan actuel jusqu'à son expiration.",
+     *     tags={"📦 Abonnements Agences"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Détails de la rétrogradation",
+     *
+     *         @OA\JsonContent(
+     *             required={"plan_id", "billing_period"},
+     *
+     *             @OA\Property(property="plan_id", type="string", format="uuid", description="UUID du nouveau plan", example="9e2f3a4b-5c6d-7e8f-9a0b-1c2d3e4f5a6b"),
+     *             @OA\Property(property="billing_period", type="string", enum={"monthly", "yearly"}, description="Période de facturation", example="monthly")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Rétrogradation programmée avec succès",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="L'abonnement sera rétrogradé à la fin de la période actuelle."),
+     *             @OA\Property(property="subscription", type="object", description="Détails de l'abonnement")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Non authentifié"),
+     *     @OA\Response(response=403, description="Non autorisé"),
+     *     @OA\Response(response=404, description="Aucun abonnement actif"),
+     *     @OA\Response(response=422, description="Plan invalide ou déjà souscrit")
+     * )
+     */
+    public function downgrade(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'plan_id' => ['required', 'string', 'exists:subscription_plans,id'],
+            'billing_period' => ['required', 'string', Rule::in(['monthly', 'yearly'])],
+        ]);
+
+        /** @var User $user */
+        $user = $request->user();
+        /** @var Agency|null $agency */
+        $agency = $user->agency;
+
+        if (!$agency) {
+            return response()->json([
+                'message' => 'Vous n\'appartenez à aucune agence.',
+            ], 403);
+        }
+
+        $subscription = $agency->getCurrentSubscription();
+
+        if (!$subscription) {
+            return response()->json([
+                'message' => 'Aucun abonnement actif.',
+            ], 404);
+        }
+
+        $newPlan = SubscriptionPlan::findOrFail($validated['plan_id']);
+
+        if (!$newPlan->is_active) {
+            return response()->json([
+                'message' => 'Ce plan n\'est plus disponible.',
+            ], 422);
+        }
+
+        if ($newPlan->id === $subscription->subscription_plan_id) {
+            return response()->json([
+                'message' => 'Vous êtes déjà abonné à ce plan.',
+            ], 422);
+        }
+
+        $subscription->downgradeTo($newPlan, $validated['billing_period']);
+
+        return response()->json([
+            'message' => 'L\'abonnement sera rétrogradé à la fin de la période actuelle.',
+            'subscription' => new SubscriptionResource($subscription->fresh()->load('plan')),
         ]);
     }
 }

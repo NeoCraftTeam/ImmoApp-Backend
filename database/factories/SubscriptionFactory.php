@@ -47,4 +47,39 @@ class SubscriptionFactory extends Factory
             'ends_at' => now()->subDays(30),
         ]);
     }
+
+    public function onTrial(int $days = 14): static
+    {
+        return $this->state(fn () => [
+            'status' => SubscriptionStatus::ACTIVE,
+            'starts_at' => now(),
+            'trial_ends_at' => now()->addDays($days),
+            'ends_at' => now()->addDays($days + 30),
+        ]);
+    }
+
+    public function trialEnded(): static
+    {
+        return $this->state(fn () => [
+            'status' => SubscriptionStatus::ACTIVE,
+            'starts_at' => now()->subDays(20),
+            'trial_ends_at' => now()->subDays(5),
+            'ends_at' => now()->addDays(10),
+        ]);
+    }
+
+    public function autoRenew(): static
+    {
+        return $this->state(fn () => [
+            'auto_renew' => true,
+        ]);
+    }
+
+    public function renewed(int $count = 1): static
+    {
+        return $this->state(fn () => [
+            'renewal_count' => $count,
+            'renewed_at' => now()->subDays(30),
+        ]);
+    }
 }

@@ -62,8 +62,10 @@ final class SubscriptionService
     public function activateSubscription(Subscription $subscription): void
     {
         DB::transaction(function () use ($subscription): void {
-            // P1-4 Fix: Cancel old subscriptions only when the new one is activated
-            $this->cancelActiveSubscriptions($subscription->agency);
+            // P1-4 Fix: Cancel old subscriptions only when the new one is activated.
+            // Immediate: the new plan replaces them now, so the old ones must not
+            // linger as ACTIVE (which would later expire and unboost the agency's ads).
+            $this->cancelActiveSubscriptions($subscription->agency, immediate: true);
 
             $subscription->activate();
 
@@ -121,14 +123,14 @@ final class SubscriptionService
     /**
      * Cancel active subscriptions for an agency.
      */
-    public function cancelActiveSubscriptions(Agency $agency, ?string $reason = null): void
+    public function cancelActiveSubscriptions(Agency $agency, ?string $reason = null, bool $immediate = false): void
     {
         $agency->subscriptions()
             ->where('status', SubscriptionStatus::ACTIVE)
             ->get()
-            ->each(function ($sub) use ($reason): void {
+            ->each(function ($sub) use ($reason, $immediate): void {
                 /** @var Subscription $sub */
-                $sub->cancel($reason);
+                $sub->cancel($reason, $immediate);
             });
     }
 
