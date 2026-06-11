@@ -111,14 +111,12 @@ class PointTransactionsTable
                         PaymentMethod::ORANGE_MONEY => 'warning',
                         PaymentMethod::MOBILE_MONEY => 'info',
                         PaymentMethod::CARD => 'primary',
-                        PaymentMethod::FLUTTERWAVE => 'success',
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (?PaymentMethod $state): string => match ($state) {
                         PaymentMethod::ORANGE_MONEY => 'Orange Money',
                         PaymentMethod::MOBILE_MONEY => 'Mobile Money',
                         PaymentMethod::CARD => 'Carte bancaire',
-                        PaymentMethod::FLUTTERWAVE => 'Flutterwave',
                         default => '—',
                     })
                     ->placeholder('—'),
@@ -177,7 +175,6 @@ class PointTransactionsTable
                         PaymentMethod::ORANGE_MONEY->value => 'Orange Money',
                         PaymentMethod::MOBILE_MONEY->value => 'Mobile Money',
                         PaymentMethod::CARD->value => 'Carte bancaire',
-                        PaymentMethod::FLUTTERWAVE->value => 'Flutterwave',
                     ])
                     ->query(fn (Builder $query, array $data): Builder => $query->when(
                         $data['value'],

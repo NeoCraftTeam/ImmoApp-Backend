@@ -149,14 +149,16 @@ class UserResource extends Resource
                             ->native(false)
                             ->required()
                             ->live()
-                            ->helperText('Définit les permissions de l\'utilisateur'),
+                            ->disabled(fn (): bool => !auth()->user()?->isSuperAdmin())
+                            ->dehydrated(fn (): bool => auth()->user()?->isSuperAdmin() ?? false)
+                            ->helperText('Définit les permissions de l\'utilisateur. Seuls les super-admins peuvent modifier ce champ.'),
                     ]),
 
                 Section::make('Permissions administrateur')
                     ->icon(Heroicon::ShieldCheck)
                     ->iconColor('warning')
                     ->description('Détermine les fonctionnalités du panel admin accessibles à cet utilisateur. Le statut « super-admin » donne tous les accès.')
-                    ->visible(fn (Get $get): bool => $get('role') === UserRole::ADMIN->value || $get('role') === UserRole::ADMIN)
+                    ->visible(fn (Get $get): bool => auth()->user()?->isSuperAdmin() && ($get('role') === UserRole::ADMIN->value || $get('role') === UserRole::ADMIN))
                     ->columns(2)
                     ->schema([
                         Toggle::make('is_super_admin')
@@ -474,6 +476,13 @@ class UserResource extends Resource
             TextColumn::make('phone_number')
                 ->label('Téléphone')
                 ->searchable()
+                ->formatStateUsing(function (?string $state): ?string {
+                    if (!$state || mb_strlen($state) < 6) {
+                        return $state;
+                    }
+
+                    return mb_substr($state, 0, 4).' ••• '.mb_substr($state, -2);
+                })
                 ->copyable()
                 ->copyMessage('Numéro copié !')
                 ->copyMessageDuration(1500),
@@ -674,7 +683,9 @@ class UserResource extends Resource
         return [
             BulkActionGroup::make([
                 DeleteBulkAction::make(),
-                ForceDeleteBulkAction::make(),
+                ForceDeleteBulkAction::make()
+                    ->visible(fn (): bool => auth()->user()?->isSuperAdmin() ?? false)
+                    ->requiresConfirmation(),
                 RestoreBulkAction::make(),
                 ExportBulkAction::make()
                     ->label('Exporter')

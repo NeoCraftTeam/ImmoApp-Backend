@@ -354,8 +354,9 @@ class ActivityLogResource extends Resource
     private static function renderDiffTable(array $old, array $new, ?string $event = null): string
     {
         $ignoredKeys = ['updated_at', 'created_at', 'id'];
-        $old = array_diff_key($old, array_flip($ignoredKeys));
-        $new = array_diff_key($new, array_flip($ignoredKeys));
+        $sensitiveKeys = ['password', 'remember_token', 'app_authentication_secret', 'app_authentication_recovery_codes', 'two_factor_secret', 'two_factor_recovery_codes', 'api_token', 'stripe_id', 'pm_last_four'];
+        $old = array_diff_key($old, array_flip($ignoredKeys), array_flip($sensitiveKeys));
+        $new = array_diff_key($new, array_flip($ignoredKeys), array_flip($sensitiveKeys));
 
         $allKeys = array_unique(array_merge(array_keys($old), array_keys($new)));
 

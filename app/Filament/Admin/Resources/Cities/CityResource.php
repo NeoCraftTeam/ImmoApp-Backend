@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\Cities;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\Cities\Pages\ManageCities;
 use App\Filament\Exports\CityExporter;
 use App\Filament\Imports\CityImporter;
@@ -35,6 +36,12 @@ class CityResource extends Resource
     protected static ?string $model = City::class;
 
     protected static bool $isScopedToTenant = false;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::CitiesManage) ?? false;
+    }
 
     protected static string|null|\UnitEnum $navigationGroup = 'Catalogue';
 
@@ -100,6 +107,7 @@ class CityResource extends Resource
                 DeleteAction::make()
                     ->successNotificationTitle('Ville supprimée'),
                 ForceDeleteAction::make()
+                    ->visible(fn (): bool => auth()->user()?->isSuperAdmin() ?? false)
                     ->successNotificationTitle('Ville supprimée définitivement'),
                 RestoreAction::make()
                     ->successNotificationTitle('Ville restaurée'),
@@ -120,7 +128,8 @@ class CityResource extends Resource
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
-                    ForceDeleteBulkAction::make(),
+                    ForceDeleteBulkAction::make()
+                        ->visible(fn (): bool => auth()->user()?->isSuperAdmin() ?? false),
                     RestoreBulkAction::make(),
                 ]),
             ]);

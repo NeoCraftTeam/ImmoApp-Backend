@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Pages;
 
+use App\Enums\AdminPermission;
 use App\Mail\PricingVerificationMail;
 use App\Models\Setting;
+use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
@@ -34,6 +36,14 @@ class ManageSettings extends Page
     protected static ?int $navigationSort = 2;
 
     protected string $view = 'filament.admin.pages.manage-settings';
+
+    #[\Override]
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->hasAdminPermission(AdminPermission::SettingsAccess);
+    }
 
     /** @var array<string, mixed> */
     public array $data = [];

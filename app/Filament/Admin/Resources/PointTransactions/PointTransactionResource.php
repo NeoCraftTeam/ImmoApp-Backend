@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\PointTransactions;
 
+use App\Enums\AdminPermission;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Enums\PointTransactionType;
@@ -20,6 +21,12 @@ use Filament\Tables\Table;
 class PointTransactionResource extends Resource
 {
     protected static ?string $model = PointTransaction::class;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::CreditsManage) ?? false;
+    }
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowsRightLeft;
 
@@ -167,7 +174,6 @@ class PointTransactionResource extends Resource
                                 PaymentMethod::ORANGE_MONEY => 'Orange Money',
                                 PaymentMethod::MOBILE_MONEY => 'Mobile Money',
                                 PaymentMethod::CARD => 'Carte bancaire',
-                                PaymentMethod::FLUTTERWAVE => 'Flutterwave',
                                 default => null,
                             })
                             ->placeholder('—'),

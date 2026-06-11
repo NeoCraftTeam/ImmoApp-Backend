@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\AdTypes;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\AdTypes\Pages\ListAdTypes;
 use App\Filament\Admin\Resources\AdTypes\Schemas\AdTypeForm;
 use App\Filament\Admin\Resources\AdTypes\Tables\AdTypesTable;
@@ -24,6 +25,12 @@ class AdTypeResource extends Resource
     protected static ?string $model = AdType::class;
 
     protected static bool $isScopedToTenant = false;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::AdTypesManage) ?? false;
+    }
 
     protected static string|null|\UnitEnum $navigationGroup = 'Annonces';
 

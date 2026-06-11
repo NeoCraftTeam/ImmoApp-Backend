@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\Reviews;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\Reviews\Pages\ManageReviews;
 use App\Models\Review;
 use BackedEnum;
@@ -34,6 +35,12 @@ class ReviewResource extends Resource
     protected static ?string $model = Review::class;
 
     protected static bool $isScopedToTenant = false;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::ReviewsManage) ?? false;
+    }
 
     protected static string|null|\UnitEnum $navigationGroup = 'Membres';
 
@@ -220,6 +227,7 @@ class ReviewResource extends Resource
                 DeleteAction::make()
                     ->successNotificationTitle('Avis supprimé'),
                 ForceDeleteAction::make()
+                    ->visible(fn (): bool => auth()->user()?->isSuperAdmin() ?? false)
                     ->successNotificationTitle('Avis supprimé définitivement'),
                 RestoreAction::make()
                     ->successNotificationTitle('Avis restauré'),
@@ -227,7 +235,8 @@ class ReviewResource extends Resource
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
-                    ForceDeleteBulkAction::make(),
+                    ForceDeleteBulkAction::make()
+                        ->visible(fn (): bool => auth()->user()?->isSuperAdmin() ?? false),
                     RestoreBulkAction::make(),
                 ]),
             ]);

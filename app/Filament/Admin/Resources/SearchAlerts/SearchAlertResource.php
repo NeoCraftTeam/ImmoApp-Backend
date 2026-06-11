@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\SearchAlerts;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\SearchAlerts\Pages\ManageSearchAlerts;
 use App\Models\SearchAlert;
 use Filament\Actions\ViewAction;
@@ -24,6 +25,12 @@ final class SearchAlertResource extends Resource
     protected static ?string $model = SearchAlert::class;
 
     protected static bool $isScopedToTenant = false;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::AdsView) ?? false;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::Bell;
 

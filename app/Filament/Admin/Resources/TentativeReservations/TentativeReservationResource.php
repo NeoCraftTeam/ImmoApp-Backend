@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\TentativeReservations;
 
+use App\Enums\AdminPermission;
 use App\Enums\ReservationStatus;
 use App\Filament\Admin\Resources\TentativeReservations\Pages\ManageTentativeReservations;
 use App\Models\TentativeReservation;
@@ -23,6 +24,12 @@ final class TentativeReservationResource extends Resource
     protected static ?string $model = TentativeReservation::class;
 
     protected static bool $isScopedToTenant = false;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::AdsView) ?? false;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::CalendarDays;
 

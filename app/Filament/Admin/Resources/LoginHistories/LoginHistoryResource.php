@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\LoginHistories;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\LoginHistories\Pages\ManageLoginHistories;
 use App\Models\LoginHistory;
 use Filament\Actions\ViewAction;
@@ -25,6 +26,12 @@ final class LoginHistoryResource extends Resource
     protected static ?string $model = LoginHistory::class;
 
     protected static bool $isScopedToTenant = false;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::ActivityLogsView) ?? false;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::LockClosed;
 
@@ -72,7 +79,17 @@ final class LoginHistoryResource extends Resource
                         TextEntry::make('ip_address')
                             ->label('Adresse IP')
                             ->icon(Heroicon::GlobeAlt)
-                            ->copyable(),
+                            ->formatStateUsing(function (?string $state): ?string {
+                                if (!$state) {
+                                    return $state;
+                                }
+                                $parts = explode('.', $state);
+                                if (count($parts) === 4) {
+                                    return $parts[0].'.'.$parts[1].'.***.***';
+                                }
+
+                                return mb_substr($state, 0, (int) ceil(mb_strlen($state) / 2)).'••••';
+                            }),
                         TextEntry::make('guard')
                             ->label('Guard')
                             ->badge(),
@@ -117,7 +134,17 @@ final class LoginHistoryResource extends Resource
                 TextColumn::make('ip_address')
                     ->label('IP')
                     ->searchable()
-                    ->copyable(),
+                    ->formatStateUsing(function (?string $state): ?string {
+                        if (!$state) {
+                            return $state;
+                        }
+                        $parts = explode('.', $state);
+                        if (count($parts) === 4) {
+                            return $parts[0].'.'.$parts[1].'.***.***';
+                        }
+
+                        return mb_substr($state, 0, (int) ceil(mb_strlen($state) / 2)).'••••';
+                    }),
                 TextColumn::make('country')
                     ->label('Pays')
                     ->searchable(),

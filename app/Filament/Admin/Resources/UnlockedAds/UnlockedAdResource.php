@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\UnlockedAds;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\UnlockedAds\Pages\ManageUnlockedAds;
 use App\Filament\Exports\UnlockedAdExporter;
 use App\Filament\Imports\UnlockedAdImporter;
@@ -30,6 +31,12 @@ class UnlockedAdResource extends Resource
     protected static ?string $model = UnlockedAd::class;
 
     protected static bool $isScopedToTenant = false;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::PaymentsView) ?? false;
+    }
 
     protected static string|null|\UnitEnum $navigationGroup = 'Finances';
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Resources\AdBoosts;
 
 use App\Enums\AdBoostStatus;
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\AdBoosts\Pages\ManageAdBoosts;
 use App\Models\AdBoost;
 use Filament\Actions\ViewAction;
@@ -23,6 +24,12 @@ final class AdBoostResource extends Resource
     protected static ?string $model = AdBoost::class;
 
     protected static bool $isScopedToTenant = false;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::AdsView) ?? false;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::RocketLaunch;
 

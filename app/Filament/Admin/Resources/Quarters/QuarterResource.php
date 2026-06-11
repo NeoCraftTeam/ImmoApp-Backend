@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\Quarters;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\Quarters\Pages\ManageQuarters;
 use App\Filament\Exports\QuarterExporter;
 use App\Filament\Imports\QuarterImporter;
@@ -36,6 +37,12 @@ class QuarterResource extends Resource
     protected static ?string $model = Quarter::class;
 
     protected static bool $isScopedToTenant = false;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::CitiesManage) ?? false;
+    }
 
     protected static string|null|\UnitEnum $navigationGroup = 'Catalogue';
 
@@ -117,6 +124,7 @@ class QuarterResource extends Resource
                 DeleteAction::make()
                     ->successNotificationTitle('Quartier supprimé'),
                 ForceDeleteAction::make()
+                    ->visible(fn (): bool => auth()->user()?->isSuperAdmin() ?? false)
                     ->successNotificationTitle('Quartier supprimé définitivement'),
                 RestoreAction::make()
                     ->successNotificationTitle('Quartier restauré'),
@@ -136,7 +144,8 @@ class QuarterResource extends Resource
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
-                    ForceDeleteBulkAction::make(),
+                    ForceDeleteBulkAction::make()
+                        ->visible(fn (): bool => auth()->user()?->isSuperAdmin() ?? false),
                     RestoreBulkAction::make(),
                 ]),
             ]);
