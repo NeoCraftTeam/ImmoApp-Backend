@@ -4,7 +4,8 @@
         <div class="rounded-xl border border-amber-300/60 bg-gradient-to-br from-amber-50 to-orange-50/50 p-5 shadow-sm dark:border-amber-700/40 dark:from-amber-950/30 dark:to-orange-950/20">
             <div class="flex items-center gap-2.5 mb-1.5">
                 <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/40">
-                    <x-heroicon-m-exclamation-triangle class="h-4.5 w-4.5 text-amber-600 dark:text-amber-400" />
+                    {{-- `h-4.5 w-4.5` are not valid Tailwind utilities (the default scale skips half-steps), so the icon fell back to its intrinsic 24×24 px and overflowed the 32×32 `rounded-lg` badge. Use `h-5 w-5` (20 px) which fits the badge cleanly. --}}
+                    <x-heroicon-m-exclamation-triangle class="h-5 w-5 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div>
                     <h3 class="text-sm font-semibold text-amber-900 dark:text-amber-200">Alertes actives</h3>

@@ -126,13 +126,16 @@
         type="button"
         @click="loginWithPasskey()"
         :disabled="loading"
-        class="group relative w-full overflow-hidden rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-5 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200 shadow-sm transition-all duration-200 hover:border-[#F6475F]/50 hover:shadow-md hover:shadow-[#F6475F]/10 focus:outline-none focus:ring-2 focus:ring-[#F6475F]/40 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-wait"
+        {{-- Use the `primary-*` palette utilities so the brand colour stays
+             wired to the Filament panel provider's primary palette and
+             dark-mode counterparts come for free. Was hard-coded `#F6475F`. --}}
+        class="group relative w-full overflow-hidden rounded-xl border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-5 py-3 text-sm font-semibold text-gray-700 dark:text-gray-200 shadow-sm transition-all duration-200 hover:border-primary-500/50 hover:shadow-md hover:shadow-primary-500/10 focus:outline-none focus:ring-2 focus:ring-primary-500/40 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-wait"
     >
-        <span class="absolute inset-0 bg-gradient-to-r from-[#F6475F]/5 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100"></span>
+        <span class="absolute inset-0 bg-gradient-to-r from-primary-500/5 to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100"></span>
         <span class="relative inline-flex w-full items-center justify-center gap-3">
             {{-- Fingerprint icon --}}
-            <span x-show="!loading" class="flex h-8 w-8 items-center justify-center rounded-lg bg-[#F6475F]/10 transition-colors duration-200 group-hover:bg-[#F6475F]/20">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#F6475F]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <span x-show="!loading" class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-500/10 transition-colors duration-200 group-hover:bg-primary-500/20">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary-600 dark:text-primary-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 10a2 2 0 0 0-2 2c0 1.02-.1 2.51-.26 4"/>
                     <path d="M14 13.12c0 2.38 0 6.38-1 8.88"/>
                     <path d="M17.29 21.02c.12-.6.43-2.3.5-3.02"/>
@@ -145,7 +148,7 @@
                 </svg>
             </span>
             {{-- Spinner --}}
-            <svg x-show="loading" x-cloak class="animate-spin h-5 w-5 text-[#F6475F]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <svg x-show="loading" x-cloak class="animate-spin h-5 w-5 text-primary-600 dark:text-primary-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
             </svg>
