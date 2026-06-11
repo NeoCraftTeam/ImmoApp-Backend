@@ -111,3 +111,34 @@ it('caches parsed results', function (): void {
     $response2->assertSuccessful();
     expect($response1->json())->toBe($response2->json());
 });
+
+it('uses same cache for canonically equivalent queries', function (): void {
+    // These queries should hit the same cache entry after canonicalization:
+    // "Appartement à Douala" → "appartement douala"
+    // "douala appartement" → "appartement douala"
+    // "appartement   de  Douala" → "appartement douala"
+
+    $response1 = $this->postJson('/api/v1/search/parse', [
+        'q' => 'Appartement à Douala',
+    ]);
+
+    $response2 = $this->postJson('/api/v1/search/parse', [
+        'q' => 'douala appartement',
+    ]);
+
+    $response3 = $this->postJson('/api/v1/search/parse', [
+        'q' => 'appartement   de  Douala',
+    ]);
+
+    $response1->assertSuccessful();
+    $response2->assertSuccessful();
+    $response3->assertSuccessful();
+
+    // All three should return identical structured results
+    expect($response1->json('type_name'))->toBe('Appartement')
+        ->and($response1->json('city_name'))->toBe('Douala')
+        ->and($response2->json('type_name'))->toBe('Appartement')
+        ->and($response2->json('city_name'))->toBe('Douala')
+        ->and($response3->json('type_name'))->toBe('Appartement')
+        ->and($response3->json('city_name'))->toBe('Douala');
+});

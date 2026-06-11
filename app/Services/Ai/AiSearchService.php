@@ -184,20 +184,21 @@ final class AiSearchService implements AiSearchServiceInterface
      *
      * @return array<string, mixed>
      */
-    public function parse(string $query, ?string $displayCurrency = null): array
+    public function parse(string $query, ?string $displayCurrency = null, string $context = 'customer'): array
     {
+        // Whitelist the surface so a hostile string can't appear in the cache key.
+        $context = $context === 'owner' ? 'owner' : 'customer';
+
         $normalized = $this->preNormalizeQuery(mb_strtolower(trim($query)));
         if ($normalized === '') {
             return $this->emptyResult($query);
         }
 
-        // Cache key includes the display currency: a French visitor typing
-        // "200 EUR" produces a different XAF amount than a Cameroonian typing
-        // the same literal — so the cache must segregate them.
+        // Cache key includes the display currency AND the surface context.
         $currencyKey = !in_array($displayCurrency, [null, 'XAF', 'XOF'], true)
             ? '_'.strtolower($displayCurrency)
             : '';
-        $cacheKey = self::CACHE_PREFIX.md5($normalized).$currencyKey;
+        $cacheKey = self::CACHE_PREFIX.$context.':'.md5($normalized).$currencyKey;
 
         return Cache::remember($cacheKey, self::CACHE_TTL_SECONDS, function () use ($normalized, $query, $displayCurrency) {
             $result = $this->tryAllProviders($normalized, $displayCurrency);
@@ -487,6 +488,18 @@ Réponse : {"transaction_type":null,"type_name":null,"city_name":null,"quarter_n
 ## RÉFÉRENTIEL DISPONIBLE
 {$context}
 PROMPT;
+    }
+
+    /**
+     * Drop the cached LLM-prompt context so the next parse() rebuilds it.
+     *
+     * Called by City/Quarter/AdType observers when those reference tables
+     * change — without the flush the LLM keeps seeing stale lists for up
+     * to 6 hours.
+     */
+    public static function invalidateContextCache(): void
+    {
+        Cache::forget(self::CONTEXT_CACHE_KEY);
     }
 
     private function buildContext(): string
