@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\AdStatus;
 use App\Enums\PropertyAttribute;
+use App\Enums\SponsorshipTier;
 use App\Enums\TransactionType;
 use App\Enums\UserType;
 use App\Enums\VerificationStatus;
@@ -178,6 +179,10 @@ class Ad extends Model implements HasMedia
         'is_boosted' => 'boolean',
         'boost_expires_at' => 'datetime',
         'boosted_at' => 'datetime',
+        'is_subscription_sponsored' => 'boolean',
+        'subscription_tier' => SponsorshipTier::class,
+        'last_shown_at' => 'datetime',
+        'impression_count' => 'integer',
         'charges_forfaitaires' => 'boolean',
         'charges_montant_forfait' => 'integer',
         'charges_eau' => 'integer',
@@ -396,6 +401,9 @@ class Ad extends Model implements HasMedia
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * @return BelongsTo<Agency, $this>
+     */
     public function agency(): BelongsTo
     {
         return $this->belongsTo(Agency::class);
@@ -661,6 +669,10 @@ class Ad extends Model implements HasMedia
             'boost_score' => $score,
             'boost_expires_at' => now()->addDays($durationDays),
             'boosted_at' => now(),
+            'subscription_tier' => SponsorshipTier::fromFlags(
+                (bool) $this->is_subscription_sponsored,
+                true,
+            ),
         ])->save();
     }
 
@@ -673,6 +685,10 @@ class Ad extends Model implements HasMedia
             'is_boosted' => false,
             'boost_score' => 0,
             'boost_expires_at' => null,
+            'subscription_tier' => SponsorshipTier::fromFlags(
+                (bool) $this->is_subscription_sponsored,
+                false,
+            ),
         ])->save();
     }
 
@@ -814,6 +830,85 @@ class Ad extends Model implements HasMedia
         }
 
         return true;
+    }
+
+    /**
+     * Derive the current sponsorship tier from the underlying flags.
+     *
+     * Canonical truth — the persisted `subscription_tier` column is a
+     * denormalised copy kept in sync via boost()/unboost() and observers.
+     */
+    public function sponsorshipTier(): SponsorshipTier
+    {
+        return SponsorshipTier::fromFlags(
+            (bool) $this->is_subscription_sponsored,
+            $this->isBoosted(),
+        );
+    }
+
+    /**
+     * Ranking multiplier for the sponsored-feed algorithm.
+     */
+    public function rankingMultiplier(): float
+    {
+        return $this->sponsorshipTier()->multiplier();
+    }
+
+    /**
+     * Recompute and persist `subscription_tier` from current flags.
+     */
+    public function syncSponsorshipTier(): void
+    {
+        $tier = $this->sponsorshipTier();
+
+        if ($this->subscription_tier === $tier) {
+            return;
+        }
+
+        $this->forceFill(['subscription_tier' => $tier])->saveQuietly();
+    }
+
+    /**
+     * Compute the final ranking score with time decay and rotation penalty.
+     */
+    public function computeRankingScore(): float
+    {
+        $baseScore = max(1, (int) ($this->boost_score ?? 0));
+
+        // Time decay: lose 1% per day since creation, floored at 10%.
+        $ageInDays = $this->created_at->diffInDays(now(), false);
+        $timeDecayFactor = max(0.1, 1 - ($ageInDays / 100));
+
+        // Rotation penalty: down-rank ads shown in the last 6h to fight fatigue.
+        $rotationPenalty = $this->last_shown_at && $this->last_shown_at->isAfter(now()->subHours(6))
+            ? 0.7
+            : 1.0;
+
+        return $baseScore * $this->rankingMultiplier() * $timeDecayFactor * $rotationPenalty;
+    }
+
+    /**
+     * Record an impression for this ad.
+     */
+    public function recordImpression(): void
+    {
+        $this->increment('impression_count');
+        $this->update(['last_shown_at' => now()]);
+    }
+
+    /**
+     * Scope to order by sponsorship ranking with distribution strategy.
+     *
+     * This ensures 60% sponsored ads, 40% organic in the feed.
+     */
+    #[Scope]
+    protected function orderBySponsorship($query)
+    {
+        return $query
+            ->orderByDesc('is_subscription_sponsored')
+            ->orderByDesc('boost_score')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
     }
 
     public function getActivitylogOptions(): LogOptions

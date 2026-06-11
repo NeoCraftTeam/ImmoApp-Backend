@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Observers;
 
 use App\Enums\AdStatus;
+use App\Enums\SponsorshipTier;
+use App\Enums\SubscriptionStatus;
 use App\Events\AdCreated;
 use App\Events\AdStatusTransitioned;
 use App\Models\Ad;
@@ -32,8 +34,25 @@ class AdObserver
      */
     public function created(Ad $ad): void
     {
+        // Auto-sponsor if agency has active subscription
+        if ($ad->agency_id && !$ad->is_subscription_sponsored) {
+            $hasActiveSubscription = $ad->agency
+                ->subscriptions()
+                ->where('status', SubscriptionStatus::ACTIVE)
+                ->where('ends_at', '>', now())
+                ->exists();
+
+            if ($hasActiveSubscription) {
+                $tier = SponsorshipTier::fromFlags(true, $ad->isBoosted());
+                $ad->forceFill([
+                    'is_subscription_sponsored' => true,
+                    'subscription_tier' => $tier->value,
+                ])->saveQuietly();
+            }
+        }
+
         AdCreated::dispatch($ad);
-        $this->invalidateFeedCache();
+        self::invalidateFeedCache();
         if ($ad->status === AdStatus::AVAILABLE && $ad->slug) {
             $this->indexNow->ping($this->adUrl($ad->slug));
         }
@@ -49,8 +68,8 @@ class AdObserver
         // Invalidate feed cache when visibility-affecting columns change.
         // 5min TTL is fine for normal eventual consistency, but newly published
         // or unpublished ads should appear/disappear immediately.
-        if ($ad->wasChanged(['status', 'is_visible', 'boost_score'])) {
-            $this->invalidateFeedCache();
+        if ($ad->wasChanged(['status', 'is_visible', 'boost_score', 'is_subscription_sponsored', 'subscription_tier'])) {
+            self::invalidateFeedCache();
         }
 
         if (!$ad->wasChanged('status')) {
@@ -77,7 +96,7 @@ class AdObserver
      */
     public function deleted(Ad $ad): void
     {
-        $this->invalidateFeedCache();
+        self::invalidateFeedCache();
         if ($ad->slug) {
             $this->indexNow->ping($this->adUrl($ad->slug));
         }
@@ -96,8 +115,11 @@ class AdObserver
      * The cache key pattern is `ads:feed:guest:first:pp={N}` for N in [1..50].
      * We forget the common page sizes; the rare custom sizes will refresh
      * naturally at TTL expiry (5 min).
+     *
+     * Public so callers that bypass model events (mass updates from
+     * SubscriptionObserver, scheduled jobs) can flush the cache directly.
      */
-    private function invalidateFeedCache(): void
+    public static function invalidateFeedCache(): void
     {
         foreach ([15, 20, 30, 50] as $perPage) {
             Cache::forget("ads:feed:guest:first:pp={$perPage}");

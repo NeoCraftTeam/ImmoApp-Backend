@@ -13,6 +13,7 @@ use App\Http\Resources\AdResource as AdApiResource;
 use App\Models\Ad;
 use App\Models\AdInteraction;
 use App\Models\User;
+use App\Services\Ad\AdFeedRankingService;
 use App\Services\Ai\RecommendationEngine;
 use App\Support\AdScoutSync;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -43,6 +44,7 @@ final class AdController
         private CreateAd $createAdAction,
         private UpdateAd $updateAdAction,
         private RecommendationEngine $engine,
+        private AdFeedRankingService $feedRanker,
     ) {}
 
     /**
@@ -148,7 +150,14 @@ final class AdController
             && $type === null
             && $sort === 'newest';
 
-        $build = function () use ($request, $perPage, $type, $sort) {
+        // First-page overfetch factor: on the initial sponsored-feed page we
+        // pull 3× the requested page size so AdFeedRankingService::distribute()
+        // has enough per-tier inventory to honour the 60/40 slot template.
+        // Subsequent pages stay on 1× so cursor pagination remains correct.
+        $isFirstPage = !$request->filled('cursor');
+        $fetchSize = ($sort === 'newest' && $isFirstPage) ? $perPage * 3 : $perPage;
+
+        $build = function () use ($request, $fetchSize, $type, $sort) {
             $query = Ad::query()
                 ->with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')
                 ->withAvg('reviews', 'rating')
@@ -170,10 +179,10 @@ final class AdController
             $ordered = match ($sort) {
                 'price_asc' => $query->orderBy('price')->orderByDesc('id'),
                 'price_desc' => $query->orderByDesc('price')->orderByDesc('id'),
-                default => $query->orderByDesc('boost_score')->orderByDesc('created_at')->orderByDesc('id'),
+                default => $query->orderBySponsorship(),
             };
 
-            return $ordered->cursorPaginate($perPage);
+            return $ordered->cursorPaginate($fetchSize);
         };
 
         $paginator = $isFirstPageGuest
@@ -195,6 +204,17 @@ final class AdController
                 );
                 $paginator->setCollection($reranked);
             }
+        }
+
+        // Sponsored-feed distribution. Best-effort within the cursor window: with
+        // cursor pagination we can only re-order what the page already contains.
+        if ($sort === 'newest') {
+            $distributed = $this->feedRanker->distribute(
+                $paginator->getCollection(),
+                $perPage,
+            );
+            $paginator->setCollection($distributed);
+            $this->feedRanker->recordImpressions($distributed);
         }
 
         /** @var int $total */

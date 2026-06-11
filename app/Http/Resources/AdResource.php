@@ -91,6 +91,11 @@ final class AdResource extends JsonResource
                 : null,
             'boost_score' => $this->isBoosted() ? (int) ($this->boost_score ?? 0) : 0,
 
+            // Sponsorship — visible so cards can render the tiered badge
+            // (premium / subscription / manual / organic).
+            'is_subscription_sponsored' => (bool) ($this->is_subscription_sponsored ?? false),
+            'sponsorship_tier' => $this->sponsorshipTier()->value,
+
             // Proximity & accessibility — always visible (helps users decide to unlock)
             'distance_main_road_m' => $this->distance_main_road_m,
             'distance_shops_m' => $this->distance_shops_m,
