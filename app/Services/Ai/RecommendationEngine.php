@@ -525,17 +525,27 @@ final class RecommendationEngine implements RecommendationEngineInterface
     /**
      * Get ad view counts for the last 30 days (popularity signal).
      *
+     * The aggregation is identical across users — a small ranking signal
+     * that shifts at most every few minutes. We were running a full
+     * GROUP BY scan of `ad_interactions` on every authenticated feed
+     * render, recomputing the same number. Cached for 10 minutes; the
+     * result is shared across all callers in the cluster.
+     *
      * @return array<int|string, int> ad_id => view_count
      */
     private function getPopularityMap(): array
     {
-        return AdInteraction::where('type', AdInteraction::TYPE_VIEW)
-            ->where('created_at', '>=', now()->subDays(30))
-            ->whereNotNull('ad_id')
-            ->selectRaw('ad_id, COUNT(*) as view_count')
-            ->groupBy('ad_id')
-            ->pluck('view_count', 'ad_id')
-            ->toArray();
+        return Cache::remember(
+            'reco:popularity_map:30d',
+            now()->addMinutes(self::CACHE_TTL_MINUTES),
+            fn (): array => AdInteraction::where('type', AdInteraction::TYPE_VIEW)
+                ->where('created_at', '>=', now()->subDays(30))
+                ->whereNotNull('ad_id')
+                ->selectRaw('ad_id, COUNT(*) as view_count')
+                ->groupBy('ad_id')
+                ->pluck('view_count', 'ad_id')
+                ->toArray(),
+        );
     }
 
     /**
@@ -556,7 +566,13 @@ final class RecommendationEngine implements RecommendationEngineInterface
 
         $preferredTypeIds = array_keys($profile['type_weights']);
 
-        return Ad::with(self::AD_EAGER_LOADS)
+        // Pull a small most-recent pool then randomise in PHP.
+        // Was `ORDER BY random()` on the full matching set — a Postgres
+        // sequential scan + full sort over thousands of rows just to take
+        // a handful. Sampling from the latest 100 candidates costs an
+        // index scan against `ad_created_at_idx` and the in-PHP shuffle
+        // is constant-time at this size.
+        $candidates = Ad::with(self::AD_EAGER_LOADS)
             ->visible()
             ->where('status', AdStatus::AVAILABLE)
             ->whereNotIn('id', $excludeIds)
@@ -574,8 +590,10 @@ final class RecommendationEngine implements RecommendationEngineInterface
                         ->orWhere('price', '>', $profile['max_price']);
                 });
             })
-            ->inRandomOrder()
-            ->take($limit)
+            ->latest('created_at')
+            ->take(100)
             ->get();
+
+        return $candidates->shuffle()->take($limit)->values();
     }
 }

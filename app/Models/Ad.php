@@ -225,9 +225,25 @@ class Ad extends Model implements HasMedia
         });
 
         static::updating(function ($ad): void {
-            if ($ad->isDirty('title')) {
-                $ad->slug = self::generateUniqueSlug($ad->title, $ad->id);
+            // Only regenerate the slug on title edits BEFORE the ad has
+            // been published. Post-publish, the slug is a stable SEO URL
+            // — typo fixes on the title shouldn't break inbound links or
+            // bust CDN canonicals. Saves the bulk of `exists()` calls
+            // because most title edits happen post-PENDING.
+            if (!$ad->isDirty('title')) {
+                return;
             }
+
+            $original = $ad->getOriginal('status');
+            $previousStatus = $original instanceof AdStatus
+                ? $original
+                : AdStatus::tryFrom((string) $original);
+
+            if ($previousStatus !== null && $previousStatus !== AdStatus::PENDING) {
+                return;
+            }
+
+            $ad->slug = self::generateUniqueSlug($ad->title, $ad->id);
         });
     }
 
@@ -274,19 +290,27 @@ class Ad extends Model implements HasMedia
 
     public static function generateUniqueSlug(string $title, ?string $ignoreId = null): string
     {
-        $slug = Str::slug($title);
-        $original = $slug;
-        $i = 1;
-        while (
-            self::where('slug', $slug)
-                ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
-                ->exists()
-        ) {
-            $slug = $original.'-'.$i;
-            $i++;
+        $base = Str::slug($title);
+
+        // Bound the linear `exists()` probe — try the base slug and the
+        // next few numeric suffixes, then fall back to a random suffix.
+        // Common-title bulk imports (e.g. "Appartement à louer Douala")
+        // used to fire 5-10 `exists()` queries per insertion; this caps
+        // the worst case at 4 queries.
+        foreach ([null, 1, 2, 3] as $suffix) {
+            $candidate = $suffix === null ? $base : "{$base}-{$suffix}";
+            $exists = self::query()
+                ->where('slug', $candidate)
+                ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
+                ->exists();
+            if (!$exists) {
+                return $candidate;
+            }
         }
 
-        return $slug;
+        // Past three collisions, append a short random suffix and trust
+        // that 36^6 collisions are vanishingly unlikely.
+        return $base.'-'.Str::lower(Str::random(6));
     }
 
     /**

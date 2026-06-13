@@ -8,6 +8,7 @@ use App\Enums\SponsorshipTier;
 use App\Enums\SubscriptionStatus;
 use App\Models\Ad;
 use App\Models\Subscription;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 final class SubscriptionObserver
@@ -50,31 +51,25 @@ final class SubscriptionObserver
             return;
         }
 
-        $baseQuery = Ad::query()
+        // Single UPDATE branching on `is_boosted + boost_expires_at` in SQL.
+        // Was two cloned queries that scanned the agency's ads twice;
+        // collapsing to a CASE expression halves the work and matches one
+        // logical observer event to one DB write.
+        $premium = SponsorshipTier::PREMIUM->value;
+        $sponsored = SponsorshipTier::SUBSCRIPTION->value;
+        $count = Ad::query()
             ->where('agency_id', $agencyId)
             ->whereIn('status', ['available', 'reserved'])
-            ->where('is_visible', true);
-
-        $premiumCount = (clone $baseQuery)
-            ->where('is_boosted', true)
-            ->where('boost_expires_at', '>', now())
+            ->where('is_visible', true)
             ->update([
                 'is_subscription_sponsored' => true,
-                'subscription_tier' => SponsorshipTier::PREMIUM->value,
+                'subscription_tier' => DB::raw(
+                    'CASE WHEN is_boosted = true AND boost_expires_at > NOW() '
+                    ."THEN '{$premium}' ELSE '{$sponsored}' END"
+                ),
             ]);
 
-        $subscriptionCount = (clone $baseQuery)
-            ->where(function ($q): void {
-                $q->where('is_boosted', false)
-                    ->orWhereNull('boost_expires_at')
-                    ->orWhere('boost_expires_at', '<=', now());
-            })
-            ->update([
-                'is_subscription_sponsored' => true,
-                'subscription_tier' => SponsorshipTier::SUBSCRIPTION->value,
-            ]);
-
-        if ($premiumCount > 0 || $subscriptionCount > 0) {
+        if ($count > 0) {
             // Mass UPDATE bypasses Eloquent observers — flush the guest feed
             // cache manually so the new sponsored placements appear immediately.
             AdObserver::invalidateFeedCache();
@@ -83,8 +78,7 @@ final class SubscriptionObserver
         Log::info('Auto-boosted agency ads on subscription activation', [
             'subscription_id' => $subscription->id,
             'agency_id' => $agencyId,
-            'premium_ads' => $premiumCount,
-            'subscription_ads' => $subscriptionCount,
+            'ads_updated' => $count,
         ]);
     }
 
@@ -102,38 +96,29 @@ final class SubscriptionObserver
             return;
         }
 
-        $baseQuery = Ad::query()
+        // Single UPDATE branching in SQL. Symmetric with boostAllAgencyAds:
+        // one logical event → one DB write, halving the agency scan.
+        $manual = SponsorshipTier::MANUAL->value;
+        $organic = SponsorshipTier::ORGANIC->value;
+        $count = Ad::query()
             ->where('agency_id', $agencyId)
-            ->where('is_subscription_sponsored', true);
-
-        $manualCount = (clone $baseQuery)
-            ->where('is_boosted', true)
-            ->where('boost_expires_at', '>', now())
+            ->where('is_subscription_sponsored', true)
             ->update([
                 'is_subscription_sponsored' => false,
-                'subscription_tier' => SponsorshipTier::MANUAL->value,
+                'subscription_tier' => DB::raw(
+                    'CASE WHEN is_boosted = true AND boost_expires_at > NOW() '
+                    ."THEN '{$manual}' ELSE '{$organic}' END"
+                ),
             ]);
 
-        $organicCount = (clone $baseQuery)
-            ->where(function ($q): void {
-                $q->where('is_boosted', false)
-                    ->orWhereNull('boost_expires_at')
-                    ->orWhere('boost_expires_at', '<=', now());
-            })
-            ->update([
-                'is_subscription_sponsored' => false,
-                'subscription_tier' => SponsorshipTier::ORGANIC->value,
-            ]);
-
-        if ($manualCount > 0 || $organicCount > 0) {
+        if ($count > 0) {
             AdObserver::invalidateFeedCache();
         }
 
         Log::info('Removed auto-boost from agency ads on subscription expiration', [
             'subscription_id' => $subscription->id,
             'agency_id' => $agencyId,
-            'kept_as_manual' => $manualCount,
-            'demoted_to_organic' => $organicCount,
+            'ads_updated' => $count,
         ]);
     }
 }

@@ -12,6 +12,7 @@ use App\Http\Requests\AdRequest;
 use App\Http\Resources\AdResource as AdApiResource;
 use App\Models\Ad;
 use App\Models\AdInteraction;
+use App\Models\AdType;
 use App\Models\User;
 use App\Services\Ad\AdFeedRankingService;
 use App\Services\Ai\RecommendationEngine;
@@ -217,14 +218,31 @@ final class AdController
             $this->feedRanker->recordImpressions($distributed);
         }
 
+        // Resolve free-text `$type` to a known AdType id so the count
+        // query becomes a single indexed `WHERE type_id = ?` instead of
+        // a correlated EXISTS with `ILIKE`. Also caps cache-key
+        // fragmentation — bots feeding random `type=` values used to
+        // mint a fresh cache entry per unique string; now unknown types
+        // bypass the cache and return the overall total.
+        $typeId = null;
+        if ($type !== null) {
+            $typeId = Cache::remember(
+                'ads:feed:type_id:'.sha1((string) $type),
+                3600,
+                fn () => AdType::query()
+                    ->where('name', 'ilike', "%{$type}%")
+                    ->value('id')
+            );
+        }
+
         /** @var int $total */
         $total = Cache::remember(
-            'ads:feed:total:'.($type ?? 'all'),
+            'ads:feed:total:'.($typeId ?? 'all'),
             600,
-            function () use ($type): int {
+            function () use ($typeId): int {
                 $q = Ad::query()->visible()->publiclyListed();
-                if ($type !== null) {
-                    $q->whereHas('ad_type', fn ($q2) => $q2->where('name', 'ilike', "%{$type}%"));
+                if ($typeId !== null) {
+                    $q->where('type_id', $typeId);
                 }
 
                 return $q->count();

@@ -5,12 +5,10 @@ declare(strict_types=1);
 namespace App\Services\Ad;
 
 use App\Enums\SponsorshipTier;
+use App\Jobs\RecordSponsoredImpressionsJob;
 use App\Models\Ad;
-use App\Models\SponsoredImpression;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 /**
  * Distributes a candidate pool of ads across a Facebook-style feed.
@@ -117,41 +115,36 @@ final class AdFeedRankingService
     }
 
     /**
-     * Persist per-page impression telemetry.
+     * Hand off per-page impression telemetry to a queued job.
      *
-     * Writes two things:
-     *  1. A batched UPDATE bumping last_shown_at + impression_count on `ad`
-     *     so rotation penalties stay current.
-     *  2. A batched INSERT into `sponsored_impressions` (one row per ad)
-     *     so SponsorshipAnalyticsService can compute per-tier KPIs.
+     * Previously this method ran the UPDATE + INSERT inline on every
+     * feed render — two write queries on the hottest table per request,
+     * contending with publishes. Now it dispatches a single job with
+     * the flat (ad_id, tier, slot) tuples; the job worker performs the
+     * actual writes off the request thread.
      */
     public function recordImpressions(Collection $ads): void
     {
-        $ids = $ads->pluck('id')->filter()->unique()->values()->all();
-
-        if ($ids === []) {
+        if ($ads->isEmpty()) {
             return;
         }
 
-        $now = now();
+        $rows = $ads
+            ->filter(fn (Ad $ad) => filled($ad->id))
+            ->map(fn (Ad $ad): array => [
+                'ad_id' => (string) $ad->id,
+                'tier' => $ad->sponsorshipTier()->value,
+                'slot' => (int) ($ad->getAttribute('_feed_slot') ?? 0),
+            ])
+            ->values()
+            ->all();
 
-        Ad::query()->whereIn('id', $ids)->update([
-            'last_shown_at' => $now,
-            'impression_count' => DB::raw('impression_count + 1'),
-        ]);
+        if ($rows === []) {
+            return;
+        }
 
-        $viewerId = Auth::id();
-
-        $rows = $ads->map(fn (Ad $ad): array => [
-            'id' => (string) Str::uuid(),
-            'ad_id' => $ad->id,
-            'user_id' => $viewerId,
-            'tier' => $ad->sponsorshipTier()->value,
-            'slot' => (int) ($ad->getAttribute('_feed_slot') ?? 0),
-            'shown_at' => $now,
-        ])->all();
-
-        SponsoredImpression::query()->insert($rows);
+        RecordSponsoredImpressionsJob::dispatch($rows, Auth::id() !== null ? (string) Auth::id() : null)
+            ->onQueue('telemetry');
     }
 
     /**
