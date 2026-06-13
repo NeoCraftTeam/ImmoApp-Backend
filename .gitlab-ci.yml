@@ -134,10 +134,31 @@ sast:
     - if: $CI_COMMIT_BRANCH
       changes:
         - '**/*.php'
+        - rector.php
+
+# Mirror of the GitHub `hygiene` job — secret scanning on every GitLab
+# push so credentials cannot reach prod via the GitLab path either.
+# Gitleaks is small + self-contained; pulling its official image keeps
+# the rule baseline in lockstep with upstream.
+gitleaks:
+  stage: quality
+  image: zricethezav/gitleaks:latest
+  needs: []
+  script:
+    - gitleaks detect --source . --redact --verbose --no-banner --exit-code 1
+  rules:
+    - if: $CI_COMMIT_BRANCH
 
 # --- ETAPE 2 : BUILD & PUSH (en parallèle avec tests) ---
 build_image:
   stage: build_and_test
+  # A push that gets interrupted mid-`docker push` can leave a
+  # partially-uploaded manifest under `:latest`. The next deploy
+  # would then `docker compose pull` an incomplete image. The
+  # global `interruptible: true` (line ~24) protects the test
+  # suite (cancel-and-restart is fine there); the build must
+  # complete or fail cleanly.
+  interruptible: false
   variables:
     DOCKER_BUILDKIT: "1"
   needs:
@@ -203,6 +224,27 @@ test_suite:
         -e POSTGRES_PASSWORD=test_pass \
         postgis/postgis:15-3.3-alpine
 
+      # Start Redis (cache + queue) — must run with the same image
+      # version as prod so a Redis-feature regression fails CI rather
+      # than slipping into release. The phpunit.xml still defaults
+      # CACHE/QUEUE/SESSION to array/sync for stability, but tests
+      # explicitly opting in via env can now hit a real Redis.
+      docker run -d \
+        --name redis-$CI_JOB_ID \
+        --network ci-net-$CI_JOB_ID \
+        redis:alpine
+
+      # Start Meilisearch — same `v1.10` tag as prod. Was absent from
+      # the GitLab pipeline, so any Scout/Meili regression slipped
+      # through CI (the team specifically called out an
+      # "ads in DB vs Meilisearch" drift bug in .env.example).
+      docker run -d \
+        --name meili-$CI_JOB_ID \
+        --network ci-net-$CI_JOB_ID \
+        -e MEILI_NO_ANALYTICS=true \
+        -e MEILI_ENV=development \
+        getmeili/meilisearch:v1.10
+
       # Wait until PostgreSQL accepts TCP connections (not just Unix socket).
       # pg_isready without -h checks /var/run/postgresql (Unix socket) which
       # becomes ready before TCP is bound — causing cross-container ECONNREFUSED.
@@ -210,6 +252,21 @@ test_suite:
       for i in $(seq 1 30); do
         docker exec pg-$CI_JOB_ID pg_isready -U gitlab -h 127.0.0.1 -p 5432 && break
         [ "$i" = "30" ] && echo "PostgreSQL failed to start" && exit 1
+        sleep 2
+      done
+
+      echo "Waiting for Redis..."
+      for i in $(seq 1 15); do
+        docker exec redis-$CI_JOB_ID redis-cli ping 2>/dev/null | grep -q PONG && break
+        [ "$i" = "15" ] && echo "Redis failed to start" && exit 1
+        sleep 1
+      done
+
+      echo "Waiting for Meilisearch..."
+      for i in $(seq 1 20); do
+        docker run --rm --network ci-net-$CI_JOB_ID curlimages/curl:latest \
+          curl --silent --fail "http://meili-$CI_JOB_ID:7700/health" >/dev/null 2>&1 && break
+        [ "$i" = "20" ] && echo "Meilisearch failed to start" && exit 1
         sleep 2
       done
 
@@ -222,6 +279,10 @@ test_suite:
         -e DB_DATABASE=testing \
         -e DB_USERNAME=gitlab \
         -e DB_PASSWORD=test_pass \
+        -e REDIS_HOST=redis-$CI_JOB_ID \
+        -e REDIS_PORT=6379 \
+        -e MEILISEARCH_HOST=http://meili-$CI_JOB_ID:7700 \
+        -e MEILISEARCH_KEY= \
         -e SCOUT_DRIVER=null \
         -e MAIL_MAILER=array \
         -e RESEND_KEY= \
@@ -240,6 +301,8 @@ test_suite:
         exit $TEST_RC'
   after_script:
     - docker rm -f pg-$CI_JOB_ID 2>/dev/null || true
+    - docker rm -f redis-$CI_JOB_ID 2>/dev/null || true
+    - docker rm -f meili-$CI_JOB_ID 2>/dev/null || true
     - docker network rm ci-net-$CI_JOB_ID 2>/dev/null || true
   rules:
     - if: $CI_COMMIT_BRANCH
@@ -271,15 +334,32 @@ test_suite:
     - cp -rf .docker/nginx/templates/. $DEPLOY_DIR/.docker/nginx/templates/
     - cp .docker/php/www.conf $DEPLOY_DIR/.docker/php/www.conf
     # ── Sync codebase to VPS for reference and manual artisan commands ─────────
+    # The CI_JOB_TOKEN is needed transiently to authenticate the clone /
+    # fetch, but must NOT linger in `.git/config` afterwards — anyone
+    # with shell access on the runner (or a co-tenant on a shared VPS)
+    # could otherwise `cat .git/config` while the next job runs and
+    # exfiltrate the token. Strategy:
+    #   1. Build the authenticated URL into a local variable
+    #   2. Fetch/clone using that URL
+    #   3. Immediately reset the remote URL to the token-less form
+    #   4. `chmod 600` the git config as a belt-and-braces measure
     - |
       AUTHENTICATED_URL="https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/${CI_PROJECT_PATH}.git"
+      CLEAN_URL="https://gitlab.com/${CI_PROJECT_PATH}.git"
       if [ -d $DEPLOY_DIR/codebase/.git ]; then
         cd $DEPLOY_DIR/codebase
         git remote set-url origin "$AUTHENTICATED_URL"
         git fetch origin $DEPLOY_BRANCH && git reset --hard origin/$DEPLOY_BRANCH
+        git remote set-url origin "$CLEAN_URL"
+        chmod 600 .git/config 2>/dev/null || true
       else
         git clone --depth 1 --branch $DEPLOY_BRANCH "$AUTHENTICATED_URL" $DEPLOY_DIR/codebase
+        cd $DEPLOY_DIR/codebase
+        git remote set-url origin "$CLEAN_URL"
+        chmod 600 .git/config 2>/dev/null || true
+        cd -
       fi
+      unset AUTHENTICATED_URL
     # ── Optional .env guard (preprod only: REQUIRE_ENV_CHECK=true) ─────────────
     - |
       if [ "${REQUIRE_ENV_CHECK}" = "true" ] && [ ! -f "$DEPLOY_DIR/.env" ]; then
@@ -416,6 +496,43 @@ test_suite:
   after_script:
     - docker logout $CI_REGISTRY 2>/dev/null || true
 
+# --- ETAPE 2bis : FRONTEND TESTS ---
+# The Next.js submodule used to be tested only on GitHub Actions. Since
+# the team's primary CD path is GitLab, that left the frontend with no
+# gate when GitHub was bypassed (direct push, GitHub outage, secondary
+# branch). This job mirrors the GitHub `frontend-test` exactly:
+# `frozen-lockfile install` + `pnpm audit --prod` + `tsc --noEmit` +
+# `pnpm lint` + `pnpm test` + a real `pnpm build`. It runs on every
+# branch that changed frontend files.
+frontend_test:
+  stage: build_and_test
+  image: node:20-alpine
+  needs: []
+  before_script:
+    - apk add --no-cache git
+    - corepack enable
+    - corepack prepare pnpm@10 --activate
+  script:
+    - cd keyhome-frontend-next
+    - pnpm install --frozen-lockfile
+    - pnpm audit --prod --audit-level=critical
+    - pnpm exec tsc --noEmit
+    - pnpm lint
+    - pnpm test
+    # Block on broken `pnpm build` — same contract as the GitHub workflow.
+    - SKIP_ENV_VALIDATION=1 NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_placeholder pnpm build
+  cache:
+    key:
+      files:
+        - keyhome-frontend-next/pnpm-lock.yaml
+    paths:
+      - keyhome-frontend-next/node_modules/
+      - keyhome-frontend-next/.next/cache/
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        - 'keyhome-frontend-next/**/*'
+
 # --- ETAPE 3 : DEPLOIEMENT ---
 production_deploy:
   <<: *deploy_template
@@ -471,12 +588,28 @@ production_smoke_test:
       SMOKE_URL="${PROD_API_URL:-https://api.keyhome.app}"
       echo "Smoke URL: $SMOKE_URL"
       set +e
+      # Hit /api/health (not /api/ping) — /ping returns 200 even when
+      # the DB is down or Filament 500s. /api/health probes DB +
+      # Redis + Queue + Storage + Meilisearch and returns 503 if any
+      # subsystem is unhealthy. The deeper probe catches the class of
+      # post-deploy break the old smoke test silently passed through.
+      # If HEALTH_CHECK_TOKEN is set on prod, smoke needs to send it.
+      AUTH_HEADER=""
+      if [ -n "${PROD_HEALTH_CHECK_TOKEN:-}" ]; then
+        AUTH_HEADER="-H Authorization: Bearer ${PROD_HEALTH_CHECK_TOKEN}"
+      fi
       for i in $(seq 1 10); do
-        STATUS=$(curl --globoff --silent --output /dev/null --write-out "%{http_code}" "${SMOKE_URL}/api/ping" 2>/dev/null)
+        RESPONSE=$(curl --globoff --silent --write-out "\n%{http_code}" $AUTH_HEADER "${SMOKE_URL}/api/health" 2>/dev/null)
+        STATUS=$(echo "$RESPONSE" | tail -n 1)
+        BODY=$(echo "$RESPONSE" | sed '$d')
         echo "Attempt $i — HTTP $STATUS"
         if [ "$STATUS" = "200" ]; then
           echo "✅ Smoke test passed"
+          echo "Health: $BODY"
           exit 0
+        fi
+        if [ "$STATUS" = "503" ]; then
+          echo "⚠️  Service responded 503 — body: $BODY"
         fi
         sleep 5
       done
@@ -496,12 +629,26 @@ preprod_smoke_test:
       PREPROD_PORT=${PREPROD_PORT:-9091}
       FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:preprod"
       echo "Using port: $PREPROD_PORT"
+      # Match the production smoke depth — `/api/health` probes DB,
+      # Redis, Queue, Storage, Meilisearch and reports 503 when any
+      # subsystem is unhealthy. `/api/ping` always returns 200 even
+      # against a broken stack.
+      AUTH_HEADER=""
+      if [ -n "${PREPROD_HEALTH_CHECK_TOKEN:-}" ]; then
+        AUTH_HEADER="-H Authorization: Bearer ${PREPROD_HEALTH_CHECK_TOKEN}"
+      fi
       for i in $(seq 1 15); do
-        STATUS=$(curl --globoff --silent --output /dev/null --write-out "%{http_code}" "http://127.0.0.1:${PREPROD_PORT}/api/ping" 2>/dev/null)
-        echo "Attempt $i — HTTP $STATUS (GET /api/ping)"
+        RESPONSE=$(curl --globoff --silent --write-out "\n%{http_code}" $AUTH_HEADER "http://127.0.0.1:${PREPROD_PORT}/api/health" 2>/dev/null)
+        STATUS=$(echo "$RESPONSE" | tail -n 1)
+        BODY=$(echo "$RESPONSE" | sed '$d')
+        echo "Attempt $i — HTTP $STATUS"
         if [ "$STATUS" = "200" ]; then
           echo "✅ Smoke test passed"
+          echo "Health: $BODY"
           exit 0
+        fi
+        if [ "$STATUS" = "503" ]; then
+          echo "⚠️  Service responded 503 — body: $BODY"
         fi
         sleep 5
       done
