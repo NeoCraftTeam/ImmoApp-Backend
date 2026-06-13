@@ -126,7 +126,8 @@ rector:
 sast:
   stage: quality
   needs: [prepare_ci_image]
-  allow_failure: true
+  # Was `allow_failure: true` — the scan ran but never blocked. The
+  # `--error` flag instructs Semgrep to exit non-zero on findings.
   script:
     - docker run --rm -v $(pwd):/src semgrep/semgrep semgrep --config=p/php --quiet --error /src
   rules:
@@ -167,12 +168,15 @@ build_image:
 trivy_scan:
   stage: build_and_test
   needs: [build_image]
-  allow_failure: true
+  # Was `allow_failure: true` AND `--exit-code 0` — the scan ran but
+  # could never block. CRITICAL CVEs on the production image now fail
+  # the pipeline. HIGH stays informational (logged, doesn't block) and
+  # `--ignore-unfixed` skips advisories with no available patch.
   script:
     - docker run --rm
         -v /var/run/docker.sock:/var/run/docker.sock
         aquasec/trivy:latest image
-        --exit-code 0 --severity HIGH,CRITICAL --no-progress
+        --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress
         $APP_IMAGE:$IMAGE_TAG
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
@@ -410,6 +414,17 @@ test_suite:
 # --- ETAPE 3 : DEPLOIEMENT ---
 production_deploy:
   <<: *deploy_template
+  # Production deploys require an explicit click. Was fully automatic
+  # on every merge to `main` — a bad commit reached live within ~15
+  # min with no human in the loop. The `environment` block also gives
+  # GitLab a Deployments record, per-env secret scoping, and freeze
+  # windows.
+  environment:
+    name: production
+    url: https://api.keyhome.app
+    deployment_tier: production
+  when: manual
+  allow_failure: false
   variables:
     DEPLOY_DIR: /opt/keyhome
     DEPLOY_BRANCH: main
@@ -423,6 +438,12 @@ production_deploy:
 # --- DEPLOIEMENT PREPROD ---
 preprod_deploy:
   <<: *deploy_template
+  # Preprod stays auto — it's the staging environment and acts as the
+  # smoke target for the production manual approval upstream.
+  environment:
+    name: preprod
+    url: https://preprod.api.keyhome.app
+    deployment_tier: staging
   variables:
     DEPLOY_DIR: /opt/keyhome-preprod
     DEPLOY_BRANCH: preprod

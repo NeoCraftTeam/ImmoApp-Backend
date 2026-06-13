@@ -41,6 +41,13 @@
         <env name="GENIUSPAY_WEBHOOK_SECRET" value="whsec_sandbox_test_secret_123"/>
         <env name="TURNSTILE_SITE_KEY" value=""/>
         <env name="TURNSTILE_SECRET_KEY" value=""/>
-        <env name="CHAT_ENCRYPTION_KEY" value="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"/>
+        <!--
+            CHAT_ENCRYPTION_KEY is generated at runtime in tests/bootstrap.php.
+            It used to be a deterministic 32-byte hex string committed here
+            (and in tests/bootstrap.php) which meant every test database
+            seeded by every developer was decryptable by anyone with repo
+            access. The boot-time key is unique per test process and never
+            persists.
+        -->
     </php>
 </phpunit>

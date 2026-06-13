@@ -140,45 +140,39 @@ jobs:
     - name: Unit Tests (Vitest)
       run: pnpm test
 
-    - name: Build for Lighthouse
+    # Build must pass — broken Next.js builds (typed import errors, env
+    # validation failures) used to ship as green checks because of
+    # `continue-on-error: true` here. Production Vercel deploys then
+    # failed out-of-band with no PR signal.
+    - name: Build (Next.js)
       run: pnpm build
       env:
         NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_placeholder
         SKIP_ENV_VALIDATION: 1
-      continue-on-error: true
 
-    - name: Lighthouse CI (SEO + Core Web Vitals)
+    # Lighthouse stays informational for now — assertions in
+    # `lighthouserc.json` are mostly `warn`, so even on regression
+    # the step would only post a comment. Marked accordingly.
+    - name: Lighthouse CI (SEO + Core Web Vitals, informational)
       run: npx @lhci/cli@0.14.x autorun
       env:
         LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
       continue-on-error: true
 
   # -----------------------------------------------------------------------------
-  # JOB 2: CD (Continuous Deployment) - Deploy to VPS
+  # NOTE — GitHub Actions is CI-only on this repository.
+  #
+  # Production CD runs through GitLab (.gitlab-ci.yml `production_deploy` /
+  # `preprod_deploy` jobs) which builds a Docker image, pushes to the GitLab
+  # registry, then SSHes to the VPS and runs `docker compose pull && up -d`
+  # against the production stack.
+  #
+  # The previous GitHub `deploy` job here invoked `bash deploy.sh` on the
+  # same VPS — but `deploy.sh` is documented as [DEPRECATED] (see the
+  # file header) and does a bare-metal `git pull` + `sudo chown` +
+  # `systemctl restart`. Running it alongside the GitLab Docker deploy
+  # produced a race that could overwrite ownership and pull a branch
+  # that did not match the running container image. Removed to keep
+  # exactly one CD path.
   # -----------------------------------------------------------------------------
-  deploy:
-    name: Deploy to Production
-    needs: [test, frontend-test] # Wait for both backend and frontend tests
-    if: github.ref == 'refs/heads/main' # Only deploy on main branch
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: SSH Deploy
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USERNAME }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        port: 22
-        script: |
-          cd ${{ secrets.PROJECT_PATH }}
-          bash deploy.sh
-
-    - name: Smoke Test (Health Check)
-      run: |
-        sleep 30
-        curl -f https://${{ secrets.APP_DOMAIN }}/api/health || exit 1
