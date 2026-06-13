@@ -364,9 +364,14 @@ test_suite:
         echo "✅ Database '${DB_NAME}' already exists."
       fi
     # ── Run migrations with automatic rollback on failure ──────────────────────
+    # `--isolated` takes a Postgres advisory lock so two concurrent
+    # `production_deploy` jobs (e.g. retry + manual trigger overlap)
+    # can't both run migrations simultaneously and corrupt the
+    # migrations table. The lock is released automatically on
+    # process exit.
     - |
       echo "🗾 Running migrations..."
-      if ! APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan migrate --force; then
+      if ! APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan migrate --force --isolated; then
         echo "❌ Migration failed — rolling back to previous image..."
         APP_IMAGE=$FULL_IMAGE docker compose logs app --tail=30
         if [ -n "$ROLLBACK_IMAGE" ]; then

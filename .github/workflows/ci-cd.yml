@@ -3,10 +3,68 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ "main", "develop", "preprod" ]
+    # Docs-only / agent-prompt-only / IDE-config-only changes don't need
+    # the full ~10-min Pest + frontend pipeline. The deploy job already
+    # gates by branch, not paths, so production is unaffected.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - '.vscode/**'
+      - '.idea/**'
+      - '.cursor/**'
+      - '.agents/**'
   pull_request:
     branches: [ "main", "develop", "preprod" ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - '.vscode/**'
+      - '.idea/**'
+      - '.cursor/**'
+      - '.agents/**'
 
 jobs:
+  # -----------------------------------------------------------------------------
+  # JOB 0: Repo hygiene — secret scan + .env leak guard
+  # Runs first because it's cheap and stops a leaked credential before
+  # the rest of the pipeline gets to log/cache anything.
+  # -----------------------------------------------------------------------------
+  hygiene:
+    name: Repo Hygiene (gitleaks + .env guard)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          # gitleaks needs commit history to scan the diff on PRs and the
+          # full set on push. Shallow clones miss reachable commits.
+          fetch-depth: 0
+
+      - name: Secret scan (gitleaks)
+        # Pinned to v2.3.7 by SHA — `@v2` is a moving tag, and this step
+        # has access to GITHUB_TOKEN.
+        uses: gitleaks/gitleaks-action@cb7149b9b57195b609c63e8518d2c37e83c2a064 # v2.3.7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify no tracked .env files
+        # `.env*` is git-ignored except `.env.example` / `.env.preprod.example`.
+        # A misnamed `.env.staging` or `.env.dev.local` would slip through
+        # the negation list. Fail the pipeline if anything tracked matches
+        # the .env pattern outside the two allowed example files.
+        run: |
+          LEAKED=$(git ls-files | grep -E '^\.env(\..+)?$' | grep -vE '\.env\.(example|preprod\.example)$' || true)
+          if [ -n "$LEAKED" ]; then
+            echo "::error::Tracked .env files detected:"
+            echo "$LEAKED"
+            exit 1
+          fi
+
+
   # -----------------------------------------------------------------------------
   # JOB 1: CI (Continuous Integration) - Run Tests
   # -----------------------------------------------------------------------------
