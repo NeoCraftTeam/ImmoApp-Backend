@@ -2,7 +2,7 @@
     @if($this->hasActiveAlerts())
         @php $alerts = $this->getAlerts(); @endphp
         <div class="rounded-xl border border-amber-300/60 bg-gradient-to-br from-amber-50 to-orange-50/50 p-5 shadow-sm dark:border-amber-700/40 dark:from-amber-950/30 dark:to-orange-950/20">
-            <div class="flex items-center gap-2.5 mb-1.5">
+            <div class="flex items-center gap-3 mb-3">
                 <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/40">
                     {{-- `h-4.5 w-4.5` are not valid Tailwind utilities (the default scale skips half-steps), so the icon fell back to its intrinsic 24×24 px and overflowed the 32×32 `rounded-lg` badge. Use `h-5 w-5` (20 px) which fits the badge cleanly. --}}
                     <x-heroicon-m-exclamation-triangle class="h-5 w-5 text-amber-600 dark:text-amber-400" />
@@ -13,7 +13,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-3 mt-4 sm:grid-cols-3 md:grid-cols-5">
+            <div class="grid grid-cols-2 gap-3 mt-3 sm:grid-cols-3 md:grid-cols-5">
                 @if($alerts['inactive_landlords'] > 0)
                     <div class="rounded-xl bg-white/80 p-4 shadow-xs ring-1 ring-gray-100 dark:bg-gray-800/60 dark:ring-gray-700/50">
                         <div class="text-2xl font-bold text-amber-600 dark:text-amber-400 tracking-tight">{{ $alerts['inactive_landlords'] }}</div>
@@ -31,7 +31,11 @@
                 @endif
 
                 @if($alerts['fraud_flagged'] > 0)
-                    <a href="{{ url('/admin/ad-reports') }}" class="rounded-xl bg-white/80 p-4 shadow-xs ring-1 ring-gray-100 dark:bg-gray-800/60 dark:ring-gray-700/50 hover:ring-2 hover:ring-red-300 dark:hover:ring-red-700 transition-all">
+                    {{-- This is the only clickable tile in the grid; siblings
+                         are static <div>s. Add cursor-pointer + a visible
+                         focus ring so keyboard users can discover the
+                         link target. --}}
+                    <a href="{{ url('/admin/ad-reports') }}" class="rounded-xl bg-white/80 p-4 shadow-xs ring-1 ring-gray-100 dark:bg-gray-800/60 dark:ring-gray-700/50 hover:ring-2 hover:ring-red-300 dark:hover:ring-red-700 focus:outline-none focus:ring-2 focus:ring-red-400 dark:focus:ring-red-600 cursor-pointer transition-all">
                         <div class="text-2xl font-bold text-red-600 dark:text-red-400 tracking-tight">{{ $alerts['fraud_flagged'] }}</div>
                         <div class="text-xs font-semibold text-gray-700 dark:text-gray-300 mt-1">Fraudes suspectées</div>
                         <div class="text-[10px] leading-tight text-gray-400 dark:text-gray-500 mt-1">3+ signalements en 7 jours — Cliquez pour voir</div>

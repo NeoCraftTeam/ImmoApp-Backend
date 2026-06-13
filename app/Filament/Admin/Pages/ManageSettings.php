@@ -336,7 +336,7 @@ class ManageSettings extends Page
             ->log('Modification de la durée de vie des annonces');
 
         Notification::make()
-            ->title('Annonces mis à jour')
+            ->title('Annonces mises à jour')
             ->body("Durée de vie des annonces : {$data['ad_lifetime_days']} jours.")
             ->success()
             ->send();
