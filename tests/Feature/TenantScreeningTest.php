@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Enums\ScreeningDocumentType;
 use App\Enums\ScreeningStatus;
 use App\Models\LeaseContract;
+use App\Models\TenantScreeningDocument;
 use App\Models\TenantScreeningRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -56,8 +58,16 @@ it('creates a screening request with a token', function (): void {
     $data = $response->json('data');
     expect($data['status'])->toBe('pending')
         ->and($data['tenant_name'])->toBe('Jean Dupont')
-        ->and($data['required_documents'])->toBe(['id_card', 'salary_slip'])
-        ->and(strlen((string) $data['token']))->toBe(64);
+        ->and($data['required_documents'])->toBe(['id_card', 'salary_slip']);
+
+    // SECURITY: the token must be generated on the server but MUST NOT
+    // leak through the landlord-facing API response. Verify the row was
+    // persisted with a 64-char token without echoing it back to the
+    // caller.
+    expect($data)->not->toHaveKey('token');
+
+    $persisted = TenantScreeningRequest::query()->where('id', $data['id'])->firstOrFail();
+    expect(strlen($persisted->token))->toBe(64);
 });
 
 it('validates required_documents contains valid types', function (): void {
@@ -247,4 +257,51 @@ it('rejects review of a non-submitted dossier', function (): void {
         "/api/v1/my/lease-contracts/{$lease->id}/screening/{$screening->id}/review",
         ['decision' => 'approved']
     )->assertStatus(409);
+});
+
+// ── Security: token IDOR closeout ─────────────────────────────────
+
+it('does not expose the upload token in the landlord-facing screening payload', function (): void {
+    $owner = User::factory()->agents()->create();
+    Sanctum::actingAs($owner);
+
+    $lease = LeaseContract::factory()->create(['user_id' => $owner->id]);
+    $screening = TenantScreeningRequest::factory()->create([
+        'lease_contract_id' => $lease->id,
+        'requested_by' => $owner->id,
+    ]);
+
+    // SECURITY: the landlord receives this payload (it powers the
+    // "review screening" page in their dashboard). The 14-day upload
+    // token used to be embedded here; forwarding the page / email
+    // leaked it. Verify it never goes back to the wire.
+    $response = $this->getJson("/api/v1/my/lease-contracts/{$lease->id}/screening/{$screening->id}")
+        ->assertOk();
+
+    expect($response->json('data'))->not->toHaveKey('token');
+});
+
+it('does not expose document URLs through the public token endpoint', function (): void {
+    $screening = TenantScreeningRequest::factory()->create();
+    TenantScreeningDocument::create([
+        'screening_request_id' => $screening->id,
+        'document_type' => ScreeningDocumentType::IdCard,
+        'original_name' => 'carte-id.pdf',
+        'disk' => 'local',
+        'path' => 'screening/'.$screening->id.'/carte-id.pdf',
+        'mime_type' => 'application/pdf',
+        'size_bytes' => 12345,
+    ]);
+
+    // SECURITY: anyone who learns the 64-char token (forwarded email,
+    // screenshot, browser history on a shared computer) used to get
+    // signed S3 URLs to the tenant's PII. Public payload now lists
+    // metadata only — URLs are gated behind the landlord's
+    // authenticated `show()` route.
+    $response = $this->getJson("/api/v1/screening/{$screening->token}")
+        ->assertOk();
+
+    expect($response->json('data.documents'))->toHaveCount(1);
+    expect($response->json('data.documents.0'))->not->toHaveKey('url');
+    expect($response->json('data.documents.0.document_type'))->toBe('id_card');
 });

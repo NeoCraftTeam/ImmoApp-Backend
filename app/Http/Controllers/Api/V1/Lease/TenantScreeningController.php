@@ -15,6 +15,7 @@ use App\Models\TenantScreeningDocument;
 use App\Models\TenantScreeningRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 final class TenantScreeningController
@@ -133,11 +134,38 @@ final class TenantScreeningController
                 'required_documents' => $screening->required_documents,
                 'landlord_notes' => $screening->landlord_notes,
                 'expires_at' => $screening->expires_at->toIso8601String(),
-                'documents' => TenantScreeningDocumentResource::collection(
-                    $screening->documents
-                ),
+                // SECURITY: omit the signed S3 URL on each document.
+                // The tenant uploaded these files and already has copies;
+                // the landlord reviews them through authenticated routes.
+                // Exposing temporaryUrl() here made the 64-char token a
+                // capability that anyone who learned it (forwarded email,
+                // screenshot, browser history) could use to fetch the
+                // tenant's ID card / payslips / bank statements for 14
+                // days. We now expose only metadata so the tenant page
+                // can show "you uploaded X of Y required documents".
+                'documents' => $this->publicDocumentList($screening->documents),
             ],
         ]);
+    }
+
+    /**
+     * URL-less projection of a screening's uploaded documents, safe to
+     * return from the token-gated public endpoint.
+     *
+     * @param  Collection<int, TenantScreeningDocument>  $documents
+     * @return array<int, array<string, mixed>>
+     */
+    private function publicDocumentList(Collection $documents): array
+    {
+        return $documents->map(fn (TenantScreeningDocument $doc): array => [
+            'id' => $doc->id,
+            'document_type' => $doc->document_type->value,
+            'document_type_label' => $doc->document_type->getLabel(),
+            'original_name' => $doc->original_name,
+            'mime_type' => $doc->mime_type,
+            'size_bytes' => $doc->size_bytes,
+            'created_at' => $doc->created_at->toIso8601String(),
+        ])->values()->all();
     }
 
     public function publicUpload(UploadScreeningDocumentRequest $request, string $token): JsonResponse

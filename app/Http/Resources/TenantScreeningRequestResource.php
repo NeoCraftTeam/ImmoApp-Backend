@@ -20,7 +20,13 @@ final class TenantScreeningRequestResource extends JsonResource
             'lease_contract_id' => $this->lease_contract_id,
             'tenant_name' => $this->tenant_name,
             'tenant_email' => $this->tenant_email,
-            'token' => $this->token,
+            // SECURITY: `token` is the tenant's upload secret. It used to
+            // be returned to the landlord-facing endpoints, which meant
+            // any forwarded email or screenshot of the landlord view
+            // leaked a capability that fetched the tenant's PII (ID
+            // cards, payslips, bank statements) for 14 days. Landlords
+            // do not need the token — they review via authenticated
+            // routes — so the field is no longer emitted.
             'status' => $this->status->value,
             'status_label' => $this->status->getLabel(),
             'required_documents' => $this->required_documents,

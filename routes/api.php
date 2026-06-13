@@ -399,7 +399,9 @@ Route::prefix('v1')->group(function (): void {
     });
 
     // --- TENANT SCREENING (public — no auth required, token-based) ---
-    Route::get('/screening/{token}', [TenantScreeningController::class, 'publicShow']);
+    // The GET is rate-limited symmetrically with upload/submit so a
+    // leaked token can't be probed at unbounded rate from a single IP.
+    Route::get('/screening/{token}', [TenantScreeningController::class, 'publicShow'])->middleware('throttle:30,1');
     Route::post('/screening/{token}/upload', [TenantScreeningController::class, 'publicUpload'])->middleware('throttle:20,1');
     Route::post('/screening/{token}/submit', [TenantScreeningController::class, 'publicSubmit'])->middleware('throttle:10,1');
 
