@@ -857,17 +857,50 @@ class Ad extends Model implements HasMedia
     }
 
     /**
+     * Lazy cache for sponsorshipTier(). The flags it depends on
+     * (is_subscription_sponsored, is_boosted, boost_expires_at) flip
+     * via mutators that all funnel through setAttribute(), which
+     * resets this field — so the cache invariant holds: a null cache
+     * means "needs recompute".
+     */
+    private ?SponsorshipTier $cachedSponsorshipTier = null;
+
+    /**
      * Derive the current sponsorship tier from the underlying flags.
      *
      * Canonical truth — the persisted `subscription_tier` column is a
      * denormalised copy kept in sync via boost()/unboost() and observers.
+     *
+     * Memoised because the feed render path calls this three times per
+     * ad (twice in AdResource, once in AdFeedRankingService::bucketize).
+     * The cache lives on the instance and is dropped whenever any input
+     * flag is reassigned via setAttribute().
      */
     public function sponsorshipTier(): SponsorshipTier
     {
-        return SponsorshipTier::fromFlags(
+        return $this->cachedSponsorshipTier ??= SponsorshipTier::fromFlags(
             (bool) $this->is_subscription_sponsored,
             $this->isBoosted(),
         );
+    }
+
+    /**
+     * Reset the sponsorship-tier memo on any write to its inputs.
+     *
+     * Eloquent funnels every property write through `setAttribute`
+     * (including `forceFill`, mass assignment, and the `$ad->foo = bar`
+     * style). Intercepting it here is the cheapest place to keep the
+     * memo invariant intact without scattering invalidation calls
+     * across every mutator.
+     */
+    #[\Override]
+    public function setAttribute($key, $value)
+    {
+        if (in_array($key, ['is_subscription_sponsored', 'is_boosted', 'boost_expires_at', 'subscription_tier'], true)) {
+            $this->cachedSponsorshipTier = null;
+        }
+
+        return parent::setAttribute($key, $value);
     }
 
     /**
