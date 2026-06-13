@@ -54,8 +54,9 @@ final class RecommendationEngine implements RecommendationEngineInterface
     /** Cache TTL in minutes */
     private const int CACHE_TTL_MINUTES = 10;
 
-    /** Standard eager-load relations for ads */
-    private const array AD_EAGER_LOADS = ['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'];
+    /** Standard eager-load relations for ads. Covers every relation that
+     *  AdResource touches so list responses stay 1+1 instead of 1+N. */
+    private const array AD_EAGER_LOADS = ['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'user.media', 'user.latestTrustScore', 'agency'];
 
     /**
      * Hard cap on candidates loaded into PHP memory for scoring.

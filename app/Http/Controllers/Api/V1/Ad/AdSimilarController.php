@@ -101,7 +101,7 @@ final class AdSimilarController
                 ->whereHas('quarter', fn ($q) => $q->where('city_id', $cityId))
                 ->orderByDesc('created_at')
                 ->limit(self::LIMIT)
-                ->with(['quarter.city', 'ad_type', 'media'])
+                ->with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'user.media', 'user.latestTrustScore', 'agency'])
                 ->get();
 
             return response()->json([

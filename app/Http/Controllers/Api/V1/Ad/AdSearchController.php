@@ -199,7 +199,7 @@ final readonly class AdSearchController
 
                 return $index->search($query, $options);
             })
-                ->query(fn ($eloquent) => $eloquent->with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])->withAvg('reviews', 'rating')->withCount('reviews'));
+                ->query(fn ($eloquent) => $eloquent->with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'user.media', 'user.latestTrustScore', 'agency'])->withAvg('reviews', 'rating')->withCount('reviews'));
 
             $results = $builder->paginate($perPage);
 
@@ -257,7 +257,7 @@ final readonly class AdSearchController
             : [];
 
         $query = Ad::query()
-            ->with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency'])
+            ->with(['quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'user.media', 'user.latestTrustScore', 'agency'])
             ->visible()
             ->publiclyListed();
 

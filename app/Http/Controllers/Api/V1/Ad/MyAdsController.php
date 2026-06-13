@@ -50,6 +50,8 @@ final class MyAdsController
                 'media',
                 'user:id,firstname,lastname,avatar,agency_id,city_id',
                 'user.agency:id,name,slug,logo',
+                'user.media',
+                'user.latestTrustScore',
                 'agency:id,name,slug,logo',
             ])
             ->withAvg('reviews', 'rating')

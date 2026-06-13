@@ -141,8 +141,15 @@ final class AdResource extends JsonResource
                 $isUnlocked = $this->isUnlockedFor($user);
                 $isOwnerOrAdmin = $user?->id === $owner->id || $user?->isAdmin();
 
-                // Item 6 — Trust badge: compute tier lazily from cached trust score
-                $trustScore = $owner->trustScores()->latest('computed_at')->first();
+                // Item 6 — Trust badge: read the eager-loaded latest score.
+                // Calling `->trustScores()->latest(...)->first()` always
+                // built a fresh query and ignored any preloaded relation,
+                // firing one extra SELECT per ad. The `latestTrustScore`
+                // HasOne (defined on User) is eager-loadable via the
+                // controllers' `->with(['user.latestTrustScore', ...])`.
+                $trustScore = $owner->relationLoaded('latestTrustScore')
+                    ? $owner->latestTrustScore
+                    : $owner->trustScores()->latest('computed_at')->first();
 
                 return [
                     'id' => $owner->id,

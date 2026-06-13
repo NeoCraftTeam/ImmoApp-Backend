@@ -78,7 +78,7 @@ final class AdController
         $type = $request->input('type');
 
         $query = Ad::query()
-            ->with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')
+            ->with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'user.media', 'user.latestTrustScore', 'agency')
             ->withAvg('reviews', 'rating')
             ->withCount('reviews')
             ->visible()
@@ -159,7 +159,7 @@ final class AdController
 
         $build = function () use ($request, $fetchSize, $type, $sort) {
             $query = Ad::query()
-                ->with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'agency')
+                ->with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'user.media', 'user.latestTrustScore', 'agency')
                 ->withAvg('reviews', 'rating')
                 ->withCount('reviews')
                 ->visible()
@@ -278,7 +278,7 @@ final class AdController
             try {
                 $existingAdId = Cache::get($cacheKey);
                 if ($existingAdId) {
-                    $existing = Ad::with(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency'])
+                    $existing = Ad::with(['media', 'user.agency', 'user.city', 'user.media', 'user.latestTrustScore', 'ad_type', 'quarter.city', 'agency'])
                         ->find($existingAdId);
                     if ($existing) {
                         $this->log->info('Idempotency hit — returning existing ad', [
@@ -327,7 +327,7 @@ final class AdController
                 $lock->release();
             }
 
-            $ad->load(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency']);
+            $ad->load(['media', 'user.agency', 'user.city', 'user.media', 'user.latestTrustScore', 'ad_type', 'quarter.city', 'agency']);
 
             return response()->json([
                 'success' => true,
@@ -376,7 +376,7 @@ final class AdController
             $id
         );
 
-        $ad = Ad::with(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency', 'reviews.user'])
+        $ad = Ad::with(['media', 'user.agency', 'user.city', 'user.media', 'user.latestTrustScore', 'ad_type', 'quarter.city', 'agency', 'reviews.user'])
             ->withAvg('reviews', 'rating')
             ->withCount([
                 'reviews',
@@ -454,7 +454,7 @@ final class AdController
             $result = $this->updateAdAction->execute($ad, $data, $images, $imagesToDelete, $propertyConditionPdf);
             $ad = $result['ad'];
 
-            $ad->load(['media', 'user.agency', 'user.city', 'ad_type', 'quarter.city', 'agency']);
+            $ad->load(['media', 'user.agency', 'user.city', 'user.media', 'user.latestTrustScore', 'ad_type', 'quarter.city', 'agency']);
 
             return response()->json([
                 'success' => true,

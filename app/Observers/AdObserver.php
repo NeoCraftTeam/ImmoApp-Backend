@@ -9,13 +9,13 @@ use App\Enums\SponsorshipTier;
 use App\Enums\SubscriptionStatus;
 use App\Events\AdCreated;
 use App\Events\AdStatusTransitioned;
+use App\Jobs\PingIndexNowJob;
 use App\Models\Ad;
-use App\Services\IndexNowService;
 use Illuminate\Support\Facades\Cache;
 
 class AdObserver
 {
-    public function __construct(private readonly IndexNowService $indexNow) {}
+    public function __construct() {}
 
     /**
      * Ensure tour_config always has a default_scene set before saving.
@@ -54,7 +54,7 @@ class AdObserver
         AdCreated::dispatch($ad);
         self::invalidateFeedCache();
         if ($ad->status === AdStatus::AVAILABLE && $ad->slug) {
-            $this->indexNow->ping($this->adUrl($ad->slug));
+            PingIndexNowJob::dispatch($this->adUrl($ad->slug))->onQueue('default');
         }
     }
 
@@ -87,7 +87,7 @@ class AdObserver
         AdStatusTransitioned::dispatch($ad, $oldStatus, $newStatus);
 
         if ($newStatus === AdStatus::AVAILABLE && $ad->slug) {
-            $this->indexNow->ping($this->adUrl($ad->slug));
+            PingIndexNowJob::dispatch($this->adUrl($ad->slug))->onQueue('default');
         }
     }
 
@@ -98,7 +98,7 @@ class AdObserver
     {
         self::invalidateFeedCache();
         if ($ad->slug) {
-            $this->indexNow->ping($this->adUrl($ad->slug));
+            PingIndexNowJob::dispatch($this->adUrl($ad->slug))->onQueue('default');
         }
     }
 
