@@ -186,6 +186,17 @@ final class AdRequest extends FormRequest
                 'charges_autres' => ['nullable', 'string', 'max:500'],
 
                 // Proximity distances (metres)
+                //
+                // NOTE — `distance_shops_m`, `distance_transport_m`,
+                // `distance_school_m`, and `distance_hospital_m` are
+                // recomputed server-side by RecomputeAdDistancesJob (via
+                // NeighborhoodScorecardService) on every save when the
+                // ad has a `location`. Whatever the client posts here is
+                // overwritten asynchronously. Validation rules are kept
+                // for backwards compatibility with already-deployed
+                // clients but should be treated as ignored on the
+                // server. `distance_main_road_m` has no scorecard
+                // mapping and stays user-declared.
                 'distance_main_road_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
                 'distance_shops_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
                 'distance_transport_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
@@ -267,6 +278,17 @@ final class AdRequest extends FormRequest
                 'charges_autres' => ['nullable', 'string', 'max:500'],
 
                 // Proximity distances (metres)
+                //
+                // NOTE — `distance_shops_m`, `distance_transport_m`,
+                // `distance_school_m`, and `distance_hospital_m` are
+                // recomputed server-side by RecomputeAdDistancesJob (via
+                // NeighborhoodScorecardService) on every save when the
+                // ad has a `location`. Whatever the client posts here is
+                // overwritten asynchronously. Validation rules are kept
+                // for backwards compatibility with already-deployed
+                // clients but should be treated as ignored on the
+                // server. `distance_main_road_m` has no scorecard
+                // mapping and stays user-declared.
                 'distance_main_road_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
                 'distance_shops_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
                 'distance_transport_m' => ['nullable', 'integer', 'min:0', 'max:99999'],
