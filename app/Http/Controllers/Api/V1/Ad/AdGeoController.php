@@ -11,7 +11,6 @@ use App\Models\User;
 use App\Support\GeoLocation;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
 use Psr\Log\LoggerInterface;
 use Throwable;
 
@@ -146,38 +145,26 @@ final class AdGeoController
         $long = $geo->longitude;
 
         try {
-            $driver = DB::getDriverName();
-            if ($driver === 'pgsql') {
-                $ads = Ad::query()
-                    ->visible()
-                    ->publiclyListed()
-                    ->whereNotNull('location')
-                    ->selectRaw('ad.*')
-                    ->selectRaw('ST_DistanceSphere(location, ST_MakePoint(?, ?)) as distance', [$long, $lat])
-                    ->selectRaw('ST_Y(location) as lat')
-                    ->selectRaw('ST_X(location) as lng')
-                    ->whereRaw('ST_DistanceSphere(location, ST_MakePoint(?, ?)) <= ?', [$long, $lat, $radius])
-                    ->orderBy('distance', 'asc')
-                    ->with(['user', 'quarter.city', 'ad_type', 'media'])
-                    ->withAvg('reviews', 'rating')
-                    ->withCount('reviews')
-                    ->get();
-            } else {
-                $ads = Ad::query()
-                    ->visible()
-                    ->publiclyListed()
-                    ->whereNotNull('location')
-                    ->selectRaw('ad.*')
-                    ->selectRaw('ST_Distance_Sphere(location, ST_MakePoint(?, ?)) as distance', [$long, $lat])
-                    ->selectRaw('ST_Y(location) as lat')
-                    ->selectRaw('ST_X(location) as lng')
-                    ->whereRaw('ST_Distance_Sphere(location, ST_MakePoint(?, ?)) <= ?', [$long, $lat, $radius])
-                    ->orderBy('distance', 'asc')
-                    ->with(['user', 'quarter.city', 'ad_type', 'media'])
-                    ->withAvg('reviews', 'rating')
-                    ->withCount('reviews')
-                    ->get();
-            }
+            // PostgreSQL + PostGIS is the only supported database backend
+            // for this project (see `.env.example` DB_CONNECTION=pgsql).
+            // The previous code branched on `DB::getDriverName()` to swap
+            // in MySQL's `ST_Distance_Sphere` syntax — that branch was
+            // unreachable and added maintenance noise (two copies of the
+            // same query). Removed.
+            $ads = Ad::query()
+                ->visible()
+                ->publiclyListed()
+                ->whereNotNull('location')
+                ->selectRaw('ad.*')
+                ->selectRaw('ST_DistanceSphere(location, ST_MakePoint(?, ?)) as distance', [$long, $lat])
+                ->selectRaw('ST_Y(location) as lat')
+                ->selectRaw('ST_X(location) as lng')
+                ->whereRaw('ST_DistanceSphere(location, ST_MakePoint(?, ?)) <= ?', [$long, $lat, $radius])
+                ->orderBy('distance', 'asc')
+                ->with(['user', 'quarter.city', 'ad_type', 'media'])
+                ->withAvg('reviews', 'rating')
+                ->withCount('reviews')
+                ->get();
 
             $coordinates = $ads->map(fn (Ad $ad) => [
                 'id' => $ad->id,
