@@ -9,6 +9,7 @@ use App\Jobs\RecordSponsoredImpressionsJob;
 use App\Models\Ad;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Distributes a candidate pool of ads across a Facebook-style feed.
@@ -72,17 +73,34 @@ final class AdFeedRankingService
         $page = collect();
         $advertiserCounts = [];
 
+        // Telemetry — every slot decision is bucketed into one of four
+        // outcomes so we can quantify under-fill in production. Dropping
+        // the first-page 3× overfetch from `cursorPaginate` (Gap 9)
+        // restored the cursor contract but at the cost of giving
+        // `distribute()` a narrower candidate pool. The numbers here
+        // tell us whether the 60/40 slot template still fills naturally
+        // from the cursor window or whether a wider out-of-band pool is
+        // needed (e.g. exclude_ids-tracked feed).
+        $picksByOutcome = [
+            'primary' => 0,
+            'fallback' => 0,
+            'relaxed' => 0,
+            'unfilled' => 0,
+        ];
+
         for ($slot = 0; $slot < $perPage; $slot++) {
             $primary = self::SLOT_TEMPLATE[$slot % 10];
             $isTopSlot = $slot < self::TOP_SLOT_COUNT;
 
             $pick = $this->pickFromTier($primary, $buckets, $advertiserCounts, $isTopSlot);
+            $outcome = $pick !== null ? 'primary' : null;
 
             if ($pick === null) {
                 foreach (self::FALLBACK_CHAIN[$primary->value] as $fallback) {
                     $pick = $this->pickFromTier($fallback, $buckets, $advertiserCounts, $isTopSlot);
 
                     if ($pick !== null) {
+                        $outcome = 'fallback';
                         break;
                     }
                 }
@@ -92,11 +110,17 @@ final class AdFeedRankingService
             if ($pick === null && $isTopSlot) {
                 $pick = $this->pickFromTier($primary, $buckets, $advertiserCounts, false)
                     ?? $this->pickFromTier(SponsorshipTier::ORGANIC, $buckets, $advertiserCounts, false);
+                if ($pick !== null) {
+                    $outcome = 'relaxed';
+                }
             }
 
             if ($pick === null) {
+                $picksByOutcome['unfilled']++;
                 break;
             }
+
+            $picksByOutcome[$outcome]++;
 
             // Tag the slot on the model instance so recordImpressions() can
             // log the placement. The attribute is transient — AdResource never
@@ -109,6 +133,29 @@ final class AdFeedRankingService
             if ($key !== null) {
                 $advertiserCounts[$key] = ($advertiserCounts[$key] ?? 0) + 1;
             }
+        }
+
+        // Single structured log per render so Telescope / log aggregators
+        // can compute ratios across requests. `picks_total` excludes
+        // unfilled slots (they're tallied separately so a fully-empty
+        // page is distinguishable from a perfectly-filled page).
+        $picksTotal = $picksByOutcome['primary']
+            + $picksByOutcome['fallback']
+            + $picksByOutcome['relaxed'];
+
+        if ($picksTotal > 0 || $picksByOutcome['unfilled'] > 0) {
+            Log::debug('feed.distribute', [
+                'per_page' => $perPage,
+                'candidates' => $candidates->count(),
+                'picks_total' => $picksTotal,
+                'picks' => $picksByOutcome,
+                // Primary fill rate — 1.0 means the slot template was
+                // honoured strictly. Drops as `distribute()` is forced
+                // to substitute from the fallback chain.
+                'primary_rate' => $picksTotal > 0
+                    ? round($picksByOutcome['primary'] / $picksTotal, 3)
+                    : 0.0,
+            ]);
         }
 
         return $page;
