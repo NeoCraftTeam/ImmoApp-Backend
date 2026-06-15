@@ -257,11 +257,6 @@ final class AdStatusController
             'transaction_type' => ['sometimes', 'nullable', 'string', 'in:location,vente'],
             'latitude' => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
             'longitude' => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
-            'distance_main_road_m' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:99999'],
-            'distance_shops_m' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:99999'],
-            'distance_transport_m' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:99999'],
-            'distance_school_m' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:99999'],
-            'distance_hospital_m' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:99999'],
             'attributes' => ['sometimes', 'nullable', 'array', 'max:50'],
             'attributes.*' => [
                 'string',

@@ -10,7 +10,6 @@ use App\Enums\SubscriptionStatus;
 use App\Events\AdCreated;
 use App\Events\AdStatusTransitioned;
 use App\Jobs\PingIndexNowJob;
-use App\Jobs\RecomputeAdDistancesJob;
 use App\Models\Ad;
 use Illuminate\Support\Facades\Cache;
 
@@ -57,14 +56,6 @@ class AdObserver
         if ($ad->status === AdStatus::AVAILABLE && $ad->slug) {
             PingIndexNowJob::dispatch($this->adUrl($ad->slug))->onQueue('default');
         }
-
-        // Compute server-side proximity distances from the scorecard
-        // service. Previously these were user-typed fields on the form
-        // (a guess at best); now they're authoritative server values
-        // matching the same nearest-POI logic that powers KeyScore.
-        if ($ad->location !== null) {
-            RecomputeAdDistancesJob::dispatch($ad->id)->onQueue('default');
-        }
     }
 
     /**
@@ -79,14 +70,6 @@ class AdObserver
         // or unpublished ads should appear/disappear immediately.
         if ($ad->wasChanged(['status', 'is_visible', 'boost_score', 'is_subscription_sponsored', 'subscription_tier'])) {
             self::invalidateFeedCache();
-        }
-
-        // Recompute the persisted proximity distances when the ad's
-        // geolocation actually moves. Skip when only a sibling column
-        // changed (status / visibility / etc.) so we don't fire a
-        // queued job on every routine save.
-        if ($ad->wasChanged('location') && $ad->location !== null) {
-            RecomputeAdDistancesJob::dispatch($ad->id)->onQueue('default');
         }
 
         if (!$ad->wasChanged('status')) {

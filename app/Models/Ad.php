@@ -146,11 +146,6 @@ class Ad extends Model implements HasMedia
         'tour_published_at',
         // SEC-007: is_verified, verified_at, verification_status, verification_notes,
         // verification_requested_at excluded — use forceFill() in admin/verification flows only.
-        'distance_main_road_m',
-        'distance_shops_m',
-        'distance_transport_m',
-        'distance_school_m',
-        'distance_hospital_m',
         'draft_payload',
         'prescreening_questions',
     ];

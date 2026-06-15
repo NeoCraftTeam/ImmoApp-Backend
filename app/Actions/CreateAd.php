@@ -59,13 +59,6 @@ final readonly class CreateAd
                 'charges_electricite' => $data['charges_electricite'] ?? null,
                 'charges_autres' => $data['charges_autres'] ?? null,
 
-                // Proximity distances (metres)
-                'distance_main_road_m' => $data['distance_main_road_m'] ?? null,
-                'distance_shops_m' => $data['distance_shops_m'] ?? null,
-                'distance_transport_m' => $data['distance_transport_m'] ?? null,
-                'distance_school_m' => $data['distance_school_m'] ?? null,
-                'distance_hospital_m' => $data['distance_hospital_m'] ?? null,
-
                 // Note: is_boost_requested is a frontend-only flag; actual boost
                 // is applied post-approval via is_boosted / boost_score columns.
             ]);
