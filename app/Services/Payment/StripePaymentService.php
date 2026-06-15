@@ -620,7 +620,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
      *
      * @param  array<string, mixed>  $payload  Decoded payload (we re-encode for verification)
      * @param  array<string, mixed>  $headers
-     * @return array{event: string, tx_ref: string, status: string, amount: float, currency: string, payment_method: string|null, raw: array<string, mixed>}
+     * @return array{event: string, event_id: string|null, tx_ref: string, status: string, amount: float, currency: string, payment_method: string|null, raw: array<string, mixed>}
      */
     public function handleWebhook(array $payload, array $headers): array
     {
@@ -653,10 +653,11 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
 
         $object = $event->data->object ?? null;
         $eventName = (string) $event->type;
+        $eventId = (string) $event->id;
 
         // Checkout Session events (ui_mode: 'custom' — Payment Element flow).
         if ($object instanceof CheckoutSession) {
-            return $this->normaliseCheckoutSessionEvent($eventName, $object);
+            return $this->normaliseCheckoutSessionEvent($eventName, $eventId, $object);
         }
 
         // We only care about PaymentIntent events for the orchestrator.
@@ -664,6 +665,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
         if (!$object instanceof PaymentIntent) {
             return [
                 'event' => $eventName,
+                'event_id' => $eventId !== '' ? $eventId : null,
                 'tx_ref' => '',
                 'status' => 'ignored',
                 'amount' => 0.0,
@@ -689,6 +691,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
 
         return [
             'event' => $eventName,
+            'event_id' => $eventId !== '' ? $eventId : null,
             'tx_ref' => (string) ($object->metadata->tx_ref ?? ''),
             'status' => $normalised['status'],
             'amount' => $normalised['amount'],
@@ -705,9 +708,9 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
      * The XAF amount is read from `session.metadata.xaf_amount` (written at
      * session creation time) to avoid a lossy EUR-cents → XAF round-trip.
      *
-     * @return array{event: string, tx_ref: string, status: string, amount: float, currency: string, payment_method: string|null, raw: array<string, mixed>}
+     * @return array{event: string, event_id: string|null, tx_ref: string, status: string, amount: float, currency: string, payment_method: string|null, raw: array<string, mixed>}
      */
-    private function normaliseCheckoutSessionEvent(string $eventName, CheckoutSession $session): array
+    private function normaliseCheckoutSessionEvent(string $eventName, string $eventId, CheckoutSession $session): array
     {
         $txRef = (string) ($session->metadata->tx_ref ?? '');
         $paymentStatus = (string) ($session->payment_status ?? '');
@@ -725,6 +728,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
 
         return [
             'event' => $eventName,
+            'event_id' => $eventId !== '' ? $eventId : null,
             'tx_ref' => $txRef,
             'status' => $normalisedStatus,
             'amount' => $xafAmount,

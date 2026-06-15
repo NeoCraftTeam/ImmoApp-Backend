@@ -180,6 +180,7 @@ final readonly class GeniusPayPaymentService implements PaymentGatewayInterface
         if ($event === 'webhook.test') {
             return [
                 'event' => $event,
+                'event_id' => null,
                 'tx_ref' => '',
                 'status' => 'ignored',
                 'amount' => 0.0,
@@ -194,8 +195,19 @@ final readonly class GeniusPayPaymentService implements PaymentGatewayInterface
         $txRef = $this->resolveTxRefFromPayload($data);
         $normalised = $this->normaliseTransaction($data);
 
+        // GeniusPay does not surface a stable event identifier the way
+        // Stripe does (`event.id` = `evt_xxx`). The (event-name +
+        // tx_ref + timestamp + signature) tuple, however, is unique
+        // per real provider attempt — same retry replays the same
+        // signed timestamp. Hash it so the orchestrator can dedupe.
+        $eventId = 'gp_'.hash(
+            'sha256',
+            $event.'|'.$txRef.'|'.$timestamp.'|'.$signature
+        );
+
         return [
             'event' => $event,
+            'event_id' => $eventId,
             'tx_ref' => $txRef,
             'status' => $normalised['status'],
             'amount' => $normalised['amount'],

@@ -17,6 +17,7 @@ use App\Models\PointPackage;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Support\PaymentTransactionLookup;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -386,6 +387,36 @@ final readonly class PaymentService
 
         $txRef = $data['tx_ref'];
 
+        // ── Event-ID deduplication ──────────────────────────────────────
+        // Stripe and GeniusPay both retry on non-200 responses. The
+        // orchestrator's row-lock + terminal-state guards prevent
+        // double-credit on simultaneous retries within a single
+        // request lifecycle, but a retry that arrives minutes later
+        // (after the payment is already SUCCESS) would normally
+        // still hit the gateway service, the DB lookup, the
+        // transaction begin, and only then short-circuit on the
+        // terminal-state guard. With many retries on a single event,
+        // that adds load and noise.
+        //
+        // Cache the event id for 24 h post-success — well past
+        // Stripe's 3-day retry window and GeniusPay's hours-long
+        // schedule. A second processWebhook call for the same event
+        // returns the cached payload without re-running side effects.
+        $eventId = $data['event_id'] ?? null;
+        if (is_string($eventId) && $eventId !== '') {
+            $cacheKey = 'payment_webhook_event:'.$gatewayName.':'.$eventId;
+            $cached = Cache::get($cacheKey);
+            if (is_array($cached)) {
+                Log::info('Webhook replay short-circuit (event already processed)', [
+                    'gateway' => $gatewayName,
+                    'event_id' => $eventId,
+                    'tx_ref' => $txRef,
+                ]);
+
+                return $cached;
+            }
+        }
+
         // CRITICAL: lockForUpdate must run inside a DB::transaction() so the row
         // lock is held until commit. Without this, two concurrent webhooks can both
         // observe a non-terminal payment and trigger duplicate side-effects.
@@ -519,6 +550,20 @@ final readonly class PaymentService
                     PaymentFailed::dispatch($payment);
                 }
             }
+        }
+
+        // Record the event for dedup AFTER the side effects committed,
+        // so a crash mid-transaction still allows the next retry to
+        // re-run the orchestrator. 24 h window covers Stripe's
+        // 3-day exponential retry schedule well past the point where
+        // a duplicate would still be ambiguous (longer windows risk
+        // legitimate replays after long outages being suppressed).
+        if (is_string($eventId) && $eventId !== '' && $eventToDispatch['event'] !== null) {
+            Cache::put(
+                'payment_webhook_event:'.$gatewayName.':'.$eventId,
+                $data,
+                now()->addHours(24),
+            );
         }
 
         return $data;
