@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Support\TourAssetToken;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
 /** @mixin Ad */
@@ -96,6 +97,14 @@ final class AdResource extends JsonResource
             'is_subscription_sponsored' => (bool) ($this->is_subscription_sponsored ?? false),
             'sponsorship_tier' => $this->sponsorshipTier()->value,
 
+            // KeyScore — cached integer (0–100) read from the same hourly
+            // cache key written by `KeyScoreController::show`. Cards on the
+            // feed render the badge straight from this field when warm and
+            // fall back to the per-ad `/keyscore` fetch when null. We never
+            // compute here: a feed page must not pay 15× the cost of a
+            // detail-page request.
+            'keyscore' => $this->keyscoreFromCache(),
+
             // Premium info - only visible when unlocked
             'deposit_amount' => $this->when($this->isUnlockedFor($user), $this->deposit_amount),
             'minimum_lease_duration' => $this->when($this->isUnlockedFor($user), $this->minimum_lease_duration),
@@ -179,6 +188,26 @@ final class AdResource extends JsonResource
             ]),
             'reviews' => ReviewResource::collection($this->whenLoaded('reviews')),
         ];
+    }
+
+    /**
+     * Cache-only read of the ad's KeyScore. Mirrors the key shape used
+     * by `KeyScoreController::show`:
+     * `keyscore_<adId>_<Ymd_H>`. Returning `null` on miss is the contract
+     * the frontend expects — `KeyScoreBadge` falls back to its per-ad
+     * fetch then. Never computes; never writes; never touches the DB.
+     */
+    private function keyscoreFromCache(): ?int
+    {
+        $cacheKey = 'keyscore_'.$this->id.'_'.now()->format('Ymd_H');
+        $cached = Cache::get($cacheKey);
+        if (!is_array($cached)) {
+            return null;
+        }
+
+        $score = $cached['score'] ?? null;
+
+        return is_int($score) ? $score : null;
     }
 
     private function buildSeoTitle(): string
