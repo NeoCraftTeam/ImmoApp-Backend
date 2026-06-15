@@ -151,14 +151,17 @@ final class AdController
             && $type === null
             && $sort === 'newest';
 
-        // First-page overfetch factor: on the initial sponsored-feed page we
-        // pull 3× the requested page size so AdFeedRankingService::distribute()
-        // has enough per-tier inventory to honour the 60/40 slot template.
-        // Subsequent pages stay on 1× so cursor pagination remains correct.
-        $isFirstPage = !$request->filled('cursor');
-        $fetchSize = ($sort === 'newest' && $isFirstPage) ? $perPage * 3 : $perPage;
-
-        $build = function () use ($request, $fetchSize, $type, $sort) {
+        // Cursor pagination uses `$perPage` consistently so:
+        //   1. `meta.per_page` matches the user-facing limit;
+        //   2. The cursor advances by `$perPage` items per page — when total
+        //      inventory is smaller than a multiple of `$perPage`, the
+        //      remaining rows still ship on subsequent pages.
+        // `AdFeedRankingService::distribute()` runs on whatever lands in the
+        // page and degrades to best-effort tier filling when inventory is
+        // thin. A wider candidate pool for the slot template would have to be
+        // assembled out-of-band (e.g. fetched separately and woven into the
+        // paginator), not by inflating cursorPaginate's page size.
+        $build = function () use ($request, $perPage, $type, $sort) {
             $query = Ad::query()
                 ->with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'user.media', 'user.latestTrustScore', 'agency')
                 ->withAvg('reviews', 'rating')
@@ -183,7 +186,7 @@ final class AdController
                 default => $query->orderBySponsorship(),
             };
 
-            return $ordered->cursorPaginate($fetchSize);
+            return $ordered->cursorPaginate($perPage);
         };
 
         $paginator = $isFirstPageGuest
