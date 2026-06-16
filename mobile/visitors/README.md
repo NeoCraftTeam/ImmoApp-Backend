@@ -72,7 +72,7 @@ eas build --platform ios       # requires Apple Developer + EAS account
 eas build --platform android   # builds an AAB ready for Play Store
 ```
 
-## What's shipped (v0.3)
+## What's shipped (v0.4)
 
 | Screen / feature                | File                                  | Status |
 | ------------------------------- | ------------------------------------- | ------ |
@@ -81,12 +81,14 @@ eas build --platform android   # builds an AAB ready for Play Store
 | Register                        | `app/(auth)/register.tsx`             | ✅      |
 | Tabs shell                      | `app/(tabs)/_layout.tsx`              | ✅      |
 | Home feed                       | `app/(tabs)/home.tsx`                 | ✅      |
-| Search (text + filter sheet)    | `app/(tabs)/search.tsx`               | ✅ v0.3 |
+| Search (text + filter sheet)    | `app/(tabs)/search.tsx`               | ✅      |
 | Favorites                       | `app/(tabs)/favorites.tsx`            | ✅      |
-| Account                         | `app/(tabs)/account.tsx`              | ✅      |
+| Account (+ Tools section)       | `app/(tabs)/account.tsx`              | ✅      |
 | Ad detail                       | `app/ads/[slug].tsx`                  | ✅      |
-| Favorite toggle (card + detail) | `src/components/FavoriteButton.tsx`   | ✅ v0.3 |
-| Share sheet (ad detail)         | `app/ads/[slug].tsx`                  | ✅ v0.3 |
+| Favorite toggle (card + detail) | `src/components/FavoriteButton.tsx`   | ✅      |
+| Share sheet (ad detail)         | `app/ads/[slug].tsx`                  | ✅      |
+| Compare flow (4-ad picker)      | `app/compare.tsx` + `CompareBar`      | ✅ v0.4 |
+| Rent estimator                  | `app/estimator.tsx`                   | ✅ v0.4 |
 
 Plus the foundation:
 
@@ -100,7 +102,7 @@ Plus the foundation:
 
 ## What's NOT shipped yet — roadmap
 
-These are wired into the audit but not implemented in this v0.3 cut:
+These are wired into the audit but not implemented in this v0.4 cut:
 
 - **Nearby**: map-backed proximity search (needs `@rnmapbox/maps`)
 - **Ad detail map**: 3D tour viewer, NeighborhoodScorecard, DirectionsPanel

@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { SessionProvider } from '@/auth/SessionProvider';
+import { CompareProvider } from '@/providers/CompareProvider';
 import { QueryProvider } from '@/providers/QueryProvider';
 import config from '../tamagui.config';
 
@@ -50,8 +51,10 @@ export default function RootLayout() {
           <Theme name={scheme === 'dark' ? 'dark' : 'light'}>
             <QueryProvider>
               <SessionProvider>
-                <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-                <Slot />
+                <CompareProvider>
+                  <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+                  <Slot />
+                </CompareProvider>
               </SessionProvider>
             </QueryProvider>
           </Theme>

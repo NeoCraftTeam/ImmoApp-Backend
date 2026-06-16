@@ -7,6 +7,7 @@ import { Button, H2, H4, Paragraph, ScrollView, Separator, XStack, YStack } from
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
+import { CompareButton } from '@/components/CompareButton';
 import { FavoriteButton } from '@/components/FavoriteButton';
 import { useAd } from '@/hooks/useAd';
 import { useSession } from '@/auth/SessionProvider';
@@ -150,6 +151,7 @@ export default function AdDetail() {
                 </YStack>
               </Pressable>
               <XStack gap="$2">
+                <CompareButton ad={ad} size="medium" />
                 <Pressable
                   onPress={handleShare}
                   hitSlop={8}

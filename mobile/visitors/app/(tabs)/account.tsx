@@ -1,6 +1,6 @@
-import { LogOut, User } from '@tamagui/lucide-icons';
+import { Calculator, ChevronRight, LogOut, User } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
-import { Alert } from 'react-native';
+import { Alert, Pressable } from 'react-native';
 import { Button, H2, H4, Paragraph, Separator, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -112,6 +112,8 @@ export default function AccountTab() {
 
           <Separator />
 
+          <ToolsSection />
+
           <Button
             size="$5"
             backgroundColor="$slate100"
@@ -147,8 +149,61 @@ export default function AccountTab() {
           >
             {t('account.signUp')}
           </Button>
+
+          <Separator />
+          <ToolsSection />
         </YStack>
       )}
+    </YStack>
+  );
+}
+
+/**
+ * "Outils" / Tools section — accessible to both guest and authed
+ * visitors. Currently links to the estimator; future entries (compare
+ * jump, currency picker, etc.) drop in here as additional rows.
+ */
+function ToolsSection() {
+  const router = useRouter();
+  return (
+    <YStack gap="$2">
+      <Paragraph size="$3" color="$slate500" textTransform="uppercase">
+        {t('account.tools')}
+      </Paragraph>
+      <Pressable
+        onPress={() => router.push('/estimator')}
+        accessibilityRole="link"
+        accessibilityLabel={t('estimator.title')}
+      >
+        <XStack
+          paddingVertical="$3"
+          paddingHorizontal="$3"
+          borderRadius={12}
+          backgroundColor="$slate100"
+          alignItems="center"
+          gap="$3"
+        >
+          <YStack
+            width={36}
+            height={36}
+            borderRadius={18}
+            backgroundColor="$brandAlpha10"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Calculator size={18} color="$brand" />
+          </YStack>
+          <YStack flex={1}>
+            <Paragraph fontWeight="700" color="$slate700">
+              {t('estimator.title')}
+            </Paragraph>
+            <Paragraph size="$2" color="$slate500">
+              {t('estimator.subtitle')}
+            </Paragraph>
+          </YStack>
+          <ChevronRight size={18} color="$slate500" />
+        </XStack>
+      </Pressable>
     </YStack>
   );
 }

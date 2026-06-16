@@ -2,6 +2,7 @@ import { Link } from 'expo-router';
 import { Image } from 'expo-image';
 import { Card, H4, Paragraph, XStack, YStack } from 'tamagui';
 
+import { CompareButton } from '@/components/CompareButton';
 import { FavoriteButton } from '@/components/FavoriteButton';
 import { t } from '@/i18n';
 import type { Ad } from '@/types/ad';
@@ -50,16 +51,18 @@ export function AdCard({ ad, priority = false }: { ad: Ad; priority?: boolean })
               accessibilityLabel={`Photo principale de ${ad.title}`}
             />
           ) : null}
-          {/* Heart button — overlaid top-right on the card image. The
-              chip variant gives it a translucent white background so
-              the icon stays legible whatever the underlying photo. */}
-          <YStack position="absolute" top={8} right={8} zIndex={2}>
+          {/* Heart + compare buttons — overlaid top-right on the card
+              image. The chip variants give them a translucent white
+              background so the icons stay legible whatever the
+              underlying photo. */}
+          <XStack position="absolute" top={8} right={8} zIndex={2} gap="$1">
+            <CompareButton ad={ad} size="small" />
             <FavoriteButton
               adId={ad.id}
               isFavorited={ad.is_favorited ?? false}
               size="small"
             />
-          </YStack>
+          </XStack>
         </YStack>
 
         <YStack padding="$3" gap="$1">

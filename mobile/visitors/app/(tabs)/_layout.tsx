@@ -1,7 +1,8 @@
 import { Tabs } from 'expo-router';
 import { Heart, Home, Search, User } from '@tamagui/lucide-icons';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
 
+import { CompareBar } from '@/components/CompareBar';
 import { t } from '@/i18n';
 
 /**
@@ -26,49 +27,54 @@ const ICON_SIZE = 22;
 
 export default function TabsLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: false,
-        tabBarActiveTintColor: '$brand',
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
-        tabBarStyle: {
-          // The native tab bar uses MUI-spec heights on iOS; bump it
-          // slightly on Android so the icon + label don't crowd each
-          // other on a tall-letterbox device (Pixel-class screens).
-          height: Platform.OS === 'android' ? 64 : undefined,
-          paddingTop: 6,
-        },
-        tabBarHideOnKeyboard: Platform.OS === 'android',
-      }}
-    >
-      <Tabs.Screen
-        name="home"
-        options={{
-          title: t('tabs.home'),
-          tabBarIcon: ({ color }) => <Home size={ICON_SIZE} color={color} />,
+    <View style={{ flex: 1 }}>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarActiveTintColor: '$brand',
+          tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+          tabBarStyle: {
+            // The native tab bar uses MUI-spec heights on iOS; bump it
+            // slightly on Android so the icon + label don't crowd each
+            // other on a tall-letterbox device (Pixel-class screens).
+            height: Platform.OS === 'android' ? 64 : undefined,
+            paddingTop: 6,
+          },
+          tabBarHideOnKeyboard: Platform.OS === 'android',
         }}
-      />
-      <Tabs.Screen
-        name="search"
-        options={{
-          title: t('tabs.search'),
-          tabBarIcon: ({ color }) => <Search size={ICON_SIZE} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="favorites"
-        options={{
-          title: t('tabs.favorites'),
-          tabBarIcon: ({ color }) => <Heart size={ICON_SIZE} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="account"
-        options={{
-          title: t('tabs.account'),
-          tabBarIcon: ({ color }) => <User size={ICON_SIZE} color={color} />,
-        }}
-      />
-    </Tabs>
+      >
+        <Tabs.Screen
+          name="home"
+          options={{
+            title: t('tabs.home'),
+            tabBarIcon: ({ color }) => <Home size={ICON_SIZE} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="search"
+          options={{
+            title: t('tabs.search'),
+            tabBarIcon: ({ color }) => <Search size={ICON_SIZE} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="favorites"
+          options={{
+            title: t('tabs.favorites'),
+            tabBarIcon: ({ color }) => <Heart size={ICON_SIZE} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="account"
+          options={{
+            title: t('tabs.account'),
+            tabBarIcon: ({ color }) => <User size={ICON_SIZE} color={color} />,
+          }}
+        />
+      </Tabs>
+      {/* Floating compare bar — auto-hides when the compare set is
+          empty, so users browsing without comparing never see it. */}
+      <CompareBar />
+    </View>
   );
 }
