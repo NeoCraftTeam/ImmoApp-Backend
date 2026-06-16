@@ -14,12 +14,21 @@ use Illuminate\Support\Facades\Cache;
 
 final class RentEstimatorController
 {
-    private const string CACHE_VERSION = 'v2';
+    private const string CACHE_VERSION = 'v3';
 
     /** Plausible monthly rent per m² (FCFA) — reduces pollution from vente prices or bad data */
     private const float PPSM_MIN = 50.0;
 
     private const float PPSM_MAX = 30_000.0;
+
+    /**
+     * Below this number of comparables the percentile estimate is more
+     * a coin-flip than a forecast — a single luxury villa in an otherwise-
+     * cheap quarter would skew p75 by 5×. Flag the response so the
+     * frontend can render an "estimation indicative" disclaimer and avoid
+     * presenting a min/max range that doesn't reflect a real distribution.
+     */
+    private const int RELIABLE_SAMPLE_MIN = 5;
 
     /**
      * @OA\Post(
@@ -112,6 +121,10 @@ final class RentEstimatorController
                 'p75' => round($p75),
             ],
             'sample_count' => $count,
+            // True when the percentile estimate stands on a thin enough
+            // sample that the frontend should show a "indicative" hint
+            // instead of presenting it as a confident forecast.
+            'is_unreliable' => $count < self::RELIABLE_SAMPLE_MIN,
             'surface' => $data['surface'],
             'type_scope_matched' => $typeScopeMatched,
             'bedrooms_scope_matched' => $bedroomsScopeMatched,
