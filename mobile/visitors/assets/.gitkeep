@@ -1,0 +1,4 @@
+# Placeholder — icon.png, splash-icon.png, adaptive-icon.png, favicon.png
+# go here. The Expo CLI generates default placeholders on first run if
+# they're missing, but for production builds you'll want branded assets
+# matching the web app's icon set in keyhome-frontend-next/public/icons/.

@@ -1,0 +1,39 @@
+node_modules/
+.expo/
+dist/
+web-build/
+.metro-health-check*
+
+# macOS
+.DS_Store
+
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Local env
+.env
+.env.local
+.env*.local
+
+# Native build artefacts
+ios/Pods/
+ios/build/
+ios/Podfile.lock
+ios/*.xcworkspace
+ios/*.xcodeproj
+android/.gradle/
+android/.idea/
+android/app/build/
+android/build/
+android/local.properties
+*.keystore
+*.jks
+
+# IDE
+.vscode/
+.idea/
+
+# Generated
+expo-env.d.ts
