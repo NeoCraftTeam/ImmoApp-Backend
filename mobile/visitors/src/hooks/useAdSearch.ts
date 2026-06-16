@@ -3,18 +3,27 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import type { Ad, AdFeedResponse } from '@/types/ad';
+import {
+  EMPTY_FILTERS,
+  activeFilterCount,
+  filtersToParams,
+  type AdFilters,
+} from '@/types/filters';
 
 /**
- * Lightweight text search backed by `/ads` (the offset paginator).
- * Sends `q` as a free-text query — the backend matches on title,
- * description, and quarter / city names.
+ * Search backed by `/ads` (the offset paginator). Sends `q` as a
+ * free-text query — the backend matches on title, description, and
+ * quarter / city names — plus an optional `AdFilters` payload that
+ * narrows by price / surface / transaction type.
  *
- * Disabled until `query` has at least 2 chars so a single-character
- * keypress doesn't fire a backend request. Once enabled, debouncing
- * is left to the calling screen (which uses `useDebounce` from a
- * lightweight hook below).
+ * The hook stays enabled as long as either the text query OR any
+ * filter is active, so a user can browse "all under 200k FCFA" with
+ * no text query and still get results.
  */
-export function useAdSearch(query: string, enabled: boolean) {
+export function useAdSearch(query: string, filters: AdFilters = EMPTY_FILTERS) {
+  const hasFilters = activeFilterCount(filters) > 0;
+  const hasQuery = query.trim().length >= 2;
+
   return useInfiniteQuery<
     AdFeedResponse,
     Error,
@@ -22,15 +31,21 @@ export function useAdSearch(query: string, enabled: boolean) {
     readonly unknown[],
     number
   >({
-    queryKey: ['ad-search', query] as const,
+    queryKey: ['ad-search', query, filters] as const,
     queryFn: async ({ pageParam }) => {
+      const params: Record<string, string | number> = {
+        per_page: 15,
+        page: pageParam,
+        ...filtersToParams(filters),
+      };
+      if (hasQuery) params.q = query;
       const { data } = await apiClient.get<AdFeedResponse>(ENDPOINTS.ads.list, {
-        params: { q: query, per_page: 15, page: pageParam },
+        params,
       });
       return data;
     },
     initialPageParam: 1,
-    getNextPageParam: (last, allPages) => {
+    getNextPageParam: (last) => {
       const meta = last.meta as undefined | { current_page?: number; last_page?: number };
       if (meta?.current_page == null || meta.last_page == null) return undefined;
       return meta.current_page < meta.last_page
@@ -38,7 +53,7 @@ export function useAdSearch(query: string, enabled: boolean) {
         : undefined;
     },
     select: (data) => data.pages.flatMap((p) => p.data),
-    enabled: enabled && query.trim().length >= 2,
+    enabled: hasQuery || hasFilters,
     staleTime: 60 * 1000,
   });
 }

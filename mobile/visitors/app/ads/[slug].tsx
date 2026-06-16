@@ -1,24 +1,27 @@
+import { ArrowLeft, Share2 } from '@tamagui/lucide-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, Share, useWindowDimensions } from 'react-native';
 import { Button, H2, H4, Paragraph, ScrollView, Separator, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
+import { FavoriteButton } from '@/components/FavoriteButton';
 import { useAd } from '@/hooks/useAd';
 import { useSession } from '@/auth/SessionProvider';
 import { t } from '@/i18n';
 
 /**
  * Ad-detail screen — the conversion surface. Layout follows the web
- * `AdDetailClient`: image carousel header, title + price, key facts
- * row (bedrooms / surface / parking / keyscore), description, location
- * teaser, and the primary CTA "Contacter". Contact prompts sign-in
- * when the visitor is anonymous, matching the web's gating.
+ * `AdDetailClient`: image carousel header (with overlaid back / share /
+ * favorite chips), title + price, key facts row (bedrooms / surface /
+ * parking / keyscore), description, location teaser, and the primary
+ * CTA "Contacter". Contact prompts sign-in when the visitor is
+ * anonymous, matching the web's gating.
  *
- * Map + neighborhood scorecard + directions panel are deliberately
- * out of scope for the v1 — they require @rnmapbox/maps which adds a
+ * Map + neighborhood scorecard + directions panel are deliberately out
+ * of scope for v0.3 — they require `@rnmapbox/maps` which adds a
  * ~20 MB native dependency and warrants its own setup PR.
  */
 export default function AdDetail() {
@@ -67,9 +70,22 @@ export default function AdDetail() {
       router.push('/(auth)/login');
       return;
     }
-    // Real contact flow lands in a follow-up — for v1 we surface the
-    // intent so testers know the button is wired up to navigation.
+    // Real contact flow (chat / WhatsApp deep-link) lands in a follow-up.
     router.push('/(auth)/login');
+  };
+
+  const handleShare = async () => {
+    // RN's built-in Share opens the OS sheet — native iOS / Android
+    // UX without extra deps. URL prefers the backend's canonical_url
+    // when emitted; falls back to a deep-link template.
+    try {
+      const url =
+        (ad as unknown as { canonical_url?: string }).canonical_url ??
+        `https://app.keyhome.app/ads/${ad.slug ?? ad.id}`;
+      await Share.share({ url, message: `${ad.title}\n${url}` });
+    } catch {
+      /* user cancelled — no toast needed */
+    }
   };
 
   return (
@@ -103,6 +119,62 @@ export default function AdDetail() {
                 />
               )}
             />
+
+            {/* Top-left back arrow + top-right share / fav chips. Sits
+                above the hero so the back affordance is reachable even
+                when the user scrolled down the hero carousel. */}
+            <XStack
+              position="absolute"
+              top={insets.top + 8}
+              left={12}
+              right={12}
+              justifyContent="space-between"
+              alignItems="center"
+              pointerEvents="box-none"
+            >
+              <Pressable
+                onPress={() => router.back()}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.back')}
+              >
+                <YStack
+                  width={36}
+                  height={36}
+                  borderRadius={18}
+                  backgroundColor="rgba(255,255,255,0.94)"
+                  alignItems="center"
+                  justifyContent="center"
+                >
+                  <ArrowLeft size={20} color="$slate700" />
+                </YStack>
+              </Pressable>
+              <XStack gap="$2">
+                <Pressable
+                  onPress={handleShare}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('ad.share')}
+                >
+                  <YStack
+                    width={36}
+                    height={36}
+                    borderRadius={18}
+                    backgroundColor="rgba(255,255,255,0.94)"
+                    alignItems="center"
+                    justifyContent="center"
+                  >
+                    <Share2 size={18} color="$slate700" />
+                  </YStack>
+                </Pressable>
+                <FavoriteButton
+                  adId={ad.id}
+                  isFavorited={ad.is_favorited ?? false}
+                  size="medium"
+                />
+              </XStack>
+            </XStack>
+
             {ad.images.length > 1 && (
               <XStack
                 position="absolute"
