@@ -81,7 +81,7 @@ it('rejects ad image upload with php payload disguised as jpeg', function (): vo
         'surface_area' => 80,
         'bedrooms' => 2,
         'bathrooms' => 1,
-        'has_parking' => 'true',
+        'has_parking' => '1',
         'latitude' => 4.05,
         'longitude' => 9.76,
         'quarter_id' => $quarter->id,

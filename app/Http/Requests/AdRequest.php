@@ -136,7 +136,14 @@ final class AdRequest extends FormRequest
                 'surface_area' => [$req, 'numeric', 'min:0'],
                 'bedrooms' => [$req, 'integer', 'min:0'],
                 'bathrooms' => [$req, 'integer', 'min:0'],
-                'has_parking' => [$req, 'string'],
+                // The `boolean` rule (not `string`) accepts the multipart
+                // variants the frontend actually sends — `'1'`/`'0'` and
+                // `'true'`/`'false'` strings — and casts them to a real
+                // bool that matches the `boolean` column. The previous
+                // `'string'` rule drifted away from autosave's `boolean`
+                // and could persist a stringly-typed value the cast
+                // layer then read as truthy `"0"`.
+                'has_parking' => [$req, 'boolean'],
                 'location' => [new GeometryGeojsonRule([Point::class])],
                 'latitude' => ($isDraft ? 'sometimes' : 'required').'|numeric|between:-90,90',
                 'longitude' => ($isDraft ? 'sometimes' : 'required').'|numeric|between:-180,180',
@@ -225,7 +232,10 @@ final class AdRequest extends FormRequest
                 'surface_area' => ['sometimes', 'numeric', 'min:0'],
                 'bedrooms' => ['sometimes', 'integer', 'min:0'],
                 'bathrooms' => ['sometimes', 'integer', 'min:0'],
-                'has_parking' => ['sometimes', 'string'],
+                // Same rationale as the POST rule above — `boolean`
+                // accepts `'1'`/`'0'`/`'true'`/`'false'` from multipart
+                // updates and matches the autosave path.
+                'has_parking' => ['sometimes', 'boolean'],
                 'location' => [new GeometryGeojsonRule([Point::class])],
                 'latitude' => 'sometimes|numeric|between:-90,90',
                 'longitude' => 'sometimes|numeric|between:-180,180',
