@@ -12,7 +12,9 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * Persist sponsored-feed impression telemetry off the request thread.
@@ -72,5 +74,23 @@ final class RecordSponsoredImpressionsJob implements ShouldQueue
         ], $this->rows);
 
         SponsoredImpression::query()->insert($impressions);
+    }
+
+    /**
+     * Surface telemetry-loss explicitly instead of letting the worker
+     * silently swallow it. Sponsored-impression data is the source of
+     * truth for advertiser billing — losing a batch and not knowing is
+     * worse than losing it and seeing the failure in the logs/Pulse
+     * dashboard. The job stays at `$tries = 2`; this hook only fires
+     * after both attempts fail, so it's a real outage signal, not a
+     * transient retry warning.
+     */
+    public function failed(Throwable $e): void
+    {
+        Log::error('RecordSponsoredImpressionsJob: telemetry write failed after retries', [
+            'rows' => count($this->rows),
+            'user_id' => $this->userId,
+            'error' => $e->getMessage(),
+        ]);
     }
 }

@@ -55,11 +55,23 @@ return new class extends Migration
     {
         DB::statement('DROP INDEX CONCURRENTLY IF EXISTS ad_feed_sponsor_idx');
 
-        Schema::table('ad', function ($table): void {
-            $table->index(
-                ['is_subscription_sponsored', 'boost_score', 'created_at', 'status', 'is_visible'],
-                'idx_ad_feed_ranking'
-            );
-        });
+        // `Schema::table->index(...)` issues `CREATE INDEX ... ON ad (...)`
+        // inside a Schema lock, which blocks writes on the `ad` table for
+        // the duration of the build (minutes on a hot production table).
+        // The matching `up()` already uses CONCURRENTLY; match that here so
+        // a rollback is also non-blocking. Requires `$withinTransaction
+        // = false` (set above) — CONCURRENTLY cannot run inside a
+        // transaction. `IF NOT EXISTS` makes the down() idempotent for
+        // partial-rollback recovery.
+        DB::statement(<<<'SQL'
+            CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_ad_feed_ranking
+            ON ad (
+                is_subscription_sponsored,
+                boost_score,
+                created_at,
+                status,
+                is_visible
+            )
+        SQL);
     }
 };
