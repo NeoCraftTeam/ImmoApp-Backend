@@ -12,6 +12,7 @@ use App\Support\GeoLocation;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
  * Manages a pending-edit draft payload for existing (non-DRAFT) ads.
@@ -46,31 +47,69 @@ final class AdDraftEditController
 {
     use AuthorizesRequests;
 
-    private const array VALIDATION_RULES = [
-        'title' => ['sometimes', 'nullable', 'string', 'max:255'],
-        'description' => ['sometimes', 'nullable', 'string'],
-        'adresse' => ['sometimes', 'nullable', 'string', 'max:500'],
-        'price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-        'price_period' => ['sometimes', 'nullable', 'string', 'in:mois,jour'],
-        'surface_area' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-        'bedrooms' => ['sometimes', 'nullable', 'integer', 'min:0'],
-        'bathrooms' => ['sometimes', 'nullable', 'integer', 'min:0'],
-        'has_parking' => ['sometimes', 'nullable', 'boolean'],
-        'deposit_amount' => ['sometimes', 'nullable', 'string', 'max:50'],
-        'minimum_lease_duration' => ['sometimes', 'nullable', 'string', 'max:50'],
-        'charges_forfaitaires' => ['sometimes', 'nullable', 'boolean'],
-        'charges_montant_forfait' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-        'charges_eau' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-        'charges_electricite' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-        'charges_autres' => ['sometimes', 'nullable', 'string', 'max:1000'],
-        'quarter_id' => ['sometimes', 'nullable', 'uuid', 'exists:quarter,id'],
-        'type_id' => ['sometimes', 'nullable', 'uuid', 'exists:ad_type,id'],
-        'transaction_type' => ['sometimes', 'nullable', 'string', 'in:location,vente'],
-        'latitude' => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
-        'longitude' => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
-        'attributes' => ['sometimes', 'nullable', 'array', 'max:50'],
-        'attributes.*' => ['string'],
+    /**
+     * Required fields a published ad must still satisfy after an edit-draft
+     * is applied. Mirrors `PublishAdRequest::withValidator()` so the two
+     * paths into a publishable state share one source of truth — an owner
+     * editing a live ad can't nullify a field they couldn't have shipped
+     * with in the first place.
+     *
+     * @var array<int, string>
+     */
+    private const array POST_APPLY_REQUIRED_FIELDS = [
+        'title',
+        'description',
+        'adresse',
+        'price',
+        'surface_area',
+        'bedrooms',
+        'bathrooms',
+        'quarter_id',
+        'type_id',
     ];
+
+    /**
+     * Validation rules used by both `save()` and `apply()`. `attributes.*`
+     * mirrors `AdStatusController::autosave` (exists + active) so an owner
+     * can't stash an invalid slug in `draft_payload` to surface only on
+     * apply. Defined as a method instead of a const so the Rule::exists()
+     * closure can run with the live container at call time.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    private function validationRules(): array
+    {
+        return [
+            'title' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'description' => ['sometimes', 'nullable', 'string'],
+            'adresse' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'price_period' => ['sometimes', 'nullable', 'string', 'in:mois,jour'],
+            'surface_area' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'bedrooms' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'bathrooms' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'has_parking' => ['sometimes', 'nullable', 'boolean'],
+            'deposit_amount' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'minimum_lease_duration' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'charges_forfaitaires' => ['sometimes', 'nullable', 'boolean'],
+            'charges_montant_forfait' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'charges_eau' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'charges_electricite' => ['sometimes', 'nullable', 'numeric', 'min:0'],
+            'charges_autres' => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'quarter_id' => ['sometimes', 'nullable', 'uuid', 'exists:quarter,id'],
+            'type_id' => ['sometimes', 'nullable', 'uuid', 'exists:ad_type,id'],
+            'transaction_type' => ['sometimes', 'nullable', 'string', 'in:location,vente'],
+            'latitude' => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
+            'longitude' => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
+            'attributes' => ['sometimes', 'nullable', 'array', 'max:50'],
+            'attributes.*' => [
+                'string',
+                Rule::exists('property_attributes', 'slug')->where(
+                    fn ($query) => $query->where('is_active', true)
+                ),
+            ],
+        ];
+    }
 
     /**
      * Save (merge) incoming fields into draft_payload without touching the live ad.
@@ -104,7 +143,7 @@ final class AdDraftEditController
         $this->authorize('update', $ad);
         $this->requireNonDraftStatus($ad);
 
-        $validated = $request->validate(self::VALIDATION_RULES);
+        $validated = $request->validate($this->validationRules());
 
         $existing = $ad->draft_payload ?? [];
         $merged = array_merge($existing, array_filter(
@@ -153,7 +192,7 @@ final class AdDraftEditController
         }
 
         // Re-validate the stored payload before applying to catch stale data
-        $validated = validator($payload, self::VALIDATION_RULES)->validate();
+        $validated = validator($payload, $this->validationRules())->validate();
 
         // Handle lat/lon → PostGIS point
         $point = GeoLocation::fromArray($validated)?->toPoint();
@@ -170,6 +209,28 @@ final class AdDraftEditController
         if (is_array($attributes)) {
             $toUpdate['attributes'] = array_values(
                 array_unique(array_filter($attributes, is_string(...)))
+            );
+        }
+
+        // Post-apply required-field check — an edit-draft must not
+        // nullify a field that's mandatory to keep the ad publishable.
+        // Empty-string overrides slip past `array_filter` above (only
+        // `null` is filtered), so re-evaluate the merged state.
+        $missing = [];
+        foreach (self::POST_APPLY_REQUIRED_FIELDS as $field) {
+            $next = array_key_exists($field, $toUpdate)
+                ? $toUpdate[$field]
+                : $ad->getAttribute($field);
+            if ($next === null || $next === '') {
+                $missing[] = $field;
+            }
+        }
+        if ($missing !== []) {
+            return ApiResponse::error(
+                'Modification refusée : ces champs deviendraient vides après application : '
+                .implode(', ', $missing).'.',
+                422,
+                ['missing_fields' => $missing],
             );
         }
 
