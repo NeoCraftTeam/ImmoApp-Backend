@@ -72,15 +72,19 @@ eas build --platform ios       # requires Apple Developer + EAS account
 eas build --platform android   # builds an AAB ready for Play Store
 ```
 
-## What's shipped today (v0.1)
+## What's shipped (v0.2)
 
-| Screen                | File                        | Status |
-| --------------------- | --------------------------- | ------ |
-| Onboarding (carousel) | `app/onboarding.tsx`        | ✅      |
-| Login                 | `app/(auth)/login.tsx`      | ✅      |
-| Register              | `app/(auth)/register.tsx`   | ✅      |
-| Home feed             | `app/home.tsx`              | ✅      |
-| Ad detail             | `app/ads/[slug].tsx`        | ✅      |
+| Screen                | File                                | Status |
+| --------------------- | ----------------------------------- | ------ |
+| Onboarding (carousel) | `app/onboarding.tsx`                | ✅      |
+| Login                 | `app/(auth)/login.tsx`              | ✅      |
+| Register              | `app/(auth)/register.tsx`           | ✅      |
+| Tabs shell            | `app/(tabs)/_layout.tsx`            | ✅      |
+| Home feed             | `app/(tabs)/home.tsx`               | ✅      |
+| Search                | `app/(tabs)/search.tsx`             | ✅      |
+| Favorites             | `app/(tabs)/favorites.tsx`          | ✅      |
+| Account               | `app/(tabs)/account.tsx`            | ✅      |
+| Ad detail             | `app/ads/[slug].tsx`                | ✅      |
 
 Plus the foundation:
 
@@ -94,11 +98,13 @@ Plus the foundation:
 
 ## What's NOT shipped yet — roadmap
 
-These are wired into the audit but not implemented in this v0.1 cut:
+These are wired into the audit but not implemented in this v0.2 cut:
 
-- **Tabs**: bottom navigation (Home / Search / Favorites / Account)
-- **Search**: full-text + filter sheet
-- **Favorites**: list + add/remove from card + detail
+- **Search filter sheet**: price range, surface, type, transaction. Today's
+  search is text-only.
+- **Favorites add/remove from card + detail**: the listing screen is
+  shipped; the toggle action ships with v0.3 (backend
+  `POST /ads/{ad}/favorite` already exists).
 - **Nearby**: map-backed proximity search (needs `@rnmapbox/maps`)
 - **Ad detail map**: 3D tour viewer, NeighborhoodScorecard, DirectionsPanel
 - **Compare**: 2–4 ad comparison sheet

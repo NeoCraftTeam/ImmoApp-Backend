@@ -19,7 +19,7 @@ import { ONBOARDING_DONE_KEY } from '@/auth/storage-keys';
  * point of use.
  */
 export default function Index() {
-  const [target, setTarget] = useState<'/onboarding' | '/home' | null>(null);
+  const [target, setTarget] = useState<'/onboarding' | '/(tabs)/home' | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -32,7 +32,7 @@ export default function Index() {
         } else {
           done = await SecureStore.getItemAsync(ONBOARDING_DONE_KEY);
         }
-        setTarget(done === '1' ? '/home' : '/onboarding');
+        setTarget(done === '1' ? '/(tabs)/home' : '/onboarding');
       } catch {
         setTarget('/onboarding');
       }

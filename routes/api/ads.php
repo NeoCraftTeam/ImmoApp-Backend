@@ -116,6 +116,9 @@ Route::middleware('optional.auth')->group(function (): void {
 // Recently viewed ads (authenticated only)
 Route::middleware('auth:sanctum')->get('/my/recently-viewed', [AdInteractionController::class, 'recentlyViewed']);
 
+// My favorites — list of ads the current user has favorited.
+Route::middleware('auth:sanctum')->get('/my/favorites', [AdInteractionController::class, 'favorites']);
+
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/ads/{ad}/favorite', [AdInteractionController::class, 'toggleFavorite'])
         ->middleware('throttle:30,1');

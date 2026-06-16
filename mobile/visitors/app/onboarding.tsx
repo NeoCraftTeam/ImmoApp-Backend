@@ -46,12 +46,12 @@ export default function Onboarding() {
       return;
     }
     await persistDone();
-    router.replace('/home');
+    router.replace('/(tabs)/home');
   }, [activeIndex, slides.length, persistDone, router]);
 
   const handleSkip = useCallback(async () => {
     await persistDone();
-    router.replace('/home');
+    router.replace('/(tabs)/home');
   }, [persistDone, router]);
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {

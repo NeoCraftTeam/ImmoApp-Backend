@@ -37,7 +37,7 @@ export default function Login() {
     setSubmitting(true);
     try {
       await signIn(email.trim(), password);
-      router.replace('/home');
+      router.replace('/(tabs)/home');
     } catch (err) {
       Alert.alert(t('common.error'), extractApiErrorMessage(err));
     } finally {
@@ -120,7 +120,7 @@ export default function Login() {
       </XStack>
 
       <YStack flex={1} justifyContent="flex-end">
-        <Button size="$3" chromeless onPress={() => router.replace('/home')}>
+        <Button size="$3" chromeless onPress={() => router.replace('/(tabs)/home')}>
           {t('auth.continueAsGuest')}
         </Button>
       </YStack>

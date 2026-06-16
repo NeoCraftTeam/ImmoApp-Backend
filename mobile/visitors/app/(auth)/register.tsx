@@ -62,7 +62,7 @@ export default function Register() {
     setSubmitting(true);
     try {
       await signUp(parsed.data);
-      router.replace('/home');
+      router.replace('/(tabs)/home');
     } catch (err) {
       Alert.alert(t('common.error'), extractApiErrorMessage(err));
     } finally {
