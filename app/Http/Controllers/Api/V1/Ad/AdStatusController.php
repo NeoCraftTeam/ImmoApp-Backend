@@ -251,7 +251,7 @@ final class AdStatusController
             'charges_montant_forfait' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'charges_eau' => ['sometimes', 'nullable', 'numeric', 'min:0'],
             'charges_electricite' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'charges_autres' => ['sometimes', 'nullable', 'string', 'max:500'],
+            'charges_autres' => ['sometimes', 'nullable', 'string', 'max:1000'],
             'quarter_id' => ['sometimes', 'nullable', 'uuid', 'exists:quarter,id'],
             'type_id' => ['sometimes', 'nullable', 'uuid', 'exists:ad_type,id'],
             'transaction_type' => ['sometimes', 'nullable', 'string', 'in:location,vente'],

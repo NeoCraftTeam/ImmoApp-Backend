@@ -190,7 +190,7 @@ final class AdRequest extends FormRequest
                 'charges_montant_forfait' => ['nullable', 'numeric', 'min:0'],
                 'charges_eau' => ['nullable', 'numeric', 'min:0'],
                 'charges_electricite' => ['nullable', 'numeric', 'min:0'],
-                'charges_autres' => ['nullable', 'string', 'max:500'],
+                'charges_autres' => ['nullable', 'string', 'max:1000'],
 
                 // Property condition PDF
                 'property_condition' => $this->propertyConditionPdfRules(),
@@ -267,7 +267,7 @@ final class AdRequest extends FormRequest
                 'charges_montant_forfait' => ['nullable', 'numeric', 'min:0'],
                 'charges_eau' => ['nullable', 'numeric', 'min:0'],
                 'charges_electricite' => ['nullable', 'numeric', 'min:0'],
-                'charges_autres' => ['nullable', 'string', 'max:500'],
+                'charges_autres' => ['nullable', 'string', 'max:1000'],
 
                 // Property condition PDF
                 'property_condition' => $this->propertyConditionPdfRules(),
