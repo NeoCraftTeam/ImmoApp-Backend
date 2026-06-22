@@ -105,12 +105,15 @@ export function extractApiErrorMessage(err: unknown): string {
     if (err.code === 'ECONNABORTED') {
       return 'Délai d’attente dépassé. Vérifiez votre connexion.';
     }
-    // No response received — typically a TLS / DNS / connectivity error.
-    // Surfacing the underlying axios error code helps the user (and us)
-    // distinguish "Wi-Fi off" from "backend down" from "untrusted cert".
+    // No response received — typiquement une erreur TLS / DNS / Wi-Fi /
+    // backend down. On expose le code axios sous-jacent pour aider à
+    // distinguer "Wi-Fi off" de "backend down" de "URL inaccessible".
+    // (Pas de mention d'un nom d'hôte spécifique — l'app est utilisée
+    // par des bailleurs hors-dev qui n'ont jamais entendu parler de
+    // `keyhome.test` ; le message générique reste actionnable.)
     if (!err.response) {
       const code = err.code ?? 'ERR_NETWORK';
-      return `Connexion au serveur impossible (${code}). Vérifiez votre réseau et le certificat keyhome.test.`;
+      return `Connexion au serveur impossible (${code}). Vérifiez votre connexion internet.`;
     }
   }
   // Non-axios Error — surface its own message instead of the generic
