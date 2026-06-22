@@ -59,11 +59,10 @@ const appConfig = createTamagui({
   },
 });
 
-export type AppConfig = typeof appConfig;
-
-declare module 'tamagui' {
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  interface TamaguiCustomConfig extends AppConfig {}
-}
-
+/**
+ * Le type augmentation `declare module 'tamagui'` vit dans
+ * `tamagui-env.d.ts` à côté — esbuild-register échoue à parser
+ * un bloc `interface` au milieu d'un fichier runtime quand le
+ * babel-plugin Tamagui le `require()` au build-time.
+ */
 export default appConfig;

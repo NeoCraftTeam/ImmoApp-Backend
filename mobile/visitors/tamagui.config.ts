@@ -54,11 +54,11 @@ const appConfig = createTamagui({
   },
 });
 
-export type AppConfig = typeof appConfig;
-
-declare module 'tamagui' {
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-  interface TamaguiCustomConfig extends AppConfig {}
-}
-
+/**
+ * Le type augmentation `declare module 'tamagui'` vit dans
+ * `tamagui-env.d.ts` à côté — voir le commentaire en tête du
+ * fichier .d.ts. Le mélanger ici cassait l'évaluation CJS du
+ * config faite par `esbuild-register` à travers `@tamagui/babel-plugin`
+ * (« Unexpected token '{' » sur le bloc `interface`).
+ */
 export default appConfig;
