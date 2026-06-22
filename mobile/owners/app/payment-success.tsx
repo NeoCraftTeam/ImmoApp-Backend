@@ -1,0 +1,182 @@
+import { ArrowLeft, CheckCircle2, Clock, XCircle } from '@tamagui/lucide-icons';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable } from 'react-native';
+import { Button, H2, Paragraph, XStack, YStack } from 'tamagui';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { usePublicPaymentStatus } from '@/hooks/usePayments';
+import { useVerifyCreditPurchase } from '@/hooks/useCredits';
+import { brand } from '@/theme/tokens';
+
+const POLLING_TIMEOUT_MS = 60_000;
+
+/**
+ * Page de retour post-checkout owner. Identique au visiteur côté flux
+ * (poll public-status + timeout 60s + retry), avec en plus un appel
+ * **opportuniste** à `/credits/verify-purchase` pour pousser le balance
+ * plus vite que le webhook backend. Si le user a payé un autre type
+ * (subscription/boost), `verify-purchase` retourne `not_found` et on
+ * laisse simplement le polling status faire son travail.
+ */
+export default function PaymentSuccessOwner() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { tx_ref, txRef } = useLocalSearchParams<{
+    tx_ref?: string;
+    txRef?: string;
+  }>();
+  const ref = tx_ref ?? txRef;
+  const { data, isLoading, refetch } = usePublicPaymentStatus(ref);
+  const verifyCredit = useVerifyCreditPurchase();
+
+  const [timedOut, setTimedOut] = useState(false);
+
+  // Verify-purchase opportuniste — idempotent côté backend
+  useEffect(() => {
+    if (!ref) return;
+    verifyCredit.mutate(
+      { tx_ref: ref },
+      {
+        // Silencieux sur erreur — fallback sur le polling status
+        onError: () => undefined,
+      },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ref]);
+
+  useEffect(() => {
+    if (!ref) return;
+    if (data?.status && data.status !== 'pending') return;
+    const t = setTimeout(() => setTimedOut(true), POLLING_TIMEOUT_MS);
+    return () => clearTimeout(t);
+  }, [ref, data?.status]);
+
+  let icon = <Clock size={56} color={brand.warning} />;
+  let title = 'Paiement en cours…';
+  let body = 'Nous confirmons votre transaction. Cela ne prend que quelques secondes.';
+  let tint: string = brand.warning;
+
+  if (timedOut && (!data?.status || data.status === 'pending')) {
+    icon = <Clock size={56} color={brand.warning} />;
+    title = 'Vérification plus longue que prévu';
+    body =
+      'Votre paiement est probablement en cours de traitement côté banque. ' +
+      'Vous recevrez une notification dès qu’il sera confirmé. ' +
+      'Vous pouvez fermer cette page sans risque.';
+    tint = brand.warning;
+  }
+
+  if (data?.status === 'success' || data?.status === 'succeeded') {
+    icon = <CheckCircle2 size={56} color={brand.success} />;
+    title = 'Paiement confirmé';
+    body = data.message ?? 'Votre transaction a été créditée avec succès.';
+    tint = brand.success;
+  } else if (data?.status === 'failed' || data?.status === 'cancelled') {
+    icon = <XCircle size={56} color={brand.danger} />;
+    title = data.status === 'cancelled' ? 'Paiement annulé' : 'Paiement échoué';
+    body =
+      data.message ??
+      'La transaction n’a pas pu aboutir. Réessayez ou contactez le support.';
+    tint = brand.danger;
+  }
+
+  const goHome = () => router.replace('/(tabs)/dashboard');
+
+  return (
+    <>
+      <Stack.Screen options={{ headerShown: false }} />
+      <YStack
+        flex={1}
+        backgroundColor="$background"
+        paddingTop={insets.top + 12}
+        paddingHorizontal={24}
+        paddingBottom={insets.bottom + 16}
+        gap={20}
+      >
+        <Pressable
+          onPress={goHome}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Retour"
+        >
+          <YStack
+            width={36}
+            height={36}
+            borderRadius={18}
+            backgroundColor="$slate100"
+            alignItems="center"
+            justifyContent="center"
+          >
+            <ArrowLeft size={18} color={brand.slate700} />
+          </YStack>
+        </Pressable>
+
+        <YStack flex={1} alignItems="center" justifyContent="center" gap={16}>
+          {isLoading && !data ? <ActivityIndicator color={brand.primary} /> : icon}
+          <H2 fontSize={24} fontWeight="800" textAlign="center" color={tint}>
+            {title}
+          </H2>
+          <Paragraph fontSize={14.5} color="$slate700" textAlign="center" lineHeight={22}>
+            {body}
+          </Paragraph>
+          {data?.amount != null ? (
+            <Paragraph fontSize={16} fontWeight="900" color="$slate900">
+              {data.amount.toLocaleString('fr-FR')} {data.currency ?? 'FCFA'}
+            </Paragraph>
+          ) : null}
+          {(data?.status === 'success' || data?.status === 'succeeded') ? (
+            <Button
+              backgroundColor="$brand"
+              color="white"
+              fontWeight="800"
+              borderRadius={12}
+              onPress={goHome}
+              marginTop={6}
+            >
+              Retour au tableau de bord
+            </Button>
+          ) : null}
+          {(data?.status === 'failed' || data?.status === 'cancelled') ? (
+            <XStack gap={10} marginTop={6}>
+              <Button
+                backgroundColor="$slate100"
+                color="$slate900"
+                fontWeight="700"
+                borderRadius={12}
+                onPress={goHome}
+              >
+                Retour
+              </Button>
+            </XStack>
+          ) : null}
+          {timedOut && (!data?.status || data.status === 'pending') ? (
+            <XStack gap={10} marginTop={6}>
+              <Button
+                backgroundColor="$slate900"
+                color="white"
+                fontWeight="700"
+                borderRadius={12}
+                onPress={() => {
+                  setTimedOut(false);
+                  refetch();
+                }}
+              >
+                Réessayer
+              </Button>
+              <Button
+                backgroundColor="$slate100"
+                color="$slate900"
+                fontWeight="700"
+                borderRadius={12}
+                onPress={goHome}
+              >
+                Retour
+              </Button>
+            </XStack>
+          ) : null}
+        </YStack>
+      </YStack>
+    </>
+  );
+}

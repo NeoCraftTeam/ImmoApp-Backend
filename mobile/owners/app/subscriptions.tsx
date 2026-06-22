@@ -1,15 +1,15 @@
 import { Check, Crown, Infinity as InfinityIcon, Sparkles } from '@tamagui/lucide-icons';
 import { useState } from 'react';
-import { Alert, Linking, RefreshControl, ScrollView } from 'react-native';
+import { Alert, RefreshControl, ScrollView } from 'react-native';
 import { Button, Paragraph, Spinner, XStack, YStack } from 'tamagui';
 
-import { extractApiErrorMessage } from '@/api/client';
+import { extractApiErrorMessage } from '@/api/extract-error';
 import { useSession } from '@/auth/SessionProvider';
+import { PaymentSheet } from '@/components/payments/PaymentSheet';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import {
   useCancelSubscription,
   useCurrentSubscription,
-  useSubscribe,
   useSubscriptionPlans,
   useToggleAutoRenew,
 } from '@/hooks/useSubscriptions';
@@ -28,10 +28,10 @@ const PERIODS: { value: BillingPeriod; key: string }[] = [
 export default function SubscriptionsScreen() {
   const { isAuthenticated } = useSession();
   const [period, setPeriod] = useState<BillingPeriod>('monthly');
+  const [paying, setPaying] = useState<SubscriptionPlan | null>(null);
 
   const current = useCurrentSubscription(isAuthenticated);
   const plans = useSubscriptionPlans();
-  const subscribe = useSubscribe();
   const cancel = useCancelSubscription();
   const toggleAutoRenew = useToggleAutoRenew();
 
@@ -43,19 +43,12 @@ export default function SubscriptionsScreen() {
     plans.refetch();
   };
 
-  const handleSubscribe = async (plan: SubscriptionPlan) => {
-    try {
-      const res = await subscribe.mutateAsync({ plan_id: plan.id, billing_period: period });
-      const link = res.payment?.payment_link;
-      if (link) {
-        await Linking.openURL(link);
-      } else {
-        Alert.alert(t('subscription.title'), 'Abonnement activé avec succès.');
-      }
-    } catch (err) {
-      Alert.alert(t('common.error'), extractApiErrorMessage(err));
-    }
+  const handleSubscribe = (plan: SubscriptionPlan) => {
+    setPaying(plan);
   };
+
+  const payingPrice =
+    paying ? (period === 'monthly' ? paying.price_monthly : paying.price_yearly) : 0;
 
   const handleCancel = () => {
     Alert.alert(
@@ -155,13 +148,34 @@ export default function SubscriptionsScreen() {
                 period={period}
                 popular={index === 1}
                 currentPlanId={active?.plan?.id}
-                busy={subscribe.isPending}
+                busy={false}
                 onSubscribe={() => handleSubscribe(plan)}
               />
             ))}
           </YStack>
         </ScrollView>
       )}
+
+      {/* PaymentSheet — unified gateway flow */}
+      {paying ? (
+        <PaymentSheet
+          open={paying !== null}
+          onOpenChange={(o) => !o && setPaying(null)}
+          title={paying.name}
+          subtitle={
+            period === 'monthly'
+              ? t('subscription.monthly')
+              : t('subscription.yearly')
+          }
+          amount={payingPrice}
+          purpose="subscription"
+          extraPayload={{
+            plan_id: paying.id,
+            billing_period: period,
+            reference_id: paying.id,
+          }}
+        />
+      ) : null}
     </YStack>
   );
 }

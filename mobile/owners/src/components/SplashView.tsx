@@ -10,13 +10,14 @@ interface Props {
 }
 
 /**
- * Owner splash overlay rendered above the routed app while the
- * SessionProvider + persisted Query cache rehydrate. Once `ready=true`
- * we fade out over ~340 ms; the splash unmounts after the fade.
- *
- * No Lottie dependency — a staggered scale-up wordmark + pulsing dot
- * (native driver, zero JS-thread overhead) keeps the splash polished
- * without shipping an animation asset.
+ * Owner splash — fond teal (`brand.primary`), pas de mention "Pro" :
+ * c'est **KeyHome Owner**. La séquence dure ~1.4 s avant fade :
+ *   1. Stagger lettres "K-e-y-H-o-m-e"             ~720 ms
+ *   2. Halo blanc grossit autour des lettres       ~360 ms
+ *   3. Tagline glisse depuis le bas                ~320 ms
+ *   4. Pulse infinie du dot (parallèle aux étapes 2–3)
+ * Une fois `ready=true`, on fade out en 380 ms — la totale dépasse
+ * légèrement le splash visiteur comme demandé.
  */
 export function SplashView({ ready }: Props) {
   const fade = useRef(new Animated.Value(1)).current;
@@ -26,7 +27,7 @@ export function SplashView({ ready }: Props) {
     if (!ready) return;
     Animated.timing(fade, {
       toValue: 0,
-      duration: 340,
+      duration: 380,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start(() => setVisible(false));
@@ -50,15 +51,7 @@ export function SplashView({ ready }: Props) {
       }}
     >
       <Wordmark />
-      <Paragraph
-        fontSize={13}
-        fontWeight="600"
-        color="rgba(255,255,255,0.9)"
-        marginTop={24}
-        letterSpacing={1}
-      >
-        Votre activité immobilière, en main
-      </Paragraph>
+      <Tagline />
     </Animated.View>
   );
 }
@@ -67,30 +60,57 @@ function Wordmark() {
   const letters = ['K', 'e', 'y', 'H', 'o', 'm', 'e'];
   const animations = useRef(letters.map(() => new Animated.Value(0.4))).current;
   const dotScale = useRef(new Animated.Value(0.6)).current;
+  const haloScale = useRef(new Animated.Value(0)).current;
+  const haloOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const stagger = animations.map((anim, i) =>
       Animated.timing(anim, {
         toValue: 1,
         duration: 360,
-        delay: i * 60,
+        delay: i * 70,
         easing: Easing.out(Easing.back(1.6)),
         useNativeDriver: true,
       }),
     );
-    Animated.stagger(50, stagger).start();
+    Animated.stagger(60, stagger).start();
+
+    // Halo qui s'étend après les lettres
+    Animated.sequence([
+      Animated.delay(620),
+      Animated.parallel([
+        Animated.timing(haloScale, {
+          toValue: 1,
+          duration: 460,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.timing(haloOpacity, {
+            toValue: 0.18,
+            duration: 220,
+            useNativeDriver: true,
+          }),
+          Animated.timing(haloOpacity, {
+            toValue: 0,
+            duration: 240,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+    ]).start();
 
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(dotScale, {
           toValue: 1.6,
-          duration: 700,
+          duration: 800,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
         Animated.timing(dotScale, {
           toValue: 0.6,
-          duration: 700,
+          duration: 800,
           easing: Easing.inOut(Easing.ease),
           useNativeDriver: true,
         }),
@@ -98,37 +118,40 @@ function Wordmark() {
     );
     loop.start();
     return () => loop.stop();
-  }, [animations, dotScale]);
+  }, [animations, dotScale, haloOpacity, haloScale]);
 
   return (
-    <YStack alignItems="center" gap={22}>
-      <YStack flexDirection="row" gap={2} alignItems="center">
-        {letters.map((letter, i) => (
-          <Animated.Text
-            key={`${letter}-${i}`}
-            style={{
-              fontSize: 42,
-              fontWeight: '900',
-              color: 'white',
-              letterSpacing: -1,
-              transform: [{ scale: animations[i] ?? new Animated.Value(1) }],
-              opacity: animations[i] ?? new Animated.Value(1),
-            }}
-          >
-            {letter}
-          </Animated.Text>
-        ))}
-        <Animated.Text
+    <YStack alignItems="center" gap={24}>
+      <YStack alignItems="center" justifyContent="center">
+        {/* Halo blanc qui pulse autour du wordmark */}
+        <Animated.View
           style={{
-            fontSize: 20,
-            fontWeight: '800',
-            color: brand.accentLight,
-            marginLeft: 6,
-            transform: [{ scale: animations[6] ?? new Animated.Value(1) }],
+            position: 'absolute',
+            width: 260,
+            height: 90,
+            borderRadius: 60,
+            backgroundColor: 'white',
+            opacity: haloOpacity,
+            transform: [{ scale: haloScale }],
           }}
-        >
-          Pro
-        </Animated.Text>
+        />
+        <YStack flexDirection="row" gap={2} alignItems="center">
+          {letters.map((letter, i) => (
+            <Animated.Text
+              key={`${letter}-${i}`}
+              style={{
+                fontSize: 44,
+                fontWeight: '900',
+                color: 'white',
+                letterSpacing: -1,
+                transform: [{ scale: animations[i] ?? new Animated.Value(1) }],
+                opacity: animations[i] ?? new Animated.Value(1),
+              }}
+            >
+              {letter}
+            </Animated.Text>
+          ))}
+        </YStack>
       </YStack>
       <Animated.View
         style={{
@@ -140,5 +163,49 @@ function Wordmark() {
         }}
       />
     </YStack>
+  );
+}
+
+function Tagline() {
+  const slide = useRef(new Animated.Value(14)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.sequence([
+      Animated.delay(820),
+      Animated.parallel([
+        Animated.timing(slide, {
+          toValue: 0,
+          duration: 360,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 360,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
+  }, [slide, opacity]);
+
+  return (
+    <Animated.View
+      style={{
+        marginTop: 26,
+        opacity,
+        transform: [{ translateY: slide }],
+      }}
+    >
+      <Paragraph
+        fontSize={13}
+        fontWeight="700"
+        color="rgba(255,255,255,0.9)"
+        letterSpacing={1.4}
+        textAlign="center"
+      >
+        Votre activité immobilière, en main
+      </Paragraph>
+    </Animated.View>
   );
 }

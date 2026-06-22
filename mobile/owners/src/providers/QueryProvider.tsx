@@ -77,9 +77,15 @@ export function QueryProvider({ children }: { children: ReactNode }) {
             const key = query.queryKey[0];
             if (typeof key !== 'string') return false;
             // Auth + live data — re-fetch fresh at each cold start.
+            // Inclut le statut paiement : on ne veut JAMAIS afficher un
+            // statut paiement persisté (pourrait être stale → user voit
+            // "pending" alors qu'il est déjà "success").
             if (key === 'me') return false;
             if (key === 'owner-stats') return false;
             if (key === 'notifications-unread-count') return false;
+            if (key === 'payment-status') return false;
+            if (key === 'credits-balance') return false;
+            if (key === 'subscription-current') return false;
             return query.state.status === 'success';
           },
         },

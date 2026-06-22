@@ -1,10 +1,12 @@
 import { Award, Check, Sparkles } from '@tamagui/lucide-icons';
+import { useState } from 'react';
 import { Alert, RefreshControl, ScrollView } from 'react-native';
 import { Button, Paragraph, Spinner, XStack, YStack } from 'tamagui';
 
-import { extractApiErrorMessage } from '@/api/client';
+import { extractApiErrorMessage } from '@/api/extract-error';
 import { useSession } from '@/auth/SessionProvider';
 import { EmptyState } from '@/components/EmptyState';
+import { PaymentSheet } from '@/components/payments/PaymentSheet';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useProServices, usePurchaseProService } from '@/hooks/useProServices';
 import { brand } from '@/theme/tokens';
@@ -80,7 +82,19 @@ export default function ProServicesScreen() {
   const { data: list = [], isLoading, isRefetching, refetch } = useProServices(isAuthenticated);
   const purchase = usePurchaseProService();
 
+  const [paying, setPaying] = useState<ProService | null>(null);
+
+  /**
+   * Distinction prix-crédits vs prix-monétaire :
+   *  - Si `price_credits` → déduction crédits côté backend, juste un confirm
+   *  - Si `price` → flow paiement complet via PaymentSheet
+   */
   const onPurchase = (s: ProService) => {
+    if (s.price && s.price > 0) {
+      setPaying(s);
+      return;
+    }
+    // Fallback crédits : confirm + déduction
     Alert.alert(
       'Confirmer',
       `Souscrire au service « ${s.name} » ?`,
@@ -103,7 +117,7 @@ export default function ProServicesScreen() {
 
   return (
     <YStack flex={1} backgroundColor="$background">
-      <ScreenHeader title="Services Pro" subtitle="Boostez votre activité bailleur" />
+      <ScreenHeader title="Services premium" subtitle="Boostez votre activité bailleur" />
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 12 }}
         refreshControl={
@@ -126,6 +140,18 @@ export default function ProServicesScreen() {
           list.map((s) => <ServiceCard key={s.id} s={s} onPurchase={() => onPurchase(s)} />)
         )}
       </ScrollView>
+
+      {paying ? (
+        <PaymentSheet
+          open={paying !== null}
+          onOpenChange={(o) => !o && setPaying(null)}
+          title={paying.name}
+          subtitle={paying.description}
+          amount={paying.price ?? 0}
+          purpose="pro_service"
+          extraPayload={{ reference_id: paying.id }}
+        />
+      ) : null}
     </YStack>
   );
 }

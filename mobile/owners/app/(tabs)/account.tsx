@@ -56,13 +56,15 @@ export default function AccountScreen() {
 
   const items: { icon: React.ReactNode; label: string; route: string; accent?: string }[] = [
     { icon: <User size={20} color={brand.primary} />, label: t('account.profile'), route: '/profile' },
+    { icon: <CreditCard size={20} color={brand.accent} />, label: 'Crédits', route: '/credits' },
     { icon: <MessageCircle size={20} color={brand.primary} />, label: 'Messages', route: '/messages' },
     { icon: <BarChart3 size={20} color={brand.secondary} />, label: t('account.analytics'), route: '/analytics' },
     { icon: <Wallet size={20} color={brand.success} />, label: 'Finances', route: '/financials' },
     { icon: <Receipt size={20} color={brand.slate700} />, label: 'Paiements', route: '/payments' },
     { icon: <RotateCcw size={20} color={brand.secondary} />, label: 'Remboursements', route: '/remboursements' },
     { icon: <CreditCard size={20} color={brand.accent} />, label: t('account.subscription'), route: '/subscriptions' },
-    { icon: <Sparkles size={20} color={brand.accent} />, label: 'Services Pro', route: '/pro-services' },
+    { icon: <Receipt size={20} color={brand.primary} />, label: 'Carte de visite', route: '/business-card' },
+    { icon: <Sparkles size={20} color={brand.accent} />, label: 'Services premium', route: '/pro-services' },
     { icon: <TrendingUp size={20} color={brand.primary} />, label: 'Prix du marché', route: '/prix-marche' },
     { icon: <ShieldCheck size={20} color={brand.primary} />, label: 'Score de confiance', route: '/trust-score' },
     { icon: <CalendarClock size={20} color={brand.secondary} />, label: 'Disponibilités', route: '/availability' },

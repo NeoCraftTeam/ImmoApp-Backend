@@ -12,6 +12,7 @@ import type { PaymentEntry, PaymentStatus } from '@/types/payment';
 
 const STATUS_COLOR: Record<PaymentStatus, string> = {
   succeeded: brand.success,
+  success: brand.success,
   pending: brand.warning,
   failed: brand.danger,
   refunded: brand.secondary,
@@ -20,6 +21,7 @@ const STATUS_COLOR: Record<PaymentStatus, string> = {
 
 const STATUS_LABEL: Record<PaymentStatus, string> = {
   succeeded: 'Réussi',
+  success: 'Réussi',
   pending: 'En attente',
   failed: 'Échec',
   refunded: 'Remboursé',

@@ -1,11 +1,11 @@
-import { Check, Minus, Plus } from '@tamagui/lucide-icons';
+import { Check, Minus, Plus, Sparkles } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, TextInput } from 'react-native';
 import { Button, Input, Paragraph, Spinner, TextArea, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { extractApiErrorMessage } from '@/api/client';
+import { extractApiErrorMessage } from '@/api/extract-error';
 import { ImagePickerGrid } from '@/components/ads/ImagePickerGrid';
 import { MapPicker } from '@/components/ads/MapPicker';
 import { PickerField } from '@/components/ads/PickerField';
@@ -17,6 +17,7 @@ import {
   type AdFormPayload,
   type PickedImage,
 } from '@/hooks/useAdMutations';
+import { useEnhanceDescription, useEnhanceTitle } from '@/hooks/useAiEnhance';
 import {
   useAdTypes,
   useCities,
@@ -113,6 +114,45 @@ export function AdForm({ mode, ad }: { mode: 'create' | 'edit'; ad?: Ad }) {
   const updateAd = useUpdateAd(ad?.id);
   const publishAd = usePublishAd();
   const autosave = useAutosaveAd(ad?.id);
+  const enhanceTitle = useEnhanceTitle();
+  const enhanceDesc = useEnhanceDescription();
+
+  const onEnhanceTitle = async () => {
+    if (!form.title.trim() && !form.description.trim()) {
+      Alert.alert('Information', 'Saisissez d’abord un titre ou une description.');
+      return;
+    }
+    try {
+      const improved = await enhanceTitle.mutateAsync({
+        title: form.title,
+        description: form.description,
+      });
+      if (improved && improved.trim()) {
+        setForm((f) => ({ ...f, title: improved.trim() }));
+      }
+    } catch (err) {
+      Alert.alert('Erreur IA', extractApiErrorMessage(err));
+    }
+  };
+
+  const onEnhanceDescription = async () => {
+    if (!form.description.trim()) {
+      Alert.alert('Information', 'Saisissez d’abord quelques mots — l’IA développera.');
+      return;
+    }
+    try {
+      const improved = await enhanceDesc.mutateAsync({
+        title: form.title,
+        description: form.description,
+        attributes: form.attributes,
+      });
+      if (improved && improved.trim()) {
+        setForm((f) => ({ ...f, description: improved.trim() }));
+      }
+    } catch (err) {
+      Alert.alert('Erreur IA', extractApiErrorMessage(err));
+    }
+  };
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
@@ -242,17 +282,40 @@ export function AdForm({ mode, ad }: { mode: 'create' | 'edit'; ad?: Ad }) {
       >
         {/* --- Basics --- */}
         <Section title={t('adForm.steps.basics')}>
-          <LabeledInput
-            label={t('adForm.fields.title')}
-            value={form.title}
-            onChange={(v) => set('title', v)}
-            placeholder={t('adForm.fields.titlePlaceholder')}
-            error={errors.title}
-          />
           <YStack gap={6}>
-            <Paragraph fontSize={13} fontWeight="600" color="$slate500">
-              {t('adForm.fields.description')}
-            </Paragraph>
+            <XStack alignItems="center" justifyContent="space-between">
+              <Paragraph fontSize={13} fontWeight="600" color="$slate500">
+                {t('adForm.fields.title')}
+              </Paragraph>
+              <AiEnhanceButton
+                onPress={onEnhanceTitle}
+                loading={enhanceTitle.isPending}
+                label="IA titre"
+              />
+            </XStack>
+            <Input
+              value={form.title}
+              onChangeText={(v) => set('title', v)}
+              placeholder={t('adForm.fields.titlePlaceholder')}
+              borderColor={errors.title ? '$danger' : '$slate300'}
+            />
+            {errors.title ? (
+              <Paragraph fontSize={11.5} color="$danger">
+                {errors.title}
+              </Paragraph>
+            ) : null}
+          </YStack>
+          <YStack gap={6}>
+            <XStack alignItems="center" justifyContent="space-between">
+              <Paragraph fontSize={13} fontWeight="600" color="$slate500">
+                {t('adForm.fields.description')}
+              </Paragraph>
+              <AiEnhanceButton
+                onPress={onEnhanceDescription}
+                loading={enhanceDesc.isPending}
+                label="IA description"
+              />
+            </XStack>
             <TextArea
               value={form.description}
               onChangeText={(v) => set('description', v)}
@@ -496,6 +559,45 @@ export function AdForm({ mode, ad }: { mode: 'create' | 'edit'; ad?: Ad }) {
 }
 
 /* ---------------- sub-components ---------------- */
+function AiEnhanceButton({
+  onPress,
+  loading,
+  label,
+}: {
+  onPress: () => void;
+  loading: boolean;
+  label: string;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={loading}
+      hitSlop={6}
+      accessibilityRole="button"
+      accessibilityLabel={`Améliorer avec l'IA — ${label}`}
+    >
+      <XStack
+        alignItems="center"
+        gap={5}
+        paddingHorizontal={9}
+        paddingVertical={5}
+        borderRadius={999}
+        backgroundColor={brand.accentAlpha10}
+        opacity={loading ? 0.6 : 1}
+      >
+        {loading ? (
+          <Spinner color={brand.accentDark} size="small" />
+        ) : (
+          <Sparkles size={12} color={brand.accentDark} />
+        )}
+        <Paragraph fontSize={11} fontWeight="800" color={brand.accentDark}>
+          {label}
+        </Paragraph>
+      </XStack>
+    </Pressable>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <YStack gap={14}>

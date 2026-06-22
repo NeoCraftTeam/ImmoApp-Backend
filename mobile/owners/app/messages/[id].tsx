@@ -1,13 +1,17 @@
-import { Send } from '@tamagui/lucide-icons';
+import { Check, CheckCheck, Send } from '@tamagui/lucide-icons';
+import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
   TextInput,
 } from 'react-native';
+import { useQueryClient } from '@tanstack/react-query';
 import { Paragraph, Spinner, XStack, YStack } from 'tamagui';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -20,14 +24,76 @@ import {
 } from '@/hooks/useConversations';
 import { useConversationRealtime } from '@/hooks/useConversationRealtime';
 import { brand } from '@/theme/tokens';
+import type { ConversationPreview } from '@/types/conversation';
+
+function TypingDots() {
+  const dots = useRef([
+    new Animated.Value(0.3),
+    new Animated.Value(0.3),
+    new Animated.Value(0.3),
+  ]).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.stagger(
+        160,
+        dots.map((d) =>
+          Animated.sequence([
+            Animated.timing(d, {
+              toValue: 1,
+              duration: 320,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+            Animated.timing(d, {
+              toValue: 0.3,
+              duration: 320,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+          ]),
+        ),
+      ),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [dots]);
+
+  return (
+    <XStack gap={4} paddingHorizontal={12} paddingVertical={9} backgroundColor="$slate100" borderRadius={16} alignSelf="flex-start">
+      {dots.map((d, i) => (
+        <Animated.View
+          key={i}
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: 3,
+            backgroundColor: brand.slate500,
+            opacity: d,
+          }}
+        />
+      ))}
+    </XStack>
+  );
+}
 
 export default function ConversationThreadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const me = useMe();
+  const qc = useQueryClient();
   const { data: messages = [], isLoading } = useConversation(id);
   const send = useSendMessage(id);
   const markRead = useMarkConversationRead(id);
   const setTyping = useSetTyping(id);
+
+  // Préfetch depuis la cache des conversations (header info instant)
+  const conversation = useMemo<ConversationPreview | undefined>(() => {
+    const data = qc.getQueryData<{ data: ConversationPreview[] } | undefined>([
+      'owner-conversations',
+    ]);
+    const list = Array.isArray(data?.data) ? data!.data : [];
+    return list.find((c) => c.id === id || c.uuid === id);
+  }, [qc, id]);
 
   const [draft, setDraft] = useState('');
   const [otherTyping, setOtherTyping] = useState<string | null>(null);
@@ -40,10 +106,7 @@ export default function ConversationThreadScreen() {
   });
 
   useEffect(() => {
-    if (id) {
-      markRead.mutate();
-    }
-    // mark-read effect intentionnel : à chaque ouverture du thread
+    if (id) markRead.mutate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -58,9 +121,40 @@ export default function ConversationThreadScreen() {
     send.mutate(body);
   };
 
+  const otherName = conversation
+    ? `${conversation.other_user.firstname} ${conversation.other_user.lastname ?? ''}`.trim()
+    : 'Conversation';
+
   return (
     <YStack flex={1} backgroundColor="$background">
-      <ScreenHeader title="Conversation" />
+      <ScreenHeader
+        title={otherName}
+        subtitle={conversation?.ad?.title}
+        right={
+          conversation?.other_user.avatar ? (
+            <YStack width={36} height={36} borderRadius={18} overflow="hidden" backgroundColor="$slate100">
+              <Image
+                source={{ uri: conversation.other_user.avatar }}
+                style={{ width: '100%', height: '100%' }}
+                contentFit="cover"
+              />
+            </YStack>
+          ) : (
+            <YStack
+              width={36}
+              height={36}
+              borderRadius={18}
+              alignItems="center"
+              justifyContent="center"
+              backgroundColor={brand.primaryAlpha10}
+            >
+              <Paragraph fontSize={14} fontWeight="800" color={brand.primary}>
+                {(conversation?.other_user.firstname?.[0] ?? '?').toUpperCase()}
+              </Paragraph>
+            </YStack>
+          )
+        }
+      />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -69,7 +163,7 @@ export default function ConversationThreadScreen() {
       >
         <ScrollView
           ref={scrollRef}
-          contentContainerStyle={{ padding: 14, paddingBottom: 20, gap: 10 }}
+          contentContainerStyle={{ padding: 14, paddingBottom: 20, gap: 8 }}
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
         >
           {isLoading ? (
@@ -91,28 +185,40 @@ export default function ConversationThreadScreen() {
                     paddingVertical={9}
                     borderRadius={16}
                     backgroundColor={mine ? brand.primary : '$slate100'}
+                    borderBottomRightRadius={mine ? 4 : 16}
+                    borderBottomLeftRadius={mine ? 16 : 4}
                   >
-                    <Paragraph fontSize={14} color={mine ? 'white' : '$slate900'}>
-                      {m.body}
-                    </Paragraph>
-                    {m.created_at ? (
-                      <Paragraph fontSize={10} color={mine ? 'rgba(255,255,255,0.7)' : '$slate500'} textAlign="right">
-                        {new Date(m.created_at).toLocaleTimeString('fr-FR', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                    {m.body ? (
+                      <Paragraph fontSize={14} color={mine ? 'white' : '$slate900'} lineHeight={19}>
+                        {m.body}
                       </Paragraph>
                     ) : null}
+                    <XStack alignItems="center" gap={4} justifyContent="flex-end" marginTop={2}>
+                      {m.created_at ? (
+                        <Paragraph
+                          fontSize={10}
+                          color={mine ? 'rgba(255,255,255,0.75)' : '$slate500'}
+                        >
+                          {new Date(m.created_at).toLocaleTimeString('fr-FR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </Paragraph>
+                      ) : null}
+                      {mine ? (
+                        m.read_at ? (
+                          <CheckCheck size={12} color="rgba(255,255,255,0.85)" />
+                        ) : (
+                          <Check size={12} color="rgba(255,255,255,0.65)" />
+                        )
+                      ) : null}
+                    </XStack>
                   </YStack>
                 </XStack>
               );
             })
           )}
-          {otherTyping ? (
-            <Paragraph fontSize={11.5} color="$slate500" fontStyle="italic">
-              En train d'écrire…
-            </Paragraph>
-          ) : null}
+          {otherTyping ? <TypingDots /> : null}
         </ScrollView>
 
         <XStack
@@ -143,7 +249,7 @@ export default function ConversationThreadScreen() {
               fontSize: 14,
             }}
           />
-          <Pressable onPress={onSubmit} hitSlop={10}>
+          <Pressable onPress={onSubmit} hitSlop={10} accessibilityLabel="Envoyer">
             <YStack
               width={42}
               height={42}

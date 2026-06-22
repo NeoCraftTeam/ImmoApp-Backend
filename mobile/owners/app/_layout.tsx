@@ -10,6 +10,7 @@ import { SessionProvider, useSession } from '@/auth/SessionProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { SplashView } from '@/components/SplashView';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { QueryProvider } from '@/providers/QueryProvider';
 import { initMonitoring, reportError } from '@/services/monitoring';
 import config from '../tamagui.config';
@@ -74,6 +75,9 @@ function AuthGate() {
   const { isAuthenticated, isLoading } = useSession();
   const segments = useSegments();
   const router = useRouter();
+
+  // Push notifications — registers FCM token at signed-in mount.
+  usePushNotifications();
 
   useEffect(() => {
     if (isLoading) return;

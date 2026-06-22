@@ -124,6 +124,9 @@ export const ENDPOINTS = {
     current: '/subscriptions/current',
     subscribe: '/subscriptions/subscribe',
     cancel: '/subscriptions/cancel',
+    renew: '/subscriptions/renew',
+    upgrade: '/subscriptions/upgrade',
+    downgrade: '/subscriptions/downgrade',
     autoRenew: '/subscriptions/auto-renew',
     history: '/subscriptions/history',
   },
@@ -133,11 +136,28 @@ export const ENDPOINTS = {
   credits: {
     balance: '/credits/balance',
     packages: '/credits/packages',
+    purchase: (packageId: string) =>
+      `/credits/purchase/${encodeURIComponent(packageId)}`,
+    verifyPurchase: '/credits/verify-purchase',
   },
   payments: {
     history: '/payments/history',
     publicStatus: (txRef: string) =>
       `/payments/${encodeURIComponent(txRef)}/public-status`,
+    methods: '/payments/methods',
+    initiate: '/payments/initiate_payment',
+    verify: '/payments/verify_payment',
+    cancel: '/payments/cancel_payment',
+    receipt: (id: string) => `/payments/${encodeURIComponent(id)}/receipt`,
+    export: '/payments/export',
+    refundRequest: (id: string) =>
+      `/payments/${encodeURIComponent(id)}/refund-request`,
+    stripeMethods: '/payments/stripe/payment-methods',
+    stripeMethod: (pmId: string) =>
+      `/payments/stripe/payment-methods/${encodeURIComponent(pmId)}`,
+    stripeSetDefault: (pmId: string) =>
+      `/payments/stripe/payment-methods/${encodeURIComponent(pmId)}/set-default`,
+    stripeSetupIntent: '/payments/stripe/setup-intent',
   },
   reviews: {
     forAd: (adId: string) => `/ads/${encodeURIComponent(adId)}/reviews`,

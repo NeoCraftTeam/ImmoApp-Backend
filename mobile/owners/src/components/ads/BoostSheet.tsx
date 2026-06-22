@@ -5,7 +5,7 @@ import { Alert, Modal, Pressable, ScrollView } from 'react-native';
 import { Button, H2, Paragraph, Spinner, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { extractApiErrorMessage } from '@/api/client';
+import { extractApiErrorMessage } from '@/api/extract-error';
 import { useApplyBoost, useBoostPacks, useCreditsBalance } from '@/hooks/useBoost';
 import { brand } from '@/theme/tokens';
 import { formatCompact } from '@/utils/format';
@@ -42,7 +42,13 @@ export function BoostSheet({
     if (!canAfford) {
       Alert.alert(t('boost.insufficient'), t('boost.buyCredits'), [
         { text: t('common.cancel'), style: 'cancel' },
-        { text: t('boost.buyCredits'), onPress: () => { onClose(); router.push('/subscriptions' as never); } },
+        {
+          text: t('boost.buyCredits'),
+          onPress: () => {
+            onClose();
+            router.push('/credits' as never);
+          },
+        },
       ]);
       return;
     }
