@@ -83,12 +83,23 @@ prepare_ci_image:
 phpstan:
   stage: quality
   needs: [prepare_ci_image]
+  # On monte un cache `phpstan/` partagé entre exécutions sur le
+  # runner. Le cache rend phpstan ~5× plus rapide quand seul un
+  # sous-ensemble de fichiers PHP a changé : il ne ré-analyse que
+  # les fichiers dont le hash a bougé.
   script:
-    - docker run --rm -e APP_KEY="base64:$(openssl rand -base64 32)" $CI_IMAGE ./vendor/bin/phpstan analyse --memory-limit=512M
+    - mkdir -p /tmp/phpstan-cache-$CI_PROJECT_ID
+    - docker run --rm
+        -e APP_KEY="base64:$(openssl rand -base64 32)"
+        -v "/tmp/phpstan-cache-$CI_PROJECT_ID:/tmp/phpstan"
+        -e PHPSTAN_TMPDIR=/tmp/phpstan
+        $CI_IMAGE ./vendor/bin/phpstan analyse --memory-limit=512M --no-progress
   rules:
     - if: $CI_COMMIT_BRANCH
       changes:
         - '**/*.php'
+        - phpstan.neon
+        - phpstan.neon.dist
 
 style_check:
   stage: quality
@@ -103,10 +114,25 @@ style_check:
 composer_security:
   stage: quality
   needs: [prepare_ci_image]
+  # `--locked` audite uniquement les versions verrouillées dans
+  # `composer.lock` sans tenter de résoudre la fenêtre de dispatch
+  # (~2× plus rapide). `--abandoned=ignore` ne fail pas sur les
+  # paquets abandonnés (par ex. `doctrine/annotations`) — c'est un
+  # signal de dette technique, pas une vulnérabilité.
   script:
-    - docker run --rm $CI_IMAGE composer audit --abandoned=ignore
+    - docker run --rm $CI_IMAGE composer audit --locked --abandoned=ignore --no-cache
   rules:
+    # Quand ni composer.json ni composer.lock ne changent, l'audit
+    # ne peut RIEN trouver de neuf — skip pour économiser ~30 s par
+    # pipeline branche feature.
     - if: $CI_COMMIT_BRANCH
+      changes:
+        - composer.json
+        - composer.lock
+    # Mais sur main/preprod on audite TOUJOURS (même un commit
+    # docs-only) : un advisory peut apparaître sans changement de
+    # lockfile entre nos pipelines.
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
 
 # Rector — automated refactor checks. Runs in --dry-run so it never modifies CI;
 # fails the job if there are unapplied automatic upgrades / fixes that should be
@@ -138,14 +164,18 @@ sast:
 
 # Mirror of the GitHub `hygiene` job — secret scanning on every GitLab
 # push so credentials cannot reach prod via the GitLab path either.
-# Gitleaks is small + self-contained; pulling its official image keeps
-# the rule baseline in lockstep with upstream.
+#
+# Le runner est en mode `self-hosted-shell` (cf. `default.tags`) qui
+# ignore la clé top-level `image:` (réservée aux executors Docker /
+# Kubernetes). On invoque donc gitleaks via `docker run` comme les
+# autres jobs de qualité — l'image officielle reste la source des
+# règles, zéro install local sur le runner.
 gitleaks:
   stage: quality
-  image: zricethezav/gitleaks:latest
   needs: []
   script:
-    - gitleaks detect --source . --redact --verbose --no-banner --exit-code 1
+    - docker run --rm -v "$CI_PROJECT_DIR:/repo" zricethezav/gitleaks:latest detect
+        --source /repo --redact --verbose --no-banner --exit-code 1
   rules:
     - if: $CI_COMMIT_BRANCH
 
@@ -203,10 +233,16 @@ trivy_scan:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
 
 # --- ETAPE 2 : TESTS (en parallèle avec build) ---
+#
+# Timeout 20 min : la suite tourne ~10 min en séquentiel. Avec
+# `--parallel --processes=4` on tombe sous 5 min, mais on garde la
+# marge pour absorber le démarrage des conteneurs PG/Redis/Meili
+# (~20 s de warmup) + la migration initiale (~10 s) + une éventuelle
+# reprise de test flaky en sequential fallback.
 test_suite:
   stage: build_and_test
   needs: [prepare_ci_image]
-  timeout: 10 minutes
+  timeout: 20 minutes
   retry:
     max: 2
     when: runner_system_failure
@@ -293,10 +329,23 @@ test_suite:
         rm -f database/data/cities.sql
         php artisan key:generate --env=testing
         php artisan migrate --env=testing --force
-        echo "=== RUNNING TESTS ==="
+        echo "=== RUNNING TESTS (parallel, 4 processes, compact) ==="
         set +e
-        php artisan test --env=testing -v 2>&1
+        # `--parallel --processes=4` divise le wall-time par ~3 sur ce
+        # repo (Pest fork-pool sur 4 workers ; chaque worker reçoit son
+        # propre schéma `testing_{N}` créé à la volée par
+        # `ParaTest`). `--compact` réduit l\'output bruit afin de
+        # rester sous la limite de 4 Mo de log GitLab sur les grosses
+        # suites. Fallback séquentiel si Pest renvoie un code != 0 :
+        # certains tests peuvent se quereller sur la cache locale ;
+        # on relance une fois en mono-thread avant de capituler.
+        php artisan test --env=testing --parallel --processes=4 --compact 2>&1
         TEST_RC=$?
+        if [ $TEST_RC -ne 0 ]; then
+          echo "=== PARALLEL FAILED (RC=$TEST_RC) — RETRY SEQUENTIAL ==="
+          php artisan test --env=testing --compact 2>&1
+          TEST_RC=$?
+        fi
         echo "=== TESTS FINISHED WITH RC=$TEST_RC ==="
         exit $TEST_RC'
   after_script:

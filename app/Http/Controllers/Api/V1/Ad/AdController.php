@@ -210,13 +210,42 @@ final class AdController
             }
         }
 
-        // Sponsored-feed distribution. Best-effort within the cursor window: with
-        // cursor pagination we can only re-order what the page already contains.
+        // Sponsored-feed distribution. La cursor-paginate ne renvoie que
+        // `$perPage` lignes — si elles sont toutes sponsorisées (car
+        // `orderBySponsorship` les met en tête), `distribute()` n'a aucun
+        // organique à insérer aux positions 4/8/9 du slot template, et
+        // produit une page 100 % sponsorisée. Pour corriger ça sans
+        // casser le cursor (qui doit avancer par `$perPage`), on enrichit
+        // la liste de candidats **uniquement sur la première page** avec
+        // un échantillon organique séparé. Les pages suivantes restent
+        // strictement basées sur la fenêtre cursor.
         if ($sort === 'newest') {
-            $distributed = $this->feedRanker->distribute(
-                $paginator->getCollection(),
-                $perPage,
-            );
+            $candidates = $paginator->getCollection();
+
+            if (!$request->filled('cursor')) {
+                $excludeIds = $candidates->pluck('id')->all();
+
+                $organicBoost = Ad::query()
+                    ->with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'user.media', 'user.latestTrustScore', 'agency')
+                    ->withAvg('reviews', 'rating')
+                    ->withCount('reviews')
+                    ->visible()
+                    ->publiclyListed()
+                    ->where('is_subscription_sponsored', false)
+                    ->where(function ($q): void {
+                        $q->whereNull('boost_expires_at')->orWhere('boost_expires_at', '<', now());
+                    })
+                    ->when($excludeIds !== [], fn ($q) => $q->whereNotIn('id', $excludeIds))
+                    ->orderByDesc('created_at')
+                    ->limit($perPage * 2)
+                    ->get();
+
+                if ($organicBoost->isNotEmpty()) {
+                    $candidates = $candidates->concat($organicBoost);
+                }
+            }
+
+            $distributed = $this->feedRanker->distribute($candidates, $perPage);
             $paginator->setCollection($distributed);
             $this->feedRanker->recordImpressions($distributed);
         }
