@@ -50,11 +50,23 @@ final readonly class LoginService
 
         $this->checkRateLimit($key, $request, $email);
 
-        // Cloudflare Turnstile — verify only when configured. Wrong/missing
-        // token rejects the login with the same generic message as bad creds
-        // so attackers can't probe whether CAPTCHA is enabled.
+        // Cloudflare Turnstile — vérifié UNIQUEMENT pour les clients
+        // stateful (web SPA avec session Sanctum). Rationale :
+        //   • Web (keyhome.app) → `EnsureFrontendRequestsAreStateful`
+        //     attache une session → on demande un token Turnstile
+        //     (bot-protection navigateur, le formulaire injecte le JS).
+        //   • Mobile (Expo, RN) / intégrations API / cron → bearer token
+        //     pur, pas de session, pas de DOM pour exécuter le widget
+        //     Turnstile. Demander un token ici renverrait un 401
+        //     systématique avec le même message que de mauvais
+        //     identifiants — l'utilisateur ne comprend rien.
+        //
+        // Le rate-limiter `login-attempts:{ip}|{email}` reste actif
+        // dans tous les cas (5 essais / 5 min), donc la protection
+        // brute-force est préservée même sur l'API stateless.
         if (
-            $this->turnstile->isConfigured()
+            $request->hasSession()
+            && $this->turnstile->isConfigured()
             && !$this->turnstile->verify(
                 $request->input('turnstile_token'),
                 $request->ip(),
