@@ -71,47 +71,8 @@ apiClient.interceptors.response.use(
 );
 
 /**
- * Pulls the API's standard `{ message, errors }` shape (Laravel
- * form-request validation responses) into a usable string for toast /
- * inline rendering. Falls back to a generic French message rather than
- * exposing raw HTTP details. When the payload carries field-level
- * `errors`, the first one is surfaced (more actionable than the generic
- * "Données invalides").
+ * Re-export pour rétro-compatibilité — voir `src/api/extract-error.ts`.
+ * On garde l'extraction dans son propre module sans deps natives pour
+ * pouvoir le couvrir par Jest sans tirer tout l'écosystème Expo.
  */
-export function extractApiErrorMessage(err: unknown): string {
-  if (axios.isAxiosError(err)) {
-    const data = err.response?.data as
-      | { message?: string; errors?: Record<string, string[]> }
-      | undefined;
-    if (data?.errors) {
-      const first = Object.values(data.errors)[0]?.[0];
-      if (typeof first === 'string' && first.trim() !== '') {
-        return first;
-      }
-    }
-    const msg = data?.message;
-    if (typeof msg === 'string' && msg.trim() !== '') {
-      return msg;
-    }
-    if (err.response?.status === 401) {
-      return 'Identifiants incorrects.';
-    }
-    if (err.response?.status === 403) {
-      return 'Action non autorisée.';
-    }
-    if (err.response?.status === 422) {
-      return 'Données invalides.';
-    }
-    if (err.code === 'ECONNABORTED') {
-      return 'Délai d’attente dépassé. Vérifiez votre connexion.';
-    }
-    if (!err.response) {
-      const code = err.code ?? 'ERR_NETWORK';
-      return `Connexion au serveur impossible (${code}). Vérifiez votre réseau.`;
-    }
-  }
-  if (err instanceof Error && err.message.trim() !== '') {
-    return err.message;
-  }
-  return 'Une erreur est survenue. Réessayez plus tard.';
-}
+export { extractApiErrorMessage } from './extract-error';

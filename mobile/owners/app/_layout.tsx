@@ -7,12 +7,16 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { SessionProvider, useSession } from '@/auth/SessionProvider';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { SplashView } from '@/components/SplashView';
 import { QueryProvider } from '@/providers/QueryProvider';
+import { initMonitoring, reportError } from '@/services/monitoring';
 import config from '../tamagui.config';
 
 import '@/i18n'; // side-effect: initialise locale before any screen renders
+
+initMonitoring();
 
 /**
  * Root layout — provider stack for the whole owner app:
@@ -38,25 +42,27 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <TamaguiProvider config={config}>
-          <PortalProvider shouldAddRootHost>
-            <Theme name={scheme === 'dark' ? 'dark' : 'light'}>
-              <QueryProvider>
-                <SessionProvider>
-                  <AuthGate />
-                  <OfflineBanner />
-                  <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-                  <Slot />
-                  <SplashGate />
-                </SessionProvider>
-              </QueryProvider>
-            </Theme>
-          </PortalProvider>
-        </TamaguiProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary onError={(err) => reportError(err)}>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <TamaguiProvider config={config}>
+            <PortalProvider shouldAddRootHost>
+              <Theme name={scheme === 'dark' ? 'dark' : 'light'}>
+                <QueryProvider>
+                  <SessionProvider>
+                    <AuthGate />
+                    <OfflineBanner />
+                    <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+                    <Slot />
+                    <SplashGate />
+                  </SessionProvider>
+                </QueryProvider>
+              </Theme>
+            </PortalProvider>
+          </TamaguiProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   );
 }
 
@@ -71,10 +77,10 @@ function AuthGate() {
 
   useEffect(() => {
     if (isLoading) return;
-    const root = segments[0];
+    const root = segments[0] as string | undefined;
     const inAuth = root === '(auth)';
     const inOnboarding = root === 'onboarding';
-    const inGate = root === undefined || root === 'index';
+    const inGate = root === undefined;
 
     if (!isAuthenticated && !inAuth && !inOnboarding && !inGate) {
       router.replace('/(auth)/login');

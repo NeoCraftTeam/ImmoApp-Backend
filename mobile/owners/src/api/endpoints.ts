@@ -151,4 +151,48 @@ export const ENDPOINTS = {
     markAllRead: '/notifications/read-all',
     fcmToken: '/fcm/token',
   },
+  /** Chat / conversations (DM owner ↔ visiteur). */
+  chat: {
+    conversations: '/conversations',
+    conversation: (id: string) => `/conversations/${encodeURIComponent(id)}`,
+    messages: (id: string) => `/conversations/${encodeURIComponent(id)}/messages`,
+    sendMessage: (id: string) => `/conversations/${encodeURIComponent(id)}/messages`,
+    markRead: (id: string) => `/conversations/${encodeURIComponent(id)}/read`,
+    typing: (id: string) => `/conversations/${encodeURIComponent(id)}/typing`,
+    reaction: (messageId: string) =>
+      `/messages/${encodeURIComponent(messageId)}/reactions`,
+    deleteMessage: (messageId: string) =>
+      `/messages/${encodeURIComponent(messageId)}`,
+  },
+  /** Remboursements (refunds requestés par le bailleur sur ses paiements). */
+  refunds: {
+    list: '/my/refunds',
+    request: '/my/refunds',
+    detail: (id: string) => `/my/refunds/${encodeURIComponent(id)}`,
+  },
+  /** Catalogue Services Pro (boost packs, premium packages, services à la carte). */
+  proServices: {
+    list: '/pro-services',
+    purchase: '/pro-services/purchase',
+  },
+  /** Trust Score détail + recommandations. */
+  trust: {
+    score: '/my/trust-score',
+  },
+  /** Marché — estimateur prix bailleur. */
+  market: {
+    estimate: '/market/estimate',
+    indices: '/market/indices',
+  },
+  /** Équipe / collaborateurs. */
+  team: {
+    list: '/my/team',
+    invite: '/my/team/invite',
+    member: (id: string) => `/my/team/${encodeURIComponent(id)}`,
+  },
+  /** Echo / Reverb realtime auth + channel naming. */
+  echo: {
+    auth: '/broadcasting/auth',
+    conversationChannel: (id: string) => `private-conversation.${id}`,
+  },
 } as const;

@@ -1,15 +1,25 @@
 import {
+  Award,
   BadgeCheck,
   BarChart3,
+  CalendarClock,
   ChevronRight,
   CreditCard,
   FileText,
   HelpCircle,
   LogOut,
+  MessageCircle,
+  Receipt,
+  RotateCcw,
   Settings,
+  ShieldCheck,
+  Sparkles,
   Star,
+  TrendingUp,
   User,
   Users,
+  Users2,
+  Wallet,
 } from '@tamagui/lucide-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
@@ -46,11 +56,21 @@ export default function AccountScreen() {
 
   const items: { icon: React.ReactNode; label: string; route: string; accent?: string }[] = [
     { icon: <User size={20} color={brand.primary} />, label: t('account.profile'), route: '/profile' },
-    { icon: <CreditCard size={20} color={brand.accent} />, label: t('account.subscription'), route: '/subscriptions' },
+    { icon: <MessageCircle size={20} color={brand.primary} />, label: 'Messages', route: '/messages' },
     { icon: <BarChart3 size={20} color={brand.secondary} />, label: t('account.analytics'), route: '/analytics' },
+    { icon: <Wallet size={20} color={brand.success} />, label: 'Finances', route: '/financials' },
+    { icon: <Receipt size={20} color={brand.slate700} />, label: 'Paiements', route: '/payments' },
+    { icon: <RotateCcw size={20} color={brand.secondary} />, label: 'Remboursements', route: '/remboursements' },
+    { icon: <CreditCard size={20} color={brand.accent} />, label: t('account.subscription'), route: '/subscriptions' },
+    { icon: <Sparkles size={20} color={brand.accent} />, label: 'Services Pro', route: '/pro-services' },
+    { icon: <TrendingUp size={20} color={brand.primary} />, label: 'Prix du marché', route: '/prix-marche' },
+    { icon: <ShieldCheck size={20} color={brand.primary} />, label: 'Score de confiance', route: '/trust-score' },
+    { icon: <CalendarClock size={20} color={brand.secondary} />, label: 'Disponibilités', route: '/availability' },
     { icon: <Users size={20} color={brand.primary} />, label: t('account.tenants'), route: '/tenants' },
+    { icon: <Users2 size={20} color={brand.primary} />, label: 'Équipe', route: '/equipe' },
     { icon: <FileText size={20} color={brand.slate700} />, label: t('account.leases'), route: '/lease-contracts' },
     { icon: <Star size={20} color={brand.accent} />, label: t('account.reviews'), route: '/reviews' },
+    { icon: <Award size={20} color={brand.accent} />, label: 'Sécurité', route: '/security' },
     { icon: <Settings size={20} color={brand.slate700} />, label: t('account.settings'), route: '/parametres' },
   ];
 
