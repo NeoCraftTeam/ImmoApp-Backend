@@ -1,0 +1,20 @@
+{
+  "root": true,
+  "extends": ["expo"],
+  "ignorePatterns": [
+    "node_modules",
+    "dist",
+    "build",
+    ".expo",
+    "coverage",
+    "android",
+    "ios"
+  ],
+  "rules": {
+    "react/no-unescaped-entities": "off",
+    "@typescript-eslint/no-unused-vars": [
+      "warn",
+      { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
+    ]
+  }
+}

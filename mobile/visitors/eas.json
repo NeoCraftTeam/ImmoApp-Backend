@@ -1,0 +1,49 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": { "simulator": true, "resourceClass": "m-medium" },
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "http://192.168.1.104:8000/api/v1"
+      },
+      "channel": "development"
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": { "resourceClass": "m-medium" },
+      "android": { "buildType": "apk" },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.keyhome.app/api/v1"
+      },
+      "channel": "preview"
+    },
+    "production": {
+      "autoIncrement": true,
+      "ios": { "resourceClass": "m-medium" },
+      "android": { "buildType": "app-bundle" },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.keyhome.app/api/v1"
+      },
+      "channel": "production"
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "TODO_APPLE_APP_ID",
+        "appleId": "TODO_APPLE_ID@example.com",
+        "appleTeamId": "TODO_TEAM_ID"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./service-account.json",
+        "track": "internal"
+      }
+    }
+  }
+}

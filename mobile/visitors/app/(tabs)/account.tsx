@@ -1,235 +1,393 @@
-import { Calculator, ChevronRight, LogOut, User } from '@tamagui/lucide-icons';
+import {
+  AlertTriangle,
+  Bell,
+  Calculator,
+  Calendar,
+  ChevronRight,
+  ClipboardList,
+  CreditCard,
+  GitCompareArrows,
+  Heart,
+  HelpCircle,
+  LogIn,
+  LogOut,
+  Mail,
+  MapPin,
+  MessageCircle,
+  Receipt,
+  Search,
+  Settings,
+  TrendingUp,
+  User,
+} from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
-import { Alert, Pressable } from 'react-native';
-import { Button, H2, H4, Paragraph, Separator, XStack, YStack } from 'tamagui';
+import { useEffect } from 'react';
+import { Alert, Pressable, ScrollView } from 'react-native';
+import { Button, H2, H4, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSession } from '@/auth/SessionProvider';
+import { useCreditsBalance } from '@/hooks/usePayments';
 import { useMe } from '@/hooks/useMe';
-import { i18n, t } from '@/i18n';
+import { useUnreadNotificationCount } from '@/hooks/useNotifications';
+import { brand } from '@/theme/tokens';
+import { t } from '@/i18n';
 
 /**
- * Account tab — split into authenticated vs guest variants:
- *
- *   Guest        : friendly hint + two CTAs (sign in / create account)
- *   Authenticated: identity card (name, email), language picker, sign-out
- *
- * Language picker is local-only for now — flipping it mutates the i18n
- * runtime instance and the next render uses the new locale. Persisting
- * the choice across launches is a future enhancement (SecureStore +
- * `expo-localization.getLocales()` override at startup).
+ * Account hub — the visitor's home for everything that isn't browsing.
+ * Sections: identity card → activity (messages, favorites, alerts,
+ * notifications, comparator) → wallet → tools (estimator) → settings →
+ * sign-out. Guest variant collapses to a single "Sign in" CTA with the
+ * tools section still available below.
  */
 export default function AccountTab() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isAuthenticated, signOut } = useSession();
+  const me = useMe(isAuthenticated);
+  const unread = useUnreadNotificationCount();
+  const balance = useCreditsBalance();
 
-  const { data: me } = useMe(isAuthenticated);
+  // Si /me échoue avec 401 (token vraiment invalide) ou 404 (user
+  // supprimé), on déconnecte automatiquement pour basculer en mode
+  // invité plutôt que de rester bloqué sur "Chargement…".
+  // Les 5xx / réseau sont retentés silencieusement par TanStack et ne
+  // doivent PAS déconnecter — c'est la différence critique avec un
+  // bug de production où un timeout efface la session.
+  useEffect(() => {
+    if (!isAuthenticated || !me.isError || me.isLoading) return;
+    const status =
+      (me.error as undefined | { response?: { status?: number } })?.response?.status;
+    if (status === 401 || status === 404) {
+      signOut();
+    }
+  }, [isAuthenticated, me.isError, me.isLoading, me.error, signOut]);
+
+  // Mode invité effectif : pas de token OU /me a échoué irrécupérablement.
+  const isGuest =
+    !isAuthenticated ||
+    (me.isError &&
+      [401, 404].includes(
+        ((me.error as undefined | { response?: { status?: number } })?.response?.status ?? 0),
+      ));
+  const meData = me.data;
 
   const handleSignOut = () => {
-    Alert.alert(
-      t('account.signOut'),
-      t('account.signOut') + ' ?',
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('account.signOut'),
-          style: 'destructive',
-          onPress: () => {
-            signOut();
-            router.replace('/(tabs)/home');
-          },
+    Alert.alert(t('account.signOut'), `${t('account.signOut')} ?`, [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('account.signOut'),
+        style: 'destructive',
+        onPress: () => {
+          signOut();
+          router.replace('/(tabs)/home');
         },
-      ],
-    );
+      },
+    ]);
   };
 
   return (
-    <YStack
-      flex={1}
-      backgroundColor="$background"
-      paddingTop={insets.top + 16}
-      paddingHorizontal="$5"
-      paddingBottom={insets.bottom + 16}
-      gap="$5"
-    >
-      <H2>{t('account.title')}</H2>
+    <YStack flex={1} backgroundColor="$background">
+      <ScrollView
+        contentContainerStyle={{
+          paddingTop: insets.top + 18,
+          paddingHorizontal: 16,
+          paddingBottom: insets.bottom + 16,
+          gap: 18,
+        }}
+        showsVerticalScrollIndicator={false}
+      >
+        <H2>{t('account.title')}</H2>
 
-      {isAuthenticated && me ? (
-        <YStack gap="$4">
+        {!isGuest ? (
+          <Pressable onPress={() => router.push('/profile')}>
+            <YStack
+              padding={16}
+              borderRadius={16}
+              backgroundColor="$slate100"
+              gap={4}
+            >
+              <XStack gap={14} alignItems="center">
+                <YStack
+                  width={56}
+                  height={56}
+                  borderRadius={28}
+                  backgroundColor={brand.primary}
+                  alignItems="center"
+                  justifyContent="center"
+                >
+                  <Paragraph fontSize={22} fontWeight="800" color="white">
+                    {meData?.firstname?.charAt(0).toUpperCase() ?? '?'}
+                  </Paragraph>
+                </YStack>
+                <YStack flex={1} gap={2}>
+                  <H4 fontSize={17} fontWeight="700" color="$slate900">
+                    {meData ? `${meData.firstname} ${meData.lastname ?? ''}`.trim() : 'Chargement…'}
+                  </H4>
+                  <Paragraph fontSize={13} color="$slate500" numberOfLines={1}>
+                    {meData?.email ?? ''}
+                  </Paragraph>
+                  {balance.data != null && (
+                    <XStack alignItems="center" gap={4} marginTop={2}>
+                      <CreditCard size={11} color={brand.slate500} />
+                      <Paragraph fontSize={11} fontWeight="700" color="$slate500">
+                        {balance.data.toLocaleString('fr-FR')} pts
+                      </Paragraph>
+                    </XStack>
+                  )}
+                </YStack>
+                <ChevronRight size={18} color={brand.slate500} />
+              </XStack>
+            </YStack>
+          </Pressable>
+        ) : (
           <YStack
-            paddingVertical="$4"
-            paddingHorizontal="$4"
+            padding={16}
             borderRadius={16}
             backgroundColor="$slate100"
-            gap="$2"
+            gap={12}
           >
-            <XStack gap="$3" alignItems="center">
-              <YStack
-                width={48}
-                height={48}
-                borderRadius={24}
+            <Paragraph fontSize={14} color="$slate700" lineHeight={20}>
+              {t('account.guestHint')}
+            </Paragraph>
+            <XStack gap={10}>
+              <Button
+                flex={1}
+                size="$4"
                 backgroundColor="$brand"
-                alignItems="center"
-                justifyContent="center"
+                color="white"
+                fontWeight="700"
+                borderRadius={12}
+                icon={<LogIn size={16} color="white" />}
+                onPress={() => router.push('/(auth)/login')}
               >
-                <User size={24} color="white" />
-              </YStack>
-              <YStack flex={1}>
-                <H4>
-                  {me.firstname} {me.lastname}
-                </H4>
-                <Paragraph color="$slate500" size="$3">
-                  {me.email}
-                </Paragraph>
-              </YStack>
+                {t('account.signIn')}
+              </Button>
+              <Button
+                flex={1}
+                size="$4"
+                backgroundColor="white"
+                color="$slate900"
+                borderColor="$slate300"
+                borderWidth={1}
+                fontWeight="700"
+                borderRadius={12}
+                onPress={() => router.push('/(auth)/register')}
+              >
+                {t('account.signUp')}
+              </Button>
             </XStack>
           </YStack>
+        )}
 
-          <Separator />
+        {isAuthenticated && (
+          <Section title="Activité">
+            <Row
+              icon={<MessageCircle size={18} color={brand.slate700} />}
+              label="Messages"
+              onPress={() => router.push('/messages')}
+            />
+            <Row
+              icon={<Bell size={18} color={brand.slate700} />}
+              label="Notifications"
+              badge={unread.data && unread.data > 0 ? unread.data : undefined}
+              onPress={() => router.push('/notifications')}
+            />
+            <Row
+              icon={<Heart size={18} color={brand.slate700} />}
+              label="Mes favoris"
+              onPress={() => router.push('/(tabs)/favorites')}
+            />
+            <Row
+              icon={<Search size={18} color={brand.slate700} />}
+              label="Alertes de recherche"
+              onPress={() => router.push('/search-alerts')}
+            />
+            <Row
+              icon={<Calendar size={18} color={brand.slate700} />}
+              label="Mes réservations"
+              onPress={() => router.push('/reservations' as never)}
+            />
+            <Row
+              icon={<GitCompareArrows size={18} color={brand.slate700} />}
+              label="Comparateur"
+              onPress={() => router.push('/compare')}
+            />
+          </Section>
+        )}
 
-          <YStack gap="$2">
-            <Paragraph size="$3" color="$slate500" textTransform="uppercase">
-              {t('account.language')}
-            </Paragraph>
-            <XStack gap="$2">
-              <LanguageChip
-                label="FR"
-                active={i18n.locale === 'fr'}
-                onPress={() => {
-                  i18n.locale = 'fr';
-                }}
-              />
-              <LanguageChip
-                label="EN"
-                active={i18n.locale === 'en'}
-                onPress={() => {
-                  i18n.locale = 'en';
-                }}
-              />
+        {isAuthenticated && (
+          <Section title="Portefeuille">
+            <Row
+              icon={<CreditCard size={18} color={brand.slate700} />}
+              label="Crédits & paiements"
+              hint={balance.data != null ? `${balance.data.toLocaleString('fr-FR')} pts disponibles` : undefined}
+              onPress={() => router.push('/credits')}
+            />
+            <Row
+              icon={<Receipt size={18} color={brand.slate700} />}
+              label="Remboursements"
+              onPress={() => router.push('/refunds' as never)}
+            />
+            <Row
+              icon={<AlertTriangle size={18} color={brand.slate700} />}
+              label="Litiges"
+              onPress={() => router.push('/disputes' as never)}
+            />
+          </Section>
+        )}
+
+        <Section title="Outils">
+          <Row
+            icon={<MapPin size={18} color={brand.slate700} />}
+            label="Près de moi"
+            hint="Annonces autour de votre position"
+            onPress={() => router.push('/nearby')}
+          />
+          <Row
+            icon={<TrendingUp size={18} color={brand.slate700} />}
+            label="Prix du marché"
+            hint="Médianes par ville et quartier"
+            onPress={() => router.push('/market-prices' as never)}
+          />
+          <Row
+            icon={<Calculator size={18} color={brand.slate700} />}
+            label={t('estimator.title')}
+            hint={t('estimator.subtitle')}
+            onPress={() => router.push('/estimator')}
+          />
+          <Row
+            icon={<ClipboardList size={18} color={brand.slate700} />}
+            label="Sondages"
+            onPress={() => router.push('/surveys' as never)}
+          />
+          {!isAuthenticated && (
+            <Row
+              icon={<GitCompareArrows size={18} color={brand.slate700} />}
+              label="Comparateur"
+              onPress={() => router.push('/compare')}
+            />
+          )}
+        </Section>
+
+        <Section title="Application">
+          <Row
+            icon={<User size={18} color={brand.slate700} />}
+            label="Profil et préférences"
+            onPress={() =>
+              router.push(isAuthenticated ? '/profile' : '/(auth)/login')
+            }
+          />
+          <Row
+            icon={<Settings size={18} color={brand.slate700} />}
+            label="Paramètres"
+            onPress={() => router.push('/parametres')}
+          />
+          <Row
+            icon={<HelpCircle size={18} color={brand.slate700} />}
+            label="Aide & support"
+            onPress={() => router.push('/aide')}
+          />
+          <Row
+            icon={<Mail size={18} color={brand.slate700} />}
+            label="Nous contacter"
+            onPress={() => router.push('/contact' as never)}
+          />
+        </Section>
+
+        {isAuthenticated && (
+          <Pressable onPress={handleSignOut}>
+            <XStack
+              alignItems="center"
+              gap={10}
+              padding={14}
+              borderRadius={12}
+              borderWidth={1}
+              borderColor="$slate300"
+            >
+              <LogOut size={18} color={brand.danger} />
+              <Paragraph fontSize={15} fontWeight="700" color={brand.danger} flex={1}>
+                {t('account.signOut')}
+              </Paragraph>
             </XStack>
-          </YStack>
-
-          <Separator />
-
-          <ToolsSection />
-
-          <Button
-            size="$5"
-            backgroundColor="$slate100"
-            color="$danger"
-            fontWeight="700"
-            icon={LogOut}
-            onPress={handleSignOut}
-            accessibilityRole="button"
-          >
-            {t('account.signOut')}
-          </Button>
-        </YStack>
-      ) : (
-        <YStack gap="$4">
-          <Paragraph color="$slate500" size="$4">
-            {t('account.guestHint')}
-          </Paragraph>
-          <Button
-            size="$5"
-            backgroundColor="$brand"
-            color="$brandText"
-            fontWeight="700"
-            onPress={() => router.push('/(auth)/login')}
-          >
-            {t('account.signIn')}
-          </Button>
-          <Button
-            size="$5"
-            chromeless
-            color="$brand"
-            fontWeight="700"
-            onPress={() => router.push('/(auth)/register')}
-          >
-            {t('account.signUp')}
-          </Button>
-
-          <Separator />
-          <ToolsSection />
-        </YStack>
-      )}
+          </Pressable>
+        )}
+      </ScrollView>
     </YStack>
   );
 }
 
-/**
- * "Outils" / Tools section — accessible to both guest and authed
- * visitors. Currently links to the estimator; future entries (compare
- * jump, currency picker, etc.) drop in here as additional rows.
- */
-function ToolsSection() {
-  const router = useRouter();
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <YStack gap="$2">
-      <Paragraph size="$3" color="$slate500" textTransform="uppercase">
-        {t('account.tools')}
+    <YStack gap={8}>
+      <Paragraph fontSize={11} fontWeight="800" color="$slate500" textTransform="uppercase">
+        {title}
       </Paragraph>
-      <Pressable
-        onPress={() => router.push('/estimator')}
-        accessibilityRole="link"
-        accessibilityLabel={t('estimator.title')}
-      >
-        <XStack
-          paddingVertical="$3"
-          paddingHorizontal="$3"
-          borderRadius={12}
-          backgroundColor="$slate100"
-          alignItems="center"
-          gap="$3"
-        >
-          <YStack
-            width={36}
-            height={36}
-            borderRadius={18}
-            backgroundColor="$brandAlpha10"
-            alignItems="center"
-            justifyContent="center"
-          >
-            <Calculator size={18} color="$brand" />
-          </YStack>
-          <YStack flex={1}>
-            <Paragraph fontWeight="700" color="$slate700">
-              {t('estimator.title')}
-            </Paragraph>
-            <Paragraph size="$2" color="$slate500">
-              {t('estimator.subtitle')}
-            </Paragraph>
-          </YStack>
-          <ChevronRight size={18} color="$slate500" />
-        </XStack>
-      </Pressable>
+      <YStack borderRadius={14} overflow="hidden" borderWidth={1} borderColor="$slate300">
+        {children}
+      </YStack>
     </YStack>
   );
 }
 
-function LanguageChip({
+function Row({
+  icon,
   label,
-  active,
+  hint,
+  badge,
   onPress,
 }: {
+  icon: React.ReactNode;
   label: string;
-  active: boolean;
+  hint?: string;
+  badge?: number;
   onPress: () => void;
 }) {
   return (
-    <Button
-      size="$3"
-      backgroundColor={active ? '$brand' : '$slate100'}
-      color={active ? '$brandText' : '$slate700'}
-      borderRadius={999}
-      fontWeight="700"
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: active }}
-      accessibilityLabel={`Définir la langue : ${label}`}
-    >
-      {label}
-    </Button>
+    <Pressable onPress={onPress}>
+      <XStack
+        alignItems="center"
+        gap={12}
+        paddingHorizontal={14}
+        paddingVertical={13}
+        backgroundColor="$background"
+        borderBottomWidth={1}
+        borderBottomColor="$slate100"
+      >
+        {icon}
+        <YStack flex={1} gap={1}>
+          <Paragraph fontSize={14.5} fontWeight="600" color="$slate900">
+            {label}
+          </Paragraph>
+          {hint && (
+            <Paragraph fontSize={12} color="$slate500" numberOfLines={1}>
+              {hint}
+            </Paragraph>
+          )}
+        </YStack>
+        {badge != null && badge > 0 && (
+          <YStack
+            minWidth={22}
+            height={22}
+            paddingHorizontal={7}
+            borderRadius={11}
+            backgroundColor={brand.primary}
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Paragraph fontSize={11} fontWeight="800" color="white">
+              {badge > 99 ? '99+' : badge}
+            </Paragraph>
+          </YStack>
+        )}
+        <ChevronRight size={16} color={brand.slate500} />
+      </XStack>
+    </Pressable>
   );
 }

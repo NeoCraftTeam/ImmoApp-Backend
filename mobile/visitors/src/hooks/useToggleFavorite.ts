@@ -42,14 +42,16 @@ export function useToggleFavorite() {
 
       // 2. Flip is_favorited on every cached page of the feed + search.
       const flipPages = (data: InfiniteData<AdFeedResponse> | undefined) => {
-        if (!data) return data;
+        if (!data || !Array.isArray(data.pages)) return data;
         return {
           ...data,
           pages: data.pages.map((p) => ({
             ...p,
-            data: p.data.map((ad) =>
-              ad.id === adId ? { ...ad, is_favorited: !ad.is_favorited } : ad,
-            ),
+            data: Array.isArray(p?.data)
+              ? p.data.map((ad) =>
+                  ad.id === adId ? { ...ad, is_favorited: !ad.is_favorited } : ad,
+                )
+              : [],
           })),
         };
       };
@@ -68,7 +70,7 @@ export function useToggleFavorite() {
       //    entry appears with all its server-side metadata (rating,
       //    review count, etc.) rather than a partial optimistic stub.
       qc.setQueryData<Ad[]>(['my-favorites'], (current) =>
-        current ? current.filter((ad) => ad.id !== adId) : current,
+        Array.isArray(current) ? current.filter((ad) => ad.id !== adId) : current,
       );
 
       return { previous };

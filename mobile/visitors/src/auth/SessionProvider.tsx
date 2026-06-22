@@ -2,6 +2,7 @@ import { createContext, useContext, useMemo, type ReactNode } from 'react';
 
 import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
+import { clearUserContext, trackEvent } from '@/services/monitoring';
 
 import { SESSION_KEY } from './storage-keys';
 import { useStorageState } from './useStorageState';
@@ -15,8 +16,14 @@ interface SessionContextValue {
   isAuthenticated: boolean;
   /** Posts to `/auth/login`, persists the returned token, resolves on success. */
   signIn: (email: string, password: string) => Promise<void>;
-  /** Posts to `/auth/register`, persists the returned token. */
-  signUp: (input: SignUpInput) => Promise<void>;
+  /**
+   * Posts to `/auth/registerCustomer`. Returns the backend's
+   * `email_verification_required` flag so the caller can route to
+   * `verify-otp` or straight to home.
+   */
+  signUp: (input: SignUpInput) => Promise<{ emailVerificationRequired: boolean }>;
+  /** Install a token returned by an external flow (e.g. OTP verify response). */
+  setToken: (token: string) => void;
   /** Clears the stored token; the Axios 401 interceptor calls this too. */
   signOut: () => void;
 }
@@ -25,7 +32,22 @@ export interface SignUpInput {
   firstname: string;
   lastname: string;
   email: string;
+  phone_number: string;
   password: string;
+  confirm_password: string;
+}
+
+/**
+ * Backend response from `/auth/login` + `/auth/register`. Laravel ships
+ * `access_token`; older drafts used `token` — we accept both so older
+ * mocks / fixtures don't silently swallow the value.
+ */
+interface LoginResponse {
+  access_token?: string;
+  token?: string;
+  message?: string;
+  expires_at?: string;
+  email_verification_required?: boolean;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -46,26 +68,38 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       isLoading,
       isAuthenticated: token !== null,
       signIn: async (email, password) => {
-        const { data } = await apiClient.post<{ token: string }>(
+        const { data } = await apiClient.post<LoginResponse>(
           ENDPOINTS.auth.login,
           { email, password },
         );
-        if (typeof data?.token !== 'string' || data.token === '') {
+        const accessToken = data?.access_token ?? data?.token;
+        if (typeof accessToken !== 'string' || accessToken === '') {
           throw new Error('Réponse de connexion invalide.');
         }
-        setToken(data.token);
+        setToken(accessToken);
+        trackEvent('auth.signIn', { email });
       },
       signUp: async (input) => {
-        const { data } = await apiClient.post<{ token: string }>(
+        const { data } = await apiClient.post<LoginResponse>(
           ENDPOINTS.auth.register,
           input,
         );
-        if (typeof data?.token !== 'string' || data.token === '') {
+        const accessToken = data?.access_token ?? data?.token;
+        const emailVerificationRequired = Boolean(data?.email_verification_required);
+        if (typeof accessToken === 'string' && accessToken !== '') {
+          setToken(accessToken);
+        } else if (!emailVerificationRequired) {
+          // Pas de token et pas de flag verif → contrat backend cassé
           throw new Error('Réponse d’inscription invalide.');
         }
-        setToken(data.token);
+        return { emailVerificationRequired };
       },
-      signOut: () => setToken(null),
+      setToken: (next: string) => setToken(next),
+      signOut: () => {
+        trackEvent('auth.signOut');
+        clearUserContext();
+        setToken(null);
+      },
     }),
     [token, isLoading, setToken],
   );

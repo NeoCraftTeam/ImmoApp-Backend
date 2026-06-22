@@ -4,7 +4,12 @@
  * runtime style resolution is replaced by a flat StyleSheet. Without it
  * the app still works but loses ~30% of the perf win Tamagui exists for.
  *
- * `reanimated/plugin` must be LAST per Reanimated docs.
+ * The Reanimated worklets transform is intentionally NOT included: this
+ * app uses React Native's built-in `Animated` API with `useNativeDriver`
+ * for every animation (press scale, parallax, heart burst, etc.). Adding
+ * the worklets plugin without a compatible native module in Expo Go
+ * blew up the entire bundle in a previous iteration — keep it omitted
+ * unless a screen explicitly imports `react-native-reanimated`.
  */
 module.exports = function (api) {
   api.cache(true);
@@ -19,7 +24,6 @@ module.exports = function (api) {
           logTimings: true,
         },
       ],
-      'react-native-reanimated/plugin',
     ],
   };
 };

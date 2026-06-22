@@ -1,0 +1,63 @@
+{
+  "expo": {
+    "name": "KeyHome Pro",
+    "slug": "keyhome-owners",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "keyhomeowners",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0D9488"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.keyhome.owners",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "Pour positionner précisément vos biens sur la carte lors de la création d'une annonce.",
+        "NSPhotoLibraryUsageDescription": "Pour ajouter des photos à vos annonces.",
+        "NSCameraUsageDescription": "Pour photographier vos biens directement depuis l'application."
+      }
+    },
+    "android": {
+      "package": "com.keyhome.owners",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0D9488"
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0D9488",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "apiBaseUrl": "https://api.keyhome.app/api/v1",
+      "apiBaseUrlDev": "http://localhost:8000/api/v1"
+    }
+  }
+}

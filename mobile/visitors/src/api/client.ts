@@ -97,7 +97,7 @@ export function extractApiErrorMessage(err: unknown): string {
       return msg;
     }
     if (err.response?.status === 401) {
-      return 'Session expirée — connectez-vous à nouveau.';
+      return 'Identifiants incorrects.';
     }
     if (err.response?.status === 422) {
       return 'Données invalides.';
@@ -105,6 +105,18 @@ export function extractApiErrorMessage(err: unknown): string {
     if (err.code === 'ECONNABORTED') {
       return 'Délai d’attente dépassé. Vérifiez votre connexion.';
     }
+    // No response received — typically a TLS / DNS / connectivity error.
+    // Surfacing the underlying axios error code helps the user (and us)
+    // distinguish "Wi-Fi off" from "backend down" from "untrusted cert".
+    if (!err.response) {
+      const code = err.code ?? 'ERR_NETWORK';
+      return `Connexion au serveur impossible (${code}). Vérifiez votre réseau et le certificat keyhome.test.`;
+    }
+  }
+  // Non-axios Error — surface its own message instead of the generic
+  // fallback so caller code's `throw new Error('…')` actually reaches the UI.
+  if (err instanceof Error && err.message.trim() !== '') {
+    return err.message;
   }
   return 'Une erreur est survenue. Réessayez plus tard.';
 }

@@ -181,9 +181,28 @@ export default function EstimatorScreen() {
 
             {/* Results */}
             {estimate.isError && (
-              <Paragraph color="$danger" textAlign="center">
-                {extractApiErrorMessage(estimate.error)}
-              </Paragraph>
+              <YStack
+                padding={14}
+                borderRadius={12}
+                backgroundColor="$slate100"
+                borderWidth={1}
+                borderColor="$danger"
+                gap={8}
+                alignItems="center"
+              >
+                <Paragraph color="$danger" textAlign="center" fontSize={13}>
+                  {extractApiErrorMessage(estimate.error)}
+                </Paragraph>
+                <Button
+                  size="$3"
+                  backgroundColor="$slate900"
+                  color="white"
+                  fontWeight="700"
+                  onPress={handleSubmit}
+                >
+                  Réessayer
+                </Button>
+              </YStack>
             )}
 
             {result?.error && (

@@ -3,7 +3,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 type State<T> = [boolean, T | null];
-type Reducer<T> = (state: State<T>, action: T | null) => State<T>;
+type Action<T> = T | null;
 
 /**
  * `[ [isLoading, value], setValue ]` — small primitive that hides the
@@ -15,10 +15,12 @@ type Reducer<T> = (state: State<T>, action: T | null) => State<T>;
  * initial read resolves, so callers can render a splash until the
  * persisted value is hydrated.
  */
-export function useStorageState<T extends string>(key: string): [State<T>, (value: T | null) => void] {
-  const [state, dispatch] = useReducer<Reducer<T>>(
-    (_state, action) => [false, action],
-    [true, null],
+export function useStorageState<T extends string>(
+  key: string,
+): [State<T>, (value: T | null) => void] {
+  const [state, dispatch] = useReducer<State<T>, [Action<T>]>(
+    (_state: State<T>, action: Action<T>): State<T> => [false, action as T | null],
+    [true, null] as State<T>,
   );
 
   useEffect(() => {

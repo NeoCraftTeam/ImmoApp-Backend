@@ -21,8 +21,9 @@ import {
  * no text query and still get results.
  */
 export function useAdSearch(query: string, filters: AdFilters = EMPTY_FILTERS) {
+  const trimmed = query.trim();
   const hasFilters = activeFilterCount(filters) > 0;
-  const hasQuery = query.trim().length >= 2;
+  const hasQuery = trimmed.length >= 2;
 
   return useInfiniteQuery<
     AdFeedResponse,
@@ -31,14 +32,14 @@ export function useAdSearch(query: string, filters: AdFilters = EMPTY_FILTERS) {
     readonly unknown[],
     number
   >({
-    queryKey: ['ad-search', query, filters] as const,
+    queryKey: ['ad-search', trimmed, filters] as const,
     queryFn: async ({ pageParam }) => {
       const params: Record<string, string | number> = {
         per_page: 15,
         page: pageParam,
         ...filtersToParams(filters),
       };
-      if (hasQuery) params.q = query;
+      if (hasQuery) params.q = trimmed;
       const { data } = await apiClient.get<AdFeedResponse>(ENDPOINTS.ads.list, {
         params,
       });
@@ -52,7 +53,10 @@ export function useAdSearch(query: string, filters: AdFilters = EMPTY_FILTERS) {
         ? meta.current_page + 1
         : undefined;
     },
-    select: (data) => data.pages.flatMap((p) => p.data),
+    select: (data) =>
+      Array.isArray(data?.pages)
+        ? data.pages.flatMap((p) => (Array.isArray(p?.data) ? p.data : []))
+        : [],
     enabled: hasQuery || hasFilters,
     staleTime: 60 * 1000,
   });

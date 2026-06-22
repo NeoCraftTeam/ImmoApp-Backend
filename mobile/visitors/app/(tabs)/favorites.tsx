@@ -1,12 +1,16 @@
+import { AlertCircle, Heart, LogIn } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
 import { ActivityIndicator, FlatList, RefreshControl } from 'react-native';
-import { Button, H2, Paragraph, YStack } from 'tamagui';
+import { H2, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AdCard } from '@/components/AdCard';
+import { AdCardSkeleton } from '@/components/AdCardSkeleton';
+import { EmptyState } from '@/components/EmptyState';
 import { extractApiErrorMessage } from '@/api/client';
 import { useSession } from '@/auth/SessionProvider';
 import { useFavorites } from '@/hooks/useFavorites';
+import { brand } from '@/theme/tokens';
 import { t } from '@/i18n';
 
 /**
@@ -37,58 +41,50 @@ export default function FavoritesTab() {
 
   if (!isAuthenticated) {
     return (
-      <YStack
-        flex={1}
-        backgroundColor="$background"
-        paddingTop={insets.top + 32}
-        paddingHorizontal="$5"
-        gap="$5"
-      >
-        <YStack gap="$2">
-          <H2>{t('favorites.title')}</H2>
-        </YStack>
-        <YStack flex={1} justifyContent="center" alignItems="center" gap="$4">
-          <Paragraph color="$slate500" size="$4" textAlign="center">
-            {t('favorites.signInPrompt')}
-          </Paragraph>
-          <Button
-            size="$5"
-            backgroundColor="$brand"
-            color="$brandText"
-            fontWeight="700"
-            onPress={() => router.push('/(auth)/login')}
-          >
-            {t('account.signIn')}
-          </Button>
-        </YStack>
+      <YStack flex={1} backgroundColor="$background" paddingTop={insets.top + 32} paddingHorizontal="$5">
+        <H2>{t('favorites.title')}</H2>
+        <EmptyState
+          icon={<LogIn size={32} color={brand.slate500} />}
+          title={t('favorites.signInPrompt')}
+          body={t('favorites.emptyHint')}
+          action={{ label: t('account.signIn'), onPress: () => router.push('/(auth)/login') }}
+        />
       </YStack>
     );
   }
 
   if (isLoading) {
     return (
-      <YStack flex={1} backgroundColor="$background" justifyContent="center" alignItems="center">
-        <ActivityIndicator />
-      </YStack>
+      <FlatList
+        data={Array.from({ length: 6 }, (_, i) => i)}
+        keyExtractor={(i) => `skel-${i}`}
+        numColumns={2}
+        columnWrapperStyle={{ gap: 12, marginBottom: 16 }}
+        contentContainerStyle={{
+          paddingTop: insets.top + 8,
+          paddingBottom: insets.bottom + 16,
+          paddingHorizontal: 12,
+        }}
+        ListHeaderComponent={
+          <YStack paddingVertical="$3"><H2>{t('favorites.title')}</H2></YStack>
+        }
+        renderItem={() => (
+          <YStack flex={1}><AdCardSkeleton /></YStack>
+        )}
+        scrollEnabled={false}
+      />
     );
   }
 
   if (isError) {
     return (
-      <YStack
-        flex={1}
-        backgroundColor="$background"
-        justifyContent="center"
-        alignItems="center"
-        padding="$5"
-        gap="$3"
-      >
-        <Paragraph color="$slate700" textAlign="center">
-          {extractApiErrorMessage(error)}
-        </Paragraph>
-        <Button onPress={() => refetch()} size="$3">
-          {t('common.retry')}
-        </Button>
+      <YStack flex={1} backgroundColor="$background" paddingTop={insets.top + 12} paddingHorizontal="$5">
+        <H2>{t('favorites.title')}</H2>
+        <EmptyState
+          icon={<AlertCircle size={32} color={brand.slate500} />}
+          title={extractApiErrorMessage(error)}
+          action={{ label: t('common.retry'), onPress: () => refetch() }}
+        />
       </YStack>
     );
   }
@@ -97,6 +93,8 @@ export default function FavoritesTab() {
     <FlatList
       data={favorites ?? []}
       keyExtractor={(item) => item.id}
+      numColumns={2}
+      columnWrapperStyle={{ gap: 12, marginBottom: 16 }}
       contentContainerStyle={{
         paddingTop: insets.top + 8,
         paddingBottom: insets.bottom + 16,
@@ -108,16 +106,18 @@ export default function FavoritesTab() {
         </YStack>
       }
       ListEmptyComponent={
-        <YStack padding="$6" alignItems="center" gap="$2">
-          <Paragraph color="$slate700" fontWeight="700">
-            {t('favorites.empty')}
-          </Paragraph>
-          <Paragraph color="$slate500" size="$3" textAlign="center">
-            {t('favorites.emptyHint')}
-          </Paragraph>
-        </YStack>
+        <EmptyState
+          icon={<Heart size={32} color={brand.slate500} />}
+          title={t('favorites.empty')}
+          body={t('favorites.emptyHint')}
+          action={{ label: 'Découvrir les annonces', onPress: () => router.replace('/(tabs)/home') }}
+        />
       }
-      renderItem={({ item, index }) => <AdCard ad={item} priority={index < 3} />}
+      renderItem={({ item, index }) => (
+        <YStack flex={1}>
+          <AdCard ad={item} priority={index < 3} />
+        </YStack>
+      )}
       refreshControl={
         <RefreshControl refreshing={isRefetching} onRefresh={() => refetch()} />
       }

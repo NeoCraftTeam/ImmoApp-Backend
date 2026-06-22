@@ -32,7 +32,13 @@ export interface AdType {
 
 export interface AdUser {
   id: string;
+  username?: string;
   firstname: string;
+  lastname?: string;
+  avatar?: string | null;
+  phone_number?: string | null;
+  phone_is_whatsapp?: boolean;
+  email?: string;
   is_verified?: boolean;
   trust_tier?: string;
   trust_score?: number;
@@ -72,6 +78,10 @@ export interface Ad {
   user?: AdUser;
   created_at?: string;
   available_from?: string | null;
+  /** Equipment slugs (resolved to labels via /property-attributes). */
+  attributes?: string[];
+  /** Optional pre-formatted distance from the user, set by the search/feed endpoint. */
+  distance?: number | null;
 }
 
 export interface AdFeedResponse {

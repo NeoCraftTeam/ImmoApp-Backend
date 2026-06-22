@@ -10,13 +10,15 @@ export interface CityOption {
 export interface AdTypeOption {
   id: string;
   name: string;
+  desc?: string | null;
 }
 
 /**
- * Tiny helpers for the estimator's dropdowns. We don't ship a full
- * autocomplete on mobile yet — the city list is small enough (~50
- * West-African capitals + districts) that loading them up-front and
- * picking from a scrollable sheet is faster than a debounced fetch.
+ * Tiny helpers for the estimator's dropdowns + the home filter chips.
+ * We don't ship a full autocomplete on mobile yet — the city list is
+ * small enough (~50 West-African capitals + districts) that loading
+ * them up-front and picking from a scrollable sheet is faster than a
+ * debounced fetch.
  */
 export function useCitiesList() {
   return useQuery<{ data: CityOption[] }, Error, CityOption[]>({
@@ -27,7 +29,7 @@ export function useCitiesList() {
       });
       return data;
     },
-    select: (payload) => payload.data,
+    select: (payload) => (Array.isArray(payload?.data) ? payload.data : []),
     staleTime: 10 * 60 * 1000,
   });
 }
@@ -39,7 +41,7 @@ export function useAdTypes() {
       const { data } = await apiClient.get<{ data: AdTypeOption[] }>('/ad-types');
       return data;
     },
-    select: (payload) => payload.data,
+    select: (payload) => (Array.isArray(payload?.data) ? payload.data : []),
     staleTime: 30 * 60 * 1000,
   });
 }

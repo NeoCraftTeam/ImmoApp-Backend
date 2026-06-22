@@ -101,10 +101,36 @@ export default function CompareScreen() {
         </XStack>
 
         {items.length === 0 ? (
-          <YStack flex={1} justifyContent="center" alignItems="center" padding="$5">
-            <Paragraph color="$slate500" textAlign="center">
+          <YStack flex={1} justifyContent="center" alignItems="center" padding="$5" gap={12}>
+            <YStack
+              width={64}
+              height={64}
+              borderRadius={32}
+              backgroundColor="$slate100"
+              alignItems="center"
+              justifyContent="center"
+            >
+              <X size={28} color="$slate500" />
+            </YStack>
+            <Paragraph color="$slate900" fontWeight="700" textAlign="center" fontSize={15}>
               {t('compare.empty')}
             </Paragraph>
+            <Pressable
+              onPress={() => router.replace('/(tabs)/search')}
+              accessibilityRole="button"
+              accessibilityLabel="Aller à la recherche"
+            >
+              <XStack
+                paddingHorizontal={16}
+                paddingVertical={10}
+                borderRadius={999}
+                backgroundColor="$brand"
+              >
+                <Paragraph color="white" fontWeight="700" fontSize={13}>
+                  Parcourir les annonces
+                </Paragraph>
+              </XStack>
+            </Pressable>
           </YStack>
         ) : (
           <XStack flex={1}>

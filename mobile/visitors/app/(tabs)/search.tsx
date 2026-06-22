@@ -1,10 +1,13 @@
-import { Filter, Search as SearchIcon } from '@tamagui/lucide-icons';
+import { Filter, RefreshCw, Search as SearchIcon } from '@tamagui/lucide-icons';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable } from 'react-native';
 import { H2, Input, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { extractApiErrorMessage } from '@/api/client';
 import { AdCard } from '@/components/AdCard';
+import { EmptyState } from '@/components/EmptyState';
+import { FadeIn } from '@/components/FadeIn';
 import { SearchFilterSheet } from '@/components/SearchFilterSheet';
 import { useAdSearch } from '@/hooks/useAdSearch';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -32,6 +35,9 @@ export default function SearchTab() {
     data: results,
     isFetching,
     isLoading,
+    isError,
+    error,
+    refetch,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -134,10 +140,40 @@ export default function SearchTab() {
         </YStack>
       )}
 
-      {isSearching && (
+      {isSearching && isError && (
+        <YStack flex={1} alignItems="center" justifyContent="center" padding="$5" gap={12}>
+          <Paragraph color="$slate700" textAlign="center" fontSize={14}>
+            {extractApiErrorMessage(error)}
+          </Paragraph>
+          <Pressable
+            onPress={() => refetch()}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Réessayer la recherche"
+          >
+            <XStack
+              alignItems="center"
+              gap={6}
+              paddingHorizontal={14}
+              paddingVertical={10}
+              borderRadius={999}
+              backgroundColor="$slate900"
+            >
+              <RefreshCw size={14} color="white" />
+              <Paragraph fontSize={13} fontWeight="700" color="white">
+                Réessayer
+              </Paragraph>
+            </XStack>
+          </Pressable>
+        </YStack>
+      )}
+
+      {isSearching && !isError && (
         <FlatList
           data={results ?? []}
           keyExtractor={(item) => item.id}
+          numColumns={2}
+          columnWrapperStyle={{ gap: 12, marginBottom: 16 }}
           contentContainerStyle={{
             paddingHorizontal: 12,
             paddingTop: 4,
@@ -145,13 +181,19 @@ export default function SearchTab() {
           }}
           ListEmptyComponent={
             showEmpty ? (
-              <YStack padding="$5" alignItems="center">
-                <Paragraph color="$slate500">{t('search.noResults')}</Paragraph>
-              </YStack>
+              <EmptyState
+                icon={<SearchIcon size={32} color="#94A3B8" />}
+                title={t('search.noResults')}
+                body="Essayez d'élargir vos critères ou de modifier votre recherche."
+              />
             ) : null
           }
           renderItem={({ item, index }) => (
-            <AdCard ad={item} priority={index < 3} />
+            <YStack flex={1}>
+              <FadeIn delay={Math.min(index, 6) * 40}>
+                <AdCard ad={item} priority={index < 3} />
+              </FadeIn>
+            </YStack>
           )}
           ListFooterComponent={
             isFetching && !isFetchingNextPage ? null : isFetchingNextPage ? (
@@ -179,12 +221,14 @@ export default function SearchTab() {
         </YStack>
       )}
 
-      <SearchFilterSheet
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        filters={filters}
-        onApply={setFilters}
-      />
+      {sheetOpen && (
+        <SearchFilterSheet
+          open={sheetOpen}
+          onOpenChange={setSheetOpen}
+          filters={filters}
+          onApply={setFilters}
+        />
+      )}
     </YStack>
   );
 }
