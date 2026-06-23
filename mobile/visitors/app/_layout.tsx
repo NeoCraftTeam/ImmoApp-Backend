@@ -93,9 +93,12 @@ function SplashGate() {
   const [minDelayElapsed, setMinDelayElapsed] = useState(false);
 
   useEffect(() => {
-    // Hold le splash au moins 600 ms même si la session se rehydrate
-    // instantanément — donne le temps à l'animation de jouer son intro.
-    const t = setTimeout(() => setMinDelayElapsed(true), 600);
+    // Hold le splash 1500 ms même si la session se rehydrate
+    // instantanément — laisse l'anim complète jouer (pastille clé →
+    // wordmark stagger → halo → tagline ≈ 1.3 s). À 600 ms l'écran
+    // disparaissait avant que l'utilisateur ait vu se construire le
+    // logo — flash sans identité de marque.
+    const t = setTimeout(() => setMinDelayElapsed(true), 1500);
     return () => clearTimeout(t);
   }, []);
 

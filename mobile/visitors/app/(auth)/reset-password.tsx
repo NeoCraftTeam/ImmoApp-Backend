@@ -6,6 +6,7 @@ import { Button, H2, Paragraph, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
+import { KeyHomeLogo } from '@/components/KeyHomeLogo';
 import { useResetPassword } from '@/hooks/useAuthExtras';
 import { brand } from '@/theme/tokens';
 
@@ -90,6 +91,7 @@ export default function ResetPasswordScreen() {
           </YStack>
         ) : (
           <YStack gap={14}>
+            <KeyHomeLogo size={22} />
             <YStack gap={6}>
               <H2 fontSize={26} fontWeight="700">Nouveau mot de passe</H2>
               <Paragraph fontSize={14} color="$slate500">

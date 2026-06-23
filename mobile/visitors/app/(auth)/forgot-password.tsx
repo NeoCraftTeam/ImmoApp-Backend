@@ -6,6 +6,7 @@ import { Button, H2, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
+import { KeyHomeLogo } from '@/components/KeyHomeLogo';
 import { useForgotPassword } from '@/hooks/useAuthExtras';
 import { brand } from '@/theme/tokens';
 
@@ -51,6 +52,7 @@ export default function ForgotPasswordScreen() {
           </YStack>
         </Pressable>
 
+        <KeyHomeLogo size={22} />
         <YStack gap={6}>
           <H2 fontSize={26} fontWeight="700">Mot de passe oublié</H2>
           <Paragraph fontSize={14} color="$slate500">

@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
 import { useSession } from '@/auth/SessionProvider';
+import { KeyHomeLogo } from '@/components/KeyHomeLogo';
 import { brand } from '@/theme/tokens';
 import { t } from '@/i18n';
 
@@ -116,11 +117,14 @@ export default function Login() {
       paddingBottom={insets.bottom + 16}
       gap="$5"
     >
-      <YStack gap="$2">
-        <H2>{t('auth.loginTitle')}</H2>
-        <Paragraph color="$slate500" size="$4">
-          {t('auth.loginSubtitle')}
-        </Paragraph>
+      <YStack alignItems="flex-start" gap="$4">
+        <KeyHomeLogo size={22} />
+        <YStack gap="$2">
+          <H2>{t('auth.loginTitle')}</H2>
+          <Paragraph color="$slate500" size="$4">
+            {t('auth.loginSubtitle')}
+          </Paragraph>
+        </YStack>
       </YStack>
 
       <YStack gap="$3">

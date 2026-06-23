@@ -146,9 +146,56 @@ export function LocationMap({
       </YStack>
 
       {!userLocation && permissionDenied && (
-        <Paragraph fontSize={12} color="$slate500" fontStyle="italic">
-          Activez la localisation pour voir la distance et l'itinéraire jusqu'au bien.
-        </Paragraph>
+        <YStack
+          padding={14}
+          gap={10}
+          borderRadius={14}
+          backgroundColor={brand.primaryAlpha10}
+          borderWidth={1}
+          borderColor={brand.primaryAlpha20}
+        >
+          <XStack alignItems="flex-start" gap={10}>
+            <YStack
+              width={32}
+              height={32}
+              borderRadius={16}
+              alignItems="center"
+              justifyContent="center"
+              backgroundColor="rgba(255,255,255,0.6)"
+            >
+              <MapPin size={16} color={brand.primary} />
+            </YStack>
+            <YStack flex={1} gap={2}>
+              <Paragraph fontSize={13.5} fontWeight="800" color="$slate900">
+                Voir la distance jusqu'à ce bien
+              </Paragraph>
+              <Paragraph fontSize={12} color="$slate700" lineHeight={17}>
+                Activez la localisation pour voir l'itinéraire en voiture, à pied
+                ou à vélo depuis votre position actuelle.
+              </Paragraph>
+            </YStack>
+          </XStack>
+          <Pressable
+            onPress={() => void Linking.openSettings()}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Ouvrir les réglages pour activer la localisation"
+          >
+            <XStack
+              alignItems="center"
+              justifyContent="center"
+              gap={6}
+              paddingVertical={9}
+              borderRadius={10}
+              backgroundColor={brand.primary}
+            >
+              <Navigation size={14} color="white" />
+              <Paragraph fontSize={13} fontWeight="800" color="white">
+                Activer la localisation
+              </Paragraph>
+            </XStack>
+          </Pressable>
+        </YStack>
       )}
 
       {userLocation && !isLocked && (

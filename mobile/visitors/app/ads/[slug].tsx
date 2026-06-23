@@ -33,6 +33,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { extractApiErrorMessage } from '@/api/client';
 import { CompareButton } from '@/components/CompareButton';
 import { FavoriteButton } from '@/components/FavoriteButton';
+import { AdDetailSkeleton } from '@/components/ads/AdDetailSkeleton';
 import { BookViewingSheet } from '@/components/ads/BookViewingSheet';
 import { KeyScoreSection } from '@/components/ads/KeyScoreSection';
 import { LocationMap } from '@/components/ads/LocationMap';
@@ -100,13 +101,11 @@ export default function AdDetail() {
 
   if (isLoading) {
     return (
-      <YStack
-        flex={1}
-        backgroundColor="$background"
-        justifyContent="center"
-        alignItems="center"
-      >
-        <ActivityIndicator />
+      <YStack flex={1} backgroundColor="$background">
+        <Stack.Screen options={{ headerShown: false }} />
+        <ScrollView contentContainerStyle={{ paddingTop: insets.top }}>
+          <AdDetailSkeleton />
+        </ScrollView>
       </YStack>
     );
   }

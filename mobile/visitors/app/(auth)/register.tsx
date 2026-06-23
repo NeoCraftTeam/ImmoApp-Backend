@@ -7,6 +7,7 @@ import { z } from 'zod';
 
 import { extractApiErrorMessage } from '@/api/client';
 import { useSession } from '@/auth/SessionProvider';
+import { KeyHomeLogo } from '@/components/KeyHomeLogo';
 import { t } from '@/i18n';
 
 /**
@@ -111,6 +112,7 @@ export default function Register() {
       keyboardShouldPersistTaps="handled"
     >
       <YStack gap="$4">
+        <KeyHomeLogo size={22} />
         <YStack gap="$2">
           <H2>{t('auth.registerTitle')}</H2>
           <Paragraph color="$slate500" size="$4">

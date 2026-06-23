@@ -6,6 +6,7 @@ import { Button, H2, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
+import { KeyHomeLogo } from '@/components/KeyHomeLogo';
 import { useResendVerification, useVerifyEmailOtp } from '@/hooks/useAuthExtras';
 import { useSession } from '@/auth/SessionProvider';
 import { brand } from '@/theme/tokens';
@@ -128,6 +129,7 @@ export default function VerifyOtpScreen() {
           >
             <MailCheck size={32} color={brand.primary} />
           </YStack>
+          <KeyHomeLogo size={18} />
           <H2 fontSize={24} fontWeight="700" textAlign="center">
             Vérifiez votre email
           </H2>
