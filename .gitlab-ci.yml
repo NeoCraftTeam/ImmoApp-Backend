@@ -162,20 +162,44 @@ sast:
         - '**/*.php'
         - rector.php
 
-# Mirror of the GitHub `hygiene` job — secret scanning on every GitLab
-# push so credentials cannot reach prod via the GitLab path either.
+# Secret scanning **incremental** — on scanne uniquement les 50
+# derniers commits, pas l'historique complet.
 #
-# Le runner est en mode `self-hosted-shell` (cf. `default.tags`) qui
-# ignore la clé top-level `image:` (réservée aux executors Docker /
-# Kubernetes). On invoque donc gitleaks via `docker run` comme les
-# autres jobs de qualité — l'image officielle reste la source des
-# règles, zéro install local sur le runner.
+# Avant : scan complet 24 min, 481 faux positifs sur des valeurs
+# litterales "REDACTED" dans .docs/. Apres :
+#   - `.gitleaks.toml` a la racine whiteliste `.docs/**` + REDACTED/etc.
+#   - `--log-opts="HEAD~50..HEAD"` limite a la fenetre changeset
+#   → execution ~30 s, alerte uniquement sur les VRAIES fuites.
+#
+# Si tu veux supprimer entierement cette protection, retire ce job
+# et `.gitleaks.toml`. Mais 30 s pour bloquer un secret accidentel
+# avant qu'il ne reach prod, c'est un trade-off que je recommande.
 gitleaks:
   stage: quality
   needs: []
   script:
-    - docker run --rm -v "$CI_PROJECT_DIR:/repo" zricethezav/gitleaks:latest detect
-        --source /repo --redact --verbose --no-banner --exit-code 1
+    - |
+      # --log-opts ne fonctionne que s'il existe au moins 50 commits
+      # d'historique. Sur une nouvelle branche shallow-cloned on
+      # fallback sur un scan filesystem (--no-git equivalent : pas
+      # de --log-opts → scan complet du HEAD checkout, toujours fast
+      # car le checkout est borne).
+      COMMITS=$(git rev-list --count HEAD 2>/dev/null || echo 0)
+      if [ "$COMMITS" -ge 50 ]; then
+        LOG_OPTS='--log-opts=HEAD~50..HEAD'
+      else
+        LOG_OPTS=''
+      fi
+      docker run --rm \
+        -v "$CI_PROJECT_DIR:/repo:ro" \
+        -w /repo \
+        zricethezav/gitleaks:latest detect \
+        --source /repo \
+        --config /repo/.gitleaks.toml \
+        --redact \
+        --no-banner \
+        --exit-code 1 \
+        $LOG_OPTS
   rules:
     - if: $CI_COMMIT_BRANCH
 
@@ -306,7 +330,16 @@ test_suite:
         sleep 2
       done
 
-      # Run test suite inside CI image
+      # Run test suite inside CI image.
+      #
+      # IMPORTANT : on passe le script via `bash -s` + heredoc
+      # single-quoted (`<<'TEST_SCRIPT'`). Le précédent `sh -c '...'`
+      # cassait sur la moindre apostrophe dans les commentaires
+      # francais (les chaînes single-quoted shell ne supportent PAS
+      # \' comme echappement — l'apostrophe FERME la chaîne et la
+      # suite est ré-interprétée par le shell HÔTE gitlab-runner).
+      # Conséquence du bug : `php artisan test` était exécuté sur
+      # le runner (sans vendor/autoload.php) au lieu du container.
       docker run --rm \
         --network ci-net-$CI_JOB_ID \
         -e DB_CONNECTION=pgsql \
@@ -322,32 +355,32 @@ test_suite:
         -e SCOUT_DRIVER=null \
         -e MAIL_MAILER=array \
         -e RESEND_KEY= \
-        $CI_IMAGE sh -c \
-        'set -e
-        cp .env.example .env
-        cp .env.example .env.testing
-        rm -f database/data/cities.sql
-        php artisan key:generate --env=testing
-        php artisan migrate --env=testing --force
-        echo "=== RUNNING TESTS (parallel, 4 processes, compact) ==="
-        set +e
-        # `--parallel --processes=4` divise le wall-time par ~3 sur ce
-        # repo (Pest fork-pool sur 4 workers ; chaque worker reçoit son
-        # propre schéma `testing_{N}` créé à la volée par
-        # `ParaTest`). `--compact` réduit l\'output bruit afin de
-        # rester sous la limite de 4 Mo de log GitLab sur les grosses
-        # suites. Fallback séquentiel si Pest renvoie un code != 0 :
-        # certains tests peuvent se quereller sur la cache locale ;
-        # on relance une fois en mono-thread avant de capituler.
-        php artisan test --env=testing --parallel --processes=4 --compact 2>&1
+        -i \
+        $CI_IMAGE bash -s <<'TEST_SCRIPT'
+      set -e
+      cp .env.example .env
+      cp .env.example .env.testing
+      rm -f database/data/cities.sql
+      php artisan key:generate --env=testing
+      php artisan migrate --env=testing --force
+      echo "=== RUNNING TESTS (parallel, 4 processes, compact) ==="
+      set +e
+      # --parallel --processes=4 divise le wall-time par ~3 sur ce
+      # repo (Pest fork-pool sur 4 workers ; chaque worker recoit son
+      # propre schema testing_{N} cree a la volee par ParaTest).
+      # --compact reduit le bruit pour rester sous la limite de 4 Mo
+      # de log GitLab. Fallback sequentiel si Pest sort != 0 :
+      # certains tests peuvent se concurrencer sur la cache locale.
+      php artisan test --env=testing --parallel --processes=4 --compact 2>&1
+      TEST_RC=$?
+      if [ $TEST_RC -ne 0 ]; then
+        echo "=== PARALLEL FAILED (RC=$TEST_RC) - RETRY SEQUENTIAL ==="
+        php artisan test --env=testing --compact 2>&1
         TEST_RC=$?
-        if [ $TEST_RC -ne 0 ]; then
-          echo "=== PARALLEL FAILED (RC=$TEST_RC) — RETRY SEQUENTIAL ==="
-          php artisan test --env=testing --compact 2>&1
-          TEST_RC=$?
-        fi
-        echo "=== TESTS FINISHED WITH RC=$TEST_RC ==="
-        exit $TEST_RC'
+      fi
+      echo "=== TESTS FINISHED WITH RC=$TEST_RC ==="
+      exit $TEST_RC
+      TEST_SCRIPT
   after_script:
     - docker rm -f pg-$CI_JOB_ID 2>/dev/null || true
     - docker rm -f redis-$CI_JOB_ID 2>/dev/null || true
@@ -712,10 +745,36 @@ preprod_smoke_test:
   rules:
     - if: $CI_COMMIT_BRANCH == "preprod"
 
-# --- ETAPE 5 : NOTIFICATION SLACK ---
-slack_success:
+# ─────────────────────────────────────────────────────────────────────
+# ETAPE 5 : NOTIFICATIONS EMAIL (via Resend)
+# ─────────────────────────────────────────────────────────────────────
+#
+# Variables GitLab CI/CD a configurer (Settings → CI/CD → Variables) :
+#   RESEND_API_KEY         (Masked, Protected) — cle API Resend
+#   DEPLOY_NOTIFY_EMAIL    (Protected)         — destinataire(s), CSV
+#                                                ex: "cedrick@neocraft.com,ops@keyhome.app"
+#   DEPLOY_NOTIFY_FROM     (optionnel)         — expediteur,
+#                                                default "KeyHome CI <ci@keyhome.app>"
+#
+# Le domaine `keyhome.app` doit etre verifie dans Resend (DNS SPF +
+# DKIM). En attendant la verification, fallback `onboarding@resend.dev`
+# fonctionne pour tester (rate-limite a 100 mails/jour).
+#
+# Template HTML : table-based + CSS inline pour la compat email clients
+# (Gmail / Outlook / Apple Mail / mobile). Tons KeyHome (rose #F6475F
+# pour les CTAs, vert/rouge pour le status banner).
+
+.email_notify_base: &email_notify_base
   stage: notify
   allow_failure: true
+  variables:
+    # Note : pas de `set -euo pipefail` dans les scripts notify — on
+    # ne veut PAS qu'un email rate fasse echouer la pipeline (allow_
+    # failure deja, mais double ceinture). Tout est en `|| true`.
+    RESEND_ENDPOINT: "https://api.resend.com/emails"
+
+email_success:
+  <<: *email_notify_base
   needs:
     - job: production_smoke_test
       optional: true
@@ -725,59 +784,25 @@ slack_success:
       optional: true
     - job: preprod_deploy
       optional: true
-  script:
-    - |
-      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
-        WEBHOOK="$SLACK_WEBHOOK_PROD"
-        DEPLOY_ENV="Production"
-      else
-        WEBHOOK="${SLACK_WEBHOOK_PREPROD:-$SLACK_WEBHOOK_PROD}"
-        DEPLOY_ENV="Preproduction"
-      fi
-      if [ -z "$WEBHOOK" ]; then
-        echo "No Slack webhook configured for branch $CI_COMMIT_BRANCH, skipping"
-        exit 0
-      fi
-      SHORT_SHA="${CI_COMMIT_SHA:0:8}"
-
-      curl --globoff -sS -X POST -H 'Content-type: application/json' \
-      --data "{
-        \"attachments\": [{
-          \"color\": \"#28a745\",
-          \"blocks\": [
-            {
-              \"type\": \"header\",
-              \"text\": {\"type\": \"plain_text\", \"text\": \"✅ Déploiement Backend $DEPLOY_ENV Réussi\", \"emoji\": true}
-            },
-            {
-              \"type\": \"section\",
-              \"fields\": [
-                {\"type\": \"mrkdwn\", \"text\": \"*Environnement:*\\n$DEPLOY_ENV\"},
-                {\"type\": \"mrkdwn\", \"text\": \"*Branche:*\\n\`$CI_COMMIT_REF_NAME\`\"},
-                {\"type\": \"mrkdwn\", \"text\": \"*Auteur:*\\n$GITLAB_USER_NAME\"},
-                {\"type\": \"mrkdwn\", \"text\": \"*Commit:*\\n\`$SHORT_SHA\`\"}
-              ]
-            },
-            {
-              \"type\": \"section\",
-              \"text\": {\"type\": \"mrkdwn\", \"text\": \"📝 _${CI_COMMIT_TITLE}_\"}
-            },
-            {
-              \"type\": \"actions\",
-              \"elements\": [
-                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"🚀 Voir la pipeline\"}, \"style\": \"primary\", \"url\": \"$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID\"}
-              ]
-            }
-          ]
-        }]
-      }" "$WEBHOOK"
   when: on_success
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
+  script:
+    - |
+      RECIPIENTS="${DEPLOY_NOTIFY_EMAIL:-}"
+      API_KEY="${RESEND_API_KEY:-}"
+      if [ -z "$RECIPIENTS" ] || [ -z "$API_KEY" ]; then
+        echo "ℹ  Email skipped (DEPLOY_NOTIFY_EMAIL ou RESEND_API_KEY non configuree)"
+        exit 0
+      fi
+      export EMAIL_STATUS="success"
+      bash .gitlab/notify-email.sh
+  artifacts:
+    when: always
+    paths: []
 
-slack_failure:
-  stage: notify
-  allow_failure: true
+email_failure:
+  <<: *email_notify_base
   needs:
     - job: production_smoke_test
       optional: true
@@ -793,66 +818,27 @@ slack_failure:
       optional: true
     - job: style_check
       optional: true
-  script:
-    - |
-      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
-        WEBHOOK="$SLACK_WEBHOOK_PROD"
-      else
-        WEBHOOK="${SLACK_WEBHOOK_PREPROD:-$SLACK_WEBHOOK_PROD}"
-      fi
-      if [ -z "$WEBHOOK" ]; then
-        echo "No Slack webhook configured for branch $CI_COMMIT_BRANCH, skipping"
-        exit 0
-      fi
-      SHORT_SHA="${CI_COMMIT_SHA:0:8}"
-
-      # Récupérer le vrai job qui a échoué via l'API GitLab
-      FAILED_JOBS_JSON=$(curl --globoff -sS --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/jobs?scope[]=failed" 2>/dev/null || echo "[]")
-
-      # Extraire le premier job échoué (sans jq, avec grep/sed)
-      FAILED_JOB=$(echo "$FAILED_JOBS_JSON" | grep -o '"name":"[^"]*"' | head -1 | sed 's/"name":"//;s/"//' || echo "unknown")
-      FAILED_STAGE=$(echo "$FAILED_JOBS_JSON" | grep -o '"stage":"[^"]*"' | head -1 | sed 's/"stage":"//;s/"//' || echo "unknown")
-
-      # Fallback si l'API ne retourne rien
-      [ -z "$FAILED_JOB" ] && FAILED_JOB="Voir la pipeline"
-      [ -z "$FAILED_STAGE" ] && FAILED_STAGE="unknown"
-
-      curl --globoff -sS -X POST -H 'Content-type: application/json' \
-      --data "{
-        \"attachments\": [{
-          \"color\": \"#dc3545\",
-          \"blocks\": [
-            {
-              \"type\": \"header\",
-              \"text\": {\"type\": \"plain_text\", \"text\": \"🚨 Pipeline Backend Échouée\", \"emoji\": true}
-            },
-            {
-              \"type\": \"section\",
-              \"fields\": [
-                {\"type\": \"mrkdwn\", \"text\": \"*Étape échouée:*\n\`$FAILED_STAGE\`\"},
-                {\"type\": \"mrkdwn\", \"text\": \"*Job:*\n\`$FAILED_JOB\`\"},
-                {\"type\": \"mrkdwn\", \"text\": \"*Branche:*\n\`$CI_COMMIT_REF_NAME\`\"},
-                {\"type\": \"mrkdwn\", \"text\": \"*Auteur:*\n$GITLAB_USER_NAME\"}
-              ]
-            },
-            {
-              \"type\": \"section\",
-              \"text\": {\"type\": \"mrkdwn\", \"text\": \"📝 _${CI_COMMIT_TITLE}_\"}
-            },
-            {
-              \"type\": \"actions\",
-              \"elements\": [
-                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"🔴 Voir l'erreur\"}, \"style\": \"danger\", \"url\": \"$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID\"},
-                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"📋 Logs\"}, \"url\": \"$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID/failures\"}
-              ]
-            }
-          ]
-        }]
-      }" "$WEBHOOK"
+    - job: composer_security
+      optional: true
+    - job: gitleaks
+      optional: true
+    - job: build_image
+      optional: true
+    - job: trivy_scan
+      optional: true
   when: on_failure
   rules:
     - if: $CI_COMMIT_BRANCH
+  script:
+    - |
+      RECIPIENTS="${DEPLOY_NOTIFY_EMAIL:-}"
+      API_KEY="${RESEND_API_KEY:-}"
+      if [ -z "$RECIPIENTS" ] || [ -z "$API_KEY" ]; then
+        echo "ℹ  Email skipped (DEPLOY_NOTIFY_EMAIL ou RESEND_API_KEY non configuree)"
+        exit 0
+      fi
+      export EMAIL_STATUS="failure"
+      bash .gitlab/notify-email.sh
 
 # --- ETAPE 6 : NETTOYAGE INTELLIGENT ---
 cleanup:

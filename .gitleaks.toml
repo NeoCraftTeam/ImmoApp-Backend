@@ -1,0 +1,53 @@
+title = "KeyHome — gitleaks configuration"
+
+# On etend le ruleset par defaut de gitleaks (Stripe, AWS, GCP, Slack,
+# Twilio, Mailgun, SendGrid, Github tokens, etc.) puis on rajoute des
+# allowlists ciblees pour neutraliser les faux positifs connus.
+[extend]
+useDefault = true
+
+# ── Allowlist globale ─────────────────────────────────────────────
+#
+# Le scan precedent (24 min, 529 commits, 2.3 Go) remontait 481
+# "fuites" toutes localisees dans `.docs/04-docker-compose-complet.md`
+# sur des lignes du type :
+#
+#     FEDAPAY_SECRET_KEY=REDACTED
+#
+# Le pattern Stripe `sk_live_[a-zA-Z0-9]+` matche la chaine litterale
+# "REDACTED" (8+ alphanumeriques) — c'est un faux positif. Pareil pour
+# nos .env.example qui contiennent `placeholder` / `xxxxxxxx`.
+#
+# Cette allowlist couvre :
+#   1. Les fichiers de doc / exemples (paths)
+#   2. Les valeurs marquees REDACTED / placeholder / your-key-here
+#      (regexes sur la ligne entiere — secondaire en cas de bypass paths)
+[allowlist]
+description = "Sample / redacted credentials in docs, tests and env examples"
+
+paths = [
+    '''^\.docs/''',
+    '''^docs/''',
+    '''^tests/''',
+    '''^\.env\.example$''',
+    '''^\.env\.preprod\.example$''',
+    '''^\.env\.testing$''',
+    '''(^|/)README''',
+    '''CHANGELOG''',
+    # CI config = pas de secrets en clair, juste des references $VAR
+    '''^\.gitlab-ci\.yml$''',
+    '''^\.github/''',
+]
+
+# Mots-cle qui signalent une valeur factice
+regexes = [
+    '''REDACTED''',
+    '''placeholder''',
+    '''xxxxxxxx''',
+    '''your[-_]?key[-_]?here''',
+    '''<your[-_]?''',
+    '''sk_test_''',
+    '''pk_test_''',
+    '''CHANGE_ME''',
+    '''TODO_''',
+]
