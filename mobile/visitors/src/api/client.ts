@@ -48,20 +48,42 @@ export const apiClient: AxiosInstance = axios.create({
   },
 });
 
+/**
+ * Cache in-memory du bearer token — evite la race condition ou des
+ * requetes concurrentes lisaient SecureStore (async ~5 ms) avant
+ * que le store ait ete hydrate, certaines partaient avec
+ * `Authorization` et d'autres sans. Le SessionProvider populate
+ * `setBearerToken()` au boot puis a chaque signIn/signOut, donc
+ * les requetes apres l'hydratation initiale lisent cache et zero
+ * SecureStore (snappier + thread-safe).
+ *
+ * Le fallback SecureStore est garde pour les requetes qui partent
+ * AVANT que le provider ait pu populate la cache (cold-start fast
+ * fire). C'est une lecture lazy: si on a deja la valeur en memoire
+ * on skip totalement SecureStore.
+ */
+let bearerTokenCache: string | null = null;
+
+export function setBearerToken(token: string | null): void {
+  bearerTokenCache = token && token !== 'null' && token !== '' ? token : null;
+}
+
 apiClient.interceptors.request.use(async (config) => {
-  // SecureStore reads are async and adds ~5 ms per request. The session
-  // provider caches the token in memory once mounted, so reads after the
-  // first navigation are cheap (provider-tracked); this read is the
-  // safety net for screens that fire requests before the provider has
-  // hydrated (e.g. SSR-like first paint on Web export).
-  try {
-    const token = await SecureStore.getItemAsync(SESSION_KEY);
-    if (token && token !== 'null') {
-      config.headers = config.headers ?? {};
-      config.headers.Authorization = `Bearer ${token}`;
+  let token: string | null = bearerTokenCache;
+  if (token === null) {
+    try {
+      const stored = await SecureStore.getItemAsync(SESSION_KEY);
+      if (stored && stored !== 'null' && stored !== '') {
+        token = stored;
+        bearerTokenCache = stored; // populate la cache pour les prochains calls
+      }
+    } catch {
+      /* SecureStore unavailable (e.g. Web export) — anonymous request. */
     }
-  } catch {
-    /* SecureStore unavailable (e.g. Web export) — anonymous request. */
+  }
+  if (token) {
+    config.headers = config.headers ?? {};
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -74,6 +96,11 @@ apiClient.interceptors.response.use(
     // from here (the API layer must not know about the router); the
     // provider observes the cleared state and redirects.
     if (error.response?.status === 401) {
+      // Vider la cache en premier (sync, atomique) — sinon une
+      // requete in-flight pourrait re-lire l'ancien token via
+      // bearerTokenCache pendant que deleteItemAsync est encore
+      // en cours (P0 token zombie). Puis cleanup SecureStore.
+      bearerTokenCache = null;
       try {
         await SecureStore.deleteItemAsync(SESSION_KEY);
       } catch {

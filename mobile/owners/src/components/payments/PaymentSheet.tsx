@@ -1,5 +1,6 @@
 import { Lock, ShieldCheck, X } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable } from 'react-native';
 import { Button, Input, Paragraph, Sheet, Spinner, XStack, YStack } from 'tamagui';
@@ -59,6 +60,7 @@ export function PaymentSheet({
   onSuccess,
 }: Props) {
   const router = useRouter();
+  const qc = useQueryClient();
   const { data: methods = [], isLoading: methodsLoading } = usePaymentMethods(open);
   const initiate = useInitiatePayment();
 
@@ -90,7 +92,11 @@ export function PaymentSheet({
   const canSubmit = Boolean(selectedMethod) && (!requiresPhone || phone.trim().length >= 8);
 
   const handleSubmit = async () => {
-    if (!selectedMethod) return;
+    // Guard double-submit : si l'utilisateur tap 2 fois en moins
+    // d'un tick React (avant que setSubmitting(true) ne re-render le
+    // bouton en disabled), on aurait 2 mutateAsync en parallele →
+    // 2 tx_ref orphelins, double charge potentielle.
+    if (!selectedMethod || submitting || initiate.isPending) return;
     setSubmitting(true);
     trackEvent('payment.sheet.submit', { purpose, gateway: selectedMethod.gateway });
 
@@ -106,8 +112,11 @@ export function PaymentSheet({
       const link = init.payment_link ?? init.payment_url;
       const txRef = init.tx_ref;
 
-      if (!link) {
-        Alert.alert('Erreur', 'Le gateway de paiement n’a pas renvoyé d’URL.');
+      if (!link || !txRef) {
+        Alert.alert(
+          'Erreur',
+          'Le gateway de paiement n’a pas renvoye d’URL ou de tx_ref.',
+        );
         setSubmitting(false);
         return;
       }
@@ -116,7 +125,7 @@ export function PaymentSheet({
       const result = await openHostedCheckout(link, txRef);
 
       if (result.cancelled) {
-        Alert.alert('Paiement annulé', 'Vous avez fermé la fenêtre de paiement.');
+        Alert.alert('Paiement annule', 'Vous avez ferme la fenetre de paiement.');
         return;
       }
       if (result.error) {
@@ -124,6 +133,14 @@ export function PaymentSheet({
         return;
       }
       const finalRef = result.txRef ?? txRef;
+
+      // Invalider les caches affectes par un paiement reussi AVANT
+      // de naviguer — le user voit directement la bonne valeur sur la
+      // page suivante au lieu d'un solde stale (P0 cache poisoning).
+      qc.invalidateQueries({ queryKey: ['credits-balance'] });
+      qc.invalidateQueries({ queryKey: ['subscription-current'] });
+      qc.invalidateQueries({ queryKey: ['payments-history'] });
+
       onSuccess?.(finalRef);
       router.push({
         pathname: '/payment-success',

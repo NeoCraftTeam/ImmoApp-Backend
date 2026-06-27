@@ -135,10 +135,28 @@ export function usePublicPaymentStatus(txRef: string | undefined) {
         ? (payload as { data: PublicPaymentStatus }).data
         : (payload as PublicPaymentStatus),
     enabled: Boolean(txRef),
+    // Poll toutes les 3 s tant que `pending`. Auto-stop sur status
+    // terminal (success/failed/cancelled/refunded) ET sur >100 polls
+    // (~5 min) pour eviter un poll infini si le backend reste coince
+    // sur pending (webhook gateway tombe, etc.). La page
+    // `payment-success` a son propre timer de 60 s qui bascule en
+    // mode "verification longue" avec bouton Reessayer — la borne
+    // 100 polls n'est qu'un kill-switch dernier rempart cote query.
     refetchInterval: (q) => {
-      const status = (q.state.data as PublicPaymentStatus | undefined)?.status;
-      return status === 'pending' || !status ? 3000 : false;
+      const data = q.state.data as PublicPaymentStatus | undefined;
+      const status = data?.status;
+      const terminal = status === 'success'
+        || status === 'succeeded'
+        || status === 'failed'
+        || status === 'cancelled'
+        || status === 'refunded';
+      if (terminal) return false;
+      if ((q.state.dataUpdateCount ?? 0) >= 100) return false;
+      return 3000;
     },
+    // Retry rapide si le serveur ne repond pas au premier poll
+    retry: 2,
+    retryDelay: 2000,
   });
 }
 

@@ -34,7 +34,17 @@ export function getEchoClient(): PusherClient | null {
   let Pusher: new (key: string, opts: Record<string, unknown>) => PusherClient;
   try {
     Pusher = require('pusher-js/react-native').default;
-  } catch {
+  } catch (err) {
+    // Le package n'est pas installe. Cas attendu pour les dev qui
+    // n'ont pas configure Reverb — on log en DEV pour faciliter
+    // le debug et on tombe en silence en prod (un dev devrait avoir
+    // configure le realtime AVANT de pusher en prod). Sans ce log,
+    // un dev qui essayait d'activer Reverb voyait juste "pas de
+    // realtime" sans savoir pourquoi.
+    if (__DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn('[echo] pusher-js/react-native non installé — realtime désactivé', err);
+    }
     return null;
   }
 

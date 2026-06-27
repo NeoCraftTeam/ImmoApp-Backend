@@ -1,5 +1,6 @@
-import { ArrowLeft, CheckCircle2, Clock, XCircle } from '@tamagui/lucide-icons';
+import { AlertTriangle, ArrowLeft, CheckCircle2, Clock, XCircle } from '@tamagui/lucide-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable } from 'react-native';
 import { Button, H2, Paragraph, XStack, YStack } from 'tamagui';
@@ -7,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePublicPaymentStatus } from '@/hooks/usePayments';
 import { useVerifyCreditPurchase } from '@/hooks/useCredits';
+import { reportError } from '@/services/monitoring';
 import { brand } from '@/theme/tokens';
 
 const POLLING_TIMEOUT_MS = 60_000;
@@ -27,23 +29,93 @@ export default function PaymentSuccessOwner() {
     txRef?: string;
   }>();
   const ref = tx_ref ?? txRef;
+  const qc = useQueryClient();
   const { data, isLoading, refetch } = usePublicPaymentStatus(ref);
   const verifyCredit = useVerifyCreditPurchase();
 
   const [timedOut, setTimedOut] = useState(false);
 
-  // Verify-purchase opportuniste — idempotent côté backend
+  // Edge case : si l'utilisateur arrive ici sans tx_ref (deep-link
+  // casse, gateway timeout, navigation manuelle) on affiche un
+  // ecran d'erreur clair au lieu de tourner indefiniment sur le
+  // spinner sans pouvoir rien faire.
+  if (!ref) {
+    return (
+      <>
+        <Stack.Screen options={{ headerShown: false }} />
+        <YStack
+          flex={1}
+          backgroundColor="$background"
+          paddingTop={insets.top + 12}
+          paddingHorizontal={24}
+          paddingBottom={insets.bottom + 16}
+          alignItems="center"
+          justifyContent="center"
+          gap={16}
+        >
+          <AlertTriangle size={48} color={brand.warning} />
+          <H2 fontSize={22} fontWeight="800" textAlign="center" color={brand.warning}>
+            Reference de transaction manquante
+          </H2>
+          <Paragraph fontSize={14} color="$slate700" textAlign="center" lineHeight={20}>
+            Nous n'avons pas recu l'identifiant de paiement (tx_ref). Si vous venez
+            de payer, retournez a l'ecran precedent puis touchez « Reessayer ».
+            Sinon ouvrez votre historique de paiements pour verifier le statut.
+          </Paragraph>
+          <XStack gap={10} marginTop={6}>
+            <Button
+              backgroundColor="$brand"
+              color="white"
+              fontWeight="800"
+              borderRadius={12}
+              onPress={() => router.replace('/payments' as never)}
+            >
+              Voir l'historique
+            </Button>
+            <Button
+              backgroundColor="$slate100"
+              color="$slate900"
+              fontWeight="700"
+              borderRadius={12}
+              onPress={() => router.replace('/(tabs)/dashboard')}
+            >
+              Tableau de bord
+            </Button>
+          </XStack>
+        </YStack>
+      </>
+    );
+  }
+
+  // Verify-purchase opportuniste — idempotent cote backend. On
+  // ne swallow PAS l'erreur silencieusement : si verify echoue
+  // (4xx, payload corrompu), on log dans monitoring pour ne pas
+  // perdre la trace. Le polling status reste le fallback principal,
+  // donc l'echec ici n'a pas de consequence UX.
   useEffect(() => {
     if (!ref) return;
     verifyCredit.mutate(
       { tx_ref: ref },
       {
-        // Silencieux sur erreur — fallback sur le polling status
-        onError: () => undefined,
+        onError: (err) => {
+          reportError(err, { tx_ref: ref, stage: 'verify-purchase-opportunistic' });
+        },
       },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ref]);
+
+  // Cache invalidation defensive — meme si PaymentSheet l'a deja
+  // fait, on re-invalide au cas ou l'utilisateur arrive ici via un
+  // deep-link direct (sans passer par PaymentSheet) OU si le payment
+  // se settle plus tard via webhook.
+  useEffect(() => {
+    if (data?.status === 'success' || data?.status === 'succeeded') {
+      qc.invalidateQueries({ queryKey: ['credits-balance'] });
+      qc.invalidateQueries({ queryKey: ['subscription-current'] });
+      qc.invalidateQueries({ queryKey: ['payments-history'] });
+    }
+  }, [data?.status, qc]);
 
   useEffect(() => {
     if (!ref) return;

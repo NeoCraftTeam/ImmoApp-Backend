@@ -1,7 +1,11 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
 
-import { apiClient } from '@/api/client';
+import { apiClient, setBearerToken } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
+import {
+  clearUserContext,
+  trackEvent,
+} from '@/services/monitoring';
 
 import { SESSION_KEY } from './storage-keys';
 import { useStorageState } from './useStorageState';
@@ -60,6 +64,12 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [[isLoading, token], setToken] = useStorageState<string>(SESSION_KEY);
 
+  // Sync le bearer-token cache de apiClient — voir client.ts pour
+  // le rationale (cache in-memory pour eviter SecureStore race).
+  useEffect(() => {
+    setBearerToken(token);
+  }, [token]);
+
   const value = useMemo<SessionContextValue>(
     () => ({
       token,
@@ -74,7 +84,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (typeof accessToken !== 'string' || accessToken === '') {
           throw new Error('Réponse de connexion invalide.');
         }
+        // Sync cache AVANT setToken → premieres requetes post-login
+        // ont deja le bon token (sinon race avec le re-render).
+        setBearerToken(accessToken);
         setToken(accessToken);
+        trackEvent('auth.signIn', { email });
       },
       signUp: async (input) => {
         const { data } = await apiClient.post<LoginResponse>(
@@ -86,14 +100,25 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           data?.email_verification_required,
         );
         if (typeof accessToken === 'string' && accessToken !== '') {
+          setBearerToken(accessToken);
           setToken(accessToken);
         } else if (!emailVerificationRequired) {
           throw new Error('Réponse d’inscription invalide.');
         }
         return { emailVerificationRequired };
       },
-      setToken: (next: string) => setToken(next),
-      signOut: () => setToken(null),
+      setToken: (next: string) => {
+        setBearerToken(next);
+        setToken(next);
+      },
+      signOut: () => {
+        trackEvent('auth.signOut');
+        clearUserContext();
+        // Vider cache AVANT le setToken pour eviter qu'une
+        // derniere requete in-flight lise un token zombie.
+        setBearerToken(null);
+        setToken(null);
+      },
     }),
     [token, isLoading, setToken],
   );

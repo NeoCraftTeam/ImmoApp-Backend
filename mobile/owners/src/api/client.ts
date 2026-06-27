@@ -39,15 +39,34 @@ export const apiClient: AxiosInstance = axios.create({
   },
 });
 
+/**
+ * Cache in-memory du bearer token — voir client.ts visiteur pour
+ * le rationale (race condition reads SecureStore concurrents).
+ * Le SessionProvider populate via `setBearerToken()` au boot, signIn,
+ * signOut.
+ */
+let bearerTokenCache: string | null = null;
+
+export function setBearerToken(token: string | null): void {
+  bearerTokenCache = token && token !== 'null' && token !== '' ? token : null;
+}
+
 apiClient.interceptors.request.use(async (config) => {
-  try {
-    const token = await SecureStore.getItemAsync(SESSION_KEY);
-    if (token && token !== 'null') {
-      config.headers = config.headers ?? {};
-      config.headers.Authorization = `Bearer ${token}`;
+  let token: string | null = bearerTokenCache;
+  if (token === null) {
+    try {
+      const stored = await SecureStore.getItemAsync(SESSION_KEY);
+      if (stored && stored !== 'null' && stored !== '') {
+        token = stored;
+        bearerTokenCache = stored;
+      }
+    } catch {
+      /* SecureStore unavailable (e.g. Web export) — anonymous request. */
     }
-  } catch {
-    /* SecureStore unavailable (e.g. Web export) — anonymous request. */
+  }
+  if (token) {
+    config.headers = config.headers ?? {};
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -55,11 +74,8 @@ apiClient.interceptors.request.use(async (config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<{ message?: string }>) => {
-    // Treat 401 as "session ended" — clear the token so the app's
-    // SessionProvider re-runs its gate. We do NOT trigger a navigation
-    // from here (the API layer must not know about the router); the
-    // provider observes the cleared state and redirects.
     if (error.response?.status === 401) {
+      bearerTokenCache = null;
       try {
         await SecureStore.deleteItemAsync(SESSION_KEY);
       } catch {

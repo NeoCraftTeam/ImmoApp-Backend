@@ -53,6 +53,11 @@ export function FavoriteButton({
       router.push('/(auth)/login');
       return;
     }
+    // Guard double-tap : sans ce check, un user qui tap 2 fois en
+    // < 1 tick spawns 2 toggle.mutate consecutifs. Backend traite
+    // dans l'ordre arbitraire → l'ad peut finir dans le mauvais
+    // etat (favorited puis re-unfavorited par la 2e requete).
+    if (toggle.isPending) return;
     if (!isFavorited) {
       playBurst();
     }

@@ -98,12 +98,31 @@ export default function ConversationThreadScreen() {
   const [draft, setDraft] = useState('');
   const [otherTyping, setOtherTyping] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView | null>(null);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useConversationRealtime(id, (uid) => {
     if (!me.data || uid === me.data.id) return;
     setOtherTyping(uid);
-    setTimeout(() => setOtherTyping(null), 3000);
+    // Cleanup le timer precedent avant d'en starter un nouveau —
+    // sans ce clear, 5 messages "typing" rapproches stackent 5 timers
+    // qui fire tous a 3 s, polluant le state apres le user a tape.
+    // Pire : si l'utilisateur navigue ailleurs, ces timers leak et
+    // continuent a appeler setOtherTyping sur un component demonted
+    // (warning RN + memoire qui s'accumule).
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => {
+      setOtherTyping(null);
+      typingTimerRef.current = null;
+    }, 3000);
   });
+
+  // Cleanup au unmount : pas de leak du timer si user navigue
+  // pendant que le ping "typing" est encore valide.
+  useEffect(() => {
+    return () => {
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (id) markRead.mutate();

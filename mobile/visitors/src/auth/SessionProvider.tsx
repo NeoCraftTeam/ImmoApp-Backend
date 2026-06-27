@@ -1,6 +1,6 @@
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
 
-import { apiClient } from '@/api/client';
+import { apiClient, setBearerToken } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import { clearUserContext, trackEvent } from '@/services/monitoring';
 
@@ -62,6 +62,16 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [[isLoading, token], setToken] = useStorageState<string>(SESSION_KEY);
 
+  // Sync le bearer-token cache de `apiClient` chaque fois que le token
+  // bouge. Sans ca, la cache in-memory de client.ts (qui evite la
+  // race condition sur les reads SecureStore concurrents) restait
+  // desynchronisee apres signIn/signOut — les premieres requetes
+  // post-login partaient sans Authorization, les post-logout
+  // continuaient avec l'ancien token.
+  useEffect(() => {
+    setBearerToken(token);
+  }, [token]);
+
   const value = useMemo<SessionContextValue>(
     () => ({
       token,
@@ -76,6 +86,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (typeof accessToken !== 'string' || accessToken === '') {
           throw new Error('Réponse de connexion invalide.');
         }
+        // Sync direct la cache AVANT de setToken (qui re-render
+        // les consumers) — garantit que les hooks qui fire des
+        // requetes au moment du re-render ont deja le bon token.
+        setBearerToken(accessToken);
         setToken(accessToken);
         trackEvent('auth.signIn', { email });
       },
@@ -87,17 +101,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const accessToken = data?.access_token ?? data?.token;
         const emailVerificationRequired = Boolean(data?.email_verification_required);
         if (typeof accessToken === 'string' && accessToken !== '') {
+          setBearerToken(accessToken);
           setToken(accessToken);
         } else if (!emailVerificationRequired) {
-          // Pas de token et pas de flag verif → contrat backend cassé
           throw new Error('Réponse d’inscription invalide.');
         }
         return { emailVerificationRequired };
       },
-      setToken: (next: string) => setToken(next),
+      setToken: (next: string) => {
+        setBearerToken(next);
+        setToken(next);
+      },
       signOut: () => {
         trackEvent('auth.signOut');
         clearUserContext();
+        // Vider la cache AVANT le setToken — sinon une derniere
+        // requete qui fire pendant le re-render lit encore l'ancien
+        // token et envoie une auth zombie.
+        setBearerToken(null);
         setToken(null);
       },
     }),

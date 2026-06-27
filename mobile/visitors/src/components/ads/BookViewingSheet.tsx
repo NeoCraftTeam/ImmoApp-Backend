@@ -38,6 +38,12 @@ export function BookViewingSheet({ adId, open, onClose, onBooked }: Props) {
   };
 
   const handleConfirm = async () => {
+    // Guard double-tap : une visite reservee 2x cree 2 entries en
+    // backend, le bailleur recoit 2 notifications, le creneau peut
+    // se faire booker par un autre user entre les 2 calls. C'est un
+    // P0 sur les flows de booking (conflit de creneau, support
+    // tickets, no-show fantome).
+    if (reserve.isPending) return;
     if (!selected) {
       Alert.alert('Créneau requis', 'Choisissez un créneau disponible.');
       return;

@@ -223,7 +223,21 @@ export function AdForm({ mode, ad }: { mode: 'create' | 'edit'; ad?: Ad }) {
   };
 
   /* ---- Submit handlers ------------------------------------------- */
+  // Helper : annule l'autosave en cours pour eviter qu'il n'ecrase
+  // le payload du publish/saveDraft. Sans ce cancel, une frappe < 1.5 s
+  // avant un tap "Publier" produit 2 mutations concurrentes (autosave
+  // is_draft=true ET publish is_draft=false) — la derniere ecrit gagne
+  // → ad peut rester en draft ou flipper bizarrement (P0 data race).
+  const cancelPendingAutosave = () => {
+    if (autosaveTimer.current) {
+      clearTimeout(autosaveTimer.current);
+      autosaveTimer.current = null;
+    }
+  };
+
   const saveDraft = async () => {
+    if (busy) return;
+    cancelPendingAutosave();
     try {
       if (mode === 'create') {
         const created = await createAd.mutateAsync(buildPayload(true));
@@ -240,10 +254,12 @@ export function AdForm({ mode, ad }: { mode: 'create' | 'edit'; ad?: Ad }) {
   };
 
   const publish = async () => {
+    if (busy) return;
     if (!validateForPublish()) {
       Alert.alert(t('adForm.missingFields'), t('adForm.reviewHint'));
       return;
     }
+    cancelPendingAutosave();
     try {
       if (mode === 'create') {
         const created = await createAd.mutateAsync(buildPayload(false));
@@ -260,8 +276,15 @@ export function AdForm({ mode, ad }: { mode: 'create' | 'edit'; ad?: Ad }) {
     }
   };
 
+  // `busy` inclut autosave : tant qu'un autosave mutation est en
+  // flight, on bloque les boutons. Evite : tap rapide "Publier"
+  // pendant qu'un autosave roule → 2 writes en parallele sur la meme
+  // ressource backend (race condition flag is_draft).
   const busy =
-    createAd.isPending || updateAd.isPending || publishAd.isPending;
+    createAd.isPending
+    || updateAd.isPending
+    || publishAd.isPending
+    || autosave.isPending;
 
   const cityOptions = useMemo(() => cities.data ?? [], [cities.data]);
   const quarterOptions = useMemo(
