@@ -3,7 +3,7 @@
     "name": "KeyHome Owner",
     "slug": "keyhome-owners",
     "version": "0.3.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/icon.png",
     "scheme": "keyhomeowners",
     "userInterfaceStyle": "automatic",
@@ -15,6 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
+      "requireFullScreen": false,
       "bundleIdentifier": "com.keyhome.owners",
       "buildNumber": "3",
       "infoPlist": {
@@ -82,7 +83,7 @@
     },
     "extra": {
       "apiBaseUrl": "https://api.keyhome.app/api/v1",
-      "apiBaseUrlDev": "http://localhost:8000/api/v1",
+      "apiBaseUrlDev": "https://api.keyhome.app/api/v1",
       "eas": {
         "projectId": "TODO_EAS_PROJECT_ID"
       }
