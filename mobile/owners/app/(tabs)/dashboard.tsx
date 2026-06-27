@@ -1,7 +1,5 @@
 import {
-  BarChart3,
   Bell,
-  CalendarClock,
   ChevronRight,
   Coins,
   Eye,
@@ -10,7 +8,6 @@ import {
   Plus,
   Rocket,
   Sparkles,
-  TrendingUp,
 } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
@@ -22,13 +19,12 @@ import { useSession } from '@/auth/SessionProvider';
 import { EmptyState } from '@/components/EmptyState';
 import { FadeIn } from '@/components/FadeIn';
 import { OwnerAdCard } from '@/components/OwnerAdCard';
-import { StatCard } from '@/components/StatCard';
 import { StatusBadge } from '@/components/StatusBadge';
 import { useCreditsBalance } from '@/hooks/useCredits';
 import { useMe } from '@/hooks/useMe';
 import { useOwnerStats } from '@/hooks/useOwnerStats';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
-import { brand } from '@/theme/tokens';
+import { brand, tabularNumStyle } from '@/theme/tokens';
 import { formatFcfa } from '@/utils/format';
 import { t } from '@/i18n';
 
@@ -176,58 +172,106 @@ export default function Dashboard() {
           </Button>
         </YStack>
 
-        {/* KPI grid */}
-        <YStack paddingHorizontal={16} gap={10}>
-          <XStack gap={10}>
-            <StatCard
-              label={t('dashboard.stats.activeAds')}
-              value={isLoading ? '—' : stats?.active_ads_count ?? 0}
-              icon={<Home size={16} color={brand.primary} />}
-              accent={brand.primary}
-              hint={`${stats?.total_ads_count ?? 0} au total`}
-            />
-            <StatCard
-              label={t('dashboard.stats.occupancy')}
-              value={isLoading ? '—' : `${Math.round(stats?.occupancy_rate ?? 0)}%`}
-              icon={<TrendingUp size={16} color={brand.success} />}
-              accent={brand.success}
-            />
-          </XStack>
-          <XStack gap={10}>
-            <StatCard
-              label={t('dashboard.stats.boosts')}
-              value={isLoading ? '—' : stats?.active_boosts_count ?? 0}
-              icon={<Rocket size={16} color={brand.accent} />}
-              accent={brand.accent}
-            />
-            <StatCard
-              label={t('dashboard.stats.pendingViewings')}
-              value={isLoading ? '—' : stats?.recent_viewings_count ?? 0}
-              icon={<CalendarClock size={16} color={brand.secondary} />}
-              accent={brand.secondary}
-            />
-          </XStack>
-          <StatCard
-            label={t('dashboard.stats.revenueMonth')}
-            value={isLoading ? '—' : formatFcfa(stats?.this_month_revenue)}
-            icon={<BarChart3 size={16} color={brand.primary} />}
-            accent={brand.primary}
-            hint={`${formatFcfa(stats?.total_revenue)} cumulés`}
-          />
+        {/* ──────────────────────────────────────────────────────────
+            HERO REVENUS — 1 chiffre dominant + textline KPIs
+            (vs. ancienne grille 2×2 StatCards identique = AI-slop).
+            Inspiration : Stripe dashboard, Linear metrics overview.
+            ────────────────────────────────────────────────────────── */}
+        <YStack paddingHorizontal={20} marginBottom={32}>
+          <Paragraph
+            fontSize={11}
+            fontWeight="800"
+            color="$slate500"
+            letterSpacing={1.4}
+            textTransform="uppercase"
+            marginBottom={8}
+          >
+            Revenus ce mois
+          </Paragraph>
+          <Paragraph
+            fontSize={48}
+            fontWeight="900"
+            color="$slate900"
+            letterSpacing={-1.5}
+            lineHeight={52}
+            style={tabularNumStyle}
+          >
+            {isLoading ? '—' : formatFcfa(stats?.this_month_revenue ?? 0)}
+          </Paragraph>
+          {!isLoading && stats?.total_revenue != null ? (
+            <Paragraph
+              fontSize={12.5}
+              color="$slate500"
+              marginTop={6}
+              fontWeight="600"
+            >
+              {formatFcfa(stats.total_revenue)} cumulés
+            </Paragraph>
+          ) : null}
         </YStack>
 
-        {/* Status breakdown */}
+        {/* KPIs secondaires : textline avec separateurs verticaux —
+            ZERO card, ZERO icon-container, juste de la typo. */}
+        <XStack
+          paddingHorizontal={20}
+          marginBottom={28}
+          gap={0}
+          alignItems="flex-end"
+        >
+          <InlineMetric
+            value={isLoading ? '—' : String(stats?.active_ads_count ?? 0)}
+            label="annonces"
+            subLabel={`/ ${stats?.total_ads_count ?? 0}`}
+            tone="primary"
+            onPress={() => router.push('/(tabs)/ads' as never)}
+          />
+          <YStack width={1} height={36} backgroundColor="$slate200" marginHorizontal={18} />
+          <InlineMetric
+            value={isLoading ? '—' : `${Math.round(stats?.occupancy_rate ?? 0)}%`}
+            label="occupées"
+            tone="success"
+          />
+          <YStack width={1} height={36} backgroundColor="$slate200" marginHorizontal={18} />
+          <InlineMetric
+            value={isLoading ? '—' : String(stats?.recent_viewings_count ?? 0)}
+            label="visites"
+            tone="secondary"
+            onPress={() => router.push('/(tabs)/viewings' as never)}
+          />
+        </XStack>
+
+        {/* Boosts en bandeau accent doré (si actifs uniquement) —
+            crée un point d'asymétrie + breaks le rythme texte/texte. */}
+        {!isLoading && (stats?.active_boosts_count ?? 0) > 0 ? (
+          <Pressable onPress={() => router.push('/pro-services' as never)}>
+            <XStack
+              marginHorizontal={16}
+              padding={14}
+              marginBottom={28}
+              borderRadius={14}
+              backgroundColor={brand.accentAlpha10}
+              alignItems="center"
+              gap={12}
+            >
+              <Rocket size={18} color={brand.accentDark} />
+              <Paragraph fontSize={13} color={brand.accentDark} flex={1} fontWeight="700">
+                {stats?.active_boosts_count} boost{(stats?.active_boosts_count ?? 0) > 1 ? 's' : ''} actif{(stats?.active_boosts_count ?? 0) > 1 ? 's' : ''} en ce moment
+              </Paragraph>
+              <ChevronRight size={16} color={brand.accentDark} />
+            </XStack>
+          </Pressable>
+        ) : null}
+
+        {/* Status breakdown — déjà bien fait, juste rythme adouci */}
         {Object.keys(breakdown).length > 0 ? (
-          <YStack paddingHorizontal={16} marginTop={22} gap={10}>
-            <Paragraph fontSize={16} fontWeight="800" color="$slate900">
-              {t('dashboard.statusBreakdown')}
-            </Paragraph>
-            <XStack flexWrap="wrap" gap={8}>
+          <YStack paddingHorizontal={20} marginBottom={28} gap={12}>
+            <SectionLabel>Répartition des annonces</SectionLabel>
+            <XStack flexWrap="wrap" gap={10} rowGap={10}>
               {Object.entries(breakdown).map(([status, count]) =>
                 count ? (
                   <XStack key={status} alignItems="center" gap={6}>
                     <StatusBadge status={status} size="sm" />
-                    <Paragraph fontSize={13} fontWeight="800" color="$slate700">
+                    <Paragraph fontSize={13} fontWeight="900" color="$slate700" style={tabularNumStyle}>
                       {count}
                     </Paragraph>
                   </XStack>
@@ -237,31 +281,28 @@ export default function Dashboard() {
           </YStack>
         ) : null}
 
-        {/* Quick links — 4 actions clés */}
-        <YStack paddingHorizontal={16} marginTop={22} gap={10}>
-          <Paragraph fontSize={16} fontWeight="800" color="$slate900">
-            {t('dashboard.quickActions')}
-          </Paragraph>
-          <XStack gap={10}>
-            <QuickLink
-              icon={<Eye size={18} color={brand.primary} />}
+        {/* Quick links — INLINE action bar, plus de grille 2×2 :
+            compact, sans border, hierarchie text-link visible. */}
+        <YStack paddingHorizontal={20} marginBottom={28} gap={14}>
+          <SectionLabel>Aller à</SectionLabel>
+          <XStack flexWrap="wrap" gap={8} rowGap={8}>
+            <InlineAction
+              icon={<Eye size={14} color={brand.primary} />}
               label={t('account.analytics')}
               onPress={() => router.push('/analytics' as never)}
             />
-            <QuickLink
-              icon={<MessageCircle size={18} color={brand.primary} />}
+            <InlineAction
+              icon={<MessageCircle size={14} color={brand.primary} />}
               label="Messages"
               onPress={() => router.push('/messages' as never)}
             />
-          </XStack>
-          <XStack gap={10}>
-            <QuickLink
-              icon={<Rocket size={18} color={brand.accent} />}
+            <InlineAction
+              icon={<Rocket size={14} color={brand.accentDark} />}
               label={t('account.subscription')}
               onPress={() => router.push('/subscriptions' as never)}
             />
-            <QuickLink
-              icon={<Sparkles size={18} color={brand.accent} />}
+            <InlineAction
+              icon={<Sparkles size={14} color={brand.accentDark} />}
               label="Services premium"
               onPress={() => router.push('/pro-services' as never)}
             />
@@ -284,10 +325,13 @@ export default function Dashboard() {
           {recentAds.length === 0 && !isLoading ? (
             <EmptyState
               icon={<Home size={28} color={brand.primary} />}
-              title={t('ads.empty')}
-              hint={t('ads.emptyHint')}
-              ctaLabel={t('ads.create')}
+              title="Aucune annonce, mais le marché vous attend."
+              hint="Créez votre première annonce pour commencer à recevoir des demandes de visite et des messages de prospects."
+              tip="Conseil : une photo nette en lumière naturelle augmente vos vues de 50 %. Soignez aussi le titre — pas plus de 8 mots."
+              ctaLabel="Créer ma première annonce"
               onPressCta={() => router.push('/ads/new' as never)}
+              secondaryLabel="Voir les services premium"
+              onPressSecondary={() => router.push('/pro-services' as never)}
             />
           ) : (
             <YStack gap={10}>
@@ -302,7 +346,63 @@ export default function Dashboard() {
   );
 }
 
-function QuickLink({
+/**
+ * KPI compact inline — texte seul, ZERO card, ZERO icon container.
+ * Le chiffre est l'element dominant (28px tabular), le label en sub.
+ * Optionnellement cliquable. Inspiration Stripe metrics overview.
+ */
+function InlineMetric({
+  value,
+  label,
+  subLabel,
+  tone,
+  onPress,
+}: {
+  value: string;
+  label: string;
+  subLabel?: string;
+  tone: 'primary' | 'success' | 'secondary' | 'accent';
+  onPress?: () => void;
+}) {
+  const colorMap = {
+    primary: brand.primary,
+    success: brand.success,
+    secondary: brand.secondary,
+    accent: brand.accentDark,
+  } as const;
+  const content = (
+    <YStack gap={3} flex={1}>
+      <Paragraph
+        fontSize={26}
+        fontWeight="900"
+        color={colorMap[tone]}
+        letterSpacing={-0.6}
+        style={tabularNumStyle}
+      >
+        {value}
+        {subLabel ? (
+          <Paragraph fontSize={13} color="$slate400" fontWeight="600">
+            {' '}{subLabel}
+          </Paragraph>
+        ) : null}
+      </Paragraph>
+      <Paragraph fontSize={11.5} color="$slate500" fontWeight="600" letterSpacing={0.2}>
+        {label}
+      </Paragraph>
+    </YStack>
+  );
+  if (onPress) {
+    return <Pressable onPress={onPress} style={{ flex: 1 }}>{content}</Pressable>;
+  }
+  return content;
+}
+
+/**
+ * Action inline — pill compact sans border, juste icone + label avec
+ * separateur fin a droite (sauf le dernier). C'est l'inverse d'un
+ * "bouton CTA" : ces actions sont equivalentes et discreetes.
+ */
+function InlineAction({
   icon,
   label,
   onPress,
@@ -312,22 +412,39 @@ function QuickLink({
   onPress: () => void;
 }) {
   return (
-    <Pressable style={{ flex: 1 }} onPress={onPress}>
+    <Pressable onPress={onPress}>
       <XStack
-        flex={1}
         alignItems="center"
-        gap={10}
-        padding={14}
-        borderRadius={14}
-        borderWidth={1}
-        borderColor="$slate300"
-        backgroundColor="$background"
+        gap={6}
+        paddingHorizontal={12}
+        paddingVertical={9}
+        borderRadius={999}
+        backgroundColor="$slate100"
       >
         {icon}
-        <Paragraph fontSize={13.5} fontWeight="700" color="$slate900" flex={1} numberOfLines={1}>
+        <Paragraph fontSize={12.5} fontWeight="700" color="$slate700">
           {label}
         </Paragraph>
       </XStack>
     </Pressable>
+  );
+}
+
+/**
+ * Label de section minimaliste : caps + tracking large + sans line.
+ * Inspiration : Notion / Linear sidebar headings. Pas d'icone, pas
+ * de border, juste une typo qui dit "voici un groupe".
+ */
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <Paragraph
+      fontSize={10.5}
+      fontWeight="800"
+      color="$slate500"
+      letterSpacing={1.5}
+      textTransform="uppercase"
+    >
+      {children}
+    </Paragraph>
   );
 }

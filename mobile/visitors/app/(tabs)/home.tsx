@@ -126,56 +126,74 @@ export default function Home() {
   }
 
   // ── Header (rendered above feed) ─────────────────────────────────
+  // Layout asymetrique editorial : prénom XL aligné gauche + bell
+  // discrete top-right (relative donc s'insere sans s'imposer).
+  // Tagline en italic pour break le rythme typo.
   const ListHeader = (
-    <YStack gap={14} marginBottom={12}>
-      {/* Greeting row */}
-      <XStack alignItems="flex-end" gap={12} marginTop={2}>
-        <YStack flex={1} gap={2}>
-          <Paragraph fontSize={13} color="$slate500">
-            {greeting}{firstName ? ',' : ''}
-          </Paragraph>
-          {firstName && (
-            <H2 fontSize={24} fontWeight="800" lineHeight={28}>
-              {firstName}
-            </H2>
-          )}
-        </YStack>
-        <Link href="/notifications" asChild>
-          <Pressable hitSlop={6} accessibilityLabel="Notifications">
-            <YStack
-              width={42}
-              height={42}
-              borderRadius={21}
-              backgroundColor="$slate100"
-              alignItems="center"
-              justifyContent="center"
-            >
-              <Bell size={20} color={brand.slate700} />
-              {(unread.data ?? 0) > 0 && (
-                <YStack
-                  position="absolute"
-                  top={6}
-                  right={6}
-                  minWidth={16}
-                  height={16}
-                  paddingHorizontal={4}
-                  borderRadius={8}
-                  backgroundColor={brand.primary}
-                  alignItems="center"
-                  justifyContent="center"
-                >
-                  <Paragraph fontSize={9} fontWeight="800" color="white">
-                    {(unread.data ?? 0) > 99 ? '99+' : unread.data}
-                  </Paragraph>
-                </YStack>
-              )}
-            </YStack>
-          </Pressable>
-        </Link>
-      </XStack>
+    <YStack marginBottom={16}>
+      {/* Bell absolue top-right pour ne pas perturber le flux typo */}
+      <Link href="/notifications" asChild>
+        <Pressable
+          hitSlop={6}
+          accessibilityLabel="Notifications"
+          style={{ position: 'absolute', right: 0, top: 4, zIndex: 2 }}
+        >
+          <YStack
+            width={40}
+            height={40}
+            borderRadius={20}
+            alignItems="center"
+            justifyContent="center"
+          >
+            <Bell size={22} color={brand.slate700} />
+            {(unread.data ?? 0) > 0 && (
+              <YStack
+                position="absolute"
+                top={4}
+                right={4}
+                minWidth={16}
+                height={16}
+                paddingHorizontal={4}
+                borderRadius={8}
+                backgroundColor={brand.primary}
+                alignItems="center"
+                justifyContent="center"
+              >
+                <Paragraph fontSize={9} fontWeight="800" color="white">
+                  {(unread.data ?? 0) > 99 ? '99+' : unread.data}
+                </Paragraph>
+              </YStack>
+            )}
+          </YStack>
+        </Pressable>
+      </Link>
 
-      <Paragraph fontSize={14} color="$slate500" lineHeight={20}>
-        Découvrez les meilleures annonces immobilières du moment.
+      {/* Greeting block — typo expressive editorial : caption +
+          prénom en XL, line-height tight pour le punch visuel. */}
+      <YStack gap={2} marginTop={2}>
+        <Paragraph fontSize={12} color="$slate500" fontWeight="600" letterSpacing={0.6}>
+          {greeting.toUpperCase()}{firstName ? ',' : ''}
+        </Paragraph>
+        {firstName ? (
+          <H2 fontSize={32} fontWeight="900" lineHeight={36} letterSpacing={-0.8}>
+            {firstName}
+          </H2>
+        ) : (
+          <H2 fontSize={28} fontWeight="900" lineHeight={32} letterSpacing={-0.6}>
+            Trouvez votre logement.
+          </H2>
+        )}
+      </YStack>
+
+      <Paragraph
+        fontSize={13.5}
+        color="$slate500"
+        lineHeight={19}
+        marginTop={10}
+        marginBottom={18}
+        maxWidth="86%"
+      >
+        Les meilleures annonces immobilières du moment, sélectionnées pour vous.
       </Paragraph>
 
       {/* Category chips */}
@@ -204,15 +222,27 @@ export default function Home() {
         }}
       />
 
-      {/* Recommendations carousel */}
+      {/* Recommendations carousel — heading editorial sans icone
+          "magic moment" (DON'T sparkle decoration). Une fine ligne
+          au-dessus du heading marque la section. */}
       {showRecommendations && (
-        <YStack gap={10} marginTop={4}>
-          <XStack alignItems="center" gap={6}>
-            <Sparkles size={16} color={brand.primary} />
-            <Paragraph fontSize={15} fontWeight="700" color="$slate900">
-              Recommandées pour vous
+        <YStack gap={12} marginTop={8}>
+          <YStack>
+            <YStack height={1} backgroundColor="$slate200" marginBottom={12} />
+            <Paragraph
+              fontSize={10.5}
+              fontWeight="800"
+              color="$slate500"
+              letterSpacing={1.4}
+              textTransform="uppercase"
+              marginBottom={2}
+            >
+              Pour vous
             </Paragraph>
-          </XStack>
+            <Paragraph fontSize={17} fontWeight="900" color="$slate900" letterSpacing={-0.3}>
+              Recommandations
+            </Paragraph>
+          </YStack>
           <FlatList
             data={recommendations.data ?? []}
             keyExtractor={(item) => `reco-${item.id}`}
