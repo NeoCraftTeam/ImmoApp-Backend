@@ -62,9 +62,18 @@ prepare_ci_image:
       WORKDIR /app
       # Layer 1: install deps (cached until composer.lock changes)
       COPY composer.json composer.lock ./
+      # `composer install` retry : codeload.github.com renvoie
+      # ponctuellement des HTTP 400/5xx transitoires sur les dist
+      # `legacy.zip`. 5 tentatives + backoff 15 s absorbent ces aléas
+      # GitHub sans faire échouer tout le pipeline sur un blip réseau.
       RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
         && touch .env \
-        && composer install --no-interaction --no-ansi --no-scripts -q
+        && for i in 1 2 3 4 5; do \
+             composer install --no-interaction --no-ansi --no-scripts --prefer-dist -q && break; \
+             echo "composer install a echoue, nouvelle tentative $i/5 dans 15s..."; \
+             sleep 15; \
+             [ "$i" = "5" ] && echo "composer install a echoue apres 5 tentatives" && exit 1; \
+           done
       # Layer 2: copy code (fast, does not re-run composer install)
       COPY . .
       DOCKERFILE
