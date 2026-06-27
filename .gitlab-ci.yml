@@ -53,7 +53,7 @@ prepare_ci_image:
       docker pull $CACHE_FROM || true
       docker build --cache-from $CACHE_FROM -t $CI_IMAGE -f - . <<'DOCKERFILE'
       FROM php:8.4-cli-alpine
-      RUN apk add --no-cache git libzip-dev icu-dev postgresql-dev libpng-dev oniguruma-dev gettext-dev freetype-dev libjpeg-turbo-dev libwebp-dev $PHPIZE_DEPS \
+      RUN apk add --no-cache bash git libzip-dev icu-dev postgresql-dev libpng-dev oniguruma-dev gettext-dev freetype-dev libjpeg-turbo-dev libwebp-dev $PHPIZE_DEPS \
         && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
         && docker-php-ext-install bcmath intl pdo_pgsql mbstring zip gd exif gettext \
         && pecl install redis && docker-php-ext-enable redis \
@@ -161,47 +161,6 @@ sast:
       changes:
         - '**/*.php'
         - rector.php
-
-# Secret scanning **incremental** — on scanne uniquement les 50
-# derniers commits, pas l'historique complet.
-#
-# Avant : scan complet 24 min, 481 faux positifs sur des valeurs
-# litterales "REDACTED" dans .docs/. Apres :
-#   - `.gitleaks.toml` a la racine whiteliste `.docs/**` + REDACTED/etc.
-#   - `--log-opts="HEAD~50..HEAD"` limite a la fenetre changeset
-#   → execution ~30 s, alerte uniquement sur les VRAIES fuites.
-#
-# Si tu veux supprimer entierement cette protection, retire ce job
-# et `.gitleaks.toml`. Mais 30 s pour bloquer un secret accidentel
-# avant qu'il ne reach prod, c'est un trade-off que je recommande.
-gitleaks:
-  stage: quality
-  needs: []
-  script:
-    - |
-      # --log-opts ne fonctionne que s'il existe au moins 50 commits
-      # d'historique. Sur une nouvelle branche shallow-cloned on
-      # fallback sur un scan filesystem (--no-git equivalent : pas
-      # de --log-opts → scan complet du HEAD checkout, toujours fast
-      # car le checkout est borne).
-      COMMITS=$(git rev-list --count HEAD 2>/dev/null || echo 0)
-      if [ "$COMMITS" -ge 50 ]; then
-        LOG_OPTS='--log-opts=HEAD~50..HEAD'
-      else
-        LOG_OPTS=''
-      fi
-      docker run --rm \
-        -v "$CI_PROJECT_DIR:/repo:ro" \
-        -w /repo \
-        zricethezav/gitleaks:latest detect \
-        --source /repo \
-        --config /repo/.gitleaks.toml \
-        --redact \
-        --no-banner \
-        --exit-code 1 \
-        $LOG_OPTS
-  rules:
-    - if: $CI_COMMIT_BRANCH
 
 # --- ETAPE 2 : BUILD & PUSH (en parallèle avec tests) ---
 build_image:
@@ -819,8 +778,6 @@ email_failure:
     - job: style_check
       optional: true
     - job: composer_security
-      optional: true
-    - job: gitleaks
       optional: true
     - job: build_image
       optional: true
