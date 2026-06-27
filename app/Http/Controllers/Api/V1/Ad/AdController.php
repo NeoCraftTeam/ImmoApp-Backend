@@ -145,6 +145,11 @@ final class AdController
         $type = filled($request->input('type')) ? (string) $request->input('type') : null;
         $sort = filled($request->input('sort')) ? (string) $request->input('sort') : 'newest';
 
+        $requestExcludeIds = [];
+        if ($rawExcludeIds = $request->input('exclude_ids')) {
+            $requestExcludeIds = array_values(array_filter(array_map(strval(...), (array) $rawExcludeIds)));
+        }
+
         $isFirstPageGuest = !auth()->check()
             && !$request->filled('cursor')
             && !$request->filled('exclude_ids')
@@ -161,7 +166,7 @@ final class AdController
         // thin. A wider candidate pool for the slot template would have to be
         // assembled out-of-band (e.g. fetched separately and woven into the
         // paginator), not by inflating cursorPaginate's page size.
-        $build = function () use ($request, $perPage, $type, $sort) {
+        $build = function () use ($perPage, $type, $sort, $requestExcludeIds) {
             $query = Ad::query()
                 ->with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'user.media', 'user.latestTrustScore', 'agency')
                 ->withAvg('reviews', 'rating')
@@ -169,11 +174,8 @@ final class AdController
                 ->visible()
                 ->publiclyListed();
 
-            if ($excludeIds = $request->input('exclude_ids')) {
-                $ids = array_values(array_filter(array_map(strval(...), (array) $excludeIds)));
-                if ($ids !== []) {
-                    $query->whereNotIn('id', $ids);
-                }
+            if ($requestExcludeIds !== []) {
+                $query->whereNotIn('id', $requestExcludeIds);
             }
 
             if ($type !== null) {
@@ -223,7 +225,14 @@ final class AdController
             $candidates = $paginator->getCollection();
 
             if (!$request->filled('cursor')) {
-                $excludeIds = $candidates->pluck('id')->all();
+                // Exclure à la fois les candidats déjà présents ET les
+                // `exclude_ids` de la requête : sinon une annonce écartée
+                // par l'appelant (déjà vue côté client) serait re-pêchée
+                // ici comme organique et réinjectée dans le feed.
+                $excludeIds = array_values(array_unique(array_merge(
+                    $candidates->pluck('id')->all(),
+                    $requestExcludeIds,
+                )));
 
                 $organicBoost = Ad::query()
                     ->with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'user.media', 'user.latestTrustScore', 'agency')
@@ -235,6 +244,7 @@ final class AdController
                     ->where(function ($q): void {
                         $q->whereNull('boost_expires_at')->orWhere('boost_expires_at', '<', now());
                     })
+                    ->when($type !== null, fn ($q) => $q->whereHas('ad_type', fn ($sub) => $sub->where('name', 'ilike', "%{$type}%")))
                     ->when($excludeIds !== [], fn ($q) => $q->whereNotIn('id', $excludeIds))
                     ->orderByDesc('created_at')
                     ->limit($perPage * 2)

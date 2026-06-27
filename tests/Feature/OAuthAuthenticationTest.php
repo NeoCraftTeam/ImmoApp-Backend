@@ -373,7 +373,7 @@ describe('OAuth Error Handling', function (): void {
         ]);
 
         $response->assertStatus(401)
-            ->assertJson(['message' => 'Échec de l\'authentification OAuth']);
+            ->assertJson(['message' => 'Échec de l\'authentification. Veuillez réessayer.']);
     });
 
     it('handles missing email from OAuth provider', function (): void {

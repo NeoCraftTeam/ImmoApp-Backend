@@ -283,6 +283,17 @@ test_suite:
         sleep 2
       done
 
+      # PostGIS dans template1 : `php artisan test --parallel` cree une
+      # base par worker via `CREATE DATABASE testing_test_N`, qui herite
+      # de template1. L'image postgis n'active l'extension que dans la
+      # base `testing` (POSTGRES_DB), donc les bases parallèles n'ont PAS
+      # postgis → la migration `create_ad` (colonne geometry) casse sur
+      # "type public.geometry does not exist". On l'active une fois dans
+      # template1 pour que toutes les bases filles en heritent.
+      echo "Enabling PostGIS in template1..."
+      docker exec pg-$CI_JOB_ID psql -U gitlab -d template1 \
+        -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+
       echo "Waiting for Redis..."
       for i in $(seq 1 15); do
         docker exec redis-$CI_JOB_ID redis-cli ping 2>/dev/null | grep -q PONG && break
