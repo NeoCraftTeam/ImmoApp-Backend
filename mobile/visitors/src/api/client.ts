@@ -27,6 +27,15 @@ function resolveBaseUrl(): string {
   return extra.apiBaseUrl ?? 'https://api.keyhome.app/api/v1';
 }
 
+const RESOLVED_BASE_URL = resolveBaseUrl();
+
+if (__DEV__) {
+  // Diagnostic : confirme contre quel backend l'app tape réellement.
+  // Une valeur `localhost`/IP LAN inattendue ici explique un
+  // "Identifiants incorrects" alors que la prod a bien le compte.
+  console.log(`[api] base URL → ${RESOLVED_BASE_URL}`);
+}
+
 /**
  * Singleton Axios instance. Use `apiClient.get(...)`/`apiClient.post(...)`
  * everywhere — never call `axios.<method>` directly so this client's
@@ -40,7 +49,7 @@ function resolveBaseUrl(): string {
  * the retry-after-refresh dance.
  */
 export const apiClient: AxiosInstance = axios.create({
-  baseURL: resolveBaseUrl(),
+  baseURL: RESOLVED_BASE_URL,
   timeout: 15_000,
   headers: {
     Accept: 'application/json',

@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { extractApiErrorMessage } from '@/api/client';
 import { useSession } from '@/auth/SessionProvider';
 import { KeyHomeLogo } from '@/components/KeyHomeLogo';
+import { PasswordInput } from '@/components/PasswordInput';
 import { brand } from '@/theme/tokens';
 import { t } from '@/i18n';
 
@@ -149,11 +150,9 @@ export default function Login() {
           <Paragraph size="$3" color="$slate500">
             {t('auth.password')}
           </Paragraph>
-          <Input
+          <PasswordInput
             value={password}
             onChangeText={setPassword}
-            secureTextEntry
-            autoCapitalize="none"
             autoComplete="current-password"
             textContentType="password"
             placeholder="••••••••"
