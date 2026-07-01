@@ -25,10 +25,14 @@ describe('filters', () => {
       ...EMPTY_FILTERS,
       minPrice: 100000,
       maxPrice: 500000,
+      minSurface: 20,
+      maxSurface: 120,
       transactionType: 'location',
     });
-    expect(params.min_price).toBe(100000);
-    expect(params.max_price).toBe(500000);
+    expect(params.price_min).toBe(100000);
+    expect(params.price_max).toBe(500000);
+    expect(params.surface_min).toBe(20);
+    expect(params.surface_max).toBe(120);
     expect(params.transaction_type).toBe('location');
   });
 });

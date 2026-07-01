@@ -35,13 +35,17 @@ export function activeFilterCount(filters: AdFilters): number {
   return Object.values(filters).filter((v) => v !== null && v !== '').length;
 }
 
-/** Translate `AdFilters` into the query-string params the backend understands. */
+/**
+ * Translate `AdFilters` into the query-string params the `/ads/search`
+ * endpoint understands (validated by `AdRequest`): `price_min`,
+ * `price_max`, `surface_min`, `surface_max`, `transaction_type`, `type`.
+ */
 export function filtersToParams(filters: AdFilters): Record<string, string | number> {
   const params: Record<string, string | number> = {};
-  if (filters.minPrice != null) params.min_price = filters.minPrice;
-  if (filters.maxPrice != null) params.max_price = filters.maxPrice;
-  if (filters.minSurface != null) params.min_surface = filters.minSurface;
-  if (filters.maxSurface != null) params.max_surface = filters.maxSurface;
+  if (filters.minPrice != null) params.price_min = filters.minPrice;
+  if (filters.maxPrice != null) params.price_max = filters.maxPrice;
+  if (filters.minSurface != null) params.surface_min = filters.minSurface;
+  if (filters.maxSurface != null) params.surface_max = filters.maxSurface;
   if (filters.transactionType) params.transaction_type = filters.transactionType;
   if (filters.type) params.type = filters.type;
   return params;

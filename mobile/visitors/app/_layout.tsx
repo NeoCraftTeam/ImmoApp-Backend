@@ -1,7 +1,6 @@
 import { PortalProvider, TamaguiProvider, Theme } from 'tamagui';
-import { Slot, SplashScreen } from 'expo-router';
+import { Stack, SplashScreen } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useColorScheme } from 'react-native';
 import { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -13,6 +12,7 @@ import { SplashView } from '@/components/SplashView';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { CompareProvider } from '@/providers/CompareProvider';
 import { QueryProvider } from '@/providers/QueryProvider';
+import { ThemeProvider, useAppTheme } from '@/providers/ThemeProvider';
 import { initMonitoring, reportError } from '@/services/monitoring';
 import config from '../tamagui.config';
 
@@ -27,15 +27,15 @@ import '@/i18n'; // side-effect import: initialises locale before any screen ren
  *
  *   GestureHandlerRoot     gestures & drags (react-native-gesture-handler)
  *     SafeAreaProvider     insets notch / home-indicator
- *       TamaguiProvider    design tokens + extraction CSS
- *         Theme            light/dark dynamique
- *           QueryProvider  TanStack Query + persistance AsyncStorage
- *             SessionProvider  token Sanctum bearer (SecureStore)
- *               CompareProvider compareur d'annonces (persisted)
- *                 PushBridge   register expo-push token
- *                 OfflineBanner sticky banner offline (NetInfo)
- *                 SplashView   overlay Lottie/wordmark pendant la rehydrate
- *                 <Slot />     route active
+ *       ThemeProvider      mode d'apparence persisté (system/light/dark)
+ *         TamaguiProvider  design tokens + extraction CSS
+ *           Theme          light/dark résolu par ThemeProvider
+ *             QueryProvider  TanStack Query + persistance AsyncStorage
+ *               SessionProvider  token Sanctum bearer (SecureStore)
+ *                 CompareProvider compareur d'annonces (persisted)
+ *                   OfflineBanner sticky banner offline (NetInfo)
+ *                   <Stack />     pile de navigation (swipe-back iOS actif)
+ *                   SplashView    overlay pendant la rehydrate
  *
  *  Le splash natif est masqué dès que React mount ; on prend le relais
  *  avec `SplashView` qui reste visible jusqu'à ce que la session ait
@@ -45,8 +45,6 @@ import '@/i18n'; // side-effect import: initialises locale before any screen ren
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
-  const scheme = useColorScheme();
-
   useEffect(() => {
     // Cache le splash natif — on bascule sur notre SplashView animé qui
     // tient jusqu'à ce que SessionProvider ait fini de réhydrater.
@@ -60,26 +58,48 @@ export default function RootLayout() {
     <ErrorBoundary onError={reportError}>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
-          <TamaguiProvider config={config}>
-            <Theme name={scheme === 'dark' ? 'dark' : 'light'}>
-              <PortalProvider shouldAddRootHost>
-                <QueryProvider>
-                  <SessionProvider>
-                    <CompareProvider>
-                      <PushNotificationsBridge />
-                      <OfflineBanner />
-                      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-                      <Slot />
-                      <SplashGate />
-                    </CompareProvider>
-                  </SessionProvider>
-                </QueryProvider>
-              </PortalProvider>
-            </Theme>
-          </TamaguiProvider>
+          <ThemeProvider>
+            <TamaguiProvider config={config}>
+              <ThemedRoot />
+            </TamaguiProvider>
+          </ThemeProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>
+  );
+}
+
+/**
+ * Applique le schéma résolu par `ThemeProvider` à Tamagui + la StatusBar,
+ * puis monte la pile de navigation. `gestureEnabled` active le swipe-back
+ * iOS depuis le bord gauche sur tous les écrans de la pile (le root passait
+ * auparavant par `<Slot/>`, sans navigateur, donc sans geste retour).
+ */
+function ThemedRoot() {
+  const { scheme } = useAppTheme();
+
+  return (
+    <Theme name={scheme}>
+      <PortalProvider shouldAddRootHost>
+        <QueryProvider>
+          <SessionProvider>
+            <CompareProvider>
+              <PushNotificationsBridge />
+              <OfflineBanner />
+              <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  gestureEnabled: true,
+                  animation: 'slide_from_right',
+                }}
+              />
+              <SplashGate />
+            </CompareProvider>
+          </SessionProvider>
+        </QueryProvider>
+      </PortalProvider>
+    </Theme>
   );
 }
 
@@ -94,10 +114,8 @@ function SplashGate() {
 
   useEffect(() => {
     // Hold le splash 1500 ms même si la session se rehydrate
-    // instantanément — laisse l'anim complète jouer (pastille clé →
-    // wordmark stagger → halo → tagline ≈ 1.3 s). À 600 ms l'écran
-    // disparaissait avant que l'utilisateur ait vu se construire le
-    // logo — flash sans identité de marque.
+    // instantanément — laisse l'anim complète jouer avant de basculer
+    // vers la première route.
     const t = setTimeout(() => setMinDelayElapsed(true), 1500);
     return () => clearTimeout(t);
   }, []);

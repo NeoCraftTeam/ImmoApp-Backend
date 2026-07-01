@@ -11,10 +11,14 @@ import {
 } from '@/types/filters';
 
 /**
- * Search backed by `/ads` (the offset paginator). Sends `q` as a
- * free-text query — the backend matches on title, description, and
- * quarter / city names — plus an optional `AdFilters` payload that
- * narrows by price / surface / transaction type.
+ * Search backed by `/ads/search` (dedicated search endpoint —
+ * Meilisearch with a SQL fallback). Sends `q` as a free-text query —
+ * the backend matches on title, description, and quarter / city names —
+ * plus an optional `AdFilters` payload that narrows by price / surface /
+ * transaction type.
+ *
+ * NB: `/ads` (the plain index) ignores `q` entirely, which is why the
+ * search tab previously returned unfiltered results from everywhere.
  *
  * The hook stays enabled as long as either the text query OR any
  * filter is active, so a user can browse "all under 200k FCFA" with
@@ -40,7 +44,7 @@ export function useAdSearch(query: string, filters: AdFilters = EMPTY_FILTERS) {
         ...filtersToParams(filters),
       };
       if (hasQuery) params.q = trimmed;
-      const { data } = await apiClient.get<AdFeedResponse>(ENDPOINTS.ads.list, {
+      const { data } = await apiClient.get<AdFeedResponse>(ENDPOINTS.ads.search, {
         params,
       });
       return data;

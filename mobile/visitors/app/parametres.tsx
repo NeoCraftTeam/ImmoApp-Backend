@@ -14,12 +14,19 @@ import {
 } from '@tamagui/lucide-icons';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, Switch, useColorScheme } from 'react-native';
+import { Alert, Pressable, Switch } from 'react-native';
 import { H2, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSession } from '@/auth/SessionProvider';
+import { useAppTheme, type ThemeMode } from '@/providers/ThemeProvider';
 import { brand } from '@/theme/tokens';
+
+const THEME_LABELS: Record<ThemeMode, string> = {
+  system: 'Système',
+  light: 'Clair',
+  dark: 'Sombre',
+};
 
 /**
  * Settings screen — split into account / preferences / support /
@@ -31,9 +38,18 @@ export default function Settings() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isAuthenticated, signOut } = useSession();
-  const scheme = useColorScheme();
+  const { mode, scheme, setMode } = useAppTheme();
   const [pushEnabled, setPushEnabled] = useState(true);
   const [emailEnabled, setEmailEnabled] = useState(true);
+
+  const handleThemePress = () => {
+    Alert.alert('Apparence', 'Choisissez le thème de l’application.', [
+      { text: THEME_LABELS.system, onPress: () => setMode('system') },
+      { text: THEME_LABELS.light, onPress: () => setMode('light') },
+      { text: THEME_LABELS.dark, onPress: () => setMode('dark') },
+      { text: 'Annuler', style: 'cancel' },
+    ]);
+  };
 
   const handleLogout = () => {
     Alert.alert('Déconnexion', 'Êtes-vous sûr de vouloir vous déconnecter ?', [
@@ -139,7 +155,8 @@ export default function Settings() {
                 )
               }
               label="Apparence"
-              hint={scheme === 'dark' ? 'Sombre (système)' : 'Clair (système)'}
+              hint={mode === 'system' ? `${THEME_LABELS.system} (${scheme === 'dark' ? 'sombre' : 'clair'})` : THEME_LABELS[mode]}
+              onPress={handleThemePress}
             />
           </Section>
 

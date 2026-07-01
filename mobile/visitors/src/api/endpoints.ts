@@ -32,6 +32,7 @@ export const ENDPOINTS = {
   ads: {
     feed: '/ads/feed',
     list: '/ads',
+    search: '/ads/search',
     nearby: '/ads/nearby',
     recommendations: '/recommendations',
     types: '/ad-types',
