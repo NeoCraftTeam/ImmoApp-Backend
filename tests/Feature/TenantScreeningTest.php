@@ -67,7 +67,7 @@ it('creates a screening request with a token', function (): void {
     expect($data)->not->toHaveKey('token');
 
     $persisted = TenantScreeningRequest::query()->where('id', $data['id'])->firstOrFail();
-    expect(strlen($persisted->token))->toBe(64);
+    expect(strlen((string) $persisted->token))->toBe(64);
 });
 
 it('validates required_documents contains valid types', function (): void {

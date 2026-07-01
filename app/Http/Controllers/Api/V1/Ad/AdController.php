@@ -269,7 +269,7 @@ final class AdController
         $typeId = null;
         if ($type !== null) {
             $typeId = Cache::remember(
-                'ads:feed:type_id:'.sha1((string) $type),
+                'ads:feed:type_id:'.sha1($type),
                 3600,
                 fn () => AdType::query()
                     ->where('name', 'ilike', "%{$type}%")

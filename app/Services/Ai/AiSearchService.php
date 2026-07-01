@@ -22,9 +22,9 @@ use Illuminate\Support\Facades\Log;
  * Falls back to regex-based parsing only when ALL providers fail or are unavailable.
  * Results are cached for 24 hours per query.
  */
-final class AiSearchService implements AiSearchServiceInterface
+final readonly class AiSearchService implements AiSearchServiceInterface
 {
-    private readonly AiCircuitBreaker $circuitBreaker;
+    private AiCircuitBreaker $circuitBreaker;
 
     private const int CACHE_TTL_SECONDS = 86400; // 24 hours
 
