@@ -34,7 +34,7 @@ final class SocialAuthController
      *
      * @var array<string>
      */
-    private const array SUPPORTED_PROVIDERS = ['google', 'facebook', 'apple'];
+    private const array SUPPORTED_PROVIDERS = ['google', 'facebook', 'apple', 'github'];
 
     /**
      * Handle OAuth callback for mobile/SPA apps.
@@ -639,6 +639,21 @@ final class SocialAuthController
      */
     private function isAllowedRedirectUri(string $uri): bool
     {
+        // Deep links mobiles (Expo) : keyhome://auth/callback,
+        // keyhomeowners://auth/callback. parse_url ne fournit pas de host
+        // exploitable pour un scheme custom — on valide donc par scheme
+        // contre une whitelist (OAUTH_ALLOWED_REDIRECT_SCHEMES).
+        $scheme = parse_url($uri, PHP_URL_SCHEME);
+        if (is_string($scheme) && $scheme !== '') {
+            $allowedSchemes = array_filter(array_map(
+                trim(...),
+                explode(',', (string) config('app.oauth_allowed_redirect_schemes', '')),
+            ));
+            if (in_array(mb_strtolower($scheme), array_map('mb_strtolower', $allowedSchemes), true)) {
+                return true;
+            }
+        }
+
         $host = parse_url($uri, PHP_URL_HOST);
 
         if (!is_string($host) || $host === '') {

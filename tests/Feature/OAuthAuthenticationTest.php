@@ -201,6 +201,33 @@ describe('Facebook OAuth Authentication', function (): void {
             'facebook_id' => 'fb-123',
         ]);
     });
+
+    it('authenticates user with GitHub', function (): void {
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
+        $socialiteUser->shouldReceive('getId')->andReturn('gh-123');
+        $socialiteUser->shouldReceive('getEmail')->andReturn('ghuser@example.com');
+        $socialiteUser->shouldReceive('getName')->andReturn('GH User');
+        $socialiteUser->shouldReceive('getAvatar')->andReturn('https://github.com/avatar.jpg');
+        $socialiteUser->shouldReceive('getRaw')->andReturn([]);
+
+        Socialite::shouldReceive('driver')
+            ->with('github')
+            ->andReturnSelf();
+        Socialite::shouldReceive('userFromToken')
+            ->andReturn($socialiteUser);
+
+        $response = $this->postJson('/api/v1/auth/oauth/github', [
+            'token' => 'valid-gh-token',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonStructure(['message', 'user', 'token', 'is_new_user']);
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'ghuser@example.com',
+            'github_id' => 'gh-123',
+        ]);
+    });
 });
 
 describe('Apple OAuth Authentication', function (): void {

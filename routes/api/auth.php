@@ -59,22 +59,22 @@ Route::prefix('auth')->group(function (): void {
     Route::prefix('oauth')->controller(SocialAuthController::class)->group(function (): void {
         Route::post('{provider}', 'authenticate')
             ->middleware('throttle:auth.social')
-            ->where('provider', 'google|facebook|apple');
+            ->where('provider', 'google|facebook|apple|github');
 
         Route::get('{provider}/redirect', 'redirect')
             ->middleware('throttle:auth.social')
-            ->where('provider', 'google|facebook|apple');
+            ->where('provider', 'google|facebook|apple|github');
 
         Route::get('{provider}/callback', 'callback')
             ->middleware('throttle:auth.social')
-            ->where('provider', 'google|facebook|apple');
+            ->where('provider', 'google|facebook|apple|github');
 
         Route::middleware('auth:sanctum')->group(function (): void {
             Route::post('{provider}/link', 'link')
-                ->where('provider', 'google|facebook|apple');
+                ->where('provider', 'google|facebook|apple|github');
 
             Route::delete('{provider}/unlink', 'unlink')
-                ->where('provider', 'google|facebook|apple');
+                ->where('provider', 'google|facebook|apple|github');
         });
 
         Route::post('confirm-link', 'confirmOAuthLink')

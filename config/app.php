@@ -63,6 +63,11 @@ return [
     // Example: "app.keyhome.com,staging.keyhome.com"
     'oauth_allowed_redirect_hosts' => env('OAUTH_ALLOWED_REDIRECT_HOSTS', ''),
 
+    // Comma-separated list of allowed OAuth redirect *schemes* — for mobile
+    // deep links (Expo). Lets the OAuth callback redirect back into the
+    // native apps (keyhome://auth/callback, keyhomeowners://auth/callback).
+    'oauth_allowed_redirect_schemes' => env('OAUTH_ALLOWED_REDIRECT_SCHEMES', 'keyhome,keyhomeowners'),
+
     'mail_asset_base_url' => env('MAIL_ASSET_BASE_URL', env('APP_URL', 'http://localhost')),
 
     // Physical mailing address shown in email footers (CAN-SPAM / RGPD compliance).

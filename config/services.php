@@ -96,6 +96,12 @@ return [
         'redirect' => env('APPLE_REDIRECT_URI', '/api/v1/auth/oauth/apple/callback'),
     ],
 
+    'github' => [
+        'client_id' => env('GITHUB_CLIENT_ID'),
+        'client_secret' => env('GITHUB_CLIENT_SECRET'),
+        'redirect' => env('GITHUB_REDIRECT_URI', '/api/v1/auth/oauth/github/callback'),
+    ],
+
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
         'model' => env('OPENAI_MODEL', 'gpt-4o-mini'),

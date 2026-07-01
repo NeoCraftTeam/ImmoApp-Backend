@@ -194,6 +194,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'google_id',
         'facebook_id',
         'apple_id',
+        'github_id',
         'clerk_id',
         'oauth_provider',
         'oauth_avatar',
@@ -221,7 +222,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
      *
      * @var list<string>
      */
-    protected $hidden = ['password', 'app_authentication_secret', 'app_authentication_recovery_codes', 'remember_token', 'location', 'created_at', 'updated_at', 'google_id', 'facebook_id', 'apple_id'];
+    protected $hidden = ['password', 'app_authentication_secret', 'app_authentication_recovery_codes', 'remember_token', 'location', 'created_at', 'updated_at', 'google_id', 'facebook_id', 'apple_id', 'github_id'];
 
     // =========================================================================
     // Boot
