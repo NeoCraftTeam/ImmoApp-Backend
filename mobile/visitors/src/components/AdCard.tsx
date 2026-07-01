@@ -7,6 +7,7 @@ import { Paragraph, XStack, YStack } from 'tamagui';
 
 import { CompareButton } from '@/components/CompareButton';
 import { FavoriteButton } from '@/components/FavoriteButton';
+import { useThemeColors } from '@/theme/useThemeColors';
 import { brand } from '@/theme/tokens';
 import { t } from '@/i18n';
 import type { Ad } from '@/types/ad';
@@ -30,6 +31,7 @@ const HERO_RADIUS = 14;
 
 /** KeyScore — compact text-only badge. */
 function KeyScoreBadge({ score }: { score: number }) {
+  const colors = useThemeColors();
   const color =
     score >= 75 ? brand.success : score >= 50 ? brand.warning : brand.danger;
   return (
@@ -39,7 +41,7 @@ function KeyScoreBadge({ score }: { score: number }) {
       paddingHorizontal={6}
       paddingVertical={2}
       borderRadius={999}
-      backgroundColor="rgba(0,0,0,0.04)"
+      backgroundColor={colors.faintFill}
     >
       <YStack width={6} height={6} borderRadius={3} backgroundColor={color} />
       <Paragraph fontSize={11} fontWeight="700" color={color} lineHeight={14}>
@@ -71,6 +73,7 @@ interface AdCardProps {
 }
 
 function AdCardComponent({ ad, priority = false }: AdCardProps) {
+  const colors = useThemeColors();
   const scale = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = useCallback(() => {
@@ -136,7 +139,7 @@ function AdCardComponent({ ad, priority = false }: AdCardProps) {
               aspectRatio={3 / 2}
               borderRadius={HERO_RADIUS}
               overflow="hidden"
-              backgroundColor="$slate100"
+              backgroundColor={colors.track}
             >
               {coverUri ? (
                 <Image

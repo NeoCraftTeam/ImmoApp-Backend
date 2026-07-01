@@ -5,6 +5,7 @@ import { Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CompareBar } from '@/components/CompareBar';
+import { useThemeColors } from '@/theme/useThemeColors';
 import { brand } from '@/theme/tokens';
 import { t } from '@/i18n';
 
@@ -31,6 +32,7 @@ const ICON_SIZE = 22;
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
 
   // iOS home indicator height varies (34 pt typical) ; on Android le
   // gesture-bar inset peut être à 0 sur les vieux téléphones. On force
@@ -50,8 +52,8 @@ export default function TabsLayout() {
             marginBottom: Platform.OS === 'ios' ? 0 : 4,
           },
           tabBarStyle: {
-            backgroundColor: 'white',
-            borderTopColor: brand.slate300,
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
             borderTopWidth: 0.5,
             height: 56 + bottomInset,
             paddingTop: 8,

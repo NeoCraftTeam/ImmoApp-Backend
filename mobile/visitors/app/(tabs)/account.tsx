@@ -30,6 +30,7 @@ import { useSession } from '@/auth/SessionProvider';
 import { useCreditsBalance } from '@/hooks/usePayments';
 import { useMe } from '@/hooks/useMe';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
+import { useThemeColors } from '@/theme/useThemeColors';
 import { brand } from '@/theme/tokens';
 import { t } from '@/i18n';
 
@@ -42,6 +43,7 @@ import { t } from '@/i18n';
  */
 export default function AccountTab() {
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   const router = useRouter();
   const { isAuthenticated, signOut } = useSession();
   const me = useMe(isAuthenticated);
@@ -144,7 +146,7 @@ export default function AccountTab() {
           <YStack
             padding={16}
             borderRadius={16}
-            backgroundColor="$slate100"
+            backgroundColor={colors.track}
             gap={12}
           >
             <Paragraph fontSize={14} color="$slate700" lineHeight={20}>
@@ -166,9 +168,9 @@ export default function AccountTab() {
               <Button
                 flex={1}
                 size="$4"
-                backgroundColor="white"
-                color="$slate900"
-                borderColor="$slate300"
+                backgroundColor={colors.surface}
+                color="$color"
+                borderColor="$borderColor"
                 borderWidth={1}
                 fontWeight="700"
                 borderRadius={12}

@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, Easing } from 'react-native';
 import { YStack } from 'tamagui';
 
-import { brand } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/useThemeColors';
 
 /**
  * Loading placeholder for an AdCard. Two-tone shimmer driven by RN
@@ -14,6 +14,7 @@ import { brand } from '@/theme/tokens';
  * the layout doesn't jump when real cards mount.
  */
 export function AdCardSkeleton() {
+  const colors = useThemeColors();
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -45,7 +46,7 @@ export function AdCardSkeleton() {
         width: width as number,
         height,
         borderRadius: 6,
-        backgroundColor: brand.slate100,
+        backgroundColor: colors.track,
         opacity,
       }}
     />
@@ -58,7 +59,7 @@ export function AdCardSkeleton() {
           width: '100%',
           aspectRatio: 3 / 2,
           borderRadius: 14,
-          backgroundColor: brand.slate100,
+          backgroundColor: colors.track,
           opacity,
         }}
       />

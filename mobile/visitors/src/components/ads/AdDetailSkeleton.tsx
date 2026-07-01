@@ -65,7 +65,7 @@ function ReviewRow() {
       gap={8}
       borderRadius={14}
       borderWidth={1}
-      borderColor="$slate300"
+      borderColor="$borderColor"
     >
       <XStack alignItems="center" gap={10}>
         <Skeleton width={36} height={36} radius={18} />

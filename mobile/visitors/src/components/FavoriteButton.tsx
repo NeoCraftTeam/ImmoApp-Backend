@@ -7,6 +7,7 @@ import { YStack } from 'tamagui';
 
 import { useSession } from '@/auth/SessionProvider';
 import { useToggleFavorite } from '@/hooks/useToggleFavorite';
+import { useThemeColors } from '@/theme/useThemeColors';
 
 interface Props {
   adId: string;
@@ -32,6 +33,7 @@ export function FavoriteButton({
   variant = 'chip',
 }: Props) {
   const router = useRouter();
+  const colors = useThemeColors();
   const { isAuthenticated } = useSession();
   const toggle = useToggleFavorite();
 
@@ -83,7 +85,7 @@ export function FavoriteButton({
         height={variant === 'chip' ? chipSize : undefined}
         borderRadius={variant === 'chip' ? chipSize / 2 : undefined}
         backgroundColor={
-          variant === 'chip' ? 'rgba(255,255,255,0.92)' : 'transparent'
+          variant === 'chip' ? colors.chromeOverlay : 'transparent'
         }
         alignItems="center"
         justifyContent="center"
@@ -91,7 +93,7 @@ export function FavoriteButton({
         <Animated.View style={{ transform: [{ scale }] }}>
           <Heart
             size={iconSize}
-            color={isFavorited ? '$brand' : '$slate700'}
+            color={isFavorited ? '$brand' : colors.mutedIcon}
             fill={isFavorited ? '$brand' : 'transparent'}
           />
         </Animated.View>

@@ -182,7 +182,7 @@ export default function SearchTab() {
           ListEmptyComponent={
             showEmpty ? (
               <EmptyState
-                icon={<SearchIcon size={32} color="#94A3B8" />}
+                icon={<SearchIcon size={32} color="$slate500" />}
                 title={t('search.noResults')}
                 body="Essayez d'élargir vos critères ou de modifier votre recherche."
               />

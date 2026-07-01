@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, type DimensionValue } from 'react-native';
 
+import { useAppTheme } from '@/providers/ThemeProvider';
 import { brand } from '@/theme/tokens';
 
 interface Props {
@@ -8,7 +9,7 @@ interface Props {
   height?: DimensionValue;
   /** Rayon de bordure — défaut 8. */
   radius?: number;
-  /** Override de la couleur de fond. */
+  /** Override de la couleur de fond (sinon adaptée au thème). */
   backgroundColor?: string;
   /** Marge custom inline. */
   style?: object;
@@ -32,9 +33,12 @@ export function Skeleton({
   width = '100%',
   height = 12,
   radius = 8,
-  backgroundColor = brand.slate100,
+  backgroundColor,
   style,
 }: Props) {
+  const { scheme } = useAppTheme();
+  const resolvedBackground =
+    backgroundColor ?? (scheme === 'dark' ? brand.slate700 : brand.slate100);
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -70,7 +74,7 @@ export function Skeleton({
           width,
           height,
           borderRadius: radius,
-          backgroundColor,
+          backgroundColor: resolvedBackground,
           opacity,
         },
         style,

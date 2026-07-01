@@ -5,6 +5,7 @@ import { Pressable } from 'react-native';
 import { YStack } from 'tamagui';
 
 import { COMPARE_MAX_ITEMS, useCompare } from '@/providers/CompareProvider';
+import { useThemeColors } from '@/theme/useThemeColors';
 import type { Ad } from '@/types/ad';
 
 interface Props {
@@ -23,6 +24,7 @@ interface Props {
  * feel like siblings.
  */
 export function CompareButton({ ad, size = 'small' }: Props) {
+  const colors = useThemeColors();
   const { isCompared, isFull, toggle } = useCompare();
   const active = isCompared(ad.id);
 
@@ -59,13 +61,13 @@ export function CompareButton({ ad, size = 'small' }: Props) {
         width={chipSize}
         height={chipSize}
         borderRadius={chipSize / 2}
-        backgroundColor={active ? '$brand' : 'rgba(255,255,255,0.94)'}
+        backgroundColor={active ? '$brand' : colors.chromeOverlay}
         alignItems="center"
         justifyContent="center"
       >
         <GitCompareArrows
           size={iconSize}
-          color={active ? '$brandText' : '$slate700'}
+          color={active ? '$brandText' : colors.mutedIcon}
         />
       </YStack>
     </Pressable>

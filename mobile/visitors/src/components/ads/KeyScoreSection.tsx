@@ -3,6 +3,7 @@ import { ActivityIndicator } from 'react-native';
 import { Paragraph, XStack, YStack } from 'tamagui';
 
 import { useKeyScore } from '@/hooks/useKeyScore';
+import { useThemeColors } from '@/theme/useThemeColors';
 import { brand } from '@/theme/tokens';
 
 interface Props {
@@ -16,6 +17,7 @@ interface Props {
  * the user can scan strengths and weaknesses quickly.
  */
 export function KeyScoreSection({ adId }: Props) {
+  const colors = useThemeColors();
   const { data, isLoading, isError } = useKeyScore(adId);
 
   if (isLoading) {
@@ -69,7 +71,7 @@ export function KeyScoreSection({ adId }: Props) {
               <YStack
                 height={6}
                 borderRadius={3}
-                backgroundColor="$slate100"
+                backgroundColor={colors.track}
                 overflow="hidden"
               >
                 <YStack

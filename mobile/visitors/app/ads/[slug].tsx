@@ -43,6 +43,7 @@ import { ReviewsSection } from '@/components/ads/ReviewsSection';
 import { SimilarAdsCarousel } from '@/components/ads/SimilarAdsCarousel';
 import { useAd } from '@/hooks/useAd';
 import { useSession } from '@/auth/SessionProvider';
+import { useThemeColors } from '@/theme/useThemeColors';
 import { brand } from '@/theme/tokens';
 import { t } from '@/i18n';
 import type { Ad, AdImage } from '@/types/ad';
@@ -365,6 +366,7 @@ function FloatingChrome({
   onBack: () => void;
   onShare: () => void;
 }) {
+  const colors = useThemeColors();
   return (
     <YStack
       position="absolute"
@@ -382,9 +384,9 @@ function FloatingChrome({
           left: 0,
           right: 0,
           height: insets.top + 56,
-          backgroundColor: 'rgba(255,255,255,0.96)',
+          backgroundColor: colors.chromeOverlay,
           borderBottomWidth: 1,
-          borderBottomColor: brand.slate300,
+          borderBottomColor: colors.border,
           opacity: chromeBgOpacity,
         }}
       />
@@ -397,12 +399,12 @@ function FloatingChrome({
         pointerEvents="box-none"
       >
         <ChromeIconButton onPress={onBack} accessibilityLabel={t('common.back')}>
-          <ArrowLeft size={20} color={brand.slate700} />
+          <ArrowLeft size={20} color={colors.mutedIcon} />
         </ChromeIconButton>
         <XStack gap={8} alignItems="center">
           <CompareButton ad={ad} size="medium" />
           <ChromeIconButton onPress={onShare} accessibilityLabel={t('ad.share')}>
-            <Share2 size={18} color={brand.slate700} />
+            <Share2 size={18} color={colors.mutedIcon} />
           </ChromeIconButton>
           <FavoriteButton
             adId={ad.id}
@@ -424,6 +426,7 @@ function ChromeIconButton({
   children: React.ReactNode;
   accessibilityLabel: string;
 }) {
+  const colors = useThemeColors();
   return (
     <Pressable
       onPress={onPress}
@@ -435,7 +438,7 @@ function ChromeIconButton({
         width={36}
         height={36}
         borderRadius={18}
-        backgroundColor="rgba(255,255,255,0.92)"
+        backgroundColor={colors.chromeOverlay}
         alignItems="center"
         justifyContent="center"
       >

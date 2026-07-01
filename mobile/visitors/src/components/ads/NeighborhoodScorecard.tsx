@@ -2,6 +2,7 @@ import { ActivityIndicator } from 'react-native';
 import { Paragraph, XStack, YStack } from 'tamagui';
 
 import { useNeighborhoodScorecard } from '@/hooks/useNeighborhoodScorecard';
+import { useThemeColors } from '@/theme/useThemeColors';
 import { brand } from '@/theme/tokens';
 import { formatDistance } from '@/utils/geo';
 import type { ScorecardCategory } from '@/types/scorecard';
@@ -39,6 +40,7 @@ function humanizeKey(key: string): string {
  * detail page already conveys the spatial context.
  */
 export function NeighborhoodScorecard({ adId }: Props) {
+  const colors = useThemeColors();
   const { data, isLoading, isError } = useNeighborhoodScorecard(adId);
 
   if (isLoading) {
@@ -97,7 +99,7 @@ export function NeighborhoodScorecard({ adId }: Props) {
             <YStack
               height={5}
               borderRadius={3}
-              backgroundColor="$slate100"
+              backgroundColor={colors.track}
               overflow="hidden"
             >
               <YStack
