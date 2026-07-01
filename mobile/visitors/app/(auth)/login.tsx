@@ -10,6 +10,7 @@ import { extractApiErrorMessage } from '@/api/client';
 import { useSession } from '@/auth/SessionProvider';
 import { KeyHomeLogo } from '@/components/KeyHomeLogo';
 import { PasswordInput } from '@/components/PasswordInput';
+import { SocialLoginButtons } from '@/components/SocialLoginButtons';
 import { brand } from '@/theme/tokens';
 import { t } from '@/i18n';
 
@@ -174,6 +175,11 @@ export default function Login() {
       >
         {t('auth.signIn')}
       </Button>
+
+      <SocialLoginButtons
+        disabled={submitting || succeeded}
+        onSuccess={() => router.replace('/(tabs)/home')}
+      />
 
       <Link href={'/(auth)/forgot-password' as never} asChild>
         <Paragraph color="$brand" fontWeight="600" textAlign="center">

@@ -16,6 +16,8 @@ export const ENDPOINTS = {
     resendVerification: '/auth/resend-verification',
     trackHomeVisit: '/auth/track-home-visit',
     checkEmail: '/auth/check-email',
+    oauthRedirect: (provider: string) => `/auth/oauth/${provider}/redirect`,
+    oauthExchange: '/auth/oauth/exchange-token',
   },
   users: {
     update: (id: string) => `/users/${encodeURIComponent(id)}`,

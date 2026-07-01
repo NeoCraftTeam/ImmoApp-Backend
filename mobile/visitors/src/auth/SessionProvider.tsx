@@ -1,8 +1,12 @@
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 
 import { apiClient, setBearerToken } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import { clearUserContext, trackEvent } from '@/services/monitoring';
+
+export type SocialProvider = 'google' | 'facebook' | 'github';
 
 import { SESSION_KEY } from './storage-keys';
 import { useStorageState } from './useStorageState';
@@ -16,6 +20,14 @@ interface SessionContextValue {
   isAuthenticated: boolean;
   /** Posts to `/auth/login`, persists the returned token, resolves on success. */
   signIn: (email: string, password: string) => Promise<void>;
+  /**
+   * Social login via the backend redirect flow (Google / Facebook / GitHub).
+   * Opens the provider's OAuth page in a system browser, captures the
+   * one-time `exchange_code` from the deep-link callback, and swaps it for
+   * a Sanctum token. Resolves on success, resolves silently if the user
+   * cancels, throws on failure.
+   */
+  signInWithProvider: (provider: SocialProvider) => Promise<{ cancelled: boolean }>;
   /**
    * Posts to `/auth/registerCustomer`. Returns the backend's
    * `email_verification_required` flag so the caller can route to
@@ -92,6 +104,44 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setBearerToken(accessToken);
         setToken(accessToken);
         trackEvent('auth.signIn', { email });
+      },
+      signInWithProvider: async (provider) => {
+        // Deep link de retour (keyhome://auth/callback en build natif,
+        // exp://…/--/auth/callback en Expo Go). Le backend le reçoit comme
+        // `redirect_uri` et y renvoie le `exchange_code` après OAuth.
+        const returnUrl = Linking.createURL('auth/callback');
+
+        const { data: redirect } = await apiClient.get<{ redirect_url?: string }>(
+          ENDPOINTS.auth.oauthRedirect(provider),
+          { params: { redirect_uri: returnUrl } },
+        );
+        if (typeof redirect?.redirect_url !== 'string' || redirect.redirect_url === '') {
+          throw new Error('Impossible de démarrer la connexion.');
+        }
+
+        const result = await WebBrowser.openAuthSessionAsync(redirect.redirect_url, returnUrl);
+        if (result.type !== 'success' || !('url' in result) || !result.url) {
+          // L'utilisateur a fermé le navigateur — pas une erreur.
+          return { cancelled: true };
+        }
+
+        const { queryParams } = Linking.parse(result.url);
+        const code = queryParams?.exchange_code;
+        if (typeof code !== 'string' || code === '') {
+          throw new Error('Échec de l’authentification. Veuillez réessayer.');
+        }
+
+        const { data } = await apiClient.get<LoginResponse>(ENDPOINTS.auth.oauthExchange, {
+          params: { exchange_code: code },
+        });
+        const accessToken = data?.access_token ?? data?.token;
+        if (typeof accessToken !== 'string' || accessToken === '') {
+          throw new Error('Réponse de connexion invalide.');
+        }
+        setBearerToken(accessToken);
+        setToken(accessToken);
+        trackEvent('auth.signInSocial', { provider });
+        return { cancelled: false };
       },
       signUp: async (input) => {
         const { data } = await apiClient.post<LoginResponse>(
