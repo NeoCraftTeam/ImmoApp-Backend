@@ -56,9 +56,18 @@ final readonly class RegistrationService
 
         $data = array_merge($request->validated(), $data);
 
-        // Cloudflare Turnstile — verify only when configured.
+        // Cloudflare Turnstile — vérifié UNIQUEMENT pour les clients
+        // stateful (web SPA avec session Sanctum). Même rationale que
+        // LoginService::authenticate : le web injecte le widget JS dans
+        // le DOM, mais le mobile (Expo/RN) et les intégrations API pures
+        // n'ont ni session ni DOM pour exécuter Turnstile — l'exiger
+        // renverrait un 422 systématique et bloquerait toute inscription
+        // mobile. Le rate-limiter `register-attempts:{ip}` (10/10 min)
+        // reste actif dans tous les cas, donc la protection anti-bot est
+        // préservée sur l'API stateless.
         if (
-            $this->turnstile->isConfigured()
+            $request->hasSession()
+            && $this->turnstile->isConfigured()
             && !$this->turnstile->verify(
                 $request->input('turnstile_token'),
                 $request->ip(),

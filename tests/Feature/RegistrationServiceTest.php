@@ -128,6 +128,26 @@ it('throws RegistrationEmailTakenException from service when email is taken', fu
         ->toThrow(RegistrationEmailTakenException::class);
 });
 
+it('allows stateless (mobile) registration when turnstile is configured', function (): void {
+    // Turnstile actif côté serveur, mais la requête est stateless (bearer
+    // pur, sans session) comme l'app mobile Expo. Le widget Turnstile ne
+    // peut pas tourner hors d'un navigateur, donc on ne doit PAS l'exiger.
+    // Avant le fix, ceci renvoyait 422 {turnstile_token} et bloquait toute
+    // inscription mobile en prod.
+    config()->set('services.turnstile.secret_key', 'real-test-secret-not-dummy-placeholder');
+
+    $data = validRegistrationData();
+
+    $response = $this->postJson('/api/v1/auth/registerCustomer', $data);
+
+    $response->assertCreated();
+
+    $this->assertDatabaseHas('users', [
+        'email' => $data['email'],
+        'role' => 'customer',
+    ]);
+});
+
 it('returns 429 when rate limited', function (): void {
     // Exhaust rate limiter
     for ($i = 0; $i < 11; $i++) {
