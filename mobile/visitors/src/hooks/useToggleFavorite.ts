@@ -25,6 +25,9 @@ export function useToggleFavorite() {
   const qc = useQueryClient();
 
   return useMutation<ToggleResponse, Error, { adId: string }, { previous: Ad[] | undefined }>({
+    // Doit matcher les mutationDefaults enregistrés dans QueryProvider —
+    // permet de rejouer la mutation après un cold-start (offline queue).
+    mutationKey: ['toggle-favorite'],
     mutationFn: async ({ adId }) => {
       const { data } = await apiClient.post<ToggleResponse>(`/ads/${adId}/favorite`);
       return data;

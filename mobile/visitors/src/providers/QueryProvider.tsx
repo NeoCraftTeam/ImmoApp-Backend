@@ -6,6 +6,8 @@ import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client
 import { useEffect, useState, type ReactNode } from 'react';
 import { AppState, Platform } from 'react-native';
 
+import { apiClient } from '@/api/client';
+
 /**
  * Single QueryClient + offline persistence layer.
  *
@@ -38,23 +40,40 @@ function onAppStateChange(status: string) {
 }
 
 export function QueryProvider({ children }: { children: ReactNode }) {
-  const [client] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 5 * 60 * 1000,
-            gcTime: 24 * 60 * 60 * 1000,
-            retry: 2,
-            refetchOnWindowFocus: false,
-            refetchOnReconnect: true,
-          },
-          mutations: {
-            retry: 0,
-          },
+  const [client] = useState(() => {
+    const qc = new QueryClient({
+      defaultOptions: {
+        queries: {
+          staleTime: 5 * 60 * 1000,
+          gcTime: 24 * 60 * 60 * 1000,
+          retry: 2,
+          refetchOnWindowFocus: false,
+          refetchOnReconnect: true,
         },
-      }),
-  );
+        mutations: {
+          // networkMode 'online' (défaut) : une mutation lancée hors
+          // ligne est mise en PAUSE (pas échouée) puis reprise à la
+          // reconnexion. On rejoue jusqu'à 3× en cas d'erreur transitoire.
+          retry: 3,
+          retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 30_000),
+        },
+      },
+    });
+
+    // mutationDefaults par clé : indispensable pour que les mutations
+    // mises en pause hors-ligne et **persistées** (voir shouldDehydrate
+    // Mutation) retrouvent leur mutationFn après un cold-start et soient
+    // rejouées. L'optimistic update vit dans le hook (composant monté) ;
+    // ici on ne (re)définit que le POST réseau rejouable.
+    qc.setMutationDefaults(['toggle-favorite'], {
+      mutationFn: async ({ adId }: { adId: string }) => {
+        const { data } = await apiClient.post(`/ads/${adId}/favorite`);
+        return data;
+      },
+    });
+
+    return qc;
+  });
 
   const [persister] = useState(() =>
     createAsyncStoragePersister({
@@ -86,7 +105,16 @@ export function QueryProvider({ children }: { children: ReactNode }) {
             if (key === 'notifications-unread-count') return false;
             return query.state.status === 'success';
           },
+          // Persiste les mutations en pause (actions faites hors-ligne)
+          // pour qu'elles survivent à la fermeture de l'app et soient
+          // rejouées au retour du réseau.
+          shouldDehydrateMutation: (mutation) => mutation.state.isPaused,
         },
+      }}
+      onSuccess={() => {
+        // Après réhydratation du cache : rejoue les mutations mises en
+        // pause hors-ligne lors de la session précédente.
+        void client.resumePausedMutations();
       }}
     >
       {children}
