@@ -122,6 +122,43 @@ export function filtersToParams(
   return params;
 }
 
+/**
+ * Hydrate query + filters from navigation params (Home hero search,
+ * AI search). Expo-router params are strings (or string arrays); every
+ * unknown or malformed value is simply ignored. `furnished=1` maps to
+ * the `furnished` amenity, like the web URL sync.
+ */
+export function searchParamsToState(
+  params: Record<string, string | string[] | undefined>,
+): { query: string; filters: AdFilters } {
+  const str = (v: string | string[] | undefined): string | null => {
+    const raw = Array.isArray(v) ? v[0] : v;
+    return raw != null && raw.trim() !== '' ? raw.trim() : null;
+  };
+  const num = (v: string | string[] | undefined): number | null => {
+    const raw = str(v);
+    if (raw === null) return null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  };
+
+  const transaction = str(params.transaction_type);
+  const filters: AdFilters = {
+    ...EMPTY_FILTERS,
+    city: str(params.city),
+    type: str(params.type),
+    bedrooms: num(params.bedrooms),
+    minPrice: num(params.price_min),
+    maxPrice: num(params.price_max),
+    minSurface: num(params.surface_min),
+    transactionType:
+      transaction === 'location' || transaction === 'vente' ? transaction : null,
+    hasParking: str(params.parking) === '1',
+    attributes: str(params.furnished) === '1' ? ['furnished'] : [],
+  };
+  return { query: str(params.q) ?? '', filters };
+}
+
 /** One removable chip in the active-filters row above the results. */
 export interface FilterChipDescriptor {
   key:

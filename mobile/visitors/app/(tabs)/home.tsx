@@ -28,6 +28,7 @@ import { AdCardSkeleton } from '@/components/AdCardSkeleton';
 import { ClientProfileBanner } from '@/components/ClientProfileBanner';
 import { EmptyState } from '@/components/EmptyState';
 import { FadeIn } from '@/components/FadeIn';
+import { HomeHeroSearch } from '@/components/HomeHeroSearch';
 import { useAdFeed } from '@/hooks/useAdFeed';
 import { useAdTypes } from '@/hooks/useCitiesAndTypes';
 import { useGreeting } from '@/hooks/useGreeting';
@@ -234,6 +235,10 @@ export default function Home() {
       >
         Les meilleures annonces immobilières du moment, sélectionnées pour vous.
       </Paragraph>
+
+      {/* Hero search — par ville (autocomplete + géoloc) ou IA, comme
+          le HeroSearch web. Navigue vers l'onglet recherche prérempli. */}
+      <HomeHeroSearch />
 
       {/* Profile completion banner — se masque de lui-même si le profil
           est complet ; visible uniquement pour un utilisateur connecté. */}

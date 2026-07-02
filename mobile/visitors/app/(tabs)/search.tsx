@@ -8,7 +8,8 @@ import {
   Search as SearchIcon,
   X,
 } from '@tamagui/lucide-icons';
-import { useCallback, useRef, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -38,6 +39,7 @@ import {
   activeFilterChips,
   activeFilterCount,
   removeFilterChip,
+  searchParamsToState,
   type AdFilters,
   type AdSort,
   type FilterChipDescriptor,
@@ -63,6 +65,26 @@ export default function SearchTab() {
   const [inputFocused, setInputFocused] = useState(false);
   const blurTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedQuery = useDebounce(query, 350);
+
+  // Préremplissage depuis la Home (hero search / recherche IA) — chaque
+  // navigation avec des params écrase l'état courant, une seule fois par
+  // jeu de params (la ref évite de ré-appliquer à chaque re-render).
+  const navParams = useLocalSearchParams<Record<string, string | string[]>>();
+  const appliedParamsKey = useRef<string | null>(null);
+  useEffect(() => {
+    const relevant = ['q', 'city', 'type', 'transaction_type', 'bedrooms', 'price_min', 'price_max', 'surface_min', 'parking', 'furnished'];
+    const incoming: Record<string, string | string[] | undefined> = {};
+    for (const key of relevant) {
+      if (navParams[key] != null) incoming[key] = navParams[key];
+    }
+    if (Object.keys(incoming).length === 0) return;
+    const paramsKey = JSON.stringify(incoming);
+    if (appliedParamsKey.current === paramsKey) return;
+    appliedParamsKey.current = paramsKey;
+    const { query: nextQuery, filters: nextFilters } = searchParamsToState(incoming);
+    setQuery(nextQuery);
+    setFilters(nextFilters);
+  }, [navParams]);
 
   const { data: citySuggestions } = useCityAutocomplete(
     inputFocused ? debouncedQuery : '',

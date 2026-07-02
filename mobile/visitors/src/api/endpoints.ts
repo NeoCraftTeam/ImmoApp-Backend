@@ -134,6 +134,7 @@ export const ENDPOINTS = {
   },
   priceIndex: '/price-index',
   propertyAttributes: '/property-attributes',
+  searchParse: '/search/parse',
   geo: {
     directions: '/directions',
   },
