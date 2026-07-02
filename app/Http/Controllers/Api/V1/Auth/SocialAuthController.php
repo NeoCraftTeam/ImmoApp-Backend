@@ -108,10 +108,16 @@ final class SocialAuthController
             }
 
             // Find or create user.
-            // NOTE: OAuth users always receive the CUSTOMER role regardless of the
-            // `role` parameter passed to `authenticate()`. Role escalation (agent/admin)
-            // requires explicit verification and cannot be granted via OAuth flow alone.
-            $result = $this->findOrCreateUser($socialUser, $provider, $request, $utmPayload);
+            // NOTE: the requested role is restricted to customer|agent — admin can
+            // never be granted via OAuth. The role only applies at CREATION; an
+            // existing account keeps its role whatever the client requests.
+            $result = $this->findOrCreateUser(
+                $socialUser,
+                $provider,
+                $request,
+                $utmPayload,
+                $this->sanitizeRequestedRole($request->input('role')),
+            );
             $user = $result['user'];
             $isNewUser = $result['is_new'];
 
@@ -210,10 +216,13 @@ final class SocialAuthController
             $redirectUri = config('app.frontend_url').'/auth/callback';
         }
 
-        // Encode redirect_uri in state parameter (stateless approach for API)
+        // Encode redirect_uri in state parameter (stateless approach for API).
+        // The requested role rides along so callback() can create bailleur
+        // accounts initiated from the owner panel / owners mobile app.
         $stateData = [
             'csrf' => Str::random(40),
             'redirect_uri' => $redirectUri,
+            'role' => $this->sanitizeRequestedRole($request->query('role')),
         ];
         $state = base64_encode(json_encode($stateData) ?: '');
 
@@ -255,8 +264,10 @@ final class SocialAuthController
         }
 
         try {
-            // Decode redirect_uri from state parameter and validate against allowed hosts
+            // Decode redirect_uri (and requested role) from state parameter
+            // and validate against allowed hosts
             $redirectUri = config('app.frontend_url').'/auth/callback';
+            $requestedRole = 'customer';
             $state = $request->query('state');
 
             if ($state) {
@@ -274,12 +285,15 @@ final class SocialAuthController
                         ]);
                     }
                 }
+                if (is_array($stateData) && isset($stateData['role'])) {
+                    $requestedRole = $this->sanitizeRequestedRole($stateData['role']);
+                }
             }
 
             /** @phpstan-ignore method.notFound */
             $socialUser = Socialite::driver($provider)->stateless()->user();
 
-            $result = $this->findOrCreateUser($socialUser, $provider, $request, []);
+            $result = $this->findOrCreateUser($socialUser, $provider, $request, [], $requestedRole);
             $user = $result['user'];
 
             $user->forceFill([
@@ -546,10 +560,11 @@ final class SocialAuthController
         string $provider,
         Request $request,
         array $utmPayload,
+        string $requestedRole = 'customer',
     ): array {
         $providerIdField = $provider.'_id';
 
-        return DB::transaction(function () use ($socialUser, $provider, $providerIdField, $request, $utmPayload) {
+        return DB::transaction(function () use ($socialUser, $provider, $providerIdField, $request, $utmPayload, $requestedRole) {
             // Try to find by provider ID first
             $user = User::where($providerIdField, $socialUser->getId())->first();
 
@@ -594,10 +609,10 @@ final class SocialAuthController
                 ];
             }
 
-            // Create new user
-            // Note: OAuth always creates CUSTOMER accounts. Agents require additional setup
-            // (type: INDIVIDUAL/AGENCY, agency association) that can't be determined from OAuth.
-            // Users can request agent upgrade through the app after completing their profile.
+            // Create new user with the sanitized requested role (customer par
+            // défaut, agent quand le flux vient du panel/app owners — jamais
+            // admin). Un agent OAuth démarre en type `individual` ; le
+            // rattachement à une agence passe par l'onboarding post-création.
             $names = $this->parseNames($socialUser);
 
             $utm = app(UtmAttributionService::class);
@@ -615,7 +630,8 @@ final class SocialAuthController
             ]);
             $user->forceFill([
                 'email_verified_at' => now(),
-                'role' => UserRole::CUSTOMER,
+                'role' => $requestedRole === 'agent' ? UserRole::AGENT : UserRole::CUSTOMER,
+                'type' => 'individual',
                 'is_active' => true,
                 'registration_ip' => $request->ip(),
                 'last_login_ip' => $request->ip(),
@@ -629,6 +645,17 @@ final class SocialAuthController
 
             return ['user' => $user, 'is_new' => true];
         });
+    }
+
+    /**
+     * Whitelist the role a client may request at OAuth account creation.
+     *
+     * Only `customer` (default) and `agent` (owner panel / owners app) are
+     * accepted — `admin` or any other value silently falls back to customer.
+     */
+    private function sanitizeRequestedRole(mixed $role): string
+    {
+        return $role === 'agent' ? 'agent' : 'customer';
     }
 
     /**

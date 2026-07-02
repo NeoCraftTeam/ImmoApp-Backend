@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
 import { useSession } from '@/auth/SessionProvider';
+import { SocialLoginButtons } from '@/components/SocialLoginButtons';
 import { brand } from '@/theme/tokens';
 import { t } from '@/i18n';
 
@@ -57,6 +58,21 @@ export default function Login() {
       await signIn(email.trim(), password);
       playSuccess(() => router.replace('/(tabs)/dashboard'));
     } catch (err) {
+      // 403 « email non vérifié » — router vers la saisie d'OTP au lieu
+      // d'une impasse (parité web owner/login).
+      const response = (err as { response?: { status?: number; data?: unknown } })
+        .response;
+      const data = response?.data as
+        | { email_verification_required?: boolean }
+        | undefined;
+      if (response?.status === 403 && data?.email_verification_required) {
+        setSubmitting(false);
+        router.push({
+          pathname: '/(auth)/verify-otp',
+          params: { email: email.trim() },
+        });
+        return;
+      }
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert(t('common.error'), extractApiErrorMessage(err));
       setSubmitting(false);
@@ -146,6 +162,11 @@ export default function Login() {
           {t('auth.forgotPassword')}
         </Paragraph>
       </Link>
+
+      <SocialLoginButtons
+        disabled={submitting || succeeded}
+        onSuccess={() => playSuccess(() => router.replace('/(tabs)/dashboard'))}
+      />
 
       <XStack justifyContent="center" gap="$2" marginTop="auto">
         <Paragraph color="$slate500">{t('auth.noAccount')}</Paragraph>

@@ -1,4 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 
 import { apiClient, setBearerToken } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
@@ -25,11 +27,20 @@ interface SessionContextValue {
    * `verify-otp` or straight to the dashboard.
    */
   signUp: (input: SignUpInput) => Promise<{ emailVerificationRequired: boolean }>;
+  /**
+   * OAuth via le navigateur système, avec `role=agent` — le backend
+   * crée le compte bailleur (ou connecte le compte existant sans
+   * toucher à son rôle). `cancelled` quand l'utilisateur ferme le
+   * navigateur sans finir.
+   */
+  signInWithProvider: (provider: SocialProvider) => Promise<{ cancelled: boolean }>;
   /** Install a token returned by an external flow (e.g. OTP verify). */
   setToken: (token: string) => void;
   /** Clears the stored token; the Axios 401 interceptor calls this too. */
   signOut: () => void;
 }
+
+export type SocialProvider = 'google' | 'facebook' | 'github';
 
 export interface SignUpInput {
   firstname: string;
@@ -106,6 +117,43 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           throw new Error('Réponse d’inscription invalide.');
         }
         return { emailVerificationRequired };
+      },
+      signInWithProvider: async (provider) => {
+        // Deep link de retour (keyhomeowners://auth/callback en build
+        // natif) — whitelisté côté backend (OAUTH_ALLOWED_REDIRECT_SCHEMES).
+        const returnUrl = Linking.createURL('auth/callback');
+
+        const { data: redirect } = await apiClient.get<{ redirect_url?: string }>(
+          ENDPOINTS.auth.oauthRedirect(provider),
+          { params: { redirect_uri: returnUrl, role: 'agent' } },
+        );
+        if (typeof redirect?.redirect_url !== 'string' || redirect.redirect_url === '') {
+          throw new Error('Impossible de démarrer la connexion.');
+        }
+
+        const result = await WebBrowser.openAuthSessionAsync(redirect.redirect_url, returnUrl);
+        if (result.type !== 'success' || !('url' in result) || !result.url) {
+          // L'utilisateur a fermé le navigateur — pas une erreur.
+          return { cancelled: true };
+        }
+
+        const { queryParams } = Linking.parse(result.url);
+        const code = queryParams?.exchange_code;
+        if (typeof code !== 'string' || code === '') {
+          throw new Error('Échec de l’authentification. Veuillez réessayer.');
+        }
+
+        const { data } = await apiClient.get<LoginResponse>(ENDPOINTS.auth.oauthExchange, {
+          params: { exchange_code: code },
+        });
+        const accessToken = data?.access_token ?? data?.token;
+        if (typeof accessToken !== 'string' || accessToken === '') {
+          throw new Error('Réponse de connexion invalide.');
+        }
+        setBearerToken(accessToken);
+        setToken(accessToken);
+        trackEvent('auth.signInSocial', { provider });
+        return { cancelled: false };
       },
       setToken: (next: string) => {
         setBearerToken(next);

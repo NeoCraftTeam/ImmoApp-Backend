@@ -107,7 +107,7 @@ describe('Google OAuth Authentication', function (): void {
         ]);
     });
 
-    it('always creates customer accounts via OAuth (agents need manual setup)', function (): void {
+    it('creates an agent account via OAuth when role=agent is requested', function (): void {
         $socialiteUser = Mockery::mock(SocialiteUser::class);
         $socialiteUser->shouldReceive('getId')->andReturn('google-agent-789');
         $socialiteUser->shouldReceive('getEmail')->andReturn('agent@example.com');
@@ -121,18 +121,66 @@ describe('Google OAuth Authentication', function (): void {
         Socialite::shouldReceive('userFromToken')
             ->andReturn($socialiteUser);
 
-        // Even if role=agent is requested, OAuth creates customer accounts
-        // because agents need type (INDIVIDUAL/AGENCY) setup that OAuth can't provide
+        // Owner panel / owners mobile app pass role=agent — the account is
+        // created as agent (type individual, agency linking via onboarding)
         $response = $this->postJson('/api/v1/auth/oauth/google', [
             'token' => 'valid-google-token',
-            'role' => 'agent', // This is ignored
+            'role' => 'agent',
         ]);
 
         $response->assertOk();
 
         $this->assertDatabaseHas('users', [
             'email' => 'agent@example.com',
-            'role' => UserRole::CUSTOMER->value, // Always customer via OAuth
+            'role' => UserRole::AGENT->value,
+            'type' => 'individual',
+        ]);
+    });
+
+    it('rejects a non-whitelisted OAuth role with a validation error', function (): void {
+        $response = $this->postJson('/api/v1/auth/oauth/google', [
+            'token' => 'valid-google-token',
+            'role' => 'admin',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['role']);
+
+        $this->assertDatabaseMissing('users', [
+            'email' => 'wannabe-admin@example.com',
+        ]);
+    });
+
+    it('never changes the role of an existing account whatever role is requested', function (): void {
+        User::factory()->create([
+            'email' => 'customer@example.com',
+            'google_id' => 'google-existing-111',
+            'role' => UserRole::CUSTOMER,
+        ]);
+
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
+        $socialiteUser->shouldReceive('getId')->andReturn('google-existing-111');
+        $socialiteUser->shouldReceive('getEmail')->andReturn('customer@example.com');
+        $socialiteUser->shouldReceive('getName')->andReturn('Existing Customer');
+        $socialiteUser->shouldReceive('getAvatar')->andReturn(null);
+        $socialiteUser->shouldReceive('getRaw')->andReturn([]);
+
+        Socialite::shouldReceive('driver')
+            ->with('google')
+            ->andReturnSelf();
+        Socialite::shouldReceive('userFromToken')
+            ->andReturn($socialiteUser);
+
+        $response = $this->postJson('/api/v1/auth/oauth/google', [
+            'token' => 'valid-google-token',
+            'role' => 'agent',
+        ]);
+
+        $response->assertOk();
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'customer@example.com',
+            'role' => UserRole::CUSTOMER->value,
         ]);
     });
 

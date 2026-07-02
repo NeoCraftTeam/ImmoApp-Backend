@@ -21,6 +21,8 @@ export const ENDPOINTS = {
     verifyEmailOtp: '/auth/verify-email-otp',
     resendVerification: '/auth/resend-verification',
     checkEmail: '/auth/check-email',
+    oauthRedirect: (provider: string) => `/auth/oauth/${provider}/redirect`,
+    oauthExchange: '/auth/oauth/exchange-token',
   },
   users: {
     update: (id: string) => `/users/${encodeURIComponent(id)}`,
