@@ -9,6 +9,7 @@ import {
   Maximize,
   ParkingCircle,
   Share2,
+  ShieldCheck,
   ShowerHead,
   X,
 } from '@tamagui/lucide-icons';
@@ -764,6 +765,15 @@ function PublisherCard({
 }) {
   const router = useRouter();
   const usernameOrId = ad.user?.username ?? ad.user?.id;
+  const trustScore = ad.user?.trust_score;
+  const trustColor =
+    trustScore == null
+      ? null
+      : trustScore >= 75
+        ? brand.success
+        : trustScore >= 50
+          ? brand.warning
+          : brand.danger;
   const handlePress = () => {
     if (!usernameOrId) return;
     router.push({
@@ -794,6 +804,21 @@ function PublisherCard({
             </Paragraph>
             {ad.user?.is_verified && (
               <CheckCircle2 size={14} color={brand.success} />
+            )}
+            {trustScore != null && trustColor && (
+              <XStack
+                alignItems="center"
+                gap={3}
+                paddingHorizontal={7}
+                paddingVertical={2}
+                borderRadius={999}
+                backgroundColor={`${trustColor}1A`}
+              >
+                <ShieldCheck size={11} color={trustColor} />
+                <Paragraph fontSize={11} fontWeight="800" color={trustColor}>
+                  {Math.round(trustScore)}
+                </Paragraph>
+              </XStack>
             )}
           </XStack>
           {updatedRelative && (
