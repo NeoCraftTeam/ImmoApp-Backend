@@ -1,16 +1,33 @@
 /**
- * Property attribute metadata — labels + icon hints for the equipment
- * keys returned on an ad (e.g. "balcon", "ascenseur"). Backend endpoint:
- * `GET /property-attributes` (CDN-cached 30 minutes).
+ * Property attributes (equipment) — `GET /property-attributes`
+ * (CDN-cached 30 minutes). The endpoint returns the attributes twice:
+ * `data` is a map keyed by slug (used to label `Ad.attributes` on the
+ * ad detail screen) and `grouped` nests them under their category
+ * (used by the search filter accordions).
  */
 export interface PropertyAttributeMeta {
-  key: string;
+  /** Slug — also the value sent to `/ads/search` as `attributes[]`. */
+  value: string;
   label: string;
-  /** Lucide icon name; the mobile component maps it to a Tamagui icon. */
-  icon?: string;
-  category?: string;
+  /** Web icon name hint; the mobile UI maps slugs to lucide icons instead. */
+  icon?: string | null;
+  admin_icon?: string | null;
+  category?: {
+    id: number | null;
+    name: string | null;
+    slug: string | null;
+  } | null;
+}
+
+export interface PropertyAttributeCategory {
+  id: number;
+  name: string;
+  slug: string;
+  attributes: PropertyAttributeMeta[];
 }
 
 export interface PropertyAttributesResponse {
-  data: PropertyAttributeMeta[];
+  success?: boolean;
+  data?: Record<string, PropertyAttributeMeta>;
+  grouped?: PropertyAttributeCategory[];
 }

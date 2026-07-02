@@ -78,6 +78,7 @@ const fr = {
       typePlaceholder: 'ex. appartement, studio, terrain',
       min: 'Min',
       max: 'Max',
+      amenities: 'Équipements',
       apply: 'Appliquer',
     },
   },

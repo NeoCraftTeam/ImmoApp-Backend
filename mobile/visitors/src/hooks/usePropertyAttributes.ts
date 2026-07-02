@@ -3,9 +3,20 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import type {
+  PropertyAttributeCategory,
   PropertyAttributeMeta,
   PropertyAttributesResponse,
 } from '@/types/property-attribute';
+
+const QUERY_KEY = ['property-attributes'];
+const STALE_TIME = 30 * 60 * 1000;
+
+async function fetchPropertyAttributes(): Promise<PropertyAttributesResponse> {
+  const { data } = await apiClient.get<PropertyAttributesResponse>(
+    ENDPOINTS.propertyAttributes,
+  );
+  return data;
+}
 
 /**
  * Property attribute metadata — fetched once per session and cached
@@ -18,23 +29,30 @@ export function usePropertyAttributes() {
     Error,
     Record<string, PropertyAttributeMeta>
   >({
-    queryKey: ['property-attributes'],
-    queryFn: async () => {
-      const { data } = await apiClient.get<PropertyAttributesResponse>(
-        ENDPOINTS.propertyAttributes,
-      );
-      return data;
-    },
+    queryKey: QUERY_KEY,
+    queryFn: fetchPropertyAttributes,
     select: (payload) => {
-      const out: Record<string, PropertyAttributeMeta> = {};
-      const list = Array.isArray(payload?.data) ? payload.data : [];
-      for (const attr of list) {
-        if (attr?.key) {
-          out[attr.key] = attr;
-        }
-      }
-      return out;
+      const data = payload?.data;
+      return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
     },
-    staleTime: 30 * 60 * 1000,
+    staleTime: STALE_TIME,
+  });
+}
+
+/**
+ * Same endpoint, grouped by category — powers the equipment accordions
+ * in the search filter sheet. Shares the query cache with
+ * `usePropertyAttributes` (only the `select` differs).
+ */
+export function usePropertyAttributeGroups() {
+  return useQuery<
+    PropertyAttributesResponse,
+    Error,
+    PropertyAttributeCategory[]
+  >({
+    queryKey: QUERY_KEY,
+    queryFn: fetchPropertyAttributes,
+    select: (payload) => (Array.isArray(payload?.grouped) ? payload.grouped : []),
+    staleTime: STALE_TIME,
   });
 }

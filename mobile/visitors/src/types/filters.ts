@@ -30,6 +30,8 @@ export interface AdFilters {
   has3dTour: boolean;
   /** Only verified ads. */
   isVerified: boolean;
+  /** Selected equipment slugs (AND semantics on the backend). */
+  attributes: string[];
 }
 
 /** Sort options exposed in the UI, mapped to the backend `sort`/`order`. */
@@ -80,21 +82,26 @@ export const EMPTY_FILTERS: AdFilters = {
   hasParking: false,
   has3dTour: false,
   isVerified: false,
+  attributes: [],
 };
 
 /** Count the number of constraints active — used for the badge on the filter button. */
 export function activeFilterCount(filters: AdFilters): number {
-  return Object.values(filters).filter(
+  const { attributes, ...scalars } = filters;
+  const scalarCount = Object.values(scalars).filter(
     (v) => v !== null && v !== '' && v !== false,
   ).length;
+  return scalarCount + attributes.length;
 }
 
 /**
  * Translate `AdFilters` into the query-string params the `/ads/search`
  * endpoint understands (validated by `AdRequest`).
  */
-export function filtersToParams(filters: AdFilters): Record<string, string | number> {
-  const params: Record<string, string | number> = {};
+export function filtersToParams(
+  filters: AdFilters,
+): Record<string, string | number | string[]> {
+  const params: Record<string, string | number | string[]> = {};
   if (filters.minPrice != null) params.price_min = filters.minPrice;
   if (filters.maxPrice != null) params.price_max = filters.maxPrice;
   if (filters.minSurface != null) params.surface_min = filters.minSurface;
@@ -107,5 +114,6 @@ export function filtersToParams(filters: AdFilters): Record<string, string | num
   if (filters.hasParking) params.has_parking = 1;
   if (filters.has3dTour) params.has_3d_tour = 1;
   if (filters.isVerified) params.is_verified = 1;
+  if (filters.attributes.length > 0) params.attributes = filters.attributes;
   return params;
 }

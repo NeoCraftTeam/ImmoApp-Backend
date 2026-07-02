@@ -1,7 +1,11 @@
+import { ChevronDown, ChevronUp } from '@tamagui/lucide-icons';
 import { useEffect, useState } from 'react';
 import { Button, Input, Paragraph, Sheet, XStack, YStack, Separator } from 'tamagui';
 
+import { usePropertyAttributeGroups } from '@/hooks/usePropertyAttributes';
+import { brand } from '@/theme/tokens';
 import { EMPTY_FILTERS, activeFilterCount, type AdFilters } from '@/types/filters';
+import type { PropertyAttributeCategory } from '@/types/property-attribute';
 import { t } from '@/i18n';
 
 interface Props {
@@ -24,6 +28,7 @@ interface Props {
  */
 export function SearchFilterSheet({ open, onOpenChange, filters, onApply }: Props) {
   const [draft, setDraft] = useState<AdFilters>(filters);
+  const { data: attributeGroups } = usePropertyAttributeGroups();
 
   // Re-sync the draft each time the sheet opens — closing without
   // applying must not leak partial edits to a future open.
@@ -44,6 +49,15 @@ export function SearchFilterSheet({ open, onOpenChange, filters, onApply }: Prop
     const parsed = Number(trimmed);
     if (!Number.isFinite(parsed) || parsed < 0) return;
     update(key, parsed);
+  };
+
+  const toggleAttribute = (slug: string) => {
+    setDraft((d) => ({
+      ...d,
+      attributes: d.attributes.includes(slug)
+        ? d.attributes.filter((s) => s !== slug)
+        : [...d.attributes, slug],
+    }));
   };
 
   const handleApply = () => {
@@ -250,6 +264,24 @@ export function SearchFilterSheet({ open, onOpenChange, filters, onApply }: Prop
             />
           </XStack>
         </YStack>
+
+        {attributeGroups && attributeGroups.length > 0 ? (
+          <YStack gap="$2">
+            <Paragraph size="$3" color="$slate500">
+              {t('search.filters.amenities')}
+            </Paragraph>
+            <YStack gap="$2">
+              {attributeGroups.map((category) => (
+                <AmenityCategoryAccordion
+                  key={category.id}
+                  category={category}
+                  selected={draft.attributes}
+                  onToggle={toggleAttribute}
+                />
+              ))}
+            </YStack>
+          </YStack>
+        ) : null}
         </Sheet.ScrollView>
 
         <Button
@@ -264,6 +296,80 @@ export function SearchFilterSheet({ open, onOpenChange, filters, onApply }: Prop
         </Button>
       </Sheet.Frame>
     </Sheet>
+  );
+}
+
+/**
+ * One collapsible equipment category — mirrors the web's per-category
+ * MUI accordion (`SearchFiltersDrawerContent`): count badge + brand
+ * border when the category holds active selections, chip-toggle per
+ * attribute inside.
+ */
+function AmenityCategoryAccordion({
+  category,
+  selected,
+  onToggle,
+}: {
+  category: PropertyAttributeCategory;
+  selected: string[];
+  onToggle: (slug: string) => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const activeCount = category.attributes.filter((attr) =>
+    selected.includes(attr.value),
+  ).length;
+  const Chevron = expanded ? ChevronUp : ChevronDown;
+
+  return (
+    <YStack
+      borderWidth={1}
+      borderColor={activeCount > 0 ? '$brand' : '$slate100'}
+      borderRadius={12}
+      overflow="hidden"
+    >
+      <XStack
+        alignItems="center"
+        justifyContent="space-between"
+        paddingVertical={12}
+        paddingHorizontal={14}
+        onPress={() => setExpanded((v) => !v)}
+        pressStyle={{ backgroundColor: '$slate100' }}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+      >
+        <XStack alignItems="center" gap="$2" flex={1}>
+          <Paragraph fontSize={14} fontWeight="600" color="$slate900">
+            {category.name}
+          </Paragraph>
+          {activeCount > 0 ? (
+            <Paragraph
+              fontSize={11}
+              fontWeight="700"
+              color="$brandText"
+              backgroundColor="$brand"
+              borderRadius={999}
+              paddingHorizontal={7}
+              paddingVertical={1}
+            >
+              {activeCount}
+            </Paragraph>
+          ) : null}
+        </XStack>
+        <Chevron size={16} color={brand.slate500} />
+      </XStack>
+      {expanded ? (
+        <XStack gap="$2" flexWrap="wrap" paddingHorizontal={14} paddingBottom={12}>
+          {category.attributes.map((attr) => (
+            <FilterChip
+              key={attr.value}
+              label={attr.label}
+              active={selected.includes(attr.value)}
+              onPress={() => onToggle(attr.value)}
+            />
+          ))}
+        </XStack>
+      ) : null}
+    </YStack>
   );
 }
 

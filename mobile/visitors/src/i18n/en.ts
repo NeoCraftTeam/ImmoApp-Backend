@@ -79,6 +79,7 @@ const en = {
       typePlaceholder: 'e.g. apartment, studio, plot',
       min: 'Min',
       max: 'Max',
+      amenities: 'Amenities',
       apply: 'Apply',
     },
   },

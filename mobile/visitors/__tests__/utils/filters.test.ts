@@ -65,6 +65,25 @@ describe('filters', () => {
     ).toBe(2);
   });
 
+  it('activeFilterCount compte chaque équipement sélectionné', () => {
+    expect(
+      activeFilterCount({ ...EMPTY_FILTERS, attributes: ['wifi', 'piscine'] }),
+    ).toBe(2);
+    expect(activeFilterCount({ ...EMPTY_FILTERS, attributes: [] })).toBe(0);
+  });
+
+  it('filtersToParams envoie les équipements comme tableau attributes', () => {
+    const params = filtersToParams({
+      ...EMPTY_FILTERS,
+      attributes: ['wifi', 'piscine'],
+    });
+    expect(params.attributes).toEqual(['wifi', 'piscine']);
+  });
+
+  it('filtersToParams omet le tableau attributes vide', () => {
+    expect(filtersToParams(EMPTY_FILTERS)).not.toHaveProperty('attributes');
+  });
+
   it('sortToParams traduit le tri UI en sort/order backend', () => {
     expect(sortToParams('recent')).toEqual({ sort: 'created_at', order: 'desc' });
     expect(sortToParams('price_asc')).toEqual({ sort: 'price', order: 'asc' });

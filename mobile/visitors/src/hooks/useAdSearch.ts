@@ -45,7 +45,7 @@ export function useAdSearch(
   >({
     queryKey: ['ad-search', trimmed, filters, sort] as const,
     queryFn: async ({ pageParam }) => {
-      const params: Record<string, string | number> = {
+      const params: Record<string, string | number | string[]> = {
         per_page: 15,
         page: pageParam,
         ...filtersToParams(filters),
