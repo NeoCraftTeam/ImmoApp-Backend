@@ -34,6 +34,28 @@ export function useCitiesList() {
   });
 }
 
+/**
+ * Debounce-friendly city autocomplete for the search bar — mirrors the
+ * web's `['cities', q]` query (`/cities?q=…&per_page=20`, 5 min cache).
+ * Pass the already-debounced input; the query stays off until the
+ * first character.
+ */
+export function useCityAutocomplete(q: string) {
+  const trimmed = q.trim();
+  return useQuery<{ data: CityOption[] }, Error, CityOption[]>({
+    queryKey: ['cities', trimmed],
+    queryFn: async () => {
+      const { data } = await apiClient.get<{ data: CityOption[] }>('/cities', {
+        params: { q: trimmed, per_page: 20 },
+      });
+      return data;
+    },
+    select: (payload) => (Array.isArray(payload?.data) ? payload.data : []),
+    enabled: trimmed.length >= 1,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useAdTypes() {
   return useQuery<{ data: AdTypeOption[] }, Error, AdTypeOption[]>({
     queryKey: ['ad-types'],

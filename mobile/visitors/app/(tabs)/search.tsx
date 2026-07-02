@@ -1,6 +1,20 @@
-import { ArrowUpDown, Filter, RefreshCw, Search as SearchIcon } from '@tamagui/lucide-icons';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Pressable } from 'react-native';
+import {
+  ArrowUpDown,
+  Filter,
+  MapPin,
+  RefreshCw,
+  Search as SearchIcon,
+  X,
+} from '@tamagui/lucide-icons';
+import { useCallback, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Keyboard,
+  Pressable,
+  ScrollView,
+} from 'react-native';
 import { H2, Input, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,6 +24,7 @@ import { EmptyState } from '@/components/EmptyState';
 import { FadeIn } from '@/components/FadeIn';
 import { SearchFilterSheet } from '@/components/SearchFilterSheet';
 import { useAdSearch } from '@/hooks/useAdSearch';
+import { useCityAutocomplete } from '@/hooks/useCitiesAndTypes';
 import { useDebounce } from '@/hooks/useDebounce';
 import { t } from '@/i18n';
 import {
@@ -37,7 +52,13 @@ export default function SearchTab() {
   const [filters, setFilters] = useState<AdFilters>(EMPTY_FILTERS);
   const [sort, setSort] = useState<AdSort>(DEFAULT_SORT);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [inputFocused, setInputFocused] = useState(false);
+  const blurTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedQuery = useDebounce(query, 350);
+
+  const { data: citySuggestions } = useCityAutocomplete(
+    inputFocused ? debouncedQuery : '',
+  );
 
   const {
     data: results,
@@ -67,11 +88,38 @@ export default function SearchTab() {
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  const selectCity = (name: string) => {
+    if (blurTimeout.current) clearTimeout(blurTimeout.current);
+    setFilters((f) => ({ ...f, city: name }));
+    setQuery('');
+    setInputFocused(false);
+    Keyboard.dismiss();
+  };
+
+  const clearCity = () => {
+    setFilters((f) => ({ ...f, city: null }));
+  };
+
+  // Hiding on blur is delayed one tick so a tap on a suggestion row
+  // (which blurs the input first) still lands before the list unmounts.
+  const handleInputBlur = () => {
+    blurTimeout.current = setTimeout(() => setInputFocused(false), 150);
+  };
+
+  const handleInputFocus = () => {
+    if (blurTimeout.current) clearTimeout(blurTimeout.current);
+    setInputFocused(true);
+  };
+
   const filterCount = activeFilterCount(filters);
   const hasQuery = debouncedQuery.trim().length >= 2;
   const hasFilters = filterCount > 0;
   const isSearching = hasQuery || hasFilters;
   const showEmpty = isSearching && !isLoading && (results?.length ?? 0) === 0;
+  const showSuggestions =
+    inputFocused &&
+    query.trim().length >= 1 &&
+    (citySuggestions?.length ?? 0) > 0;
 
   return (
     <YStack flex={1} backgroundColor="$background">
@@ -80,8 +128,10 @@ export default function SearchTab() {
         paddingHorizontal="$4"
         paddingBottom="$2"
         gap="$3"
+        zIndex={30}
       >
         <H2>{t('search.title')}</H2>
+        <YStack position="relative" zIndex={30}>
         <XStack gap="$2" alignItems="center">
           <XStack
             flex={1}
@@ -99,6 +149,8 @@ export default function SearchTab() {
               flex={1}
               value={query}
               onChangeText={setQuery}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
               placeholder={t('search.placeholder')}
               placeholderTextColor="$slate500"
               autoCapitalize="none"
@@ -168,6 +220,79 @@ export default function SearchTab() {
             </YStack>
           </Pressable>
         </XStack>
+
+        {showSuggestions && (
+          <YStack
+            position="absolute"
+            top={50}
+            left={0}
+            right={0}
+            zIndex={40}
+            backgroundColor="$background"
+            borderWidth={1}
+            borderColor="$borderColor"
+            borderRadius={12}
+            maxHeight={260}
+            overflow="hidden"
+            shadowColor="#000"
+            shadowOpacity={0.12}
+            shadowRadius={16}
+            shadowOffset={{ width: 0, height: 8 }}
+            elevation={8}
+          >
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {(citySuggestions ?? []).map((city) => (
+                <Pressable
+                  key={city.id}
+                  onPress={() => selectCity(city.name)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Rechercher à ${city.name}`}
+                >
+                  <XStack
+                    alignItems="center"
+                    gap={10}
+                    paddingHorizontal={14}
+                    paddingVertical={12}
+                  >
+                    <MapPin size={16} color="$slate500" />
+                    <Paragraph fontSize={14} color="$slate900">
+                      {city.name}
+                    </Paragraph>
+                  </XStack>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </YStack>
+        )}
+        </YStack>
+
+        {filters.city ? (
+          <XStack>
+            <XStack
+              alignItems="center"
+              gap={6}
+              paddingHorizontal={12}
+              paddingVertical={6}
+              borderRadius={999}
+              borderWidth={1}
+              borderColor="$brand"
+              backgroundColor="$brandAlpha10"
+            >
+              <MapPin size={14} color="$brand" />
+              <Paragraph fontSize={13} fontWeight="600" color="$brand">
+                {filters.city}
+              </Paragraph>
+              <Pressable
+                onPress={clearCity}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={`Retirer la ville ${filters.city}`}
+              >
+                <X size={14} color="$brand" />
+              </Pressable>
+            </XStack>
+          </XStack>
+        ) : null}
       </YStack>
 
       {!isSearching && (

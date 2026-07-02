@@ -84,6 +84,15 @@ describe('filters', () => {
     expect(filtersToParams(EMPTY_FILTERS)).not.toHaveProperty('attributes');
   });
 
+  it('filtersToParams envoie le nom de ville sélectionné', () => {
+    const params = filtersToParams({ ...EMPTY_FILTERS, city: 'Douala' });
+    expect(params.city).toBe('Douala');
+  });
+
+  it('activeFilterCount compte la ville comme filtre actif', () => {
+    expect(activeFilterCount({ ...EMPTY_FILTERS, city: 'Douala' })).toBe(1);
+  });
+
   it('sortToParams traduit le tri UI en sort/order backend', () => {
     expect(sortToParams('recent')).toEqual({ sort: 'created_at', order: 'desc' });
     expect(sortToParams('price_asc')).toEqual({ sort: 'price', order: 'asc' });

@@ -32,6 +32,8 @@ export interface AdFilters {
   isVerified: boolean;
   /** Selected equipment slugs (AND semantics on the backend). */
   attributes: string[];
+  /** City name picked from the autocomplete — the backend matches on name. */
+  city: string | null;
 }
 
 /** Sort options exposed in the UI, mapped to the backend `sort`/`order`. */
@@ -83,6 +85,7 @@ export const EMPTY_FILTERS: AdFilters = {
   has3dTour: false,
   isVerified: false,
   attributes: [],
+  city: null,
 };
 
 /** Count the number of constraints active — used for the badge on the filter button. */
@@ -115,5 +118,6 @@ export function filtersToParams(
   if (filters.has3dTour) params.has_3d_tour = 1;
   if (filters.isVerified) params.is_verified = 1;
   if (filters.attributes.length > 0) params.attributes = filters.attributes;
+  if (filters.city) params.city = filters.city;
   return params;
 }
