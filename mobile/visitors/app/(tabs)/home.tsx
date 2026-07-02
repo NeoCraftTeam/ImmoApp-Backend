@@ -1,4 +1,15 @@
-import { Bell, CheckCircle2, RefreshCw, Sparkles } from '@tamagui/lucide-icons';
+import {
+  Bell,
+  Building2,
+  CheckCircle2,
+  Home as HomeIcon,
+  LayoutGrid,
+  RefreshCw,
+  Search as SearchIcon,
+  Store,
+  Tag,
+  Trees,
+} from '@tamagui/lucide-icons';
 import { Image } from 'expo-image';
 import { Link } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -14,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { extractApiErrorMessage } from '@/api/client';
 import { AdCard } from '@/components/AdCard';
 import { AdCardSkeleton } from '@/components/AdCardSkeleton';
+import { EmptyState } from '@/components/EmptyState';
 import { FadeIn } from '@/components/FadeIn';
 import { useAdFeed } from '@/hooks/useAdFeed';
 import { useAdTypes } from '@/hooks/useCitiesAndTypes';
@@ -28,6 +40,27 @@ import type { Ad } from '@/types/ad';
 
 const TOP_PRIORITY_COUNT = 4;
 const SKELETON_COUNT = 6;
+
+/** Icône représentative d'une catégorie de bien (mapping par mots-clés). */
+function categoryIcon(id: string | null, color: string) {
+  if (id === null) {
+    return <LayoutGrid size={14} color={color} />;
+  }
+  const n = id.toLowerCase();
+  if (n.includes('appart') || n.includes('studio') || n.includes('chambre')) {
+    return <Building2 size={14} color={color} />;
+  }
+  if (n.includes('terrain')) {
+    return <Trees size={14} color={color} />;
+  }
+  if (n.includes('commerc') || n.includes('bureau') || n.includes('local') || n.includes('boutique')) {
+    return <Store size={14} color={color} />;
+  }
+  if (n.includes('villa') || n.includes('maison') || n.includes('duplex')) {
+    return <HomeIcon size={14} color={color} />;
+  }
+  return <Tag size={14} color={color} />;
+}
 
 /**
  * Home feed — port mobile du `(dashboard)/home` web :
@@ -211,8 +244,11 @@ export default function Home() {
                 paddingHorizontal={14}
                 paddingVertical={8}
                 borderRadius={999}
+                alignItems="center"
+                gap={6}
                 backgroundColor={active ? brand.slate900 : '$slate100'}
               >
+                {categoryIcon(item.id, active ? 'white' : brand.slate700)}
                 <Paragraph fontSize={13} fontWeight="700" color={active ? 'white' : '$slate700'}>
                   {item.name}
                 </Paragraph>
@@ -300,10 +336,16 @@ export default function Home() {
       }}
       ListHeaderComponent={ListHeader}
       ListEmptyComponent={
-        <YStack paddingVertical={32} alignItems="center" gap={6}>
-          <Paragraph fontSize={15} fontWeight="700" color="$slate900">
-            {selectedType ? `Aucune annonce ${selectedType}` : t('home.empty')}
-          </Paragraph>
+        <YStack paddingVertical={24} alignItems="center" gap={12}>
+          <EmptyState
+            icon={<SearchIcon size={32} color="#94A3B8" />}
+            title={selectedType ? `Aucune annonce ${selectedType}` : t('home.empty')}
+            body={
+              selectedType
+                ? 'Essayez une autre catégorie ou revenez plus tard.'
+                : 'De nouvelles annonces arrivent régulièrement — revenez bientôt.'
+            }
+          />
           {selectedType && (
             <Pressable onPress={() => setSelectedType(null)} hitSlop={4}>
               <Paragraph fontSize={13} color={brand.primary} fontWeight="700" textDecorationLine="underline">
