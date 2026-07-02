@@ -104,19 +104,19 @@ function ThemedRoot() {
 }
 
 /**
- * Lit `useSession().isLoading` puis cache le splash overlay. Le boot
- * complet dure typiquement < 400 ms : on n'attend donc qu'un tick puis
- * fade-out (la SplashView gère elle-même l'animation de sortie).
+ * Lit `useSession().isLoading` puis cache le splash overlay une fois le
+ * min-delay de 3 s écoulé (la SplashView gère elle-même l'animation de
+ * sortie).
  */
 function SplashGate() {
   const { isLoading } = useSession();
   const [minDelayElapsed, setMinDelayElapsed] = useState(false);
 
   useEffect(() => {
-    // Hold le splash 1500 ms même si la session se rehydrate
-    // instantanément — laisse l'anim complète jouer avant de basculer
-    // vers la première route.
-    const t = setTimeout(() => setMinDelayElapsed(true), 1500);
+    // Hold le splash 3000 ms minimum même si la session se rehydrate
+    // instantanément — demande produit : le splash doit rester visible
+    // au moins 3 secondes, le temps que l'anim logo + signature joue.
+    const t = setTimeout(() => setMinDelayElapsed(true), 3000);
     return () => clearTimeout(t);
   }, []);
 
