@@ -43,6 +43,9 @@ import { useRecordRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { LocationMap } from '@/components/ads/LocationMap';
 import { NeighborhoodScorecard } from '@/components/ads/NeighborhoodScorecard';
 import { PropertyAttributes } from '@/components/ads/PropertyAttributes';
+import { SupplementaryInfoCard } from '@/components/ads/SupplementaryInfoCard';
+import { VirtualTourSection } from '@/components/ads/VirtualTourSection';
+import { hasSupplementaryInfo } from '@/utils/supplementary-info';
 import { ReviewsSection } from '@/components/ads/ReviewsSection';
 import { SearchAlertButton } from '@/components/ads/SearchAlertButton';
 import { SimilarAdsCarousel } from '@/components/ads/SimilarAdsCarousel';
@@ -750,6 +753,23 @@ function DetailBody({
       {ad.attributes && ad.attributes.length > 0 && (
         <>
           <PropertyAttributes attributes={ad.attributes} />
+          <SectionDivider />
+        </>
+      )}
+
+      {/* Infos supplémentaires (dépôt / bail / charges) — champs envoyés
+          par l'API uniquement quand l'annonce est déverrouillée. */}
+      {ad.is_unlocked && hasSupplementaryInfo(ad) && (
+        <>
+          <SupplementaryInfoCard ad={ad} />
+          <SectionDivider />
+        </>
+      )}
+
+      {/* Visite 3D — teaser verrouillé ou bouton vers la visite web. */}
+      {ad.has_3d_tour && (
+        <>
+          <VirtualTourSection ad={ad} />
           <SectionDivider />
         </>
       )}

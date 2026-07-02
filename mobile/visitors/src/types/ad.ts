@@ -72,6 +72,8 @@ export interface Ad {
   images: AdImage[];
   total_images: number;
   has_3d_tour: boolean;
+  /** Nombre de pièces de la visite 360° (présent si has_3d_tour). */
+  tour_scenes_count?: number | null;
   transaction_type?: 'location' | 'vente' | null;
   quarter?: AdQuarter;
   type?: AdType;
@@ -82,6 +84,16 @@ export interface Ad {
   attributes?: string[];
   /** Optional pre-formatted distance from the user, set by the search/feed endpoint. */
   distance?: number | null;
+  /** Infos supplémentaires — présentes uniquement quand l'annonce est déverrouillée. */
+  deposit_amount?: string | null;
+  minimum_lease_duration?: string | null;
+  detailed_charges?: string | null;
+  charges_forfaitaires?: boolean | null;
+  charges_montant_forfait?: number | string | null;
+  charges_eau?: number | string | null;
+  charges_electricite?: number | string | null;
+  charges_autres?: string | null;
+  property_condition_pdf?: string | null;
 }
 
 export interface AdFeedResponse {
