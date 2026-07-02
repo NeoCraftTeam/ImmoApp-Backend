@@ -1,11 +1,12 @@
 import { CheckCircle2, ShieldCheck, XCircle } from '@tamagui/lucide-icons';
-import { RefreshControl, ScrollView } from 'react-native';
-import { Paragraph, Spinner, XStack, YStack } from 'tamagui';
+import { Alert, Pressable, RefreshControl, ScrollView } from 'react-native';
+import { Button, Paragraph, Spinner, XStack, YStack } from 'tamagui';
 
+import { extractApiErrorMessage } from '@/api/client';
 import { useSession } from '@/auth/SessionProvider';
 import { EmptyState } from '@/components/EmptyState';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { useTrustScore } from '@/hooks/useTrustScore';
+import { useTrustScore, useTrustScoreConsent } from '@/hooks/useTrustScore';
 import { brand } from '@/theme/tokens';
 
 function scoreColor(score: number): string {
@@ -17,7 +18,15 @@ function scoreColor(score: number): string {
 
 export default function TrustScoreScreen() {
   const { isAuthenticated } = useSession();
-  const { data: trust, isLoading, isRefetching, refetch } = useTrustScore(isAuthenticated);
+  const { data: state, isLoading, isRefetching, refetch } = useTrustScore(isAuthenticated);
+  const consent = useTrustScoreConsent();
+  const trust = state?.score ?? null;
+
+  const setConsent = (value: boolean) => {
+    consent.mutate(value, {
+      onError: (err) => Alert.alert('Action impossible', extractApiErrorMessage(err)),
+    });
+  };
 
   return (
     <YStack flex={1} backgroundColor="$background">
@@ -31,6 +40,39 @@ export default function TrustScoreScreen() {
         {isLoading ? (
           <YStack height={320} alignItems="center" justifyContent="center">
             <Spinner color={brand.primary} size="large" />
+          </YStack>
+        ) : state?.consentRequired || state?.consentDeclined ? (
+          <YStack
+            padding={20}
+            gap={14}
+            borderRadius={20}
+            backgroundColor={brand.primaryAlpha10}
+            alignItems="center"
+          >
+            <ShieldCheck size={36} color={brand.primary} />
+            <Paragraph fontSize={17} fontWeight="800" color="$slate900" textAlign="center">
+              {state.consentDeclined
+                ? 'Votre score de confiance est désactivé'
+                : 'Activez votre score de confiance'}
+            </Paragraph>
+            <Paragraph fontSize={13} color="$slate700" lineHeight={19} textAlign="center">
+              Le score de confiance analyse votre activité (annonces vérifiées,
+              réactivité, avis reçus…) et s'affiche publiquement sur votre profil
+              pour rassurer les locataires. Il nécessite votre consentement
+              explicite et reste désactivable à tout moment.
+            </Paragraph>
+            <Button
+              size="$4"
+              backgroundColor="$brand"
+              color="$brandText"
+              fontWeight="800"
+              borderRadius={12}
+              onPress={() => setConsent(true)}
+              disabled={consent.isPending}
+              icon={consent.isPending ? <Spinner /> : undefined}
+            >
+              Activer mon score
+            </Button>
           </YStack>
         ) : !trust ? (
           <YStack height={320}>
@@ -117,6 +159,30 @@ export default function TrustScoreScreen() {
                 ))}
               </YStack>
             ) : null}
+
+            <Pressable
+              onPress={() =>
+                Alert.alert(
+                  'Désactiver le score ?',
+                  'Votre score ne sera plus calculé ni affiché publiquement. Vous pourrez le réactiver à tout moment.',
+                  [
+                    { text: 'Annuler', style: 'cancel' },
+                    {
+                      text: 'Désactiver',
+                      style: 'destructive',
+                      onPress: () => setConsent(false),
+                    },
+                  ],
+                )
+              }
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel="Désactiver le score de confiance"
+            >
+              <Paragraph fontSize={12.5} color="$slate500" textAlign="center" textDecorationLine="underline">
+                Désactiver mon score de confiance
+              </Paragraph>
+            </Pressable>
           </>
         )}
       </ScrollView>

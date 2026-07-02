@@ -1,16 +1,15 @@
-import { Star } from '@tamagui/lucide-icons';
+import { MessageSquare, Send, Star, X } from '@tamagui/lucide-icons';
 import { Image } from 'expo-image';
-import { useMemo } from 'react';
-import { useQueries } from '@tanstack/react-query';
-import { RefreshControl, ScrollView } from 'react-native';
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Alert, Pressable, RefreshControl, ScrollView, TextInput } from 'react-native';
 import { Paragraph, Spinner, XStack, YStack } from 'tamagui';
 
-import { apiClient } from '@/api/client';
+import { apiClient, extractApiErrorMessage } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import { useSession } from '@/auth/SessionProvider';
 import { EmptyState } from '@/components/EmptyState';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { useMyAds } from '@/hooks/useMyAds';
 import { brand } from '@/theme/tokens';
 import { formatDate } from '@/utils/format';
 import type { Review } from '@/types/owner';
@@ -30,64 +29,56 @@ function StarRow({ rating }: { rating: number }) {
   );
 }
 
-interface ReviewWithAd extends Review {
-  ad: { id: string; title: string };
-}
-
+/**
+ * Avis reçus — alimenté par l'endpoint agrégé `GET /my/reviews`
+ * (l'ancien fan-out par annonce est remplacé : l'endpoint existe bel
+ * et bien côté backend). Le bailleur peut répondre à chaque avis via
+ * `POST /reviews/{id}/respond` (parité web).
+ */
 export default function ReviewsScreen() {
   const { isAuthenticated } = useSession();
-  const ads = useMyAds({}, isAuthenticated);
-  const flatAds = useMemo(
-    () =>
-      Array.isArray(ads.data?.pages)
-        ? ads.data!.pages.flatMap((p) => (Array.isArray(p?.data) ? p.data : []))
-        : [],
-    [ads.data],
-  );
+  const qc = useQueryClient();
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyDraft, setReplyDraft] = useState('');
 
-  /**
-   * Le backend n'expose pas `/my/reviews` agrégé — on fan-out un GET par
-   * annonce et on agrège côté client. Pour de gros volumes ce serait un
-   * endpoint dédié, mais pour <50 annonces c'est acceptable et permet
-   * d'envoyer reviews + ad title pour grouper l'affichage.
-   */
-  const reviewQueries = useQueries({
-    queries: flatAds.slice(0, 30).map((ad) => ({
-      queryKey: ['ad-reviews', ad.id],
-      queryFn: async () => {
-        const { data } = await apiClient.get<{ data?: Review[] }>(
-          ENDPOINTS.reviews.forAd(ad.id),
-          { params: { per_page: 20 } },
-        );
-        const reviews = Array.isArray(data?.data) ? data!.data : [];
-        return reviews.map((r) => ({
-          ...r,
-          ad: { id: ad.id, title: ad.title },
-        }) as ReviewWithAd);
-      },
-      enabled: isAuthenticated && !!ad.id,
-      staleTime: 60 * 1000,
-    })),
+  const reviews = useQuery<{ data?: Review[] }, Error, Review[]>({
+    queryKey: ['my-reviews'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<{ data?: Review[] }>(
+        ENDPOINTS.reviews.mine,
+        { params: { per_page: 100 } },
+      );
+      return data;
+    },
+    select: (p) => (Array.isArray(p?.data) ? p.data : []),
+    enabled: isAuthenticated,
+    staleTime: 60 * 1000,
   });
 
-  const allReviews: ReviewWithAd[] = reviewQueries
-    .flatMap((q) => (q.data ?? []) as ReviewWithAd[])
-    .sort((a, b) => {
-      const ta = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const tb = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return tb - ta;
-    });
+  const respond = useMutation<void, Error, { reviewId: string; response: string }>({
+    mutationFn: async ({ reviewId, response }) => {
+      await apiClient.post(ENDPOINTS.reviews.respond(reviewId), { response });
+    },
+    onSuccess: () => {
+      setReplyingTo(null);
+      setReplyDraft('');
+      qc.invalidateQueries({ queryKey: ['my-reviews'] });
+    },
+    onError: (err) => {
+      Alert.alert('Réponse impossible', extractApiErrorMessage(err));
+    },
+  });
 
+  const submitReply = (reviewId: string) => {
+    const response = replyDraft.trim();
+    if (response === '') return;
+    respond.mutate({ reviewId, response });
+  };
+
+  const allReviews = reviews.data ?? [];
   const avg = allReviews.length
     ? allReviews.reduce((acc, r) => acc + (r.rating ?? 0), 0) / allReviews.length
     : 0;
-
-  const isLoading = ads.isLoading || reviewQueries.some((q) => q.isLoading);
-  const refreshing = ads.isRefetching || reviewQueries.some((q) => q.isRefetching);
-  const onRefresh = () => {
-    ads.refetch();
-    reviewQueries.forEach((q) => q.refetch());
-  };
 
   return (
     <YStack flex={1} backgroundColor="$background">
@@ -95,12 +86,16 @@ export default function ReviewsScreen() {
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 12 }}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={brand.primary} />
+          <RefreshControl
+            refreshing={reviews.isRefetching}
+            onRefresh={() => reviews.refetch()}
+            tintColor={brand.primary}
+          />
         }
       >
-        {/* Header stats */}
-        {!isLoading && allReviews.length > 0 ? (
+        {!reviews.isLoading && allReviews.length > 0 ? (
           <YStack
             padding={16}
             gap={6}
@@ -123,7 +118,7 @@ export default function ReviewsScreen() {
           </YStack>
         ) : null}
 
-        {isLoading ? (
+        {reviews.isLoading ? (
           <YStack height={300} alignItems="center" justifyContent="center">
             <Spinner color={brand.primary} size="large" />
           </YStack>
@@ -138,6 +133,7 @@ export default function ReviewsScreen() {
         ) : (
           allReviews.map((r) => {
             const fullName = `${r.user?.firstname ?? ''} ${r.user?.lastname ?? ''}`.trim();
+            const isReplying = replyingTo === r.id;
             return (
               <YStack
                 key={r.id}
@@ -162,7 +158,8 @@ export default function ReviewsScreen() {
                       {fullName || 'Anonyme'}
                     </Paragraph>
                     <Paragraph fontSize={11} color="$slate500">
-                      {formatDate(r.created_at)} · {r.ad.title}
+                      {formatDate(r.created_at)}
+                      {r.ad?.title ? ` · ${r.ad.title}` : ''}
                     </Paragraph>
                   </YStack>
                   <StarRow rating={r.rating ?? 0} />
@@ -172,7 +169,8 @@ export default function ReviewsScreen() {
                     {r.comment}
                   </Paragraph>
                 ) : null}
-                {r.response ? (
+
+                {r.owner_response ? (
                   <YStack
                     marginLeft={46}
                     padding={10}
@@ -184,10 +182,91 @@ export default function ReviewsScreen() {
                       Votre réponse
                     </Paragraph>
                     <Paragraph fontSize={12.5} color="$slate900">
-                      {r.response}
+                      {r.owner_response}
                     </Paragraph>
                   </YStack>
-                ) : null}
+                ) : isReplying ? (
+                  <YStack gap={8} marginLeft={46}>
+                    <TextInput
+                      value={replyDraft}
+                      onChangeText={setReplyDraft}
+                      placeholder="Votre réponse publique (1000 caractères max)…"
+                      placeholderTextColor={brand.slate500}
+                      multiline
+                      maxLength={1000}
+                      autoFocus
+                      style={{
+                        minHeight: 70,
+                        padding: 10,
+                        borderRadius: 10,
+                        backgroundColor: brand.slate100,
+                        color: brand.slate900,
+                        fontSize: 13,
+                        textAlignVertical: 'top',
+                      }}
+                    />
+                    <XStack gap={8} justifyContent="flex-end">
+                      <Pressable
+                        onPress={() => {
+                          setReplyingTo(null);
+                          setReplyDraft('');
+                        }}
+                        hitSlop={6}
+                        accessibilityRole="button"
+                        accessibilityLabel="Annuler la réponse"
+                      >
+                        <XStack alignItems="center" gap={4} paddingHorizontal={12} paddingVertical={8} borderRadius={999} backgroundColor={brand.slate100}>
+                          <X size={13} color={brand.slate700} />
+                          <Paragraph fontSize={12.5} fontWeight="700" color="$slate700">
+                            Annuler
+                          </Paragraph>
+                        </XStack>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => submitReply(r.id)}
+                        hitSlop={6}
+                        disabled={respond.isPending || replyDraft.trim() === ''}
+                        accessibilityRole="button"
+                        accessibilityLabel="Publier la réponse"
+                      >
+                        <XStack
+                          alignItems="center"
+                          gap={4}
+                          paddingHorizontal={12}
+                          paddingVertical={8}
+                          borderRadius={999}
+                          backgroundColor={replyDraft.trim() ? brand.primary : brand.slate300}
+                        >
+                          {respond.isPending ? (
+                            <Spinner size="small" color="white" />
+                          ) : (
+                            <Send size={13} color="white" />
+                          )}
+                          <Paragraph fontSize={12.5} fontWeight="700" color="white">
+                            Publier
+                          </Paragraph>
+                        </XStack>
+                      </Pressable>
+                    </XStack>
+                  </YStack>
+                ) : (
+                  <Pressable
+                    onPress={() => {
+                      setReplyingTo(r.id);
+                      setReplyDraft('');
+                    }}
+                    hitSlop={6}
+                    accessibilityRole="button"
+                    accessibilityLabel="Répondre à cet avis"
+                  >
+                    <XStack alignItems="center" gap={6} marginLeft={46}>
+                      <MessageSquare size={14} color={brand.primary} />
+                      <Paragraph fontSize={12.5} fontWeight="700" color={brand.primary}>
+                        Répondre
+                      </Paragraph>
+                    </XStack>
+                  </Pressable>
+                )}
               </YStack>
             );
           })

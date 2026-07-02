@@ -201,13 +201,14 @@ export interface Expense {
 }
 
 /* ------------------------------------------------------------------ */
-/* Reviews — GET /ads/{ad}/reviews                                   */
+/* Reviews — GET /my/reviews (agrégé) + GET /ads/{ad}/reviews        */
 /* ------------------------------------------------------------------ */
 export interface Review {
   id: string;
   rating: number;
   comment?: string | null;
-  response?: string | null;
+  /** Réponse du bailleur — champ API `owner_response`. */
+  owner_response?: string | null;
   created_at?: string;
   user?: {
     firstname: string;

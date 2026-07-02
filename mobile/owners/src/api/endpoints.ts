@@ -162,6 +162,7 @@ export const ENDPOINTS = {
     stripeSetupIntent: '/payments/stripe/setup-intent',
   },
   reviews: {
+    mine: '/my/reviews',
     forAd: (adId: string) => `/ads/${encodeURIComponent(adId)}/reviews`,
     respond: (reviewId: string) =>
       `/reviews/${encodeURIComponent(reviewId)}/respond`,
@@ -200,6 +201,7 @@ export const ENDPOINTS = {
   /** Trust Score détail + recommandations. */
   trust: {
     score: '/my/trust-score',
+    consent: '/my/trust-score/consent',
   },
   /** Marché — estimateur prix bailleur. */
   market: {
