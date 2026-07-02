@@ -2,6 +2,7 @@ import { ChevronDown, ChevronUp } from '@tamagui/lucide-icons';
 import { useEffect, useState } from 'react';
 import { Button, Input, Paragraph, Sheet, XStack, YStack, Separator } from 'tamagui';
 
+import { useAdFacets } from '@/hooks/useAdFacets';
 import { usePropertyAttributeGroups } from '@/hooks/usePropertyAttributes';
 import { brand } from '@/theme/tokens';
 import { EMPTY_FILTERS, activeFilterCount, type AdFilters } from '@/types/filters';
@@ -29,6 +30,13 @@ interface Props {
 export function SearchFilterSheet({ open, onOpenChange, filters, onApply }: Props) {
   const [draft, setDraft] = useState<AdFilters>(filters);
   const { data: attributeGroups } = usePropertyAttributeGroups();
+  const { data: facets } = useAdFacets();
+
+  const bedroomsFacetLabel = (n: number): string => {
+    const count = facets?.bedrooms?.find((b) => b.value === n)?.count;
+    return count != null ? `${n}+ (${count})` : `${n}+`;
+  };
+  const parkingCount = facets?.has_parking?.with_parking;
 
   // Re-sync the draft each time the sheet opens — closing without
   // applying must not leak partial edits to a future open.
@@ -193,7 +201,7 @@ export function SearchFilterSheet({ open, onOpenChange, filters, onApply }: Prop
             {[null, 1, 2, 3, 4].map((n) => (
               <FilterChip
                 key={`bed-${n ?? 'any'}`}
-                label={n === null ? 'Toutes' : `${n}+`}
+                label={n === null ? 'Toutes' : bedroomsFacetLabel(n)}
                 active={draft.bedrooms === n}
                 onPress={() => update('bedrooms', n)}
               />
@@ -248,7 +256,7 @@ export function SearchFilterSheet({ open, onOpenChange, filters, onApply }: Prop
           </Paragraph>
           <XStack gap="$2" flexWrap="wrap">
             <FilterChip
-              label="Parking"
+              label={parkingCount != null ? `Parking (${parkingCount})` : 'Parking'}
               active={draft.hasParking}
               onPress={() => update('hasParking', !draft.hasParking)}
             />

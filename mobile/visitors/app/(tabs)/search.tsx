@@ -23,6 +23,7 @@ import { AdCard } from '@/components/AdCard';
 import { EmptyState } from '@/components/EmptyState';
 import { FadeIn } from '@/components/FadeIn';
 import { SearchFilterSheet } from '@/components/SearchFilterSheet';
+import { useAdFacets } from '@/hooks/useAdFacets';
 import { useAdSearch } from '@/hooks/useAdSearch';
 import { useCityAutocomplete } from '@/hooks/useCitiesAndTypes';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -31,9 +32,12 @@ import {
   DEFAULT_SORT,
   EMPTY_FILTERS,
   SORT_OPTIONS,
+  activeFilterChips,
   activeFilterCount,
+  removeFilterChip,
   type AdFilters,
   type AdSort,
+  type FilterChipDescriptor,
 } from '@/types/filters';
 
 /**
@@ -96,8 +100,17 @@ export default function SearchTab() {
     Keyboard.dismiss();
   };
 
-  const clearCity = () => {
-    setFilters((f) => ({ ...f, city: null }));
+  const removeChip = (key: FilterChipDescriptor['key']) => {
+    if (key === 'query') {
+      setQuery('');
+      return;
+    }
+    setFilters((f) => removeFilterChip(f, key));
+  };
+
+  const resetAll = () => {
+    setFilters(EMPTY_FILTERS);
+    setQuery('');
   };
 
   // Hiding on blur is delayed one tick so a tap on a suggestion row
@@ -120,6 +133,11 @@ export default function SearchTab() {
     inputFocused &&
     query.trim().length >= 1 &&
     (citySuggestions?.length ?? 0) > 0;
+  const chips = activeFilterChips(filters, debouncedQuery);
+  const { data: facets } = useAdFacets();
+  const citySuggestionsForEmpty = (facets?.cities ?? [])
+    .filter((c) => c.name !== filters.city)
+    .slice(0, 3);
 
   return (
     <YStack flex={1} backgroundColor="$background">
@@ -266,32 +284,55 @@ export default function SearchTab() {
         )}
         </YStack>
 
-        {filters.city ? (
-          <XStack>
-            <XStack
-              alignItems="center"
-              gap={6}
-              paddingHorizontal={12}
-              paddingVertical={6}
-              borderRadius={999}
-              borderWidth={1}
-              borderColor="$brand"
-              backgroundColor="$brandAlpha10"
-            >
-              <MapPin size={14} color="$brand" />
-              <Paragraph fontSize={13} fontWeight="600" color="$brand">
-                {filters.city}
-              </Paragraph>
-              <Pressable
-                onPress={clearCity}
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel={`Retirer la ville ${filters.city}`}
+        {chips.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={{ gap: 8, alignItems: 'center' }}
+          >
+            {chips.map((chip) => (
+              <XStack
+                key={chip.key}
+                alignItems="center"
+                gap={6}
+                paddingHorizontal={12}
+                paddingVertical={6}
+                borderRadius={999}
+                borderWidth={1}
+                borderColor="$brand"
+                backgroundColor="$brandAlpha10"
               >
-                <X size={14} color="$brand" />
-              </Pressable>
-            </XStack>
-          </XStack>
+                {chip.key === 'city' ? <MapPin size={14} color="$brand" /> : null}
+                <Paragraph fontSize={13} fontWeight="600" color="$brand">
+                  {chip.label}
+                </Paragraph>
+                <Pressable
+                  onPress={() => removeChip(chip.key)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Retirer le filtre ${chip.label}`}
+                >
+                  <X size={14} color="$brand" />
+                </Pressable>
+              </XStack>
+            ))}
+            <Pressable
+              onPress={resetAll}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel="Réinitialiser tous les filtres"
+            >
+              <Paragraph
+                fontSize={13}
+                fontWeight="600"
+                color="$slate500"
+                paddingHorizontal={4}
+              >
+                {t('search.filters.reset')}
+              </Paragraph>
+            </Pressable>
+          </ScrollView>
         ) : null}
       </YStack>
 
@@ -344,11 +385,45 @@ export default function SearchTab() {
           }}
           ListEmptyComponent={
             showEmpty ? (
-              <EmptyState
-                icon={<SearchIcon size={32} color="$slate500" />}
-                title={t('search.noResults')}
-                body="Essayez d'élargir vos critères ou de modifier votre recherche."
-              />
+              <YStack gap="$3">
+                <EmptyState
+                  icon={<SearchIcon size={32} color="$slate500" />}
+                  title={t('search.noResults')}
+                  body="Essayez d'élargir vos critères ou de modifier votre recherche."
+                />
+                {citySuggestionsForEmpty.length > 0 ? (
+                  <YStack gap="$2" alignItems="center">
+                    <Paragraph fontSize={13} color="$slate500">
+                      Explorer d'autres villes :
+                    </Paragraph>
+                    <XStack gap="$2" flexWrap="wrap" justifyContent="center">
+                      {citySuggestionsForEmpty.map((city) => (
+                        <Pressable
+                          key={city.name}
+                          onPress={() => selectCity(city.name)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Rechercher à ${city.name}`}
+                        >
+                          <XStack
+                            alignItems="center"
+                            gap={6}
+                            paddingHorizontal={12}
+                            paddingVertical={8}
+                            borderRadius={999}
+                            borderWidth={1}
+                            borderColor="$borderColor"
+                          >
+                            <MapPin size={14} color="$slate500" />
+                            <Paragraph fontSize={13} color="$slate700">
+                              {city.name} ({city.count})
+                            </Paragraph>
+                          </XStack>
+                        </Pressable>
+                      ))}
+                    </XStack>
+                  </YStack>
+                ) : null}
+              </YStack>
             ) : null
           }
           renderItem={({ item, index }) => (

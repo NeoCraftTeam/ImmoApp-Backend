@@ -121,3 +121,82 @@ export function filtersToParams(
   if (filters.city) params.city = filters.city;
   return params;
 }
+
+/** One removable chip in the active-filters row above the results. */
+export interface FilterChipDescriptor {
+  key:
+    | 'query'
+    | 'city'
+    | 'type'
+    | 'bedrooms'
+    | 'transactionType'
+    | 'pricePeriod'
+    | 'hasParking'
+    | 'has3dTour'
+    | 'isVerified';
+  label: string;
+}
+
+/**
+ * Chips shown above the results, mirroring the web's "Active filter
+ * chips" row: same filter set (no chip for price/surface/bathrooms/
+ * amenities — those still count in `activeFilterCount`), plus the
+ * mobile-only `isVerified` toggle.
+ */
+export function activeFilterChips(
+  filters: AdFilters,
+  query: string,
+): FilterChipDescriptor[] {
+  const chips: FilterChipDescriptor[] = [];
+  const trimmed = query.trim();
+  if (trimmed !== '') chips.push({ key: 'query', label: `« ${trimmed} »` });
+  if (filters.city) chips.push({ key: 'city', label: `Ville : ${filters.city}` });
+  if (filters.type) chips.push({ key: 'type', label: `Type : ${filters.type}` });
+  if (filters.bedrooms != null) {
+    chips.push({ key: 'bedrooms', label: `${filters.bedrooms}+ chambres` });
+  }
+  if (filters.transactionType) {
+    chips.push({
+      key: 'transactionType',
+      label: filters.transactionType === 'location' ? 'Location' : 'Vente',
+    });
+  }
+  if (filters.pricePeriod) {
+    chips.push({
+      key: 'pricePeriod',
+      label: filters.pricePeriod === 'mois' ? 'Par mois' : 'Par jour',
+    });
+  }
+  if (filters.hasParking) chips.push({ key: 'hasParking', label: 'Parking' });
+  if (filters.has3dTour) chips.push({ key: 'has3dTour', label: 'Visite 3D' });
+  if (filters.isVerified) chips.push({ key: 'isVerified', label: 'Vérifiée' });
+  return chips;
+}
+
+/** Reset the filter behind one chip; `query` chips are handled by the screen. */
+export function removeFilterChip(
+  filters: AdFilters,
+  key: FilterChipDescriptor['key'],
+): AdFilters {
+  switch (key) {
+    case 'city':
+      return { ...filters, city: null };
+    case 'type':
+      return { ...filters, type: null };
+    case 'bedrooms':
+      return { ...filters, bedrooms: null };
+    case 'transactionType':
+      return { ...filters, transactionType: null };
+    case 'pricePeriod':
+      return { ...filters, pricePeriod: null };
+    case 'hasParking':
+      return { ...filters, hasParking: false };
+    case 'has3dTour':
+      return { ...filters, has3dTour: false };
+    case 'isVerified':
+      return { ...filters, isVerified: false };
+    case 'query':
+    default:
+      return filters;
+  }
+}

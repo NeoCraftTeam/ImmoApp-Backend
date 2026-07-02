@@ -1,7 +1,9 @@
 import {
+  activeFilterChips,
   activeFilterCount,
   EMPTY_FILTERS,
   filtersToParams,
+  removeFilterChip,
   sortToParams,
 } from '@/types/filters';
 
@@ -91,6 +93,63 @@ describe('filters', () => {
 
   it('activeFilterCount compte la ville comme filtre actif', () => {
     expect(activeFilterCount({ ...EMPTY_FILTERS, city: 'Douala' })).toBe(1);
+  });
+
+  it('activeFilterChips reflète les filtres actifs (parité web)', () => {
+    expect(activeFilterChips(EMPTY_FILTERS, '')).toEqual([]);
+
+    const chips = activeFilterChips(
+      {
+        ...EMPTY_FILTERS,
+        city: 'Douala',
+        bedrooms: 2,
+        transactionType: 'location',
+        hasParking: true,
+      },
+      'studio',
+    );
+    expect(chips.map((c) => c.key)).toEqual([
+      'query',
+      'city',
+      'bedrooms',
+      'transactionType',
+      'hasParking',
+    ]);
+    expect(chips.find((c) => c.key === 'city')?.label).toBe('Ville : Douala');
+    expect(chips.find((c) => c.key === 'bedrooms')?.label).toBe('2+ chambres');
+  });
+
+  it('activeFilterChips ignore prix/surface/sdb/équipements comme le web', () => {
+    const chips = activeFilterChips(
+      {
+        ...EMPTY_FILTERS,
+        minPrice: 100000,
+        maxSurface: 80,
+        bathrooms: 2,
+        attributes: ['wifi'],
+      },
+      '',
+    );
+    expect(chips).toEqual([]);
+  });
+
+  it('removeFilterChip réinitialise uniquement le filtre visé', () => {
+    const filters = {
+      ...EMPTY_FILTERS,
+      city: 'Douala',
+      bedrooms: 2,
+      hasParking: true,
+    };
+    expect(removeFilterChip(filters, 'city')).toEqual({ ...filters, city: null });
+    expect(removeFilterChip(filters, 'bedrooms')).toEqual({
+      ...filters,
+      bedrooms: null,
+    });
+    expect(removeFilterChip(filters, 'hasParking')).toEqual({
+      ...filters,
+      hasParking: false,
+    });
+    expect(removeFilterChip(filters, 'query')).toEqual(filters);
   });
 
   it('sortToParams traduit le tri UI en sort/order backend', () => {
