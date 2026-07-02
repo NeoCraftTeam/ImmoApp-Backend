@@ -1,6 +1,8 @@
 import {
   ArrowUpDown,
   Filter,
+  List,
+  Map as MapIcon,
   MapPin,
   RefreshCw,
   Search as SearchIcon,
@@ -23,6 +25,7 @@ import { AdCard } from '@/components/AdCard';
 import { EmptyState } from '@/components/EmptyState';
 import { FadeIn } from '@/components/FadeIn';
 import { SearchFilterSheet } from '@/components/SearchFilterSheet';
+import { SearchResultsMap } from '@/components/SearchResultsMap';
 import { useAdFacets } from '@/hooks/useAdFacets';
 import { useAdSearch } from '@/hooks/useAdSearch';
 import { useCityAutocomplete } from '@/hooks/useCitiesAndTypes';
@@ -56,6 +59,7 @@ export default function SearchTab() {
   const [filters, setFilters] = useState<AdFilters>(EMPTY_FILTERS);
   const [sort, setSort] = useState<AdSort>(DEFAULT_SORT);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [inputFocused, setInputFocused] = useState(false);
   const blurTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedQuery = useDebounce(query, 350);
@@ -237,6 +241,32 @@ export default function SearchTab() {
               <ArrowUpDown size={18} color={sort !== DEFAULT_SORT ? '$brand' : '$slate700'} />
             </YStack>
           </Pressable>
+
+          <Pressable
+            onPress={() => setViewMode((m) => (m === 'list' ? 'map' : 'list'))}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={
+              viewMode === 'list' ? 'Afficher la carte' : 'Afficher la liste'
+            }
+          >
+            <YStack
+              width={44}
+              height={44}
+              borderRadius={12}
+              borderWidth={1}
+              borderColor={viewMode === 'map' ? '$brand' : '$borderColor'}
+              backgroundColor={viewMode === 'map' ? '$brandAlpha10' : 'transparent'}
+              alignItems="center"
+              justifyContent="center"
+            >
+              {viewMode === 'list' ? (
+                <MapIcon size={18} color="$slate700" />
+              ) : (
+                <List size={18} color="$brand" />
+              )}
+            </YStack>
+          </Pressable>
         </XStack>
 
         {showSuggestions && (
@@ -372,7 +402,11 @@ export default function SearchTab() {
         </YStack>
       )}
 
-      {isSearching && !isError && (
+      {isSearching && !isError && viewMode === 'map' && (
+        <SearchResultsMap ads={results ?? []} />
+      )}
+
+      {isSearching && !isError && viewMode === 'list' && (
         <FlatList
           data={results ?? []}
           keyExtractor={(item) => item.id}
