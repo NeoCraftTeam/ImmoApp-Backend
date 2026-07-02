@@ -4,10 +4,13 @@ import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import type { Ad, AdFeedResponse } from '@/types/ad';
 import {
+  DEFAULT_SORT,
   EMPTY_FILTERS,
   activeFilterCount,
   filtersToParams,
+  sortToParams,
   type AdFilters,
+  type AdSort,
 } from '@/types/filters';
 
 /**
@@ -24,7 +27,11 @@ import {
  * filter is active, so a user can browse "all under 200k FCFA" with
  * no text query and still get results.
  */
-export function useAdSearch(query: string, filters: AdFilters = EMPTY_FILTERS) {
+export function useAdSearch(
+  query: string,
+  filters: AdFilters = EMPTY_FILTERS,
+  sort: AdSort = DEFAULT_SORT,
+) {
   const trimmed = query.trim();
   const hasFilters = activeFilterCount(filters) > 0;
   const hasQuery = trimmed.length >= 2;
@@ -36,12 +43,13 @@ export function useAdSearch(query: string, filters: AdFilters = EMPTY_FILTERS) {
     readonly unknown[],
     number
   >({
-    queryKey: ['ad-search', trimmed, filters] as const,
+    queryKey: ['ad-search', trimmed, filters, sort] as const,
     queryFn: async ({ pageParam }) => {
       const params: Record<string, string | number> = {
         per_page: 15,
         page: pageParam,
         ...filtersToParams(filters),
+        ...sortToParams(sort),
       };
       if (hasQuery) params.q = trimmed;
       const { data } = await apiClient.get<AdFeedResponse>(ENDPOINTS.ads.search, {

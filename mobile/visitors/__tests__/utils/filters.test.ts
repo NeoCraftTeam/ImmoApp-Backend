@@ -1,4 +1,9 @@
-import { activeFilterCount, EMPTY_FILTERS, filtersToParams } from '@/types/filters';
+import {
+  activeFilterCount,
+  EMPTY_FILTERS,
+  filtersToParams,
+  sortToParams,
+} from '@/types/filters';
 
 describe('filters', () => {
   it('activeFilterCount = 0 pour les filtres vides', () => {
@@ -34,5 +39,37 @@ describe('filters', () => {
     expect(params.surface_min).toBe(20);
     expect(params.surface_max).toBe(120);
     expect(params.transaction_type).toBe('location');
+  });
+
+  it('filtersToParams mappe les filtres avancés', () => {
+    const params = filtersToParams({
+      ...EMPTY_FILTERS,
+      bedrooms: 2,
+      bathrooms: 1,
+      pricePeriod: 'mois',
+      hasParking: true,
+      has3dTour: true,
+      isVerified: true,
+    });
+    expect(params.bedrooms).toBe(2);
+    expect(params.bathrooms).toBe(1);
+    expect(params.price_period).toBe('mois');
+    expect(params.has_parking).toBe(1);
+    expect(params.has_3d_tour).toBe(1);
+    expect(params.is_verified).toBe(1);
+  });
+
+  it('activeFilterCount ignore les booléens à false', () => {
+    expect(
+      activeFilterCount({ ...EMPTY_FILTERS, hasParking: true, bedrooms: 3 }),
+    ).toBe(2);
+  });
+
+  it('sortToParams traduit le tri UI en sort/order backend', () => {
+    expect(sortToParams('recent')).toEqual({ sort: 'created_at', order: 'desc' });
+    expect(sortToParams('price_asc')).toEqual({ sort: 'price', order: 'asc' });
+    expect(sortToParams('price_desc')).toEqual({ sort: 'price', order: 'desc' });
+    expect(sortToParams('surface_desc')).toEqual({ sort: 'surface_area', order: 'desc' });
+    expect(sortToParams('rating_desc')).toEqual({ sort: 'reviews_avg_rating', order: 'desc' });
   });
 });

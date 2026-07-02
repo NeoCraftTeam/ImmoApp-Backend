@@ -60,7 +60,7 @@ export function SearchFilterSheet({ open, onOpenChange, filters, onApply }: Prop
       modal
       open={open}
       onOpenChange={onOpenChange}
-      snapPoints={[60]}
+      snapPoints={[90]}
       dismissOnSnapToBottom
       animation="quick"
     >
@@ -78,6 +78,7 @@ export function SearchFilterSheet({ open, onOpenChange, filters, onApply }: Prop
 
         <Separator />
 
+        <Sheet.ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ gap: 16, paddingBottom: 8 }}>
         <YStack gap="$2">
           <Paragraph size="$3" color="$slate500">
             {t('search.filters.transaction')}
@@ -170,18 +171,97 @@ export function SearchFilterSheet({ open, onOpenChange, filters, onApply }: Prop
           />
         </YStack>
 
-        <YStack flex={1} justifyContent="flex-end" gap="$2">
-          <Button
-            size="$5"
-            backgroundColor="$brand"
-            color="$brandText"
-            fontWeight="700"
-            onPress={handleApply}
-            accessibilityRole="button"
-          >
-            {t('search.filters.apply')} {activeFilterCount(draft) > 0 ? `(${activeFilterCount(draft)})` : ''}
-          </Button>
+        <YStack gap="$2">
+          <Paragraph size="$3" color="$slate500">
+            Chambres
+          </Paragraph>
+          <XStack gap="$2" flexWrap="wrap">
+            {[null, 1, 2, 3, 4].map((n) => (
+              <FilterChip
+                key={`bed-${n ?? 'any'}`}
+                label={n === null ? 'Toutes' : `${n}+`}
+                active={draft.bedrooms === n}
+                onPress={() => update('bedrooms', n)}
+              />
+            ))}
+          </XStack>
         </YStack>
+
+        <YStack gap="$2">
+          <Paragraph size="$3" color="$slate500">
+            Salles de bain
+          </Paragraph>
+          <XStack gap="$2" flexWrap="wrap">
+            {[null, 1, 2, 3].map((n) => (
+              <FilterChip
+                key={`bath-${n ?? 'any'}`}
+                label={n === null ? 'Toutes' : `${n}+`}
+                active={draft.bathrooms === n}
+                onPress={() => update('bathrooms', n)}
+              />
+            ))}
+          </XStack>
+        </YStack>
+
+        {draft.transactionType === 'location' ? (
+          <YStack gap="$2">
+            <Paragraph size="$3" color="$slate500">
+              Période
+            </Paragraph>
+            <XStack gap="$2">
+              <FilterChip
+                label="Toutes"
+                active={draft.pricePeriod === null}
+                onPress={() => update('pricePeriod', null)}
+              />
+              <FilterChip
+                label="Mensuel"
+                active={draft.pricePeriod === 'mois'}
+                onPress={() => update('pricePeriod', 'mois')}
+              />
+              <FilterChip
+                label="Journalier"
+                active={draft.pricePeriod === 'jour'}
+                onPress={() => update('pricePeriod', 'jour')}
+              />
+            </XStack>
+          </YStack>
+        ) : null}
+
+        <YStack gap="$2">
+          <Paragraph size="$3" color="$slate500">
+            Options
+          </Paragraph>
+          <XStack gap="$2" flexWrap="wrap">
+            <FilterChip
+              label="Parking"
+              active={draft.hasParking}
+              onPress={() => update('hasParking', !draft.hasParking)}
+            />
+            <FilterChip
+              label="Visite 3D"
+              active={draft.has3dTour}
+              onPress={() => update('has3dTour', !draft.has3dTour)}
+            />
+            <FilterChip
+              label="Vérifiée"
+              active={draft.isVerified}
+              onPress={() => update('isVerified', !draft.isVerified)}
+            />
+          </XStack>
+        </YStack>
+        </Sheet.ScrollView>
+
+        <Button
+          size="$5"
+          backgroundColor="$brand"
+          color="$brandText"
+          fontWeight="700"
+          onPress={handleApply}
+          accessibilityRole="button"
+        >
+          {t('search.filters.apply')} {activeFilterCount(draft) > 0 ? `(${activeFilterCount(draft)})` : ''}
+        </Button>
       </Sheet.Frame>
     </Sheet>
   );

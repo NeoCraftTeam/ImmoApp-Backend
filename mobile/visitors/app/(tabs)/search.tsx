@@ -1,6 +1,6 @@
-import { Filter, RefreshCw, Search as SearchIcon } from '@tamagui/lucide-icons';
+import { ArrowUpDown, Filter, RefreshCw, Search as SearchIcon } from '@tamagui/lucide-icons';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable } from 'react-native';
 import { H2, Input, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,7 +12,14 @@ import { SearchFilterSheet } from '@/components/SearchFilterSheet';
 import { useAdSearch } from '@/hooks/useAdSearch';
 import { useDebounce } from '@/hooks/useDebounce';
 import { t } from '@/i18n';
-import { EMPTY_FILTERS, activeFilterCount, type AdFilters } from '@/types/filters';
+import {
+  DEFAULT_SORT,
+  EMPTY_FILTERS,
+  SORT_OPTIONS,
+  activeFilterCount,
+  type AdFilters,
+  type AdSort,
+} from '@/types/filters';
 
 /**
  * Search tab — single text input plus a filter sheet for the structural
@@ -28,6 +35,7 @@ export default function SearchTab() {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState('');
   const [filters, setFilters] = useState<AdFilters>(EMPTY_FILTERS);
+  const [sort, setSort] = useState<AdSort>(DEFAULT_SORT);
   const [sheetOpen, setSheetOpen] = useState(false);
   const debouncedQuery = useDebounce(query, 350);
 
@@ -41,7 +49,17 @@ export default function SearchTab() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useAdSearch(debouncedQuery, filters);
+  } = useAdSearch(debouncedQuery, filters, sort);
+
+  const openSortPicker = () => {
+    Alert.alert('Trier par', undefined, [
+      ...SORT_OPTIONS.map((opt) => ({
+        text: opt.value === sort ? `✓ ${opt.label}` : opt.label,
+        onPress: () => setSort(opt.value),
+      })),
+      { text: 'Annuler', style: 'cancel' as const },
+    ]);
+  };
 
   const handleEndReached = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -127,6 +145,26 @@ export default function SearchTab() {
                   </Paragraph>
                 </YStack>
               )}
+            </YStack>
+          </Pressable>
+
+          <Pressable
+            onPress={openSortPicker}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel="Trier les résultats"
+          >
+            <YStack
+              width={44}
+              height={44}
+              borderRadius={12}
+              borderWidth={1}
+              borderColor={sort !== DEFAULT_SORT ? '$brand' : '$borderColor'}
+              backgroundColor={sort !== DEFAULT_SORT ? '$brandAlpha10' : 'transparent'}
+              alignItems="center"
+              justifyContent="center"
+            >
+              <ArrowUpDown size={18} color={sort !== DEFAULT_SORT ? '$brand' : '$slate700'} />
             </YStack>
           </Pressable>
         </XStack>
