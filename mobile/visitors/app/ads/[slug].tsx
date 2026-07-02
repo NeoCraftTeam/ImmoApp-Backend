@@ -43,6 +43,7 @@ import { LocationMap } from '@/components/ads/LocationMap';
 import { NeighborhoodScorecard } from '@/components/ads/NeighborhoodScorecard';
 import { PropertyAttributes } from '@/components/ads/PropertyAttributes';
 import { ReviewsSection } from '@/components/ads/ReviewsSection';
+import { SearchAlertButton } from '@/components/ads/SearchAlertButton';
 import { SimilarAdsCarousel } from '@/components/ads/SimilarAdsCarousel';
 import { useAd } from '@/hooks/useAd';
 import { useSession } from '@/auth/SessionProvider';
@@ -772,6 +773,11 @@ function DetailBody({
 
       {/* Neighborhood */}
       <NeighborhoodScorecard adId={ad.id} />
+
+      <SectionDivider />
+
+      {/* Alerte de recherche préremplie avec les critères de l'annonce */}
+      <SearchAlertButton ad={ad} />
 
       <SectionDivider />
 
