@@ -36,6 +36,7 @@ import { CompareButton } from '@/components/CompareButton';
 import { FavoriteButton } from '@/components/FavoriteButton';
 import { AdDetailSkeleton } from '@/components/ads/AdDetailSkeleton';
 import { BookViewingSheet } from '@/components/ads/BookViewingSheet';
+import { ImageLightbox } from '@/components/ads/ImageLightbox';
 import { KeyScoreSection } from '@/components/ads/KeyScoreSection';
 import { useKeyScore } from '@/hooks/useKeyScore';
 import { useRecordRecentlyViewed } from '@/hooks/useRecentlyViewed';
@@ -91,6 +92,7 @@ export default function AdDetail() {
   const [activeImage, setActiveImage] = useState(0);
   const [descOpen, setDescOpen] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
 
   const carouselRef = useRef<FlatList<AdImage> | null>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -169,6 +171,10 @@ export default function AdDetail() {
           setActiveImage={setActiveImage}
           translateY={heroTranslateY}
           scale={heroScale}
+          onImagePress={(i) => {
+            setActiveImage(i);
+            setLightboxOpen(true);
+          }}
         />
 
         <Animated.ScrollView
@@ -249,6 +255,16 @@ export default function AdDetail() {
           open={bookingOpen}
           onClose={() => setBookingOpen(false)}
         />
+
+        {/* Galerie plein écran (tap sur le héro) */}
+        {Array.isArray(ad.images) && ad.images.length > 0 && (
+          <ImageLightbox
+            images={ad.images}
+            initialIndex={activeImage}
+            visible={lightboxOpen}
+            onClose={() => setLightboxOpen(false)}
+          />
+        )}
       </YStack>
     </>
   );
@@ -264,6 +280,7 @@ function AnimatedHero({
   setActiveImage,
   translateY,
   scale,
+  onImagePress,
 }: {
   ad: Ad;
   width: number;
@@ -273,6 +290,7 @@ function AnimatedHero({
   setActiveImage: (idx: number) => void;
   translateY: Animated.AnimatedInterpolation<number>;
   scale: Animated.AnimatedInterpolation<number>;
+  onImagePress: (index: number) => void;
 }) {
   const images = Array.isArray(ad.images) && ad.images.length > 0 ? ad.images : [];
 
@@ -335,14 +353,16 @@ function AnimatedHero({
           index,
         })}
         renderItem={({ item, index }) => (
-          <Image
-            source={{ uri: item.large ?? item.url }}
-            style={{ width, height: heroHeight }}
-            contentFit="cover"
-            transition={260}
-            priority={index === 0 ? 'high' : 'normal'}
-            accessibilityLabel={`Photo ${index + 1} sur ${images.length} — ${ad.title}`}
-          />
+          <Pressable onPress={() => onImagePress(index)} accessibilityRole="imagebutton">
+            <Image
+              source={{ uri: item.large ?? item.url }}
+              style={{ width, height: heroHeight }}
+              contentFit="cover"
+              transition={260}
+              priority={index === 0 ? 'high' : 'normal'}
+              accessibilityLabel={`Photo ${index + 1} sur ${images.length} — ${ad.title}`}
+            />
+          </Pressable>
         )}
       />
 
