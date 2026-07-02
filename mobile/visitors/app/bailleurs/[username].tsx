@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
 import { AdCard } from '@/components/AdCard';
+import { MarkdownText } from '@/components/MarkdownText';
 import { useBailleur, useBailleurFollow } from '@/hooks/useBailleur';
 import { useSession } from '@/auth/SessionProvider';
 import { brand } from '@/theme/tokens';
@@ -181,11 +182,7 @@ export default function BailleurProfile() {
                 )}
               </XStack>
 
-              {data.bio && (
-                <Paragraph fontSize={14} color="$slate700" lineHeight={22}>
-                  {data.bio}
-                </Paragraph>
-              )}
+              {data.bio && <MarkdownText>{data.bio}</MarkdownText>}
 
               {/* Actions */}
               <XStack gap={10}>
