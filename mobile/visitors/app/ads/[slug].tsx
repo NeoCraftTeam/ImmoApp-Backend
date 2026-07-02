@@ -37,6 +37,7 @@ import { FavoriteButton } from '@/components/FavoriteButton';
 import { AdDetailSkeleton } from '@/components/ads/AdDetailSkeleton';
 import { BookViewingSheet } from '@/components/ads/BookViewingSheet';
 import { KeyScoreSection } from '@/components/ads/KeyScoreSection';
+import { useKeyScore } from '@/hooks/useKeyScore';
 import { LocationMap } from '@/components/ads/LocationMap';
 import { NeighborhoodScorecard } from '@/components/ads/NeighborhoodScorecard';
 import { PropertyAttributes } from '@/components/ads/PropertyAttributes';
@@ -461,6 +462,17 @@ function DetailBody({
   onOpenDescription: () => void;
   onBookViewing: () => void;
 }) {
+  const keyScore = useKeyScore(ad.id);
+  const score = keyScore.data?.score;
+  const scoreColor =
+    score == null
+      ? null
+      : score >= 75
+        ? brand.success
+        : score >= 50
+          ? brand.warning
+          : brand.danger;
+
   const locationLabel = [ad.quarter?.name, ad.quarter?.city_name]
     .filter(Boolean)
     .join(', ');
@@ -544,6 +556,21 @@ function DetailBody({
           label="Partager"
           onPress={onShare}
         />
+        {score != null && scoreColor && (
+          <XStack
+            alignItems="center"
+            gap={5}
+            paddingHorizontal={12}
+            height={36}
+            borderRadius={999}
+            backgroundColor={`${scoreColor}1A`}
+          >
+            <ShieldCheck size={14} color={scoreColor} />
+            <Paragraph fontSize={13} fontWeight="800" color={scoreColor}>
+              KeyScore {Math.round(score)}
+            </Paragraph>
+          </XStack>
+        )}
       </XStack>
 
       {/* Title + verified */}
