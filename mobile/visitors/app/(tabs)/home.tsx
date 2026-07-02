@@ -11,7 +11,7 @@ import {
   Trees,
 } from '@tamagui/lucide-icons';
 import { Image } from 'expo-image';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { extractApiErrorMessage } from '@/api/client';
 import { AdCard } from '@/components/AdCard';
 import { AdCardSkeleton } from '@/components/AdCardSkeleton';
+import { ClientProfileBanner } from '@/components/ClientProfileBanner';
 import { EmptyState } from '@/components/EmptyState';
 import { FadeIn } from '@/components/FadeIn';
 import { useAdFeed } from '@/hooks/useAdFeed';
@@ -79,6 +80,7 @@ function categoryIcon(id: string | null, color: string) {
  */
 export default function Home() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const greeting = useGreeting();
   const { isAuthenticated } = useSession();
   const me = useMe(isAuthenticated);
@@ -232,6 +234,12 @@ export default function Home() {
       >
         Les meilleures annonces immobilières du moment, sélectionnées pour vous.
       </Paragraph>
+
+      {/* Profile completion banner — se masque de lui-même si le profil
+          est complet ; visible uniquement pour un utilisateur connecté. */}
+      {isAuthenticated && me.data && (
+        <ClientProfileBanner user={me.data} onPress={() => router.push('/profile')} />
+      )}
 
       {/* Category chips */}
       <FlatList
