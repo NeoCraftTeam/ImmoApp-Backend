@@ -17,7 +17,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -38,6 +38,7 @@ import { AdDetailSkeleton } from '@/components/ads/AdDetailSkeleton';
 import { BookViewingSheet } from '@/components/ads/BookViewingSheet';
 import { KeyScoreSection } from '@/components/ads/KeyScoreSection';
 import { useKeyScore } from '@/hooks/useKeyScore';
+import { useRecordRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { LocationMap } from '@/components/ads/LocationMap';
 import { NeighborhoodScorecard } from '@/components/ads/NeighborhoodScorecard';
 import { PropertyAttributes } from '@/components/ads/PropertyAttributes';
@@ -76,6 +77,16 @@ export default function AdDetail() {
   const heroHeight = Math.round(height * HERO_RATIO);
 
   const { data: ad, isLoading, isError, error } = useAd(slug);
+
+  // Historise l'annonce consultée pour le carrousel « Récemment consultés »
+  // de l'accueil (persisté en AsyncStorage, dédupliqué, max 10).
+  const recordView = useRecordRecentlyViewed();
+  useEffect(() => {
+    if (ad?.id) {
+      void recordView(ad);
+    }
+  }, [ad, recordView]);
+
   const [activeImage, setActiveImage] = useState(0);
   const [descOpen, setDescOpen] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);

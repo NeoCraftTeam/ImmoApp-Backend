@@ -31,6 +31,7 @@ import { useAdFeed } from '@/hooks/useAdFeed';
 import { useAdTypes } from '@/hooks/useCitiesAndTypes';
 import { useGreeting } from '@/hooks/useGreeting';
 import { useMe } from '@/hooks/useMe';
+import { useRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { useRecommendations } from '@/hooks/useRecommendations';
 import { useSession } from '@/auth/SessionProvider';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
@@ -99,6 +100,7 @@ export default function Home() {
   } = useAdFeed(15, selectedType);
 
   const recommendations = useRecommendations(8);
+  const recentlyViewed = useRecentlyViewed();
 
   const pendingNextPage = useRef(false);
   const handleEndReached = useCallback(() => {
@@ -112,6 +114,8 @@ export default function Home() {
   const firstName = me.data?.firstname?.trim();
   const showRecommendations =
     !selectedType && (recommendations.data?.length ?? 0) > 0;
+  const recentAds = recentlyViewed.data ?? [];
+  const showRecent = !selectedType && recentAds.length > 0;
 
   const categoryChips = useMemo(
     () => [
@@ -282,6 +286,39 @@ export default function Home() {
           <FlatList
             data={recommendations.data ?? []}
             keyExtractor={(item) => `reco-${item.id}`}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 12, paddingRight: 8 }}
+            renderItem={({ item, index }) => (
+              <RecommendationCard ad={item} priority={index < 2} />
+            )}
+          />
+        </YStack>
+      )}
+
+      {/* Recently viewed carousel — miroir de la section web "Récemment
+          consultés", alimenté par l'historique local (AsyncStorage). */}
+      {showRecent && (
+        <YStack gap={12} marginTop={8}>
+          <YStack>
+            <YStack height={1} backgroundColor="$slate200" marginBottom={12} />
+            <Paragraph
+              fontSize={10.5}
+              fontWeight="800"
+              color="$slate500"
+              letterSpacing={1.4}
+              textTransform="uppercase"
+              marginBottom={2}
+            >
+              Déjà vus
+            </Paragraph>
+            <Paragraph fontSize={17} fontWeight="900" color="$slate900" letterSpacing={-0.3}>
+              Récemment consultés
+            </Paragraph>
+          </YStack>
+          <FlatList
+            data={recentAds}
+            keyExtractor={(item) => `recent-${item.id}`}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ gap: 12, paddingRight: 8 }}
