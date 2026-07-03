@@ -243,9 +243,12 @@ export default function Login() {
           >
             <CheckCircle2 size={56} color="white" strokeWidth={2.4} />
           </Animated.View>
-          <Animated.View style={{ opacity: checkOpacity, marginTop: 18 }}>
-            <Paragraph fontSize={18} fontWeight="800" color="$slate900">
-              Bienvenue !
+          <Animated.View style={{ opacity: checkOpacity, marginTop: 20, alignItems: 'center' }}>
+            <Paragraph fontSize={22} fontWeight="900" color="$slate900" letterSpacing={-0.4}>
+              Content de vous revoir
+            </Paragraph>
+            <Paragraph fontSize={13.5} color="$slate500" marginTop={4}>
+              Connexion réussie
             </Paragraph>
           </Animated.View>
         </Animated.View>

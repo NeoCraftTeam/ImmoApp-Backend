@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { extractApiErrorMessage } from '@/api/client';
 import { AdCard } from '@/components/AdCard';
 import { AdCardSkeleton } from '@/components/AdCardSkeleton';
+import { CountBadge } from '@/components/CountBadge';
 import { ClientProfileBanner } from '@/components/ClientProfileBanner';
 import { EmptyState } from '@/components/EmptyState';
 import { FadeIn } from '@/components/FadeIn';
@@ -186,24 +187,11 @@ export default function Home() {
             justifyContent="center"
           >
             <Bell size={22} color={brand.slate700} />
-            {(unread.data ?? 0) > 0 && (
-              <YStack
-                position="absolute"
-                top={4}
-                right={4}
-                minWidth={16}
-                height={16}
-                paddingHorizontal={4}
-                borderRadius={8}
-                backgroundColor={brand.primary}
-                alignItems="center"
-                justifyContent="center"
-              >
-                <Paragraph fontSize={9} fontWeight="800" color="white">
-                  {(unread.data ?? 0) > 99 ? '99+' : unread.data}
-                </Paragraph>
-              </YStack>
-            )}
+            <CountBadge
+              count={unread.data ?? 0}
+              size={16}
+              style={{ position: 'absolute', top: 3, right: 3 }}
+            />
           </YStack>
         </Pressable>
       </Link>

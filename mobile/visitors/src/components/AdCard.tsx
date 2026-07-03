@@ -1,4 +1,4 @@
-import { Bed, GalleryHorizontal, Maximize, ShowerHead, Star } from '@tamagui/lucide-icons';
+import { Bed, Maximize, ShowerHead, Star } from '@tamagui/lucide-icons';
 import { Link } from 'expo-router';
 import { Image } from 'expo-image';
 import { memo, useCallback, useRef } from 'react';
@@ -96,7 +96,6 @@ function AdCardComponent({ ad, priority = false }: AdCardProps) {
 
   const cover = ad.images.find((i) => i.is_primary) ?? ad.images[0];
   const coverUri = cover?.thumb ?? cover?.url;
-  const photoCount = ad.total_images ?? ad.images.length;
   const locationLabel = [ad.quarter?.name, ad.quarter?.city_name]
     .filter(Boolean)
     .join(', ');
@@ -200,25 +199,6 @@ function AdCardComponent({ ad, priority = false }: AdCardProps) {
                 />
               </YStack>
 
-              {/* Photo counter — bottom-right pill */}
-              {photoCount > 1 && (
-                <XStack
-                  position="absolute"
-                  bottom={10}
-                  right={10}
-                  alignItems="center"
-                  gap={4}
-                  paddingHorizontal={8}
-                  paddingVertical={3}
-                  borderRadius={999}
-                  backgroundColor="rgba(0,0,0,0.55)"
-                >
-                  <GalleryHorizontal size={11} color="white" />
-                  <Paragraph fontSize={10} fontWeight="700" color="white">
-                    {photoCount}
-                  </Paragraph>
-                </XStack>
-              )}
             </YStack>
 
             {/* ── Title row : title + rating · keyscore ──────────────── */}
