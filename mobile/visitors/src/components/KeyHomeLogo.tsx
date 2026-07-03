@@ -52,11 +52,16 @@ export function KeyHomeLogo({
   }
 
   if (variant === 'stacked') {
+    const stackedSize = wordmarkSize * 1.4;
     return (
       <YStack alignItems="center" gap={10}>
         {icon}
         <Paragraph
-          fontSize={wordmarkSize * 1.4}
+          fontSize={stackedSize}
+          // lineHeight explicite : Tamagui n'adapte pas la hauteur de
+          // ligne aux fontSize hors échelle — sans ça le wordmark est
+          // tronqué verticalement (vu sur le splash).
+          lineHeight={stackedSize * 1.2}
           fontWeight="900"
           color={color}
           letterSpacing={-0.6}
@@ -72,6 +77,7 @@ export function KeyHomeLogo({
       {icon}
       <Paragraph
         fontSize={wordmarkSize}
+        lineHeight={wordmarkSize * 1.25}
         fontWeight="900"
         color={color}
         letterSpacing={-0.4}

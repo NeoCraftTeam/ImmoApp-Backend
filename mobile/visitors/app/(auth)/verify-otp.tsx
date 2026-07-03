@@ -69,6 +69,17 @@ export default function VerifyOtpScreen() {
     }
   };
 
+  // L'inscription arrive ici via `router.replace` (pas d'historique) —
+  // un `back()` nu ne ferait rien. Fallback explicite vers l'inscription
+  // pour permettre de corriger une faute de frappe dans l'email.
+  const goBackToRegister = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(auth)/register' as never);
+    }
+  };
+
   const handleVerify = async () => {
     const otp = digits.join('');
     if (otp.length < OTP_LENGTH) {
@@ -112,7 +123,7 @@ export default function VerifyOtpScreen() {
         paddingBottom={insets.bottom + 16}
         gap={20}
       >
-        <Pressable onPress={() => router.back()} hitSlop={8} accessibilityLabel="Retour">
+        <Pressable onPress={goBackToRegister} hitSlop={8} accessibilityLabel="Retour">
           <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
             <ArrowLeft size={18} color={brand.slate700} />
           </YStack>
@@ -137,6 +148,11 @@ export default function VerifyOtpScreen() {
             Nous avons envoyé un code à 6 chiffres
             {email ? ` à ${email}.` : '.'}
           </Paragraph>
+          <Pressable onPress={goBackToRegister} hitSlop={6} accessibilityRole="button">
+            <Paragraph fontSize={13} fontWeight="700" color={brand.primary} textDecorationLine="underline">
+              Ce n'est pas le bon email ? Modifier
+            </Paragraph>
+          </Pressable>
         </YStack>
 
         <XStack gap={10} alignSelf="center">

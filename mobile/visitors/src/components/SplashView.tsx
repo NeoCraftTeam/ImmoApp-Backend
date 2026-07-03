@@ -99,10 +99,12 @@ export function SplashView({ ready }: Props) {
         <YStack alignItems="center">
           <Paragraph
             fontSize={13}
-            fontWeight="800"
-            color="#8A8681"
-            letterSpacing={2.4}
+            lineHeight={18}
+            fontWeight="900"
+            color="#6E6963"
+            letterSpacing={3.2}
             textAlign="center"
+            textTransform="uppercase"
           >
             BY NEOCRAFT
           </Paragraph>
