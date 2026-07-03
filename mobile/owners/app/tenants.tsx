@@ -1,4 +1,4 @@
-import { Briefcase, Mail, Phone, Plus, Trash2, Users, X } from '@tamagui/lucide-icons';
+import { FileText, Mail, Pencil, Phone, Plus, Trash2, Users, X } from '@tamagui/lucide-icons';
 import { useState } from 'react';
 import { Alert, FlatList, Modal, Pressable, ScrollView } from 'react-native';
 import { Button, H1, Input, Paragraph, Spinner, XStack, YStack } from 'tamagui';
@@ -11,6 +11,7 @@ import {
   useCreateTenant,
   useDeleteTenant,
   useTenants,
+  useUpdateTenant,
   type TenantInput,
 } from '@/hooks/useTenants';
 import { t } from '@/i18n';
@@ -18,30 +19,48 @@ import { brand } from '@/theme/tokens';
 import type { Tenant } from '@/types/owner';
 
 const EMPTY_FORM: TenantInput = {
-  firstname: '',
-  lastname: '',
+  name: '',
+  phone: '',
   email: '',
-  phone_number: '',
   id_number: '',
-  profession: '',
+  notes: '',
 };
 
 export default function TenantsScreen() {
   const { isAuthenticated } = useSession();
   const { data: tenants, isLoading } = useTenants(isAuthenticated);
   const createTenant = useCreateTenant();
+  const updateTenant = useUpdateTenant();
   const deleteTenant = useDeleteTenant();
 
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<TenantInput>(EMPTY_FORM);
 
   const setField = (key: keyof TenantInput, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const openCreate = () => {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setModalOpen(true);
+  };
+
+  const openEdit = (tenant: Tenant) => {
+    setEditingId(tenant.id);
+    setForm({
+      name: tenant.name,
+      phone: tenant.phone ?? '',
+      email: tenant.email ?? '',
+      id_number: tenant.id_number ?? '',
+      notes: tenant.notes ?? '',
+    });
+    setModalOpen(true);
+  };
+
   const handleDelete = (tenant: Tenant) => {
-    const name = `${tenant.firstname} ${tenant.lastname ?? ''}`.trim();
-    Alert.alert(t('tenants.title'), `${t('tenants.deleteConfirm')}\n${name}`, [
+    Alert.alert(t('tenants.title'), `${t('tenants.deleteConfirm')}\n${tenant.name}`, [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.delete'),
@@ -55,22 +74,26 @@ export default function TenantsScreen() {
     ]);
   };
 
-  const handleCreate = async () => {
-    if (!form.firstname.trim()) {
-      Alert.alert(t('common.error'), 'Le prénom est obligatoire.');
+  const handleSubmit = async () => {
+    if (!form.name.trim()) {
+      Alert.alert(t('common.error'), 'Le nom est obligatoire.');
       return;
     }
     try {
       const input: TenantInput = {
-        firstname: form.firstname.trim(),
-        lastname: form.lastname?.trim() || undefined,
+        name: form.name.trim(),
+        phone: form.phone?.trim() || undefined,
         email: form.email?.trim() || undefined,
-        phone_number: form.phone_number?.trim() || undefined,
         id_number: form.id_number?.trim() || undefined,
-        profession: form.profession?.trim() || undefined,
+        notes: form.notes?.trim() || undefined,
       };
-      await createTenant.mutateAsync(input);
+      if (editingId) {
+        await updateTenant.mutateAsync({ id: editingId, input });
+      } else {
+        await createTenant.mutateAsync(input);
+      }
       setForm(EMPTY_FORM);
+      setEditingId(null);
       setModalOpen(false);
     } catch (err) {
       Alert.alert(t('common.error'), extractApiErrorMessage(err));
@@ -79,15 +102,18 @@ export default function TenantsScreen() {
 
   const closeModal = () => {
     setForm(EMPTY_FORM);
+    setEditingId(null);
     setModalOpen(false);
   };
+
+  const submitting = createTenant.isPending || updateTenant.isPending;
 
   return (
     <YStack flex={1} backgroundColor="$background">
       <ScreenHeader
         title={t('tenants.title')}
         right={
-          <Pressable onPress={() => setModalOpen(true)} hitSlop={10} accessibilityLabel={t('tenants.add')}>
+          <Pressable onPress={openCreate} hitSlop={10} accessibilityLabel={t('tenants.add')}>
             <YStack
               width={36}
               height={36}
@@ -115,6 +141,7 @@ export default function TenantsScreen() {
             <TenantCard
               tenant={item}
               busy={deleteTenant.isPending}
+              onEdit={() => openEdit(item)}
               onDelete={() => handleDelete(item)}
             />
           )}
@@ -125,7 +152,7 @@ export default function TenantsScreen() {
                 title={t('tenants.empty')}
                 hint="Ajoutez vos locataires pour les associer à vos contrats de bail."
                 ctaLabel={t('tenants.add')}
-                onPressCta={() => setModalOpen(true)}
+                onPressCta={openCreate}
               />
             </YStack>
           }
@@ -152,7 +179,7 @@ export default function TenantsScreen() {
           >
             <XStack alignItems="center" justifyContent="space-between">
               <H1 fontSize={20} fontWeight="800">
-                {t('tenants.add')}
+                {editingId ? 'Modifier le locataire' : t('tenants.add')}
               </H1>
               <Pressable onPress={closeModal} hitSlop={10} accessibilityLabel={t('common.close')}>
                 <YStack width={32} height={32} borderRadius={16} backgroundColor="$slate100" alignItems="center" justifyContent="center">
@@ -163,19 +190,21 @@ export default function TenantsScreen() {
 
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
               <YStack gap={12}>
-                <FormField label={t('auth.firstname')}>
+                <FormField label="Nom complet">
                   <Input
-                    value={form.firstname}
-                    onChangeText={(v) => setField('firstname', v)}
-                    placeholder={t('auth.firstname')}
+                    value={form.name}
+                    onChangeText={(v) => setField('name', v)}
+                    placeholder="ex. Marie Ngo Bell"
+                    autoCapitalize="words"
                     borderColor="$slate300"
                   />
                 </FormField>
-                <FormField label={t('auth.lastname')}>
+                <FormField label={t('tenants.phone')}>
                   <Input
-                    value={form.lastname ?? ''}
-                    onChangeText={(v) => setField('lastname', v)}
-                    placeholder={t('auth.lastname')}
+                    value={form.phone ?? ''}
+                    onChangeText={(v) => setField('phone', v)}
+                    placeholder={t('tenants.phone')}
+                    keyboardType="phone-pad"
                     borderColor="$slate300"
                   />
                 </FormField>
@@ -189,15 +218,6 @@ export default function TenantsScreen() {
                     borderColor="$slate300"
                   />
                 </FormField>
-                <FormField label={t('tenants.phone')}>
-                  <Input
-                    value={form.phone_number ?? ''}
-                    onChangeText={(v) => setField('phone_number', v)}
-                    placeholder={t('tenants.phone')}
-                    keyboardType="phone-pad"
-                    borderColor="$slate300"
-                  />
-                </FormField>
                 <FormField label={t('tenants.idNumber')}>
                   <Input
                     value={form.id_number ?? ''}
@@ -206,11 +226,11 @@ export default function TenantsScreen() {
                     borderColor="$slate300"
                   />
                 </FormField>
-                <FormField label={t('tenants.profession')}>
+                <FormField label="Notes">
                   <Input
-                    value={form.profession ?? ''}
-                    onChangeText={(v) => setField('profession', v)}
-                    placeholder={t('tenants.profession')}
+                    value={form.notes ?? ''}
+                    onChangeText={(v) => setField('notes', v)}
+                    placeholder="Notes internes (garant, situation…)"
                     borderColor="$slate300"
                   />
                 </FormField>
@@ -222,9 +242,9 @@ export default function TenantsScreen() {
                   color="white"
                   fontWeight="800"
                   borderRadius={12}
-                  disabled={createTenant.isPending}
-                  icon={createTenant.isPending ? <Spinner color="white" /> : undefined}
-                  onPress={handleCreate}
+                  disabled={submitting}
+                  icon={submitting ? <Spinner color="white" /> : undefined}
+                  onPress={handleSubmit}
                 >
                   {t('common.save')}
                 </Button>
@@ -251,13 +271,15 @@ function FormField({ label, children }: { label: string; children: React.ReactNo
 function TenantCard({
   tenant,
   busy,
+  onEdit,
   onDelete,
 }: {
   tenant: Tenant;
   busy: boolean;
+  onEdit: () => void;
   onDelete: () => void;
 }) {
-  const fullName = `${tenant.firstname} ${tenant.lastname ?? ''}`.trim() || 'Locataire';
+  const fullName = tenant.name.trim() || 'Locataire';
 
   return (
     <YStack borderWidth={1} borderColor="$slate300" borderRadius={16} padding={14} gap={10} backgroundColor="$background">
@@ -267,9 +289,22 @@ function TenantCard({
             {fullName.charAt(0).toUpperCase()}
           </Paragraph>
         </YStack>
-        <Paragraph fontSize={15} fontWeight="800" color="$slate900" flex={1} numberOfLines={1}>
-          {fullName}
-        </Paragraph>
+        <YStack flex={1} gap={1}>
+          <Paragraph fontSize={15} fontWeight="800" color="$slate900" numberOfLines={1}>
+            {fullName}
+          </Paragraph>
+          {tenant.lease_contracts_count != null && tenant.lease_contracts_count > 0 ? (
+            <Paragraph fontSize={11.5} color="$slate500">
+              {tenant.lease_contracts_count} contrat
+              {tenant.lease_contracts_count > 1 ? 's' : ''} de bail
+            </Paragraph>
+          ) : null}
+        </YStack>
+        <Pressable onPress={onEdit} hitSlop={10} accessibilityLabel="Modifier le locataire">
+          <YStack width={34} height={34} borderRadius={17} backgroundColor={brand.primaryAlpha10} alignItems="center" justifyContent="center">
+            <Pencil size={15} color={brand.primary} />
+          </YStack>
+        </Pressable>
         <Pressable onPress={onDelete} disabled={busy} hitSlop={10} accessibilityLabel={t('common.delete')}>
           <YStack width={34} height={34} borderRadius={17} backgroundColor={`${brand.danger}12`} alignItems="center" justifyContent="center">
             <Trash2 size={16} color={brand.danger} />
@@ -277,11 +312,11 @@ function TenantCard({
         </Pressable>
       </XStack>
 
-      {tenant.phone_number ? (
+      {tenant.phone ? (
         <XStack alignItems="center" gap={8}>
           <Phone size={14} color={brand.slate500} />
           <Paragraph fontSize={13} color="$slate700">
-            {tenant.phone_number}
+            {tenant.phone}
           </Paragraph>
         </XStack>
       ) : null}
@@ -293,11 +328,11 @@ function TenantCard({
           </Paragraph>
         </XStack>
       ) : null}
-      {tenant.profession ? (
-        <XStack alignItems="center" gap={8}>
-          <Briefcase size={14} color={brand.slate500} />
-          <Paragraph fontSize={13} color="$slate700">
-            {tenant.profession}
+      {tenant.notes ? (
+        <XStack alignItems="flex-start" gap={8}>
+          <FileText size={14} color={brand.slate500} />
+          <Paragraph fontSize={13} color="$slate700" flex={1}>
+            {tenant.notes}
           </Paragraph>
         </XStack>
       ) : null}

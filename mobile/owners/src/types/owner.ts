@@ -63,21 +63,28 @@ export type ViewingStatus =
 
 export interface ViewingReservation {
   id: string;
-  ad_id: string;
   ad?: Pick<Ad, 'id' | 'title' | 'adresse' | 'slug' | 'images'>;
-  user_id: string;
-  user?: {
-    id: string;
-    firstname: string;
+  /** Prospect — visible complet pour le bailleur (TentativeReservationResource). */
+  client?: {
+    id?: string;
+    firstname?: string;
     lastname?: string;
+    name?: string;
     avatar?: string | null;
     phone_number?: string | null;
     email?: string;
   };
   status: ViewingStatus;
   status_label?: string;
-  scheduled_at: string;
-  notes?: string | null;
+  /** Date du créneau (Y-m-d) + heures de début/fin (H:i). */
+  slot_date: string;
+  slot_starts_at?: string | null;
+  slot_ends_at?: string | null;
+  client_message?: string | null;
+  landlord_notes?: string | null;
+  cancelled_by?: string | null;
+  cancellation_reason?: string | null;
+  expires_at?: string;
   created_at?: string;
 }
 
@@ -107,12 +114,13 @@ export interface BoostStatus {
 /* ------------------------------------------------------------------ */
 export interface Tenant {
   id: string;
-  firstname: string;
-  lastname?: string;
+  /** Nom complet — le backend stocke un champ unique `name`. */
+  name: string;
+  phone?: string | null;
   email?: string | null;
-  phone_number?: string | null;
   id_number?: string | null;
-  profession?: string | null;
+  notes?: string | null;
+  lease_contracts_count?: number;
   created_at?: string;
 }
 
@@ -129,18 +137,24 @@ export type LeaseStatus =
 export interface LeaseContract {
   id: string;
   ad_id: string;
+  contract_number?: string | null;
+  unit_reference?: string | null;
   status: LeaseStatus;
   status_label?: string;
   lease_start: string;
   lease_end: string;
+  lease_duration_months?: number | null;
   monthly_rent: number;
-  tenant?: {
-    id?: string;
-    firstname?: string;
-    lastname?: string;
-    email?: string;
-    phone?: string;
-  };
+  deposit_amount?: number | null;
+  special_conditions?: string | null;
+  /** La ressource API est plate — pas d'objet tenant imbriqué. */
+  tenant_name?: string | null;
+  tenant_phone?: string | null;
+  tenant_email?: string | null;
+  tenant_id_number?: string | null;
+  terminated_at?: string | null;
+  termination_reason?: string | null;
+  archived_at?: string | null;
   created_at?: string;
 }
 

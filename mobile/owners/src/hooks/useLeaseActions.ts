@@ -4,7 +4,13 @@ import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import type { LeaseContract } from '@/types/owner';
 
-/** POST /my/lease-contracts/{adId}/generate — créer un bail depuis une annonce. */
+/**
+ * POST /my/lease-contracts/{adId}/generate — créer un bail depuis une
+ * annonce. Contrat backend (GenerateLeaseContractRequest) : le locataire
+ * est passé par ses coordonnées (tenant_name + tenant_phone requis),
+ * pas par un tenant_id, et la fin de bail se calcule via
+ * lease_duration_months (1–120).
+ */
 export function useGenerateLease() {
   const qc = useQueryClient();
   return useMutation<
@@ -12,11 +18,16 @@ export function useGenerateLease() {
     Error,
     {
       adId: string;
-      tenant_id: string;
+      tenant_name: string;
+      tenant_phone: string;
+      tenant_email?: string;
+      tenant_id_number?: string;
+      unit_reference?: string;
       lease_start: string;
-      lease_end: string;
-      monthly_rent: number;
-      deposit?: number;
+      lease_duration_months: number;
+      monthly_rent?: number;
+      deposit_amount?: number;
+      special_conditions?: string;
     }
   >({
     mutationFn: async ({ adId, ...payload }) => {
@@ -30,13 +41,14 @@ export function useGenerateLease() {
   });
 }
 
+/** POST /my/lease-contracts/{id}/renew — prolonge de N mois (1–120). */
 export function useRenewLease() {
   const qc = useQueryClient();
-  return useMutation<LeaseContract, Error, { id: string; new_end_date: string }>({
-    mutationFn: async ({ id, new_end_date }) => {
+  return useMutation<LeaseContract, Error, { id: string; extend_months: number }>({
+    mutationFn: async ({ id, extend_months }) => {
       const { data } = await apiClient.post<{ data: LeaseContract }>(
         ENDPOINTS.my.leaseRenew(id),
-        { new_end_date },
+        { extend_months },
       );
       return data.data;
     },
@@ -44,9 +56,10 @@ export function useRenewLease() {
   });
 }
 
+/** POST /my/lease-contracts/{id}/terminate — motif requis (3–1000 car.). */
 export function useTerminateLease() {
   const qc = useQueryClient();
-  return useMutation<LeaseContract, Error, { id: string; reason?: string }>({
+  return useMutation<LeaseContract, Error, { id: string; reason: string }>({
     mutationFn: async ({ id, reason }) => {
       const { data } = await apiClient.post<{ data: LeaseContract }>(
         ENDPOINTS.my.leaseTerminate(id),

@@ -37,13 +37,31 @@ function useViewingAction(action: (id: string) => string) {
 export const useConfirmViewing = () => useViewingAction(ENDPOINTS.reservations.confirm);
 export const useNoShowViewing = () => useViewingAction(ENDPOINTS.reservations.noShow);
 
-/** PATCH /reservations/{id}/notes — attach a private note. */
+/** PATCH /reservations/{id}/notes — note privée (champ backend `landlord_notes`). */
 export function useViewingNotes() {
   const qc = useQueryClient();
   return useMutation<void, Error, { id: string; notes: string }>({
     mutationFn: async ({ id, notes }) => {
-      await apiClient.patch(ENDPOINTS.reservations.notes(id), { notes });
+      await apiClient.patch(ENDPOINTS.reservations.notes(id), {
+        landlord_notes: notes,
+      });
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['viewings'] }),
+  });
+}
+
+/** DELETE /reservations/{id} — annuler la visite (motif optionnel). */
+export function useCancelViewing() {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { id: string; reason?: string }>({
+    mutationFn: async ({ id, reason }) => {
+      await apiClient.delete(ENDPOINTS.reservations.cancel(id), {
+        data: reason ? { cancellation_reason: reason } : undefined,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['viewings'] });
+      qc.invalidateQueries({ queryKey: ['owner-stats'] });
+    },
   });
 }

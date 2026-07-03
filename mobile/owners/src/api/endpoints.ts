@@ -93,6 +93,8 @@ export const ENDPOINTS = {
       `/my/lease-contracts/${encodeURIComponent(id)}/renew`,
     leaseTerminate: (id: string) =>
       `/my/lease-contracts/${encodeURIComponent(id)}/terminate`,
+    leaseDownload: (id: string) =>
+      `/my/lease-contracts/${encodeURIComponent(id)}/download`,
     // Expenses / P&L
     expenses: (adId: string) => `/my/ads/${encodeURIComponent(adId)}/expenses`,
     profitLoss: (adId: string) =>
@@ -119,6 +121,7 @@ export const ENDPOINTS = {
     confirm: (id: string) => `/reservations/${encodeURIComponent(id)}/confirm`,
     noShow: (id: string) => `/reservations/${encodeURIComponent(id)}/no-show`,
     notes: (id: string) => `/reservations/${encodeURIComponent(id)}/notes`,
+    cancel: (id: string) => `/reservations/${encodeURIComponent(id)}`,
   },
   /** Subscriptions + credits + payments. */
   subscriptions: {

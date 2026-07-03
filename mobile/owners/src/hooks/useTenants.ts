@@ -5,12 +5,12 @@ import { ENDPOINTS } from '@/api/endpoints';
 import type { Tenant } from '@/types/owner';
 
 export interface TenantInput {
-  firstname: string;
-  lastname?: string;
+  /** Nom complet (champ backend `name`). */
+  name: string;
+  phone?: string;
   email?: string;
-  phone_number?: string;
   id_number?: string;
-  profession?: string;
+  notes?: string;
 }
 
 /** GET /my/tenants. */
@@ -36,6 +36,21 @@ export function useCreateTenant() {
     mutationFn: async (input) => {
       const { data } = await apiClient.post<{ data?: Tenant } | Tenant>(
         ENDPOINTS.my.tenants,
+        input,
+      );
+      return (data as { data?: Tenant }).data ?? (data as Tenant);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tenants'] }),
+  });
+}
+
+/** PUT /my/tenants/{id}. */
+export function useUpdateTenant() {
+  const qc = useQueryClient();
+  return useMutation<Tenant, Error, { id: string; input: TenantInput }>({
+    mutationFn: async ({ id, input }) => {
+      const { data } = await apiClient.put<{ data?: Tenant } | Tenant>(
+        ENDPOINTS.my.tenant(id),
         input,
       );
       return (data as { data?: Tenant }).data ?? (data as Tenant);

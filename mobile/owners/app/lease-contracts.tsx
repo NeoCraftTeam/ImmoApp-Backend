@@ -1,5 +1,6 @@
 import {
   CalendarRange,
+  Download,
   FileText,
   MoreVertical,
   Plus,
@@ -32,7 +33,9 @@ import { useLeases } from '@/hooks/useLeases';
 import { useMyAds } from '@/hooks/useMyAds';
 import { useTenants } from '@/hooks/useTenants';
 import { t } from '@/i18n';
+import { ENDPOINTS } from '@/api/endpoints';
 import { brand } from '@/theme/tokens';
+import { downloadAuthedFile, shareLocalFile } from '@/utils/documents';
 import { formatDate, formatFcfa } from '@/utils/format';
 import type { LeaseContract, LeaseStatus } from '@/types/owner';
 
@@ -126,10 +129,25 @@ function LeaseCard({
   onTerminate: () => void;
 }) {
   const [menu, setMenu] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const color = STATUS_COLOR[lease.status] ?? brand.slate500;
-  const tenantName =
-    `${lease.tenant?.firstname ?? ''} ${lease.tenant?.lastname ?? ''}`.trim();
+  const tenantName = lease.tenant_name?.trim() ?? '';
   const canAct = lease.status === 'active' || lease.status === 'expired';
+
+  const downloadPdf = async () => {
+    setDownloading(true);
+    try {
+      const uri = await downloadAuthedFile(
+        ENDPOINTS.my.leaseDownload(lease.id),
+        `bail-${lease.contract_number ?? lease.id}.pdf`,
+      );
+      await shareLocalFile(uri);
+    } catch (err) {
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : 'Erreur');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <YStack
@@ -179,44 +197,69 @@ function LeaseCard({
       {tenantName ? (
         <XStack alignItems="center" gap={8}>
           <User size={14} color={brand.slate500} />
-          <Paragraph fontSize={13} color="$slate700" numberOfLines={1}>
+          <Paragraph fontSize={13} color="$slate700" numberOfLines={1} flex={1}>
             {tenantName}
           </Paragraph>
+          {lease.contract_number ? (
+            <Paragraph fontSize={11} color="$slate500">
+              N° {lease.contract_number}
+            </Paragraph>
+          ) : null}
         </XStack>
       ) : null}
 
-      {menu ? (
-        <XStack gap={8} marginTop={2}>
-          <Button
-            size="$2"
-            backgroundColor={brand.primaryAlpha10}
-            color={brand.primary}
-            fontWeight="800"
-            borderRadius={10}
-            onPress={() => {
-              setMenu(false);
-              onRenew();
-            }}
-            icon={<RefreshCw size={12} color={brand.primary} />}
-          >
-            Renouveler
-          </Button>
-          <Button
-            size="$2"
-            backgroundColor={`${brand.danger}1A`}
-            color={brand.danger}
-            fontWeight="800"
-            borderRadius={10}
-            onPress={() => {
-              setMenu(false);
-              onTerminate();
-            }}
-            icon={<X size={12} color={brand.danger} />}
-          >
-            Résilier
-          </Button>
-        </XStack>
-      ) : null}
+      <XStack gap={8} marginTop={2} flexWrap="wrap">
+        <Button
+          size="$2"
+          backgroundColor="$slate100"
+          color={brand.slate700}
+          fontWeight="800"
+          borderRadius={10}
+          disabled={downloading}
+          onPress={() => void downloadPdf()}
+          icon={
+            downloading ? (
+              <Spinner size="small" />
+            ) : (
+              <Download size={12} color={brand.slate700} />
+            )
+          }
+        >
+          PDF
+        </Button>
+        {menu ? (
+          <>
+            <Button
+              size="$2"
+              backgroundColor={brand.primaryAlpha10}
+              color={brand.primary}
+              fontWeight="800"
+              borderRadius={10}
+              onPress={() => {
+                setMenu(false);
+                onRenew();
+              }}
+              icon={<RefreshCw size={12} color={brand.primary} />}
+            >
+              Renouveler
+            </Button>
+            <Button
+              size="$2"
+              backgroundColor={`${brand.danger}1A`}
+              color={brand.danger}
+              fontWeight="800"
+              borderRadius={10}
+              onPress={() => {
+                setMenu(false);
+                onTerminate();
+              }}
+              icon={<X size={12} color={brand.danger} />}
+            >
+              Résilier
+            </Button>
+          </>
+        ) : null}
+      </XStack>
     </YStack>
   );
 }
@@ -239,33 +282,53 @@ function GenerateLeaseSheet({
 
   const [adId, setAdId] = useState<string>('');
   const [tenantId, setTenantId] = useState<string>('');
+  const [tenantName, setTenantName] = useState<string>('');
+  const [tenantPhone, setTenantPhone] = useState<string>('');
+  const [tenantEmail, setTenantEmail] = useState<string>('');
   const [start, setStart] = useState<string>('');
-  const [end, setEnd] = useState<string>('');
+  const [months, setMonths] = useState<string>('12');
   const [rent, setRent] = useState<string>('');
   const [deposit, setDeposit] = useState<string>('');
 
   const reset = () => {
     setAdId('');
     setTenantId('');
+    setTenantName('');
+    setTenantPhone('');
+    setTenantEmail('');
     setStart('');
-    setEnd('');
+    setMonths('12');
     setRent('');
     setDeposit('');
   };
 
   const onSubmit = () => {
-    if (!adId || !tenantId || !start || !end || !rent) {
-      Alert.alert('Champs manquants', 'Annonce, locataire, dates et loyer requis.');
+    const duration = Number(months);
+    if (
+      !adId ||
+      !tenantName.trim() ||
+      !tenantPhone.trim() ||
+      !start ||
+      !Number.isInteger(duration) ||
+      duration < 1 ||
+      duration > 120
+    ) {
+      Alert.alert(
+        'Champs manquants',
+        'Annonce, nom + téléphone du locataire, date de début et durée (1–120 mois) requis.',
+      );
       return;
     }
     generate.mutate(
       {
         adId,
-        tenant_id: tenantId,
+        tenant_name: tenantName.trim(),
+        tenant_phone: tenantPhone.trim(),
+        tenant_email: tenantEmail.trim() || undefined,
         lease_start: start,
-        lease_end: end,
-        monthly_rent: Number(rent),
-        deposit: deposit ? Number(deposit) : undefined,
+        lease_duration_months: duration,
+        monthly_rent: rent ? Number(rent) : undefined,
+        deposit_amount: deposit ? Number(deposit) : undefined,
       },
       {
         onSuccess: () => {
@@ -322,7 +385,7 @@ function GenerateLeaseSheet({
 
           <YStack gap={6}>
             <Paragraph fontSize={12.5} fontWeight="700" color="$slate700">
-              Locataire
+              Locataire (préremplit les champs)
             </Paragraph>
             <XStack gap={6} flexWrap="wrap">
               {(tenants.data ?? []).map((tn) => {
@@ -334,11 +397,16 @@ function GenerateLeaseSheet({
                     chromeless
                     borderRadius={999}
                     backgroundColor={sel ? '$brand' : '$slate100'}
-                    onPress={() => setTenantId(tn.id)}
+                    onPress={() => {
+                      setTenantId(tn.id);
+                      setTenantName(tn.name);
+                      setTenantPhone(tn.phone ?? '');
+                      setTenantEmail(tn.email ?? '');
+                    }}
                     paddingHorizontal={12}
                   >
                     <Paragraph fontSize={12} fontWeight="700" color={sel ? 'white' : '$slate700'}>
-                      {tn.firstname} {tn.lastname ?? ''}
+                      {tn.name}
                     </Paragraph>
                   </Button>
                 );
@@ -346,18 +414,40 @@ function GenerateLeaseSheet({
             </XStack>
           </YStack>
 
+          <YStack gap={6}>
+            <Paragraph fontSize={12.5} fontWeight="700" color="$slate700">
+              Nom du locataire
+            </Paragraph>
+            <Input value={tenantName} onChangeText={setTenantName} placeholder="ex. Marie Ngo Bell" autoCapitalize="words" />
+          </YStack>
+
+          <XStack gap={10}>
+            <YStack flex={1} gap={6}>
+              <Paragraph fontSize={12.5} fontWeight="700" color="$slate700">
+                Téléphone
+              </Paragraph>
+              <Input value={tenantPhone} onChangeText={setTenantPhone} placeholder="+237…" keyboardType="phone-pad" />
+            </YStack>
+            <YStack flex={1} gap={6}>
+              <Paragraph fontSize={12.5} fontWeight="700" color="$slate700">
+                Email (optionnel)
+              </Paragraph>
+              <Input value={tenantEmail} onChangeText={setTenantEmail} placeholder="email@exemple.com" keyboardType="email-address" autoCapitalize="none" />
+            </YStack>
+          </XStack>
+
           <XStack gap={10}>
             <YStack flex={1} gap={6}>
               <Paragraph fontSize={12.5} fontWeight="700" color="$slate700">
                 Début (AAAA-MM-JJ)
               </Paragraph>
-              <Input value={start} onChangeText={setStart} placeholder="2026-07-01" />
+              <Input value={start} onChangeText={setStart} placeholder="2026-08-01" />
             </YStack>
             <YStack flex={1} gap={6}>
               <Paragraph fontSize={12.5} fontWeight="700" color="$slate700">
-                Fin
+                Durée (mois)
               </Paragraph>
-              <Input value={end} onChangeText={setEnd} placeholder="2027-06-30" />
+              <Input value={months} onChangeText={setMonths} placeholder="12" keyboardType="numeric" />
             </YStack>
           </XStack>
 
@@ -401,17 +491,17 @@ function RenewLeaseSheet({
   onClose: () => void;
 }) {
   const renew = useRenewLease();
-  const [newEnd, setNewEnd] = useState<string>('');
+  const [months, setMonths] = useState<number>(12);
 
   const onSubmit = () => {
-    if (!lease || !newEnd) return;
+    if (!lease) return;
     renew.mutate(
-      { id: lease.id, new_end_date: newEnd },
+      { id: lease.id, extend_months: months },
       {
         onSuccess: () => {
-          setNewEnd('');
+          setMonths(12);
           onClose();
-          Alert.alert('Succès', 'Bail renouvelé.');
+          Alert.alert('Succès', `Bail prolongé de ${months} mois.`);
         },
         onError: (err) => Alert.alert('Erreur', extractApiErrorMessage(err)),
       },
@@ -433,9 +523,25 @@ function RenewLeaseSheet({
           Renouveler le bail
         </Paragraph>
         <Paragraph fontSize={12.5} color="$slate500">
-          Indiquez la nouvelle date de fin.
+          De combien de mois prolonger le bail ?
         </Paragraph>
-        <Input value={newEnd} onChangeText={setNewEnd} placeholder="2028-06-30" />
+        <XStack gap={8} flexWrap="wrap">
+          {[3, 6, 12, 24].map((m) => (
+            <Button
+              key={m}
+              size="$3"
+              chromeless
+              borderRadius={999}
+              backgroundColor={months === m ? '$brand' : '$slate100'}
+              color={months === m ? 'white' : '$slate700'}
+              fontWeight="800"
+              paddingHorizontal={16}
+              onPress={() => setMonths(m)}
+            >
+              {m} mois
+            </Button>
+          ))}
+        </XStack>
         <Button
           size="$4"
           backgroundColor="$brand"
@@ -443,9 +549,9 @@ function RenewLeaseSheet({
           fontWeight="800"
           borderRadius={12}
           onPress={onSubmit}
-          disabled={renew.isPending || !newEnd}
+          disabled={renew.isPending}
         >
-          {renew.isPending ? 'Renouvellement…' : 'Renouveler'}
+          {renew.isPending ? 'Renouvellement…' : `Prolonger de ${months} mois`}
         </Button>
       </Sheet.Frame>
     </Sheet>
@@ -464,8 +570,12 @@ function TerminateLeaseSheet({
 
   const onSubmit = () => {
     if (!lease) return;
+    if (reason.trim().length < 3) {
+      Alert.alert('Motif requis', 'Indiquez un motif de résiliation (3 caractères minimum).');
+      return;
+    }
     terminate.mutate(
-      { id: lease.id, reason: reason.trim() || undefined },
+      { id: lease.id, reason: reason.trim() },
       {
         onSuccess: () => {
           setReason('');
@@ -492,7 +602,7 @@ function TerminateLeaseSheet({
           Résilier le bail
         </Paragraph>
         <Paragraph fontSize={12.5} color="$slate500">
-          Cette action est irréversible. Précisez un motif (optionnel).
+          Cette action est irréversible. Le motif est requis (traçabilité).
         </Paragraph>
         <Input
           value={reason}

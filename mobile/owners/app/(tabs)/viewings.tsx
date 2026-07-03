@@ -1,4 +1,4 @@
-import { CalendarCheck, Check, Phone, UserX } from '@tamagui/lucide-icons';
+import { CalendarCheck, Check, Phone, X as XIcon, UserX } from '@tamagui/lucide-icons';
 import { useMemo, useState } from 'react';
 import { Alert, FlatList, Linking, Pressable, RefreshControl } from 'react-native';
 import { Button, H1, Paragraph, Spinner, XStack, YStack } from 'tamagui';
@@ -8,12 +8,13 @@ import { extractApiErrorMessage } from '@/api/client';
 import { useSession } from '@/auth/SessionProvider';
 import { EmptyState } from '@/components/EmptyState';
 import {
+  useCancelViewing,
   useConfirmViewing,
   useNoShowViewing,
   useViewings,
 } from '@/hooks/useViewings';
 import { brand } from '@/theme/tokens';
-import { formatDateTime } from '@/utils/format';
+import { formatDate } from '@/utils/format';
 import { t } from '@/i18n';
 import type { ViewingReservation, ViewingStatus } from '@/types/owner';
 
@@ -22,6 +23,9 @@ const STATUS_FILTERS: { value: string; key: string }[] = [
   { value: 'pending', key: 'status.pending' },
   { value: 'confirmed', key: 'status.confirmed' },
   { value: 'completed', key: 'status.completed' },
+  { value: 'cancelled', key: 'status.cancelled' },
+  { value: 'expired', key: 'status.expired' },
+  { value: 'no_show', key: 'status.no_show' },
 ];
 
 const STATUS_COLOR: Record<ViewingStatus, string> = {
@@ -41,6 +45,7 @@ export default function ViewingsScreen() {
 
   const confirm = useConfirmViewing();
   const noShow = useNoShowViewing();
+  const cancel = useCancelViewing();
 
   const list = useMemo(() => viewings ?? [], [viewings]);
 
@@ -53,6 +58,27 @@ export default function ViewingsScreen() {
     noShow.mutate(id, {
       onError: (err) => Alert.alert(t('common.error'), extractApiErrorMessage(err)),
     });
+  };
+  const handleCancel = (id: string) => {
+    Alert.alert(
+      'Annuler la visite ?',
+      'Le prospect sera notifié de l’annulation.',
+      [
+        { text: 'Retour', style: 'cancel' },
+        {
+          text: 'Annuler la visite',
+          style: 'destructive',
+          onPress: () =>
+            cancel.mutate(
+              { id, reason: 'Annulée par le propriétaire' },
+              {
+                onError: (err) =>
+                  Alert.alert(t('common.error'), extractApiErrorMessage(err)),
+              },
+            ),
+        },
+      ],
+    );
   };
 
   return (
@@ -95,9 +121,10 @@ export default function ViewingsScreen() {
           renderItem={({ item }) => (
             <ViewingCard
               viewing={item}
-              busy={confirm.isPending || noShow.isPending}
+              busy={confirm.isPending || noShow.isPending || cancel.isPending}
               onConfirm={() => handleConfirm(item.id)}
               onNoShow={() => handleNoShow(item.id)}
+              onCancel={() => handleCancel(item.id)}
             />
           )}
           ListEmptyComponent={
@@ -120,17 +147,30 @@ function ViewingCard({
   busy,
   onConfirm,
   onNoShow,
+  onCancel,
 }: {
   viewing: ViewingReservation;
   busy: boolean;
   onConfirm: () => void;
   onNoShow: () => void;
+  onCancel: () => void;
 }) {
-  const fullName = `${viewing.user?.firstname ?? ''} ${viewing.user?.lastname ?? ''}`.trim() || 'Prospect';
+  const fullName =
+    viewing.client?.name?.trim() ||
+    `${viewing.client?.firstname ?? ''} ${viewing.client?.lastname ?? ''}`.trim() ||
+    'Prospect';
   const color = STATUS_COLOR[viewing.status] ?? brand.slate500;
-  const phone = viewing.user?.phone_number;
+  const phone = viewing.client?.phone_number;
   const isPending = viewing.status === 'pending';
   const isConfirmed = viewing.status === 'confirmed';
+  const slotLabel = [
+    formatDate(viewing.slot_date),
+    viewing.slot_starts_at
+      ? `${viewing.slot_starts_at}${viewing.slot_ends_at ? ` – ${viewing.slot_ends_at}` : ''}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <YStack borderWidth={1} borderColor="$slate300" borderRadius={16} padding={14} gap={10} backgroundColor="$background">
@@ -149,11 +189,21 @@ function ViewingCard({
         {viewing.ad?.title ?? 'Annonce'}
       </Paragraph>
       <Paragraph fontSize={12.5} color="$slate500">
-        {t('viewings.scheduledFor')} {formatDateTime(viewing.scheduled_at)}
+        {t('viewings.scheduledFor')} {slotLabel}
       </Paragraph>
-      {viewing.notes ? (
+      {viewing.client_message ? (
         <Paragraph fontSize={12.5} color="$slate500" fontStyle="italic">
-          « {viewing.notes} »
+          « {viewing.client_message} »
+        </Paragraph>
+      ) : null}
+      {viewing.landlord_notes ? (
+        <Paragraph fontSize={12} color="$slate500">
+          Note : {viewing.landlord_notes}
+        </Paragraph>
+      ) : null}
+      {viewing.status === 'cancelled' && viewing.cancellation_reason ? (
+        <Paragraph fontSize={12} color={brand.danger}>
+          Motif : {viewing.cancellation_reason}
         </Paragraph>
       ) : null}
 
@@ -182,6 +232,13 @@ function ViewingCard({
           <Button size="$3" chromeless borderWidth={1} borderColor="$danger" borderRadius={10} disabled={busy} icon={<UserX size={15} color={brand.danger} />} onPress={onNoShow}>
             <Paragraph fontSize={13} fontWeight="700" color="$danger">
               {t('viewings.noShow')}
+            </Paragraph>
+          </Button>
+        ) : null}
+        {(isPending || isConfirmed) ? (
+          <Button size="$3" chromeless borderWidth={1} borderColor="$slate300" borderRadius={10} disabled={busy} icon={<XIcon size={15} color={brand.slate700} />} onPress={onCancel}>
+            <Paragraph fontSize={13} fontWeight="700" color="$slate700">
+              Annuler
             </Paragraph>
           </Button>
         ) : null}
