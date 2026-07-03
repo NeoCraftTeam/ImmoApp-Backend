@@ -14,10 +14,8 @@ import {
   Mail,
   MapPin,
   MessageCircle,
-  Receipt,
   Search,
   Settings,
-  TrendingUp,
   User,
 } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
@@ -293,13 +291,8 @@ export default function AccountTab() {
             <Row
               icon={<CreditCard size={18} color={brand.slate700} />}
               label="Crédits & paiements"
-              hint={balance.data != null ? `${balance.data.toLocaleString('fr-FR')} pts disponibles` : undefined}
+              hint={balance.data != null ? `${balance.data.toLocaleString('fr-FR')} crédits disponibles` : undefined}
               onPress={() => router.push('/credits')}
-            />
-            <Row
-              icon={<Receipt size={18} color={brand.slate700} />}
-              label="Remboursements"
-              onPress={() => router.push('/refunds' as never)}
             />
             <Row
               icon={<AlertTriangle size={18} color={brand.slate700} />}
@@ -315,12 +308,6 @@ export default function AccountTab() {
             label="Près de moi"
             hint="Annonces autour de votre position"
             onPress={() => router.push('/nearby')}
-          />
-          <Row
-            icon={<TrendingUp size={18} color={brand.slate700} />}
-            label="Prix du marché"
-            hint="Médianes par ville et quartier"
-            onPress={() => router.push('/market-prices' as never)}
           />
           <Row
             icon={<Calculator size={18} color={brand.slate700} />}
