@@ -15,7 +15,8 @@ export const ENDPOINTS = {
     logout: '/auth/logout',
     logoutAll: '/auth/logout-all',
     me: '/auth/me',
-    changePassword: '/auth/change-password',
+    /** Route réelle backend : update-password (change-password n'existe pas). */
+    changePassword: '/auth/update-password',
     forgotPassword: '/auth/forgot-password',
     resetPassword: '/auth/reset-password',
     verifyEmailOtp: '/auth/verify-email-otp',

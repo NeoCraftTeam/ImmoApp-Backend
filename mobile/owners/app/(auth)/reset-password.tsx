@@ -92,7 +92,7 @@ export default function ResetPasswordScreen() {
             </YStack>
 
             <Field label="Email" value={email} onChange={setEmail} keyboardType="email-address" autoCapitalize="none" />
-            <Field label="Code" value={token} onChange={setToken} placeholder="ex. 482931" autoCapitalize="none" />
+            <Field label="Code de réinitialisation" value={token} onChange={setToken} placeholder="Collez le code du lien reçu par email (token=…)" autoCapitalize="none" />
             <Field label="Nouveau mot de passe" value={password} onChange={setPassword} secure />
             <Field label="Confirmation" value={confirm} onChange={setConfirm} secure />
 

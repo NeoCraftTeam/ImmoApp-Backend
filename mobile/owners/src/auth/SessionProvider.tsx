@@ -162,6 +162,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signOut: () => {
         trackEvent('auth.signOut');
         clearUserContext();
+        // Révoque le token côté serveur (best-effort, AVANT de vider le
+        // bearer local — sinon la requête part sans Authorization).
+        void apiClient.post(ENDPOINTS.auth.logout).catch(() => {});
         // Vider cache AVANT le setToken pour eviter qu'une
         // derniere requete in-flight lise un token zombie.
         setBearerToken(null);
