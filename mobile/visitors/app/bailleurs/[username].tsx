@@ -121,7 +121,9 @@ export default function BailleurProfile() {
           }}
           ListHeaderComponent={
             <YStack paddingHorizontal={8} paddingVertical={18} gap={16}>
-              <XStack alignItems="center" gap={14}>
+              {/* En-tête façon Instagram : avatar à gauche, nom + boutons
+                  Suivre / Message directement à côté. */}
+              <XStack alignItems="center" gap={16}>
                 <YStack
                   width={84}
                   height={84}
@@ -144,25 +146,68 @@ export default function BailleurProfile() {
                     </Paragraph>
                   )}
                 </YStack>
-                <YStack flex={1} gap={4}>
-                  <XStack alignItems="center" gap={6}>
-                    <H2 fontSize={22} fontWeight="700" color="$slate900">
-                      {firstName || 'Bailleur'}
-                    </H2>
-                    {data.is_verified && (
-                      <CheckCircle2 size={18} color={brand.success} />
-                    )}
+                <YStack flex={1} gap={10}>
+                  <YStack gap={2}>
+                    <XStack alignItems="center" gap={6}>
+                      <H2 fontSize={20} fontWeight="700" color="$slate900" numberOfLines={1}>
+                        {firstName || 'Bailleur'}
+                      </H2>
+                      {data.is_verified && (
+                        <CheckCircle2 size={18} color={brand.success} />
+                      )}
+                    </XStack>
+                    {data.city ? (
+                      <Paragraph fontSize={13} color="$slate500" numberOfLines={1}>
+                        {data.city}
+                      </Paragraph>
+                    ) : null}
+                  </YStack>
+                  <XStack gap={8}>
+                    <Button
+                      flex={1}
+                      size="$3"
+                      backgroundColor={follow.data?.is_following ? '$slate100' : '$brand'}
+                      color={follow.data?.is_following ? '$slate900' : 'white'}
+                      fontWeight="700"
+                      borderRadius={10}
+                      paddingHorizontal={8}
+                      onPress={() => {
+                        if (!isAuthenticated) {
+                          router.push('/(auth)/login');
+                          return;
+                        }
+                        follow.toggle();
+                      }}
+                      icon={
+                        follow.data?.is_following ? (
+                          <UserCheck size={15} color={brand.slate900} />
+                        ) : (
+                          <UserPlus size={15} color="white" />
+                        )
+                      }
+                    >
+                      {follow.data?.is_following ? 'Suivi' : 'Suivre'}
+                    </Button>
+                    <Button
+                      flex={1}
+                      size="$3"
+                      backgroundColor="$slate100"
+                      color="$slate900"
+                      fontWeight="700"
+                      borderRadius={10}
+                      paddingHorizontal={8}
+                      onPress={() => {
+                        if (!isAuthenticated) {
+                          router.push('/(auth)/login');
+                          return;
+                        }
+                        router.push('/messages');
+                      }}
+                      icon={<MessageCircle size={15} color={brand.slate900} />}
+                    >
+                      Message
+                    </Button>
                   </XStack>
-                  {data.city && (
-                    <Paragraph fontSize={13} color="$slate500">
-                      {data.city}
-                    </Paragraph>
-                  )}
-                  {memberSince && (
-                    <Paragraph fontSize={12} color="$slate500">
-                      Membre depuis {memberSince}
-                    </Paragraph>
-                  )}
                 </YStack>
               </XStack>
 
@@ -179,54 +224,12 @@ export default function BailleurProfile() {
                     label={`${data.follower_count} abonné${(data.follower_count ?? 0) > 1 ? 's' : ''}`}
                   />
                 )}
+                {memberSince && (
+                  <TrustChip label={`Membre depuis ${memberSince}`} />
+                )}
               </XStack>
 
               {data.bio && <MarkdownText>{data.bio}</MarkdownText>}
-
-              {/* Actions */}
-              <XStack gap={10}>
-                <Button
-                  flex={1}
-                  size="$4"
-                  backgroundColor={follow.data?.is_following ? '$slate100' : '$brand'}
-                  color={follow.data?.is_following ? '$slate900' : 'white'}
-                  fontWeight="700"
-                  borderRadius={12}
-                  onPress={() => {
-                    if (!isAuthenticated) {
-                      router.push('/(auth)/login');
-                      return;
-                    }
-                    follow.toggle();
-                  }}
-                  icon={
-                    follow.data?.is_following ? (
-                      <UserCheck size={16} color={brand.slate900} />
-                    ) : (
-                      <UserPlus size={16} color="white" />
-                    )
-                  }
-                >
-                  {follow.data?.is_following ? 'Suivi' : 'Suivre'}
-                </Button>
-                <Button
-                  size="$4"
-                  backgroundColor="$slate100"
-                  color="$slate900"
-                  fontWeight="700"
-                  borderRadius={12}
-                  onPress={() => {
-                    if (!isAuthenticated) {
-                      router.push('/(auth)/login');
-                      return;
-                    }
-                    router.push('/messages');
-                  }}
-                  icon={<MessageCircle size={16} color={brand.slate900} />}
-                >
-                  Message
-                </Button>
-              </XStack>
 
               <Paragraph
                 fontSize={15}
