@@ -19,24 +19,25 @@ export function usePayments() {
 }
 
 export function useCreditsBalance() {
-  return useQuery<{ balance: number } | number, Error, number>({
+  return useQuery<Record<string, unknown> | number, Error, number>({
     queryKey: ['credits-balance'],
     queryFn: async () => {
       const { data } = await apiClient.get(ENDPOINTS.credits.balance);
       return data;
     },
+    // Le backend renvoie { point_balance: N } — l'ancienne lecture de
+    // `balance` retombait toujours à 0 (d'où « 0 crédits » alors que le
+    // web affiche le vrai solde). On accepte point_balance / balance /
+    // credit_balance, à la racine ou sous `data`.
     select: (payload) => {
       if (typeof payload === 'number') return payload;
-      if (payload && typeof payload === 'object' && 'balance' in payload) {
-        return (payload as { balance: number }).balance ?? 0;
-      }
-      if (
-        payload &&
-        typeof payload === 'object' &&
-        'data' in payload &&
-        typeof (payload as { data?: { balance?: number } }).data?.balance === 'number'
-      ) {
-        return (payload as { data: { balance: number } }).data.balance;
+      const root = (payload ?? {}) as Record<string, unknown>;
+      const nested = (root.data ?? {}) as Record<string, unknown>;
+      for (const src of [root, nested]) {
+        for (const key of ['point_balance', 'balance', 'credit_balance', 'credits']) {
+          const v = src[key];
+          if (typeof v === 'number') return v;
+        }
       }
       return 0;
     },

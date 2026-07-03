@@ -112,6 +112,10 @@ export const ENDPOINTS = {
   },
   credits: {
     balance: '/credits/balance',
+    packages: '/credits/packages',
+    purchase: (packageId: string) =>
+      `/credits/purchase/${encodeURIComponent(packageId)}`,
+    verifyPurchase: '/credits/verify-purchase',
   },
   disputes: {
     list: '/disputes',
