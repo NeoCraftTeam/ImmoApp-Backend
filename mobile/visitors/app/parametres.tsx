@@ -3,6 +3,7 @@ import {
   Bell,
   ChevronRight,
   CreditCard,
+  FileText,
   HelpCircle,
   Lock,
   LogOut,
@@ -150,12 +151,12 @@ export default function Settings() {
             <Row
               icon={<Shield size={18} color="$slate700" />}
               label="Confidentialité"
-              onPress={() =>
-                Alert.alert(
-                  'Confidentialité',
-                  'Politique disponible sur keyhome.app/confidentialite.',
-                )
-              }
+              onPress={() => router.push('/confidentialite')}
+            />
+            <Row
+              icon={<FileText size={18} color="$slate700" />}
+              label="Conditions d'utilisation"
+              onPress={() => router.push('/conditions')}
             />
           </Section>
 
