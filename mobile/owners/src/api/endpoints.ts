@@ -20,6 +20,7 @@ export const ENDPOINTS = {
     resetPassword: '/auth/reset-password',
     verifyEmailOtp: '/auth/verify-email-otp',
     resendVerification: '/auth/resend-verification',
+    updateUnverifiedEmail: '/auth/update-unverified-email',
     checkEmail: '/auth/check-email',
     oauthRedirect: (provider: string) => `/auth/oauth/${provider}/redirect`,
     oauthExchange: '/auth/oauth/exchange-token',

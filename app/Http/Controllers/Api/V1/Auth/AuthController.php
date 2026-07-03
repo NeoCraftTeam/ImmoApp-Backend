@@ -206,10 +206,15 @@ final readonly class AuthController
 
         // Reject users with unverified email to prevent AuthProvider from
         // treating them as authenticated before OTP/email verification.
+        // Le payload porte l'email et l'id du compte (déjà identifié par
+        // son bearer token) pour que le client puisse router vers l'écran
+        // OTP et proposer la correction d'une adresse mal saisie.
         if ($user->email_verified_at === null) {
             return response()->json([
                 'message' => 'Email non vérifié.',
                 'email_verification_required' => true,
+                'email' => $user->email,
+                'user_id' => $user->id,
             ], 403);
         }
 

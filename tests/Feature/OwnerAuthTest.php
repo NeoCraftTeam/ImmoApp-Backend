@@ -234,7 +234,44 @@ test('me returns 403 for unverified user', function (): void {
         ->getJson('/api/v1/auth/me');
 
     $response->assertForbidden()
-        ->assertJsonPath('email_verification_required', true);
+        ->assertJsonPath('email_verification_required', true)
+        ->assertJsonPath('email', $user->email)
+        ->assertJsonPath('user_id', $user->id);
+});
+
+test('an unverified user can fix a mistyped email before verifying', function (): void {
+    Notification::fake();
+    $user = User::factory()->unverified()->create(['email' => 'typo@exemple.com']);
+    $token = $user->createToken('test', ['*'], now()->addDay());
+
+    $response = $this->withToken($token->plainTextToken)
+        ->postJson('/api/v1/auth/update-unverified-email', ['email' => 'correct@exemple.com']);
+
+    $response->assertOk()->assertJsonPath('email', 'correct@exemple.com');
+    expect($user->fresh()->email)->toBe('correct@exemple.com')
+        ->and($user->fresh()->email_verified_at)->toBeNull();
+});
+
+test('a verified user cannot use the unverified-email fix endpoint', function (): void {
+    $user = User::factory()->create();
+    $token = $user->createToken('test', ['*'], now()->addDay());
+
+    $this->withToken($token->plainTextToken)
+        ->postJson('/api/v1/auth/update-unverified-email', ['email' => 'new@exemple.com'])
+        ->assertForbidden();
+
+    expect($user->fresh()->email)->not->toBe('new@exemple.com');
+});
+
+test('the unverified-email fix rejects an email already taken', function (): void {
+    User::factory()->create(['email' => 'taken@exemple.com']);
+    $user = User::factory()->unverified()->create();
+    $token = $user->createToken('test', ['*'], now()->addDay());
+
+    $this->withToken($token->plainTextToken)
+        ->postJson('/api/v1/auth/update-unverified-email', ['email' => 'taken@exemple.com'])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['email']);
 });
 
 test('me returns role and type at top level', function (): void {

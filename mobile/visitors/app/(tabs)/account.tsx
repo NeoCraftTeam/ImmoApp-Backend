@@ -74,6 +74,23 @@ export default function AccountTab() {
       ));
   const meData = me.data;
 
+  // 403 « email non vérifié » : le compte existe mais l'OTP n'a jamais
+  // été validé (ex. faute de frappe dans l'email à l'inscription). On
+  // affiche une carte actionnable au lieu d'un « Chargement… » sans issue.
+  const meErrorData = (
+    me.error as undefined | {
+      response?: {
+        status?: number;
+        data?: { email_verification_required?: boolean; email?: string; user_id?: string };
+      };
+    }
+  )?.response;
+  const unverified =
+    isAuthenticated &&
+    me.isError &&
+    meErrorData?.status === 403 &&
+    Boolean(meErrorData.data?.email_verification_required);
+
   const handleSignOut = () => {
     Alert.alert(t('account.signOut'), `${t('account.signOut')} ?`, [
       { text: t('common.cancel'), style: 'cancel' },
@@ -101,7 +118,60 @@ export default function AccountTab() {
       >
         <H2>{t('account.title')}</H2>
 
-        {!isGuest ? (
+        {unverified ? (
+          <YStack
+            padding={16}
+            borderRadius={16}
+            backgroundColor={brand.primaryAlpha10}
+            borderWidth={1}
+            borderColor={brand.primaryAlpha20}
+            gap={10}
+          >
+            <Paragraph fontSize={15} fontWeight="800" color="$slate900">
+              Vérifiez votre email
+            </Paragraph>
+            <Paragraph fontSize={13} color="$slate700" lineHeight={19}>
+              Votre compte{meErrorData?.data?.email ? ` (${meErrorData.data.email})` : ''} n'est
+              pas encore vérifié. Saisissez le code reçu — ou corrigez l'adresse si
+              vous avez fait une faute de frappe.
+            </Paragraph>
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: '/(auth)/verify-otp',
+                  params: {
+                    email: meErrorData?.data?.email ?? '',
+                    user_id: meErrorData?.data?.user_id ?? '',
+                  },
+                } as never)
+              }
+              accessibilityRole="button"
+            >
+              <YStack
+                paddingVertical={11}
+                borderRadius={12}
+                backgroundColor={brand.primary}
+                alignItems="center"
+              >
+                <Paragraph fontSize={14} fontWeight="800" color="white">
+                  Vérifier ou corriger mon email
+                </Paragraph>
+              </YStack>
+            </Pressable>
+            <Pressable onPress={handleSignOut} accessibilityRole="button">
+              <Paragraph
+                fontSize={12.5}
+                color="$slate500"
+                textAlign="center"
+                textDecorationLine="underline"
+              >
+                Se déconnecter et recommencer
+              </Paragraph>
+            </Pressable>
+          </YStack>
+        ) : null}
+
+        {!isGuest && !unverified ? (
           <Pressable onPress={() => router.push('/profile')}>
             <YStack
               padding={16}

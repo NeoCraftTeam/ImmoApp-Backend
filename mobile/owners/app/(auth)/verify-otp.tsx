@@ -5,7 +5,8 @@ import { Alert, Pressable, TextInput } from 'react-native';
 import { Button, H2, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { extractApiErrorMessage } from '@/api/client';
+import { apiClient, extractApiErrorMessage } from '@/api/client';
+import { ENDPOINTS } from '@/api/endpoints';
 import { useResendVerification, useVerifyEmailOtp } from '@/hooks/useAuthExtras';
 import { useSession } from '@/auth/SessionProvider';
 import { brand } from '@/theme/tokens';
@@ -22,8 +23,11 @@ export default function VerifyOtpScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ email?: string }>();
-  const email = params.email;
-  const { setToken } = useSession();
+  const { setToken, isAuthenticated } = useSession();
+  const [email, setEmail] = useState(params.email ?? '');
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [savingEmail, setSavingEmail] = useState(false);
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [cooldown, setCooldown] = useState(0);
   const inputRefs = useRef<Array<TextInput | null>>([]);
@@ -70,6 +74,38 @@ export default function VerifyOtpScreen() {
       router.back();
     } else {
       router.replace('/(auth)/register' as never);
+    }
+  };
+
+  // Compte créé + token en session → correction inline via
+  // POST /auth/update-unverified-email ; sinon retour à l'inscription.
+  const handleWrongEmail = () => {
+    if (isAuthenticated) {
+      setNewEmail(email);
+      setEditingEmail(true);
+    } else {
+      goBackToRegister();
+    }
+  };
+
+  const handleSaveEmail = async () => {
+    const candidate = newEmail.trim().toLowerCase();
+    if (candidate === '' || !candidate.includes('@')) {
+      Alert.alert('Email invalide', 'Saisissez une adresse email valide.');
+      return;
+    }
+    setSavingEmail(true);
+    try {
+      await apiClient.post(ENDPOINTS.auth.updateUnverifiedEmail, { email: candidate });
+      setEmail(candidate);
+      setEditingEmail(false);
+      setDigits(Array(OTP_LENGTH).fill(''));
+      setCooldown(RESEND_COOLDOWN_SECONDS);
+      Alert.alert('Email corrigé', `Un nouveau code a été envoyé à ${candidate}.`);
+    } catch (err) {
+      Alert.alert('Erreur', extractApiErrorMessage(err));
+    } finally {
+      setSavingEmail(false);
     }
   };
 
@@ -131,11 +167,52 @@ export default function VerifyOtpScreen() {
           <Paragraph fontSize={13.5} color="$slate500" textAlign="center" lineHeight={20}>
             Nous avons envoyé un code à 6 chiffres{email ? ` à ${email}.` : '.'}
           </Paragraph>
-          <Pressable onPress={goBackToRegister} hitSlop={6} accessibilityRole="button">
-            <Paragraph fontSize={13} fontWeight="700" color={brand.primary} textDecorationLine="underline">
-              Ce n'est pas le bon email ? Modifier
-            </Paragraph>
-          </Pressable>
+          {editingEmail ? (
+            <YStack gap={8} width="100%" paddingHorizontal={8}>
+              <TextInput
+                value={newEmail}
+                onChangeText={setNewEmail}
+                placeholder="nouvelle-adresse@exemple.com"
+                placeholderTextColor={brand.slate500}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoFocus
+                style={{
+                  borderWidth: 1,
+                  borderColor: brand.slate300,
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  fontSize: 15,
+                  color: brand.slate900,
+                }}
+              />
+              <XStack gap={8} justifyContent="center">
+                <Pressable onPress={() => setEditingEmail(false)} hitSlop={6} accessibilityRole="button">
+                  <Paragraph fontSize={13} fontWeight="700" color="$slate500" padding={8}>
+                    Annuler
+                  </Paragraph>
+                </Pressable>
+                <Pressable
+                  onPress={() => void handleSaveEmail()}
+                  hitSlop={6}
+                  disabled={savingEmail}
+                  accessibilityRole="button"
+                >
+                  <Paragraph fontSize={13} fontWeight="800" color={brand.primary} padding={8}>
+                    {savingEmail ? 'Enregistrement…' : 'Corriger et renvoyer le code'}
+                  </Paragraph>
+                </Pressable>
+              </XStack>
+            </YStack>
+          ) : (
+            <Pressable onPress={handleWrongEmail} hitSlop={6} accessibilityRole="button">
+              <Paragraph fontSize={13} fontWeight="700" color={brand.primary} textDecorationLine="underline">
+                Ce n'est pas le bon email ? Modifier
+              </Paragraph>
+            </Pressable>
+          )}
         </YStack>
 
         <XStack gap={10} alignSelf="center">

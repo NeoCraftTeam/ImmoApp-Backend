@@ -14,6 +14,7 @@ export const ENDPOINTS = {
     resetPassword: '/auth/reset-password',
     verifyEmailOtp: '/auth/verify-email-otp',
     resendVerification: '/auth/resend-verification',
+    updateUnverifiedEmail: '/auth/update-unverified-email',
     trackHomeVisit: '/auth/track-home-visit',
     checkEmail: '/auth/check-email',
     oauthRedirect: (provider: string) => `/auth/oauth/${provider}/redirect`,

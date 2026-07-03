@@ -37,6 +37,10 @@ Route::prefix('auth')->group(function (): void {
     // Email verification
     Route::post('resend-verification', [EmailVerificationController::class, 'resendVerificationEmail'])
         ->middleware('throttle:auth.resend-verify');
+    // Correction d'une adresse mal saisie AVANT vérification (compte
+    // authentifié mais non vérifié) — renvoie l'OTP à la nouvelle adresse.
+    Route::post('update-unverified-email', [EmailVerificationController::class, 'updateUnverifiedEmail'])
+        ->middleware(['auth:sanctum', 'throttle:auth.resend-verify']);
     Route::get('email/verify/{id}/{hash}', [EmailVerificationController::class, 'verifyEmail'])
         ->middleware('throttle:auth.verify-email')
         ->name('api.verification.verify');
