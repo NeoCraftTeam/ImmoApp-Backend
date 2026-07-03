@@ -55,7 +55,7 @@ export function CityAutocomplete({ value, onSelect, onClear, placeholder = 'Doua
           accessibilityRole="button"
           accessibilityLabel="Changer de ville"
         >
-          <X size={16} color={brand.slate500} />
+          <X size={16} color="$slate500" />
         </Pressable>
       </XStack>
     );

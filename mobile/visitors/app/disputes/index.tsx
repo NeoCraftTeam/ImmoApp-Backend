@@ -26,7 +26,7 @@ export default function DisputesList() {
   if (!isAuthenticated) {
     return (
       <YStack flex={1} alignItems="center" justifyContent="center" padding="$5" gap={10}>
-        <AlertTriangle size={36} color={brand.slate500} />
+        <AlertTriangle size={36} color="$slate500" />
         <Paragraph fontSize={15} fontWeight="700" color="$slate900" textAlign="center">
           Connectez-vous pour voir vos litiges
         </Paragraph>
@@ -54,7 +54,7 @@ export default function DisputesList() {
           <XStack alignItems="center" gap={10}>
             <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
               <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-                <ArrowLeft size={18} color={brand.slate700} />
+                <ArrowLeft size={18} color="$slate700" />
               </YStack>
             </Pressable>
             <Paragraph fontSize={20} fontWeight="700" color="$slate900" flex={1}>
@@ -84,7 +84,7 @@ export default function DisputesList() {
             refreshing={isRefetching}
             ListEmptyComponent={
               <YStack padding="$6" alignItems="center" gap={6}>
-                <AlertTriangle size={32} color={brand.slate500} />
+                <AlertTriangle size={32} color="$slate500" />
                 <Paragraph fontSize={14} fontWeight="700" color="$slate900">
                   Aucun litige
                 </Paragraph>
@@ -140,7 +140,7 @@ function DisputeRow({ dispute, onPress }: { dispute: Dispute; onPress: () => voi
         )}
         <XStack alignItems="center" justifyContent="space-between">
           <Paragraph fontSize={11} color="$slate500">Ouvert {relative}</Paragraph>
-          <ChevronRight size={14} color={brand.slate500} />
+          <ChevronRight size={14} color="$slate500" />
         </XStack>
       </YStack>
     </Pressable>

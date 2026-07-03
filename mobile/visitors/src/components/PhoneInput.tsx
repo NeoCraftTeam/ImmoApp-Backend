@@ -82,7 +82,7 @@ export function PhoneInput({
             <Paragraph fontSize={13.5} fontWeight="700" color="$slate900">
               {country.dial}
             </Paragraph>
-            <ChevronDown size={13} color={brand.slate500} />
+            <ChevronDown size={13} color="$slate500" />
           </XStack>
         </Pressable>
         <TextInput
@@ -133,7 +133,7 @@ export function PhoneInput({
               borderRadius={12}
               backgroundColor="$slate100"
             >
-              <SearchIcon size={16} color={brand.slate500} />
+              <SearchIcon size={16} color="$slate500" />
               <TextInput
                 value={search}
                 onChangeText={setSearch}

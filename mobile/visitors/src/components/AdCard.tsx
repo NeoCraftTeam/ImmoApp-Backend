@@ -217,7 +217,7 @@ function AdCardComponent({ ad, priority = false }: AdCardProps) {
                 <XStack alignItems="center" gap={6} flexShrink={0}>
                   {ad.rating != null && (
                     <XStack alignItems="center" gap={2}>
-                      <Star size={12} color={brand.slate900} fill={brand.slate900} />
+                      <Star size={12} color="$slate900" fill={brand.slate900} />
                       <Paragraph
                         fontSize={12}
                         fontWeight="600"
@@ -251,19 +251,19 @@ function AdCardComponent({ ad, priority = false }: AdCardProps) {
                 <XStack alignItems="center" gap={10} marginTop={2} flexWrap="wrap">
                   {(ad.bedrooms ?? 0) > 0 && (
                     <FeatureChip
-                      icon={<Bed size={13} color={brand.slate500} />}
+                      icon={<Bed size={13} color="$slate500" />}
                       label={String(ad.bedrooms)}
                     />
                   )}
                   {(ad.bathrooms ?? 0) > 0 && (
                     <FeatureChip
-                      icon={<ShowerHead size={13} color={brand.slate500} />}
+                      icon={<ShowerHead size={13} color="$slate500" />}
                       label={String(ad.bathrooms)}
                     />
                   )}
                   {(ad.surface_area ?? 0) > 0 && (
                     <FeatureChip
-                      icon={<Maximize size={13} color={brand.slate500} />}
+                      icon={<Maximize size={13} color="$slate500" />}
                       label={`${ad.surface_area} m²`}
                     />
                   )}

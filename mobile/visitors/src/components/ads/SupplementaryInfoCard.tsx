@@ -46,14 +46,14 @@ export function SupplementaryInfoCard({ ad }: Props) {
       <YStack gap={10}>
         {ad.deposit_amount ? (
           <InfoRow
-            icon={<Wallet size={16} color={brand.slate700} />}
+            icon={<Wallet size={16} color="$slate700" />}
             label="Dépôt de garantie"
             value={ad.deposit_amount}
           />
         ) : null}
         {ad.minimum_lease_duration ? (
           <InfoRow
-            icon={<CalendarDays size={16} color={brand.slate700} />}
+            icon={<CalendarDays size={16} color="$slate700" />}
             label="Durée minimum"
             value={ad.minimum_lease_duration}
           />
@@ -72,14 +72,14 @@ export function SupplementaryInfoCard({ ad }: Props) {
         ) : null}
         {ad.detailed_charges ? (
           <InfoRow
-            icon={<Receipt size={16} color={brand.slate700} />}
+            icon={<Receipt size={16} color="$slate700" />}
             label="Détail"
             value={ad.detailed_charges}
           />
         ) : null}
         {ad.charges_forfaitaires && ad.charges_montant_forfait ? (
           <InfoRow
-            icon={<Receipt size={16} color={brand.slate700} />}
+            icon={<Receipt size={16} color="$slate700" />}
             label="Forfait mensuel"
             value={formatChargeAmount(ad.charges_montant_forfait)}
           />
@@ -100,7 +100,7 @@ export function SupplementaryInfoCard({ ad }: Props) {
         ) : null}
         {ad.charges_autres ? (
           <InfoRow
-            icon={<Receipt size={16} color={brand.slate700} />}
+            icon={<Receipt size={16} color="$slate700" />}
             label="Autres"
             value={ad.charges_autres}
           />

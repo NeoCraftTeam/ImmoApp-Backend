@@ -281,7 +281,7 @@ function DistanceRow({
       borderRadius={10}
       backgroundColor="$slate100"
     >
-      <MapPin size={16} color={brand.slate700} />
+      <MapPin size={16} color="$slate700" />
       <Paragraph fontSize={13} color="$slate700" flex={1}>
         À <Paragraph fontSize={13} fontWeight="700" color="$slate900">
           {distanceLabel}

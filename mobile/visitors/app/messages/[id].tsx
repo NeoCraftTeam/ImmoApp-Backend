@@ -210,7 +210,7 @@ export default function ConversationScreen() {
               accessibilityLabel="Retour à mes conversations"
             >
               <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-                <ArrowLeft size={18} color={brand.slate700} />
+                <ArrowLeft size={18} color="$slate700" />
               </YStack>
             </Pressable>
             <YStack flex={1} gap={1}>
@@ -318,7 +318,7 @@ export default function ConversationScreen() {
                 alignItems="center"
                 justifyContent="center"
               >
-                <ImagePlus size={18} color={brand.slate700} />
+                <ImagePlus size={18} color="$slate700" />
               </YStack>
             </Pressable>
             <YStack

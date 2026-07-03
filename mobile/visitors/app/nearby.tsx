@@ -53,7 +53,7 @@ export default function Nearby() {
                 alignItems="center"
                 justifyContent="center"
               >
-                <ArrowLeft size={18} color={brand.slate700} />
+                <ArrowLeft size={18} color="$slate700" />
               </YStack>
             </Pressable>
             <H2 fontSize={20} fontWeight="700" color="$slate900" flex={1}>
@@ -86,7 +86,7 @@ export default function Nearby() {
           </YStack>
         ) : permissionDenied || !location ? (
           <YStack flex={1} alignItems="center" justifyContent="center" gap={10} padding="$5">
-            <MapPin size={36} color={brand.slate500} />
+            <MapPin size={36} color="$slate500" />
             <Paragraph fontSize={15} fontWeight="700" color="$slate900" textAlign="center">
               Activez la localisation
             </Paragraph>

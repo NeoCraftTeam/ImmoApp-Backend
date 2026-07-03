@@ -186,7 +186,7 @@ export default function Home() {
             alignItems="center"
             justifyContent="center"
           >
-            <Bell size={22} color={brand.slate700} />
+            <Bell size={22} color="$slate700" />
             <CountBadge
               count={unread.data ?? 0}
               size={16}
@@ -468,7 +468,7 @@ function FeedFooter({
             borderWidth={1}
             borderColor="$slate300"
           >
-            <RefreshCw size={13} color={brand.slate700} />
+            <RefreshCw size={13} color="$slate700" />
             <Paragraph fontSize={13} fontWeight="700" color="$slate700">
               Charger plus
             </Paragraph>

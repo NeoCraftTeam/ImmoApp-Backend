@@ -199,14 +199,14 @@ export default function AccountTab() {
                   </Paragraph>
                   {balance.data != null && (
                     <XStack alignItems="center" gap={4} marginTop={2}>
-                      <CreditCard size={11} color={brand.slate500} />
+                      <CreditCard size={11} color="$slate500" />
                       <Paragraph fontSize={11} fontWeight="700" color="$slate500">
                         {balance.data.toLocaleString('fr-FR')} pts
                       </Paragraph>
                     </XStack>
                   )}
                 </YStack>
-                <ChevronRight size={18} color={brand.slate500} />
+                <ChevronRight size={18} color="$slate500" />
               </XStack>
             </YStack>
           </Pressable>
@@ -253,33 +253,33 @@ export default function AccountTab() {
         {isAuthenticated && (
           <Section title="Activité">
             <Row
-              icon={<MessageCircle size={18} color={brand.slate700} />}
+              icon={<MessageCircle size={18} color="$slate700" />}
               label="Messages"
               onPress={() => router.push('/messages')}
             />
             <Row
-              icon={<Bell size={18} color={brand.slate700} />}
+              icon={<Bell size={18} color="$slate700" />}
               label="Notifications"
               badge={unread.data && unread.data > 0 ? unread.data : undefined}
               onPress={() => router.push('/notifications')}
             />
             <Row
-              icon={<Heart size={18} color={brand.slate700} />}
+              icon={<Heart size={18} color="$slate700" />}
               label="Mes favoris"
               onPress={() => router.push('/(tabs)/favorites')}
             />
             <Row
-              icon={<Search size={18} color={brand.slate700} />}
+              icon={<Search size={18} color="$slate700" />}
               label="Alertes de recherche"
               onPress={() => router.push('/search-alerts')}
             />
             <Row
-              icon={<Calendar size={18} color={brand.slate700} />}
+              icon={<Calendar size={18} color="$slate700" />}
               label="Mes réservations"
               onPress={() => router.push('/reservations' as never)}
             />
             <Row
-              icon={<GitCompareArrows size={18} color={brand.slate700} />}
+              icon={<GitCompareArrows size={18} color="$slate700" />}
               label="Comparateur"
               onPress={() => router.push('/compare')}
             />
@@ -289,13 +289,13 @@ export default function AccountTab() {
         {isAuthenticated && (
           <Section title="Portefeuille">
             <Row
-              icon={<CreditCard size={18} color={brand.slate700} />}
+              icon={<CreditCard size={18} color="$slate700" />}
               label="Crédits & paiements"
               hint={balance.data != null ? `${balance.data.toLocaleString('fr-FR')} crédits disponibles` : undefined}
               onPress={() => router.push('/credits')}
             />
             <Row
-              icon={<AlertTriangle size={18} color={brand.slate700} />}
+              icon={<AlertTriangle size={18} color="$slate700" />}
               label="Litiges"
               onPress={() => router.push('/disputes' as never)}
             />
@@ -304,25 +304,25 @@ export default function AccountTab() {
 
         <Section title="Outils">
           <Row
-            icon={<MapPin size={18} color={brand.slate700} />}
+            icon={<MapPin size={18} color="$slate700" />}
             label="Près de moi"
             hint="Annonces autour de votre position"
             onPress={() => router.push('/nearby')}
           />
           <Row
-            icon={<Calculator size={18} color={brand.slate700} />}
+            icon={<Calculator size={18} color="$slate700" />}
             label={t('estimator.title')}
             hint={t('estimator.subtitle')}
             onPress={() => router.push('/estimator')}
           />
           <Row
-            icon={<ClipboardList size={18} color={brand.slate700} />}
+            icon={<ClipboardList size={18} color="$slate700" />}
             label="Sondages"
             onPress={() => router.push('/surveys' as never)}
           />
           {!isAuthenticated && (
             <Row
-              icon={<GitCompareArrows size={18} color={brand.slate700} />}
+              icon={<GitCompareArrows size={18} color="$slate700" />}
               label="Comparateur"
               onPress={() => router.push('/compare')}
             />
@@ -331,24 +331,24 @@ export default function AccountTab() {
 
         <Section title="Application">
           <Row
-            icon={<User size={18} color={brand.slate700} />}
+            icon={<User size={18} color="$slate700" />}
             label="Profil et préférences"
             onPress={() =>
               router.push(isAuthenticated ? '/profile' : '/(auth)/login')
             }
           />
           <Row
-            icon={<Settings size={18} color={brand.slate700} />}
+            icon={<Settings size={18} color="$slate700" />}
             label="Paramètres"
             onPress={() => router.push('/parametres')}
           />
           <Row
-            icon={<HelpCircle size={18} color={brand.slate700} />}
+            icon={<HelpCircle size={18} color="$slate700" />}
             label="Aide & support"
             onPress={() => router.push('/aide')}
           />
           <Row
-            icon={<Mail size={18} color={brand.slate700} />}
+            icon={<Mail size={18} color="$slate700" />}
             label="Nous contacter"
             onPress={() => router.push('/contact' as never)}
           />
@@ -445,7 +445,7 @@ function Row({
             </Paragraph>
           </YStack>
         )}
-        <ChevronRight size={16} color={brand.slate500} />
+        <ChevronRight size={16} color="$slate500" />
       </XStack>
     </Pressable>
   );

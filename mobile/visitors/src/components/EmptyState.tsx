@@ -84,7 +84,7 @@ export function EmptyState({ icon, title, body, action, secondary, style }: Prop
         >
           <Paragraph
             fontSize={13}
-            color={brand.slate500}
+            color="$slate500"
             fontWeight="600"
             textDecorationLine="underline"
             marginTop={2}

@@ -21,12 +21,12 @@ export default function Offline() {
       >
         <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
           <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-            <ArrowLeft size={18} color={brand.slate700} />
+            <ArrowLeft size={18} color="$slate700" />
           </YStack>
         </Pressable>
         <YStack flex={1} alignItems="center" justifyContent="center" gap={14}>
           <YStack width={84} height={84} borderRadius={42} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-            <WifiOff size={36} color={brand.slate500} />
+            <WifiOff size={36} color="$slate500" />
           </YStack>
           <H2 fontSize={22} fontWeight="700" textAlign="center">Vous êtes hors ligne</H2>
           <Paragraph fontSize={14} color="$slate500" textAlign="center" lineHeight={20}>

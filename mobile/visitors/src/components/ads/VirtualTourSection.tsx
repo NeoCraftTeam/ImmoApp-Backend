@@ -43,7 +43,7 @@ export function VirtualTourSection({ ad }: Props) {
           <Paragraph fontSize={14.5} fontWeight="800" color="$slate900" flex={1}>
             Visite Virtuelle 3D disponible
           </Paragraph>
-          <Lock size={16} color={brand.slate500} />
+          <Lock size={16} color="$slate500" />
         </XStack>
         <Paragraph fontSize={13} color="$slate500" lineHeight={19}>
           {scenesLabel

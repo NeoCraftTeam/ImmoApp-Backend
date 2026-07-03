@@ -73,7 +73,7 @@ export function BookViewingSheet({ adId, open, onClose, onBooked }: Props) {
         >
           <Pressable onPress={handleClose} hitSlop={8}>
             <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-              <X size={18} color={brand.slate700} />
+              <X size={18} color="$slate700" />
             </YStack>
           </Pressable>
           <Paragraph fontSize={16} fontWeight="700" color="$slate900" flex={1} textAlign="center">

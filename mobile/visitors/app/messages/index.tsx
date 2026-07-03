@@ -52,7 +52,7 @@ export default function MessagesInbox() {
         >
           <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
             <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-              <ArrowLeft size={18} color={brand.slate700} />
+              <ArrowLeft size={18} color="$slate700" />
             </YStack>
           </Pressable>
           <H2 fontSize={20} fontWeight="700" color="$slate900" flex={1}>
@@ -73,7 +73,7 @@ export default function MessagesInbox() {
             refreshing={isRefetching}
             ListEmptyComponent={
               <YStack padding="$6" alignItems="center" gap={8}>
-                <MessageCircle size={36} color={brand.slate500} />
+                <MessageCircle size={36} color="$slate500" />
                 <Paragraph fontSize={15} fontWeight="700" color="$slate900">
                   Pas encore de conversations
                 </Paragraph>
@@ -209,7 +209,7 @@ function SignInWall({
       padding={28}
       paddingTop={insets.top + 28}
     >
-      <MessageCircle size={40} color={brand.slate500} />
+      <MessageCircle size={40} color="$slate500" />
       <Paragraph fontSize={17} fontWeight="700" color="$slate900" textAlign="center">
         Connectez-vous pour voir vos messages
       </Paragraph>

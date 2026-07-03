@@ -108,7 +108,7 @@ export default function DisputeDetail() {
           >
             <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
               <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-                <ArrowLeft size={18} color={brand.slate700} />
+                <ArrowLeft size={18} color="$slate700" />
               </YStack>
             </Pressable>
             <Paragraph fontSize={16} fontWeight="700" color="$slate900" flex={1} numberOfLines={1}>
@@ -189,7 +189,7 @@ export default function DisputeDetail() {
                         <Image source={{ uri: ev.url }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
                       ) : (
                         <YStack alignItems="center" gap={4}>
-                          <FileText size={22} color={brand.slate500} />
+                          <FileText size={22} color="$slate500" />
                           <Paragraph fontSize={9} color="$slate500">{ev.type}</Paragraph>
                         </YStack>
                       )}

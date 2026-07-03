@@ -44,7 +44,7 @@ export default function FavoritesTab() {
       <YStack flex={1} backgroundColor="$background" paddingTop={insets.top + 32} paddingHorizontal="$5">
         <H2>{t('favorites.title')}</H2>
         <EmptyState
-          icon={<LogIn size={32} color={brand.slate500} />}
+          icon={<LogIn size={32} color="$slate500" />}
           title={t('favorites.signInPrompt')}
           body={t('favorites.emptyHint')}
           action={{ label: t('account.signIn'), onPress: () => router.push('/(auth)/login') }}
@@ -81,7 +81,7 @@ export default function FavoritesTab() {
       <YStack flex={1} backgroundColor="$background" paddingTop={insets.top + 12} paddingHorizontal="$5">
         <H2>{t('favorites.title')}</H2>
         <EmptyState
-          icon={<AlertCircle size={32} color={brand.slate500} />}
+          icon={<AlertCircle size={32} color="$slate500" />}
           title={extractApiErrorMessage(error)}
           action={{ label: t('common.retry'), onPress: () => refetch() }}
         />
@@ -107,7 +107,7 @@ export default function FavoritesTab() {
       }
       ListEmptyComponent={
         <EmptyState
-          icon={<Heart size={32} color={brand.slate500} />}
+          icon={<Heart size={32} color="$slate500" />}
           title={t('favorites.empty')}
           body={t('favorites.emptyHint')}
           action={{ label: 'Découvrir les annonces', onPress: () => router.replace('/(tabs)/home') }}

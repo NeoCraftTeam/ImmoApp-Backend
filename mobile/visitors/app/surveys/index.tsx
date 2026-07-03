@@ -29,7 +29,7 @@ export default function SurveysList() {
         >
           <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
             <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-              <ArrowLeft size={18} color={brand.slate700} />
+              <ArrowLeft size={18} color="$slate700" />
             </YStack>
           </Pressable>
           <Paragraph fontSize={20} fontWeight="700" color="$slate900" flex={1}>
@@ -50,7 +50,7 @@ export default function SurveysList() {
             refreshing={isRefetching}
             ListEmptyComponent={
               <YStack padding="$6" alignItems="center" gap={6}>
-                <ClipboardList size={32} color={brand.slate500} />
+                <ClipboardList size={32} color="$slate500" />
                 <Paragraph fontSize={14} fontWeight="700" color="$slate900">Aucun sondage actif</Paragraph>
                 <Paragraph fontSize={12} color="$slate500" textAlign="center">
                   Revenez bientôt — nous publions régulièrement des sondages pour améliorer KeyHome.
@@ -85,7 +85,7 @@ function SurveyRow({ survey, onPress }: { survey: Survey; onPress: () => void })
             {survey.description ?? `${(survey.questions ?? []).length} question${(survey.questions ?? []).length > 1 ? 's' : ''}`}
           </Paragraph>
         </YStack>
-        <ChevronRight size={16} color={brand.slate500} />
+        <ChevronRight size={16} color="$slate500" />
       </XStack>
     </Pressable>
   );

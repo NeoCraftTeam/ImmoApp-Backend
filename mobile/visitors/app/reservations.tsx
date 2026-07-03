@@ -74,7 +74,7 @@ export default function Reservations() {
           <XStack alignItems="center" gap={10}>
             <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
               <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-                <ArrowLeft size={18} color={brand.slate700} />
+                <ArrowLeft size={18} color="$slate700" />
               </YStack>
             </Pressable>
             <Paragraph fontSize={20} fontWeight="700" color="$slate900" flex={1}>
@@ -105,7 +105,7 @@ export default function Reservations() {
             refreshing={isRefetching}
             ListEmptyComponent={
               <YStack padding="$6" alignItems="center" gap={6}>
-                <Calendar size={32} color={brand.slate500} />
+                <Calendar size={32} color="$slate500" />
                 <Paragraph fontSize={14} fontWeight="700" color="$slate900">
                   Aucune réservation
                 </Paragraph>
@@ -161,14 +161,14 @@ function ReservationCard({ r, onCancel }: { r: Reservation; onCancel: () => void
       )}
       {(r.ad?.quarter?.name || r.ad?.quarter?.city_name) && (
         <XStack alignItems="center" gap={6}>
-          <MapPin size={13} color={brand.slate500} />
+          <MapPin size={13} color="$slate500" />
           <Paragraph fontSize={13} color="$slate500" numberOfLines={1}>
             {[r.ad?.quarter?.name, r.ad?.quarter?.city_name].filter(Boolean).join(', ')}
           </Paragraph>
         </XStack>
       )}
       <XStack alignItems="center" gap={10}>
-        <Calendar size={14} color={brand.slate700} />
+        <Calendar size={14} color="$slate700" />
         <Paragraph fontSize={13.5} fontWeight="600" color="$slate900">
           {dateLabel} · {timeLabel}
         </Paragraph>
@@ -182,11 +182,11 @@ function statusFor(status: string): { icon: React.ReactNode; label: string; colo
     case 'confirmed':
       return { icon: <CheckCircle2 size={14} color={brand.success} />, label: 'Confirmée', color: brand.success };
     case 'completed':
-      return { icon: <CheckCircle2 size={14} color={brand.slate500} />, label: 'Terminée', color: brand.slate500 };
+      return { icon: <CheckCircle2 size={14} color="$slate500" />, label: 'Terminée', color: brand.slate500 };
     case 'cancelled':
       return { icon: <X size={14} color={brand.danger} />, label: 'Annulée', color: brand.danger };
     case 'expired':
-      return { icon: <Clock size={14} color={brand.slate500} />, label: 'Expirée', color: brand.slate500 };
+      return { icon: <Clock size={14} color="$slate500" />, label: 'Expirée', color: brand.slate500 };
     case 'no_show':
       return { icon: <X size={14} color={brand.warning} />, label: 'Absence', color: brand.warning };
     default:
@@ -197,7 +197,7 @@ function statusFor(status: string): { icon: React.ReactNode; label: string; colo
 function SignInWall({ onSignIn }: { onSignIn: () => void }) {
   return (
     <YStack flex={1} alignItems="center" justifyContent="center" padding="$5" gap={10}>
-      <Calendar size={36} color={brand.slate500} />
+      <Calendar size={36} color="$slate500" />
       <Paragraph fontSize={15} fontWeight="700" color="$slate900" textAlign="center">
         Connectez-vous pour voir vos réservations
       </Paragraph>

@@ -79,7 +79,7 @@ export default function PaymentSuccess() {
           accessibilityLabel="Retour à l'accueil"
         >
           <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-            <ArrowLeft size={18} color={brand.slate700} />
+            <ArrowLeft size={18} color="$slate700" />
           </YStack>
         </Pressable>
 

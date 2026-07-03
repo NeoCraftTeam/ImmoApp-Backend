@@ -50,7 +50,7 @@ export default function Notifications() {
   if (!isAuthenticated) {
     return (
       <YStack flex={1} alignItems="center" justifyContent="center" padding="$5" gap={10}>
-        <BellRing size={36} color={brand.slate500} />
+        <BellRing size={36} color="$slate500" />
         <Paragraph fontSize={15} color="$slate900" textAlign="center" fontWeight="700">
           Connectez-vous pour voir vos notifications
         </Paragraph>
@@ -87,7 +87,7 @@ export default function Notifications() {
           <XStack alignItems="center" gap={10}>
             <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
               <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-                <ArrowLeft size={18} color={brand.slate700} />
+                <ArrowLeft size={18} color="$slate700" />
               </YStack>
             </Pressable>
             <H2 fontSize={20} fontWeight="700" color="$slate900" flex={1}>
@@ -102,7 +102,7 @@ export default function Notifications() {
                 borderRadius={999}
                 backgroundColor="$slate100"
               >
-                <CheckCheck size={14} color={brand.slate700} />
+                <CheckCheck size={14} color="$slate700" />
                 <Paragraph fontSize={12} fontWeight="700" color="$slate700">
                   Tout lu
                 </Paragraph>
@@ -141,7 +141,7 @@ export default function Notifications() {
             ItemSeparatorComponent={() => <YStack height={1} backgroundColor="$slate100" marginLeft={60} />}
             ListEmptyComponent={
               <YStack padding="$6" alignItems="center" gap={6}>
-                <Bell size={36} color={brand.slate500} />
+                <Bell size={36} color="$slate500" />
                 <Paragraph fontSize={14} color="$slate900" fontWeight="700">
                   Pas de notifications
                 </Paragraph>
@@ -252,7 +252,7 @@ function NotificationRow({
         </YStack>
         <Pressable onPress={onDelete} hitSlop={6}>
           <YStack padding={4}>
-            <Trash2 size={15} color={brand.slate500} />
+            <Trash2 size={15} color="$slate500" />
           </YStack>
         </Pressable>
       </XStack>
@@ -277,5 +277,5 @@ function iconFor(type: string): { icon: React.ReactNode; tint: string } {
   if (t.includes('message') || t.includes('chat')) {
     return { icon: <MessageCircle size={18} color={brand.info} />, tint: brand.info };
   }
-  return { icon: <Bell size={18} color={brand.slate700} />, tint: brand.slate700 };
+  return { icon: <Bell size={18} color="$slate700" />, tint: brand.slate700 };
 }

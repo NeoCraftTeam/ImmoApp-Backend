@@ -64,7 +64,7 @@ export default function AgencyProfile() {
         >
           <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
             <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-              <ArrowLeft size={18} color={brand.slate700} />
+              <ArrowLeft size={18} color="$slate700" />
             </YStack>
           </Pressable>
           <Paragraph fontSize={16} fontWeight="700" color="$slate900" flex={1}>
@@ -93,7 +93,7 @@ export default function AgencyProfile() {
                   {data.logo ? (
                     <Image source={{ uri: data.logo }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
                   ) : (
-                    <Building2 size={36} color={brand.slate500} />
+                    <Building2 size={36} color="$slate500" />
                   )}
                 </YStack>
                 <YStack flex={1} gap={4}>
@@ -127,7 +127,7 @@ export default function AgencyProfile() {
                 )}
                 {(data.agents_count ?? 0) > 0 && (
                   <Chip
-                    icon={<Users size={14} color={brand.slate700} />}
+                    icon={<Users size={14} color="$slate700" />}
                     label={`${data.agents_count} agent${(data.agents_count ?? 0) > 1 ? 's' : ''}`}
                   />
                 )}

@@ -75,7 +75,7 @@ export default function CreditsScreen() {
   if (!isAuthenticated) {
     return (
       <YStack flex={1} alignItems="center" justifyContent="center" padding="$5" gap={10} backgroundColor="$background">
-        <Wallet size={36} color={brand.slate500} />
+        <Wallet size={36} color="$slate500" />
         <Paragraph fontSize={15} fontWeight="700" color="$slate900" textAlign="center">
           Connectez-vous pour voir vos crédits
         </Paragraph>
@@ -103,7 +103,7 @@ export default function CreditsScreen() {
         >
           <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
             <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-              <ArrowLeft size={18} color={brand.slate700} />
+              <ArrowLeft size={18} color="$slate700" />
             </YStack>
           </Pressable>
           <H2 fontSize={20} fontWeight="700" color="$slate900" flex={1}>
@@ -279,7 +279,7 @@ function PacksModal({
             </XStack>
             <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Fermer">
               <YStack width={32} height={32} borderRadius={16} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-                <X size={16} color={brand.slate700} />
+                <X size={16} color="$slate700" />
               </YStack>
             </Pressable>
           </XStack>

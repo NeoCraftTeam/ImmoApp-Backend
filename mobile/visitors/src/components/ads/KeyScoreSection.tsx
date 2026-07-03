@@ -86,7 +86,7 @@ export function KeyScoreSection({ adId }: Props) {
       )}
 
       <XStack alignItems="center" gap={6}>
-        <Info size={12} color={brand.slate500} />
+        <Info size={12} color="$slate500" />
         <Paragraph fontSize={11} color="$slate500" flex={1}>
           Le KeyScore évalue la complétude d'une annonce (photos,
           description, prix, équipements…).

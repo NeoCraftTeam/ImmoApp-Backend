@@ -102,7 +102,7 @@ export default function BailleurProfile() {
               alignItems="center"
               justifyContent="center"
             >
-              <ArrowLeft size={18} color={brand.slate700} />
+              <ArrowLeft size={18} color="$slate700" />
             </YStack>
           </Pressable>
           <Paragraph fontSize={16} fontWeight="700" color="$slate900" flex={1}>
@@ -180,7 +180,7 @@ export default function BailleurProfile() {
                       }}
                       icon={
                         follow.data?.is_following ? (
-                          <UserCheck size={15} color={brand.slate900} />
+                          <UserCheck size={15} color="$slate900" />
                         ) : (
                           <UserPlus size={15} color="white" />
                         )
@@ -203,7 +203,7 @@ export default function BailleurProfile() {
                         }
                         router.push('/messages');
                       }}
-                      icon={<MessageCircle size={15} color={brand.slate900} />}
+                      icon={<MessageCircle size={15} color="$slate900" />}
                     >
                       Message
                     </Button>

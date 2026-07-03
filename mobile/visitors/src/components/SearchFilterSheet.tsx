@@ -363,7 +363,7 @@ function AmenityCategoryAccordion({
             </Paragraph>
           ) : null}
         </XStack>
-        <Chevron size={16} color={brand.slate500} />
+        <Chevron size={16} color="$slate500" />
       </XStack>
       {expanded ? (
         <XStack gap="$2" flexWrap="wrap" paddingHorizontal={14} paddingBottom={12}>

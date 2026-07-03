@@ -101,7 +101,7 @@ export function PropertyAttributes({ attributes }: Props) {
               borderRadius={12}
               backgroundColor="$slate100"
             >
-              <Icon size={18} color={brand.slate700} />
+              <Icon size={18} color="$slate700" />
               <Paragraph fontSize={14} color="$slate900" fontWeight="500" flex={1}>
                 {label}
               </Paragraph>

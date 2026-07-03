@@ -52,7 +52,7 @@ export default function SearchAlerts() {
   if (!isAuthenticated) {
     return (
       <YStack flex={1} alignItems="center" justifyContent="center" padding="$5" gap={10}>
-        <Bell size={36} color={brand.slate500} />
+        <Bell size={36} color="$slate500" />
         <Paragraph fontSize={15} color="$slate900" fontWeight="700" textAlign="center">
           Connectez-vous pour gérer vos alertes
         </Paragraph>
@@ -93,7 +93,7 @@ export default function SearchAlerts() {
         >
           <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
             <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-              <ArrowLeft size={18} color={brand.slate700} />
+              <ArrowLeft size={18} color="$slate700" />
             </YStack>
           </Pressable>
           <H2 fontSize={20} fontWeight="700" color="$slate900" flex={1}>
@@ -121,7 +121,7 @@ export default function SearchAlerts() {
             refreshing={isRefetching}
             ListEmptyComponent={
               <YStack padding="$6" alignItems="center" gap={6}>
-                <Search size={36} color={brand.slate500} />
+                <Search size={36} color="$slate500" />
                 <Paragraph fontSize={14} fontWeight="700" color="$slate900">
                   Aucune alerte
                 </Paragraph>
@@ -210,7 +210,7 @@ function AlertRow({
           {alert.is_active ? (
             <Bell size={18} color={brand.primary} />
           ) : (
-            <BellOff size={18} color={brand.slate500} />
+            <BellOff size={18} color="$slate500" />
           )}
           <YStack flex={1}>
             <Paragraph fontSize={15} fontWeight="700" color="$slate900">
@@ -299,7 +299,7 @@ function AlertEditor({
         borderBottomColor="$slate300"
       >
         <Pressable onPress={onClose} hitSlop={6}>
-          <Paragraph fontSize={15} color={brand.slate700}>
+          <Paragraph fontSize={15} color="$slate700">
             Annuler
           </Paragraph>
         </Pressable>

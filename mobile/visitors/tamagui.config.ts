@@ -37,19 +37,41 @@ const appConfig = createTamagui({
   },
   themes: {
     ...config.themes,
+    // IMPORTANT : l'échelle slate est redéfinie DANS chaque thème pour
+    // être theme-aware. Toute l'app utilise `$slate900/700/500` pour le
+    // texte et `$slate100` pour les surfaces ; sans ces clés par thème,
+    // `$slate900` restait quasi-noir en sombre → texte invisible. En
+    // dark on inverse la luminosité (texte clair, surfaces sombres).
     light: {
       ...config.themes.light,
       background: '#FFFFFF',
+      backgroundHover: '#F3F4F6',
       color: brand.slate900,
       brand: brand.primary,
+      brandText: brand.primaryText,
       borderColor: brand.slate300,
+      slate900: brand.slate900,
+      slate700: brand.slate700,
+      slate500: brand.slate500,
+      slate300: brand.slate300,
+      slate100: brand.slate100,
+      brandAlpha10: brand.primaryAlpha10,
     },
     dark: {
       ...config.themes.dark,
       background: '#0A0A0F',
-      color: '#FFFFFF',
+      backgroundHover: '#1E293B',
+      color: '#F8FAFC',
       brand: brand.primary,
-      borderColor: brand.slate700,
+      brandText: brand.primaryText,
+      borderColor: '#334155',
+      // Inversé : slate900 = texte clair, slate100 = surface sombre.
+      slate900: '#F8FAFC',
+      slate700: '#CBD5E1',
+      slate500: '#94A3B8',
+      slate300: '#334155',
+      slate100: '#1E293B',
+      brandAlpha10: 'rgba(246, 71, 95, 0.16)',
     },
   },
 });

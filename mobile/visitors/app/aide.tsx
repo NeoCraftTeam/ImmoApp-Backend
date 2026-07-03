@@ -61,7 +61,7 @@ export default function Aide() {
               alignItems="center"
               justifyContent="center"
             >
-              <ArrowLeft size={18} color={brand.slate700} />
+              <ArrowLeft size={18} color="$slate700" />
             </YStack>
           </Pressable>
           <H2 fontSize={20} fontWeight="700" color="$slate900" flex={1}>
@@ -149,7 +149,7 @@ export default function Aide() {
               borderColor="$slate300"
               marginTop={6}
             >
-              <ExternalLink size={16} color={brand.slate700} />
+              <ExternalLink size={16} color="$slate700" />
               <Paragraph fontSize={14} fontWeight="700" color="$slate700">
                 Centre d'aide complet
               </Paragraph>
@@ -187,9 +187,9 @@ function FaqItem({
             {question}
           </Paragraph>
           {isOpen ? (
-            <ChevronUp size={16} color={brand.slate700} />
+            <ChevronUp size={16} color="$slate700" />
           ) : (
-            <ChevronDown size={16} color={brand.slate700} />
+            <ChevronDown size={16} color="$slate700" />
           )}
         </XStack>
         {isOpen && (

@@ -34,9 +34,9 @@ export function PasswordInput(props: InputProps): React.JSX.Element {
         hitSlop={8}
       >
         {visible ? (
-          <EyeOff size={20} color={brand.slate500} />
+          <EyeOff size={20} color="$slate500" />
         ) : (
-          <Eye size={20} color={brand.slate500} />
+          <Eye size={20} color="$slate500" />
         )}
       </XStack>
     </XStack>

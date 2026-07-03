@@ -49,7 +49,7 @@ export default function MarketPrices() {
           <XStack alignItems="center" gap={10}>
             <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
               <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-                <ArrowLeft size={18} color={brand.slate700} />
+                <ArrowLeft size={18} color="$slate700" />
               </YStack>
             </Pressable>
             <H2 fontSize={20} fontWeight="700" color="$slate900" flex={1}>Prix du marché</H2>
@@ -79,7 +79,7 @@ export default function MarketPrices() {
           <YStack flex={1} alignItems="center" justifyContent="center"><ActivityIndicator /></YStack>
         ) : isError ? (
           <YStack flex={1} alignItems="center" justifyContent="center" padding="$5" gap={14}>
-            <TrendingUp size={36} color={brand.slate500} />
+            <TrendingUp size={36} color="$slate500" />
             <Paragraph color="$slate700" textAlign="center" fontSize={14}>
               {extractApiErrorMessage(error)}
             </Paragraph>
@@ -102,7 +102,7 @@ export default function MarketPrices() {
             contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 14, paddingBottom: insets.bottom + 24, gap: 8 }}
             ListEmptyComponent={
               <YStack padding="$6" alignItems="center" gap={6}>
-                <TrendingUp size={32} color={brand.slate500} />
+                <TrendingUp size={32} color="$slate500" />
                 <Paragraph fontSize={14} fontWeight="700" color="$slate900">Aucune donnée</Paragraph>
               </YStack>
             }

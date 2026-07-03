@@ -99,7 +99,7 @@ export default function Settings() {
         >
           <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
             <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-              <ArrowLeft size={18} color={brand.slate700} />
+              <ArrowLeft size={18} color="$slate700" />
             </YStack>
           </Pressable>
           <H2 fontSize={20} fontWeight="700" color="$slate900" flex={1}>
@@ -110,13 +110,13 @@ export default function Settings() {
         <YStack flex={1} paddingHorizontal={16} paddingTop={18} gap={18}>
           <Section title="Compte">
             <Row
-              icon={<User size={18} color={brand.slate700} />}
+              icon={<User size={18} color="$slate700" />}
               label="Profil"
               hint={isAuthenticated ? 'Modifier vos informations' : 'Connectez-vous pour modifier'}
               onPress={() => router.push(isAuthenticated ? '/profile' : '/(auth)/login')}
             />
             <Row
-              icon={<Lock size={18} color={brand.slate700} />}
+              icon={<Lock size={18} color="$slate700" />}
               label="Sécurité"
               hint="Mot de passe et authentification"
               onPress={() =>
@@ -127,7 +127,7 @@ export default function Settings() {
               }
             />
             <Row
-              icon={<CreditCard size={18} color={brand.slate700} />}
+              icon={<CreditCard size={18} color="$slate700" />}
               label="Crédits & paiements"
               onPress={() => router.push('/credits')}
             />
@@ -135,13 +135,13 @@ export default function Settings() {
 
           <Section title="Préférences">
             <ToggleRow
-              icon={<Bell size={18} color={brand.slate700} />}
+              icon={<Bell size={18} color="$slate700" />}
               label="Notifications push"
               value={pushEnabled}
               onChange={setPushEnabled}
             />
             <ToggleRow
-              icon={<Bell size={18} color={brand.slate700} />}
+              icon={<Bell size={18} color="$slate700" />}
               label="Notifications email"
               value={emailEnabled}
               onChange={setEmailEnabled}
@@ -149,9 +149,9 @@ export default function Settings() {
             <Row
               icon={
                 scheme === 'dark' ? (
-                  <Moon size={18} color={brand.slate700} />
+                  <Moon size={18} color="$slate700" />
                 ) : (
-                  <Sun size={18} color={brand.slate700} />
+                  <Sun size={18} color="$slate700" />
                 )
               }
               label="Apparence"
@@ -162,12 +162,12 @@ export default function Settings() {
 
           <Section title="Aide et confidentialité">
             <Row
-              icon={<HelpCircle size={18} color={brand.slate700} />}
+              icon={<HelpCircle size={18} color="$slate700" />}
               label="Centre d'aide"
               onPress={() => router.push('/aide')}
             />
             <Row
-              icon={<Shield size={18} color={brand.slate700} />}
+              icon={<Shield size={18} color="$slate700" />}
               label="Confidentialité"
               onPress={() =>
                 Alert.alert(
@@ -189,7 +189,7 @@ export default function Settings() {
                   borderWidth={1}
                   borderColor="$slate300"
                 >
-                  <LogOut size={18} color={brand.slate700} />
+                  <LogOut size={18} color="$slate700" />
                   <Paragraph fontSize={15} fontWeight="700" color="$slate900" flex={1}>
                     Se déconnecter
                   </Paragraph>
@@ -268,7 +268,7 @@ function Row({
           </Paragraph>
         )}
       </YStack>
-      <ChevronRight size={16} color={brand.slate500} />
+      <ChevronRight size={16} color="$slate500" />
     </XStack>
   );
   if (onPress) {

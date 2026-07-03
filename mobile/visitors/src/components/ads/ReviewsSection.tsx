@@ -59,7 +59,7 @@ export function ReviewsSection({ adId, fallbackRating, fallbackCount }: Props) {
         </Paragraph>
         {average != null ? (
           <XStack alignItems="center" gap={4}>
-            <Star size={14} color={brand.slate900} fill={brand.slate900} />
+            <Star size={14} color="$slate900" fill={brand.slate900} />
             <Paragraph fontSize={14} fontWeight="700" color="$slate900">
               {average.toFixed(1)}
             </Paragraph>

@@ -53,7 +53,7 @@ export default function ComparisonIndex() {
         >
           <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
             <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-              <ArrowLeft size={18} color={brand.slate700} />
+              <ArrowLeft size={18} color="$slate700" />
             </YStack>
           </Pressable>
           <H2 fontSize={20} fontWeight="700" color="$slate900" flex={1}>
@@ -97,7 +97,7 @@ export default function ComparisonIndex() {
                       ))}
                     </XStack>
                   </YStack>
-                  <ChevronRight size={16} color={brand.slate500} />
+                  <ChevronRight size={16} color="$slate500" />
                 </XStack>
                 <Paragraph fontSize={13} color="$slate700" lineHeight={20}>
                   {c.summary}

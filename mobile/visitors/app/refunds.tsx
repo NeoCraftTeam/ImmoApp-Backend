@@ -44,7 +44,7 @@ export default function RefundsScreen() {
         >
           <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
             <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-              <ArrowLeft size={18} color={brand.slate700} />
+              <ArrowLeft size={18} color="$slate700" />
             </YStack>
           </Pressable>
           <Paragraph fontSize={20} fontWeight="700" color="$slate900" flex={1}>
@@ -74,7 +74,7 @@ export default function RefundsScreen() {
             refreshing={refunds.isRefetching}
             ListEmptyComponent={
               <YStack padding="$6" alignItems="center" gap={6}>
-                <Clock size={32} color={brand.slate500} />
+                <Clock size={32} color="$slate500" />
                 <Paragraph fontSize={14} fontWeight="700" color="$slate900">Aucune demande</Paragraph>
                 <Paragraph fontSize={12} color="$slate500" textAlign="center">
                   Vous pouvez demander un remboursement depuis l'historique de paiements.
@@ -161,7 +161,7 @@ function RefundForm({ onClose }: { onClose: () => void }) {
         borderBottomColor="$slate300"
       >
         <Pressable onPress={onClose} hitSlop={6}>
-          <Paragraph fontSize={15} color={brand.slate700}>Annuler</Paragraph>
+          <Paragraph fontSize={15} color="$slate700">Annuler</Paragraph>
         </Pressable>
         <Paragraph fontSize={16} fontWeight="700" color="$slate900" flex={1} textAlign="center">
           Nouvelle demande
@@ -254,7 +254,7 @@ function statusFor(s: string): { icon: React.ReactNode; label: string; color: st
 function SignInWall({ onSignIn }: { onSignIn: () => void }) {
   return (
     <YStack flex={1} alignItems="center" justifyContent="center" padding="$5" gap={10}>
-      <Clock size={36} color={brand.slate500} />
+      <Clock size={36} color="$slate500" />
       <Paragraph fontSize={15} fontWeight="700" color="$slate900" textAlign="center">
         Connectez-vous pour voir vos remboursements
       </Paragraph>

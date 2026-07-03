@@ -318,7 +318,7 @@ function AnimatedHero({
           alignItems="center"
           justifyContent="center"
         >
-          <Maximize size={28} color={brand.slate500} />
+          <Maximize size={28} color="$slate500" />
         </YStack>
         <Paragraph color="$slate500" fontSize={13}>
           Aucune photo disponible
@@ -536,19 +536,19 @@ function DetailBody({
 
   const features = [
     (ad.bedrooms ?? 0) > 0 && {
-      icon: <Bed size={15} color={brand.slate700} />,
+      icon: <Bed size={15} color="$slate700" />,
       label: `${ad.bedrooms} chambre${(ad.bedrooms ?? 0) > 1 ? 's' : ''}`,
     },
     (ad.bathrooms ?? 0) > 0 && {
-      icon: <ShowerHead size={15} color={brand.slate700} />,
+      icon: <ShowerHead size={15} color="$slate700" />,
       label: `${ad.bathrooms} SDB`,
     },
     (ad.surface_area ?? 0) > 0 && {
-      icon: <Maximize size={15} color={brand.slate700} />,
+      icon: <Maximize size={15} color="$slate700" />,
       label: `${ad.surface_area} m²`,
     },
     ad.has_parking && {
-      icon: <ParkingCircle size={15} color={brand.slate700} />,
+      icon: <ParkingCircle size={15} color="$slate700" />,
       label: 'Parking',
     },
   ].filter(Boolean) as { icon: React.ReactNode; label: string }[];
@@ -587,7 +587,7 @@ function DetailBody({
           variant="primary"
         />
         <ActionChip
-          icon={<Share2 size={14} color={brand.slate700} />}
+          icon={<Share2 size={14} color="$slate700" />}
           label="Partager"
           onPress={onShare}
         />
@@ -636,7 +636,7 @@ function DetailBody({
         <XStack flexWrap="wrap" gap={12} marginTop={4}>
           {(ad.view_count ?? 0) > 0 && (
             <XStack alignItems="center" gap={4}>
-              <Eye size={13} color={brand.slate500} />
+              <Eye size={13} color="$slate500" />
               <Paragraph fontSize={12} color="$slate500">
                 {ad.view_count} vue{(ad.view_count ?? 0) > 1 ? 's' : ''}
               </Paragraph>
@@ -644,7 +644,7 @@ function DetailBody({
           )}
           {availableFromLabel && (
             <XStack alignItems="center" gap={4}>
-              <CalendarCheck size={13} color={brand.slate500} />
+              <CalendarCheck size={13} color="$slate500" />
               <Paragraph fontSize={12} color="$slate500">
                 {availableFromLabel}
               </Paragraph>
@@ -660,7 +660,7 @@ function DetailBody({
         {/* Location row */}
         {locationLabel.length > 0 && (
           <XStack alignItems="center" gap={6} marginTop={6}>
-            <MapPin size={15} color={brand.slate500} />
+            <MapPin size={15} color="$slate500" />
             <Paragraph fontSize={13.5} color="$slate700" flex={1}>
               {locationLabel}
               {ad.adresse ? ` — ${ad.adresse}` : ''}
@@ -1037,7 +1037,7 @@ function DescriptionModal({ ad, onClose }: { ad: Ad; onClose: () => void }) {
             alignItems="center"
             justifyContent="center"
           >
-            <X size={18} color={brand.slate700} />
+            <X size={18} color="$slate700" />
           </YStack>
         </Pressable>
         <Paragraph fontSize={16} fontWeight="700" color="$slate900" flex={1}>

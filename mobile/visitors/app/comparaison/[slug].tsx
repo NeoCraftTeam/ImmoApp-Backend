@@ -106,7 +106,7 @@ export default function ComparisonDetail() {
         >
           <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
             <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-              <ArrowLeft size={18} color={brand.slate700} />
+              <ArrowLeft size={18} color="$slate700" />
             </YStack>
           </Pressable>
           <H2 fontSize={18} fontWeight="700" color="$slate900" flex={1} numberOfLines={1}>
@@ -158,7 +158,7 @@ export default function ComparisonDetail() {
 
           <Pressable onPress={() => Linking.openURL(`https://keyhome.app/comparaison/${slug}`)} hitSlop={6}>
             <XStack alignItems="center" justifyContent="center" gap={8} padding={14} borderRadius={12} borderWidth={1} borderColor="$slate300">
-              <ExternalLink size={16} color={brand.slate700} />
+              <ExternalLink size={16} color="$slate700" />
               <Paragraph fontSize={14} fontWeight="700" color="$slate700">
                 Lire l'article complet
               </Paragraph>
