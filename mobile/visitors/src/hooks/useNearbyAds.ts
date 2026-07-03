@@ -19,14 +19,18 @@ export function useNearbyAds(input: {
     input.latitude != null &&
     input.longitude != null;
 
+  const radiusKm = input.radiusKm ?? 5;
+
   return useQuery<NearbyResponse, Error, Ad[]>({
-    queryKey: ['ads-nearby', input.latitude, input.longitude, input.radiusKm ?? 5],
+    queryKey: ['ads-nearby', input.latitude, input.longitude, radiusKm],
     queryFn: async () => {
       const { data } = await apiClient.get<NearbyResponse>(ENDPOINTS.ads.nearby, {
         params: {
           latitude: input.latitude,
           longitude: input.longitude,
-          radius: input.radiusKm ?? 5,
+          // ⚠️ Le backend compare en MÈTRES (ST_DistanceSphere) — envoyer
+          // le rayon en km (5) donnait un rayon de 5 m → liste vide.
+          radius: radiusKm * 1000,
         },
       });
       return data;

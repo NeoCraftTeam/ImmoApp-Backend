@@ -1,5 +1,6 @@
 import { Lock, Orbit } from '@tamagui/lucide-icons';
-import { Linking, Pressable } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
+import { Pressable } from 'react-native';
 import { Paragraph, XStack, YStack } from 'tamagui';
 
 import { brand } from '@/theme/tokens';
@@ -12,11 +13,11 @@ interface Props {
 }
 
 /**
- * Section « Visite 3D » — port mobile du bloc web : teaser cadenassé
- * tant que l'annonce est verrouillée, bouton « Visiter en 3D » sinon.
- * Le viewer photo-sphère du web (`TourViewerPSV`) n'a pas d'équivalent
- * RN sans nouvelle dépendance : le bouton ouvre la visite sur le site
- * web dans le navigateur.
+ * Section « Visite 3D » — teaser cadenassé tant que l'annonce est
+ * verrouillée, bouton « Visiter en 3D » sinon. Le viewer photo-sphère
+ * plein-natif (TourViewerPSV du web) nécessiterait une dépendance
+ * dédiée (react-native-webview / lib pano) : en attendant, la visite
+ * s'ouvre IN-APP (expo-web-browser, feuille modale) et non dans Safari.
  */
 export function VirtualTourSection({ ad }: Props) {
   if (!ad.has_3d_tour) {
@@ -57,7 +58,9 @@ export function VirtualTourSection({ ad }: Props) {
   return (
     <Pressable
       onPress={() =>
-        void Linking.openURL(`${WEB_BASE_URL}/ads/${encodeURIComponent(ad.slug ?? ad.id)}`)
+        void WebBrowser.openBrowserAsync(
+          `${WEB_BASE_URL}/ads/${encodeURIComponent(ad.slug ?? ad.id)}`,
+        )
       }
       hitSlop={4}
       accessibilityRole="button"
