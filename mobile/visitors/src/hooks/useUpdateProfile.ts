@@ -59,3 +59,12 @@ export function useChangePassword() {
     },
   });
 }
+
+/** DELETE /my/account — suppression définitive du compte. */
+export function useDeleteAccount() {
+  return useMutation({
+    mutationFn: async () => {
+      await apiClient.delete(ENDPOINTS.my.deleteAccount);
+    },
+  });
+}

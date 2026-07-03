@@ -66,22 +66,8 @@ export default function Settings() {
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
-      'Supprimer le compte',
-      'Cette action est irréversible. Vos annonces favorites et messages seront effacés.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer',
-          style: 'destructive',
-          onPress: () =>
-            Alert.alert(
-              'Contactez-nous',
-              'Pour supprimer définitivement votre compte, écrivez à support@keyhome.app.',
-            ),
-        },
-      ],
-    );
+    // La suppression réelle vit dans l'écran Sécurité (zone de danger).
+    router.push('/security');
   };
 
   return (
@@ -118,13 +104,8 @@ export default function Settings() {
             <Row
               icon={<Lock size={18} color="$slate700" />}
               label="Sécurité"
-              hint="Mot de passe et authentification"
-              onPress={() =>
-                Alert.alert(
-                  'Sécurité',
-                  'La modification du mot de passe arrive prochainement.',
-                )
-              }
+              hint="Mot de passe et suppression du compte"
+              onPress={() => router.push('/security')}
             />
             <Row
               icon={<CreditCard size={18} color="$slate700" />}
