@@ -1,15 +1,23 @@
-import { ArrowLeft, KeyRound, ShieldCheck, Trash2 } from '@tamagui/lucide-icons';
+import { ArrowLeft, Github, KeyRound, Link2, ShieldCheck, Trash2 } from '@tamagui/lucide-icons';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable } from 'react-native';
+import { Alert, Pressable, ScrollView } from 'react-native';
 import { Button, H2, Paragraph, Spinner, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
 import { PasswordInput } from '@/components/PasswordInput';
+import { useLinkProvider, useUnlinkProvider } from '@/hooks/useLinkedAccounts';
+import { useMe } from '@/hooks/useMe';
 import { useChangePassword, useDeleteAccount } from '@/hooks/useUpdateProfile';
-import { useSession } from '@/auth/SessionProvider';
+import { useSession, type SocialProvider } from '@/auth/SessionProvider';
 import { brand } from '@/theme/tokens';
+
+const LINKABLE: { key: SocialProvider; label: string }[] = [
+  { key: 'google', label: 'Google' },
+  { key: 'facebook', label: 'Facebook' },
+  { key: 'github', label: 'GitHub' },
+];
 
 /**
  * Sécurité du compte — changement de mot de passe (POST
@@ -22,8 +30,58 @@ export default function SecurityScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isAuthenticated, signOut } = useSession();
+  const me = useMe(isAuthenticated);
   const changePassword = useChangePassword();
   const deleteAccount = useDeleteAccount();
+  const linkProvider = useLinkProvider();
+  const unlinkProvider = useUnlinkProvider();
+  const [pendingProvider, setPendingProvider] = useState<SocialProvider | null>(null);
+
+  const linked = me.data?.linked_providers ?? [];
+
+  const handleLink = (provider: SocialProvider) => {
+    setPendingProvider(provider);
+    linkProvider.mutate(provider, {
+      onSuccess: (res) => {
+        if (res.linked) {
+          Alert.alert('Compte lié', 'Le compte a été lié avec succès.');
+        } else if (res.error) {
+          const msg =
+            res.error === 'already_used'
+              ? 'Ce compte est déjà lié à un autre utilisateur.'
+              : 'La liaison a échoué. Réessayez.';
+          Alert.alert('Liaison impossible', msg);
+        }
+      },
+      onError: (err) => Alert.alert('Erreur', extractApiErrorMessage(err)),
+      onSettled: () => setPendingProvider(null),
+    });
+  };
+
+  const handleUnlink = (provider: SocialProvider, label: string) => {
+    // Refus si c'est le dernier moyen de connexion.
+    if (linked.length <= 1 && !me.data?.has_password) {
+      Alert.alert(
+        'Impossible de délier',
+        'Définissez d\'abord un mot de passe ou liez un autre compte avant de délier celui-ci.',
+      );
+      return;
+    }
+    Alert.alert('Délier le compte', `Délier votre compte ${label} ?`, [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Délier',
+        style: 'destructive',
+        onPress: () => {
+          setPendingProvider(provider);
+          unlinkProvider.mutate(provider, {
+            onError: (err) => Alert.alert('Erreur', extractApiErrorMessage(err)),
+            onSettled: () => setPendingProvider(null),
+          });
+        },
+      },
+    ]);
+  };
 
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
@@ -115,7 +173,7 @@ export default function SecurityScreen() {
           </H2>
         </XStack>
 
-        <YStack padding={16} gap={22}>
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 22, paddingBottom: insets.bottom + 24 }} keyboardShouldPersistTaps="handled">
           <YStack gap={12}>
             <XStack alignItems="center" gap={8}>
               <KeyRound size={18} color={brand.primary} />
@@ -158,6 +216,75 @@ export default function SecurityScreen() {
 
           <YStack height={1} backgroundColor="$borderColor" />
 
+          <YStack gap={12}>
+            <XStack alignItems="center" gap={8}>
+              <Link2 size={18} color={brand.primary} />
+              <Paragraph fontSize={15} fontWeight="800" color="$slate900">
+                Comptes liés
+              </Paragraph>
+            </XStack>
+            <Paragraph fontSize={13} color="$slate500" lineHeight={19}>
+              Connectez des comptes sociaux pour vous connecter en un geste.
+            </Paragraph>
+            {LINKABLE.map(({ key, label }) => {
+              const isLinked = linked.includes(key);
+              const busy = pendingProvider === key && (linkProvider.isPending || unlinkProvider.isPending);
+              return (
+                <XStack
+                  key={key}
+                  alignItems="center"
+                  gap={12}
+                  padding={14}
+                  borderRadius={12}
+                  borderWidth={1}
+                  borderColor="$borderColor"
+                  backgroundColor="$background"
+                >
+                  {key === 'github' ? (
+                    <Github size={20} color="$slate700" />
+                  ) : (
+                    <Paragraph fontSize={18} fontWeight="900" color={key === 'google' ? '#4285F4' : '#1877F2'}>
+                      {key === 'google' ? 'G' : 'f'}
+                    </Paragraph>
+                  )}
+                  <YStack flex={1}>
+                    <Paragraph fontSize={14.5} fontWeight="700" color="$slate900">
+                      {label}
+                    </Paragraph>
+                    <Paragraph fontSize={12} color={isLinked ? brand.success : '$slate500'}>
+                      {isLinked ? 'Connecté' : 'Non connecté'}
+                    </Paragraph>
+                  </YStack>
+                  <Pressable
+                    onPress={() => (isLinked ? handleUnlink(key, label) : handleLink(key))}
+                    disabled={busy}
+                    hitSlop={6}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${isLinked ? 'Délier' : 'Lier'} ${label}`}
+                  >
+                    <XStack
+                      paddingHorizontal={14}
+                      paddingVertical={8}
+                      borderRadius={999}
+                      backgroundColor={isLinked ? '$slate100' : '$brandAlpha10'}
+                      alignItems="center"
+                    >
+                      {busy ? (
+                        <Spinner size="small" color={brand.primary} />
+                      ) : (
+                        <Paragraph fontSize={13} fontWeight="700" color={isLinked ? '$slate700' : brand.primary}>
+                          {isLinked ? 'Délier' : 'Lier'}
+                        </Paragraph>
+                      )}
+                    </XStack>
+                  </Pressable>
+                </XStack>
+              );
+            })}
+          </YStack>
+
+          <YStack height={1} backgroundColor="$borderColor" />
+
           <YStack gap={10}>
             <XStack alignItems="center" gap={8}>
               <Trash2 size={18} color={brand.danger} />
@@ -189,7 +316,7 @@ export default function SecurityScreen() {
               </XStack>
             </Pressable>
           </YStack>
-        </YStack>
+        </ScrollView>
       </YStack>
     </>
   );

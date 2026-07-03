@@ -74,6 +74,12 @@ Route::prefix('auth')->group(function (): void {
             ->where('provider', 'google|facebook|apple|github');
 
         Route::middleware('auth:sanctum')->group(function (): void {
+            // Liaison via le flux redirect pour un utilisateur authentifié
+            // (mobile : pas de token provider natif pour `link`).
+            Route::get('{provider}/link-redirect', 'linkRedirect')
+                ->middleware('throttle:auth.social')
+                ->where('provider', 'google|facebook|apple|github');
+
             Route::post('{provider}/link', 'link')
                 ->where('provider', 'google|facebook|apple|github');
 

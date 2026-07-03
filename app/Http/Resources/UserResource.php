@@ -82,6 +82,18 @@ final class UserResource extends JsonResource
                 $request->user()?->id === $this->id,
                 (int) $this->point_balance
             ),
+            // Providers OAuth liés au compte (pour l'écran Sécurité mobile).
+            'linked_providers' => $this->when(
+                $request->user()?->id === $this->id,
+                fn () => collect(['google', 'facebook', 'apple', 'github'])
+                    ->filter(fn (string $p) => !empty($this->{$p.'_id'}))
+                    ->values()
+                    ->all(),
+            ),
+            'has_password' => $this->when(
+                $request->user()?->id === $this->id,
+                fn () => !empty($this->password),
+            ),
             'onboarding_completed_at' => $this->when(
                 $request->user()?->id === $this->id,
                 $this->onboarding_completed_at,

@@ -241,6 +241,82 @@ final class SocialAuthController
     }
 
     /**
+     * Lancer une liaison de provider pour un utilisateur AUTHENTIFIÉ via
+     * le flux redirect (le mobile n'a pas de token provider natif pour
+     * l'endpoint `link`). Un `link_code` à usage unique est mis en cache
+     * (→ id utilisateur) et encodé dans le `state` ; `callback()` le lit
+     * pour LIER le provider au compte au lieu d'ouvrir une session.
+     */
+    public function linkRedirect(Request $request, string $provider): JsonResponse
+    {
+        if (!in_array($provider, self::SUPPORTED_PROVIDERS, true)) {
+            return response()->json(['message' => 'Provider OAuth non supporté'], 400);
+        }
+
+        $redirectUri = $request->query('redirect_uri', config('app.frontend_url').'/auth/callback');
+        if (!$this->isAllowedRedirectUri((string) $redirectUri)) {
+            $redirectUri = config('app.frontend_url').'/auth/callback';
+        }
+
+        $linkCode = Str::random(64);
+        Cache::put('oauth_link_'.$linkCode, (string) $request->user()->id, now()->addMinutes(10));
+
+        $state = base64_encode(json_encode([
+            'csrf' => Str::random(40),
+            'redirect_uri' => $redirectUri,
+            'link_code' => $linkCode,
+        ]) ?: '');
+
+        $driver = Socialite::driver($provider)
+            ->stateless() // @phpstan-ignore method.notFound
+            ->with(['state' => $state]);
+        if ($provider === 'apple') {
+            $driver->scopes(['name', 'email']);
+        }
+
+        return response()->json(['redirect_url' => $driver->redirect()->getTargetUrl()]);
+    }
+
+    /**
+     * Rattache le provider au compte identifié par le link_code (issu de
+     * linkRedirect). Redirige vers redirect_uri avec `?linked=1` en cas de
+     * succès, ou `?link_error=<code>` sinon. Consomme le link_code.
+     */
+    private function completeLinkFromCallback(
+        string $provider,
+        string $linkCode,
+        mixed $socialUser,
+        string $redirectUri,
+    ): mixed {
+        $userId = Cache::pull('oauth_link_'.$linkCode);
+        $sep = str_contains($redirectUri, '?') ? '&' : '?';
+
+        if (!$userId) {
+            return redirect($redirectUri.$sep.'link_error=expired&provider='.$provider);
+        }
+
+        $user = User::find($userId);
+        if (!$user || !$socialUser || !$socialUser->getId()) {
+            return redirect($redirectUri.$sep.'link_error=invalid&provider='.$provider);
+        }
+
+        $providerIdField = $provider.'_id';
+        $alreadyLinked = User::where($providerIdField, $socialUser->getId())
+            ->where('id', '!=', $user->id)
+            ->exists();
+        if ($alreadyLinked) {
+            return redirect($redirectUri.$sep.'link_error=already_used&provider='.$provider);
+        }
+
+        $user->forceFill([
+            $providerIdField => $socialUser->getId(),
+            'oauth_provider' => $user->oauth_provider ?? $provider,
+        ])->save();
+
+        return redirect($redirectUri.$sep.'linked=1&provider='.$provider);
+    }
+
+    /**
      * Handle OAuth callback (web flow).
      */
     #[OA\Get(
@@ -264,10 +340,11 @@ final class SocialAuthController
         }
 
         try {
-            // Decode redirect_uri (and requested role) from state parameter
-            // and validate against allowed hosts
+            // Decode redirect_uri (and requested role / link intent) from
+            // state parameter and validate against allowed hosts
             $redirectUri = config('app.frontend_url').'/auth/callback';
             $requestedRole = 'customer';
+            $linkCode = null;
             $state = $request->query('state');
 
             if ($state) {
@@ -288,10 +365,20 @@ final class SocialAuthController
                 if (is_array($stateData) && isset($stateData['role'])) {
                     $requestedRole = $this->sanitizeRequestedRole($stateData['role']);
                 }
+                if (is_array($stateData) && isset($stateData['link_code'])) {
+                    $linkCode = (string) $stateData['link_code'];
+                }
             }
 
             /** @phpstan-ignore method.notFound */
             $socialUser = Socialite::driver($provider)->stateless()->user();
+
+            // Flux de LIAISON authentifiée (initié par linkRedirect) : on
+            // rattache le provider au compte identifié par le link_code, au
+            // lieu d'ouvrir une session.
+            if ($linkCode !== null) {
+                return $this->completeLinkFromCallback($provider, $linkCode, $socialUser, $redirectUri);
+            }
 
             $result = $this->findOrCreateUser($socialUser, $provider, $request, [], $requestedRole);
             $user = $result['user'];

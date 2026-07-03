@@ -19,6 +19,9 @@ export interface AuthUser {
   trust_tier?: string | null;
   notification_email?: boolean;
   notification_push?: boolean;
+  /** Providers OAuth liés (google/facebook/apple/github) — écran Sécurité. */
+  linked_providers?: string[];
+  has_password?: boolean;
   /** ISO timestamp — last time the user opened the home tab while authenticated.
    *  Drives the "Bon retour parmi nous" greeting (>24 h since last visit). */
   last_home_visit_at?: string | null;
