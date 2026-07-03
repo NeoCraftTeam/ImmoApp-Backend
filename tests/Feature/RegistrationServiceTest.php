@@ -70,48 +70,41 @@ it('registers an agent successfully and returns 201', function (): void {
     ]);
 });
 
-it('returns 422 with use_login_or_reset when email already exists and account is verified', function (): void {
+it('returns a generic 422 without leaking account existence or provider (OWASP)', function (): void {
     App::setLocale('fr');
-    $existing = User::factory()->customers()->create([
+    $generic = __('auth.registration_generic_conflict');
+
+    // Trois états de compte différents doivent produire EXACTEMENT la
+    // même réponse : aucun facteur de distinction (anti-énumération),
+    // aucune divulgation du fournisseur, aucun code `registration_conflict`.
+    $verified = User::factory()->customers()->create([
         'email_verified_at' => now(),
         'clerk_id' => null,
     ]);
-    $data = validRegistrationData(['email' => $existing->email]);
-
-    $response = $this->postJson('/api/v1/auth/registerCustomer', $data);
-
-    $response->assertUnprocessable()
-        ->assertJsonPath('registration_conflict', 'use_login_or_reset')
-        ->assertJsonPath('errors.email.0', __('auth.registration_email_taken_login_or_reset'));
-});
-
-it('returns 422 with use_clerk_sso when email exists and user is linked to Clerk', function (): void {
-    App::setLocale('fr');
-    $existing = User::factory()->customers()->create([
+    $clerk = User::factory()->customers()->create([
         'clerk_id' => 'user_'.uniqid(),
         'email_verified_at' => now(),
     ]);
-    $data = validRegistrationData(['email' => $existing->email]);
-
-    $response = $this->postJson('/api/v1/auth/registerCustomer', $data);
-
-    $response->assertUnprocessable()
-        ->assertJsonPath('registration_conflict', 'use_clerk_sso')
-        ->assertJsonPath('errors.email.0', __('auth.registration_email_taken_use_clerk'));
-});
-
-it('returns 422 with complete_email_verification when email exists but is unverified', function (): void {
-    App::setLocale('fr');
-    $existing = User::factory()->customers()->unverified()->create([
+    $unverified = User::factory()->customers()->unverified()->create([
         'clerk_id' => null,
     ]);
-    $data = validRegistrationData(['email' => $existing->email]);
 
-    $response = $this->postJson('/api/v1/auth/registerCustomer', $data);
+    foreach ([$verified, $clerk, $unverified] as $existing) {
+        $response = $this->withHeaders(['Accept-Language' => 'fr'])->postJson(
+            '/api/v1/auth/registerCustomer',
+            validRegistrationData(['email' => $existing->email]),
+        );
 
-    $response->assertUnprocessable()
-        ->assertJsonPath('registration_conflict', 'complete_email_verification')
-        ->assertJsonPath('errors.email.0', __('auth.registration_email_taken_verify_email'));
+        $response->assertUnprocessable()
+            ->assertJsonPath('errors.email.0', $generic)
+            ->assertJsonMissingPath('registration_conflict');
+    }
+
+    // Le message générique ne doit pas révéler le fournisseur de connexion
+    // (Google/SSO) ni affirmer qu'un compte existe (formulation conditionnelle
+    // « Si vous avez déjà un compte » tolérée — OWASP password-recovery style).
+    expect($generic)->not->toContain('Google')
+        ->and($generic)->not->toContain('connexion sécurisée');
 });
 
 it('throws RegistrationEmailTakenException from service when email is taken', function (): void {

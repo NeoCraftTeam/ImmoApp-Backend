@@ -7,6 +7,7 @@ import { z } from 'zod';
 
 import { extractApiErrorMessage } from '@/api/client';
 import { useSession } from '@/auth/SessionProvider';
+import { PasswordInput } from '@/components/PasswordInput';
 import { PhoneInput } from '@/components/PhoneInput';
 import { t } from '@/i18n';
 
@@ -29,7 +30,7 @@ const RegisterSchema = z
       .min(1, 'Nom requis')
       .max(50, '50 caractères maximum')
       .regex(/^[a-zA-ZÀ-ÿ\s'-]+$/, 'Lettres et espaces uniquement'),
-    email: z.string().trim().email('Email invalide').max(255),
+    email: z.string().trim().toLowerCase().email('Email invalide').max(255),
     phone_number: z
       .string()
       .trim()
@@ -192,18 +193,28 @@ function Field({
       <Paragraph size="$3" color="$slate500">
         {label}
       </Paragraph>
-      <Input
-        value={value}
-        onChangeText={onChange}
-        secureTextEntry={secure}
-        keyboardType={keyboardType}
-        autoComplete={autoComplete}
-        autoCapitalize={autoCapitalize}
-        autoCorrect={false}
-        placeholder={placeholder}
-        size="$4"
-        borderColor={error ? '$danger' : undefined}
-      />
+      {secure ? (
+        <PasswordInput
+          value={value}
+          onChangeText={onChange}
+          autoComplete={autoComplete}
+          placeholder={placeholder}
+          size="$4"
+          borderColor={error ? '$danger' : undefined}
+        />
+      ) : (
+        <Input
+          value={value}
+          onChangeText={onChange}
+          keyboardType={keyboardType}
+          autoComplete={autoComplete}
+          autoCapitalize={autoCapitalize}
+          autoCorrect={false}
+          placeholder={placeholder}
+          size="$4"
+          borderColor={error ? '$danger' : undefined}
+        />
+      )}
       {error ? (
         <Paragraph size="$2" color="$danger">
           {error}
