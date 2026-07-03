@@ -18,13 +18,14 @@ export function usePayments() {
   });
 }
 
-export function useCreditsBalance() {
+export function useCreditsBalance(enabled = true) {
   return useQuery<Record<string, unknown> | number, Error, number>({
     queryKey: ['credits-balance'],
     queryFn: async () => {
       const { data } = await apiClient.get(ENDPOINTS.credits.balance);
       return data;
     },
+    enabled,
     // Le backend renvoie { point_balance: N } — l'ancienne lecture de
     // `balance` retombait toujours à 0 (d'où « 0 crédits » alors que le
     // web affiche le vrai solde). On accepte point_balance / balance /

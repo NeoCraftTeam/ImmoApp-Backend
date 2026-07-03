@@ -9,6 +9,7 @@ import {
   Store,
   Tag,
   Trees,
+  Wallet,
 } from '@tamagui/lucide-icons';
 import { Image } from 'expo-image';
 import { Link, useRouter } from 'expo-router';
@@ -38,6 +39,7 @@ import { useRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { useRecommendations } from '@/hooks/useRecommendations';
 import { useSession } from '@/auth/SessionProvider';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
+import { useCreditsBalance } from '@/hooks/usePayments';
 import { brand } from '@/theme/tokens';
 import { t } from '@/i18n';
 import type { Ad } from '@/types/ad';
@@ -87,6 +89,7 @@ export default function Home() {
   const { isAuthenticated } = useSession();
   const me = useMe(isAuthenticated);
   const unread = useUnreadNotificationCount();
+  const creditsBalance = useCreditsBalance(isAuthenticated);
   const adTypes = useAdTypes();
 
   const [selectedType, setSelectedType] = useState<string | null>(null);
@@ -172,29 +175,43 @@ export default function Home() {
   // Tagline en italic pour break le rythme typo.
   const ListHeader = (
     <YStack marginBottom={16}>
-      {/* Bell absolue top-right pour ne pas perturber le flux typo */}
-      <Link href="/notifications" asChild>
-        <Pressable
-          hitSlop={6}
-          accessibilityLabel="Notifications"
-          style={{ position: 'absolute', right: 0, top: 4, zIndex: 2 }}
-        >
-          <YStack
-            width={40}
-            height={40}
-            borderRadius={20}
-            alignItems="center"
-            justifyContent="center"
+      {/* Cluster top-right : solde crédits + cloche notifications */}
+      <XStack
+        alignItems="center"
+        gap={8}
+        style={{ position: 'absolute', right: 0, top: 4, zIndex: 2 }}
+      >
+        {isAuthenticated && creditsBalance.data != null && (
+          <Pressable
+            onPress={() => router.push('/credits')}
+            hitSlop={6}
+            accessibilityRole="button"
+            accessibilityLabel={`${creditsBalance.data} crédits`}
           >
-            <Bell size={22} color="$slate700" />
-            <CountBadge
-              count={unread.data ?? 0}
-              size={16}
-              style={{ position: 'absolute', top: 3, right: 3 }}
-            />
-          </YStack>
-        </Pressable>
-      </Link>
+            <XStack
+              alignItems="center"
+              gap={5}
+              paddingHorizontal={10}
+              height={32}
+              borderRadius={16}
+              backgroundColor="$brandAlpha10"
+            >
+              <Wallet size={14} color={brand.primary} />
+              <Paragraph fontSize={13} fontWeight="800" color={brand.primary}>
+                {creditsBalance.data.toLocaleString('fr-FR')}
+              </Paragraph>
+            </XStack>
+          </Pressable>
+        )}
+        <Link href="/notifications" asChild>
+          <Pressable hitSlop={6} accessibilityLabel="Notifications">
+            <YStack width={40} height={40} borderRadius={20} alignItems="center" justifyContent="center">
+              <Bell size={22} color="$slate700" />
+              <CountBadge count={unread.data ?? 0} size={16} style={{ position: 'absolute', top: 3, right: 3 }} />
+            </YStack>
+          </Pressable>
+        </Link>
+      </XStack>
 
       {/* Greeting block — typo expressive editorial : caption +
           prénom en XL, line-height tight pour le punch visuel. */}

@@ -11,6 +11,7 @@ import {
   Share2,
   ShieldCheck,
   ShowerHead,
+  Wallet,
   X,
 } from '@tamagui/lucide-icons';
 import { formatDistanceToNow } from 'date-fns';
@@ -50,6 +51,7 @@ import { ReviewsSection } from '@/components/ads/ReviewsSection';
 import { SearchAlertButton } from '@/components/ads/SearchAlertButton';
 import { SimilarAdsCarousel } from '@/components/ads/SimilarAdsCarousel';
 import { useAd } from '@/hooks/useAd';
+import { useCreditsBalance } from '@/hooks/usePayments';
 import { useSession } from '@/auth/SessionProvider';
 import { useThemeColors } from '@/theme/useThemeColors';
 import { brand } from '@/theme/tokens';
@@ -404,6 +406,8 @@ function FloatingChrome({
   onShare: () => void;
 }) {
   const colors = useThemeColors();
+  const { isAuthenticated } = useSession();
+  const creditsBalance = useCreditsBalance(isAuthenticated);
   return (
     <YStack
       position="absolute"
@@ -439,6 +443,21 @@ function FloatingChrome({
           <ArrowLeft size={20} color={colors.mutedIcon} />
         </ChromeIconButton>
         <XStack gap={8} alignItems="center">
+          {isAuthenticated && creditsBalance.data != null && (
+            <XStack
+              alignItems="center"
+              gap={4}
+              paddingHorizontal={9}
+              height={34}
+              borderRadius={17}
+              backgroundColor="rgba(0,0,0,0.45)"
+            >
+              <Wallet size={13} color="white" />
+              <Paragraph fontSize={12.5} fontWeight="800" color="white">
+                {creditsBalance.data.toLocaleString('fr-FR')}
+              </Paragraph>
+            </XStack>
+          )}
           <CompareButton ad={ad} size="medium" />
           <ChromeIconButton onPress={onShare} accessibilityLabel={t('ad.share')}>
             <Share2 size={18} color={colors.mutedIcon} />
