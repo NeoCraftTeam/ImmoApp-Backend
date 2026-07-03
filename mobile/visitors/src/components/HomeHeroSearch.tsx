@@ -288,14 +288,14 @@ export function HomeHeroSearch() {
                 style={{
                   minHeight: 110,
                   maxHeight: 180,
-                  borderWidth: 1.5,
-                  borderColor: brand.primaryAlpha20,
+                  borderWidth: 1,
+                  borderColor: brand.slate300,
                   borderRadius: 16,
                   padding: 14,
                   fontSize: 16,
                   lineHeight: 22,
                   color: brand.slate900,
-                  backgroundColor: brand.primaryAlpha10,
+                  backgroundColor: brand.slate100,
                   textAlignVertical: 'top',
                 }}
                 accessibilityLabel="Recherche en langage naturel"

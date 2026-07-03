@@ -230,24 +230,9 @@ export default function BailleurProfile() {
               </XStack>
 
               {data.bio && <MarkdownText>{data.bio}</MarkdownText>}
-
-              <Paragraph
-                fontSize={15}
-                fontWeight="700"
-                color="$slate900"
-                marginTop={6}
-              >
-                Annonces du bailleur ({data.ads_count ?? data.ads?.length ?? 0})
-              </Paragraph>
             </YStack>
           }
-          ListEmptyComponent={
-            <YStack padding="$5" alignItems="center">
-              <Paragraph color="$slate500" textAlign="center">
-                Ce bailleur n'a pas encore publié d'annonce.
-              </Paragraph>
-            </YStack>
-          }
+          ListEmptyComponent={null}
           renderItem={({ item, index }) => (
             <YStack flex={1}>
               <AdCard ad={item} priority={index < 2} />

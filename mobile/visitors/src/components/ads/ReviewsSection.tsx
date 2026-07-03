@@ -1,4 +1,4 @@
-import { MessageCircle, Star } from '@tamagui/lucide-icons';
+import { Star } from '@tamagui/lucide-icons';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useState } from 'react';
@@ -49,17 +49,17 @@ export function ReviewsSection({ adId, fallbackRating, fallbackCount }: Props) {
     );
   }
 
-  const visible = showAll ? reviews : reviews.slice(0, 3);
+  const visible = showAll ? reviews : reviews.slice(0, 2);
 
   return (
-    <YStack gap={14}>
+    <YStack gap={10}>
       <XStack alignItems="center" gap={8}>
-        <Paragraph fontSize={17} fontWeight="700" color="$slate900">
+        <Paragraph fontSize={16} fontWeight="700" color="$slate900">
           Avis
         </Paragraph>
         {average != null ? (
           <XStack alignItems="center" gap={4}>
-            <Star size={15} color={brand.slate900} fill={brand.slate900} />
+            <Star size={14} color={brand.slate900} fill={brand.slate900} />
             <Paragraph fontSize={14} fontWeight="700" color="$slate900">
               {average.toFixed(1)}
             </Paragraph>
@@ -75,24 +75,15 @@ export function ReviewsSection({ adId, fallbackRating, fallbackCount }: Props) {
       </XStack>
 
       {reviews.length === 0 ? (
-        <XStack
-          alignItems="center"
-          gap={10}
-          padding={14}
-          borderRadius={12}
-          backgroundColor="$slate100"
-        >
-          <MessageCircle size={18} color={brand.slate500} />
-          <Paragraph fontSize={13} color="$slate500" flex={1}>
-            Soyez le premier à laisser un avis sur cette annonce.
-          </Paragraph>
-        </XStack>
+        <Paragraph fontSize={13} color="$slate500">
+          Soyez le premier à laisser un avis sur cette annonce.
+        </Paragraph>
       ) : (
-        <YStack gap={12}>
+        <YStack gap={10}>
           {visible.map((review) => (
             <ReviewItem key={review.id} review={review} />
           ))}
-          {reviews.length > 3 && (
+          {reviews.length > 2 && (
             <Pressable onPress={() => setShowAll((s) => !s)} hitSlop={6}>
               <Paragraph
                 fontSize={13}
@@ -127,43 +118,39 @@ function ReviewItem({ review }: { review: Review }) {
   }
 
   return (
-    <YStack gap={6}>
-      <XStack alignItems="center" gap={10}>
+    <YStack gap={4}>
+      <XStack alignItems="center" gap={8}>
         <YStack
-          width={36}
-          height={36}
-          borderRadius={18}
+          width={30}
+          height={30}
+          borderRadius={15}
           backgroundColor={brand.primaryAlpha10}
           alignItems="center"
           justifyContent="center"
         >
-          <Paragraph fontSize={14} fontWeight="700" color={brand.primary}>
+          <Paragraph fontSize={13} fontWeight="700" color={brand.primary}>
             {initial}
           </Paragraph>
         </YStack>
-        <YStack flex={1} gap={1}>
-          <Paragraph fontSize={14} fontWeight="700" color="$slate900">
-            {review.user.firstname}
+        <Paragraph fontSize={13.5} fontWeight="700" color="$slate900">
+          {review.user.firstname}
+        </Paragraph>
+        <Stars rating={review.rating} size={12} />
+        {relative && (
+          <Paragraph fontSize={12} color="$slate500">
+            · {relative}
           </Paragraph>
-          <XStack alignItems="center" gap={4}>
-            <Stars rating={review.rating} size={12} />
-            {relative && (
-              <Paragraph fontSize={12} color="$slate500">
-                · {relative}
-              </Paragraph>
-            )}
-          </XStack>
-        </YStack>
+        )}
       </XStack>
       {review.comment ? (
-        <Paragraph fontSize={13.5} color="$slate700" lineHeight={20} paddingLeft={46}>
+        <Paragraph fontSize={13} color="$slate700" lineHeight={18} paddingLeft={38}>
           {review.comment}
         </Paragraph>
       ) : null}
       {review.response?.body ? (
         <YStack
-          paddingLeft={46}
-          paddingTop={4}
+          paddingLeft={38}
+          paddingTop={2}
           marginLeft={4}
           borderLeftWidth={2}
           borderLeftColor="$slate300"
