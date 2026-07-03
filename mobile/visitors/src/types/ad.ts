@@ -10,6 +10,19 @@ export interface AdLocation {
   longitude: number;
 }
 
+export interface TourScene {
+  id?: string;
+  title?: string;
+  /** URL de la photo équirectangulaire (signée par le backend). */
+  image_url?: string;
+  thumbnail_url?: string;
+}
+
+export interface TourConfig {
+  default_scene?: string;
+  scenes: TourScene[];
+}
+
 export interface AdImage {
   id: number;
   url: string;
@@ -74,6 +87,8 @@ export interface Ad {
   has_3d_tour: boolean;
   /** Nombre de pièces de la visite 360° (présent si has_3d_tour). */
   tour_scenes_count?: number | null;
+  /** Config du viewer 360° — présent seulement si has_3d_tour ET déverrouillé. */
+  tour_config?: TourConfig | null;
   transaction_type?: 'location' | 'vente' | null;
   quarter?: AdQuarter;
   type?: AdType;
