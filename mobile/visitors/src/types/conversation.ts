@@ -4,26 +4,33 @@
  */
 export interface ConversationParticipant {
   id: string;
-  firstname: string;
+  username?: string;
+  /** Nom complet pré-formaté par le backend (`other_participant.name`). */
+  name: string;
   avatar?: string | null;
+  last_seen_at?: string | null;
 }
 
 export interface Conversation {
   uuid: string;
-  participants: ConversationParticipant[];
+  status?: string;
+  /** Interlocuteur — objet unique fourni par le backend (pas un tableau). */
+  other_participant?: ConversationParticipant | null;
   last_message?: {
-    body: string;
+    uuid?: string;
     sender_id: string;
-    created_at: string;
+    /** `null` si message scellé (E2EE) — afficher un fallback neutre. */
+    body: string | null;
+    created_at?: string;
   } | null;
+  last_message_at?: string | null;
   unread_count?: number;
   ad?: {
     id: string;
     slug?: string;
     title: string;
-    cover_url?: string | null;
+    cover_image?: string | null;
   } | null;
-  updated_at?: string;
 }
 
 export interface MessageReaction {

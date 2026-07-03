@@ -9,7 +9,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
 import { useConversations } from '@/hooks/useConversations';
-import { useMe } from '@/hooks/useMe';
 import { useSession } from '@/auth/SessionProvider';
 import { brand } from '@/theme/tokens';
 import type { Conversation } from '@/types/conversation';
@@ -23,7 +22,6 @@ export default function MessagesInbox() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isAuthenticated } = useSession();
-  const me = useMe();
   const { data, isLoading, isError, error, refetch, isRefetching } =
     useConversations();
 
@@ -90,7 +88,6 @@ export default function MessagesInbox() {
             renderItem={({ item }) => (
               <ConversationRow
                 conversation={item}
-                currentUserId={me.data?.id ?? null}
                 onPress={() => router.push(`/messages/${item.uuid}`)}
               />
             )}
@@ -103,20 +100,25 @@ export default function MessagesInbox() {
 
 function ConversationRow({
   conversation,
-  currentUserId,
   onPress,
 }: {
   conversation: Conversation;
-  currentUserId: string | null;
   onPress: () => void;
 }) {
-  const other = conversation.participants.find((p) => p.id !== currentUserId)
-    ?? conversation.participants[0];
+  const other = conversation.other_participant ?? null;
+  const otherName = other?.name?.trim() || 'Conversation';
+  const avatarUrl = other?.avatar?.startsWith('http') ? other.avatar : null;
   const lastMessage = conversation.last_message;
   const unread = (conversation.unread_count ?? 0) > 0;
-  const relative = lastMessage?.created_at
-    ? formatDistanceToNow(new Date(lastMessage.created_at), { addSuffix: false, locale: fr })
-    : '';
+  const timestamp = lastMessage?.created_at ?? conversation.last_message_at;
+  let relative = '';
+  try {
+    relative = timestamp
+      ? formatDistanceToNow(new Date(timestamp), { addSuffix: false, locale: fr })
+      : '';
+  } catch {
+    relative = '';
+  }
 
   return (
     <Pressable onPress={onPress} accessibilityRole="button">
@@ -130,11 +132,11 @@ function ConversationRow({
           justifyContent="center"
           overflow="hidden"
         >
-          {other?.avatar ? (
-            <Image source={{ uri: other.avatar }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+          {avatarUrl ? (
+            <Image source={{ uri: avatarUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
           ) : (
             <Paragraph fontSize={18} fontWeight="700" color={brand.primary}>
-              {other?.firstname?.charAt(0).toUpperCase() ?? '?'}
+              {otherName.charAt(0).toUpperCase()}
             </Paragraph>
           )}
         </YStack>
@@ -147,7 +149,7 @@ function ConversationRow({
               numberOfLines={1}
               flex={1}
             >
-              {other?.firstname ?? 'Conversation'}
+              {otherName}
             </Paragraph>
             <Paragraph fontSize={11} color="$slate500">
               {relative}
