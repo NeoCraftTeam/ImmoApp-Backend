@@ -84,7 +84,9 @@ export function SplashView({ ready }: Props) {
       <Animated.View
         style={{ opacity: logoOpacity, transform: [{ scale: logoScale }] }}
       >
-        <KeyHomeLogo variant="stacked" size={40} />
+        {/* Icône + wordmark côte à côte, taille contenue, graisse maximale
+            (demande produit : « à côté du logo, pas très gros, mais en gras »). */}
+        <KeyHomeLogo size={26} />
       </Animated.View>
 
       <Animated.View

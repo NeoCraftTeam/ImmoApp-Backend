@@ -34,6 +34,12 @@ describe('parsedToSearchParams', () => {
     expect(parsedToSearchParams({ quarter_name: 'Bastos' })).toEqual({ q: 'Bastos' });
   });
 
+  it('privilégie type_id (exact) sur type_name (flou)', () => {
+    expect(
+      parsedToSearchParams({ type_id: 42, type_name: 'Appartement' }),
+    ).toEqual({ type_id: '42', type: 'Appartement' });
+  });
+
   it('ignore les valeurs nulles et une transaction inconnue', () => {
     expect(
       parsedToSearchParams({ transaction_type: 'colocation', bedrooms: null }),
@@ -62,6 +68,12 @@ describe('searchParamsToState', () => {
       hasParking: true,
       attributes: ['furnished'],
     });
+  });
+
+  it('hydrate typeId depuis type_id (filtrage exact)', () => {
+    const { filters } = searchParamsToState({ type_id: '42', type: 'Appartement' });
+    expect(filters.typeId).toBe('42');
+    expect(filters.type).toBe('Appartement');
   });
 
   it('ignore les valeurs malformées', () => {

@@ -14,7 +14,14 @@ export function parsedToSearchParams(
   const q = parsed.q ?? (parsed.quarter_name || null);
   if (q) params.q = q;
   if (parsed.city_name) params.city = parsed.city_name;
-  if (parsed.type_name) params.type = parsed.type_name;
+  // type_id (résolu par le backend) prime : « appartement » ne doit pas
+  // matcher « appartement simple » via la recherche floue sur le nom.
+  if (parsed.type_id != null && String(parsed.type_id) !== '') {
+    params.type_id = String(parsed.type_id);
+    if (parsed.type_name) params.type = parsed.type_name;
+  } else if (parsed.type_name) {
+    params.type = parsed.type_name;
+  }
   if (parsed.transaction_type === 'location' || parsed.transaction_type === 'vente') {
     params.transaction_type = parsed.transaction_type;
   }

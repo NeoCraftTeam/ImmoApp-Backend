@@ -4,40 +4,19 @@ import { Paragraph, XStack, YStack } from 'tamagui';
 import { useNeighborhoodScorecard } from '@/hooks/useNeighborhoodScorecard';
 import { useThemeColors } from '@/theme/useThemeColors';
 import { brand } from '@/theme/tokens';
-import { formatDistance } from '@/utils/geo';
-import type { ScorecardCategory } from '@/types/scorecard';
+import { formatDistance, walkingMinutes } from '@/utils/geo';
+import { normalizeCategories, overallScore } from '@/utils/scorecard';
 
 interface Props {
   adId: string;
 }
 
-function normalizeCategories(input: unknown): ScorecardCategory[] {
-  if (Array.isArray(input)) {
-    return input as ScorecardCategory[];
-  }
-  if (input && typeof input === 'object') {
-    return Object.entries(input as Record<string, Partial<ScorecardCategory>>).map(
-      ([key, value]) => ({
-        key,
-        label: value?.label ?? humanizeKey(key),
-        score: value?.score ?? 0,
-        poi_count: value?.poi_count,
-        nearest: value?.nearest ?? null,
-      }),
-    );
-  }
-  return [];
-}
-
-function humanizeKey(key: string): string {
-  return key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ');
-}
-
 /**
  * Compact mobile mirror of the web `NeighborhoodScorecard` — global
- * score + per-category bars + nearest POI line. The full PSV map of
- * the web version is intentionally omitted; the map block on the
- * detail page already conveys the spatial context.
+ * score + per-category bars + nearest POI line (distance réelle du
+ * backend + minutes à pied estimées). The full PSV map of the web
+ * version is intentionally omitted; the map block on the detail page
+ * already conveys the spatial context.
  */
 export function NeighborhoodScorecard({ adId }: Props) {
   const colors = useThemeColors();
@@ -52,11 +31,12 @@ export function NeighborhoodScorecard({ adId }: Props) {
   }
 
   const categories = normalizeCategories(data?.categories);
-  if (isError || !data || data.unavailable || categories.length === 0) {
+  if (isError || !data || data.status === 'unavailable' || categories.length === 0) {
     return null;
   }
 
-  const color = colorFor(data.overall_score ?? 0);
+  const overall = overallScore(data, categories);
+  const color = colorFor(overall);
 
   return (
     <YStack gap={14}>
@@ -72,7 +52,7 @@ export function NeighborhoodScorecard({ adId }: Props) {
           backgroundColor="$background"
         >
           <Paragraph fontSize={18} fontWeight="800" color={color}>
-            {Math.round(data.overall_score)}
+            {overall}
           </Paragraph>
         </YStack>
         <YStack flex={1} gap={2}>
@@ -86,41 +66,45 @@ export function NeighborhoodScorecard({ adId }: Props) {
       </XStack>
 
       <YStack gap={10}>
-        {categories.map((cat) => (
-          <YStack key={cat.key} gap={3}>
-            <XStack justifyContent="space-between" alignItems="center">
-              <Paragraph fontSize={13} fontWeight="600" color="$slate900">
-                {cat.label}
-              </Paragraph>
-              <Paragraph fontSize={12} fontWeight="700" color={colorFor(cat.score)}>
-                {Math.round(cat.score)} %
-              </Paragraph>
-            </XStack>
-            <YStack
-              height={5}
-              borderRadius={3}
-              backgroundColor={colors.track}
-              overflow="hidden"
-            >
+        {categories.map((cat) => {
+          const distanceKm =
+            cat.nearest_poi?.distance_m != null
+              ? cat.nearest_poi.distance_m / 1000
+              : null;
+          return (
+            <YStack key={cat.key} gap={3}>
+              <XStack justifyContent="space-between" alignItems="center">
+                <Paragraph fontSize={13} fontWeight="600" color="$slate900">
+                  {cat.label}
+                </Paragraph>
+                <Paragraph fontSize={12} fontWeight="700" color={colorFor(cat.score)}>
+                  {Math.round(cat.score)} %
+                </Paragraph>
+              </XStack>
               <YStack
-                height="100%"
-                width={`${Math.max(0, Math.min(100, cat.score))}%`}
-                backgroundColor={colorFor(cat.score)}
-              />
+                height={5}
+                borderRadius={3}
+                backgroundColor={colors.track}
+                overflow="hidden"
+              >
+                <YStack
+                  height="100%"
+                  width={`${Math.max(0, Math.min(100, cat.score))}%`}
+                  backgroundColor={colorFor(cat.score)}
+                />
+              </YStack>
+              {cat.nearest_poi?.name ? (
+                <Paragraph fontSize={11.5} color="$slate500">
+                  Plus proche : {cat.nearest_poi.name}
+                  {distanceKm != null ? ` · ${formatDistance(distanceKm)}` : ''}
+                  {distanceKm != null
+                    ? ` · ${walkingMinutes(distanceKm)} min à pied`
+                    : ''}
+                </Paragraph>
+              ) : null}
             </YStack>
-            {cat.nearest?.name && (
-              <Paragraph fontSize={11.5} color="$slate500">
-                Plus proche : {cat.nearest.name}
-                {cat.nearest.distance_m != null
-                  ? ` · ${formatDistance(cat.nearest.distance_m / 1000)}`
-                  : ''}
-                {cat.nearest.walking_minutes != null
-                  ? ` · ${cat.nearest.walking_minutes} min à pied`
-                  : ''}
-              </Paragraph>
-            )}
-          </YStack>
-        ))}
+          );
+        })}
       </YStack>
     </YStack>
   );

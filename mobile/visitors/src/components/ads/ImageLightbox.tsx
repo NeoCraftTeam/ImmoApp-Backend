@@ -1,10 +1,11 @@
-import { X } from '@tamagui/lucide-icons';
+import { ChevronLeft, ChevronRight, X } from '@tamagui/lucide-icons';
 import { Image } from 'expo-image';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Modal,
   Pressable,
+  ScrollView,
   useWindowDimensions,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -24,8 +25,10 @@ interface Props {
 
 /**
  * Galerie plein écran swipeable — réplique l'ImageLightbox web. Modal
- * noir, une image par page (swipe horizontal), compteur + bouton fermer
- * dans une barre haute. Utilise la variante `large` de chaque image.
+ * noir, une image par page (swipe horizontal + chevrons), compteur et
+ * bouton fermer dans une barre haute, pincement/zoom par image (iOS —
+ * la ScrollView RN n'expose le zoom que là ; Android garde le swipe).
+ * L'index se resynchronise à chaque ouverture.
  */
 export function ImageLightbox({ images, initialIndex, visible, onClose }: Props) {
   const { width, height } = useWindowDimensions();
@@ -33,13 +36,29 @@ export function ImageLightbox({ images, initialIndex, visible, onClose }: Props)
   const [index, setIndex] = useState(initialIndex);
   const listRef = useRef<FlatList<AdImage> | null>(null);
 
+  // Ré-ouvrir sur une autre photo doit repartir du bon index — le
+  // useState initial ne suffit pas (le composant reste monté).
+  useEffect(() => {
+    if (!visible) return;
+    setIndex(initialIndex);
+    requestAnimationFrame(() => {
+      listRef.current?.scrollToIndex({ index: initialIndex, animated: false });
+    });
+  }, [visible, initialIndex]);
+
   const onMomentumEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const next = Math.round(e.nativeEvent.contentOffset.x / width);
-      setIndex(next);
+      setIndex(Math.max(0, Math.min(images.length - 1, next)));
     },
-    [width],
+    [width, images.length],
   );
+
+  const goTo = (next: number) => {
+    const clamped = Math.max(0, Math.min(images.length - 1, next));
+    listRef.current?.scrollToIndex({ index: clamped, animated: true });
+    setIndex(clamped);
+  };
 
   return (
     <Modal
@@ -61,7 +80,21 @@ export function ImageLightbox({ images, initialIndex, visible, onClose }: Props)
           getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
           onMomentumScrollEnd={onMomentumEnd}
           renderItem={({ item }) => (
-            <YStack width={width} height={height} alignItems="center" justifyContent="center">
+            <ScrollView
+              style={{ width, height }}
+              maximumZoomScale={3}
+              minimumZoomScale={1}
+              bouncesZoom
+              showsVerticalScrollIndicator={false}
+              showsHorizontalScrollIndicator={false}
+              centerContent
+              contentContainerStyle={{
+                width,
+                height,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
               <Image
                 source={{ uri: item.large ?? item.url }}
                 style={{ width, height: height * 0.8 }}
@@ -69,9 +102,37 @@ export function ImageLightbox({ images, initialIndex, visible, onClose }: Props)
                 transition={150}
                 accessibilityLabel="Photo de l'annonce"
               />
-            </YStack>
+            </ScrollView>
           )}
         />
+
+        {/* Chevrons de navigation (en plus du swipe) */}
+        {index > 0 && (
+          <Pressable
+            onPress={() => goTo(index - 1)}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Photo précédente"
+            style={{ position: 'absolute', left: 10, top: height / 2 - 22 }}
+          >
+            <YStack width={44} height={44} borderRadius={22} backgroundColor="rgba(0,0,0,0.45)" alignItems="center" justifyContent="center">
+              <ChevronLeft size={26} color="white" />
+            </YStack>
+          </Pressable>
+        )}
+        {index < images.length - 1 && (
+          <Pressable
+            onPress={() => goTo(index + 1)}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Photo suivante"
+            style={{ position: 'absolute', right: 10, top: height / 2 - 22 }}
+          >
+            <YStack width={44} height={44} borderRadius={22} backgroundColor="rgba(0,0,0,0.45)" alignItems="center" justifyContent="center">
+              <ChevronRight size={26} color="white" />
+            </YStack>
+          </Pressable>
+        )}
 
         {/* Barre haute : fermer + compteur */}
         <XStack

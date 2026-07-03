@@ -18,6 +18,11 @@ export interface AdFilters {
   transactionType: 'location' | 'vente' | null;
   /** Free-text type query — matches `ad_type.name`. */
   type: string | null;
+  /**
+   * Exact ad-type id (search IA / navigation) — prioritaire sur `type` :
+   * « appartement » ne doit pas matcher « appartement simple » par flou.
+   */
+  typeId: string | null;
   /** Minimum bedrooms (1 = "1+"). `null` = any. */
   bedrooms: number | null;
   /** Minimum bathrooms (1 = "1+"). `null` = any. */
@@ -78,6 +83,7 @@ export const EMPTY_FILTERS: AdFilters = {
   maxSurface: null,
   transactionType: null,
   type: null,
+  typeId: null,
   bedrooms: null,
   bathrooms: null,
   pricePeriod: null,
@@ -110,7 +116,11 @@ export function filtersToParams(
   if (filters.minSurface != null) params.surface_min = filters.minSurface;
   if (filters.maxSurface != null) params.surface_max = filters.maxSurface;
   if (filters.transactionType) params.transaction_type = filters.transactionType;
-  if (filters.type) params.type = filters.type;
+  if (filters.typeId) {
+    params.type_id = filters.typeId;
+  } else if (filters.type) {
+    params.type = filters.type;
+  }
   if (filters.bedrooms != null) params.bedrooms = filters.bedrooms;
   if (filters.bathrooms != null) params.bathrooms = filters.bathrooms;
   if (filters.pricePeriod) params.price_period = filters.pricePeriod;
@@ -147,6 +157,7 @@ export function searchParamsToState(
     ...EMPTY_FILTERS,
     city: str(params.city),
     type: str(params.type),
+    typeId: str(params.type_id),
     bedrooms: num(params.bedrooms),
     minPrice: num(params.price_min),
     maxPrice: num(params.price_max),
@@ -188,7 +199,9 @@ export function activeFilterChips(
   const trimmed = query.trim();
   if (trimmed !== '') chips.push({ key: 'query', label: `« ${trimmed} »` });
   if (filters.city) chips.push({ key: 'city', label: `Ville : ${filters.city}` });
-  if (filters.type) chips.push({ key: 'type', label: `Type : ${filters.type}` });
+  if (filters.type || filters.typeId) {
+    chips.push({ key: 'type', label: `Type : ${filters.type ?? 'sélectionné'}` });
+  }
   if (filters.bedrooms != null) {
     chips.push({ key: 'bedrooms', label: `${filters.bedrooms}+ chambres` });
   }
@@ -219,7 +232,7 @@ export function removeFilterChip(
     case 'city':
       return { ...filters, city: null };
     case 'type':
-      return { ...filters, type: null };
+      return { ...filters, type: null, typeId: null };
     case 'bedrooms':
       return { ...filters, bedrooms: null };
     case 'transactionType':

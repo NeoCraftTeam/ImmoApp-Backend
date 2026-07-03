@@ -16,9 +16,9 @@ export function useNeighborhoodScorecard(adId: string | undefined) {
       ('data' in (payload as { data?: unknown })
         ? (payload as { data: NeighborhoodScorecard }).data
         : (payload as NeighborhoodScorecard)) ?? {
-        overall_score: 0,
+        global_score: 0,
         categories: [],
-        unavailable: true,
+        status: 'unavailable',
       },
     enabled: Boolean(adId),
     staleTime: 24 * 60 * 60 * 1000,

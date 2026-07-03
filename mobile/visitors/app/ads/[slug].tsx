@@ -849,15 +849,9 @@ function PublisherCard({
 }) {
   const router = useRouter();
   const usernameOrId = ad.user?.username ?? ad.user?.id;
-  const trustScore = ad.user?.trust_score;
-  const trustColor =
-    trustScore == null
-      ? null
-      : trustScore >= 75
-        ? brand.success
-        : trustScore >= 50
-          ? brand.warning
-          : brand.danger;
+  // Certains comptes anciens portent un chemin relatif (avatars/default.png)
+  // inutilisable par <Image> — on retombe alors sur l'initiale.
+  const avatarUrl = ad.user?.avatar?.startsWith('http') ? ad.user.avatar : null;
   const handlePress = () => {
     if (!usernameOrId) return;
     router.push({
@@ -873,13 +867,23 @@ function PublisherCard({
           width={48}
           height={48}
           borderRadius={24}
+          overflow="hidden"
           backgroundColor={brand.primaryAlpha10}
           alignItems="center"
           justifyContent="center"
         >
-          <Paragraph fontSize={18} fontWeight="700" color={brand.primary}>
-            {publisherInitial}
-          </Paragraph>
+          {avatarUrl ? (
+            <Image
+              source={{ uri: avatarUrl }}
+              style={{ width: '100%', height: '100%' }}
+              contentFit="cover"
+              accessibilityLabel={publisherName}
+            />
+          ) : (
+            <Paragraph fontSize={18} fontWeight="700" color={brand.primary}>
+              {publisherInitial}
+            </Paragraph>
+          )}
         </YStack>
         <YStack flex={1} gap={2}>
           <XStack alignItems="center" gap={6} flexWrap="wrap">
@@ -888,21 +892,6 @@ function PublisherCard({
             </Paragraph>
             {ad.user?.is_verified && (
               <CheckCircle2 size={14} color={brand.success} />
-            )}
-            {trustScore != null && trustColor && (
-              <XStack
-                alignItems="center"
-                gap={3}
-                paddingHorizontal={7}
-                paddingVertical={2}
-                borderRadius={999}
-                backgroundColor={`${trustColor}1A`}
-              >
-                <ShieldCheck size={11} color={trustColor} />
-                <Paragraph fontSize={11} fontWeight="800" color={trustColor}>
-                  {Math.round(trustScore)}
-                </Paragraph>
-              </XStack>
             )}
           </XStack>
           {updatedRelative && (

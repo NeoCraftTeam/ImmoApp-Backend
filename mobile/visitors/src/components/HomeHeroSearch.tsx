@@ -7,7 +7,17 @@ import {
 } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Keyboard, Pressable, ScrollView } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  TextInput,
+} from 'react-native';
 import { Input, Paragraph, XStack, YStack } from 'tamagui';
 
 import { useCityAutocomplete } from '@/hooks/useCitiesAndTypes';
@@ -38,6 +48,7 @@ export function HomeHeroSearch() {
   const [mode, setMode] = useState<Mode>('city');
   const [cityInput, setCityInput] = useState('');
   const [aiInput, setAiInput] = useState('');
+  const [aiModalOpen, setAiModalOpen] = useState(false);
   const debouncedCity = useDebounce(cityInput, 300);
   const { data: suggestions } = useCityAutocomplete(mode === 'city' ? debouncedCity : '');
   const parse = useNaturalSearchParse();
@@ -82,8 +93,10 @@ export function HomeHeroSearch() {
     try {
       const parsed = await parse.mutateAsync(query);
       const params = parsedToSearchParams(parsed);
+      setAiModalOpen(false);
       goToSearch(Object.keys(params).length > 0 ? params : { q: query });
     } catch {
+      setAiModalOpen(false);
       goToSearch({ q: query });
     }
   };
@@ -196,7 +209,11 @@ export function HomeHeroSearch() {
           )}
         </YStack>
       ) : (
-        <YStack gap="$2">
+        <Pressable
+          onPress={() => setAiModalOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Ouvrir la recherche en langage naturel"
+        >
           <XStack
             alignItems="center"
             gap="$2"
@@ -208,56 +225,129 @@ export function HomeHeroSearch() {
             backgroundColor="$background"
           >
             <Sparkles size={18} color={brand.primary} />
-            <Input
-              flex={1}
-              value={aiInput}
-              onChangeText={setAiInput}
-              onSubmitEditing={() => void runAiSearch(aiInput)}
-              returnKeyType="search"
-              placeholder="Ex : Appartement 3 pièces à Bastos moins de 150 000 FCFA…"
-              placeholderTextColor="$slate500"
-              unstyled
-              size="$4"
-              accessibilityLabel="Recherche en langage naturel"
-            />
-            {parse.isPending ? (
-              <ActivityIndicator size="small" />
-            ) : (
+            <Paragraph flex={1} fontSize={14} color="$slate500" numberOfLines={1}>
+              {aiInput.trim() !== ''
+                ? aiInput
+                : 'Décrivez ce que vous cherchez…'}
+            </Paragraph>
+            <SearchIcon size={18} color={brand.primary} />
+          </XStack>
+        </Pressable>
+      )}
+
+      {/* Popup animé de saisie IA — grande zone de texte + exemples. */}
+      <Modal
+        visible={aiModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setAiModalOpen(false)}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <YStack flex={1} justifyContent="flex-end" backgroundColor="rgba(0,0,0,0.45)">
+            <Pressable style={{ flex: 1 }} onPress={() => setAiModalOpen(false)} />
+            <YStack
+              backgroundColor="$background"
+              borderTopLeftRadius={24}
+              borderTopRightRadius={24}
+              paddingHorizontal={20}
+              paddingTop={18}
+              paddingBottom={30}
+              gap={14}
+            >
+              <XStack alignItems="center" gap={8}>
+                <Sparkles size={20} color={brand.primary} />
+                <Paragraph fontSize={17} fontWeight="800" color="$slate900" flex={1}>
+                  Recherche intelligente
+                </Paragraph>
+                <Pressable
+                  onPress={() => setAiModalOpen(false)}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Fermer"
+                >
+                  <Paragraph fontSize={13} fontWeight="700" color="$slate500">
+                    Fermer
+                  </Paragraph>
+                </Pressable>
+              </XStack>
+              <Paragraph fontSize={13} color="$slate500" lineHeight={19}>
+                Décrivez votre recherche en langage naturel — type de bien, ville,
+                quartier, budget, chambres… L'IA la traduit en filtres précis.
+              </Paragraph>
+              <TextInput
+                value={aiInput}
+                onChangeText={setAiInput}
+                placeholder="Ex : Appartement 3 pièces à Bastos moins de 150 000 FCFA par mois…"
+                placeholderTextColor={brand.slate500}
+                multiline
+                autoFocus
+                editable={!parse.isPending}
+                style={{
+                  minHeight: 110,
+                  maxHeight: 180,
+                  borderWidth: 1.5,
+                  borderColor: brand.primaryAlpha20,
+                  borderRadius: 16,
+                  padding: 14,
+                  fontSize: 16,
+                  lineHeight: 22,
+                  color: brand.slate900,
+                  backgroundColor: brand.primaryAlpha10,
+                  textAlignVertical: 'top',
+                }}
+                accessibilityLabel="Recherche en langage naturel"
+              />
+              <XStack gap="$2" flexWrap="wrap">
+                {AI_EXAMPLES.map((example) => (
+                  <Pressable
+                    key={example}
+                    onPress={() => setAiInput(example)}
+                    accessibilityRole="button"
+                  >
+                    <XStack
+                      paddingHorizontal={10}
+                      paddingVertical={6}
+                      borderRadius={999}
+                      backgroundColor="$slate100"
+                    >
+                      <Paragraph fontSize={12} color="$slate700">
+                        {example}
+                      </Paragraph>
+                    </XStack>
+                  </Pressable>
+                ))}
+              </XStack>
               <Pressable
                 onPress={() => void runAiSearch(aiInput)}
-                hitSlop={8}
+                disabled={parse.isPending || aiInput.trim() === ''}
                 accessibilityRole="button"
                 accessibilityLabel="Lancer la recherche IA"
               >
-                <SearchIcon size={18} color={brand.primary} />
-              </Pressable>
-            )}
-          </XStack>
-          <XStack gap="$2" flexWrap="wrap">
-            {AI_EXAMPLES.map((example) => (
-              <Pressable
-                key={example}
-                onPress={() => {
-                  setAiInput(example);
-                  void runAiSearch(example);
-                }}
-                accessibilityRole="button"
-              >
                 <XStack
-                  paddingHorizontal={10}
-                  paddingVertical={6}
-                  borderRadius={999}
-                  backgroundColor="$slate100"
+                  alignItems="center"
+                  justifyContent="center"
+                  gap={8}
+                  paddingVertical={14}
+                  borderRadius={14}
+                  backgroundColor={aiInput.trim() ? brand.primary : brand.slate300}
                 >
-                  <Paragraph fontSize={12} color="$slate700">
-                    {example}
+                  {parse.isPending ? (
+                    <ActivityIndicator size="small" color="white" />
+                  ) : (
+                    <SearchIcon size={18} color="white" />
+                  )}
+                  <Paragraph fontSize={15} fontWeight="800" color="white">
+                    {parse.isPending ? 'Analyse en cours…' : 'Rechercher'}
                   </Paragraph>
                 </XStack>
               </Pressable>
-            ))}
-          </XStack>
-        </YStack>
-      )}
+            </YStack>
+          </YStack>
+        </KeyboardAvoidingView>
+      </Modal>
     </YStack>
   );
 }

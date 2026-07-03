@@ -2,11 +2,11 @@ import {
   ArrowLeft,
   CheckCircle2,
   MessageCircle,
-  Shield,
   Star,
   UserPlus,
   UserCheck,
 } from '@tamagui/lucide-icons';
+import { Image } from 'expo-image';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -126,13 +126,23 @@ export default function BailleurProfile() {
                   width={84}
                   height={84}
                   borderRadius={42}
+                  overflow="hidden"
                   backgroundColor={brand.primaryAlpha10}
                   alignItems="center"
                   justifyContent="center"
                 >
-                  <Paragraph fontSize={34} fontWeight="800" color={brand.primary}>
-                    {initial}
-                  </Paragraph>
+                  {data.avatar?.startsWith('http') ? (
+                    <Image
+                      source={{ uri: data.avatar }}
+                      style={{ width: '100%', height: '100%' }}
+                      contentFit="cover"
+                      accessibilityLabel={firstName || 'Bailleur'}
+                    />
+                  ) : (
+                    <Paragraph fontSize={34} fontWeight="800" color={brand.primary}>
+                      {initial}
+                    </Paragraph>
+                  )}
                 </YStack>
                 <YStack flex={1} gap={4}>
                   <XStack alignItems="center" gap={6}>
@@ -162,17 +172,6 @@ export default function BailleurProfile() {
                   <TrustChip
                     icon={<Star size={14} color={brand.warning} fill={brand.warning} />}
                     label={`${data.rating.toFixed(1)} (${data.reviews_count ?? 0})`}
-                  />
-                )}
-                {data.trust_score != null && (
-                  <TrustChip
-                    icon={<Shield size={14} color={brand.success} />}
-                    label={`Trust ${Math.round(data.trust_score)}`}
-                  />
-                )}
-                {(data.ads_count ?? 0) > 0 && (
-                  <TrustChip
-                    label={`${data.ads_count} annonce${(data.ads_count ?? 0) > 1 ? 's' : ''}`}
                   />
                 )}
                 {(data.follower_count ?? 0) > 0 && (
