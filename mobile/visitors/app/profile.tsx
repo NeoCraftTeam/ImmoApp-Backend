@@ -14,6 +14,7 @@ import { Button, H2, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
+import { CityAutocomplete } from '@/components/CityAutocomplete';
 import { PhoneInput } from '@/components/PhoneInput';
 import { useMe } from '@/hooks/useMe';
 import { useUpdateProfile, useUploadAvatar } from '@/hooks/useUpdateProfile';
@@ -39,14 +40,16 @@ export default function ProfileEdit() {
   const [firstname, setFirstname] = useState('');
   const [lastname, setLastname] = useState('');
   const [phone, setPhone] = useState('');
-  const [city, setCity] = useState('');
+  const [cityId, setCityId] = useState<string | null>(null);
+  const [cityName, setCityName] = useState('');
 
   useEffect(() => {
     if (me.data) {
       setFirstname(me.data.firstname ?? '');
       setLastname(me.data.lastname ?? '');
       setPhone(me.data.phone_number ?? '');
-      setCity(me.data.city ?? '');
+      setCityId(me.data.city_id ?? null);
+      setCityName(me.data.city_name ?? '');
     }
   }, [me.data]);
 
@@ -93,9 +96,16 @@ export default function ProfileEdit() {
         firstname: firstname.trim(),
         lastname: lastname.trim(),
         phone_number: phone.trim() === '' ? null : phone.trim(),
-        city: city.trim() === '' ? null : city.trim(),
+        // Le backend attend city_id (uuid), pas un texte libre — c'est
+        // pourquoi la ville ne se sauvegardait pas auparavant.
+        ...(cityId ? { city_id: cityId } : {}),
       });
-      Alert.alert('Profil', 'Vos informations ont été mises à jour.');
+      // Retour à l'écran précédent après succès (pas de simple alerte).
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/(tabs)/account');
+      }
     } catch (err) {
       Alert.alert('Erreur', extractApiErrorMessage(err));
     }
@@ -212,7 +222,22 @@ export default function ProfileEdit() {
             </Paragraph>
             <PhoneInput value={phone} onChange={setPhone} />
           </YStack>
-          <Field label="Ville" value={city} onChange={setCity} placeholder="Douala, Yaoundé…" />
+          <YStack gap={6} zIndex={20}>
+            <Paragraph fontSize={12} fontWeight="700" color="$slate500" textTransform="uppercase">
+              Ville
+            </Paragraph>
+            <CityAutocomplete
+              value={cityName}
+              onSelect={({ id, name }) => {
+                setCityId(id);
+                setCityName(name);
+              }}
+              onClear={() => {
+                setCityId(null);
+                setCityName('');
+              }}
+            />
+          </YStack>
 
           <Button
             size="$5"

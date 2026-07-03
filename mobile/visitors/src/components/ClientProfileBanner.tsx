@@ -41,7 +41,7 @@ export function ClientProfileBanner({ user, onPress }: Props) {
     {
       key: 'city',
       label: 'Ville',
-      done: Boolean(user.city),
+      done: Boolean(user.city_id),
       icon: <MapPin size={13} color={brand.primary} />,
     },
   ];

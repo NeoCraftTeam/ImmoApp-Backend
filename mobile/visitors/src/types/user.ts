@@ -9,7 +9,9 @@ export interface AuthUser {
   email: string;
   phone_number?: string | null;
   avatar?: string | null;
-  city?: string | null;
+  /** UserResource expose `city_id` (uuid) + `city_name` — pas `city`. */
+  city_id?: string | null;
+  city_name?: string | null;
   username?: string | null;
   point_balance?: number;
   is_verified?: boolean;
