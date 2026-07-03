@@ -14,6 +14,7 @@ import { Button, H2, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
+import { PhoneInput } from '@/components/PhoneInput';
 import { useMe } from '@/hooks/useMe';
 import { useUpdateProfile, useUploadAvatar } from '@/hooks/useUpdateProfile';
 import { useSession } from '@/auth/SessionProvider';
@@ -205,7 +206,12 @@ export default function ProfileEdit() {
 
           <Field label="Prénom" value={firstname} onChange={setFirstname} placeholder="Prénom" />
           <Field label="Nom" value={lastname} onChange={setLastname} placeholder="Nom" />
-          <Field label="Téléphone" value={phone} onChange={setPhone} placeholder="+237…" keyboardType="phone-pad" />
+          <YStack gap={6}>
+            <Paragraph fontSize={12} fontWeight="700" color="$slate500" textTransform="uppercase">
+              Téléphone
+            </Paragraph>
+            <PhoneInput value={phone} onChange={setPhone} />
+          </YStack>
           <Field label="Ville" value={city} onChange={setCity} placeholder="Douala, Yaoundé…" />
 
           <Button

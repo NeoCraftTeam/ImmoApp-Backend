@@ -7,6 +7,7 @@ import { z } from 'zod';
 
 import { extractApiErrorMessage } from '@/api/client';
 import { useSession } from '@/auth/SessionProvider';
+import { PhoneInput } from '@/components/PhoneInput';
 import { t } from '@/i18n';
 
 /**
@@ -117,7 +118,21 @@ export default function Register() {
             <Field flex label={t('auth.lastname')} value={form.lastname} onChange={update('lastname')} error={errors.lastname} autoComplete="family-name" autoCapitalize="words" />
           </XStack>
           <Field label={t('auth.email')} value={form.email} onChange={update('email')} error={errors.email} keyboardType="email-address" autoComplete="email" autoCapitalize="none" placeholder="email@exemple.com" />
-          <Field label={t('auth.phone')} value={form.phone_number} onChange={update('phone_number')} error={errors.phone_number} keyboardType="phone-pad" autoComplete="tel" placeholder="+237 6 12 34 56 78" />
+          <YStack gap="$1">
+            <Paragraph size="$3" color="$slate500">
+              {t('auth.phone')}
+            </Paragraph>
+            <PhoneInput
+              value={form.phone_number}
+              onChange={(v) => update('phone_number')(v)}
+              hasError={Boolean(errors.phone_number)}
+            />
+            {errors.phone_number ? (
+              <Paragraph size="$2" color="$danger">
+                {errors.phone_number}
+              </Paragraph>
+            ) : null}
+          </YStack>
           <Field label={t('auth.password')} value={form.password} onChange={update('password')} error={errors.password} secure autoComplete="new-password" placeholder="8 caractères minimum" />
           <Field label="Confirmer le mot de passe" value={form.password_confirmation} onChange={update('password_confirmation')} error={errors.password_confirmation} secure autoComplete="new-password" placeholder="••••••••" />
         </YStack>

@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { extractApiErrorMessage } from '@/api/client';
 import { useSession } from '@/auth/SessionProvider';
 import { KeyHomeLogo } from '@/components/KeyHomeLogo';
+import { PhoneInput } from '@/components/PhoneInput';
 import { t } from '@/i18n';
 
 /**
@@ -187,15 +188,10 @@ export default function Register() {
             <Paragraph size="$3" color="$slate500">
               Numéro de téléphone
             </Paragraph>
-            <Input
+            <PhoneInput
               value={form.phone_number}
-              onChangeText={update('phone_number')}
-              keyboardType="phone-pad"
-              autoComplete="tel"
-              textContentType="telephoneNumber"
-              placeholder="+237 6 12 34 56 78"
-              size="$4"
-              borderColor={errors.phone_number ? '$danger' : undefined}
+              onChange={(v) => update('phone_number')(v)}
+              hasError={Boolean(errors.phone_number)}
             />
             {errors.phone_number && (
               <Paragraph size="$2" color="$danger">

@@ -27,6 +27,7 @@ import {
 import { extractApiErrorMessage } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import { useSession } from '@/auth/SessionProvider';
+import { PhoneInput } from '@/components/PhoneInput';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useMe } from '@/hooks/useMe';
 import { useProfileQr } from '@/hooks/useMarketing';
@@ -259,12 +260,9 @@ export default function ProfileScreen() {
             />
           </Field>
           <Field label={t('auth.phone')}>
-            <Input
+            <PhoneInput
               value={form.phone_number}
-              onChangeText={(v) => set('phone_number', v)}
-              placeholder={t('auth.phone')}
-              keyboardType="phone-pad"
-              borderColor="$slate300"
+              onChange={(v) => set('phone_number', v)}
             />
           </Field>
           <Field label={t('adForm.fields.city')}>
