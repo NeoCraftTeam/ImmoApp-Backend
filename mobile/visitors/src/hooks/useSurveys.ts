@@ -37,7 +37,7 @@ export function useSurvey(slug: string | undefined) {
 
 export function useSubmitSurvey(slug: string | undefined) {
   return useMutation({
-    mutationFn: async (input: { answers: SurveyAnswer[]; anonymous?: boolean }) => {
+    mutationFn: async (input: { client_token: string; answers: SurveyAnswer[] }) => {
       if (!slug) throw new Error('Missing survey slug');
       const { data } = await apiClient.post(
         ENDPOINTS.surveys.publicSubmit(slug),

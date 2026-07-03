@@ -1,283 +1,310 @@
-import { ArrowLeft, CheckCircle2 } from '@tamagui/lucide-icons';
+import { ArrowLeft, Check, ChevronLeft, ChevronRight, Star } from '@tamagui/lucide-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, TextInput } from 'react-native';
-import { Button, Paragraph, XStack, YStack } from 'tamagui';
+import { useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, ScrollView, TextInput } from 'react-native';
+import { Button, H2, Paragraph, Spinner, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
 import { useSubmitSurvey, useSurvey } from '@/hooks/useSurveys';
 import { brand } from '@/theme/tokens';
-import type { SurveyAnswer, SurveyQuestion } from '@/types/survey';
+import type { SurveyQuestion } from '@/types/survey';
+
+/** UUID v4 minimal (jeton de déduplication client — pas de sécurité requise). */
+function uuidv4(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+function optionLabel(opt: string | { label?: string; value?: string }): string {
+  return typeof opt === 'string' ? opt : (opt.label ?? opt.value ?? '');
+}
 
 /**
- * Sondage public — un écran qui collecte toutes les réponses d'un
- * coup. Chaque type de question rend un widget différent (text /
- * choice / rating / number). Sur succès, écran de remerciement.
+ * Sondage en STEPPER — une question par étape, barre de progression,
+ * Précédent/Suivant, soumission à la dernière. Gère texte libre, choix
+ * unique (multiple_choice), choix multiple (checkbox) et note (rating).
  */
-export default function SurveyDetail() {
+export default function SurveyScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { data: survey, isLoading, isError, error } = useSurvey(slug);
   const submit = useSubmitSurvey(slug);
-  const [answers, setAnswers] = useState<Record<string, SurveyAnswer>>({});
-  const [done, setDone] = useState(false);
+  const clientToken = useRef(uuidv4()).current;
 
-  const update = (questionId: string, patch: Partial<SurveyAnswer>) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [questionId]: { question_id: questionId, ...prev[questionId], ...patch },
-    }));
+  const [step, setStep] = useState(0);
+  // Réponses : question_id → string (texte / option / note) ou string[] (checkbox).
+  const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
+
+  const questions = useMemo(
+    () => (survey?.questions ?? []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    [survey],
+  );
+  const total = questions.length;
+  const current = questions[step];
+
+  const setAnswer = (qid: string, value: string | string[]) => {
+    setAnswers((prev) => ({ ...prev, [qid]: value }));
   };
 
-  const handleSubmit = async () => {
-    if (!survey) return;
-    const required = survey.questions.filter((q) => q.is_required);
-    for (const q of required) {
-      const a = answers[q.id];
-      if (!a || (a.value == null && (!a.option_ids || a.option_ids.length === 0))) {
-        Alert.alert('Réponse requise', `Veuillez répondre à : ${q.prompt}`);
-        return;
-      }
-    }
-    try {
-      await submit.mutateAsync({ answers: Object.values(answers), anonymous: true });
-      setDone(true);
-    } catch (err) {
-      Alert.alert('Erreur', extractApiErrorMessage(err));
-    }
+  const isAnswered = (q: SurveyQuestion | undefined): boolean => {
+    if (!q) return false;
+    const a = answers[q.id];
+    if (Array.isArray(a)) return a.length > 0;
+    return typeof a === 'string' && a.trim() !== '';
+  };
+
+  const handleSubmit = () => {
+    const payload = Object.entries(answers)
+      .filter(([, v]) => (Array.isArray(v) ? v.length > 0 : String(v).trim() !== ''))
+      .map(([question_id, v]) => ({ question_id, answer: v }));
+    if (payload.length === 0) return;
+    submit.mutate(
+      { client_token: clientToken, answers: payload },
+      {
+        onSuccess: () => {
+          Alert.alert('Merci !', 'Vos réponses ont bien été envoyées.', [
+            {
+              text: 'OK',
+              onPress: () => (router.canGoBack() ? router.back() : router.replace('/(tabs)/account')),
+            },
+          ]);
+        },
+        onError: (err) => Alert.alert('Erreur', extractApiErrorMessage(err)),
+      },
+    );
   };
 
   if (isLoading) {
-    return <YStack flex={1} alignItems="center" justifyContent="center"><ActivityIndicator /></YStack>;
-  }
-  if (isError || !survey) {
-    return <YStack flex={1} alignItems="center" justifyContent="center" padding="$5"><Paragraph color="$slate700">{extractApiErrorMessage(error)}</Paragraph></YStack>;
+    return (
+      <YStack flex={1} backgroundColor="$background" alignItems="center" justifyContent="center">
+        <ActivityIndicator />
+      </YStack>
+    );
   }
 
-  if (done) {
+  if (isError || !survey || total === 0) {
     return (
-      <YStack flex={1} alignItems="center" justifyContent="center" padding="$5" gap={12}>
-        <CheckCircle2 size={56} color={brand.success} />
-        <Paragraph fontSize={20} fontWeight="700" textAlign="center">Merci !</Paragraph>
-        <Paragraph fontSize={14} color="$slate500" textAlign="center">
-          Votre réponse a bien été enregistrée. Elle nous aide à améliorer KeyHome.
+      <YStack flex={1} backgroundColor="$background" alignItems="center" justifyContent="center" padding="$5" gap={12}>
+        <Paragraph fontSize={14} color="$slate700" textAlign="center">
+          {isError ? extractApiErrorMessage(error) : 'Ce sondage ne contient aucune question.'}
         </Paragraph>
-        <Button backgroundColor="$brand" color="white" fontWeight="700" borderRadius={12} marginTop={6} onPress={() => router.back()}>
+        <Button backgroundColor="$brand" color="$brandText" onPress={() => router.back()}>
           Retour
         </Button>
       </YStack>
     );
   }
 
+  if (survey.already_submitted) {
+    return (
+      <YStack flex={1} backgroundColor="$background" alignItems="center" justifyContent="center" padding="$5" gap={12}>
+        <YStack width={64} height={64} borderRadius={32} backgroundColor={`${brand.success}20`} alignItems="center" justifyContent="center">
+          <Check size={30} color={brand.success} />
+        </YStack>
+        <Paragraph fontSize={16} fontWeight="800" color="$slate900" textAlign="center">
+          Merci, vous avez déjà répondu à ce sondage.
+        </Paragraph>
+        <Button backgroundColor="$brand" color="$brandText" onPress={() => router.back()}>
+          Retour
+        </Button>
+      </YStack>
+    );
+  }
+
+  const isLast = step === total - 1;
+  const progress = ((step + 1) / total) * 100;
+
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <YStack flex={1} backgroundColor="$background">
-          <XStack
-            paddingTop={insets.top + 8}
-            paddingHorizontal={14}
-            paddingBottom={10}
-            alignItems="center"
-            gap={10}
-            borderBottomWidth={1}
-            borderBottomColor="$slate300"
-          >
-            <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Retour">
-              <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-                <ArrowLeft size={18} color="$slate700" />
-              </YStack>
-            </Pressable>
-            <Paragraph fontSize={16} fontWeight="700" color="$slate900" flex={1} numberOfLines={1}>{survey.title}</Paragraph>
-          </XStack>
+      <YStack flex={1} backgroundColor="$background">
+        <XStack paddingTop={insets.top + 8} paddingHorizontal={14} paddingBottom={10} alignItems="center" gap={10}>
+          <Pressable onPress={() => router.back()} hitSlop={8} accessibilityRole="button" accessibilityLabel="Fermer">
+            <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
+              <ArrowLeft size={18} color="$slate700" />
+            </YStack>
+          </Pressable>
+          <H2 fontSize={17} fontWeight="700" color="$slate900" flex={1} numberOfLines={1}>
+            {survey.title}
+          </H2>
+        </XStack>
 
-          <ScrollView
-            contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 30, gap: 18 }}
-            keyboardShouldPersistTaps="handled"
-          >
-            {survey.description && (
-              <Paragraph fontSize={14} color="$slate500" lineHeight={20}>{survey.description}</Paragraph>
-            )}
-            {survey.questions.map((q, idx) => (
-              <YStack key={q.id} gap={10}>
-                <Paragraph fontSize={14} fontWeight="700" color="$slate900">
-                  {idx + 1}. {q.prompt}
-                  {q.is_required ? ' *' : ''}
-                </Paragraph>
-                {q.description && (
-                  <Paragraph fontSize={12} color="$slate500">{q.description}</Paragraph>
-                )}
-                <QuestionWidget question={q} answer={answers[q.id]} onChange={(patch) => update(q.id, patch)} />
-              </YStack>
-            ))}
+        <YStack paddingHorizontal={16} gap={6} marginBottom={8}>
+          <Paragraph fontSize={12} color="$slate500" fontWeight="600">
+            Question {step + 1} / {total}
+          </Paragraph>
+          <YStack height={6} borderRadius={3} backgroundColor="$slate100" overflow="hidden">
+            <YStack height="100%" width={`${progress}%`} backgroundColor="$brand" />
+          </YStack>
+        </YStack>
+
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 16, flexGrow: 1 }} keyboardShouldPersistTaps="handled">
+          {current ? (
+            <YStack gap={16}>
+              <Paragraph fontSize={19} fontWeight="800" color="$slate900" lineHeight={26}>
+                {current.text}
+              </Paragraph>
+              <QuestionWidget question={current} value={answers[current.id]} onChange={(v) => setAnswer(current.id, v)} />
+            </YStack>
+          ) : null}
+        </ScrollView>
+
+        <XStack padding={16} paddingBottom={insets.bottom + 16} gap={10} borderTopWidth={1} borderTopColor="$borderColor">
+          {step > 0 ? (
             <Button
-              size="$5"
-              backgroundColor="$brand"
-              color="white"
+              flex={1}
+              size="$4"
+              chromeless
+              borderWidth={1}
+              borderColor="$borderColor"
+              borderRadius={12}
+              color="$slate900"
               fontWeight="700"
-              borderRadius={14}
-              disabled={submit.isPending}
+              icon={<ChevronLeft size={16} color="$slate700" />}
+              onPress={() => setStep((s) => Math.max(0, s - 1))}
+            >
+              Précédent
+            </Button>
+          ) : null}
+          {isLast ? (
+            <Button
+              flex={2}
+              size="$4"
+              backgroundColor="$brand"
+              color="$brandText"
+              fontWeight="800"
+              borderRadius={12}
+              disabled={submit.isPending || !isAnswered(current)}
+              icon={submit.isPending ? <Spinner color="white" /> : undefined}
               onPress={handleSubmit}
             >
-              {submit.isPending ? 'Envoi…' : 'Envoyer mes réponses'}
+              Envoyer mes réponses
             </Button>
-          </ScrollView>
-        </YStack>
-      </KeyboardAvoidingView>
+          ) : (
+            <Button
+              flex={2}
+              size="$4"
+              backgroundColor="$brand"
+              color="$brandText"
+              fontWeight="800"
+              borderRadius={12}
+              disabled={!isAnswered(current)}
+              iconAfter={<ChevronRight size={16} color="white" />}
+              onPress={() => setStep((s) => Math.min(total - 1, s + 1))}
+            >
+              Suivant
+            </Button>
+          )}
+        </XStack>
+      </YStack>
     </>
   );
 }
 
 function QuestionWidget({
   question,
-  answer,
+  value,
   onChange,
 }: {
   question: SurveyQuestion;
-  answer?: SurveyAnswer;
-  onChange: (patch: Partial<SurveyAnswer>) => void;
+  value: string | string[] | undefined;
+  onChange: (v: string | string[]) => void;
 }) {
-  if (question.kind === 'short_text' || question.kind === 'long_text') {
+  const options = (question.options ?? []).map(optionLabel).filter((o) => o !== '');
+
+  if (question.type === 'text') {
     return (
       <TextInput
-        value={(answer?.value as string) ?? ''}
-        onChangeText={(v) => onChange({ value: v })}
+        value={typeof value === 'string' ? value : ''}
+        onChangeText={onChange}
         placeholder="Votre réponse…"
         placeholderTextColor={brand.slate500}
-        multiline={question.kind === 'long_text'}
+        multiline
+        maxLength={1000}
         style={{
+          minHeight: 100,
           borderWidth: 1,
           borderColor: brand.slate300,
           borderRadius: 12,
-          paddingHorizontal: 14,
-          paddingVertical: 10,
-          fontSize: 14,
+          padding: 14,
+          fontSize: 15,
           color: brand.slate900,
-          minHeight: question.kind === 'long_text' ? 90 : 44,
-          textAlignVertical: question.kind === 'long_text' ? 'top' : 'center',
+          textAlignVertical: 'top',
         }}
+        accessibilityLabel={question.text}
       />
     );
   }
-  if (question.kind === 'number') {
-    return (
-      <TextInput
-        value={answer?.value != null ? String(answer.value) : ''}
-        onChangeText={(v) => onChange({ value: v === '' ? null : Number(v) })}
-        keyboardType="numeric"
-        style={{
-          borderWidth: 1,
-          borderColor: brand.slate300,
-          borderRadius: 12,
-          paddingHorizontal: 14,
-          paddingVertical: 10,
-          fontSize: 14,
-          color: brand.slate900,
-        }}
-      />
-    );
-  }
-  if (question.kind === 'rating') {
-    const value = typeof answer?.value === 'number' ? answer.value : 0;
+
+  if (question.type === 'rating') {
+    const rating = Number(value) || 0;
     return (
       <XStack gap={8}>
-        {[1, 2, 3, 4, 5].map((i) => (
-          <Pressable key={i} onPress={() => onChange({ value: i })}>
-            <YStack
-              width={42}
-              height={42}
-              borderRadius={21}
-              backgroundColor={i <= value ? brand.primary : brand.slate100}
-              alignItems="center"
-              justifyContent="center"
-              borderWidth={1}
-              borderColor={i <= value ? brand.primary : brand.slate300}
-            >
-              <Paragraph fontSize={14} fontWeight="700" color={i <= value ? 'white' : brand.slate700}>{i}</Paragraph>
-            </YStack>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <Pressable key={n} onPress={() => onChange(String(n))} hitSlop={6} accessibilityRole="button" accessibilityLabel={`Note ${n}`}>
+            <Star size={38} color={brand.warning} fill={n <= rating ? brand.warning : 'transparent'} />
           </Pressable>
         ))}
       </XStack>
     );
   }
-  if (question.kind === 'single_choice') {
-    const selected = answer?.option_ids?.[0];
-    return (
-      <YStack gap={6}>
-        {(question.options ?? []).map((opt) => (
-          <Pressable key={opt.id} onPress={() => onChange({ option_ids: [opt.id], value: null })}>
+
+  const multi = question.type === 'checkbox';
+  const selected: string[] = multi
+    ? Array.isArray(value)
+      ? value
+      : []
+    : typeof value === 'string' && value !== ''
+      ? [value]
+      : [];
+
+  const toggle = (opt: string) => {
+    if (multi) {
+      onChange(selected.includes(opt) ? selected.filter((o) => o !== opt) : [...selected, opt]);
+    } else {
+      onChange(opt);
+    }
+  };
+
+  return (
+    <YStack gap={10}>
+      {options.map((opt) => {
+        const isSel = selected.includes(opt);
+        return (
+          <Pressable key={opt} onPress={() => toggle(opt)} accessibilityRole="button" accessibilityState={{ selected: isSel }}>
             <XStack
-              padding={12}
-              borderRadius={10}
-              borderWidth={1}
-              borderColor={selected === opt.id ? brand.primary : brand.slate300}
-              backgroundColor={selected === opt.id ? brand.primaryAlpha10 : '$background'}
               alignItems="center"
-              gap={8}
+              gap={12}
+              padding={14}
+              borderRadius={12}
+              borderWidth={1.5}
+              borderColor={isSel ? '$brand' : '$borderColor'}
+              backgroundColor={isSel ? '$brandAlpha10' : '$background'}
             >
               <YStack
-                width={18}
-                height={18}
-                borderRadius={9}
+                width={22}
+                height={22}
+                borderRadius={multi ? 6 : 11}
                 borderWidth={2}
-                borderColor={selected === opt.id ? brand.primary : brand.slate300}
+                borderColor={isSel ? '$brand' : '$slate300'}
+                backgroundColor={isSel ? '$brand' : 'transparent'}
                 alignItems="center"
                 justifyContent="center"
               >
-                {selected === opt.id && (
-                  <YStack width={8} height={8} borderRadius={4} backgroundColor={brand.primary} />
-                )}
+                {isSel ? <Check size={13} color="white" /> : null}
               </YStack>
-              <Paragraph fontSize={14} color="$slate900" flex={1}>{opt.label}</Paragraph>
+              <Paragraph flex={1} fontSize={15} color="$slate900">
+                {opt}
+              </Paragraph>
             </XStack>
           </Pressable>
-        ))}
-      </YStack>
-    );
-  }
-  if (question.kind === 'multi_choice') {
-    const ids = new Set(answer?.option_ids ?? []);
-    const toggle = (id: string) => {
-      const next = new Set(ids);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      onChange({ option_ids: Array.from(next), value: null });
-    };
-    return (
-      <YStack gap={6}>
-        {(question.options ?? []).map((opt) => {
-          const on = ids.has(opt.id);
-          return (
-            <Pressable key={opt.id} onPress={() => toggle(opt.id)}>
-              <XStack
-                padding={12}
-                borderRadius={10}
-                borderWidth={1}
-                borderColor={on ? brand.primary : brand.slate300}
-                backgroundColor={on ? brand.primaryAlpha10 : '$background'}
-                alignItems="center"
-                gap={8}
-              >
-                <YStack
-                  width={18}
-                  height={18}
-                  borderRadius={4}
-                  borderWidth={2}
-                  borderColor={on ? brand.primary : brand.slate300}
-                  backgroundColor={on ? brand.primary : 'transparent'}
-                  alignItems="center"
-                  justifyContent="center"
-                >
-                  {on && <Paragraph fontSize={11} color="white" fontWeight="800">✓</Paragraph>}
-                </YStack>
-                <Paragraph fontSize={14} color="$slate900" flex={1}>{opt.label}</Paragraph>
-              </XStack>
-            </Pressable>
-          );
-        })}
-      </YStack>
-    );
-  }
-  return null;
+        );
+      })}
+    </YStack>
+  );
 }

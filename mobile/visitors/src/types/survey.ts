@@ -1,28 +1,19 @@
 /**
- * Survey — `GET /public/surveys` (list) + `GET /public/surveys/{slug}` (detail).
+ * Survey — `GET /public/surveys` (liste) + `GET /public/surveys/{slug}`
+ * (détail). Forme alignée sur le backend : question `{ text, type,
+ * options }` (pas `prompt`/`kind`). Types de question backend :
+ * multiple_choice (choix unique), checkbox (choix multiple), rating,
+ * text (texte libre).
  */
-export type SurveyQuestionKind =
-  | 'short_text'
-  | 'long_text'
-  | 'single_choice'
-  | 'multi_choice'
-  | 'rating'
-  | 'number';
-
-export interface SurveyOption {
-  id: string;
-  label: string;
-}
+export type SurveyQuestionType = 'multiple_choice' | 'checkbox' | 'rating' | 'text';
 
 export interface SurveyQuestion {
   id: string;
-  prompt: string;
-  description?: string;
-  kind: SurveyQuestionKind;
-  is_required?: boolean;
-  options?: SurveyOption[];
-  max?: number;
-  min?: number;
+  text: string;
+  type: SurveyQuestionType;
+  /** Liste d'options (array JSON) — chaînes ou { label, value }. */
+  options?: (string | { label?: string; value?: string })[] | null;
+  order?: number;
 }
 
 export interface Survey {
@@ -30,17 +21,18 @@ export interface Survey {
   slug: string;
   title: string;
   description?: string | null;
+  is_active?: boolean;
+  is_public?: boolean;
+  already_submitted?: boolean;
   questions: SurveyQuestion[];
-  allow_anonymous?: boolean;
-  is_open?: boolean;
 }
 
 export interface SurveyListResponse {
   data: Survey[];
 }
 
+/** Réponse envoyée : `answer` est une chaîne (ou un tableau pour checkbox). */
 export interface SurveyAnswer {
   question_id: string;
-  value?: string | number | null;
-  option_ids?: string[];
+  answer: string | string[];
 }
