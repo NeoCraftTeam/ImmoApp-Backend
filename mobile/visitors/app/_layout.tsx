@@ -2,7 +2,7 @@ import { PortalProvider, TamaguiProvider, Theme } from 'tamagui';
 import { Stack, SplashScreen } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { SessionProvider, useSession } from '@/auth/SessionProvider';
@@ -57,7 +57,7 @@ export default function RootLayout() {
   return (
     <ErrorBoundary onError={reportError}>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
+        <SafeAreaProvider initialMetrics={initialWindowMetrics}>
           <ThemeProvider>
             <TamaguiProvider config={config}>
               <ThemedRoot />
