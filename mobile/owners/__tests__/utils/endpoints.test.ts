@@ -30,8 +30,9 @@ describe('ENDPOINTS owner', () => {
   });
 
   it('refunds + market + trust + team', () => {
-    expect(ENDPOINTS.refunds.list).toBe('/my/refunds');
-    expect(ENDPOINTS.market.estimate).toBe('/market/estimate');
+    expect(ENDPOINTS.refunds.list).toBe('/payments/refunds');
+    expect(ENDPOINTS.refunds.request('p1')).toBe('/payments/p1/refund-request');
+    expect(ENDPOINTS.market.estimate).toBe('/rent-estimate');
     expect(ENDPOINTS.trust.score).toBe('/my/trust-score');
     expect(ENDPOINTS.team.list).toBe('/my/team');
   });

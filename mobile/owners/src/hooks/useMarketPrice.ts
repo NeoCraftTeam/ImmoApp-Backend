@@ -13,12 +13,14 @@ interface EstimatePayload {
 
 /** Réponse brute de RentEstimatorController@estimate. */
 interface RentEstimateResponse {
-  estimated_min: number;
-  estimated_median: number;
-  estimated_max: number;
+  estimated_min?: number;
+  estimated_median?: number;
+  estimated_max?: number;
   sample_count?: number;
   currency?: string;
   bedrooms_scope_matched?: boolean;
+  /** Présent (avec HTTP 200) quand l'échantillon est insuffisant. */
+  error?: string;
 }
 
 /**
@@ -41,13 +43,18 @@ export function useMarketEstimate() {
           },
         },
       );
+      // Le backend renvoie { error } avec un HTTP 200 quand l'échantillon
+      // est vide : on remonte une vraie erreur pour que l'écran l'affiche.
+      if (data.error || data.estimated_median == null) {
+        throw new Error(data.error ?? 'Pas assez de données pour estimer ce loyer.');
+      }
       return {
         estimated_price: data.estimated_median,
         currency: data.currency,
-        range: { low: data.estimated_min, high: data.estimated_max },
+        range: { low: data.estimated_min ?? 0, high: data.estimated_max ?? 0 },
         comparable_count: data.sample_count,
         is_unreliable:
-          data.bedrooms_scope_matched === false || (data.sample_count ?? 0) < 3,
+          data.bedrooms_scope_matched === false || (data.sample_count ?? 0) < 5,
       };
     },
   });
