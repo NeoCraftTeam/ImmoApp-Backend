@@ -211,7 +211,8 @@ export interface Expense {
   ad_id: string;
   category: ExpenseCategory;
   amount: number;
-  date: string;
+  /** Champ backend `expense_date` (colonne du modèle Expense). */
+  expense_date: string;
   description?: string | null;
   created_at?: string;
 }

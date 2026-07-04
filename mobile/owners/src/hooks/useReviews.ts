@@ -28,13 +28,22 @@ export function useAdReviews(adId: string | undefined, enabled = true) {
       );
       return data;
     },
-    select: (payload) => ({
-      reviews: Array.isArray(payload?.data) ? payload.data : [],
-      averageRating: payload?.meta?.average_rating ?? null,
-      count:
-        payload?.meta?.reviews_count ??
-        (Array.isArray(payload?.data) ? payload.data.length : 0),
-    }),
+    select: (payload) => {
+      const reviews = Array.isArray(payload?.data) ? payload.data : [];
+      // L'index backend ne renvoie pas d'agrégat dans `meta` (pagination
+      // standard) → on calcule la moyenne côté client à partir des avis
+      // chargés (per_page=30, exact pour la plupart des annonces).
+      const rated = reviews.filter((r) => typeof r.rating === 'number');
+      const clientAverage =
+        rated.length > 0
+          ? rated.reduce((sum, r) => sum + r.rating, 0) / rated.length
+          : null;
+      return {
+        reviews,
+        averageRating: payload?.meta?.average_rating ?? clientAverage,
+        count: payload?.meta?.reviews_count ?? reviews.length,
+      };
+    },
     enabled: enabled && !!adId,
     staleTime: 60 * 1000,
   });

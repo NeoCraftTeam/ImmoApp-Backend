@@ -8,12 +8,13 @@ interface ExpensesResponse {
   data?: Expense[];
 }
 
+/** Forme renvoyée par ExpenseController@profitLoss, enveloppée dans `data`. */
 interface ProfitLossResponse {
-  income: number;
-  expenses: number;
-  net: number;
+  contract_revenue: number;
+  total_expenses: number;
+  net_income: number;
   currency?: string;
-  by_category?: Record<ExpenseCategory, number>;
+  expenses_by_category?: Partial<Record<ExpenseCategory, number>>;
 }
 
 export function useExpenses(adId: string | undefined, enabled = true) {
@@ -33,17 +34,18 @@ export function useExpenses(adId: string | undefined, enabled = true) {
 }
 
 export function useProfitLoss(adId: string | undefined, enabled = true) {
-  return useQuery<ProfitLossResponse, Error, ProfitLossResponse>({
+  return useQuery<{ data: ProfitLossResponse }, Error, ProfitLossResponse>({
     queryKey: ['profit-loss', adId],
     queryFn: async () => {
       if (!adId) {
-        return { income: 0, expenses: 0, net: 0 };
+        return { data: { contract_revenue: 0, total_expenses: 0, net_income: 0 } };
       }
-      const { data } = await apiClient.get<ProfitLossResponse>(
+      const { data } = await apiClient.get<{ data: ProfitLossResponse }>(
         ENDPOINTS.my.profitLoss(adId),
       );
       return data;
     },
+    select: (p) => p.data,
     enabled: enabled && !!adId,
     staleTime: 60 * 1000,
   });
@@ -54,7 +56,7 @@ export function useCreateExpense(adId: string) {
   return useMutation<
     Expense,
     Error,
-    { category: ExpenseCategory; amount: number; date: string; description?: string }
+    { category: ExpenseCategory; amount: number; expense_date: string; description?: string }
   >({
     mutationFn: async (payload) => {
       const { data } = await apiClient.post<{ data: Expense }>(
