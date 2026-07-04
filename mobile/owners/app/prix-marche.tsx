@@ -22,13 +22,13 @@ export default function PrixMarcheScreen() {
   const [transactionType, setTransactionType] = useState<'rent' | 'sale'>('rent');
 
   const onSubmit = () => {
-    if (!cityId || !adTypeId) return;
+    // Le backend exige city_id + type_id + surface (≥ 10).
+    if (!cityId || !adTypeId || !surface) return;
     estimate.mutate({
       city_id: cityId,
       ad_type_id: adTypeId,
-      transaction_type: transactionType,
       bedrooms: bedrooms ? Number(bedrooms) : undefined,
-      surface: surface ? Number(surface) : undefined,
+      surface: Number(surface),
     });
   };
 
@@ -134,8 +134,8 @@ export default function PrixMarcheScreen() {
           color="white"
           fontWeight="800"
           borderRadius={12}
-          disabled={!cityId || !adTypeId || estimate.isPending}
-          opacity={!cityId || !adTypeId ? 0.5 : 1}
+          disabled={!cityId || !adTypeId || !surface || estimate.isPending}
+          opacity={!cityId || !adTypeId || !surface ? 0.5 : 1}
           onPress={onSubmit}
           icon={<Calculator size={16} color="white" />}
         >

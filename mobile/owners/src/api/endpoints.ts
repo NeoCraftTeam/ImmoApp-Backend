@@ -194,9 +194,11 @@ export const ENDPOINTS = {
   },
   /** Remboursements (refunds requestés par le bailleur sur ses paiements). */
   refunds: {
-    list: '/my/refunds',
-    request: '/my/refunds',
-    detail: (id: string) => `/my/refunds/${encodeURIComponent(id)}`,
+    // Liste des remboursements de l'utilisateur (RefundController@userRefunds).
+    list: '/payments/refunds',
+    // La demande se fait par paiement : POST /payments/{payment}/refund-request.
+    request: (paymentId: string) =>
+      `/payments/${encodeURIComponent(paymentId)}/refund-request`,
   },
   /** Catalogue Services Pro (boost packs, premium packages, services à la carte). */
   proServices: {
@@ -210,8 +212,9 @@ export const ENDPOINTS = {
   },
   /** Marché — estimateur prix bailleur. */
   market: {
-    estimate: '/market/estimate',
-    indices: '/market/indices',
+    // Estimateur de loyer (RentEstimatorController@estimate) — GET avec
+    // city_id + type_id + surface en query.
+    estimate: '/rent-estimate',
   },
   /** Équipe / collaborateurs. */
   team: {

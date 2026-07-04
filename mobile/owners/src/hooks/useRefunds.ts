@@ -25,20 +25,24 @@ export function useRefunds(enabled = true) {
   });
 }
 
-/** POST /my/refunds — créer une demande de remboursement. */
+/**
+ * POST /payments/{payment}/refund-request — demander le remboursement
+ * d'un paiement. Le backend prend le montant sur le paiement ; seul
+ * `reason` (≥ 10 caractères) est envoyé.
+ */
 export function useRequestRefund() {
   const qc = useQueryClient();
   return useMutation<
-    RefundRequest,
+    { refund_id: string; message?: string },
     Error,
-    { payment_id?: string; amount: number; reason: string }
+    { payment_id: string; reason: string }
   >({
-    mutationFn: async (payload) => {
-      const { data } = await apiClient.post<{ data: RefundRequest }>(
-        ENDPOINTS.refunds.request,
-        payload,
+    mutationFn: async ({ payment_id, reason }) => {
+      const { data } = await apiClient.post<{ refund_id: string; message?: string }>(
+        ENDPOINTS.refunds.request(payment_id),
+        { reason },
       );
-      return data.data;
+      return data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['refunds'] }),
   });
