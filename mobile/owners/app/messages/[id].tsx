@@ -34,21 +34,20 @@ import type { ConversationMessage, ConversationPreview } from '@/types/conversat
 
 const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
-/** Regroupe les réactions par emoji + indique si l'utilisateur a réagi. */
+/**
+ * Normalise les réactions (déjà groupées par le backend :
+ * { emoji, count, user_ids }) + indique si l'utilisateur courant a réagi.
+ */
 function groupReactions(
   reactions: ConversationMessage['reactions'],
   myId?: string,
 ): { emoji: string; count: number; mine: boolean }[] {
   if (!Array.isArray(reactions) || reactions.length === 0) return [];
-  const map = new Map<string, { count: number; mine: boolean }>();
-  for (const r of reactions) {
-    const prev = map.get(r.emoji) ?? { count: 0, mine: false };
-    map.set(r.emoji, {
-      count: prev.count + 1,
-      mine: prev.mine || r.user_id === myId,
-    });
-  }
-  return Array.from(map.entries()).map(([emoji, v]) => ({ emoji, ...v }));
+  return reactions.map((r) => ({
+    emoji: r.emoji,
+    count: r.count ?? (Array.isArray(r.user_ids) ? r.user_ids.length : 0),
+    mine: Array.isArray(r.user_ids) && myId != null && r.user_ids.includes(myId),
+  }));
 }
 
 function TypingDots() {

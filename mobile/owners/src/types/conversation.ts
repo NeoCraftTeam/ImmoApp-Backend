@@ -44,7 +44,8 @@ export interface ConversationMessage {
   body: string | null;
   is_client_sealed?: boolean;
   attachments?: { id: string; url: string; type?: string }[];
-  reactions?: { id: string; emoji: string; user_id: string }[];
+  /** Déjà groupées par le backend (MessageResource::buildReactions). */
+  reactions?: { emoji: string; count: number; user_ids: string[] }[];
   read_at?: string | null;
   created_at: string;
   client_id?: string;
