@@ -52,9 +52,17 @@ export interface MessageAttachment {
 export interface Message {
   uuid: string;
   conversation_uuid: string;
-  /** `null` pour les messages sans corps (pièce jointe seule). */
+  /** `null` pour les messages sans corps (pièce jointe seule) ou scellés E2EE. */
   body: string | null;
   sender_id: string;
+  /** Expéditeur (nom + avatar) — sert aux avatars côté reçu. */
+  sender?: {
+    id: string;
+    name: string;
+    avatar?: string | null;
+  } | null;
+  /** `true` = message chiffré E2EE non déchiffrable ici (legacy) → placeholder. */
+  is_client_sealed?: boolean;
   created_at: string;
   read_at?: string | null;
   delivered_at?: string | null;

@@ -97,6 +97,13 @@ export default function ConversationScreen() {
     );
   }, [messages, myId]);
 
+  // Interlocuteur dérivé des messages reçus (nom + avatar) pour un
+  // en-tête façon Messenger. Fallback neutre si aucun message reçu.
+  const otherParticipant = useMemo(
+    () => messages.find((m) => m.sender && m.sender_id !== myId)?.sender ?? null,
+    [messages, myId],
+  );
+
   useEffect(() => {
     if (messagesResolved.length > 0) {
       requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
@@ -213,9 +220,14 @@ export default function ConversationScreen() {
                 <ArrowLeft size={18} color="$slate700" />
               </YStack>
             </Pressable>
+            <Avatar
+              uri={otherParticipant?.avatar}
+              name={otherParticipant?.name ?? 'Conversation'}
+              size={38}
+            />
             <YStack flex={1} gap={1}>
-              <Paragraph fontSize={16} fontWeight="700" color="$slate900">
-                Conversation
+              <Paragraph fontSize={16} fontWeight="700" color="$slate900" numberOfLines={1}>
+                {otherParticipant?.name ?? 'Conversation'}
               </Paragraph>
               {realtime.typingUser?.is_typing ? (
                 <Paragraph fontSize={11} color={brand.primary} fontWeight="600">
@@ -495,8 +507,12 @@ function MessageBubble({
   const hasReactions = Array.isArray(message.reactions) && message.reactions.length > 0;
   const isDelivered = !!message.delivered_at && !message.read_at;
   const isRead = !!message.read_at;
+  // Message E2EE legacy non déchiffrable ici : on affiche un placeholder
+  // plutôt qu'une bulle vide (l'E2EE est désactivé pour les nouveaux msg).
+  const isSealed = Boolean(message.is_client_sealed) && !message.body;
+  const hasText = (message.body?.length ?? 0) > 0;
 
-  return (
+  const bubble = (
     <YStack alignSelf={isMine ? 'flex-end' : 'flex-start'} maxWidth="80%">
       <Pressable onLongPress={onLongPress} delayLongPress={250}>
         <YStack gap={4}>
@@ -531,7 +547,7 @@ function MessageBubble({
                 )}
               </YStack>
             ))}
-          {(message.body?.length ?? 0) > 0 && (
+          {hasText && (
             <YStack
               paddingHorizontal={14}
               paddingVertical={9}
@@ -557,6 +573,23 @@ function MessageBubble({
                 {message.body}
               </Paragraph>
             </YStack>
+          )}
+          {isSealed && !hasAttachments && (
+            <XStack
+              paddingHorizontal={14}
+              paddingVertical={9}
+              borderRadius={18}
+              backgroundColor={brand.slate100}
+              borderBottomLeftRadius={!isMine && isTail ? 6 : 18}
+              borderBottomRightRadius={isMine && isTail ? 6 : 18}
+              alignItems="center"
+              gap={6}
+            >
+              <Paragraph fontSize={13}>🔒</Paragraph>
+              <Paragraph fontSize={13} color="$slate500" fontStyle="italic">
+                Message chiffré
+              </Paragraph>
+            </XStack>
           )}
         </YStack>
       </Pressable>
@@ -614,6 +647,67 @@ function MessageBubble({
             </>
           )}
         </XStack>
+      )}
+    </YStack>
+  );
+
+  // Messages reçus : petit avatar aligné sur la bulle de fin de cluster
+  // (façon Messenger). Les messages groupés gardent un décalage pour
+  // rester alignés. Les messages envoyés n'ont pas d'avatar.
+  if (isMine) {
+    return bubble;
+  }
+
+  return (
+    <XStack alignItems="flex-end" gap={6} maxWidth="86%">
+      {isTail ? (
+        <Avatar uri={message.sender?.avatar} name={message.sender?.name ?? '?'} size={26} />
+      ) : (
+        <YStack width={26} />
+      )}
+      {bubble}
+    </XStack>
+  );
+}
+
+/** Avatar rond : photo si dispo, sinon initiales sur fond neutre. */
+function Avatar({
+  uri,
+  name,
+  size,
+}: {
+  uri?: string | null;
+  name: string;
+  size: number;
+}) {
+  const initials = name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('');
+
+  return (
+    <YStack
+      width={size}
+      height={size}
+      borderRadius={size / 2}
+      backgroundColor="$slate200"
+      alignItems="center"
+      justifyContent="center"
+      overflow="hidden"
+    >
+      {uri ? (
+        <Image
+          source={{ uri }}
+          style={{ width: size, height: size }}
+          contentFit="cover"
+          transition={150}
+        />
+      ) : (
+        <Paragraph fontSize={size * 0.4} fontWeight="800" color="$slate600">
+          {initials || '?'}
+        </Paragraph>
       )}
     </YStack>
   );
