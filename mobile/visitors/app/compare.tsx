@@ -6,6 +6,7 @@ import { H4, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useCompare } from '@/providers/CompareProvider';
+import { useCurrency } from '@/hooks/useCurrency';
 import { t } from '@/i18n';
 import type { Ad } from '@/types/ad';
 
@@ -25,11 +26,13 @@ const COLUMN_WIDTH = 156;
  * which immediately reflows the screen; when the last ad is removed
  * the screen renders an empty state.
  */
-const CRITERIA: Array<{ label: string; render: (ad: Ad) => string }> = [
+const CRITERIA: Array<{
+  label: string;
+  render: (ad: Ad, formatPrice: (amountXAF: number) => string) => string;
+}> = [
   {
     label: 'Prix',
-    render: (ad) =>
-      ad.price != null ? `${ad.price.toLocaleString('fr-FR')} FCFA` : '—',
+    render: (ad, formatPrice) => (ad.price != null ? formatPrice(ad.price) : '—'),
   },
   {
     label: 'Transaction',
@@ -78,6 +81,7 @@ export default function CompareScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { items, toggle } = useCompare();
+  const { format } = useCurrency();
 
   return (
     <>
@@ -231,7 +235,7 @@ export default function CompareScreen() {
                         minHeight={42}
                       >
                         <Paragraph size="$3" textAlign="center" numberOfLines={1}>
-                          {c.render(ad)}
+                          {c.render(ad, format)}
                         </Paragraph>
                       </YStack>
                     ))}
