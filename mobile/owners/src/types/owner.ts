@@ -10,15 +10,17 @@ import type { Ad } from './ad';
 /* ------------------------------------------------------------------ */
 export interface OwnerStats {
   active_ads_count: number;
-  total_ads_count: number;
+  active_leases_count: number;
   occupancy_rate: number;
+  /** Loyers mensuels cumulés des baux actifs (accrual). */
+  monthly_rent_total_xaf: number;
+  pending_viewings_count: number;
+  confirmed_viewings_count: number;
   active_boosts_count: number;
-  recent_viewings_count: number;
-  unread_messages_count: number;
-  total_revenue: number;
-  this_month_revenue: number;
-  recent_ads?: Ad[];
-  status_breakdown?: Partial<Record<string, number>>;
+  unread_conversations_count: number;
+  expenses_total_xaf_30d: number;
+  /** Loyers réellement encaissés sur 30 jours (ledger). */
+  rent_collected_xaf_30d: number;
 }
 
 /* ------------------------------------------------------------------ */

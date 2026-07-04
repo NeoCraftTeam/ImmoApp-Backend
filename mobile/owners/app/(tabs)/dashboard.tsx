@@ -19,9 +19,9 @@ import { useSession } from '@/auth/SessionProvider';
 import { EmptyState } from '@/components/EmptyState';
 import { FadeIn } from '@/components/FadeIn';
 import { OwnerAdCard } from '@/components/OwnerAdCard';
-import { StatusBadge } from '@/components/StatusBadge';
 import { useCreditsBalance } from '@/hooks/useCredits';
 import { useMe } from '@/hooks/useMe';
+import { useMyAds } from '@/hooks/useMyAds';
 import { useOwnerStats } from '@/hooks/useOwnerStats';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { brand, tabularNumStyle } from '@/theme/tokens';
@@ -44,15 +44,18 @@ export default function Dashboard() {
   const { data: stats, isLoading, isRefetching, refetch } = useOwnerStats(isAuthenticated);
   const credits = useCreditsBalance(isAuthenticated);
   const unread = useUnreadNotificationCount(isAuthenticated);
+  // `/my/stats` ne renvoie pas les annonces récentes : on les tire de la
+  // liste paginée /my/ads (première page).
+  const { data: adsPages, refetch: refetchAds } = useMyAds({}, isAuthenticated);
 
   const onRefresh = useCallback(() => {
     refetch();
     me.refetch();
     credits.refetch();
-  }, [refetch, me, credits]);
+    refetchAds();
+  }, [refetch, me, credits, refetchAds]);
 
-  const recentAds = stats?.recent_ads ?? [];
-  const breakdown = stats?.status_breakdown ?? {};
+  const recentAds = (adsPages?.pages[0]?.data ?? []).slice(0, 3);
   const greeting = useGreeting();
 
   return (
@@ -186,7 +189,7 @@ export default function Dashboard() {
             textTransform="uppercase"
             marginBottom={8}
           >
-            Revenus ce mois
+            Loyers encaissés (30 j)
           </Paragraph>
           <Paragraph
             fontSize={48}
@@ -196,16 +199,16 @@ export default function Dashboard() {
             lineHeight={52}
             style={tabularNumStyle}
           >
-            {isLoading ? '—' : formatFcfa(stats?.this_month_revenue ?? 0)}
+            {isLoading ? '—' : formatFcfa(stats?.rent_collected_xaf_30d ?? 0)}
           </Paragraph>
-          {!isLoading && stats?.total_revenue != null ? (
+          {!isLoading && stats?.monthly_rent_total_xaf != null ? (
             <Paragraph
               fontSize={12.5}
               color="$slate500"
               marginTop={6}
               fontWeight="600"
             >
-              {formatFcfa(stats.total_revenue)} cumulés
+              {formatFcfa(stats.monthly_rent_total_xaf)} attendus / mois
             </Paragraph>
           ) : null}
         </YStack>
@@ -221,7 +224,6 @@ export default function Dashboard() {
           <InlineMetric
             value={isLoading ? '—' : String(stats?.active_ads_count ?? 0)}
             label="annonces"
-            subLabel={`/ ${stats?.total_ads_count ?? 0}`}
             tone="primary"
             onPress={() => router.push('/(tabs)/ads' as never)}
           />
@@ -233,7 +235,7 @@ export default function Dashboard() {
           />
           <YStack width={1} height={36} backgroundColor="$slate200" marginHorizontal={18} />
           <InlineMetric
-            value={isLoading ? '—' : String(stats?.recent_viewings_count ?? 0)}
+            value={isLoading ? '—' : String(stats?.pending_viewings_count ?? 0)}
             label="visites"
             tone="secondary"
             onPress={() => router.push('/(tabs)/viewings' as never)}
@@ -262,24 +264,6 @@ export default function Dashboard() {
           </Pressable>
         ) : null}
 
-        {/* Status breakdown — déjà bien fait, juste rythme adouci */}
-        {Object.keys(breakdown).length > 0 ? (
-          <YStack paddingHorizontal={20} marginBottom={28} gap={12}>
-            <SectionLabel>Répartition des annonces</SectionLabel>
-            <XStack flexWrap="wrap" gap={10} rowGap={10}>
-              {Object.entries(breakdown).map(([status, count]) =>
-                count ? (
-                  <XStack key={status} alignItems="center" gap={6}>
-                    <StatusBadge status={status} size="sm" />
-                    <Paragraph fontSize={13} fontWeight="900" color="$slate700" style={tabularNumStyle}>
-                      {count}
-                    </Paragraph>
-                  </XStack>
-                ) : null,
-              )}
-            </XStack>
-          </YStack>
-        ) : null}
 
         {/* Quick links — INLINE action bar, plus de grille 2×2 :
             compact, sans border, hierarchie text-link visible. */}

@@ -39,14 +39,14 @@ export default function FinancialsScreen() {
           <>
             <XStack gap={10}>
               <StatCard
-                label="Revenus du mois"
-                value={formatFcfa(data.this_month_revenue ?? 0)}
+                label="Encaissé (30 j)"
+                value={formatFcfa(data.rent_collected_xaf_30d ?? 0)}
                 icon={<ArrowUpRight size={16} color={brand.success} />}
                 accent={brand.success}
               />
               <StatCard
-                label="Revenus total"
-                value={formatFcfa(data.total_revenue ?? 0)}
+                label="Attendu / mois"
+                value={formatFcfa(data.monthly_rent_total_xaf ?? 0)}
                 icon={<Wallet size={16} color={brand.primary} />}
                 accent={brand.primary}
               />
