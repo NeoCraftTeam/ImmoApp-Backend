@@ -7,6 +7,7 @@ import { Paragraph, XStack, YStack } from 'tamagui';
 
 import { CompareButton } from '@/components/CompareButton';
 import { FavoriteButton } from '@/components/FavoriteButton';
+import { useCurrency } from '@/hooks/useCurrency';
 import { useThemeColors } from '@/theme/useThemeColors';
 import { brand } from '@/theme/tokens';
 import { t } from '@/i18n';
@@ -74,6 +75,7 @@ interface AdCardProps {
 
 function AdCardComponent({ ad, priority = false }: AdCardProps) {
   const colors = useThemeColors();
+  const { format } = useCurrency();
   const scale = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = useCallback(() => {
@@ -284,9 +286,7 @@ function AdCardComponent({ ad, priority = false }: AdCardProps) {
                     color="$slate900"
                     numberOfLines={1}
                   >
-                    {ad.price != null
-                      ? `${ad.price.toLocaleString('fr-FR')} FCFA`
-                      : '—'}
+                    {ad.price != null ? format(ad.price) : '—'}
                   </Paragraph>
                   {ad.price != null && ad.transaction_type === 'location' && (
                     <Paragraph fontSize={12} color="$slate500" fontWeight="500">

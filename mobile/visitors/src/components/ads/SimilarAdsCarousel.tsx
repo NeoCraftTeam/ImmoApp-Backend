@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { ActivityIndicator, FlatList, Pressable } from 'react-native';
 import { Paragraph, XStack, YStack } from 'tamagui';
 
+import { useCurrency } from '@/hooks/useCurrency';
 import { useSimilarAds } from '@/hooks/useSimilarAds';
 import { t } from '@/i18n';
 import type { Ad } from '@/types/ad';
@@ -55,6 +56,7 @@ export function SimilarAdsCarousel({ adId }: Props) {
 }
 
 function SimilarCard({ ad }: { ad: Ad }) {
+  const { format } = useCurrency();
   const cover = ad.images.find((i) => i.is_primary) ?? ad.images[0];
   const coverUri = cover?.thumb ?? cover?.url;
   const locationLabel = [ad.quarter?.name, ad.quarter?.city_name]
@@ -106,9 +108,7 @@ function SimilarCard({ ad }: { ad: Ad }) {
             )}
             <XStack alignItems="baseline" gap={3} marginTop={2}>
               <Paragraph fontSize={13} fontWeight="800" color="$slate900" numberOfLines={1}>
-                {ad.price != null
-                  ? `${ad.price.toLocaleString('fr-FR')} FCFA`
-                  : '—'}
+                {ad.price != null ? format(ad.price) : '—'}
               </Paragraph>
               {ad.price != null && ad.transaction_type === 'location' && (
                 <Paragraph fontSize={11} color="$slate500">

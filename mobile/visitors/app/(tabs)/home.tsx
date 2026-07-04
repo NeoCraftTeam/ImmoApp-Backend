@@ -33,6 +33,7 @@ import { FadeIn } from '@/components/FadeIn';
 import { HomeHeroSearch } from '@/components/HomeHeroSearch';
 import { useAdFeed } from '@/hooks/useAdFeed';
 import { useAdTypes } from '@/hooks/useCitiesAndTypes';
+import { useCurrency } from '@/hooks/useCurrency';
 import { useGreeting } from '@/hooks/useGreeting';
 import { useMe } from '@/hooks/useMe';
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed';
@@ -514,6 +515,7 @@ function FeedFooter({
  * pour qu'environ deux cartes tiennent à l'écran.
  */
 function RecommendationCard({ ad, priority }: { ad: Ad; priority: boolean }) {
+  const { format } = useCurrency();
   const cover = ad.images?.find((i) => i.is_primary) ?? ad.images?.[0];
   const coverUri = cover?.thumb ?? cover?.url;
   const locationLabel = [ad.quarter?.name, ad.quarter?.city_name]
@@ -558,9 +560,7 @@ function RecommendationCard({ ad, priority }: { ad: Ad; priority: boolean }) {
             )}
             <XStack alignItems="baseline" gap={3} marginTop={2}>
               <Paragraph fontSize={13} fontWeight="800" color="$slate900" numberOfLines={1}>
-                {ad.price != null
-                  ? `${ad.price.toLocaleString('fr-FR')} FCFA`
-                  : '—'}
+                {ad.price != null ? format(ad.price) : '—'}
               </Paragraph>
               {ad.price != null && isRent && (
                 <Paragraph fontSize={11} color="$slate500">

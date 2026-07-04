@@ -54,6 +54,7 @@ import { ReviewsSection } from '@/components/ads/ReviewsSection';
 import { SearchAlertButton } from '@/components/ads/SearchAlertButton';
 import { SimilarAdsCarousel } from '@/components/ads/SimilarAdsCarousel';
 import { useAd } from '@/hooks/useAd';
+import { useCurrency } from '@/hooks/useCurrency';
 import { useStartConversation } from '@/hooks/useConversations';
 import { useCreditsBalance } from '@/hooks/usePayments';
 import { useSession } from '@/auth/SessionProvider';
@@ -1031,6 +1032,7 @@ function StickyCTA({
   onWhatsApp: () => void;
   onBookViewing: () => void;
 }) {
+  const { format } = useCurrency();
   const periodLabel =
     ad.price_period === 'jour' ? t('ad.perDay') : t('ad.perMonth');
   // Téléphone visible = annonce déverrouillée → appel + WhatsApp possibles.
@@ -1052,7 +1054,7 @@ function StickyCTA({
     >
       <XStack alignItems="baseline" gap={4}>
         <Paragraph fontSize={19} fontWeight="800" color="$slate900" numberOfLines={1}>
-          {ad.price != null ? `${ad.price.toLocaleString('fr-FR')} FCFA` : '—'}
+          {ad.price != null ? format(ad.price) : '—'}
         </Paragraph>
         {ad.price != null && ad.transaction_type === 'location' && (
           <Paragraph fontSize={13} color="$slate500" fontWeight="500">
