@@ -35,7 +35,14 @@ const RegisterSchema = z
       .string()
       .trim()
       .regex(/^[+]?[0-9\s\-()]{8,15}$/, 'Numéro invalide'),
-    password: z.string().min(8, 'Mot de passe : 8 caractères minimum'),
+    // Aligné sur le backend : Password::min(8)->mixedCase()->numbers()->symbols().
+    password: z
+      .string()
+      .min(8, 'Mot de passe : 8 caractères minimum')
+      .regex(/[a-z]/, 'Au moins une minuscule')
+      .regex(/[A-Z]/, 'Au moins une majuscule')
+      .regex(/[0-9]/, 'Au moins un chiffre')
+      .regex(/[^A-Za-z0-9]/, 'Au moins un symbole'),
     password_confirmation: z.string(),
   })
   .refine((d) => d.password === d.password_confirmation, {
@@ -77,7 +84,9 @@ export default function Register() {
     }
     setSubmitting(true);
     try {
-      const result = await signUp(parsed.data);
+      // Le backend attend `confirm_password` (pas `password_confirmation`).
+      const { password_confirmation, ...rest } = parsed.data;
+      const result = await signUp({ ...rest, confirm_password: password_confirmation });
       if (result.emailVerificationRequired) {
         router.replace({
           pathname: '/(auth)/verify-otp',

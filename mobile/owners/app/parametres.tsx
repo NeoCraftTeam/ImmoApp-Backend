@@ -83,7 +83,10 @@ export default function SettingsScreen() {
           onPress: async () => {
             setDeleting(true);
             try {
-              await apiClient.delete(ENDPOINTS.my.deleteAccount);
+              // Le backend exige une phrase de confirmation exacte.
+              await apiClient.delete(ENDPOINTS.my.deleteAccount, {
+                data: { confirmation: 'SUPPRIMER MON COMPTE' },
+              });
               signOut();
               router.replace('/(auth)/login');
             } catch (err) {

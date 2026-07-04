@@ -48,7 +48,8 @@ export interface SignUpInput {
   email: string;
   phone_number: string;
   password: string;
-  password_confirmation: string;
+  /** Confirmation — nom de champ backend (`confirm_password`). */
+  confirm_password: string;
   agency_id?: string | null;
 }
 

@@ -37,7 +37,7 @@ export function useVerifyEmailOtp() {
     mutationFn: async (input: { email: string; otp: string }) => {
       const { data } = await apiClient.post<{ token?: string; access_token?: string }>(
         ENDPOINTS.auth.verifyEmailOtp,
-        { email: input.email, otp_code: input.otp },
+        { email: input.email, otp: input.otp },
       );
       return data;
     },
