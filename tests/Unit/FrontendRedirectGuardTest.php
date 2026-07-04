@@ -18,6 +18,16 @@ it('rejects an arbitrary https host', function (): void {
     expect(FrontendRedirectGuard::isAllowedAbsoluteUrl('https://evil.example.com/callback'))->toBeFalse();
 });
 
+it('accepts a subdomain of the allowed frontend host', function (): void {
+    expect(FrontendRedirectGuard::isAllowedAbsoluteUrl('https://app.keyhome.app/payment/callback'))->toBeTrue();
+});
+
+it('rejects a look-alike host that merely ends with the allowed host', function (): void {
+    // `notkeyhome.app` ne doit PAS matcher `keyhome.app` (le check exige un
+    // séparateur `.` de sous-domaine).
+    expect(FrontendRedirectGuard::isAllowedAbsoluteUrl('https://notkeyhome.app/callback'))->toBeFalse();
+});
+
 it('accepts the mobile deep-link schemes', function (string $uri): void {
     expect(FrontendRedirectGuard::isAllowedAbsoluteUrl($uri))->toBeTrue();
 })->with([

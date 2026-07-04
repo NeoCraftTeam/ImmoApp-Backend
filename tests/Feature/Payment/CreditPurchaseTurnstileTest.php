@@ -162,6 +162,24 @@ it('skips turnstile for credits purchase from a stateless mobile request', funct
         ->assertJsonStructure(['payment_url', 'tx_ref', 'gateway']);
 });
 
+it('rejects a credits purchase whose callback_url host is not allowed', function (): void {
+    config()->set('services.turnstile.secret_key', '');
+    config()->set('app.frontend_url', 'https://keyhome.app');
+    config()->set('app.oauth_allowed_redirect_hosts', '');
+
+    $package = PointPackage::factory()->create(['price' => 1000, 'is_active' => true]);
+    $user = User::factory()->create();
+
+    // Un host arbitraire doit être refusé par FrontendRedirectGuard côté
+    // contrôleur (422 « URL de retour non autorisée »), même si la
+    // validation du FormRequest laisse passer la chaîne.
+    $this->actingAs($user)
+        ->postJson("/api/v1/credits/purchase/{$package->id}", [
+            'callback_url' => 'https://evil.example.com/steal',
+        ])
+        ->assertUnprocessable();
+});
+
 it('allows credits purchase endpoint with valid turnstile token when configured', function (): void {
     config()->set('services.turnstile.secret_key', 'real-test-secret-not-dummy-placeholder');
 

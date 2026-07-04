@@ -23,10 +23,16 @@ final class FrontendRedirectGuard
      */
     public static function allowedAppSchemes(): array
     {
-        $schemes = ['exp'];
+        $schemes = [];
         $configured = (string) config('app.oauth_allowed_redirect_schemes', '');
         foreach (array_filter(array_map(trim(...), explode(',', $configured))) as $s) {
             $schemes[] = mb_strtolower($s);
+        }
+
+        // `exp://` est le scheme d'Expo Go (développement uniquement) : on
+        // ne l'autorise pas en production pour éviter tout laxisme inutile.
+        if (app()->environment('local', 'testing')) {
+            $schemes[] = 'exp';
         }
 
         /** @var list<string> */

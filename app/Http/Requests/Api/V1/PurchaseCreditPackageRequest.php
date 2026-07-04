@@ -95,7 +95,6 @@ class PurchaseCreditPackageRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'callback_url.url' => 'L\'URL de retour est invalide.',
             'payment_method.in' => 'Le moyen de paiement sélectionné n\'est pas pris en charge.',
             'payment_method_id.regex' => 'L\'identifiant de carte enregistrée est invalide.',
         ];
