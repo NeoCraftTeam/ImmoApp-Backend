@@ -28,6 +28,32 @@ export function useConversations() {
   });
 }
 
+interface StartConversationResponse {
+  data: Conversation;
+}
+
+/**
+ * Démarre (ou récupère) la conversation avec l'annonceur d'une annonce.
+ * Le backend applique un `findOrCreate` sur `ad_id` : renvoie 200 si le
+ * thread existait déjà, 201 sinon. Retourne l'uuid pour naviguer vers le
+ * fil. Un 403 signifie que l'annonce doit d'abord être débloquée.
+ */
+export function useStartConversation() {
+  const qc = useQueryClient();
+  return useMutation<Conversation, Error, string>({
+    mutationFn: async (adId: string) => {
+      const { data } = await apiClient.post<StartConversationResponse>(
+        ENDPOINTS.conversations.create,
+        { ad_id: adId },
+      );
+      return data.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
+}
+
 /**
  * Single-conversation thread. We poll the messages endpoint every
  * 4 seconds while the screen is mounted — Expo Go doesn't expose

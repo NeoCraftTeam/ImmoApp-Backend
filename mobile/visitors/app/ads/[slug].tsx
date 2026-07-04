@@ -23,6 +23,7 @@ import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   FlatList,
   Linking,
@@ -53,6 +54,7 @@ import { ReviewsSection } from '@/components/ads/ReviewsSection';
 import { SearchAlertButton } from '@/components/ads/SearchAlertButton';
 import { SimilarAdsCarousel } from '@/components/ads/SimilarAdsCarousel';
 import { useAd } from '@/hooks/useAd';
+import { useStartConversation } from '@/hooks/useConversations';
 import { useCreditsBalance } from '@/hooks/usePayments';
 import { useSession } from '@/auth/SessionProvider';
 import { useThemeColors } from '@/theme/useThemeColors';
@@ -86,6 +88,7 @@ export default function AdDetail() {
   const heroHeight = Math.round(height * HERO_RATIO);
 
   const { data: ad, isLoading, isError, error } = useAd(slug);
+  const startConversation = useStartConversation();
 
   // Historise l'annonce consultée pour le carrousel « Récemment consultés »
   // de l'accueil (persisté en AsyncStorage, dédupliqué, max 10).
@@ -232,7 +235,22 @@ export default function AdDetail() {
               router.push('/(auth)/login');
               return;
             }
-            router.push('/messages');
+            if (startConversation.isPending) {
+              return;
+            }
+            startConversation.mutate(ad.id, {
+              onSuccess: (conv) => {
+                router.push(`/messages/${conv.uuid}`);
+              },
+              onError: (err) => {
+                const message = extractApiErrorMessage(err);
+                Alert.alert(
+                  'Annonce verrouillée',
+                  message ??
+                    'Vous devez débloquer cette annonce avant de contacter l’annonceur.',
+                );
+              },
+            });
           }}
           onCall={() => {
             if (!isAuthenticated) {
