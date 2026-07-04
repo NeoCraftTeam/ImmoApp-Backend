@@ -22,17 +22,19 @@ export function useSubscriptionPlans() {
   });
 }
 
-/** GET /subscriptions/current. */
+/**
+ * GET /subscriptions/current. Le backend renvoie directement
+ * { has_subscription, subscription, stats } — PAS d'enveloppe `data`.
+ */
 export function useCurrentSubscription(enabled = true) {
-  return useQuery<{ data: CurrentSubscription }, Error, CurrentSubscription>({
+  return useQuery<CurrentSubscription, Error, CurrentSubscription>({
     queryKey: ['subscription-current'],
     queryFn: async () => {
-      const { data } = await apiClient.get<{ data: CurrentSubscription }>(
+      const { data } = await apiClient.get<CurrentSubscription>(
         ENDPOINTS.subscriptions.current,
       );
       return data;
     },
-    select: (p) => p.data,
     enabled,
     staleTime: 2 * 60 * 1000,
   });

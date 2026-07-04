@@ -228,13 +228,13 @@ function ActiveSubscriptionCard({
       </Paragraph>
 
       <XStack gap={16} flexWrap="wrap">
-        {subscription.expires_at ? (
+        {subscription.ends_at ? (
           <YStack gap={2}>
             <Paragraph fontSize={11} color="$slate500" fontWeight="600">
               {t('subscription.expiresOn')}
             </Paragraph>
             <Paragraph fontSize={13.5} fontWeight="800" color="$slate900">
-              {formatDate(subscription.expires_at)}
+              {formatDate(subscription.ends_at)}
             </Paragraph>
           </YStack>
         ) : null}

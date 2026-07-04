@@ -193,8 +193,10 @@ export interface CurrentSubscription {
     plan: SubscriptionPlan;
     status: string;
     status_label?: string;
-    started_at?: string;
-    expires_at?: string;
+    billing_period?: string;
+    starts_at?: string;
+    /** Fin d'abonnement — champ backend `ends_at`. */
+    ends_at?: string;
     days_remaining?: number;
     auto_renew?: boolean;
     boosted_ads_count?: number;
