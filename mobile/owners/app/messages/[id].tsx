@@ -209,6 +209,14 @@ export default function ConversationThreadScreen() {
                       <Paragraph fontSize={14} color={mine ? 'white' : '$slate900'} lineHeight={19}>
                         {m.body}
                       </Paragraph>
+                    ) : m.is_client_sealed ? (
+                      <Paragraph
+                        fontSize={13}
+                        fontStyle="italic"
+                        color={mine ? 'rgba(255,255,255,0.85)' : '$slate500'}
+                      >
+                        🔒 Message chiffré
+                      </Paragraph>
                     ) : null}
                     <XStack alignItems="center" gap={4} justifyContent="flex-end" marginTop={2}>
                       {m.created_at ? (
