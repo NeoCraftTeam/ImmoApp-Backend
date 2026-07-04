@@ -186,6 +186,8 @@ export const ENDPOINTS = {
     messages: (id: string) => `/conversations/${encodeURIComponent(id)}/messages`,
     sendMessage: (id: string) => `/conversations/${encodeURIComponent(id)}/messages`,
     markRead: (id: string) => `/conversations/${encodeURIComponent(id)}/read`,
+    attachments: (id: string) =>
+      `/conversations/${encodeURIComponent(id)}/attachments`,
     typing: (id: string) => `/conversations/${encodeURIComponent(id)}/typing`,
     reaction: (messageId: string) =>
       `/messages/${encodeURIComponent(messageId)}/reactions`,

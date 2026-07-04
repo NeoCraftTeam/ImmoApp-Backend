@@ -1,8 +1,10 @@
-import { Check, CheckCheck, Send } from '@tamagui/lucide-icons';
+import { Check, CheckCheck, ImagePlus, Send } from '@tamagui/lucide-icons';
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Easing,
   KeyboardAvoidingView,
@@ -14,6 +16,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { Paragraph, Spinner, XStack, YStack } from 'tamagui';
 
+import { extractApiErrorMessage } from '@/api/client';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useMe } from '@/hooks/useMe';
 import {
@@ -21,6 +24,7 @@ import {
   useMarkConversationRead,
   useSendMessage,
   useSetTyping,
+  useUploadAttachment,
 } from '@/hooks/useConversations';
 import { useConversationRealtime } from '@/hooks/useConversationRealtime';
 import { brand } from '@/theme/tokens';
@@ -85,6 +89,7 @@ export default function ConversationThreadScreen() {
   const send = useSendMessage(id);
   const markRead = useMarkConversationRead(id);
   const setTyping = useSetTyping(id);
+  const upload = useUploadAttachment(id);
 
   // Préfetch depuis la cache des conversations (header info instant)
   const conversation = useMemo<ConversationPreview | undefined>(() => {
@@ -138,6 +143,29 @@ export default function ConversationThreadScreen() {
     if (!body) return;
     setDraft('');
     send.mutate(body);
+  };
+
+  const handlePickImage = async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (perm.status !== 'granted') {
+        Alert.alert('Permission requise', 'Autorisez l’accès aux photos.');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets[0]) return;
+      const asset = result.assets[0];
+      await upload.mutateAsync({
+        uri: asset.uri,
+        name: asset.fileName ?? asset.uri.split('/').pop() ?? 'photo.jpg',
+        type: asset.mimeType ?? 'image/jpeg',
+      });
+    } catch (err) {
+      Alert.alert('Erreur', extractApiErrorMessage(err));
+    }
   };
 
   const otherName = conversation?.other_participant?.name?.trim() || 'Conversation';
@@ -205,6 +233,26 @@ export default function ConversationThreadScreen() {
                     borderBottomRightRadius={mine ? 4 : 16}
                     borderBottomLeftRadius={mine ? 16 : 4}
                   >
+                    {Array.isArray(m.attachments) && m.attachments.length > 0
+                      ? m.attachments.map((att) => (
+                          <YStack
+                            key={att.id ?? att.url}
+                            width={200}
+                            height={200}
+                            borderRadius={12}
+                            overflow="hidden"
+                            backgroundColor="$slate200"
+                            marginBottom={m.body ? 6 : 0}
+                          >
+                            <Image
+                              source={{ uri: att.url }}
+                              style={{ width: '100%', height: '100%' }}
+                              contentFit="cover"
+                              transition={150}
+                            />
+                          </YStack>
+                        ))
+                      : null}
                     {m.body ? (
                       <Paragraph fontSize={14} color={mine ? 'white' : '$slate900'} lineHeight={19}>
                         {m.body}
@@ -254,6 +302,27 @@ export default function ConversationThreadScreen() {
           borderTopColor="$slate300"
           backgroundColor="$background"
         >
+          <Pressable
+            onPress={handlePickImage}
+            hitSlop={8}
+            disabled={upload.isPending}
+            accessibilityLabel="Envoyer une photo"
+          >
+            <YStack
+              width={40}
+              height={40}
+              borderRadius={20}
+              alignItems="center"
+              justifyContent="center"
+              backgroundColor={brand.slate100}
+            >
+              {upload.isPending ? (
+                <Spinner size="small" color={brand.primary} />
+              ) : (
+                <ImagePlus size={20} color={brand.slate700} />
+              )}
+            </YStack>
+          </Pressable>
           <TextInput
             value={draft}
             onChangeText={(v) => {

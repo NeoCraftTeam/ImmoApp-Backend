@@ -111,3 +111,26 @@ export function useSetTyping(id: string | undefined) {
     },
   });
 }
+
+/**
+ * Envoi d'une pièce jointe (photo) — multipart `file`, POST
+ * /conversations/{uuid}/attachments. Invalide le fil au retour.
+ */
+export function useUploadAttachment(id: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation<unknown, Error, { uri: string; name: string; type: string }>({
+    mutationFn: async (file) => {
+      if (!id) throw new Error('Missing conversation id');
+      const form = new FormData();
+      form.append('file', file as unknown as Blob);
+      const { data } = await apiClient.post(ENDPOINTS.chat.attachments(id), form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['owner-conversation-messages', id] });
+      qc.invalidateQueries({ queryKey: ['owner-conversations'] });
+    },
+  });
+}
