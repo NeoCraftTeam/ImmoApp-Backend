@@ -7,7 +7,9 @@ import {
   Eye,
   MapPin,
   Maximize,
+  MessageCircle,
   ParkingCircle,
+  Phone,
   Share2,
   ShieldCheck,
   ShowerHead,
@@ -167,21 +169,6 @@ export default function AdDetail() {
     <>
       <Stack.Screen options={{ headerShown: false }} />
       <YStack flex={1} backgroundColor="$slate100">
-        <AnimatedHero
-          ad={ad}
-          width={width}
-          heroHeight={heroHeight}
-          carouselRef={carouselRef}
-          activeImage={activeImage}
-          setActiveImage={setActiveImage}
-          translateY={heroTranslateY}
-          scale={heroScale}
-          onImagePress={(i) => {
-            setActiveImage(i);
-            setLightboxOpen(true);
-          }}
-        />
-
         <Animated.ScrollView
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -208,6 +195,25 @@ export default function AdDetail() {
           />
         </Animated.ScrollView>
 
+        {/* Héro rendu APRÈS la ScrollView (donc au-dessus en z-order) pour
+            que la galerie horizontale reçoive les gestes de swipe — sinon
+            la ScrollView verticale les capte. La zone OVERLAP en bas laisse
+            passer les touches vers le corps (pointerEvents box-none). */}
+        <AnimatedHero
+          ad={ad}
+          width={width}
+          heroHeight={heroHeight}
+          carouselRef={carouselRef}
+          activeImage={activeImage}
+          setActiveImage={setActiveImage}
+          translateY={heroTranslateY}
+          scale={heroScale}
+          onImagePress={(i) => {
+            setActiveImage(i);
+            setLightboxOpen(true);
+          }}
+        />
+
         {/* Floating top chrome — back arrow + share/compare/favorite */}
         <FloatingChrome
           insets={insets}
@@ -217,30 +223,52 @@ export default function AdDetail() {
           onShare={handleShare}
         />
 
-        {/* Sticky bottom CTA */}
+        {/* Sticky bottom CTA — Message / Appeler / WhatsApp + Réserver */}
         <StickyCTA
           ad={ad}
           insets={insets}
-          onContact={() => {
+          onMessage={() => {
+            if (!isAuthenticated) {
+              router.push('/(auth)/login');
+              return;
+            }
+            router.push('/messages');
+          }}
+          onCall={() => {
             if (!isAuthenticated) {
               router.push('/(auth)/login');
               return;
             }
             const phone = ad.user?.phone_number?.replace(/[\s\-()]/g, '');
-            if (phone && ad.user?.phone_is_whatsapp) {
+            if (phone) {
+              Linking.openURL(`tel:${phone}`).catch(() => router.push('/messages'));
+            } else {
+              router.push('/messages');
+            }
+          }}
+          onWhatsApp={() => {
+            if (!isAuthenticated) {
+              router.push('/(auth)/login');
+              return;
+            }
+            const phone = ad.user?.phone_number?.replace(/[\s\-()]/g, '');
+            if (phone) {
               const text = encodeURIComponent(
                 `Bonjour, je vous contacte au sujet de votre annonce "${ad.title}" sur KeyHome.`,
               );
               Linking.openURL(`https://wa.me/${phone.replace(/^\+/, '')}?text=${text}`).catch(
                 () => router.push('/messages'),
               );
+            } else {
+              router.push('/messages');
+            }
+          }}
+          onBookViewing={() => {
+            if (!isAuthenticated) {
+              router.push('/(auth)/login');
               return;
             }
-            if (phone) {
-              Linking.openURL(`tel:${phone}`).catch(() => router.push('/messages'));
-              return;
-            }
-            router.push('/messages');
+            setBookingOpen(true);
           }}
         />
 
@@ -973,14 +1001,22 @@ function ActionChip({
 function StickyCTA({
   ad,
   insets,
-  onContact,
+  onMessage,
+  onCall,
+  onWhatsApp,
+  onBookViewing,
 }: {
   ad: Ad;
   insets: { bottom: number };
-  onContact: () => void;
+  onMessage: () => void;
+  onCall: () => void;
+  onWhatsApp: () => void;
+  onBookViewing: () => void;
 }) {
   const periodLabel =
     ad.price_period === 'jour' ? t('ad.perDay') : t('ad.perMonth');
+  // Téléphone visible = annonce déverrouillée → appel + WhatsApp possibles.
+  const hasPhone = Boolean(ad.user?.phone_number);
 
   return (
     <YStack
@@ -991,44 +1027,83 @@ function StickyCTA({
       paddingHorizontal={16}
       paddingTop={12}
       paddingBottom={insets.bottom + 12}
+      gap={10}
       backgroundColor="$background"
       borderTopWidth={1}
-      borderTopColor="$slate300"
+      borderTopColor="$borderColor"
     >
-      <XStack alignItems="center" gap={12}>
-        <YStack flex={1} gap={1}>
-          <XStack alignItems="baseline" gap={4}>
-            <Paragraph fontSize={19} fontWeight="800" color="$slate900" numberOfLines={1}>
-              {ad.price != null
-                ? `${ad.price.toLocaleString('fr-FR')} FCFA`
-                : '—'}
-            </Paragraph>
-            {ad.price != null && ad.transaction_type === 'location' && (
-              <Paragraph fontSize={13} color="$slate500" fontWeight="500">
-                {periodLabel}
-              </Paragraph>
-            )}
-          </XStack>
-          {ad.user?.firstname && (
-            <Paragraph fontSize={12} color="$slate500" numberOfLines={1}>
-              Publié par {ad.user.firstname}
-            </Paragraph>
-          )}
-        </YStack>
+      <XStack alignItems="baseline" gap={4}>
+        <Paragraph fontSize={19} fontWeight="800" color="$slate900" numberOfLines={1}>
+          {ad.price != null ? `${ad.price.toLocaleString('fr-FR')} FCFA` : '—'}
+        </Paragraph>
+        {ad.price != null && ad.transaction_type === 'location' && (
+          <Paragraph fontSize={13} color="$slate500" fontWeight="500">
+            {periodLabel}
+          </Paragraph>
+        )}
+        {ad.user?.firstname && (
+          <Paragraph fontSize={12} color="$slate500" numberOfLines={1} flex={1} textAlign="right">
+            Publié par {ad.user.firstname}
+          </Paragraph>
+        )}
+      </XStack>
+
+      <XStack gap={8} alignItems="center">
+        <CtaIconButton label="Message" onPress={onMessage}>
+          <MessageCircle size={18} color={brand.primary} />
+        </CtaIconButton>
+        {hasPhone ? (
+          <>
+            <CtaIconButton label="Appeler" onPress={onCall}>
+              <Phone size={18} color={brand.primary} />
+            </CtaIconButton>
+            <CtaIconButton label="WhatsApp" onPress={onWhatsApp}>
+              <MessageCircle size={18} color="#25D366" />
+            </CtaIconButton>
+          </>
+        ) : null}
         <Button
-          size="$5"
+          flex={1}
+          size="$4"
           backgroundColor="$brand"
           color="$brandText"
-          fontWeight="700"
-          borderRadius={14}
-          paddingHorizontal={20}
-          onPress={onContact}
+          fontWeight="800"
+          borderRadius={12}
+          onPress={onBookViewing}
+          icon={<CalendarPlus size={16} color="white" />}
           accessibilityRole="button"
         >
-          {t('ad.contactOwner')}
+          Réserver
         </Button>
       </XStack>
     </YStack>
+  );
+}
+
+function CtaIconButton({
+  label,
+  onPress,
+  children,
+}: {
+  label: string;
+  onPress: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Pressable onPress={onPress} hitSlop={6} accessibilityRole="button" accessibilityLabel={label}>
+      <YStack
+        width={46}
+        height={46}
+        borderRadius={12}
+        borderWidth={1}
+        borderColor="$borderColor"
+        alignItems="center"
+        justifyContent="center"
+        backgroundColor="$background"
+      >
+        {children}
+      </YStack>
+    </Pressable>
   );
 }
 
