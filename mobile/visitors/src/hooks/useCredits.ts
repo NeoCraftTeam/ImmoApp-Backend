@@ -6,14 +6,16 @@ import { ENDPOINTS } from '@/api/endpoints';
 export interface CreditPackage {
   id: string;
   name: string;
-  /** Nombre de crédits (points) octroyés. */
-  credits?: number;
-  points?: number;
+  description?: string | null;
+  badge?: string | null;
+  /** Crédits octroyés — champ backend `points_awarded`. */
+  points_awarded?: number;
+  /** Prix en XAF (entier) — le backend stocke toujours en FCFA. */
   price: number;
-  currency?: string;
-  /** Réductions / mise en avant éventuelles. */
+  price_formatted?: string;
+  features?: string[];
   is_popular?: boolean;
-  bonus_points?: number;
+  sort_order?: number;
 }
 
 interface PackagesResponse {

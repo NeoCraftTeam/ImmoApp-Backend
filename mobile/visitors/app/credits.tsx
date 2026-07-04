@@ -26,9 +26,21 @@ import {
   type CreditPackage,
 } from '@/hooks/useCredits';
 import { useCreditsBalance, usePayments } from '@/hooks/usePayments';
+import { useCurrency } from '@/hooks/useCurrency';
 import { useSession } from '@/auth/SessionProvider';
+import { SUPPORTED_CURRENCIES } from '@/services/currency';
 import { brand } from '@/theme/tokens';
 import type { PaymentTransaction } from '@/types/payment';
+
+/** Devises proposées en priorité dans le sélecteur cyclique. */
+const QUICK_CURRENCIES = ['XAF', 'EUR', 'USD', 'XOF', 'GBP'].filter((c) =>
+  SUPPORTED_CURRENCIES.includes(c),
+);
+
+function nextCurrency(current: string): string {
+  const idx = QUICK_CURRENCIES.indexOf(current);
+  return QUICK_CURRENCIES[(idx + 1) % QUICK_CURRENCIES.length] ?? 'XAF';
+}
 
 type Period = 'all' | '30d' | '90d';
 
@@ -231,6 +243,7 @@ function PacksModal({
   const packages = useCreditPackages(open);
   const purchase = usePurchaseCredits();
   const verify = useVerifyCreditPurchase();
+  const { format, currency: displayCurrency, setCurrency } = useCurrency();
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const buy = async (pkg: CreditPackage) => {
@@ -271,12 +284,33 @@ function PacksModal({
           maxHeight="82%"
         >
           <XStack alignItems="center" justifyContent="space-between">
-            <XStack alignItems="center" gap={8}>
+            <XStack alignItems="center" gap={8} flex={1}>
               <Sparkles size={20} color={brand.primary} />
               <H2 fontSize={18} fontWeight="800" color="$slate900">
-                Recharger des crédits
+                Recharger
               </H2>
             </XStack>
+            {/* Sélecteur de devise (défile les devises courantes). */}
+            <Pressable
+              onPress={() => setCurrency(nextCurrency(displayCurrency))}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel="Changer la devise d'affichage"
+            >
+              <XStack
+                alignItems="center"
+                gap={4}
+                paddingHorizontal={12}
+                height={32}
+                borderRadius={16}
+                backgroundColor="$slate100"
+                marginRight={8}
+              >
+                <Paragraph fontSize={13} fontWeight="800" color="$slate900">
+                  {displayCurrency}
+                </Paragraph>
+              </XStack>
+            </Pressable>
             <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Fermer">
               <YStack width={32} height={32} borderRadius={16} backgroundColor="$slate100" alignItems="center" justifyContent="center">
                 <X size={16} color="$slate700" />
@@ -298,7 +332,7 @@ function PacksModal({
               keyExtractor={(p) => p.id}
               contentContainerStyle={{ gap: 10, paddingBottom: 8 }}
               renderItem={({ item }) => {
-                const credits = item.credits ?? item.points ?? 0;
+                const credits = item.points_awarded ?? 0;
                 const busy = busyId === item.id;
                 return (
                   <Pressable onPress={() => void buy(item)} disabled={Boolean(busyId)} accessibilityRole="button">
@@ -326,15 +360,21 @@ function PacksModal({
                         </XStack>
                         <Paragraph fontSize={13} color="$slate500">
                           {credits.toLocaleString('fr-FR')} crédits
-                          {item.bonus_points ? ` + ${item.bonus_points} bonus` : ''}
                         </Paragraph>
                       </YStack>
                       {busy ? (
                         <Spinner color={brand.primary} />
                       ) : (
-                        <Paragraph fontSize={15} fontWeight="800" color={brand.primary}>
-                          {item.price.toLocaleString('fr-FR')} {item.currency ?? 'XAF'}
-                        </Paragraph>
+                        <YStack alignItems="flex-end">
+                          <Paragraph fontSize={15} fontWeight="800" color={brand.primary}>
+                            {format(item.price)}
+                          </Paragraph>
+                          {displayCurrency !== 'XAF' && displayCurrency !== 'XOF' ? (
+                            <Paragraph fontSize={11} color="$slate500">
+                              ≈ {item.price.toLocaleString('fr-FR')} FCFA
+                            </Paragraph>
+                          ) : null}
+                        </YStack>
                       )}
                     </XStack>
                   </Pressable>
