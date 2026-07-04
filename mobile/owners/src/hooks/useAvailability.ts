@@ -47,7 +47,8 @@ export function useUpdateAvailability(adId: string) {
     { id: string; payload: Partial<AvailabilityPayload> }
   >({
     mutationFn: async ({ id, payload }) => {
-      const { data } = await apiClient.patch<{ data: AvailabilitySlot }>(
+      // La route backend est déclarée en PUT (pas PATCH) → 405 sinon.
+      const { data } = await apiClient.put<{ data: AvailabilitySlot }>(
         ENDPOINTS.availability.update(adId, id),
         payload,
       );

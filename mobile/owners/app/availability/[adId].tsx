@@ -14,39 +14,78 @@ import {
   useDeleteAvailability,
 } from '@/hooks/useAvailability';
 import { brand } from '@/theme/tokens';
-import type { DayOfWeek } from '@/types/availability';
+import type { WeekdaySlug } from '@/types/availability';
 
-const DAYS: { value: DayOfWeek; label: string }[] = [
-  { value: 1, label: 'Lundi' },
-  { value: 2, label: 'Mardi' },
-  { value: 3, label: 'Mercredi' },
-  { value: 4, label: 'Jeudi' },
-  { value: 5, label: 'Vendredi' },
-  { value: 6, label: 'Samedi' },
-  { value: 0, label: 'Dimanche' },
+const WEEKDAYS: { value: WeekdaySlug; label: string }[] = [
+  { value: 'monday', label: 'Lun' },
+  { value: 'tuesday', label: 'Mar' },
+  { value: 'wednesday', label: 'Mer' },
+  { value: 'thursday', label: 'Jeu' },
+  { value: 'friday', label: 'Ven' },
+  { value: 'saturday', label: 'Sam' },
+  { value: 'sunday', label: 'Dim' },
 ];
+
+const WEEKDAY_LABELS: Record<string, string> = {
+  monday: 'Lun',
+  tuesday: 'Mar',
+  wednesday: 'Mer',
+  thursday: 'Jeu',
+  friday: 'Ven',
+  saturday: 'Sam',
+  sunday: 'Dim',
+};
+
+/** Renvoie la date du jour au format `YYYY-MM-DD` (exigé par `starts_on`). */
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 export default function AvailabilityScreen() {
   const { adId } = useLocalSearchParams<{ adId: string }>();
   const { isAuthenticated } = useSession();
-  const { data: slots = [], isLoading, isRefetching, refetch } = useAdAvailability(adId, isAuthenticated);
+  const { data: schedules = [], isLoading, isRefetching, refetch } = useAdAvailability(adId, isAuthenticated);
   const create = useCreateAvailability(adId ?? '');
   const remove = useDeleteAvailability(adId ?? '');
 
-  const [day, setDay] = useState<DayOfWeek>(1);
+  const [name, setName] = useState('Visites en semaine');
+  const [days, setDays] = useState<WeekdaySlug[]>(['monday', 'tuesday', 'wednesday', 'thursday', 'friday']);
   const [start, setStart] = useState('09:00');
   const [end, setEnd] = useState('17:00');
+  const [slotDuration, setSlotDuration] = useState('30');
+
+  const toggleDay = (d: WeekdaySlug) => {
+    setDays((prev) => (prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]));
+  };
 
   const onAdd = () => {
-    if (!start || !end) return;
+    if (!name.trim()) {
+      Alert.alert('Nom requis', 'Donnez un nom à ce planning (ex : « Visites en semaine »).');
+      return;
+    }
+    if (!start || !end) {
+      return;
+    }
+    if (days.length === 0) {
+      Alert.alert('Jours requis', 'Sélectionnez au moins un jour de la semaine.');
+      return;
+    }
+    const duration = Number.parseInt(slotDuration, 10);
     create.mutate(
-      { day_of_week: day, start_time: start, end_time: end, slot_minutes: 30 },
+      {
+        name: name.trim(),
+        starts_on: todayIso(),
+        recurrence: 'weekly',
+        recurrence_days: days,
+        periods: [{ starts_at: start, ends_at: end }],
+        slot_duration: Number.isFinite(duration) ? Math.min(240, Math.max(15, duration)) : 30,
+      },
       { onError: (err) => Alert.alert('Erreur', extractApiErrorMessage(err)) },
     );
   };
 
   const onDelete = (id: string) => {
-    Alert.alert('Supprimer', 'Supprimer ce créneau ?', [
+    Alert.alert('Supprimer', 'Supprimer ce planning de visite ?', [
       { text: 'Annuler', style: 'cancel' },
       { text: 'Supprimer', style: 'destructive', onPress: () => remove.mutate(id) },
     ]);
@@ -54,7 +93,7 @@ export default function AvailabilityScreen() {
 
   return (
     <YStack flex={1} backgroundColor="$background">
-      <ScreenHeader title="Créneaux de visite" subtitle="Définissez vos plages hebdomadaires" />
+      <ScreenHeader title="Créneaux de visite" subtitle="Définissez vos plannings hebdomadaires" />
 
       <ScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 14 }}
@@ -62,22 +101,30 @@ export default function AvailabilityScreen() {
       >
         <YStack
           padding={14}
-          gap={10}
+          gap={12}
           borderRadius={14}
           borderWidth={1}
           borderColor="$slate300"
           backgroundColor={brand.primaryAlpha10}
         >
           <Paragraph fontSize={13} fontWeight="800" color="$slate900">
-            Ajouter un créneau
+            Nouveau planning
           </Paragraph>
+
           <YStack gap={6}>
             <Paragraph fontSize={12} fontWeight="700" color="$slate700">
-              Jour
+              Nom
+            </Paragraph>
+            <Input value={name} onChangeText={setName} placeholder="Visites en semaine" />
+          </YStack>
+
+          <YStack gap={6}>
+            <Paragraph fontSize={12} fontWeight="700" color="$slate700">
+              Jours
             </Paragraph>
             <XStack gap={6} flexWrap="wrap">
-              {DAYS.map((d) => {
-                const isSel = day === d.value;
+              {WEEKDAYS.map((d) => {
+                const isSel = days.includes(d.value);
                 return (
                   <Button
                     key={d.value}
@@ -85,7 +132,7 @@ export default function AvailabilityScreen() {
                     chromeless
                     borderRadius={999}
                     backgroundColor={isSel ? '$brand' : '$slate100'}
-                    onPress={() => setDay(d.value)}
+                    onPress={() => toggleDay(d.value)}
                     paddingHorizontal={12}
                   >
                     <Paragraph fontSize={12} fontWeight="700" color={isSel ? 'white' : '$slate700'}>
@@ -110,6 +157,12 @@ export default function AvailabilityScreen() {
               </Paragraph>
               <Input value={end} onChangeText={setEnd} placeholder="17:00" />
             </YStack>
+            <YStack width={92} gap={6}>
+              <Paragraph fontSize={12} fontWeight="700" color="$slate700">
+                Min/visite
+              </Paragraph>
+              <Input value={slotDuration} onChangeText={setSlotDuration} keyboardType="number-pad" placeholder="30" />
+            </YStack>
           </XStack>
 
           <Button
@@ -122,7 +175,7 @@ export default function AvailabilityScreen() {
             disabled={create.isPending}
             icon={<Plus size={14} color="white" />}
           >
-            {create.isPending ? 'Ajout…' : 'Ajouter'}
+            {create.isPending ? 'Ajout…' : 'Ajouter le planning'}
           </Button>
         </YStack>
 
@@ -130,14 +183,17 @@ export default function AvailabilityScreen() {
           <YStack height={200} alignItems="center" justifyContent="center">
             <Spinner color={brand.primary} size="large" />
           </YStack>
-        ) : slots.length === 0 ? (
+        ) : schedules.length === 0 ? (
           <YStack height={200}>
-            <EmptyState title="Aucun créneau" hint="Ajoutez votre premier créneau ci-dessus." />
+            <EmptyState title="Aucun planning" hint="Ajoutez votre premier planning de visite ci-dessus." />
           </YStack>
         ) : (
           <YStack gap={8}>
-            {slots.map((s) => {
-              const dayLabel = DAYS.find((d) => d.value === s.day_of_week)?.label ?? `Jour ${s.day_of_week}`;
+            {schedules.map((s) => {
+              const daysLabel = (s.frequency_config?.days ?? [])
+                .map((d) => WEEKDAY_LABELS[d] ?? d)
+                .join(', ');
+              const period = s.periods?.[0];
               return (
                 <XStack
                   key={s.id}
@@ -150,11 +206,12 @@ export default function AvailabilityScreen() {
                 >
                   <YStack flex={1} gap={2}>
                     <Paragraph fontSize={13.5} fontWeight="700">
-                      {dayLabel}
+                      {s.name}
                     </Paragraph>
                     <Paragraph fontSize={12} color="$slate500">
-                      {s.start_time} → {s.end_time}
-                      {s.slot_minutes ? ` · ${s.slot_minutes} min/visite` : ''}
+                      {daysLabel ? `${daysLabel} · ` : ''}
+                      {period ? `${period.starts_at} → ${period.ends_at}` : '—'}
+                      {s.slot_duration ? ` · ${s.slot_duration} min/visite` : ''}
                     </Paragraph>
                   </YStack>
                   <Button size="$2" chromeless onPress={() => onDelete(s.id)} icon={<Trash2 size={14} color={brand.danger} />} />
