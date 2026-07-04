@@ -28,6 +28,7 @@ import {
   useUpdateSearchAlert,
 } from '@/hooks/useSearchAlerts';
 import { useSession } from '@/auth/SessionProvider';
+import { useCurrency } from '@/hooks/useCurrency';
 import { brand } from '@/theme/tokens';
 import type { AlertFrequency, SearchAlert } from '@/types/search-alert';
 
@@ -187,11 +188,12 @@ function AlertRow({
   onDelete: () => void;
   onEdit: () => void;
 }) {
+  const { format } = useCurrency();
   const filters = alert.filters ?? {};
   const summary = [
     filters.city,
     filters.type,
-    filters.max_price != null ? `≤ ${filters.max_price.toLocaleString('fr-FR')} FCFA` : null,
+    filters.max_price != null ? `≤ ${format(filters.max_price)}` : null,
     filters.bedrooms ? `${filters.bedrooms} ch.` : null,
   ]
     .filter(Boolean)

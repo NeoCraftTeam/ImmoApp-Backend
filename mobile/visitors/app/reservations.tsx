@@ -43,7 +43,7 @@ export default function Reservations() {
   }
 
   const handleCancel = (r: Reservation) => {
-    Alert.alert('Annuler cette visite ?', `Visite prévue ${format(new Date(r.starts_at), "EEEE d MMMM 'à' HH'h'mm", { locale: fr })}.`, [
+    Alert.alert('Annuler cette visite ?', `Visite prévue ${safeFormat(r.starts_at, "EEEE d MMMM 'à' HH'h'mm")}.`, [
       { text: 'Non', style: 'cancel' },
       {
         text: 'Annuler',
@@ -132,10 +132,29 @@ function Tab({ label, active, onPress }: { label: string; active: boolean; onPre
   );
 }
 
+/**
+ * Formate une date ISO en tolérant les valeurs nulles/invalides —
+ * `date-fns.format` lève `RangeError` sur une date invalide, ce qui
+ * crasherait le rendu de la liste.
+ */
+function safeFormat(iso: string | null | undefined, pattern: string): string {
+  try {
+    if (!iso) {
+      return '';
+    }
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+    return format(date, pattern, { locale: fr });
+  } catch {
+    return '';
+  }
+}
+
 function ReservationCard({ r, onCancel }: { r: Reservation; onCancel: () => void }) {
-  const start = new Date(r.starts_at);
-  const dateLabel = format(start, "EEEE d MMMM", { locale: fr });
-  const timeLabel = format(start, "HH'h'mm", { locale: fr });
+  const dateLabel = safeFormat(r.starts_at, 'EEEE d MMMM');
+  const timeLabel = safeFormat(r.starts_at, "HH'h'mm");
   const status = statusFor(r.status);
 
   return (

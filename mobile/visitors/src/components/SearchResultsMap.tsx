@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { Paragraph, YStack } from 'tamagui';
 
+import { useCurrency } from '@/hooks/useCurrency';
 import { brand } from '@/theme/tokens';
 import type { Ad } from '@/types/ad';
 
@@ -19,6 +20,7 @@ interface Props {
  */
 export function SearchResultsMap({ ads }: Props) {
   const router = useRouter();
+  const { format } = useCurrency();
   const mapRef = useRef<MapView | null>(null);
 
   const located = useMemo(
@@ -74,9 +76,7 @@ export function SearchResultsMap({ ads }: Props) {
           coordinate={ad.location}
           pinColor={brand.primary}
           title={ad.title}
-          description={
-            ad.price != null ? `${ad.price.toLocaleString('fr-FR')} FCFA` : undefined
-          }
+          description={ad.price != null ? format(ad.price) : undefined}
           onCalloutPress={() =>
             router.push({
               pathname: '/ads/[slug]',
