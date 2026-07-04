@@ -52,7 +52,8 @@ export interface MessageAttachment {
 export interface Message {
   uuid: string;
   conversation_uuid: string;
-  body: string;
+  /** `null` pour les messages sans corps (pièce jointe seule). */
+  body: string | null;
   sender_id: string;
   created_at: string;
   read_at?: string | null;

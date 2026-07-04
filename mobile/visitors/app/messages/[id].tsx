@@ -144,7 +144,7 @@ export default function ConversationScreen() {
   };
 
   const handleRetry = async (msg: Message) => {
-    if (!msg.is_failed) return;
+    if (!msg.is_failed || !msg.body) return;
     try {
       await send.mutateAsync(msg.body);
     } catch {
@@ -531,7 +531,7 @@ function MessageBubble({
                 )}
               </YStack>
             ))}
-          {message.body.length > 0 && (
+          {(message.body?.length ?? 0) > 0 && (
             <YStack
               paddingHorizontal={14}
               paddingVertical={9}
