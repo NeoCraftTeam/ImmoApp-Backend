@@ -53,6 +53,22 @@ export default function FinancialsScreen() {
             </XStack>
             <XStack gap={10}>
               <StatCard
+                label="Dépenses (30 j)"
+                value={formatFcfa(data.expenses_total_xaf_30d ?? 0)}
+                icon={<ArrowDownRight size={16} color={brand.danger} />}
+                accent={brand.danger}
+              />
+              <StatCard
+                label="Net (30 j)"
+                value={formatFcfa(
+                  (data.rent_collected_xaf_30d ?? 0) - (data.expenses_total_xaf_30d ?? 0),
+                )}
+                icon={<TrendingUp size={16} color={brand.success} />}
+                accent={brand.success}
+              />
+            </XStack>
+            <XStack gap={10}>
+              <StatCard
                 label="Taux d'occupation"
                 value={`${Math.round(data.occupancy_rate ?? 0)}%`}
                 icon={<TrendingUp size={16} color={brand.secondary} />}
@@ -61,7 +77,7 @@ export default function FinancialsScreen() {
               <StatCard
                 label="Annonces actives"
                 value={String(data.active_ads_count ?? 0)}
-                icon={<ArrowDownRight size={16} color={brand.accent} />}
+                icon={<Wallet size={16} color={brand.accent} />}
                 accent={brand.accent}
               />
             </XStack>
