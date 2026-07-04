@@ -33,7 +33,7 @@ export function useConversationRealtime(
             ['owner-conversation-messages', conversationId],
             (prev) => {
               const list = Array.isArray(prev?.data) ? prev!.data : [];
-              if (list.some((m) => m.id === data.message!.id)) return prev;
+              if (list.some((m) => m.uuid === data.message!.uuid)) return prev;
               return { data: [...list, data.message!] };
             },
           );
@@ -48,7 +48,7 @@ export function useConversationRealtime(
             (prev) => {
               if (!prev) return prev;
               const list = Array.isArray(prev.data) ? prev.data : [];
-              return { data: list.filter((m) => m.id !== data.message!.id) };
+              return { data: list.filter((m) => m.uuid !== data.message!.uuid) };
             },
           );
         }

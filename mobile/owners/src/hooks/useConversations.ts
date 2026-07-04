@@ -67,8 +67,8 @@ export function useSendMessage(id: string | undefined) {
       await qc.cancelQueries({ queryKey: ['owner-conversation-messages', id] });
       const tempId = `temp:${Date.now()}`;
       const optimistic: ConversationMessage = {
-        id: tempId,
-        conversation_id: id,
+        uuid: tempId,
+        conversation_uuid: id,
         sender_id: '__me__',
         body,
         created_at: new Date().toISOString(),

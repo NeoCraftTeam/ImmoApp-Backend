@@ -51,13 +51,13 @@ export default function MessagesScreen() {
           </YStack>
         ) : (
           list.map((c) => {
-            const fullName = `${c.other_user.firstname} ${c.other_user.lastname ?? ''}`.trim();
+            const fullName = c.other_participant?.name?.trim() ?? '';
             const preview = c.last_message?.body ?? 'Pas encore de message';
             const isUnread = c.unread_count > 0;
             return (
               <Pressable
-                key={c.id}
-                onPress={() => router.push(`/messages/${c.id}` as never)}
+                key={c.uuid}
+                onPress={() => router.push(`/messages/${c.uuid}` as never)}
               >
                 <XStack
                   padding={12}
@@ -69,11 +69,11 @@ export default function MessagesScreen() {
                   borderColor={isUnread ? brand.primaryAlpha20 : '$slate300'}
                 >
                   <YStack width={48} height={48} borderRadius={24} overflow="hidden" backgroundColor="$slate100" alignItems="center" justifyContent="center">
-                    {c.other_user.avatar ? (
-                      <Image source={{ uri: c.other_user.avatar }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                    {c.other_participant?.avatar ? (
+                      <Image source={{ uri: c.other_participant.avatar }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
                     ) : (
                       <Paragraph fontSize={16} fontWeight="800" color={brand.primary}>
-                        {(c.other_user.firstname?.[0] ?? '?').toUpperCase()}
+                        {(c.other_participant?.name?.[0] ?? '?').toUpperCase()}
                       </Paragraph>
                     )}
                   </YStack>
@@ -83,7 +83,7 @@ export default function MessagesScreen() {
                         {fullName || 'Conversation'}
                       </Paragraph>
                       <Paragraph fontSize={11} color="$slate500">
-                        {timeAgo(c.last_message?.created_at ?? c.updated_at)}
+                        {timeAgo(c.last_message?.created_at ?? c.last_message_at ?? undefined)}
                       </Paragraph>
                     </XStack>
                     <XStack alignItems="center" gap={6}>

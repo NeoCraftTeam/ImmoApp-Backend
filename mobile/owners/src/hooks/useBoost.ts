@@ -68,18 +68,21 @@ export function useRemoveBoost(adId: string | undefined) {
   });
 }
 
-/** GET /credits/balance. */
+/** GET /credits/balance — le backend renvoie `{ point_balance }`. */
 export function useCreditsBalance(enabled = true) {
-  return useQuery<{ balance: number } | { data: { balance: number } }, Error, number>({
+  return useQuery<Record<string, unknown>, Error, number>({
     queryKey: ['credits-balance'],
     queryFn: async () => {
       const { data } = await apiClient.get(ENDPOINTS.credits.balance);
-      return data;
+      return data as Record<string, unknown>;
     },
     select: (p) => {
-      const flat = (p as { balance?: number }).balance;
-      const nested = (p as { data?: { balance?: number } }).data?.balance;
-      return flat ?? nested ?? 0;
+      // Le contrôleur renvoie `point_balance` ; on tolère aussi `balance`
+      // et `credit_balance`, à plat ou sous `data`, par robustesse.
+      const src = (p?.data as Record<string, unknown> | undefined) ?? p ?? {};
+      const value =
+        src.point_balance ?? src.balance ?? src.credit_balance ?? 0;
+      return typeof value === 'number' ? value : Number(value) || 0;
     },
     enabled,
     staleTime: 60 * 1000,

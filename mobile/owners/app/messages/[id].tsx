@@ -92,7 +92,7 @@ export default function ConversationThreadScreen() {
       'owner-conversations',
     ]);
     const list = Array.isArray(data?.data) ? data!.data : [];
-    return list.find((c) => c.id === id || c.uuid === id);
+    return list.find((c) => c.uuid === id);
   }, [qc, id]);
 
   const [draft, setDraft] = useState('');
@@ -140,9 +140,7 @@ export default function ConversationThreadScreen() {
     send.mutate(body);
   };
 
-  const otherName = conversation
-    ? `${conversation.other_user.firstname} ${conversation.other_user.lastname ?? ''}`.trim()
-    : 'Conversation';
+  const otherName = conversation?.other_participant?.name?.trim() || 'Conversation';
 
   return (
     <YStack flex={1} backgroundColor="$background">
@@ -150,10 +148,10 @@ export default function ConversationThreadScreen() {
         title={otherName}
         subtitle={conversation?.ad?.title}
         right={
-          conversation?.other_user.avatar ? (
+          conversation?.other_participant?.avatar ? (
             <YStack width={36} height={36} borderRadius={18} overflow="hidden" backgroundColor="$slate100">
               <Image
-                source={{ uri: conversation.other_user.avatar }}
+                source={{ uri: conversation.other_participant.avatar }}
                 style={{ width: '100%', height: '100%' }}
                 contentFit="cover"
               />
@@ -168,7 +166,7 @@ export default function ConversationThreadScreen() {
               backgroundColor={brand.primaryAlpha10}
             >
               <Paragraph fontSize={14} fontWeight="800" color={brand.primary}>
-                {(conversation?.other_user.firstname?.[0] ?? '?').toUpperCase()}
+                {(conversation?.other_participant?.name?.[0] ?? '?').toUpperCase()}
               </Paragraph>
             </YStack>
           )
@@ -194,7 +192,7 @@ export default function ConversationThreadScreen() {
               const mine = m.sender_id === me.data?.id || m.sender_id === '__me__';
               return (
                 <XStack
-                  key={m.id}
+                  key={m.uuid}
                   justifyContent={mine ? 'flex-end' : 'flex-start'}
                   paddingHorizontal={2}
                 >
