@@ -16,6 +16,14 @@ trait EnsuresCreditPurchasePassesTurnstile
 {
     protected function enforceTurnstileForCreditPurchase(Validator $validator): void
     {
+        // Turnstile ne s'applique qu'aux clients web stateful (session +
+        // widget DOM). L'API mobile stateless (bearer Sanctum, sans
+        // session) ne peut pas fournir de token — même logique que le
+        // login/register. Le rate-limiter de la route protège l'abus.
+        if (!$this->hasSession()) {
+            return;
+        }
+
         /** @var TurnstileService $turnstile */
         $turnstile = app(TurnstileService::class);
         if (!$turnstile->isConfigured()) {

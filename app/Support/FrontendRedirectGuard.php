@@ -7,11 +7,32 @@ namespace App\Support;
 /**
  * Validates absolute URLs used as post-payment redirects (hosted-checkout callback_url).
  *
- * Host must match {@see config('app.frontend_url')} and optional
- * {@see config('app.oauth_allowed_redirect_hosts')} entries — same policy as OAuth redirects.
+ * Two families are accepted:
+ *  - Web (http/https): host must match {@see config('app.frontend_url')} and optional
+ *    {@see config('app.oauth_allowed_redirect_hosts')} entries — same policy as OAuth redirects.
+ *  - Mobile deep-links: the scheme must be one of {@see config('app.oauth_allowed_redirect_schemes')}
+ *    (e.g. `keyhome://`, `keyhomeowners://`), or `exp://` for Expo Go during development.
+ *    The scheme itself is the whitelist — only our app registers it on the device.
  */
 final class FrontendRedirectGuard
 {
+    /**
+     * App deep-link schemes allowed as post-payment redirects (mobile).
+     *
+     * @return list<string>
+     */
+    public static function allowedAppSchemes(): array
+    {
+        $schemes = ['exp'];
+        $configured = (string) config('app.oauth_allowed_redirect_schemes', '');
+        foreach (array_filter(array_map(trim(...), explode(',', $configured))) as $s) {
+            $schemes[] = mb_strtolower($s);
+        }
+
+        /** @var list<string> */
+        return array_values(array_unique($schemes));
+    }
+
     /**
      * @return list<string>
      */
@@ -39,11 +60,22 @@ final class FrontendRedirectGuard
         }
 
         $parts = parse_url($uri);
-        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+        if (!is_array($parts) || empty($parts['scheme'])) {
             return false;
         }
 
         $scheme = mb_strtolower($parts['scheme']);
+
+        // Mobile deep-link : the app scheme is the whitelist. No host check —
+        // `keyhome://credits/callback` has an authority-less path.
+        if (in_array($scheme, self::allowedAppSchemes(), true)) {
+            return true;
+        }
+
+        if (empty($parts['host'])) {
+            return false;
+        }
+
         if ($scheme !== 'http' && $scheme !== 'https') {
             return false;
         }

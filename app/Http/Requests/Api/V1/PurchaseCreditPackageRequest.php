@@ -37,7 +37,7 @@ class PurchaseCreditPackageRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'callback_url' => ['nullable', 'string', 'url', 'max:2048'],
+            'callback_url' => ['nullable', 'string', 'max:2048'],
             'payment_method' => ['nullable', 'string', 'in:mobile_money,orange_money,card'],
             'save_payment_method' => ['nullable', 'boolean'],
             'payment_method_id' => ['nullable', 'string', 'regex:/^pm_[A-Za-z0-9_]+$/', 'max:255'],

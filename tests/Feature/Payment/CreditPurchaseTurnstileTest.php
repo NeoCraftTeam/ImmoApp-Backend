@@ -21,19 +21,35 @@ beforeEach(function (): void {
     config()->set('payment.gateways.geniuspay.redirect_url', 'https://test.app/payment/callback');
 });
 
-it('rejects credit initiate without turnstile when turnstile is configured', function (): void {
+// NB : l'enforcement Turnstile sur le chemin web (session) est couvert par
+// un test unitaire déterministe du trait
+// {@see tests/Unit/EnsuresCreditPurchasePassesTurnstileTest.php} — simuler
+// une session Sanctum stateful dans un test HTTP est trop fragile.
+
+it('skips turnstile for credit initiate from a stateless mobile request', function (): void {
     config()->set('services.turnstile.secret_key', 'real-test-secret-not-dummy-placeholder');
+
+    Http::fake([
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'MTX-MOBILE',
+                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-MOBILE',
+            ],
+        ], 201),
+    ]);
 
     $package = PointPackage::factory()->create(['price' => 1000, 'is_active' => true]);
     $user = User::factory()->create();
 
+    // Pas de session (bearer Sanctum) : le mobile ne peut pas fournir de
+    // token Turnstile, la vérification est sautée.
     $this->actingAs($user)
         ->postJson('/api/v1/payments/initiate_payment', [
             'type' => 'credit',
             'plan_id' => $package->id,
         ])
-        ->assertUnprocessable()
-        ->assertJsonValidationErrors(['turnstile_token']);
+        ->assertSuccessful();
 });
 
 it('allows credit initiate without turnstile when turnstile is not configured', function (): void {
@@ -121,16 +137,29 @@ it('passes credit initiate with valid turnstile token when turnstile is configur
         ->assertSuccessful();
 });
 
-it('rejects credits purchase endpoint without turnstile when configured', function (): void {
+it('skips turnstile for credits purchase from a stateless mobile request', function (): void {
     config()->set('services.turnstile.secret_key', 'real-test-secret-not-dummy-placeholder');
+
+    Http::fake([
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'MTX-MOBILE',
+                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-MOBILE',
+            ],
+        ], 201),
+    ]);
 
     $package = PointPackage::factory()->create(['price' => 1000, 'is_active' => true]);
     $user = User::factory()->create();
 
+    // Callback deep-link mobile accepté par FrontendRedirectGuard.
     $this->actingAs($user)
-        ->postJson("/api/v1/credits/purchase/{$package->id}")
-        ->assertUnprocessable()
-        ->assertJsonValidationErrors(['turnstile_token']);
+        ->postJson("/api/v1/credits/purchase/{$package->id}", [
+            'callback_url' => 'keyhome://credits/callback',
+        ])
+        ->assertSuccessful()
+        ->assertJsonStructure(['payment_url', 'tx_ref', 'gateway']);
 });
 
 it('allows credits purchase endpoint with valid turnstile token when configured', function (): void {
