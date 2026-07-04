@@ -8,6 +8,7 @@ import {
   Animated,
   Easing,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -24,11 +25,31 @@ import {
   useMarkConversationRead,
   useSendMessage,
   useSetTyping,
+  useToggleReaction,
   useUploadAttachment,
 } from '@/hooks/useConversations';
 import { useConversationRealtime } from '@/hooks/useConversationRealtime';
 import { brand } from '@/theme/tokens';
-import type { ConversationPreview } from '@/types/conversation';
+import type { ConversationMessage, ConversationPreview } from '@/types/conversation';
+
+const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+/** Regroupe les réactions par emoji + indique si l'utilisateur a réagi. */
+function groupReactions(
+  reactions: ConversationMessage['reactions'],
+  myId?: string,
+): { emoji: string; count: number; mine: boolean }[] {
+  if (!Array.isArray(reactions) || reactions.length === 0) return [];
+  const map = new Map<string, { count: number; mine: boolean }>();
+  for (const r of reactions) {
+    const prev = map.get(r.emoji) ?? { count: 0, mine: false };
+    map.set(r.emoji, {
+      count: prev.count + 1,
+      mine: prev.mine || r.user_id === myId,
+    });
+  }
+  return Array.from(map.entries()).map(([emoji, v]) => ({ emoji, ...v }));
+}
 
 function TypingDots() {
   const dots = useRef([
@@ -90,6 +111,8 @@ export default function ConversationThreadScreen() {
   const markRead = useMarkConversationRead(id);
   const setTyping = useSetTyping(id);
   const upload = useUploadAttachment(id);
+  const toggleReaction = useToggleReaction(id);
+  const [reactionTarget, setReactionTarget] = useState<ConversationMessage | null>(null);
 
   // Préfetch depuis la cache des conversations (header info instant)
   const conversation = useMemo<ConversationPreview | undefined>(() => {
@@ -224,8 +247,9 @@ export default function ConversationThreadScreen() {
                   justifyContent={mine ? 'flex-end' : 'flex-start'}
                   paddingHorizontal={2}
                 >
+                  <YStack maxWidth="78%" alignItems={mine ? 'flex-end' : 'flex-start'} gap={3}>
+                  <Pressable onLongPress={() => setReactionTarget(m)} delayLongPress={250}>
                   <YStack
-                    maxWidth="78%"
                     paddingHorizontal={12}
                     paddingVertical={9}
                     borderRadius={16}
@@ -286,6 +310,42 @@ export default function ConversationThreadScreen() {
                         )
                       ) : null}
                     </XStack>
+                  </YStack>
+                  </Pressable>
+                  {(() => {
+                    const grouped = groupReactions(m.reactions, me.data?.id);
+                    if (grouped.length === 0) return null;
+                    return (
+                      <XStack gap={4} flexWrap="wrap">
+                        {grouped.map((g) => (
+                          <Pressable
+                            key={g.emoji}
+                            onPress={() =>
+                              toggleReaction.mutate({ messageId: m.uuid, emoji: g.emoji, reacted: g.mine })
+                            }
+                          >
+                            <XStack
+                              alignItems="center"
+                              gap={3}
+                              paddingHorizontal={7}
+                              paddingVertical={2}
+                              borderRadius={999}
+                              backgroundColor={g.mine ? brand.primaryAlpha10 : '$slate100'}
+                              borderWidth={g.mine ? 1 : 0}
+                              borderColor={g.mine ? brand.primary : 'transparent'}
+                            >
+                              <Paragraph fontSize={12}>{g.emoji}</Paragraph>
+                              {g.count > 1 ? (
+                                <Paragraph fontSize={11} fontWeight="700" color="$slate700">
+                                  {g.count}
+                                </Paragraph>
+                              ) : null}
+                            </XStack>
+                          </Pressable>
+                        ))}
+                      </XStack>
+                    );
+                  })()}
                   </YStack>
                 </XStack>
               );
@@ -357,6 +417,44 @@ export default function ConversationThreadScreen() {
           </Pressable>
         </XStack>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={reactionTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReactionTarget(null)}
+      >
+        <Pressable style={{ flex: 1 }} onPress={() => setReactionTarget(null)}>
+          <YStack flex={1} justifyContent="center" alignItems="center" backgroundColor="rgba(0,0,0,0.4)">
+            <XStack
+              backgroundColor="$background"
+              borderRadius={999}
+              padding={8}
+              gap={4}
+              onPress={(e) => e.stopPropagation()}
+            >
+              {REACTIONS.map((emoji) => (
+                <Pressable
+                  key={emoji}
+                  onPress={() => {
+                    const target = reactionTarget;
+                    setReactionTarget(null);
+                    if (!target) return;
+                    const mine = groupReactions(target.reactions, me.data?.id).some(
+                      (g) => g.emoji === emoji && g.mine,
+                    );
+                    toggleReaction.mutate({ messageId: target.uuid, emoji, reacted: mine });
+                  }}
+                >
+                  <YStack width={44} height={44} alignItems="center" justifyContent="center">
+                    <Paragraph fontSize={26}>{emoji}</Paragraph>
+                  </YStack>
+                </Pressable>
+              ))}
+            </XStack>
+          </YStack>
+        </Pressable>
+      </Modal>
     </YStack>
   );
 }

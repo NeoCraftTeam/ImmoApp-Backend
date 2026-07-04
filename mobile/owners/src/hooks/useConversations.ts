@@ -113,6 +113,32 @@ export function useSetTyping(id: string | undefined) {
 }
 
 /**
+ * Ajoute ou retire une réaction emoji sur un message.
+ * POST/DELETE /messages/{uuid}/reactions {emoji}. Invalide le fil.
+ */
+export function useToggleReaction(conversationId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation<
+    void,
+    Error,
+    { messageId: string; emoji: string; reacted: boolean }
+  >({
+    mutationFn: async ({ messageId, emoji, reacted }) => {
+      if (reacted) {
+        await apiClient.delete(ENDPOINTS.chat.reaction(messageId), {
+          data: { emoji },
+        });
+      } else {
+        await apiClient.post(ENDPOINTS.chat.reaction(messageId), { emoji });
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['owner-conversation-messages', conversationId] });
+    },
+  });
+}
+
+/**
  * Envoi d'une pièce jointe (photo) — multipart `file`, POST
  * /conversations/{uuid}/attachments. Invalide le fil au retour.
  */
