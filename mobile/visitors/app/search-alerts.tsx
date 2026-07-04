@@ -189,12 +189,11 @@ function AlertRow({
   onEdit: () => void;
 }) {
   const { format } = useCurrency();
-  const filters = alert.filters ?? {};
   const summary = [
-    filters.city,
-    filters.type,
-    filters.max_price != null ? `≤ ${format(filters.max_price)}` : null,
-    filters.bedrooms ? `${filters.bedrooms} ch.` : null,
+    alert.city_name,
+    alert.type_name,
+    alert.price_max != null ? `≤ ${format(alert.price_max)}` : null,
+    alert.bedrooms_min ? `${alert.bedrooms_min} ch.` : null,
   ]
     .filter(Boolean)
     .join(' · ');
@@ -257,13 +256,13 @@ function AlertEditor({
 }) {
   const insets = useSafeAreaInsets();
   const [label, setLabel] = useState(initial?.label ?? '');
-  const [city, setCity] = useState(initial?.filters?.city ?? '');
-  const [type, setType] = useState(initial?.filters?.type ?? '');
+  const [city, setCity] = useState(initial?.city_name ?? '');
+  const [type, setType] = useState(initial?.type_name ?? '');
   const [maxPrice, setMaxPrice] = useState(
-    initial?.filters?.max_price != null ? String(initial.filters.max_price) : '',
+    initial?.price_max != null ? String(initial.price_max) : '',
   );
   const [bedrooms, setBedrooms] = useState(
-    initial?.filters?.bedrooms != null ? String(initial.filters.bedrooms) : '',
+    initial?.bedrooms_min != null ? String(initial.bedrooms_min) : '',
   );
   const [frequency, setFrequency] = useState<AlertFrequency>(initial?.frequency ?? 'daily');
   const [isActive, setIsActive] = useState(initial?.is_active ?? true);
@@ -279,12 +278,10 @@ function AlertEditor({
       label: label.trim(),
       is_active: isActive,
       frequency,
-      filters: {
-        city: city.trim() === '' ? null : city.trim(),
-        type: type.trim() === '' ? null : type.trim(),
-        max_price: maxPrice.trim() === '' ? null : Number(maxPrice),
-        bedrooms: bedrooms.trim() === '' ? null : Number(bedrooms),
-      },
+      city_name: city.trim() === '' ? null : city.trim(),
+      type_name: type.trim() === '' ? null : type.trim(),
+      price_max: maxPrice.trim() === '' ? null : Number(maxPrice),
+      bedrooms_min: bedrooms.trim() === '' ? null : Number(bedrooms),
     });
     setSubmitting(false);
   };

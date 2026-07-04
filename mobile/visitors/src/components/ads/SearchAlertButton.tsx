@@ -47,13 +47,11 @@ export function SearchAlertButton({ ad }: Props) {
         label,
         is_active: true,
         frequency: 'daily',
-        filters: {
-          city: cityName,
-          type: typeName,
-          transaction_type: ad.transaction_type ?? null,
-          bedrooms: ad.bedrooms ?? null,
-        },
-        channels: { push: true, email: false },
+        city_name: cityName || null,
+        type_name: typeName || null,
+        bedrooms_min: ad.bedrooms ?? null,
+        notify_push: true,
+        notify_email: false,
       },
       {
         onSuccess: () => {

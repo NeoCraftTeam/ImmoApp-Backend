@@ -13,10 +13,15 @@ export type ReservationStatus =
 export interface Reservation {
   id: string;
   status: ReservationStatus;
-  starts_at: string;
-  ends_at?: string | null;
-  notes?: string | null;
+  status_label?: string;
+  /** Jour du créneau `YYYY-MM-DD` (TentativeReservationResource). */
+  slot_date: string;
+  /** Heure de début/fin `HH:MM`. */
+  slot_starts_at: string;
+  slot_ends_at?: string | null;
+  client_message?: string | null;
   cancellation_reason?: string | null;
+  expires_at?: string | null;
   ad?: {
     id: string;
     slug?: string;

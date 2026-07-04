@@ -1,29 +1,29 @@
 /**
- * Saved search alert — `GET/POST/PUT /search-alerts`. Each alert is a
- * named filter set the user gets notified about when new ads match.
+ * Saved search alert — `GET/POST/PUT /search-alerts`. Chaque alerte est un
+ * jeu de critères nommé pour lequel l'utilisateur est notifié quand une
+ * annonce correspond. Le backend (StoreSearchAlertRequest + modèle
+ * SearchAlert) utilise des colonnes PLATES, pas un objet `filters`.
  */
 export type AlertFrequency = 'immediate' | 'daily' | 'weekly';
 
 export interface SearchAlert {
   id: string;
-  label: string;
-  is_active: boolean;
-  frequency: AlertFrequency;
-  filters: {
-    city?: string | null;
-    type?: string | null;
-    transaction_type?: 'location' | 'vente' | null;
-    min_price?: number | null;
-    max_price?: number | null;
-    bedrooms?: number | null;
-    min_surface?: number | null;
-    max_surface?: number | null;
-    keywords?: string | null;
-  };
-  channels?: {
-    email?: boolean;
-    push?: boolean;
-  };
+  label?: string | null;
+  is_active?: boolean;
+  frequency?: AlertFrequency;
+  city_id?: string | null;
+  city_name?: string | null;
+  type_id?: string | null;
+  type_name?: string | null;
+  quarter_id?: string | null;
+  price_min?: number | null;
+  price_max?: number | null;
+  bedrooms_min?: number | null;
+  surface_min?: number | null;
+  has_parking?: boolean | null;
+  query?: string | null;
+  notify_email?: boolean;
+  notify_push?: boolean;
   match_count?: number;
-  created_at: string;
+  created_at?: string;
 }

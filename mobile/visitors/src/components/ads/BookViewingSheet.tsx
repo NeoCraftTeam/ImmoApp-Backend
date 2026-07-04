@@ -26,9 +26,11 @@ export function BookViewingSheet({ adId, open, onClose, onBooked }: Props) {
   const insets = useSafeAreaInsets();
   const slots = useViewingSlots(open ? adId : undefined);
   const reserve = useCreateReservation(adId);
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<ViewingSlot | null>(null);
   const [notes, setNotes] = useState('');
   const [done, setDone] = useState(false);
+
+  const slotKey = (s: ViewingSlot): string => `${s.date}T${s.starts_at}`;
 
   const handleClose = () => {
     setSelected(null);
@@ -49,7 +51,12 @@ export function BookViewingSheet({ adId, open, onClose, onBooked }: Props) {
       return;
     }
     try {
-      await reserve.mutateAsync({ slot_id: selected, notes: notes.trim() || undefined });
+      await reserve.mutateAsync({
+        slot_date: selected.date,
+        slot_starts_at: selected.starts_at,
+        slot_ends_at: selected.ends_at,
+        client_message: notes.trim() || undefined,
+      });
       setDone(true);
       onBooked?.();
     } catch (err) {
@@ -127,15 +134,10 @@ export function BookViewingSheet({ adId, open, onClose, onBooked }: Props) {
                 </Paragraph>
                 <XStack flexWrap="wrap" gap={8}>
                   {daySlots.map((s) => {
-                    const active = selected === s.id;
-                    let label = '';
-                    try {
-                      label = format(new Date(s.starts_at), "HH'h'mm", { locale: fr });
-                    } catch {
-                      label = '—';
-                    }
+                    const active = selected != null && slotKey(selected) === slotKey(s);
+                    const label = s.starts_at.replace(':', 'h');
                     return (
-                      <Pressable key={s.id} onPress={() => setSelected(s.id)} hitSlop={4}>
+                      <Pressable key={slotKey(s)} onPress={() => setSelected(s)} hitSlop={4}>
                         <XStack
                           paddingHorizontal={14}
                           paddingVertical={9}
@@ -200,14 +202,16 @@ export function BookViewingSheet({ adId, open, onClose, onBooked }: Props) {
 function groupByDay(slots: ViewingSlot[]): Record<string, ViewingSlot[]> {
   const out: Record<string, ViewingSlot[]> = {};
   for (const slot of slots) {
+    let key = slot.date;
     try {
-      const day = format(new Date(slot.starts_at), "EEEE d MMMM", { locale: fr });
-      const key = day.charAt(0).toUpperCase() + day.slice(1);
-      if (!out[key]) out[key] = [];
-      out[key].push(slot);
+      // `slot.date` est `YYYY-MM-DD` → libellé lisible ; on parse à midi
+      // pour éviter tout décalage de fuseau.
+      const day = format(new Date(`${slot.date}T12:00:00`), 'EEEE d MMMM', { locale: fr });
+      key = day.charAt(0).toUpperCase() + day.slice(1);
     } catch {
-      /* skip malformed */
+      /* garder la date brute en repli */
     }
+    (out[key] ??= []).push(slot);
   }
   return out;
 }

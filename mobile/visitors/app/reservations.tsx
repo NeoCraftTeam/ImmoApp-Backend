@@ -33,7 +33,8 @@ export default function Reservations() {
     const list = data ?? [];
     if (tab === 'all') return list;
     return list.filter((r) => {
-      const start = new Date(r.starts_at);
+      const start = new Date(`${r.slot_date}T${r.slot_starts_at || '00:00'}`);
+      if (Number.isNaN(start.getTime())) return tab === 'upcoming';
       return tab === 'upcoming' ? isAfter(start, now) : !isAfter(start, now);
     });
   }, [data, tab]);
@@ -43,7 +44,7 @@ export default function Reservations() {
   }
 
   const handleCancel = (r: Reservation) => {
-    Alert.alert('Annuler cette visite ?', `Visite prévue ${safeFormat(r.starts_at, "EEEE d MMMM 'à' HH'h'mm")}.`, [
+    Alert.alert('Annuler cette visite ?', `Visite prévue ${safeFormat(`${r.slot_date}T${r.slot_starts_at || '00:00'}`, "EEEE d MMMM 'à' HH'h'mm")}.`, [
       { text: 'Non', style: 'cancel' },
       {
         text: 'Annuler',
@@ -153,8 +154,8 @@ function safeFormat(iso: string | null | undefined, pattern: string): string {
 }
 
 function ReservationCard({ r, onCancel }: { r: Reservation; onCancel: () => void }) {
-  const dateLabel = safeFormat(r.starts_at, 'EEEE d MMMM');
-  const timeLabel = safeFormat(r.starts_at, "HH'h'mm");
+  const dateLabel = safeFormat(`${r.slot_date}T${r.slot_starts_at || '00:00'}`, 'EEEE d MMMM');
+  const timeLabel = (r.slot_starts_at ?? '').replace(':', 'h') || '—';
   const status = statusFor(r.status);
 
   return (
