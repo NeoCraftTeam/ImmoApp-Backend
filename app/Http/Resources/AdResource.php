@@ -54,6 +54,7 @@ final class AdResource extends JsonResource
             'adresse' => $this->adresse ?? '',
             'price' => $this->price === null ? null : (float) $this->price,
             'price_period' => $this->price_period,
+            'transaction_type' => $this->transaction_type?->value,
             'surface_area' => $this->surface_area,
             'bedrooms' => $this->bedrooms,
             'bathrooms' => $this->bathrooms,
