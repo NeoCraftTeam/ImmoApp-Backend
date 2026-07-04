@@ -58,4 +58,10 @@ describe('parseMarkdownBlocks', () => {
     expect(parseMarkdownBlocks('')).toEqual([]);
     expect(parseMarkdownBlocks('\n\n')).toEqual([]);
   });
+
+  it('tolère une entrée non-string (bio null/undefined venant de l\'API)', () => {
+    expect(parseMarkdownBlocks(null as unknown as string)).toEqual([]);
+    expect(parseMarkdownBlocks(undefined as unknown as string)).toEqual([]);
+    expect(parseMarkdownBlocks(42 as unknown as string)).toEqual([]);
+  });
 });

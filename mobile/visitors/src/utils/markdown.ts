@@ -47,6 +47,12 @@ export function parseInlineMarkdown(text: string): InlineToken[] {
 }
 
 export function parseMarkdownBlocks(markdown: string): MarkdownBlock[] {
+  // Défensif : l'entrée vient d'un champ API (bio) qui peut arriver
+  // `null`/`undefined` malgré le typage — évite un crash `.split of null`.
+  if (typeof markdown !== 'string' || markdown === '') {
+    return [];
+  }
+
   const blocks: MarkdownBlock[] = [];
   let paragraphLines: string[] = [];
   let listItems: InlineToken[][] = [];

@@ -106,7 +106,7 @@ export function ReviewsSection({ adId, fallbackRating, fallbackCount }: Props) {
 }
 
 function ReviewItem({ review }: { review: Review }) {
-  const initial = review.user.firstname.charAt(0).toUpperCase();
+  const initial = review.user?.firstname?.charAt(0)?.toUpperCase() ?? '?';
   let relative: string | null = null;
   try {
     relative = formatDistanceToNow(new Date(review.created_at), {
@@ -133,7 +133,7 @@ function ReviewItem({ review }: { review: Review }) {
           </Paragraph>
         </YStack>
         <Paragraph fontSize={13.5} fontWeight="700" color="$slate900">
-          {review.user.firstname}
+          {review.user?.firstname ?? 'Utilisateur'}
         </Paragraph>
         <Stars rating={review.rating} size={12} />
         {relative && (
