@@ -40,15 +40,20 @@ export interface AnalyticsTotals {
 
 export interface AnalyticsTrendPoint {
   date: string;
-  views?: number;
-  favorites?: number;
-  impressions?: number;
+  count: number;
 }
+
+/**
+ * `trends` est indexé par type d'interaction (`view`, `favorite`,
+ * `impression`, `contact_click`…), chaque valeur étant une série
+ * quotidienne. Cf. AdAnalyticsService::computeTrends.
+ */
+export type AnalyticsTrends = Partial<Record<string, AnalyticsTrendPoint[]>>;
 
 export interface OwnerAnalytics {
   period: string;
   totals: AnalyticsTotals;
-  trends?: AnalyticsTrendPoint[];
+  trends?: AnalyticsTrends;
   top_ads?: Ad[];
 }
 

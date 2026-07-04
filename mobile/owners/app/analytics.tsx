@@ -12,6 +12,7 @@ import { useAnalytics } from '@/hooks/useAnalytics';
 import { brand } from '@/theme/tokens';
 import { formatCompact } from '@/utils/format';
 import { t } from '@/i18n';
+import type { AnalyticsTrends } from '@/types/owner';
 
 type Period = '7d' | '30d' | '90d';
 
@@ -115,6 +116,9 @@ export default function AnalyticsScreen() {
               </XStack>
             </YStack>
 
+            {/* Trends chart — vues + favoris par jour */}
+            <TrendChart trends={data?.trends} />
+
             {/* Top ads */}
             <YStack gap={12} marginTop={6}>
               <Paragraph fontSize={16} fontWeight="800" color="$slate900">
@@ -139,6 +143,109 @@ export default function AnalyticsScreen() {
           </>
         )}
       </ScrollView>
+    </YStack>
+  );
+}
+
+/**
+ * Mini-graphique en barres (sans dépendance) : superpose les séries
+ * quotidiennes « vues » et « favoris » de `trends`. Les hauteurs sont
+ * mises à l'échelle du max global ; on limite l'affichage aux ~14
+ * derniers jours pour rester lisible sur mobile.
+ */
+function TrendChart({ trends }: { trends?: AnalyticsTrends }) {
+  const views = trends?.view ?? [];
+  const favorites = trends?.favorite ?? [];
+
+  if (views.length === 0 && favorites.length === 0) {
+    return null;
+  }
+
+  const byDate = new Map<string, { views: number; favorites: number }>();
+  for (const p of views) {
+    byDate.set(p.date, { views: p.count, favorites: byDate.get(p.date)?.favorites ?? 0 });
+  }
+  for (const p of favorites) {
+    const prev = byDate.get(p.date);
+    byDate.set(p.date, { views: prev?.views ?? 0, favorites: p.count });
+  }
+
+  const points = Array.from(byDate.entries())
+    .map(([date, v]) => ({ date, ...v }))
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-14);
+
+  const max = Math.max(1, ...points.map((p) => Math.max(p.views, p.favorites)));
+  const totalViews = points.reduce((s, p) => s + p.views, 0);
+  const totalFav = points.reduce((s, p) => s + p.favorites, 0);
+
+  const dayLabel = (iso: string): string => {
+    const parts = iso.split('-');
+    return parts.length === 3 ? `${parts[2]}/${parts[1]}` : iso;
+  };
+
+  return (
+    <YStack
+      gap={12}
+      padding={16}
+      borderRadius={16}
+      borderWidth={1}
+      borderColor="$slate200"
+      backgroundColor="$background"
+    >
+      <XStack alignItems="center" justifyContent="space-between">
+        <Paragraph fontSize={15} fontWeight="800" color="$slate900">
+          {t('analytics.views')} & {t('analytics.favorites')}
+        </Paragraph>
+        <XStack gap={12}>
+          <XStack alignItems="center" gap={5}>
+            <YStack width={9} height={9} borderRadius={2} backgroundColor={brand.primary} />
+            <Paragraph fontSize={11} color="$slate600" fontWeight="700">
+              {formatCompact(totalViews)}
+            </Paragraph>
+          </XStack>
+          <XStack alignItems="center" gap={5}>
+            <YStack width={9} height={9} borderRadius={2} backgroundColor={brand.danger} />
+            <Paragraph fontSize={11} color="$slate600" fontWeight="700">
+              {formatCompact(totalFav)}
+            </Paragraph>
+          </XStack>
+        </XStack>
+      </XStack>
+
+      <XStack height={120} alignItems="flex-end" gap={points.length > 10 ? 3 : 6}>
+        {points.map((p) => (
+          <YStack key={p.date} flex={1} alignItems="center" justifyContent="flex-end" gap={3} height="100%">
+            <XStack flex={1} alignItems="flex-end" justifyContent="center" gap={2} width="100%">
+              <YStack
+                flex={1}
+                maxWidth={10}
+                height={`${Math.max(2, (p.views / max) * 100)}%`}
+                backgroundColor={brand.primary}
+                borderTopLeftRadius={3}
+                borderTopRightRadius={3}
+              />
+              <YStack
+                flex={1}
+                maxWidth={10}
+                height={`${Math.max(2, (p.favorites / max) * 100)}%`}
+                backgroundColor={brand.danger}
+                borderTopLeftRadius={3}
+                borderTopRightRadius={3}
+              />
+            </XStack>
+          </YStack>
+        ))}
+      </XStack>
+
+      <XStack justifyContent="space-between">
+        <Paragraph fontSize={10} color="$slate500">
+          {dayLabel(points[0]?.date ?? '')}
+        </Paragraph>
+        <Paragraph fontSize={10} color="$slate500">
+          {dayLabel(points[points.length - 1]?.date ?? '')}
+        </Paragraph>
+      </XStack>
     </YStack>
   );
 }
