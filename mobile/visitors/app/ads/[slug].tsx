@@ -43,7 +43,7 @@ import { BookViewingSheet } from '@/components/ads/BookViewingSheet';
 import { ImageLightbox } from '@/components/ads/ImageLightbox';
 import { KeyScoreSection } from '@/components/ads/KeyScoreSection';
 import { useKeyScore } from '@/hooks/useKeyScore';
-import { useRecordRecentlyViewed } from '@/hooks/useRecentlyViewed';
+import { useRecordRecentlyViewed, useRemoveRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { LocationMap } from '@/components/ads/LocationMap';
 import { NeighborhoodScorecard } from '@/components/ads/NeighborhoodScorecard';
 import { PropertyAttributes } from '@/components/ads/PropertyAttributes';
@@ -99,6 +99,15 @@ export default function AdDetail() {
       void recordView(ad);
     }
   }, [ad, recordView]);
+
+  // Annonce introuvable (supprimée, ou d'un autre environnement resté en
+  // cache) → on la retire du carrousel « Récemment consultés ».
+  const removeRecent = useRemoveRecentlyViewed();
+  useEffect(() => {
+    if (isError && slug) {
+      void removeRecent(slug);
+    }
+  }, [isError, slug, removeRecent]);
 
   const [activeImage, setActiveImage] = useState(0);
   const [descOpen, setDescOpen] = useState(false);
