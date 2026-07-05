@@ -10,7 +10,9 @@ export interface AuthUser {
   phone_number?: string | null;
   phone_is_whatsapp?: boolean;
   avatar?: string | null;
-  city?: string | null;
+  /** UserResource expose city_id + city_name (pas de champ `city`). */
+  city_id?: string | null;
+  city_name?: string | null;
   username?: string | null;
   bio?: string | null;
   role?: string;

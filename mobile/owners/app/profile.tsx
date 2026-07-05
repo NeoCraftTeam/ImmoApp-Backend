@@ -28,7 +28,9 @@ import { extractApiErrorMessage } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import { useSession } from '@/auth/SessionProvider';
 import { PhoneInput } from '@/components/PhoneInput';
+import { PickerField } from '@/components/ads/PickerField';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { useCities } from '@/hooks/useReference';
 import { useMe } from '@/hooks/useMe';
 import { useProfileQr } from '@/hooks/useMarketing';
 import { useUpdateProfile, useUploadAvatar } from '@/hooks/useProfile';
@@ -44,7 +46,7 @@ interface ProfileForm {
   lastname: string;
   phone_number: string;
   bio: string;
-  city: string;
+  city_id: string;
 }
 
 /**
@@ -60,12 +62,13 @@ export default function ProfileScreen() {
   const updateProfile = useUpdateProfile(userId);
   const uploadAvatar = useUploadAvatar(userId);
 
+  const cities = useCities();
   const [form, setForm] = useState<ProfileForm>({
     firstname: '',
     lastname: '',
     phone_number: '',
     bio: '',
-    city: '',
+    city_id: '',
   });
   const [qrOpen, setQrOpen] = useState(false);
   const [busy, setBusy] = useState<MarketingAction | null>(null);
@@ -77,7 +80,7 @@ export default function ProfileScreen() {
       lastname: me.data.lastname ?? '',
       phone_number: me.data.phone_number ?? '',
       bio: me.data.bio ?? '',
-      city: me.data.city ?? '',
+      city_id: me.data.city_id ?? '',
     });
   }, [me.data]);
 
@@ -100,8 +103,8 @@ export default function ProfileScreen() {
     if (form.bio.trim() !== (me.data.bio ?? '')) {
       patch.bio = form.bio.trim();
     }
-    if (form.city.trim() !== (me.data.city ?? '')) {
-      patch.city = form.city.trim();
+    if (form.city_id !== (me.data.city_id ?? '')) {
+      patch.city_id = form.city_id || null;
     }
     return patch;
   }, [form, me.data]);
@@ -265,14 +268,12 @@ export default function ProfileScreen() {
               onChange={(v) => set('phone_number', v)}
             />
           </Field>
-          <Field label={t('adForm.fields.city')}>
-            <Input
-              value={form.city}
-              onChangeText={(v) => set('city', v)}
-              placeholder={t('adForm.fields.city')}
-              borderColor="$slate300"
-            />
-          </Field>
+          <PickerField
+            label={t('adForm.fields.city')}
+            value={form.city_id}
+            options={cities.data ?? []}
+            onSelect={(o) => set('city_id', o.id)}
+          />
           <Field label="Présentation">
             <TextArea
               value={form.bio}
