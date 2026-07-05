@@ -202,10 +202,13 @@ export const ENDPOINTS = {
     request: (paymentId: string) =>
       `/payments/${encodeURIComponent(paymentId)}/refund-request`,
   },
-  /** Catalogue Services Pro (boost packs, premium packages, services à la carte). */
+  /**
+   * « Services Pro » = catalogue des packs de boost (le backend n'a pas
+   * d'endpoint /pro-services ; les packs viennent de /boost-packs et le
+   * boost s'applique à une annonce via /my/ads/{ad}/boost).
+   */
   proServices: {
-    list: '/pro-services',
-    purchase: '/pro-services/purchase',
+    list: '/boost-packs',
   },
   /** Trust Score détail + recommandations. */
   trust: {

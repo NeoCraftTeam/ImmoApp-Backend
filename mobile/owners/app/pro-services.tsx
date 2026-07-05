@@ -1,16 +1,13 @@
-import { Award, Check, Sparkles } from '@tamagui/lucide-icons';
-import { useState } from 'react';
-import { Alert, RefreshControl, ScrollView } from 'react-native';
+import { Award, Rocket, Sparkles } from '@tamagui/lucide-icons';
+import { useRouter } from 'expo-router';
+import { RefreshControl, ScrollView } from 'react-native';
 import { Button, Paragraph, Spinner, XStack, YStack } from 'tamagui';
 
-import { extractApiErrorMessage } from '@/api/extract-error';
 import { useSession } from '@/auth/SessionProvider';
 import { EmptyState } from '@/components/EmptyState';
-import { PaymentSheet } from '@/components/payments/PaymentSheet';
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { useProServices, usePurchaseProService } from '@/hooks/useProServices';
+import { useProServices } from '@/hooks/useProServices';
 import { brand } from '@/theme/tokens';
-import { formatFcfa } from '@/utils/format';
 import type { ProService } from '@/types/proservice';
 
 function ServiceCard({ s, onPurchase }: { s: ProService; onPurchase: () => void }) {
@@ -48,10 +45,6 @@ function ServiceCard({ s, onPurchase }: { s: ProService; onPurchase: () => void 
           <Paragraph fontSize={14} fontWeight="800" color={brand.primary}>
             {s.price_credits} crédits
           </Paragraph>
-        ) : s.price != null ? (
-          <Paragraph fontSize={14} fontWeight="800" color={brand.primary}>
-            {formatFcfa(s.price)}
-          </Paragraph>
         ) : null}
       </XStack>
 
@@ -69,9 +62,9 @@ function ServiceCard({ s, onPurchase }: { s: ProService; onPurchase: () => void 
         fontWeight="700"
         borderRadius={10}
         onPress={onPurchase}
-        icon={<Check size={14} color="white" />}
+        icon={<Rocket size={14} color="white" />}
       >
-        Souscrire
+        Booster une annonce
       </Button>
     </YStack>
   );
@@ -79,40 +72,14 @@ function ServiceCard({ s, onPurchase }: { s: ProService; onPurchase: () => void 
 
 export default function ProServicesScreen() {
   const { isAuthenticated } = useSession();
+  const router = useRouter();
   const { data: list = [], isLoading, isRefetching, refetch } = useProServices(isAuthenticated);
-  const purchase = usePurchaseProService();
 
-  const [paying, setPaying] = useState<ProService | null>(null);
-
-  /**
-   * Distinction prix-crédits vs prix-monétaire :
-   *  - Si `price_credits` → déduction crédits côté backend, juste un confirm
-   *  - Si `price` → flow paiement complet via PaymentSheet
-   */
-  const onPurchase = (s: ProService) => {
-    if (s.price && s.price > 0) {
-      setPaying(s);
-      return;
-    }
-    // Fallback crédits : confirm + déduction
-    Alert.alert(
-      'Confirmer',
-      `Souscrire au service « ${s.name} » ?`,
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Souscrire',
-          onPress: () =>
-            purchase.mutate(
-              { service_id: s.id },
-              {
-                onSuccess: () => Alert.alert('Succès', 'Service activé !'),
-                onError: (err) => Alert.alert('Erreur', extractApiErrorMessage(err)),
-              },
-            ),
-        },
-      ],
-    );
+  // Un boost s'applique à une annonce précise (payé en crédits via
+  // /my/ads/{ad}/boost) : on renvoie l'utilisateur vers ses annonces où
+  // le BoostSheet gère le choix du pack et le débit.
+  const onPurchase = () => {
+    router.push('/(tabs)/ads' as never);
   };
 
   return (
@@ -137,21 +104,9 @@ export default function ProServicesScreen() {
             />
           </YStack>
         ) : (
-          list.map((s) => <ServiceCard key={s.id} s={s} onPurchase={() => onPurchase(s)} />)
+          list.map((s) => <ServiceCard key={s.id} s={s} onPurchase={onPurchase} />)
         )}
       </ScrollView>
-
-      {paying ? (
-        <PaymentSheet
-          open={paying !== null}
-          onOpenChange={(o) => !o && setPaying(null)}
-          title={paying.name}
-          subtitle={paying.description}
-          amount={paying.price ?? 0}
-          purpose="pro_service"
-          extraPayload={{ reference_id: paying.id }}
-        />
-      ) : null}
     </YStack>
   );
 }

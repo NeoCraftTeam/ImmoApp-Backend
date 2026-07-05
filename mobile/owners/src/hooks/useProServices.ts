@@ -1,38 +1,50 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 
 import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import type { ProService } from '@/types/proservice';
 
-interface ProServicesResponse {
-  data?: ProService[];
+/** Forme d'un pack de boost renvoyé par /boost-packs. */
+interface BoostPack {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string | null;
+  reach_description?: string | null;
+  duration_days?: number;
+  boost_score?: number;
+  price_credits?: number;
+  is_popular?: boolean;
 }
 
-/** GET /pro-services — catalogue des services pro disponibles. */
+interface BoostPacksResponse {
+  data?: BoostPack[];
+}
+
+/**
+ * GET /boost-packs — catalogue des packs de boost (payés en crédits, appliqués
+ * à une annonce). Mappé vers `ProService` pour l'écran « Services Pro ».
+ */
 export function useProServices(enabled = true) {
-  return useQuery<ProServicesResponse, Error, ProService[]>({
+  return useQuery<BoostPacksResponse, Error, ProService[]>({
     queryKey: ['pro-services'],
     queryFn: async () => {
-      const { data } = await apiClient.get<ProServicesResponse>(
+      const { data } = await apiClient.get<BoostPacksResponse>(
         ENDPOINTS.proServices.list,
       );
       return data;
     },
-    select: (p) => (Array.isArray(p?.data) ? p.data : []),
+    select: (p) =>
+      (Array.isArray(p?.data) ? p.data : []).map((pack) => ({
+        id: pack.id,
+        slug: pack.slug,
+        name: pack.name,
+        description: pack.reach_description ?? pack.description ?? undefined,
+        price_credits: pack.price_credits,
+        duration_days: pack.duration_days,
+        highlighted: pack.is_popular,
+      })),
     enabled,
     staleTime: 5 * 60 * 1000,
-  });
-}
-
-export function usePurchaseProService() {
-  const qc = useQueryClient();
-  return useMutation<void, Error, { service_id: string; ad_id?: string }>({
-    mutationFn: async (payload) => {
-      await apiClient.post(ENDPOINTS.proServices.purchase, payload);
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['pro-services'] });
-      qc.invalidateQueries({ queryKey: ['credits-balance'] });
-    },
   });
 }
