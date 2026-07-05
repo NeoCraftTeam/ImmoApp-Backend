@@ -4,11 +4,13 @@ import {
   ChevronRight,
   Clock,
   CreditCard,
+  Smartphone,
   Sparkles,
   Wallet,
   X,
   XCircle,
 } from '@tamagui/lucide-icons';
+import type { ComponentType } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Stack, useRouter } from 'expo-router';
@@ -37,10 +39,15 @@ type PaymentOutcome = 'completed' | 'failed' | 'pending';
 type PaymentMethodChoice = 'mobile_money' | 'orange_money' | 'card';
 
 /** Moyens de paiement proposés (mobile money d'abord, puis carte). */
-const PAYMENT_METHODS: { key: PaymentMethodChoice; label: string; sub: string; emoji: string }[] = [
-  { key: 'mobile_money', label: 'MTN Mobile Money', sub: 'MoMo', emoji: '📱' },
-  { key: 'orange_money', label: 'Orange Money', sub: 'OM', emoji: '🟠' },
-  { key: 'card', label: 'Carte bancaire', sub: 'Visa · Mastercard', emoji: '💳' },
+const PAYMENT_METHODS: {
+  key: PaymentMethodChoice;
+  label: string;
+  sub: string;
+  Icon: ComponentType<{ size?: number; color?: string }>;
+}[] = [
+  { key: 'mobile_money', label: 'MTN Mobile Money', sub: 'MoMo', Icon: Smartphone },
+  { key: 'orange_money', label: 'Orange Money', sub: 'OM', Icon: Smartphone },
+  { key: 'card', label: 'Carte bancaire', sub: 'Visa · Mastercard', Icon: CreditCard },
 ];
 
 /**
@@ -314,7 +321,7 @@ function PacksModal({
         // verify-purchase a déjà crédité côté serveur ; on rafraîchit le solde.
         await verify.mutateAsync({ tx_ref: res.tx_ref }).catch(() => {});
         onDone();
-        Alert.alert('Paiement réussi ✅', 'Vos crédits ont été ajoutés à votre solde.');
+        Alert.alert('Paiement réussi', 'Vos crédits ont été ajoutés à votre solde.');
       } else if (outcome === 'failed') {
         Alert.alert('Paiement échoué', 'La transaction a été refusée ou annulée. Aucun crédit n’a été débité.');
       } else {
@@ -388,7 +395,9 @@ function PacksModal({
                     borderColor="$borderColor"
                     backgroundColor="$background"
                   >
-                    <Paragraph fontSize={22}>{m.emoji}</Paragraph>
+                    <YStack width={40} height={40} borderRadius={20} backgroundColor="$slate100" alignItems="center" justifyContent="center">
+                      <m.Icon size={20} color={brand.primary} />
+                    </YStack>
                     <YStack flex={1}>
                       <Paragraph fontSize={15} fontWeight="800" color="$slate900">
                         {m.label}
