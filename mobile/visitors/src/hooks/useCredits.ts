@@ -46,7 +46,11 @@ interface PurchaseResponse {
 
 /** POST /credits/purchase/{package} — initie le paiement (checkout hébergé). */
 export function usePurchaseCredits() {
-  return useMutation<PurchaseResponse, Error, { packageId: string; callback_url?: string }>({
+  return useMutation<
+    PurchaseResponse,
+    Error,
+    { packageId: string; callback_url?: string; payment_method?: 'mobile_money' | 'orange_money' | 'card' }
+  >({
     mutationFn: async ({ packageId, ...payload }) => {
       const { data } = await apiClient.post<PurchaseResponse>(
         ENDPOINTS.credits.purchase(packageId),

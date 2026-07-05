@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   CheckCircle2,
+  ChevronRight,
   Clock,
   CreditCard,
   Sparkles,
@@ -31,29 +32,48 @@ import { useSession } from '@/auth/SessionProvider';
 import { brand } from '@/theme/tokens';
 import type { PaymentTransaction } from '@/types/payment';
 
-type PaymentStatus = 'success' | 'failed' | 'cancelled' | 'pending' | 'unknown';
+type PaymentOutcome = 'completed' | 'failed' | 'pending';
+
+type PaymentMethodChoice = 'mobile_money' | 'orange_money' | 'card';
+
+/** Moyens de paiement proposés (mobile money d'abord, puis carte). */
+const PAYMENT_METHODS: { key: PaymentMethodChoice; label: string; sub: string; emoji: string }[] = [
+  { key: 'mobile_money', label: 'MTN Mobile Money', sub: 'MoMo', emoji: '📱' },
+  { key: 'orange_money', label: 'Orange Money', sub: 'OM', emoji: '🟠' },
+  { key: 'card', label: 'Carte bancaire', sub: 'Visa · Mastercard', emoji: '💳' },
+];
 
 /**
- * Sonde le statut d'une transaction via l'endpoint public (sans session,
- * ne renvoie que { status }). Boucle ~90 s max (2 s d'intervalle) et
- * s'arrête dès un état terminal. Le webhook serveur reste la source de
- * vérité ; ce polling ne sert qu'au signal d'UI.
+ * Confirme un achat en RÉCONCILIANT ACTIVEMENT avec la passerelle via
+ * POST /credits/verify-purchase (syncPaymentStatus re-query GeniusPay/Stripe).
+ * Contrairement au webhook, ça fonctionne même quand le webhook ne peut
+ * pas joindre le backend (local/sandbox). Codes : 200 = completed,
+ * 202 = pending, 422 = failed. Boucle ~90 s, arrêt sur état terminal.
  */
-async function pollPaymentStatus(
+async function pollVerifyPurchase(
   txRef: string,
-  { attempts = 45, intervalMs = 2000 }: { attempts?: number; intervalMs?: number } = {},
-): Promise<PaymentStatus> {
+  { attempts = 36, intervalMs = 2500 }: { attempts?: number; intervalMs?: number } = {},
+): Promise<PaymentOutcome> {
   for (let i = 0; i < attempts; i++) {
     try {
-      const { data } = await apiClient.get<{ status?: PaymentStatus }>(
-        ENDPOINTS.payments.publicStatus(txRef),
+      const { data } = await apiClient.post<{ status?: string }>(
+        ENDPOINTS.credits.verifyPurchase,
+        { tx_ref: txRef },
       );
-      const s = data?.status;
-      if (s === 'success' || s === 'failed' || s === 'cancelled') {
-        return s;
+      if (data?.status === 'completed') {
+        return 'completed';
       }
-    } catch {
-      /* transitoire — on retente */
+      if (data?.status === 'failed') {
+        return 'failed';
+      }
+      // 'pending' / 'not_found' → on retente.
+    } catch (err) {
+      // 422 = paiement échoué (verify renvoie status:failed en erreur).
+      const status = (err as { response?: { data?: { status?: string } } })?.response?.data?.status;
+      if (status === 'failed') {
+        return 'failed';
+      }
+      /* autres erreurs transitoires → on retente */
     }
     await new Promise((r) => setTimeout(r, intervalMs));
   }
@@ -262,36 +282,42 @@ function PacksModal({
   const purchase = usePurchaseCredits();
   const verify = useVerifyCreditPurchase();
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Pack en attente du choix du moyen de paiement.
+  const [pendingPack, setPendingPack] = useState<CreditPackage | null>(null);
 
-  const buy = async (pkg: CreditPackage) => {
+  const buy = async (pkg: CreditPackage, method: PaymentMethodChoice) => {
     if (busyId) return;
+    setPendingPack(null);
     setBusyId(pkg.id);
     try {
       const callbackUrl = Linking.createURL('credits/callback');
-      const res = await purchase.mutateAsync({ packageId: pkg.id, callback_url: callbackUrl });
+      const res = await purchase.mutateAsync({
+        packageId: pkg.id,
+        callback_url: callbackUrl,
+        payment_method: method,
+      });
       const url = res.payment_url ?? res.payment_link;
       if (!url || !res.tx_ref) {
         throw new Error('Lien de paiement indisponible.');
       }
 
-      // Checkout hébergé ouvert IN-APP. On suit le statut de la transaction
-      // EN PARALLÈLE via /payments/{txRef}/public-status (source de vérité =
-      // webhook côté serveur) : dès que c'est confirmé/échoué, on ferme le
-      // navigateur et on crédite — plus fiable que d'attendre un deep-link.
+      // Checkout hébergé ouvert IN-APP. On confirme EN PARALLÈLE en
+      // réconciliant activement avec la passerelle (verify-purchase) :
+      // dès que c'est confirmé/échoué, on FERME le navigateur et on affiche
+      // l'état. Marche même sans webhook (local/sandbox).
       const browserPromise = WebBrowser.openAuthSessionAsync(url, callbackUrl);
-      const status = await pollPaymentStatus(res.tx_ref);
+      const outcome = await pollVerifyPurchase(res.tx_ref);
       await WebBrowser.dismissBrowser().catch(() => {});
       await browserPromise.catch(() => {});
 
-      if (status === 'success') {
+      if (outcome === 'completed') {
+        // verify-purchase a déjà crédité côté serveur ; on rafraîchit le solde.
         await verify.mutateAsync({ tx_ref: res.tx_ref }).catch(() => {});
         onDone();
-        Alert.alert('Paiement réussi', 'Vos crédits ont été ajoutés à votre solde.');
-      } else if (status === 'failed' || status === 'cancelled') {
-        Alert.alert('Paiement non abouti', 'La transaction a été annulée ou refusée. Aucun crédit n’a été débité.');
+        Alert.alert('Paiement réussi ✅', 'Vos crédits ont été ajoutés à votre solde.');
+      } else if (outcome === 'failed') {
+        Alert.alert('Paiement échoué', 'La transaction a été refusée ou annulée. Aucun crédit n’a été débité.');
       } else {
-        // Toujours en attente après le délai : le webhook peut arriver plus tard.
-        await verify.mutateAsync({ tx_ref: res.tx_ref }).catch(() => {});
         Alert.alert('Paiement en cours', 'Nous confirmons votre paiement. Vos crédits apparaîtront dès validation.');
       }
     } catch (err) {
@@ -329,7 +355,58 @@ function PacksModal({
             </Pressable>
           </XStack>
 
-          {packages.isLoading ? (
+          {pendingPack ? (
+            <YStack gap={12}>
+              <XStack alignItems="center" gap={10}>
+                <Pressable onPress={() => setPendingPack(null)} hitSlop={8} accessibilityLabel="Retour aux packs">
+                  <YStack width={32} height={32} borderRadius={16} backgroundColor="$slate100" alignItems="center" justifyContent="center">
+                    <ArrowLeft size={16} color="$slate700" />
+                  </YStack>
+                </Pressable>
+                <YStack flex={1}>
+                  <Paragraph fontSize={15} fontWeight="800" color="$slate900">
+                    {pendingPack.name} · {(pendingPack.points_awarded ?? 0).toLocaleString('fr-FR')} crédits
+                  </Paragraph>
+                  <Paragraph fontSize={13} color="$slate500">
+                    {pendingPack.price.toLocaleString('fr-FR')} FCFA · choisissez le moyen de paiement
+                  </Paragraph>
+                </YStack>
+              </XStack>
+              {PAYMENT_METHODS.map((m) => (
+                <Pressable
+                  key={m.key}
+                  onPress={() => void buy(pendingPack, m.key)}
+                  disabled={Boolean(busyId)}
+                  accessibilityRole="button"
+                >
+                  <XStack
+                    alignItems="center"
+                    gap={12}
+                    padding={16}
+                    borderRadius={16}
+                    borderWidth={1.5}
+                    borderColor="$borderColor"
+                    backgroundColor="$background"
+                  >
+                    <Paragraph fontSize={22}>{m.emoji}</Paragraph>
+                    <YStack flex={1}>
+                      <Paragraph fontSize={15} fontWeight="800" color="$slate900">
+                        {m.label}
+                      </Paragraph>
+                      <Paragraph fontSize={12.5} color="$slate500">
+                        {m.sub}
+                      </Paragraph>
+                    </YStack>
+                    {busyId === pendingPack.id ? (
+                      <Spinner color={brand.primary} />
+                    ) : (
+                      <ChevronRight size={18} color="$slate400" />
+                    )}
+                  </XStack>
+                </Pressable>
+              ))}
+            </YStack>
+          ) : packages.isLoading ? (
             <YStack padding={24} alignItems="center">
               <ActivityIndicator />
             </YStack>
@@ -346,7 +423,7 @@ function PacksModal({
                 const credits = item.points_awarded ?? 0;
                 const busy = busyId === item.id;
                 return (
-                  <Pressable onPress={() => void buy(item)} disabled={Boolean(busyId)} accessibilityRole="button">
+                  <Pressable onPress={() => setPendingPack(item)} disabled={Boolean(busyId)} accessibilityRole="button">
                     <XStack
                       alignItems="center"
                       gap={12}
