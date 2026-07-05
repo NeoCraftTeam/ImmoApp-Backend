@@ -526,7 +526,7 @@ function RecommendationCard({ ad, priority }: { ad: Ad; priority: boolean }) {
 
   return (
     <Link
-      href={{ pathname: '/ads/[slug]', params: { slug: ad.slug ?? ad.id } }}
+      href={{ pathname: '/ads/[slug]', params: { slug: ad.id } }}
       asChild
     >
       <Pressable accessibilityRole="link" accessibilityLabel={ad.title}>

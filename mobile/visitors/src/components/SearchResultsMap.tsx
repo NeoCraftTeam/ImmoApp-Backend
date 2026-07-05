@@ -80,7 +80,7 @@ export function SearchResultsMap({ ads }: Props) {
           onCalloutPress={() =>
             router.push({
               pathname: '/ads/[slug]',
-              params: { slug: ad.slug ?? ad.id },
+              params: { slug: ad.id },
             })
           }
         />

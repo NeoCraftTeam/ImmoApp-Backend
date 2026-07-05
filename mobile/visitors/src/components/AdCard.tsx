@@ -123,7 +123,7 @@ function AdCardComponent({ ad, priority = false }: AdCardProps) {
 
   return (
     <Link
-      href={{ pathname: '/ads/[slug]', params: { slug: ad.slug ?? ad.id } }}
+      href={{ pathname: '/ads/[slug]', params: { slug: ad.id } }}
       asChild
     >
       <Pressable
