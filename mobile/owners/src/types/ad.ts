@@ -21,8 +21,9 @@ export interface AdImage {
 export interface AdQuarter {
   id?: string;
   name: string;
+  /** QuarterResource renvoie city_id/city_name (pas d'objet city imbriqué). */
+  city_id?: string;
   city_name?: string;
-  city?: { id: string; name: string };
 }
 
 export interface AdType {

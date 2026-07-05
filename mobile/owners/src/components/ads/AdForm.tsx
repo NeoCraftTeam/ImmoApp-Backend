@@ -65,7 +65,7 @@ function initialState(ad?: Ad): FormState {
     price_period: (ad?.price_period as 'mois' | 'jour') ?? 'mois',
     type_id: ad?.type?.id ?? '',
     adresse: ad?.adresse ?? '',
-    city_id: ad?.quarter?.city?.id ?? '',
+    city_id: ad?.quarter?.city_id ?? '',
     quarter_id: ad?.quarter?.id ?? '',
     latitude: ad?.location?.latitude ?? null,
     longitude: ad?.location?.longitude ?? null,
