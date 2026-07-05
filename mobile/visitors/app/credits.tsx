@@ -18,7 +18,8 @@ import { ActivityIndicator, Alert, FlatList, Modal, Pressable } from 'react-nati
 import { H2, Paragraph, Spinner, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { extractApiErrorMessage } from '@/api/client';
+import { apiClient, extractApiErrorMessage } from '@/api/client';
+import { ENDPOINTS } from '@/api/endpoints';
 import {
   useCreditPackages,
   usePurchaseCredits,
@@ -40,6 +41,35 @@ const QUICK_CURRENCIES = ['XAF', 'EUR', 'USD', 'XOF', 'GBP'].filter((c) =>
 function nextCurrency(current: string): string {
   const idx = QUICK_CURRENCIES.indexOf(current);
   return QUICK_CURRENCIES[(idx + 1) % QUICK_CURRENCIES.length] ?? 'XAF';
+}
+
+type PaymentStatus = 'success' | 'failed' | 'cancelled' | 'pending' | 'unknown';
+
+/**
+ * Sonde le statut d'une transaction via l'endpoint public (sans session,
+ * ne renvoie que { status }). Boucle ~90 s max (2 s d'intervalle) et
+ * s'arrête dès un état terminal. Le webhook serveur reste la source de
+ * vérité ; ce polling ne sert qu'au signal d'UI.
+ */
+async function pollPaymentStatus(
+  txRef: string,
+  { attempts = 45, intervalMs = 2000 }: { attempts?: number; intervalMs?: number } = {},
+): Promise<PaymentStatus> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const { data } = await apiClient.get<{ status?: PaymentStatus }>(
+        ENDPOINTS.payments.publicStatus(txRef),
+      );
+      const s = data?.status;
+      if (s === 'success' || s === 'failed' || s === 'cancelled') {
+        return s;
+      }
+    } catch {
+      /* transitoire — on retente */
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return 'pending';
 }
 
 type Period = 'all' | '30d' | '90d';
@@ -253,15 +283,30 @@ function PacksModal({
       const callbackUrl = Linking.createURL('credits/callback');
       const res = await purchase.mutateAsync({ packageId: pkg.id, callback_url: callbackUrl });
       const url = res.payment_url ?? res.payment_link;
-      if (!url) {
+      if (!url || !res.tx_ref) {
         throw new Error('Lien de paiement indisponible.');
       }
-      // Checkout hébergé ouvert IN-APP (pas de redirection vers le web
-      // de l'app) ; au retour on vérifie la transaction pour créditer.
-      await WebBrowser.openAuthSessionAsync(url, callbackUrl);
-      await verify.mutateAsync({ tx_ref: res.tx_ref }).catch(() => {});
-      onDone();
-      Alert.alert('Paiement', 'Si votre paiement est confirmé, vos crédits seront ajoutés sous peu.');
+
+      // Checkout hébergé ouvert IN-APP. On suit le statut de la transaction
+      // EN PARALLÈLE via /payments/{txRef}/public-status (source de vérité =
+      // webhook côté serveur) : dès que c'est confirmé/échoué, on ferme le
+      // navigateur et on crédite — plus fiable que d'attendre un deep-link.
+      const browserPromise = WebBrowser.openAuthSessionAsync(url, callbackUrl);
+      const status = await pollPaymentStatus(res.tx_ref);
+      await WebBrowser.dismissBrowser().catch(() => {});
+      await browserPromise.catch(() => {});
+
+      if (status === 'success') {
+        await verify.mutateAsync({ tx_ref: res.tx_ref }).catch(() => {});
+        onDone();
+        Alert.alert('Paiement réussi', 'Vos crédits ont été ajoutés à votre solde.');
+      } else if (status === 'failed' || status === 'cancelled') {
+        Alert.alert('Paiement non abouti', 'La transaction a été annulée ou refusée. Aucun crédit n’a été débité.');
+      } else {
+        // Toujours en attente après le délai : le webhook peut arriver plus tard.
+        await verify.mutateAsync({ tx_ref: res.tx_ref }).catch(() => {});
+        Alert.alert('Paiement en cours', 'Nous confirmons votre paiement. Vos crédits apparaîtront dès validation.');
+      }
     } catch (err) {
       Alert.alert('Erreur', extractApiErrorMessage(err));
     } finally {
