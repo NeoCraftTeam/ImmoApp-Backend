@@ -99,6 +99,15 @@ final readonly class PaymentService
         $redirectUrl = $data['redirect_url'] ?? null;
         $redirectUrl = is_string($redirectUrl) && $redirectUrl !== '' ? $redirectUrl : null;
 
+        // Les passerelles hosted-checkout (GeniusPay…) exigent une URL http(s)
+        // pour success_url/error_url. Un deep-link mobile (ex. keyhome://…) est
+        // rejeté par la passerelle : on l'ignore ici et on retombe sur l'URL web
+        // de retour. Le mobile suit le résultat via GET
+        // /payments/{txRef}/public-status (sans session) puis rafraîchit le solde.
+        if ($redirectUrl !== null && preg_match('#^https?://#i', $redirectUrl) !== 1) {
+            $redirectUrl = null;
+        }
+
         if ($redirectUrl === null) {
             $configured = config('payment.gateways.geniuspay.redirect_url');
             $redirectUrl = (is_string($configured) && $configured !== '')

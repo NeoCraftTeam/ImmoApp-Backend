@@ -162,6 +162,38 @@ it('skips turnstile for credits purchase from a stateless mobile request', funct
         ->assertJsonStructure(['payment_url', 'tx_ref', 'gateway']);
 });
 
+it('n\'envoie jamais un callback deep-link comme success_url à la passerelle', function (): void {
+    config()->set('services.turnstile.secret_key', '');
+    config()->set('app.frontend_url', 'https://keyhome.app');
+
+    Http::fake([
+        'pay.genius.ci/*' => Http::response([
+            'success' => true,
+            'data' => [
+                'reference' => 'MTX-DEEPLINK',
+                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-DEEPLINK',
+            ],
+        ], 201),
+    ]);
+
+    $package = PointPackage::factory()->create(['price' => 1000, 'is_active' => true]);
+    $user = User::factory()->create();
+
+    $this->actingAs($user)
+        ->postJson("/api/v1/credits/purchase/{$package->id}", [
+            'callback_url' => 'keyhome://credits/callback',
+        ])
+        ->assertSuccessful();
+
+    // La passerelle DOIT recevoir une URL http(s) (jamais le deep-link mobile),
+    // sinon GeniusPay rejette success_url/error_url.
+    Http::assertSent(function ($request): bool {
+        $body = $request->data();
+        $success = (string) ($body['success_url'] ?? '');
+        return str_starts_with($success, 'http://') || str_starts_with($success, 'https://');
+    });
+});
+
 it('rejects a credits purchase whose callback_url host is not allowed', function (): void {
     config()->set('services.turnstile.secret_key', '');
     config()->set('app.frontend_url', 'https://keyhome.app');
