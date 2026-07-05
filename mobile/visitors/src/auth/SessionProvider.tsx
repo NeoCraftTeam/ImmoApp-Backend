@@ -71,8 +71,18 @@ const SessionContext = createContext<SessionContextValue | null>(null);
  * individual screens can also branch on it (e.g. show "Connectez-vous
  * pour ajouter aux favoris" on the ad-detail page).
  */
+// Clé de session cloisonnée par environnement d'API : un token émis par
+// prod n'est pas valable sur preprod/local (bases + tokens distincts).
+// Sans ce suffixe, un token périmé restait « connecté » et faisait
+// échouer /auth/me (401) → l'app redemandait la connexion. SecureStore
+// n'accepte que [A-Za-z0-9._-] → on sanitize l'hôte.
+const ENV_SUFFIX = String(apiClient.defaults.baseURL ?? 'default')
+  .replace(/[^a-zA-Z0-9]/g, '')
+  .slice(-24);
+const SCOPED_SESSION_KEY = `${SESSION_KEY}.${ENV_SUFFIX}`;
+
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [[isLoading, token], setToken] = useStorageState<string>(SESSION_KEY);
+  const [[isLoading, token], setToken] = useStorageState<string>(SCOPED_SESSION_KEY);
 
   // Sync le bearer-token cache de `apiClient` chaque fois que le token
   // bouge. Sans ca, la cache in-memory de client.ts (qui evite la

@@ -73,8 +73,16 @@ const SessionContext = createContext<SessionContextValue | null>(null);
  * groups — unlike the visitor app, the owner app requires sign-in
  * before any dashboard surface is reachable.
  */
+// Clé de session cloisonnée par environnement d'API (voir visitors) :
+// évite qu'un token d'un serveur reste « connecté » sur un autre → 401
+// sur /auth/me → redemande de connexion. SecureStore = [A-Za-z0-9._-].
+const ENV_SUFFIX = String(apiClient.defaults.baseURL ?? 'default')
+  .replace(/[^a-zA-Z0-9]/g, '')
+  .slice(-24);
+const SCOPED_SESSION_KEY = `${SESSION_KEY}.${ENV_SUFFIX}`;
+
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [[isLoading, token], setToken] = useStorageState<string>(SESSION_KEY);
+  const [[isLoading, token], setToken] = useStorageState<string>(SCOPED_SESSION_KEY);
 
   // Sync le bearer-token cache de apiClient — voir client.ts pour
   // le rationale (cache in-memory pour eviter SecureStore race).
