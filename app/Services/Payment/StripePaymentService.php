@@ -224,6 +224,58 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
             ];
         }
 
+        // ── Checkout Session HÉBERGÉE (mobile / clients sans Stripe.js) ──────
+        // Les apps mobiles n'embarquent pas le SDK Stripe : elles ne peuvent
+        // pas confirmer un PaymentIntent ni monter un Payment Element. On leur
+        // renvoie donc l'URL d'une Checkout Session hébergée par Stripe, ouverte
+        // dans le navigateur in-app (comme GeniusPay). Le webhook
+        // `checkout.session.completed` reste la source de vérité.
+        if (!empty($payload['stripe_hosted'])) {
+            $hostedParams = [
+                'mode' => 'payment',
+                'line_items' => [[
+                    'price_data' => [
+                        'currency' => $currency,
+                        'product_data' => ['name' => mb_substr($description, 0, 250)],
+                        'unit_amount' => $eurCents,
+                    ],
+                    'quantity' => 1,
+                ]],
+                'locale' => 'fr',
+                'metadata' => $meta,
+                'payment_intent_data' => ['metadata' => $meta, 'description' => mb_substr($description, 0, 1000)],
+                'success_url' => (string) $payload['redirect_url'],
+                'cancel_url' => (string) $payload['redirect_url'],
+                'customer_email' => (string) $payload['email'],
+            ];
+
+            try {
+                $session = $this->stripe->checkout->sessions->create(
+                    $hostedParams,
+                    ['idempotency_key' => 'kh_cshosted:'.$txRef],
+                );
+            } catch (ApiErrorException $e) {
+                Log::error('Stripe hosted checkout session creation failed', [
+                    'tx_ref' => $txRef,
+                    'message' => $e->getMessage(),
+                    'stripe_code' => $e->getStripeCode(),
+                ]);
+
+                throw new PaymentGatewayException(
+                    'Stripe a refusé l\'initialisation du paiement. Réessayez ou choisissez un autre moyen de paiement.',
+                    previous: $e,
+                );
+            }
+
+            return [
+                'link' => (string) $session->url,
+                'tx_ref' => $txRef,
+                'status' => 'pending',
+                'gateway' => $this->getName(),
+                'stripe_flow' => 'checkout_hosted',
+            ];
+        }
+
         // ── Checkout Session (new-card / first-time in-page flow) ────────────
         // Create a Checkout Session with `ui_mode: 'custom'` so the frontend
         // can mount the Payment Element via `CheckoutElementsProvider`.

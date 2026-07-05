@@ -105,9 +105,13 @@ final class PaymentController
             ], 422);
         }
 
+        // Client sans session web (app mobile) → Checkout Stripe hébergée.
+        // Calculé hors transaction : $request n'est pas capturé dans la closure.
+        $stripeHosted = !$request->hasSession();
+
         // Wrap promo code validation + payment creation in a single transaction
         // to prevent race conditions on single-use promo codes.
-        return DB::transaction(function () use ($validated, $user, $type, $amount): JsonResponse {
+        return DB::transaction(function () use ($validated, $user, $type, $amount, $stripeHosted): JsonResponse {
             $appliedPromoCode = null;
             $finalAmount = $amount;
 
@@ -142,6 +146,7 @@ final class PaymentController
                 'payment_method_id' => isset($validated['payment_method_id']) && is_string($validated['payment_method_id']) && $validated['payment_method_id'] !== ''
                     ? $validated['payment_method_id']
                     : null,
+                'stripe_hosted' => $stripeHosted,
                 'meta' => [
                     'package_id' => ($type === 'credit') ? ($validated['plan_id'] ?? null) : null,
                 ],

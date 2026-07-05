@@ -174,6 +174,8 @@ final class CreditController
                 'redirect_url' => $redirectUrl,
                 'save_payment_method' => $savePaymentMethod,
                 'payment_method_id' => $paymentMethodId,
+                // Client sans session web (app mobile) → Checkout Stripe hébergée.
+                'stripe_hosted' => !$request->hasSession(),
                 'meta' => [
                     'package_id' => $package->id,
                 ],

@@ -130,6 +130,10 @@ final readonly class PaymentService
             'redirect_url' => $redirectUrl,
             'description' => $data['description'] ?? 'Paiement KeyHome',
             'payment_method' => $data['payment_method'] ?? 'mobile_money',
+            // Force la Checkout Session Stripe hébergée (URL) pour les clients
+            // sans Stripe.js/SDK (apps mobiles) — sinon Stripe renvoie un
+            // client_secret inutilisable côté natif.
+            'stripe_hosted' => (bool) ($data['stripe_hosted'] ?? false),
             'meta' => $meta,
         ];
 
