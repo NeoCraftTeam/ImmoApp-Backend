@@ -214,22 +214,27 @@ export default function Home() {
         </Link>
       </XStack>
 
-      {/* Greeting block — typo expressive editorial : caption +
-          prénom en XL, line-height tight pour le punch visuel. */}
-      <YStack gap={2} marginTop={2}>
-        <Paragraph fontSize={12} color="$slate500" fontWeight="600" letterSpacing={0.6}>
-          {greeting.toUpperCase()}{firstName ? ',' : ''}
-        </Paragraph>
-        {firstName ? (
-          <H2 fontSize={32} fontWeight="900" lineHeight={36} letterSpacing={-0.8}>
+      {/* Greeting inline — « Il se fait tard Test » (prénom en couleur
+          marque, sur la même ligne), façon web. */}
+      {firstName ? (
+        <H2
+          fontSize={26}
+          fontWeight="800"
+          color="$slate900"
+          lineHeight={32}
+          letterSpacing={-0.4}
+          marginTop={2}
+        >
+          {greeting}{' '}
+          <H2 fontSize={26} fontWeight="900" color={brand.primary} lineHeight={32} letterSpacing={-0.4}>
             {firstName}
           </H2>
-        ) : (
-          <H2 fontSize={28} fontWeight="900" lineHeight={32} letterSpacing={-0.6}>
-            Trouvez votre logement.
-          </H2>
-        )}
-      </YStack>
+        </H2>
+      ) : (
+        <H2 fontSize={26} fontWeight="900" lineHeight={32} letterSpacing={-0.4} marginTop={2}>
+          Trouvez votre logement.
+        </H2>
+      )}
 
       <Paragraph
         fontSize={13.5}
