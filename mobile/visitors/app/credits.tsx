@@ -121,13 +121,19 @@ export default function CreditsScreen() {
       await Promise.all([balance.refetch(), payments.refetch()]);
       if (res.status === 'completed') {
         Alert.alert('Paiement confirmé', 'Vos crédits ont été ajoutés à votre solde.');
-      } else if (res.status === 'failed') {
-        Alert.alert('Paiement échoué', 'Cette transaction a été refusée ou annulée.');
       } else {
+        // 202 → toujours en attente côté passerelle.
         Alert.alert('Toujours en attente', 'La passerelle n’a pas encore confirmé ce paiement. Réessayez dans un instant.');
       }
     } catch (err) {
-      Alert.alert('Erreur', extractApiErrorMessage(err));
+      // 422 = paiement échoué (verify renvoie status:failed en erreur).
+      await payments.refetch();
+      const status = (err as { response?: { data?: { status?: string } } })?.response?.data?.status;
+      if (status === 'failed') {
+        Alert.alert('Paiement échoué', 'Cette transaction a été refusée ou annulée. Aucun crédit n’a été débité.');
+      } else {
+        Alert.alert('Erreur', extractApiErrorMessage(err));
+      }
     } finally {
       setVerifyingRef(null);
     }
@@ -351,9 +357,14 @@ function PacksModal({
       const result = await WebBrowser.openAuthSessionAsync(url, callbackUrl, {
         preferEphemeralSession: true,
       });
+      // Réconciliation COURTE (~12 s max) pour ne pas bloquer l'UI : la
+      // confirmation passerelle peut tarder (webhook/sandbox). Si toujours en
+      // attente au bout de ce délai, on ferme la modale — la transaction
+      // apparaît « En attente » dans l'historique et reste tapable pour
+      // re-vérifier plus tard. Sur annulation, un contrôle très bref suffit.
       const outcome = await pollVerifyPurchase(
         res.tx_ref,
-        result.type === 'success' ? undefined : { attempts: 6 },
+        result.type === 'success' ? { attempts: 8, intervalMs: 1500 } : { attempts: 3, intervalMs: 1500 },
       );
 
       if (outcome === 'completed') {
@@ -362,9 +373,16 @@ function PacksModal({
         onDone();
         Alert.alert('Paiement réussi', 'Vos crédits ont été ajoutés à votre solde.');
       } else if (outcome === 'failed') {
+        onDone();
         Alert.alert('Paiement échoué', 'La transaction a été refusée ou annulée. Aucun crédit n’a été débité.');
       } else {
-        Alert.alert('Paiement en cours', 'Nous confirmons votre paiement. Vos crédits apparaîtront dès validation.');
+        // Toujours en attente : on ferme et on rafraîchit l'historique pour que
+        // la ligne « En attente » (tapable) apparaisse immédiatement.
+        onDone();
+        Alert.alert(
+          'Paiement en cours',
+          'Nous confirmons votre paiement. Il apparaît dans l’historique — touchez-le pour vérifier son statut, vos crédits s’ajouteront dès validation.',
+        );
       }
     } catch (err) {
       Alert.alert('Erreur', extractApiErrorMessage(err));
