@@ -8,16 +8,18 @@ use App\Enums\PaymentStatus;
 use App\Models\Payment;
 use App\Models\User;
 use App\Notifications\StalePaymentsDetectedNotification;
+use App\Services\Payment\PaymentService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class CleanupStalePaymentsCommand extends Command
 {
     protected $signature = 'app:cleanup-stale-payments {--hours=24 : Hours after which a pending payment is considered stale}';
 
-    protected $description = 'Mark stale PENDING payments as FAILED and notify admins';
+    protected $description = 'Reconcile stale PENDING payments with the gateway, then mark the truly-abandoned ones as FAILED and notify admins';
 
-    public function handle(): int
+    public function handle(PaymentService $paymentService): int
     {
         $hours = (int) $this->option('hours');
         $cutoff = now()->subHours($hours);
@@ -33,25 +35,54 @@ class CleanupStalePaymentsCommand extends Command
             return self::SUCCESS;
         }
 
-        $count = $stalePayments->count();
+        // Réconciliation d'abord : un paiement dont le webhook a été manqué peut
+        // avoir RÉUSSI côté passerelle. On re-interroge la passerelle avant de
+        // marquer échoué — syncPaymentStatus crédite le compte si c'est payé et
+        // n'ouvre jamais un état terminal existant (idempotent).
+        $reconciled = 0;
+        $failedIds = [];
 
-        Payment::query()
-            ->where('status', PaymentStatus::PENDING)
-            ->where('created_at', '<', $cutoff)
-            ->update(['status' => PaymentStatus::FAILED]);
+        foreach ($stalePayments as $payment) {
+            try {
+                $synced = $paymentService->syncPaymentStatus($payment);
+            } catch (Throwable $e) {
+                Log::warning('Stale payment reconciliation failed', [
+                    'payment_id' => $payment->id,
+                    'tx_ref' => $payment->transaction_id,
+                    'error' => $e->getMessage(),
+                ]);
+                $synced = $payment->fresh() ?? $payment;
+            }
 
-        Log::warning('Stale payments cleaned up', [
-            'count' => $count,
-            'cutoff_hours' => $hours,
-            'payment_ids' => $stalePayments->pluck('id')->toArray(),
-        ]);
+            if ($synced->status === PaymentStatus::SUCCESS) {
+                $reconciled++;
 
-        $admins = User::query()->where('role', 'admin')->get();
-        foreach ($admins as $admin) {
-            $admin->notify(new StalePaymentsDetectedNotification($count, $hours));
+                continue;
+            }
+
+            if ($synced->status === PaymentStatus::PENDING) {
+                $synced->update(['status' => PaymentStatus::FAILED]);
+                $failedIds[] = $synced->id;
+            }
         }
 
-        $this->info("Marked {$count} stale payments as FAILED and notified admins.");
+        $failedCount = count($failedIds);
+
+        Log::warning('Stale payments cleaned up', [
+            'reconciled_success' => $reconciled,
+            'marked_failed' => $failedCount,
+            'cutoff_hours' => $hours,
+            'failed_payment_ids' => $failedIds,
+        ]);
+
+        if ($failedCount > 0) {
+            $admins = User::query()->where('role', 'admin')->get();
+            foreach ($admins as $admin) {
+                $admin->notify(new StalePaymentsDetectedNotification($failedCount, $hours));
+            }
+        }
+
+        $this->info("Reconciled {$reconciled} as paid, marked {$failedCount} as FAILED (cutoff {$hours}h).");
 
         return self::SUCCESS;
     }

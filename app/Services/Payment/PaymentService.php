@@ -103,13 +103,13 @@ final readonly class PaymentService
         // Les passerelles hosted-checkout (GeniusPay/Stripe…) exigent une URL
         // http(s) pour success_url/error_url. Un deep-link mobile
         // (keyhome://, keyhomeowners://, exp://…) est rejeté par la passerelle :
-        // on l'enveloppe dans un pont HTTPS (payment.native-return) qui renverra
-        // un 302 vers le deep-link une fois le paiement terminé — l'onglet in-app
+        // on l'enveloppe dans un pont (payment.native-return) qui renverra un
+        // 302 vers le deep-link une fois le paiement terminé — l'onglet in-app
         // se ferme alors nativement et l'app reprend la main. Un schéma inconnu
         // (ni http(s), ni whitelisté) est ignoré → repli sur l'URL web de retour.
         if ($redirectUrl !== null && preg_match('#^https?://#i', $redirectUrl) !== 1) {
             $redirectUrl = FrontendRedirectGuard::isAllowedAppScheme($redirectUrl)
-                ? route('payment.native-return', ['callback' => $redirectUrl])
+                ? self::buildNativeReturnBridgeUrl($redirectUrl)
                 : null;
         }
 
@@ -811,6 +811,26 @@ final readonly class PaymentService
         // to /payment/return.  A direct link to /payment/return from an external
         // domain causes Next.js to return RSC wire format instead of full HTML.
         return $base.'/payment/callback?'.http_build_query($query);
+    }
+
+    /**
+     * Construit l'URL du pont de retour natif à passer à la passerelle.
+     *
+     * On utilise le schéma+hôte RÉELS de la requête entrante (ce que le client
+     * a utilisé pour joindre l'API) plutôt que `route()`/`config('app.url')` :
+     * `URL::forceScheme('https')` forcerait sinon un https, ce qui casse le
+     * retour en local (artisan serve = http://localhost:8000, sans TLS). En
+     * preprod/prod la requête arrive déjà en https sur le bon domaine, donc le
+     * pont hérite naturellement du bon schéma/hôte.
+     */
+    private static function buildNativeReturnBridgeUrl(string $deepLink): string
+    {
+        $base = request()?->getSchemeAndHttpHost();
+        if (!is_string($base) || $base === '') {
+            $base = rtrim((string) config('app.url'), '/');
+        }
+
+        return $base.route('payment.native-return', ['callback' => $deepLink], absolute: false);
     }
 
     /**

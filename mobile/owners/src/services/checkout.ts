@@ -70,6 +70,9 @@ export async function openHostedCheckout(
   try {
     const result = await WebBrowser.openAuthSessionAsync(paymentLink, returnUrl, {
       showInRecents: false,
+      // Session isolée → iOS n'affiche pas le prompt de consentement
+      // « … souhaite utiliser … pour se connecter ». Inutile pour un paiement.
+      preferEphemeralSession: true,
     });
 
     if (result.type === 'success' && result.url) {

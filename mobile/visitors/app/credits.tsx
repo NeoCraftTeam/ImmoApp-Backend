@@ -107,8 +107,31 @@ export default function CreditsScreen() {
   const { isAuthenticated } = useSession();
   const balance = useCreditsBalance();
   const payments = usePayments();
+  const verify = useVerifyCreditPurchase();
   const [packsOpen, setPacksOpen] = useState(false);
   const [period, setPeriod] = useState<Period>('all');
+  // tx_ref en cours de re-vérification manuelle (tap sur une ligne « En attente »).
+  const [verifyingRef, setVerifyingRef] = useState<string | null>(null);
+
+  const verifyPending = async (txRef: string) => {
+    if (verifyingRef) return;
+    setVerifyingRef(txRef);
+    try {
+      const res = await verify.mutateAsync({ tx_ref: txRef });
+      await Promise.all([balance.refetch(), payments.refetch()]);
+      if (res.status === 'completed') {
+        Alert.alert('Paiement confirmé', 'Vos crédits ont été ajoutés à votre solde.');
+      } else if (res.status === 'failed') {
+        Alert.alert('Paiement échoué', 'Cette transaction a été refusée ou annulée.');
+      } else {
+        Alert.alert('Toujours en attente', 'La passerelle n’a pas encore confirmé ce paiement. Réessayez dans un instant.');
+      }
+    } catch (err) {
+      Alert.alert('Erreur', extractApiErrorMessage(err));
+    } finally {
+      setVerifyingRef(null);
+    }
+  };
 
   const filtered = useMemo(() => {
     const list = payments.data ?? [];
@@ -258,7 +281,14 @@ export default function CreditsScreen() {
               </YStack>
             )
           }
-          renderItem={({ item }) => <TxRow tx={item} />}
+          renderItem={({ item }) => (
+            <TxRow
+              tx={item}
+              onVerify={verifyPending}
+              verifying={verifyingRef !== null && verifyingRef === item.reference}
+              disabled={verifyingRef !== null}
+            />
+          )}
         />
       </YStack>
 
@@ -315,7 +345,12 @@ function PacksModal({
       // `type: 'cancel'` = l'utilisateur a fermé l'onglet. Dans les deux cas on
       // réconcilie activement l'état réel (verify-purchase) — le deep-link
       // prouve le retour, pas le succès. Marche même sans webhook (local/sandbox).
-      const result = await WebBrowser.openAuthSessionAsync(url, callbackUrl);
+      // `preferEphemeralSession` : session isolée (pas de cookies partagés avec
+      // Safari) → iOS n'affiche PAS le prompt de consentement « … souhaite
+      // utiliser … pour se connecter ». Inutile pour un paiement.
+      const result = await WebBrowser.openAuthSessionAsync(url, callbackUrl, {
+        preferEphemeralSession: true,
+      });
       const outcome = await pollVerifyPurchase(
         res.tx_ref,
         result.type === 'success' ? undefined : { attempts: 6 },
@@ -482,7 +517,17 @@ function PacksModal({
   );
 }
 
-function TxRow({ tx }: { tx: PaymentTransaction }) {
+function TxRow({
+  tx,
+  onVerify,
+  verifying,
+  disabled,
+}: {
+  tx: PaymentTransaction;
+  onVerify: (txRef: string) => void;
+  verifying: boolean;
+  disabled: boolean;
+}) {
   const status = statusFor(tx.status);
   const relative = (() => {
     try {
@@ -494,7 +539,11 @@ function TxRow({ tx }: { tx: PaymentTransaction }) {
     }
   })();
 
-  return (
+  // Une transaction en attente avec une référence KH peut être re-vérifiée
+  // manuellement (tap) — utile si le callback n'a pas confirmé le paiement.
+  const canVerify = tx.status === 'pending' && typeof tx.reference === 'string' && tx.reference !== '';
+
+  const body = (
     <XStack
       padding={14}
       borderRadius={12}
@@ -505,7 +554,7 @@ function TxRow({ tx }: { tx: PaymentTransaction }) {
       gap={12}
     >
       <YStack width={36} height={36} borderRadius={18} backgroundColor={`${status.color}20`} alignItems="center" justifyContent="center">
-        {status.icon}
+        {verifying ? <Spinner color={status.color} /> : status.icon}
       </YStack>
       <YStack flex={1} gap={2}>
         <Paragraph fontSize={14} fontWeight="700" color="$slate900" numberOfLines={1}>
@@ -514,6 +563,11 @@ function TxRow({ tx }: { tx: PaymentTransaction }) {
         <Paragraph fontSize={12} color="$slate500">
           {relative} · {tx.provider ?? 'KeyHome'}
         </Paragraph>
+        {canVerify ? (
+          <Paragraph fontSize={11.5} fontWeight="700" color={brand.primary}>
+            {verifying ? 'Vérification…' : 'Toucher pour vérifier le statut'}
+          </Paragraph>
+        ) : null}
       </YStack>
       <YStack alignItems="flex-end" gap={2}>
         <Paragraph fontSize={14} fontWeight="800" color="$slate900">
@@ -524,6 +578,21 @@ function TxRow({ tx }: { tx: PaymentTransaction }) {
         </Paragraph>
       </YStack>
     </XStack>
+  );
+
+  if (!canVerify) {
+    return body;
+  }
+
+  return (
+    <Pressable
+      onPress={() => onVerify(tx.reference as string)}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel="Vérifier le statut du paiement"
+    >
+      {body}
+    </Pressable>
   );
 }
 
