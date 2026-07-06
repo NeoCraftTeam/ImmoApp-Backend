@@ -36,6 +36,8 @@ import type { PaymentTransaction } from '@/types/payment';
 
 type PaymentOutcome = 'completed' | 'failed' | 'pending';
 
+type PaymentResult = { outcome: PaymentOutcome; credits?: number; message?: string };
+
 type PaymentMethodChoice = 'mobile_money' | 'orange_money' | 'card';
 
 /** Moyens de paiement proposés (mobile money d'abord, puis carte). */
@@ -301,8 +303,7 @@ export default function CreditsScreen() {
       <PacksModal
         open={packsOpen}
         onClose={() => setPacksOpen(false)}
-        onDone={() => {
-          setPacksOpen(false);
+        onRefresh={() => {
           balance.refetch();
           payments.refetch();
         }}
@@ -314,11 +315,11 @@ export default function CreditsScreen() {
 function PacksModal({
   open,
   onClose,
-  onDone,
+  onRefresh,
 }: {
   open: boolean;
   onClose: () => void;
-  onDone: () => void;
+  onRefresh: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const packages = useCreditPackages(open);
@@ -327,11 +328,15 @@ function PacksModal({
   const [busyId, setBusyId] = useState<string | null>(null);
   // Pack en attente du choix du moyen de paiement.
   const [pendingPack, setPendingPack] = useState<CreditPackage | null>(null);
+  // Écran de confirmation après retour du checkout.
+  const [processing, setProcessing] = useState(false);
+  const [result, setResult] = useState<PaymentResult | null>(null);
 
   const buy = async (pkg: CreditPackage, method: PaymentMethodChoice) => {
     if (busyId) return;
     setPendingPack(null);
     setBusyId(pkg.id);
+    const credits = pkg.points_awarded ?? 0;
     try {
       const callbackUrl = Linking.createURL('credits/callback');
       const res = await purchase.mutateAsync({
@@ -347,54 +352,54 @@ function PacksModal({
       // Checkout hébergé ouvert IN-APP (ASWebAuthenticationSession). La
       // passerelle redirige en fin de paiement vers un pont HTTPS backend qui
       // renvoie un 302 vers `callbackUrl` (deep-link natif) → l'onglet se ferme
-      // TOUT SEUL et rend la main à l'app. `type: 'success'` = redirigé,
-      // `type: 'cancel'` = l'utilisateur a fermé l'onglet. Dans les deux cas on
-      // réconcilie activement l'état réel (verify-purchase) — le deep-link
-      // prouve le retour, pas le succès. Marche même sans webhook (local/sandbox).
-      // `preferEphemeralSession` : session isolée (pas de cookies partagés avec
-      // Safari) → iOS n'affiche PAS le prompt de consentement « … souhaite
-      // utiliser … pour se connecter ». Inutile pour un paiement.
-      const result = await WebBrowser.openAuthSessionAsync(url, callbackUrl, {
+      // TOUT SEUL et rend la main à l'app. `preferEphemeralSession` : session
+      // isolée → pas de prompt de consentement iOS.
+      const browserResult = await WebBrowser.openAuthSessionAsync(url, callbackUrl, {
         preferEphemeralSession: true,
       });
-      // Réconciliation COURTE (~12 s max) pour ne pas bloquer l'UI : la
-      // confirmation passerelle peut tarder (webhook/sandbox). Si toujours en
-      // attente au bout de ce délai, on ferme la modale — la transaction
-      // apparaît « En attente » dans l'historique et reste tapable pour
-      // re-vérifier plus tard. Sur annulation, un contrôle très bref suffit.
+
+      // Écran « Confirmation en cours » pendant la réconciliation. Le webhook
+      // signé (source de vérité) crédite côté serveur ; verify-purchase renvoie
+      // « completed » dès que le solde est à jour. Fenêtre courte pour ne pas
+      // faire attendre : ~12 s au retour du checkout, ~4,5 s sur annulation.
+      setProcessing(true);
       const outcome = await pollVerifyPurchase(
         res.tx_ref,
-        result.type === 'success' ? { attempts: 8, intervalMs: 1500 } : { attempts: 3, intervalMs: 1500 },
+        browserResult.type === 'success' ? { attempts: 8, intervalMs: 1500 } : { attempts: 3, intervalMs: 1500 },
       );
+      setProcessing(false);
 
       if (outcome === 'completed') {
-        // verify-purchase a déjà crédité côté serveur ; on rafraîchit le solde.
         await verify.mutateAsync({ tx_ref: res.tx_ref }).catch(() => {});
-        onDone();
-        Alert.alert('Paiement réussi', 'Vos crédits ont été ajoutés à votre solde.');
+        onRefresh();
+        setResult({ outcome: 'completed', credits });
       } else if (outcome === 'failed') {
-        onDone();
-        Alert.alert('Paiement échoué', 'La transaction a été refusée ou annulée. Aucun crédit n’a été débité.');
+        onRefresh();
+        setResult({ outcome: 'failed' });
       } else {
-        // Toujours en attente : on ferme et on rafraîchit l'historique pour que
-        // la ligne « En attente » (tapable) apparaisse immédiatement.
-        onDone();
-        Alert.alert(
-          'Paiement en cours',
-          'Nous confirmons votre paiement. Il apparaît dans l’historique — touchez-le pour vérifier son statut, vos crédits s’ajouteront dès validation.',
-        );
+        onRefresh();
+        setResult({ outcome: 'pending' });
       }
     } catch (err) {
-      Alert.alert('Erreur', extractApiErrorMessage(err));
+      setProcessing(false);
+      setResult({ outcome: 'failed', message: extractApiErrorMessage(err) });
     } finally {
       setBusyId(null);
     }
   };
 
+  // Réinitialise l'état interne à la fermeture pour repartir propre.
+  const close = () => {
+    setResult(null);
+    setProcessing(false);
+    setPendingPack(null);
+    onClose();
+  };
+
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={open} transparent animationType="slide" onRequestClose={close}>
       <YStack flex={1} justifyContent="flex-end" backgroundColor="rgba(0,0,0,0.45)">
-        <Pressable style={{ flex: 1 }} onPress={onClose} />
+        <Pressable style={{ flex: 1 }} onPress={processing ? undefined : close} />
         <YStack
           backgroundColor="$background"
           borderTopLeftRadius={24}
@@ -409,17 +414,37 @@ function PacksModal({
             <XStack alignItems="center" gap={8} flex={1}>
               <Sparkles size={20} color={brand.primary} />
               <H2 fontSize={18} fontWeight="800" color="$slate900">
-                Recharger
+                {result ? 'Paiement' : 'Recharger'}
               </H2>
             </XStack>
-            <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Fermer">
-              <YStack width={32} height={32} borderRadius={16} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-                <X size={16} color="$slate700" />
-              </YStack>
-            </Pressable>
+            {processing ? null : (
+              <Pressable onPress={close} hitSlop={8} accessibilityRole="button" accessibilityLabel="Fermer">
+                <YStack width={32} height={32} borderRadius={16} backgroundColor="$slate100" alignItems="center" justifyContent="center">
+                  <X size={16} color="$slate700" />
+                </YStack>
+              </Pressable>
+            )}
           </XStack>
 
-          {pendingPack ? (
+          {result ? (
+            <PaymentResultView
+              result={result}
+              onDone={close}
+              onRetry={() => setResult(null)}
+            />
+          ) : processing ? (
+            <YStack paddingVertical={40} alignItems="center" gap={16}>
+              <Spinner size="large" color={brand.primary} />
+              <YStack gap={4} alignItems="center">
+                <Paragraph fontSize={16} fontWeight="800" color="$slate900">
+                  Confirmation du paiement…
+                </Paragraph>
+                <Paragraph fontSize={13} color="$slate500" textAlign="center">
+                  Un instant, nous vérifions la transaction auprès de la passerelle.
+                </Paragraph>
+              </YStack>
+            </YStack>
+          ) : pendingPack ? (
             <YStack gap={12}>
               <XStack alignItems="center" gap={10}>
                 <Pressable onPress={() => setPendingPack(null)} hitSlop={8} accessibilityLabel="Retour aux packs">
@@ -532,6 +557,96 @@ function PacksModal({
         </YStack>
       </YStack>
     </Modal>
+  );
+}
+
+/** Écran de résultat de paiement — succès / en attente / échec. */
+function PaymentResultView({
+  result,
+  onDone,
+  onRetry,
+}: {
+  result: PaymentResult;
+  onDone: () => void;
+  onRetry: () => void;
+}) {
+  const config = {
+    completed: {
+      color: brand.success,
+      icon: <CheckCircle2 size={40} color={brand.success} />,
+      title: 'Paiement réussi',
+      message:
+        result.credits && result.credits > 0
+          ? `${result.credits.toLocaleString('fr-FR')} crédits ont été ajoutés à votre solde.`
+          : 'Vos crédits ont été ajoutés à votre solde.',
+    },
+    pending: {
+      color: brand.warning,
+      icon: <Clock size={40} color={brand.warning} />,
+      title: 'Paiement en cours',
+      message:
+        'Nous confirmons votre paiement auprès de la passerelle. Vos crédits s’ajouteront automatiquement dès validation — vous pouvez suivre le statut dans l’historique.',
+    },
+    failed: {
+      color: brand.danger,
+      icon: <XCircle size={40} color={brand.danger} />,
+      title: 'Paiement échoué',
+      message:
+        result.message ??
+        'La transaction a été refusée ou annulée. Aucun montant n’a été débité.',
+    },
+  }[result.outcome];
+
+  return (
+    <YStack paddingVertical={24} paddingHorizontal={4} alignItems="center" gap={16}>
+      <YStack
+        width={88}
+        height={88}
+        borderRadius={44}
+        backgroundColor={`${config.color}1A`}
+        alignItems="center"
+        justifyContent="center"
+      >
+        {config.icon}
+      </YStack>
+      <YStack gap={6} alignItems="center">
+        <H2 fontSize={20} fontWeight="800" color="$slate900" textAlign="center">
+          {config.title}
+        </H2>
+        <Paragraph fontSize={14} color="$slate500" textAlign="center" lineHeight={20}>
+          {config.message}
+        </Paragraph>
+      </YStack>
+
+      <YStack width="100%" gap={10} marginTop={4}>
+        {result.outcome === 'failed' ? (
+          <>
+            <Pressable onPress={onRetry} accessibilityRole="button">
+              <XStack backgroundColor="$brand" paddingVertical={14} borderRadius={14} alignItems="center" justifyContent="center">
+                <Paragraph color="$brandText" fontWeight="800" fontSize={15}>
+                  Réessayer
+                </Paragraph>
+              </XStack>
+            </Pressable>
+            <Pressable onPress={onDone} accessibilityRole="button">
+              <XStack paddingVertical={12} alignItems="center" justifyContent="center">
+                <Paragraph color="$slate500" fontWeight="700" fontSize={14}>
+                  Fermer
+                </Paragraph>
+              </XStack>
+            </Pressable>
+          </>
+        ) : (
+          <Pressable onPress={onDone} accessibilityRole="button">
+            <XStack backgroundColor="$brand" paddingVertical={14} borderRadius={14} alignItems="center" justifyContent="center">
+              <Paragraph color="$brandText" fontWeight="800" fontSize={15}>
+                {result.outcome === 'pending' ? 'Voir l’historique' : 'Terminé'}
+              </Paragraph>
+            </XStack>
+          </Pressable>
+        )}
+      </YStack>
+    </YStack>
   );
 }
 
