@@ -133,7 +133,7 @@ final readonly class GeniusPayPaymentService implements PaymentGatewayInterface
     /**
      * {@inheritDoc}
      */
-    public function handleWebhook(array $payload, array $headers): array
+    public function handleWebhook(array $payload, array $headers, ?string $rawBody = null): array
     {
         $signature = (string) (
             $headers['X-Webhook-Signature']
@@ -162,14 +162,37 @@ final readonly class GeniusPayPaymentService implements PaymentGatewayInterface
             throw new InvalidWebhookSignatureException('Webhook timestamp too old.');
         }
 
-        $encodedPayload = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-        if ($encodedPayload === false) {
-            throw new InvalidWebhookSignatureException('Invalid webhook payload.');
+        // Signature GeniusPay : HMAC-SHA256(timestamp + "." + json_payload).
+        // On vérifie EN PRIORITÉ contre le corps brut exact reçu (ce que
+        // GeniusPay a réellement signé). Re-sérialiser le payload parsé peut
+        // produire des octets différents (échappement des slashes dans les URLs
+        // success_url/error_url, unicode, ordre des clés) — c'est précisément ce
+        // qui faisait échouer 100 % des webhooks. En repli, on essaie le
+        // json_encode par défaut (slashes échappés, comme la doc GeniusPay) puis
+        // la variante non échappée, pour rester robuste aux petites variations.
+        $candidates = [];
+        if (is_string($rawBody) && $rawBody !== '') {
+            $candidates[] = $rawBody;
+        }
+        $default = json_encode($payload);
+        if ($default !== false) {
+            $candidates[] = $default;
+        }
+        $unescaped = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        if ($unescaped !== false) {
+            $candidates[] = $unescaped;
         }
 
-        $expectedSignature = hash_hmac('sha256', $timestamp.'.'.$encodedPayload, $this->webhookSecret);
+        $signatureMatches = false;
+        foreach ($candidates as $candidate) {
+            $expected = hash_hmac('sha256', $timestamp.'.'.$candidate, $this->webhookSecret);
+            if (hash_equals($expected, $signature)) {
+                $signatureMatches = true;
+                break;
+            }
+        }
 
-        if (!hash_equals($expectedSignature, $signature)) {
+        if (!$signatureMatches) {
             Log::warning('GeniusPay webhook: invalid signature', [
                 'ip' => request()->ip(),
             ]);

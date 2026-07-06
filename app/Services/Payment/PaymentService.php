@@ -398,10 +398,10 @@ final readonly class PaymentService
      * @param  array<string, mixed>  $headers
      * @return array<string, mixed> Normalised webhook data from the gateway's handleWebhook
      */
-    public function processWebhook(array $payload, array $headers, string $gatewayName): array
+    public function processWebhook(array $payload, array $headers, string $gatewayName, ?string $rawBody = null): array
     {
         $gateway = $this->resolveGateway($gatewayName);
-        $data = $gateway->handleWebhook($payload, $headers);
+        $data = $gateway->handleWebhook($payload, $headers, $rawBody);
 
         $txRef = $data['tx_ref'];
 

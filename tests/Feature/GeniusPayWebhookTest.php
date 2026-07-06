@@ -82,6 +82,53 @@ it('valid GeniusPay webhook marks payment SUCCESS', function (): void {
     Event::assertDispatched(PaymentSucceeded::class);
 });
 
+it('accepts a webhook signed over the raw body with escaped URLs (regression: 100% webhook failures)', function (): void {
+    Event::fake();
+    Mail::fake();
+    $secret = 'whsec_sandbox_test_secret_123';
+    geniusPayWebhookConfig($secret);
+
+    $user = User::factory()->create();
+    $payment = Payment::factory()->create([
+        'transaction_id' => 'KH-RAWBODYOK01',
+        'status' => PaymentStatus::PENDING,
+        'type' => 'boost',
+        'user_id' => $user->id,
+        'gateway' => 'geniuspay',
+        'amount' => 5000,
+    ]);
+
+    $timestamp = time();
+    // Payload réaliste : contient des URLs (success_url/error_url). json_encode
+    // par défaut ÉCHAPPE les slashes (https:\/\/…) — c'est le corps que GeniusPay
+    // envoie ET signe. L'ancien code re-encodait en JSON_UNESCAPED_SLASHES et
+    // calculait donc une signature différente → 100 % des webhooks rejetés.
+    $payload = [
+        'event' => 'payment.success',
+        'data' => [
+            'reference' => 'SANDBOX_ZI4XRANBTKYW7JUV',
+            'status' => 'completed',
+            'amount' => 5000,
+            'currency' => 'XOF',
+            'success_url' => 'https://keyhome.test/payment/native-return?callback=keyhome://credits/callback',
+            'error_url' => 'https://keyhome.test/payment/native-return?callback=keyhome://credits/callback',
+            'metadata' => ['tx_ref' => 'KH-RAWBODYOK01'],
+        ],
+    ];
+    // Corps EXACT envoyé (flags par défaut → slashes échappés), signé tel quel.
+    $body = json_encode($payload, JSON_THROW_ON_ERROR);
+    $signature = hash_hmac('sha256', $timestamp.'.'.$body, $secret);
+
+    $this->call('POST', '/api/v1/webhooks/geniuspay', [], [], [], geniusPayWebhookHeaders($secret, $timestamp, $signature), $body)
+        ->assertSuccessful();
+
+    $this->assertDatabaseHas('payments', [
+        'id' => $payment->id,
+        'status' => PaymentStatus::SUCCESS->value,
+    ]);
+    Event::assertDispatched(PaymentSucceeded::class);
+});
+
 it('GeniusPay webhook with invalid signature returns 401', function (): void {
     Event::fake();
     geniusPayWebhookConfig('whsec_sandbox_test_secret_123');

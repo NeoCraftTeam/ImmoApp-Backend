@@ -674,7 +674,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
      * @param  array<string, mixed>  $headers
      * @return array{event: string, event_id: string|null, tx_ref: string, status: string, amount: float, currency: string, payment_method: string|null, raw: array<string, mixed>}
      */
-    public function handleWebhook(array $payload, array $headers): array
+    public function handleWebhook(array $payload, array $headers, ?string $rawBody = null): array
     {
         $signature = (string) ($headers['stripe-signature'] ?? $headers['Stripe-Signature'] ?? '');
         $secret = (string) config('services.stripe.webhook_secret');

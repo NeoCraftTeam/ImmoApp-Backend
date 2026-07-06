@@ -45,11 +45,16 @@ interface PaymentGatewayInterface
      * payload+timestamp tuple. Returning `null` opts out of dedup —
      * the orchestrator's row-lock + terminal-state guards still apply.
      *
+     * `$rawBody` is the exact bytes of the incoming request body. HMAC
+     * signatures MUST be verified against these bytes — re-encoding the
+     * parsed `$payload` can produce a different string (slash/unicode
+     * escaping, key order, number formatting) and break verification.
+     *
      * @param  array<string, mixed>  $payload
      * @param  array<string, mixed>  $headers
      * @return array{event: string, event_id: string|null, tx_ref: string, status: string, amount: float, currency: string, payment_method: string|null, raw: array<string, mixed>}
      */
-    public function handleWebhook(array $payload, array $headers): array;
+    public function handleWebhook(array $payload, array $headers, ?string $rawBody = null): array;
 
     /**
      * Return the unique gateway identifier (e.g. 'geniuspay', 'stripe').

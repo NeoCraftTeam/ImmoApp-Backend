@@ -491,7 +491,7 @@ final class PaymentController
         ];
 
         try {
-            $data = $this->paymentService->processWebhook($decoded, $headers, 'geniuspay');
+            $data = $this->paymentService->processWebhook($decoded, $headers, 'geniuspay', $rawPayload);
             $txRef = (string) ($data['tx_ref'] ?? '');
         } catch (InvalidWebhookSignatureException) {
             return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);

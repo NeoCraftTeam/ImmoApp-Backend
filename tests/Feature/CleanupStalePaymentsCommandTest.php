@@ -38,7 +38,7 @@ function fakeGateway(string $status): PaymentGatewayInterface
             ];
         }
 
-        public function handleWebhook(array $payload, array $headers): array
+        public function handleWebhook(array $payload, array $headers, ?string $rawBody = null): array
         {
             return ['event' => '', 'event_id' => null, 'tx_ref' => '', 'status' => 'pending', 'amount' => 0.0, 'currency' => 'XAF', 'payment_method' => null, 'raw' => []];
         }
