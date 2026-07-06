@@ -41,6 +41,11 @@ class InitiatePaymentRequest extends FormRequest
             ],
             'period' => ['required_if:type,subscription', 'nullable', 'string', 'in:monthly,yearly'],
             'promo_code' => ['nullable', 'string', 'max:50'],
+            // URL de retour après paiement. Deep-link natif mobile
+            // (keyhome://…, exp://…) ou URL web whitelistée — validée et,
+            // pour les deep-links, enveloppée dans le pont HTTPS par
+            // PaymentService. Sans elle, on retombe sur la page web de retour.
+            'callback_url' => ['nullable', 'string', 'max:2048'],
             // Stripe-only options. Silently ignored when `payment_method`
             // is anything other than `card`. The `withValidator()` hook
             // surfaces a French error message in that case.

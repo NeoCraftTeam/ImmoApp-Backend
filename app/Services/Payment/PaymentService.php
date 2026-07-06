@@ -16,6 +16,7 @@ use App\Models\Payment;
 use App\Models\PointPackage;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
+use App\Support\FrontendRedirectGuard;
 use App\Support\PaymentTransactionLookup;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -99,13 +100,17 @@ final readonly class PaymentService
         $redirectUrl = $data['redirect_url'] ?? null;
         $redirectUrl = is_string($redirectUrl) && $redirectUrl !== '' ? $redirectUrl : null;
 
-        // Les passerelles hosted-checkout (GeniusPay…) exigent une URL http(s)
-        // pour success_url/error_url. Un deep-link mobile (ex. keyhome://…) est
-        // rejeté par la passerelle : on l'ignore ici et on retombe sur l'URL web
-        // de retour. Le mobile suit le résultat via GET
-        // /payments/{txRef}/public-status (sans session) puis rafraîchit le solde.
+        // Les passerelles hosted-checkout (GeniusPay/Stripe…) exigent une URL
+        // http(s) pour success_url/error_url. Un deep-link mobile
+        // (keyhome://, keyhomeowners://, exp://…) est rejeté par la passerelle :
+        // on l'enveloppe dans un pont HTTPS (payment.native-return) qui renverra
+        // un 302 vers le deep-link une fois le paiement terminé — l'onglet in-app
+        // se ferme alors nativement et l'app reprend la main. Un schéma inconnu
+        // (ni http(s), ni whitelisté) est ignoré → repli sur l'URL web de retour.
         if ($redirectUrl !== null && preg_match('#^https?://#i', $redirectUrl) !== 1) {
-            $redirectUrl = null;
+            $redirectUrl = FrontendRedirectGuard::isAllowedAppScheme($redirectUrl)
+                ? route('payment.native-return', ['callback' => $redirectUrl])
+                : null;
         }
 
         if ($redirectUrl === null) {

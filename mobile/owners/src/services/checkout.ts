@@ -40,6 +40,20 @@ export function buildReturnUrl(txRef: string): string {
 }
 
 /**
+ * Deep-link de retour SANS tx_ref, à envoyer au backend comme `callback_url`.
+ *
+ * Le backend valide ce schéma puis l'enveloppe dans un pont HTTPS
+ * (`payment.native-return`) qu'il passe à la passerelle comme success_url —
+ * et y appose lui-même le `tx_ref`. En fin de paiement, la passerelle atteint
+ * le pont, qui renvoie un 302 vers ce deep-link : l'onglet in-app se ferme
+ * nativement et l'app reprend la main. Sans ce callback, la passerelle
+ * redirige vers la page web de retour et l'onglet ne se ferme jamais.
+ */
+export function buildCallbackUrl(): string {
+  return Linking.createURL(RETURN_PATH, { scheme: SCHEME });
+}
+
+/**
  * Ouvre le hosted-checkout dans un WebBrowser auth-session. Bloque
  * jusqu'à fermeture (succès/cancel). En cas d'environnement où
  * `openAuthSessionAsync` n'est pas dispo (rare), fallback sur

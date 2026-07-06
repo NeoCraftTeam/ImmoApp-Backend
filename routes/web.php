@@ -11,6 +11,7 @@ use App\Http\Controllers\EmailPreferenceController;
 use App\Http\Controllers\MediaProxyController;
 use App\Http\Controllers\NewsletterWebController;
 use App\Http\Controllers\PanelSsoController;
+use App\Http\Controllers\Payment\PaymentNativeReturnController;
 use App\Http\Controllers\PwaManifestController;
 use App\Http\Controllers\TourImageProxyController;
 use App\Http\Middleware\DynamicWebAuthnRelyingParty;
@@ -125,6 +126,14 @@ Route::prefix('email')->group(function (): void {
         ->middleware('throttle:10,1')
         ->name('email.preferences.update');
 });
+
+// ── Pont de retour natif après paiement mobile (302 → deep-link de l'app) ──
+// Les passerelles hosted-checkout exigent une success_url http(s) ; cette
+// route la reçoit puis redirige vers `keyhome://…` pour fermer l'onglet in-app
+// et rendre la main à l'application. Cf. PaymentNativeReturnController.
+Route::get('/payment/native-return', PaymentNativeReturnController::class)
+    ->middleware('throttle:60,1')
+    ->name('payment.native-return');
 
 // ── Newsletter Unsubscribe (public web — returns HTML confirmation page) ──
 Route::get('/newsletter/unsubscribe/{token}', NewsletterWebController::class)

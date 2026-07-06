@@ -20,6 +20,7 @@ use App\Models\PromoCode;
 use App\Models\PromoCodeUsage;
 use App\Models\User;
 use App\Services\Payment\PaymentService;
+use App\Support\FrontendRedirectGuard;
 use App\Support\PaymentPresentation;
 use App\Support\PaymentTransactionLookup;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -109,9 +110,22 @@ final class PaymentController
         // Calculé hors transaction : $request n'est pas capturé dans la closure.
         $stripeHosted = !$request->hasSession();
 
+        // URL de retour (deep-link natif ou web whitelisté). Validée ici puis
+        // transmise à PaymentService qui, pour un deep-link, l'enveloppe dans
+        // le pont HTTPS de retour natif.
+        $redirectUrl = null;
+        if (!empty($validated['callback_url'])) {
+            if (!FrontendRedirectGuard::isAllowedAbsoluteUrl((string) $validated['callback_url'])) {
+                return response()->json([
+                    'message' => 'URL de retour non autorisée.',
+                ], 422);
+            }
+            $redirectUrl = (string) $validated['callback_url'];
+        }
+
         // Wrap promo code validation + payment creation in a single transaction
         // to prevent race conditions on single-use promo codes.
-        return DB::transaction(function () use ($validated, $user, $type, $amount, $stripeHosted): JsonResponse {
+        return DB::transaction(function () use ($validated, $user, $type, $amount, $stripeHosted, $redirectUrl): JsonResponse {
             $appliedPromoCode = null;
             $finalAmount = $amount;
 
@@ -142,6 +156,7 @@ final class PaymentController
                 'plan_id' => $validated['plan_id'] ?? null,
                 'period' => $validated['period'] ?? null,
                 'description' => $description,
+                'redirect_url' => $redirectUrl,
                 'save_payment_method' => (bool) ($validated['save_payment_method'] ?? false),
                 'payment_method_id' => isset($validated['payment_method_id']) && is_string($validated['payment_method_id']) && $validated['payment_method_id'] !== ''
                     ? $validated['payment_method_id']

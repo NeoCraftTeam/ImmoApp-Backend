@@ -308,14 +308,18 @@ function PacksModal({
         throw new Error('Lien de paiement indisponible.');
       }
 
-      // Checkout hébergé ouvert IN-APP. On confirme EN PARALLÈLE en
-      // réconciliant activement avec la passerelle (verify-purchase) :
-      // dès que c'est confirmé/échoué, on FERME le navigateur et on affiche
-      // l'état. Marche même sans webhook (local/sandbox).
-      const browserPromise = WebBrowser.openAuthSessionAsync(url, callbackUrl);
-      const outcome = await pollVerifyPurchase(res.tx_ref);
-      await WebBrowser.dismissBrowser().catch(() => {});
-      await browserPromise.catch(() => {});
+      // Checkout hébergé ouvert IN-APP (ASWebAuthenticationSession). La
+      // passerelle redirige en fin de paiement vers un pont HTTPS backend qui
+      // renvoie un 302 vers `callbackUrl` (deep-link natif) → l'onglet se ferme
+      // TOUT SEUL et rend la main à l'app. `type: 'success'` = redirigé,
+      // `type: 'cancel'` = l'utilisateur a fermé l'onglet. Dans les deux cas on
+      // réconcilie activement l'état réel (verify-purchase) — le deep-link
+      // prouve le retour, pas le succès. Marche même sans webhook (local/sandbox).
+      const result = await WebBrowser.openAuthSessionAsync(url, callbackUrl);
+      const outcome = await pollVerifyPurchase(
+        res.tx_ref,
+        result.type === 'success' ? undefined : { attempts: 6 },
+      );
 
       if (outcome === 'completed') {
         // verify-purchase a déjà crédité côté serveur ; on rafraîchit le solde.

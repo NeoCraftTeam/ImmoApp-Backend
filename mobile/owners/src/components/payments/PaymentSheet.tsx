@@ -11,7 +11,7 @@ import {
   useInitiatePayment,
   usePaymentMethods,
 } from '@/hooks/usePayments';
-import { openHostedCheckout } from '@/services/checkout';
+import { buildCallbackUrl, openHostedCheckout } from '@/services/checkout';
 import { trackEvent } from '@/services/monitoring';
 import { brand } from '@/theme/tokens';
 import { formatFcfa } from '@/utils/format';
@@ -106,6 +106,9 @@ export function PaymentSheet({
         type: purpose,
         payment_method: selectedMethod.code,
         phone_number: requiresPhone ? phone.trim() : undefined,
+        // Deep-link natif → le backend l'enveloppe dans le pont HTTPS pour que
+        // l'onglet in-app se ferme tout seul en fin de paiement.
+        callback_url: buildCallbackUrl(),
         ...extraPayload,
       };
       const init = await initiate.mutateAsync(payload);

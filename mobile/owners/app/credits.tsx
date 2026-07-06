@@ -15,7 +15,7 @@ import {
   usePurchaseCredits,
   useVerifyCreditPurchase,
 } from '@/hooks/useCredits';
-import { openHostedCheckout } from '@/services/checkout';
+import { buildCallbackUrl, openHostedCheckout } from '@/services/checkout';
 import { brand } from '@/theme/tokens';
 import { formatFcfa } from '@/utils/format';
 import type { CreditPackage } from '@/types/credits';
@@ -65,6 +65,9 @@ export default function CreditsScreen() {
     try {
       const init = await purchase.mutateAsync({
         packageId: pkg.id,
+        // Deep-link natif → le backend l'enveloppe dans le pont HTTPS pour que
+        // l'onglet in-app se ferme tout seul en fin de paiement.
+        callback_url: buildCallbackUrl(),
       });
       const link = init.payment_link ?? init.payment_url;
       if (!link) {

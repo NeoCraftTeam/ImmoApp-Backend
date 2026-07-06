@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Http\Controllers\Payment\PaymentNativeReturnController;
+
 /**
  * Validates absolute URLs used as post-payment redirects (hosted-checkout callback_url).
  *
@@ -55,6 +57,28 @@ final class FrontendRedirectGuard
 
         /** @var list<string> */
         return array_values(array_unique($allowed));
+    }
+
+    /**
+     * True when the URI is a whitelisted mobile deep-link (custom app scheme).
+     *
+     * Hosted-checkout gateways require an http(s) success URL, so a deep-link
+     * cannot be handed to them directly — it must first be wrapped in the
+     * HTTPS return-bridge ({@see PaymentNativeReturnController})
+     * which 302-redirects to it once the gateway comes back.
+     */
+    public static function isAllowedAppScheme(string $uri): bool
+    {
+        if ($uri === '' || strlen($uri) > 2048) {
+            return false;
+        }
+
+        $scheme = parse_url($uri, PHP_URL_SCHEME);
+        if (!is_string($scheme) || $scheme === '') {
+            return false;
+        }
+
+        return in_array(mb_strtolower($scheme), self::allowedAppSchemes(), true);
     }
 
     public static function isAllowedAbsoluteUrl(string $uri): bool
