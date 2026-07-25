@@ -141,6 +141,26 @@ it('allows stateless (mobile) registration when turnstile is configured', functi
     ]);
 });
 
+it('allows mobile client registration without turnstile when turnstile is configured', function (): void {
+    // Requête native mobile identifiée par `X-KeyHome-Client`. Même si un
+    // domaine stateful attachait une session, le guard `isMobileAppRequest`
+    // doit exempter le mobile de Turnstile (aucun widget navigateur possible).
+    config()->set('services.turnstile.secret_key', 'real-test-secret-not-dummy-placeholder');
+
+    $data = validRegistrationData();
+
+    $response = $this->postJson('/api/v1/auth/registerCustomer', $data, [
+        'X-KeyHome-Client' => 'keyhome-mobile-visitors',
+    ]);
+
+    $response->assertCreated();
+
+    $this->assertDatabaseHas('users', [
+        'email' => $data['email'],
+        'role' => 'customer',
+    ]);
+});
+
 it('returns 429 when rate limited', function (): void {
     // Exhaust rate limiter
     for ($i = 0; $i < 11; $i++) {

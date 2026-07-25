@@ -19,6 +19,7 @@ import { PhoneInput } from '@/components/PhoneInput';
 import { useMe } from '@/hooks/useMe';
 import { useUpdateProfile, useUploadAvatar } from '@/hooks/useUpdateProfile';
 import { useSession } from '@/auth/SessionProvider';
+import { resolveMediaUrl } from '@/lib/media-url';
 import { brand } from '@/theme/tokens';
 
 /**
@@ -181,8 +182,8 @@ export default function ProfileEdit() {
                 overflow="hidden"
                 position="relative"
               >
-                {me.data.avatar ? (
-                  <Image source={{ uri: me.data.avatar }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+                {resolveMediaUrl(me.data.avatar) ? (
+                  <Image source={{ uri: resolveMediaUrl(me.data.avatar)! }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
                 ) : (
                   <Paragraph fontSize={40} fontWeight="800" color={brand.primary}>{initial}</Paragraph>
                 )}

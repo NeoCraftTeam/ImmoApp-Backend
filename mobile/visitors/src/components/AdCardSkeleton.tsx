@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, Easing } from 'react-native';
 import { YStack } from 'tamagui';
 
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useThemeColors } from '@/theme/useThemeColors';
 
 /**
@@ -15,9 +16,15 @@ import { useThemeColors } from '@/theme/useThemeColors';
  */
 export function AdCardSkeleton() {
   const colors = useThemeColors();
+  const reducedMotion = useReducedMotion();
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (reducedMotion) {
+      pulse.setValue(0.5);
+      return;
+    }
+
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
@@ -36,7 +43,7 @@ export function AdCardSkeleton() {
     );
     loop.start();
     return () => loop.stop();
-  }, [pulse]);
+  }, [pulse, reducedMotion]);
 
   const opacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] });
 

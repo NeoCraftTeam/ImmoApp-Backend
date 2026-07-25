@@ -5,7 +5,9 @@ import { useColorScheme } from 'react-native';
 import { useEffect, useState } from 'react';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import * as WebBrowser from 'expo-web-browser';
 
+import { OptionalClerkProvider } from '@/auth/OptionalClerkProvider';
 import { SessionProvider, useSession } from '@/auth/SessionProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { OfflineBanner } from '@/components/OfflineBanner';
@@ -18,6 +20,9 @@ import config from '../tamagui.config';
 import '@/i18n'; // side-effect: initialise locale before any screen renders
 
 initMonitoring();
+
+// Required for Clerk / OAuth browser sessions on Android.
+WebBrowser.maybeCompleteAuthSession();
 
 /**
  * Root layout — provider stack for the whole owner app:
@@ -50,13 +55,15 @@ export default function RootLayout() {
             <PortalProvider shouldAddRootHost>
               <Theme name={scheme === 'dark' ? 'dark' : 'light'}>
                 <QueryProvider>
-                  <SessionProvider>
-                    <AuthGate />
-                    <OfflineBanner />
-                    <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-                    <Slot />
-                    <SplashGate />
-                  </SessionProvider>
+                  <OptionalClerkProvider>
+                    <SessionProvider>
+                      <AuthGate />
+                      <OfflineBanner />
+                      <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
+                      <Slot />
+                      <SplashGate />
+                    </SessionProvider>
+                  </OptionalClerkProvider>
                 </QueryProvider>
               </Theme>
             </PortalProvider>

@@ -6,6 +6,7 @@ import { Button, H2, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ONBOARDING_DONE_KEY } from '@/auth/storage-keys';
+import { useMotionPresets } from '@/hooks/useMotionPresets';
 import { i18n, t } from '@/i18n';
 
 /**
@@ -23,6 +24,7 @@ export default function Onboarding() {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const slides = (i18n.t('onboarding.slides') as unknown as Array<{ title: string; body: string }>) ?? [];
+  const { tamaguiQuick, scrollAnimated } = useMotionPresets();
   const [activeIndex, setActiveIndex] = useState(0);
   const listRef = useRef<FlatList>(null);
 
@@ -42,12 +44,12 @@ export default function Onboarding() {
 
   const handleNext = useCallback(async () => {
     if (activeIndex < slides.length - 1) {
-      listRef.current?.scrollToIndex({ index: activeIndex + 1, animated: true });
+      listRef.current?.scrollToIndex({ index: activeIndex + 1, animated: scrollAnimated });
       return;
     }
     await persistDone();
     router.replace('/(tabs)/home');
-  }, [activeIndex, slides.length, persistDone, router]);
+  }, [activeIndex, slides.length, persistDone, router, scrollAnimated]);
 
   const handleSkip = useCallback(async () => {
     await persistDone();
@@ -100,7 +102,7 @@ export default function Onboarding() {
             height={8}
             borderRadius={4}
             backgroundColor={idx === activeIndex ? '$brand' : '$slate300'}
-            animation="quick"
+            animation={tamaguiQuick}
           />
         ))}
       </XStack>

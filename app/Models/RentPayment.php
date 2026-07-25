@@ -17,7 +17,7 @@ use Illuminate\Support\Carbon;
  * One row per actual rent received by the landlord (cash, mobile money,
  * bank transfer, other). Distinct from {@see Payment} which handles
  * platform fees (credits / subscriptions / unlocks / boosts) flowing
- * through Stripe or GeniusPay. Rent in CEMAC is mostly out-of-band, so
+ * through Stripe or Kpay. Rent in CEMAC is mostly out-of-band, so
  * the landlord maintains this ledger manually — partial payments for the
  * same month are captured as multiple rows.
  *

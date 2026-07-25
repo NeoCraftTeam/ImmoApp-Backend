@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
+import { queryKeys } from '@/lib/query-keys';
 import type { Refund, RefundListResponse } from '@/types/refund';
 
 export function useRefunds() {
@@ -30,7 +31,7 @@ export function useRequestRefund() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['refunds'] });
-      qc.invalidateQueries({ queryKey: ['payments-history'] });
+      qc.invalidateQueries({ queryKey: queryKeys.paymentsHistory() });
     },
   });
 }

@@ -5,6 +5,7 @@ import { Animated, Easing } from 'react-native';
 import { Paragraph, XStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { brand } from '@/theme/tokens';
 
 /**
@@ -15,14 +16,29 @@ import { brand } from '@/theme/tokens';
  */
 export function OfflineBanner() {
   const insets = useSafeAreaInsets();
+  const reducedMotion = useReducedMotion();
   const [offline, setOffline] = useState(false);
   const translateY = useRef(new Animated.Value(-100)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state: NetInfoState) => {
       const isOffline =
         !state.isConnected || state.isInternetReachable === false;
       setOffline(isOffline);
+
+      // Reduced motion : cross-fade sur place, pas de slide.
+      if (reducedMotion) {
+        translateY.setValue(0);
+        Animated.timing(opacity, {
+          toValue: isOffline ? 1 : 0,
+          duration: 180,
+          useNativeDriver: true,
+        }).start();
+        return;
+      }
+
+      opacity.setValue(1);
       Animated.timing(translateY, {
         toValue: isOffline ? 0 : -100,
         duration: 240,
@@ -31,7 +47,7 @@ export function OfflineBanner() {
       }).start();
     });
     return () => unsubscribe();
-  }, [translateY]);
+  }, [translateY, opacity, reducedMotion]);
 
   return (
     <Animated.View
@@ -43,6 +59,7 @@ export function OfflineBanner() {
         right: 0,
         zIndex: 9999,
         transform: [{ translateY }],
+        opacity,
         paddingTop: insets.top,
         backgroundColor: brand.slate900,
       }}

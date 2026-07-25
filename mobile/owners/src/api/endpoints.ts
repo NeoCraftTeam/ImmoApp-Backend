@@ -23,8 +23,13 @@ export const ENDPOINTS = {
     resendVerification: '/auth/resend-verification',
     updateUnverifiedEmail: '/auth/update-unverified-email',
     checkEmail: '/auth/check-email',
+    clerkExchange: '/auth/clerk/exchange',
+    clerkVerifyOtp: '/auth/clerk/verify-otp',
     oauthRedirect: (provider: string) => `/auth/oauth/${provider}/redirect`,
     oauthExchange: '/auth/oauth/exchange-token',
+  },
+  config: {
+    auth: '/config/auth',
   },
   users: {
     update: (id: string) => `/users/${encodeURIComponent(id)}`,

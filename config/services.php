@@ -211,7 +211,7 @@ return [
     |--------------------------------------------------------------------------
     | Stripe handles every PaymentMethod whose `gateway()` returns
     | PaymentGateway::Stripe — currently `card` only. Mobile money methods
-    | continue to flow through GeniusPay.
+    | continue to flow through Kpay.
     |
     | Stripe does NOT support XAF/XOF as a settlement currency, so KeyHome
     | bills Stripe in EUR using the official CFA peg : 1 EUR = 655.957 XAF.

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { apiClient, extractApiErrorMessage } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
+import { ClerkOtpVerifyScreen } from '@/components/ClerkOtpVerifyScreen';
 import { KeyHomeLogo } from '@/components/KeyHomeLogo';
 import { useResendVerification, useVerifyEmailOtp } from '@/hooks/useAuthExtras';
 import { useSession } from '@/auth/SessionProvider';
@@ -22,11 +23,20 @@ const RESEND_COOLDOWN_SECONDS = 60;
  * envoie l'utilisateur vers le home.
  */
 export default function VerifyOtpScreen() {
+  const params = useLocalSearchParams<{ email?: string; mode?: string }>();
+
+  if (params.mode === 'clerk') {
+    return <ClerkOtpVerifyScreen emailHint={params.email ?? ''} />;
+  }
+
+  return <EmailVerifyOtpScreen initialEmail={params.email ?? ''} />;
+}
+
+function EmailVerifyOtpScreen({ initialEmail }: { initialEmail: string }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ email?: string }>();
   const { setToken, isAuthenticated } = useSession();
-  const [email, setEmail] = useState(params.email ?? '');
+  const [email, setEmail] = useState(initialEmail);
   const [editingEmail, setEditingEmail] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [savingEmail, setSavingEmail] = useState(false);

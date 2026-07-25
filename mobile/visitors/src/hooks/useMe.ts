@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
+import { queryKeys } from '@/lib/query-keys';
 import type { AuthUser } from '@/types/user';
 
 /**
@@ -16,7 +17,7 @@ export interface MeResponse {
 
 export function useMe(enabled = true) {
   return useQuery<MeResponse, Error, AuthUser>({
-    queryKey: ['me'],
+    queryKey: queryKeys.me(),
     queryFn: async () => {
       const { data } = await apiClient.get<MeResponse>(ENDPOINTS.auth.me);
       return data;

@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView } from 'react-native';
 import {
   Button,
-  H2,
   H4,
   Input,
   Paragraph,

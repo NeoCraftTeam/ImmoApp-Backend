@@ -123,8 +123,8 @@ export default function CreditsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { isAuthenticated } = useSession();
-  const balance = useCreditsBalance();
-  const payments = usePayments();
+  const balance = useCreditsBalance(isAuthenticated);
+  const payments = usePayments(isAuthenticated);
   const verify = useVerifyCreditPurchase();
   const [packsOpen, setPacksOpen] = useState(false);
   const [period, setPeriod] = useState<Period>('all');

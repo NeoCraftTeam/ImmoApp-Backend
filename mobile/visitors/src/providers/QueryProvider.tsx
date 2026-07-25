@@ -7,6 +7,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { AppState, Platform } from 'react-native';
 
 import { apiClient } from '@/api/client';
+import { NON_PERSISTED_QUERY_ROOTS } from '@/lib/query-keys';
 
 /**
  * Single QueryClient + offline persistence layer.
@@ -24,7 +25,7 @@ import { apiClient } from '@/api/client';
  *  Cache versionné via `CACHE_BUSTER` — bump pour invalider toute
  *  persistance après un changement breaking côté API.
  */
-const CACHE_BUSTER = 'kh-v1';
+const CACHE_BUSTER = 'kh-v2-wallet-fresh';
 
 // Online / offline detection branchée sur NetInfo (single subscription).
 onlineManager.setEventListener((setOnline) => {
@@ -99,10 +100,9 @@ export function QueryProvider({ children }: { children: ReactNode }) {
           shouldDehydrateQuery: (query) => {
             const key = query.queryKey[0];
             if (typeof key !== 'string') return false;
-            // Auth + live data — re-fetch fresh à chaque cold start
-            if (key === 'me') return false;
-            if (key === 'conversation-messages') return false;
-            if (key === 'notifications-unread-count') return false;
+            // Auth + portefeuille — jamais persistés (solde / historique doivent
+            // refléter l'API courante, pas un snapshot preprod obsolète).
+            if (NON_PERSISTED_QUERY_ROOTS.has(key)) return false;
             return query.state.status === 'success';
           },
           // Persiste les mutations en pause (actions faites hors-ligne)

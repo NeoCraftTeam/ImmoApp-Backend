@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
+import { queryKeys } from '@/lib/query-keys';
 
 export interface PublicPaymentStatus {
   status: 'pending' | 'success' | 'failed' | string;
@@ -14,7 +15,7 @@ export interface PublicPaymentStatus {
 
 export function usePublicPaymentStatus(txRef: string | undefined) {
   return useQuery<{ data: PublicPaymentStatus } | PublicPaymentStatus, Error, PublicPaymentStatus>({
-    queryKey: ['payment-status', txRef],
+    queryKey: txRef ? queryKeys.paymentStatus(txRef) : ['payment-status', 'disabled'],
     queryFn: async () => {
       if (!txRef) throw new Error('Missing tx_ref');
       const { data } = await apiClient.get(ENDPOINTS.payments.publicStatus(txRef));

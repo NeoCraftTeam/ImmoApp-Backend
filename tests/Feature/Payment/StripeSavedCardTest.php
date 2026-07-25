@@ -175,9 +175,9 @@ function bindStripeService(PaymentGatewayInterface $stub): PaymentGatewayInterfa
 }
 
 beforeEach(function (): void {
-    config()->set('payment.default', 'geniuspay');
-    config()->set('payment.gateways.geniuspay.api_secret', 'sk_sandbox_test_fake');
-    config()->set('payment.gateways.geniuspay.webhook_secret', 'test_webhook_secret_123');
+    config()->set('payment.default', 'kpay');
+    config()->set('payment.gateways.kpay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.webhook_secret', 'test_webhook_secret_123');
     config()->set('services.stripe.secret', 'sk_test_fake_FOR_TESTS_ONLY');
 });
 

@@ -1,0 +1,43 @@
+---
+inclusion: always
+---
+
+# Design & UX skills — repository scope
+
+When the user invokes **polish**, **audit**, **normalize**, **harden**, **frontend-design**, **overdrive**, **clarify**, **typeset**, **arrange**, **adapt**, or similar UI/UX skills, **do not limit work to `resources/views/surveys/` or a single Blade folder**.
+
+## Surfaces to consider (this monorepo)
+
+1. **Customer-facing (public / client)**  
+   - Blade: `resources/views/` (welcome, PWA, surveys, receipts, email verification pages, auth, PDFs where HTML).  
+   - API: JSON shape, error messages, pagination meta consumed by mobile/web clients (`app/Http/Controllers/Api/`, Form Requests, Resources).
+
+2. **Owner (bailleur)**  
+   - Filament panel `app/Filament/Bailleur/`, theme `resources/css/filament/bailleur/`, views `resources/views/filament/bailleur/`.  
+   - Native bridge / WebView: `resources/views/filament/native-init.blade.php`, `mobile/bailleur/` (React Native shell).
+
+3. **Agency**  
+   - `app/Filament/Agency/`, `resources/views/filament/agency/`.
+
+4. **Admin**  
+   - `app/Filament/Admin/`, `resources/css/filament/admin/`, `resources/views/filament/admin/`.
+
+5. **Shared Filament**  
+   - `app/Filament/Resources/`, `app/Filament/Forms/`, `app/Filament/Pages/`, custom widgets, infolists.
+
+6. **Transactional email**  
+   - `resources/views/emails/`, `resources/views/vendor/mail/`, notifications.
+
+7. **Backend-only (no UI)**  
+   - Skills focused on UI/UX **do not require** changing pure domain/services **unless** the task is copy in exceptions, API error payloads, or developer-facing messages.
+
+## How to execute
+
+- **Prefer systemic fixes** (themes, shared layouts, mail CSS, API base error format) over editing hundreds of files once.  
+- For **audit/polish**, either scan **by surface** (customer → owner → agency → admin → emails → mobile) or **by theme** (a11y, tokens, motion, copy).  
+- **One chat cannot** exhaustively polish every file; state the **scope** covered and what remains for a follow-up pass.
+
+## Alignment
+
+- Follow existing **Laravel Boost** and **frontend-design** anti-patterns (no gratuitous AI-default aesthetics; respect `prefers-reduced-motion` and WCAG where applicable).  
+- **Filament**: prefer panel theme hooks and Filament APIs over one-off inline styles unless already the project pattern.

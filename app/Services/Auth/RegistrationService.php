@@ -9,6 +9,7 @@ use App\Exceptions\RegistrationEmailTakenException;
 use App\Models\User;
 use App\Services\TurnstileService;
 use App\Services\UtmAttributionService;
+use App\Support\FrontendRedirectGuard;
 use App\Support\GeoLocation;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Foundation\Http\FormRequest;
@@ -59,14 +60,15 @@ final readonly class RegistrationService
         // Cloudflare Turnstile — vérifié UNIQUEMENT pour les clients
         // stateful (web SPA avec session Sanctum). Même rationale que
         // LoginService::authenticate : le web injecte le widget JS dans
-        // le DOM, mais le mobile (Expo/RN) et les intégrations API pures
-        // n'ont ni session ni DOM pour exécuter Turnstile — l'exiger
-        // renverrait un 422 systématique et bloquerait toute inscription
-        // mobile. Le rate-limiter `register-attempts:{ip}` (10/10 min)
-        // reste actif dans tous les cas, donc la protection anti-bot est
-        // préservée sur l'API stateless.
+        // le DOM, mais le mobile (Expo/RN, en-tête `X-KeyHome-Client`) et
+        // les intégrations API pures n'ont ni session ni DOM pour exécuter
+        // Turnstile — l'exiger renverrait un 422 systématique et bloquerait
+        // toute inscription mobile. Le rate-limiter `register-attempts:{ip}`
+        // (10/10 min) reste actif dans tous les cas, donc la protection
+        // anti-bot est préservée sur l'API stateless.
         if (
             $request->hasSession()
+            && !FrontendRedirectGuard::isMobileAppRequest($request)
             && $this->turnstile->isConfigured()
             && !$this->turnstile->verify(
                 $request->input('turnstile_token'),

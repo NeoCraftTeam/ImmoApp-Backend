@@ -47,7 +47,6 @@ export function reportError(err: unknown, extra?: Record<string, unknown>): void
   if (sentry) {
     sentry.captureException(err, { extra });
   } else if (__DEV__) {
-    // eslint-disable-next-line no-console
     console.warn('[monitoring]', err, extra);
   }
 }

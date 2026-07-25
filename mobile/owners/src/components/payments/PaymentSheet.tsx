@@ -12,6 +12,7 @@ import {
   usePaymentMethods,
   useStripeMethods,
 } from '@/hooks/usePayments';
+import { useMotionPresets } from '@/hooks/useMotionPresets';
 import { buildCallbackUrl, openHostedCheckout } from '@/services/checkout';
 import { trackEvent } from '@/services/monitoring';
 import { brand } from '@/theme/tokens';
@@ -62,6 +63,7 @@ export function PaymentSheet({
 }: Props) {
   const router = useRouter();
   const qc = useQueryClient();
+  const { tamaguiMedium } = useMotionPresets();
   const { data: methods = [], isLoading: methodsLoading } = usePaymentMethods(open);
   const initiate = useInitiatePayment();
 
@@ -226,7 +228,7 @@ export function PaymentSheet({
       onOpenChange={onOpenChange}
       snapPoints={[80]}
       dismissOnSnapToBottom
-      animation="medium"
+      animation={tamaguiMedium}
     >
       <Sheet.Overlay />
       <Sheet.Frame padding={0} gap={0} backgroundColor="$background">

@@ -1,6 +1,6 @@
 import { AxiosError, AxiosHeaders } from 'axios';
 
-import { extractApiErrorMessage } from '@/api/client';
+import { extractApiErrorMessage, extractAuthErrorMessage } from '@/api/client';
 
 function makeAxiosError(opts: {
   status?: number;
@@ -29,9 +29,19 @@ describe('extractApiErrorMessage', () => {
     expect(extractApiErrorMessage(err)).toBe('Email invalide');
   });
 
-  it('returns "Identifiants incorrects." on 401 with no message', () => {
+  it('returns helpful 401 hint when credentials fail', () => {
     const err = makeAxiosError({ status: 401, data: {} });
-    expect(extractApiErrorMessage(err)).toBe('Identifiants incorrects.');
+    expect(extractApiErrorMessage(err)).toMatch(/Identifiants incorrects/i);
+    expect(extractApiErrorMessage(err)).toMatch(/Google/i);
+  });
+
+  it('explains panel mismatch for owner app with client account', () => {
+    const err = makeAxiosError({
+      status: 401,
+      data: { message: 'Identifiants incorrects', code: 'PANEL_ACCESS_DENIED' },
+    });
+    expect(extractAuthErrorMessage(err)).toMatch(/Visiteur/i);
+    expect(extractAuthErrorMessage(err)).toMatch(/Propriétaire/i);
   });
 
   it('returns "Données invalides." on 422 with no message', () => {

@@ -16,6 +16,7 @@ import {
   FlatList,
   Keyboard,
   Pressable,
+  RefreshControl,
   ScrollView,
 } from 'react-native';
 import { H2, Input, Paragraph, XStack, YStack } from 'tamagui';
@@ -32,6 +33,7 @@ import { useAdSearch } from '@/hooks/useAdSearch';
 import { useCityAutocomplete } from '@/hooks/useCitiesAndTypes';
 import { useDebounce } from '@/hooks/useDebounce';
 import { t } from '@/i18n';
+import { brand } from '@/theme/tokens';
 import {
   DEFAULT_SORT,
   EMPTY_FILTERS,
@@ -97,6 +99,7 @@ export default function SearchTab() {
     isError,
     error,
     refetch,
+    isRefetching,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -500,6 +503,14 @@ export default function SearchTab() {
           onEndReachedThreshold={0.5}
           removeClippedSubviews
           initialNumToRender={6}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={() => refetch()}
+              tintColor={brand.primary}
+              colors={[brand.primary]}
+            />
+          }
         />
       )}
 

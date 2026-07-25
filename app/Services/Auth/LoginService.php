@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Services\TurnstileService;
 use App\Services\User\UserAgentParser;
 use App\Support\AuthError;
+use App\Support\FrontendRedirectGuard;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Support\Facades\Hash;
@@ -43,7 +44,7 @@ final readonly class LoginService
     public function authenticate(LoginRequest $request): LoginResult
     {
         $credentials = $request->validated();
-        $email = $credentials['email'];
+        $email = mb_strtolower(trim((string) $credentials['email']));
         $password = $credentials['password'];
 
         $key = 'login-attempts:'.$request->ip().'|'.mb_strtolower((string) $email);
@@ -51,21 +52,11 @@ final readonly class LoginService
         $this->checkRateLimit($key, $request, $email);
 
         // Cloudflare Turnstile — vérifié UNIQUEMENT pour les clients
-        // stateful (web SPA avec session Sanctum). Rationale :
-        //   • Web (keyhome.app) → `EnsureFrontendRequestsAreStateful`
-        //     attache une session → on demande un token Turnstile
-        //     (bot-protection navigateur, le formulaire injecte le JS).
-        //   • Mobile (Expo, RN) / intégrations API / cron → bearer token
-        //     pur, pas de session, pas de DOM pour exécuter le widget
-        //     Turnstile. Demander un token ici renverrait un 401
-        //     systématique avec le même message que de mauvais
-        //     identifiants — l'utilisateur ne comprend rien.
-        //
-        // Le rate-limiter `login-attempts:{ip}|{email}` reste actif
-        // dans tous les cas (5 essais / 5 min), donc la protection
-        // brute-force est préservée même sur l'API stateless.
+        // stateful (web SPA avec session Sanctum). Les apps mobiles
+        // natives envoient `X-KeyHome-Client` et n'ont pas de widget.
         if (
             $request->hasSession()
+            && !FrontendRedirectGuard::isMobileAppRequest($request)
             && $this->turnstile->isConfigured()
             && !$this->turnstile->verify(
                 $request->input('turnstile_token'),

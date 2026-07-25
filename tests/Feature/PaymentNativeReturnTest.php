@@ -6,7 +6,7 @@ declare(strict_types=1);
  * Pont de retour natif : reçoit la redirection HTTPS de la passerelle et
  * renvoie un 302 vers le deep-link de l'app pour fermer l'onglet in-app.
  */
-it('redirects to the native deep-link and forwards gateway params', function () {
+it('redirects to the native deep-link and forwards gateway params', function (): void {
     $response = $this->get(route('payment.native-return', [
         'callback' => 'keyhome://credits/callback',
         'tx_ref' => 'KH-ABC123',
@@ -23,7 +23,7 @@ it('redirects to the native deep-link and forwards gateway params', function () 
         ->and($location)->toContain('reference=gw-ref-9');
 });
 
-it('accepts the owners scheme', function () {
+it('accepts the owners scheme', function (): void {
     $response = $this->get(route('payment.native-return', [
         'callback' => 'keyhomeowners://payment-success',
         'tx_ref' => 'KH-XYZ',
@@ -34,7 +34,7 @@ it('accepts the owners scheme', function () {
         ->and($response->headers->get('Location'))->toContain('tx_ref=KH-XYZ');
 });
 
-it('falls back to the frontend url when the callback is missing', function () {
+it('falls back to the frontend url when the callback is missing', function (): void {
     $response = $this->get(route('payment.native-return'));
 
     $response->assertRedirect();
@@ -43,7 +43,7 @@ it('falls back to the frontend url when the callback is missing', function () {
     );
 });
 
-it('rejects a non-whitelisted https origin (anti open-redirect)', function () {
+it('rejects a non-whitelisted https origin (anti open-redirect)', function (): void {
     $response = $this->get(route('payment.native-return', [
         'callback' => 'https://evil.example.com/steal',
     ]));
@@ -55,7 +55,7 @@ it('rejects a non-whitelisted https origin (anti open-redirect)', function () {
         );
 });
 
-it('rejects an arbitrary custom scheme', function () {
+it('rejects an arbitrary custom scheme', function (): void {
     $response = $this->get(route('payment.native-return', [
         'callback' => 'javascript://alert(1)',
     ]));

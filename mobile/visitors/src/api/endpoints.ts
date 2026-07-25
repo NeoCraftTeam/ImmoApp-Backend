@@ -17,10 +17,15 @@ export const ENDPOINTS = {
     updateUnverifiedEmail: '/auth/update-unverified-email',
     trackHomeVisit: '/auth/track-home-visit',
     checkEmail: '/auth/check-email',
+    clerkExchange: '/auth/clerk/exchange',
+    clerkVerifyOtp: '/auth/clerk/verify-otp',
     oauthRedirect: (provider: string) => `/auth/oauth/${provider}/redirect`,
     oauthExchange: '/auth/oauth/exchange-token',
     oauthLinkRedirect: (provider: string) => `/auth/oauth/${provider}/link-redirect`,
     oauthUnlink: (provider: string) => `/auth/oauth/${provider}/unlink`,
+  },
+  config: {
+    auth: '/config/auth',
   },
   users: {
     update: (id: string) => `/users/${encodeURIComponent(id)}`,
@@ -104,6 +109,8 @@ export const ENDPOINTS = {
     delete: (id: string) => `/search-alerts/${encodeURIComponent(id)}`,
   },
   payments: {
+    /** Déverrouille une annonce en dépensant des crédits (CreditController::unlock). */
+    unlock: (adId: string) => `/payments/initialize/${encodeURIComponent(adId)}`,
     history: '/payments/history',
     methods: '/payments/methods',
     publicStatus: (txRef: string) =>

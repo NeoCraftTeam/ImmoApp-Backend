@@ -33,7 +33,7 @@ use Stripe\Webhook;
  * (stored in `payments.amount`), the EUR equivalent travels with the
  * PaymentIntent metadata for receipt reconciliation.
  *
- * Unlike GeniusPay (which uses hosted checkout), Stripe is NOT redirect-based: `initiate()` returns
+ * Unlike Kpay (which uses hosted checkout), Stripe is NOT redirect-based: `initiate()` returns
  * a `clientSecret` (in the `link` field for interface symmetry) which the
  * frontend hands to `<PaymentElement>` for in-page card collection.
  *
@@ -131,6 +131,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
      *     customer_id?: string|null,
      *     save_payment_method?: bool,
      *     payment_method_id?: string|null,
+     *     stripe_hosted?: bool,
      *     meta?: array<string, mixed>
      * } $payload
      * @return array{link: string, tx_ref: string, status: string, gateway: string, stripe_flow: string}
@@ -228,7 +229,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
         // Les apps mobiles n'embarquent pas le SDK Stripe : elles ne peuvent
         // pas confirmer un PaymentIntent ni monter un Payment Element. On leur
         // renvoie donc l'URL d'une Checkout Session hébergée par Stripe, ouverte
-        // dans le navigateur in-app (comme GeniusPay). Le webhook
+        // dans le navigateur in-app (comme Kpay). Le webhook
         // `checkout.session.completed` reste la source de vérité.
         if (!empty($payload['stripe_hosted'])) {
             $hostedParams = [
@@ -244,9 +245,9 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
                 'locale' => 'fr',
                 'metadata' => $meta,
                 'payment_intent_data' => ['metadata' => $meta, 'description' => mb_substr($description, 0, 1000)],
-                'success_url' => (string) $payload['redirect_url'],
-                'cancel_url' => (string) $payload['redirect_url'],
-                'customer_email' => (string) $payload['email'],
+                'success_url' => $payload['redirect_url'],
+                'cancel_url' => $payload['redirect_url'],
+                'customer_email' => $payload['email'],
             ];
 
             try {

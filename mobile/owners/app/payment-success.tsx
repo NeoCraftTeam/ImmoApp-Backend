@@ -24,13 +24,17 @@ const POLLING_TIMEOUT_MS = 60_000;
 export default function PaymentSuccessOwner() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { tx_ref, txRef } = useLocalSearchParams<{
+  const { tx_ref, txRef, reference, status } = useLocalSearchParams<{
     tx_ref?: string;
     txRef?: string;
+    reference?: string;
+    status?: string;
   }>();
   const ref = tx_ref ?? txRef;
+  const gatewayReference =
+    typeof reference === 'string' && reference !== '' ? reference : undefined;
   const qc = useQueryClient();
-  const { data, isLoading, refetch } = usePublicPaymentStatus(ref);
+  const { data, isLoading, refetch } = usePublicPaymentStatus(ref ?? gatewayReference);
   const verifyCredit = useVerifyCreditPurchase();
 
   const [timedOut, setTimedOut] = useState(false);
@@ -39,7 +43,7 @@ export default function PaymentSuccessOwner() {
   // casse, gateway timeout, navigation manuelle) on affiche un
   // ecran d'erreur clair au lieu de tourner indefiniment sur le
   // spinner sans pouvoir rien faire.
-  if (!ref) {
+  if (!ref && !gatewayReference) {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
@@ -93,17 +97,26 @@ export default function PaymentSuccessOwner() {
   // perdre la trace. Le polling status reste le fallback principal,
   // donc l'echec ici n'a pas de consequence UX.
   useEffect(() => {
-    if (!ref) return;
+    if (!ref && !gatewayReference) return;
     verifyCredit.mutate(
-      { tx_ref: ref },
+      {
+        ...(ref ? { tx_ref: ref } : {}),
+        ...(gatewayReference ? { reference: gatewayReference } : {}),
+        ...(typeof status === 'string' && status !== ''
+          ? { gateway_redirect_status: status }
+          : {}),
+      },
       {
         onError: (err) => {
-          reportError(err, { tx_ref: ref, stage: 'verify-purchase-opportunistic' });
+          reportError(err, {
+            tx_ref: ref,
+            reference: gatewayReference,
+            stage: 'verify-purchase-opportunistic',
+          });
         },
       },
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ref]);
+  }, [ref, gatewayReference, status]);
 
   // Cache invalidation defensive — meme si PaymentSheet l'a deja
   // fait, on re-invalide au cas ou l'utilisateur arrive ici via un

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Http\Controllers\Payment\PaymentNativeReturnController;
+use Illuminate\Http\Request;
 
 /**
  * Validates absolute URLs used as post-payment redirects (hosted-checkout callback_url).
@@ -18,6 +19,19 @@ use App\Http\Controllers\Payment\PaymentNativeReturnController;
  */
 final class FrontendRedirectGuard
 {
+    /**
+     * True when the request originates from a KeyHome React Native app
+     * (visitors or owners). Used to skip browser-only checks (Turnstile)
+     * and to reject invalid OAuth redirect URIs instead of silently
+     * falling back to the web callback.
+     */
+    public static function isMobileAppRequest(Request $request): bool
+    {
+        $client = mb_strtolower(trim((string) $request->header('X-KeyHome-Client', '')));
+
+        return in_array($client, ['keyhome-mobile-visitors', 'keyhome-mobile-owners'], true);
+    }
+
     /**
      * App deep-link schemes allowed as post-payment redirects (mobile).
      *

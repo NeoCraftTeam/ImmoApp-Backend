@@ -1,10 +1,10 @@
-import { ArrowLeft, ImagePlus, RotateCw, Send, Smile, X } from '@tamagui/lucide-icons';
+import { ArrowLeft, ImagePlus, RotateCw, Send, X } from '@tamagui/lucide-icons';
 import { format, isToday, isYesterday } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,12 +13,14 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   TextInput,
 } from 'react-native';
 import { Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
+import { resolveMediaUrl } from '@/lib/media-url';
 import {
   useConversation,
   useDeleteMessage,
@@ -30,6 +32,7 @@ import {
 } from '@/hooks/useConversations';
 import { useConversationRealtime } from '@/hooks/useConversationRealtime';
 import { useMe } from '@/hooks/useMe';
+import { useMotionPresets } from '@/hooks/useMotionPresets';
 import { useSession } from '@/auth/SessionProvider';
 import { brand } from '@/theme/tokens';
 import type { Message, MessageReaction } from '@/types/conversation';
@@ -60,9 +63,13 @@ export default function ConversationScreen() {
   const insets = useSafeAreaInsets();
   const { isAuthenticated } = useSession();
   const me = useMe();
+  const { scrollAnimated } = useMotionPresets();
 
-  const { data, isLoading, isError, error } = useConversation(id);
   const realtime = useConversationRealtime(id, me.data?.id);
+  const { data, isLoading, isError, error, refetch, isRefetching } = useConversation(
+    id,
+    realtime.isConnected,
+  );
   const send = useSendMessage(id);
   const markRead = useMarkConversationRead(id);
   const typing = useSetTyping(id);
@@ -106,9 +113,9 @@ export default function ConversationScreen() {
 
   useEffect(() => {
     if (messagesResolved.length > 0) {
-      requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+      requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: scrollAnimated }));
     }
-  }, [messagesResolved.length]);
+  }, [messagesResolved.length, scrollAnimated]);
 
   if (!isAuthenticated) {
     return (
@@ -245,6 +252,14 @@ export default function ConversationScreen() {
             ref={listRef}
             data={messagesResolved}
             keyExtractor={(item) => item.uuid}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefetching}
+                onRefresh={() => refetch()}
+                tintColor={brand.primary}
+                colors={[brand.primary]}
+              />
+            }
             contentContainerStyle={{
               paddingVertical: 14,
               paddingHorizontal: 12,
@@ -697,9 +712,9 @@ function Avatar({
       justifyContent="center"
       overflow="hidden"
     >
-      {uri ? (
+      {resolveMediaUrl(uri) ? (
         <Image
-          source={{ uri }}
+          source={{ uri: resolveMediaUrl(uri)! }}
           style={{ width: size, height: size }}
           contentFit="cover"
           transition={150}

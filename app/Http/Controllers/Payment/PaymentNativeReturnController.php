@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 /**
  * Pont de retour natif après un paiement hosted-checkout mobile.
  *
- * Les passerelles (Stripe / GeniusPay) exigent une `success_url` http(s) :
+ * Les passerelles (Stripe / Kpay) exigent une `success_url` http(s) :
  * impossible de leur passer directement un deep-link `keyhome://`. Cette
  * route HTTPS reçoit la redirection de la passerelle puis renvoie un 302
  * vers le deep-link natif de l'app — ce qui ferme l'onglet in-app
@@ -39,7 +39,7 @@ final class PaymentNativeReturnController
         // Propage les paramètres utiles renvoyés par la passerelle vers le
         // deep-link, pour que l'app puisse vérifier et afficher l'état.
         $forward = array_filter(
-            $request->only(['tx_ref', 'reference', 'status', 'transaction_id']),
+            $request->only(['tx_ref', 'reference', 'paymentId', 'status', 'transaction_id']),
             static fn (mixed $v): bool => is_string($v) && $v !== '',
         );
 

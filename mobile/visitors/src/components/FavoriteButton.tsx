@@ -6,6 +6,7 @@ import { Animated, Easing, Pressable } from 'react-native';
 import { YStack } from 'tamagui';
 
 import { useSession } from '@/auth/SessionProvider';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useToggleFavorite } from '@/hooks/useToggleFavorite';
 import { useThemeColors } from '@/theme/useThemeColors';
 
@@ -36,6 +37,7 @@ export function FavoriteButton({
   const colors = useThemeColors();
   const { isAuthenticated } = useSession();
   const toggle = useToggleFavorite();
+  const reducedMotion = useReducedMotion();
 
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -60,12 +62,14 @@ export function FavoriteButton({
     // dans l'ordre arbitraire → l'ad peut finir dans le mauvais
     // etat (favorited puis re-unfavorited par la 2e requete).
     if (toggle.isPending) return;
-    if (!isFavorited) {
+    // Reduced motion : le burst saute, le haptic + changement de couleur
+    // suffisent comme confirmation (feedback non vestibulaire).
+    if (!isFavorited && !reducedMotion) {
       playBurst();
     }
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     toggle.mutate({ adId });
-  }, [adId, isAuthenticated, isFavorited, playBurst, router, toggle]);
+  }, [adId, isAuthenticated, isFavorited, playBurst, reducedMotion, router, toggle]);
 
   const iconSize = size === 'small' ? 16 : 20;
   const chipSize = size === 'small' ? 30 : 38;

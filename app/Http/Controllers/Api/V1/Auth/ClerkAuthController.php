@@ -9,7 +9,6 @@ use App\Enums\UserType;
 use App\Exceptions\RoleContextMismatchException;
 use App\Http\Requests\Api\V1\ClerkExchangeRequest;
 use App\Http\Resources\UserResource;
-use App\Mail\VerificationCodeMail;
 use App\Models\User;
 use App\Services\Auth\ClerkJwtService;
 use App\Services\Auth\LoginService;
@@ -23,7 +22,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Laravel\Sanctum\NewAccessToken;
@@ -132,33 +130,49 @@ final readonly class ClerkAuthController
             'registration_intent' => $registrationIntent,
         ], $utmFromRequest), now()->addMinutes(15));
 
-        $otpCooldownKey = 'clerk_otp_sent_'.$clerkId;
-
-        // Enforce cooldown regardless of whether a prior OTP exists —
-        // prevents email spam if the exchange endpoint is called repeatedly.
-        if (Cache::has($otpCooldownKey)) {
+        // OAuth via Clerk : l'email est déjà vérifié par le provider — pas d'OTP Laravel
+        // (réservé à l'inscription e-mail + mot de passe).
+        if (!$this->isClerkIdentityVerified($clerkUser)) {
             return response()->json([
-                'state' => 'otp_required',
-                'email_hint' => $email !== null ? $this->maskEmail($email) : null,
-            ]);
+                'message' => 'Votre adresse email Clerk n\'est pas encore vérifiée.',
+            ], 403);
         }
 
-        $otp = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        Cache::put('clerk_otp_'.$clerkId, $otp, now()->addMinutes(5)); // 5-minute window
-        Cache::put($otpCooldownKey, true, now()->addSeconds(60));
+        $user = $this->findOrCreateClerkOAuthUser(
+            $request,
+            $clerkId,
+            $email,
+            $firstName,
+            $lastName,
+            $avatar,
+            $registrationIntent,
+            array_merge($existingPending, $utmFromRequest),
+        );
 
-        if ($email !== null) {
-            $requestedFrom = request()->ip() ?? 'inconnu';
-            $requestedAt = now()->translatedFormat('d F Y à H:i');
+        Cache::forget('clerk_pending_'.$clerkId);
+        Cache::forget('clerk_otp_'.$clerkId);
+        Cache::forget('clerk_verified_'.$clerkId);
+        Cache::forget('clerk_otp_sent_'.$clerkId);
 
-            Mail::to($email, $firstName)
-                ->queue(new VerificationCodeMail($otp, $requestedFrom, $requestedAt));
+        try {
+            $token = $this->rotateClerkToken($user, $request->input('login_context'));
+        } catch (RoleContextMismatchException $e) {
+            return AuthError::loginPanelMismatch(code: $e->authCode);
+        }
+
+        auth()->setUser($user);
+
+        if ($request->hasSession()) {
+            $request->session()->regenerate();
+            Auth::guard('web')->login($user);
         }
 
         return response()->json([
-            'state' => 'otp_required',
-            'email_hint' => $email !== null ? $this->maskEmail($email) : null,
-        ]);
+            'access_token' => $token->plainTextToken,
+            'expires_at' => $token->accessToken->expires_at,
+            'user' => new UserResource($user),
+            'panel_sso_url' => $this->buildPanelSsoUrl($user),
+        ], $user->wasRecentlyCreated ? 201 : 200);
     }
 
     /**
@@ -452,18 +466,6 @@ final readonly class ClerkAuthController
         return count($emailAddresses) > 0 ? ($emailAddresses[0]['email_address'] ?? null) : null;
     }
 
-    private function maskEmail(string $email): ?string
-    {
-        if (!str_contains($email, '@')) {
-            return null;
-        }
-
-        [$local, $domain] = explode('@', $email, 2);
-        $masked = mb_substr($local, 0, 1).str_repeat('*', max(3, mb_strlen($local) - 1));
-
-        return $masked.'@'.$domain;
-    }
-
     private function buildPanelSsoUrl(User $user): ?string
     {
         if ($user->role === UserRole::CUSTOMER) {
@@ -475,5 +477,136 @@ final readonly class ClerkAuthController
             now()->addSeconds(60),
             ['user_id' => $user->id]
         );
+    }
+
+    /**
+     * Clerk OAuth identities are trusted once the provider (Google/Facebook/GitHub) verified the email.
+     *
+     * @param  array<string, mixed>  $clerkUser
+     */
+    private function isClerkIdentityVerified(array $clerkUser): bool
+    {
+        if ($this->hasOAuthExternalAccount($clerkUser)) {
+            return true;
+        }
+
+        $email = $this->resolveClerkEmail($clerkUser);
+
+        if ($email === null) {
+            return false;
+        }
+
+        foreach ($clerkUser['email_addresses'] ?? [] as $addr) {
+            if (!is_array($addr)) {
+                continue;
+            }
+
+            if (($addr['email_address'] ?? null) !== $email) {
+                continue;
+            }
+
+            return ($addr['verification']['status'] ?? null) === 'verified';
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $clerkUser
+     */
+    private function hasOAuthExternalAccount(array $clerkUser): bool
+    {
+        foreach ($clerkUser['external_accounts'] ?? [] as $account) {
+            if (!is_array($account)) {
+                continue;
+            }
+
+            $provider = (string) ($account['provider'] ?? '');
+
+            if (str_starts_with($provider, 'oauth_') || in_array($provider, ['google', 'facebook', 'github', 'apple'], true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributionPayload
+     */
+    private function findOrCreateClerkOAuthUser(
+        ClerkExchangeRequest $request,
+        string $clerkId,
+        ?string $email,
+        string $firstName,
+        string $lastName,
+        ?string $avatar,
+        string $registrationIntent,
+        array $attributionPayload,
+    ): User {
+        $user = User::query()->where('clerk_id', $clerkId)->first()
+            ?? ($email !== null ? User::query()->whereNull('clerk_id')->where('email', $email)->first() : null);
+
+        if ($user !== null) {
+            if ($user->clerk_id === null) {
+                $user->update(['clerk_id' => $clerkId]);
+            }
+
+            return $user;
+        }
+
+        $role = $registrationIntent === 'agent' ? UserRole::AGENT : UserRole::CUSTOMER;
+        $utm = app(UtmAttributionService::class);
+
+        try {
+            $user = new User;
+            $user->fill([
+                'clerk_id' => $clerkId,
+                'firstname' => $firstName,
+                'lastname' => $lastName,
+                'email' => $email ?? $clerkId.'@clerk.local',
+                'avatar' => $avatar,
+            ]);
+            $user->forceFill([
+                'role' => $role,
+                'type' => UserType::INDIVIDUAL,
+                'is_active' => true,
+                'email_verified_at' => now(),
+                'registration_ip' => $request->ip(),
+                'last_login_ip' => $request->ip(),
+            ]);
+            $user->forceFill($utm->attributesForNewUser($request, array_merge(
+                $attributionPayload,
+                array_intersect_key(
+                    $request->validated(),
+                    array_flip(UtmAttributionService::ATTRIBUTION_REQUEST_KEYS),
+                ),
+            )));
+            $user->save();
+
+            $sessionId = $attributionPayload['session_id'] ?? null;
+            $utm->linkSessionVisitsToUser(
+                $user,
+                is_string($sessionId) ? $sessionId : null,
+            );
+        } catch (UniqueConstraintViolationException) {
+            $user = User::query()->where('clerk_id', $clerkId)->first()
+                ?? ($email !== null ? User::query()->where('email', $email)->first() : null);
+
+            if ($user === null) {
+                throw new \RuntimeException('Erreur lors de la création du compte Clerk.');
+            }
+        }
+
+        try {
+            app(UserWelcomeService::class)->handle($user);
+        } catch (\Throwable $e) {
+            Log::error('UserWelcomeService failed', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return $user;
     }
 }

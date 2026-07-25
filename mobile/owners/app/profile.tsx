@@ -15,7 +15,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView } from 'react-native';
 import {
   Button,
-  H1,
   Input,
   Paragraph,
   Spinner,

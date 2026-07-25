@@ -20,39 +20,18 @@ use Illuminate\Support\Facades\Mail;
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
-    config()->set('payment.default', 'geniuspay');
-    config()->set('payment.gateways.geniuspay.api_secret', 'sk_sandbox_test_fake');
-    config()->set('payment.gateways.geniuspay.webhook_secret', 'test_webhook_secret_456');
+    config()->set('payment.default', 'kpay');
+    config()->set('payment.gateways.kpay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.webhook_secret', 'test_webhook_secret_456');
     Mail::fake();
 });
 
-/**
- * Build the headers + body for a signed GeniusPay webhook.
- *
- * @param  array<string, mixed>  $payload
- * @return array{0: array<string, string>, 1: string}
- */
-function signedGeniusPayWebhook(string $secret, array $payload, ?string $event = null): array
-{
-    $timestamp = time();
-    $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
-    $signature = hash_hmac('sha256', $timestamp.'.'.$encoded, $secret);
-    $headers = [
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_X_WEBHOOK_SIGNATURE' => $signature,
-        'HTTP_X_WEBHOOK_TIMESTAMP' => (string) $timestamp,
-        'HTTP_X_WEBHOOK_EVENT' => $event ?? (string) ($payload['event'] ?? 'payment.success'),
-    ];
-
-    return [$headers, $encoded];
-}
-
 // ─── WEBHOOK CREDITS UN PAIEMENT ─────────────────────────────────────────
 
-it('credits the user balance when a GeniusPay webhook confirms a credit purchase', function (): void {
+it('credits the user balance when a Kpay webhook confirms a credit purchase', function (): void {
     Event::fake();
     Bus::fake();
-    $secret = (string) config('payment.gateways.geniuspay.webhook_secret');
+    $secret = (string) config('payment.gateways.kpay.webhook_secret');
 
     $user = User::factory()->create(['point_balance' => 0]);
     $package = PointPackage::factory()->create([
@@ -62,24 +41,23 @@ it('credits the user balance when a GeniusPay webhook confirms a credit purchase
     ]);
     $payment = Payment::factory()->pending()->create([
         'user_id' => $user->id,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => 5000,
         'type' => PaymentType::CREDIT->value,
         'plan_id' => $package->id,
     ]);
 
-    [$headers, $body] = signedGeniusPayWebhook($secret, [
-        'event' => 'payment.success',
-        'data' => [
-            'reference' => 'MTX-CREDIT-OK',
-            'status' => 'completed',
-            'amount' => 5000,
-            'currency' => 'XAF',
-            'metadata' => ['tx_ref' => $payment->transaction_id],
-        ],
+    [$headers, $body] = signedKpayWebhook($secret, [
+        'event' => 'payment.completed',
+        'paymentId' => 'pay_credit_ok',
+        'reference' => 'KPAY-CREDIT-OK',
+        'status' => 'COMPLETED',
+        'amount' => 5000,
+        'currency' => 'XAF',
+        'externalId' => $payment->transaction_id,
     ]);
 
-    $this->call('POST', '/api/v1/webhooks/geniuspay', [], [], [], $headers, $body)
+    $this->call('POST', '/api/v1/webhooks/kpay', [], [], [], $headers, $body)
         ->assertSuccessful();
 
     // The webhook controller marks Payment as SUCCESS synchronously, then
@@ -117,7 +95,7 @@ it('does not double-credit when the post-payment action runs twice for the same 
     ]);
     $payment = Payment::factory()->success()->create([
         'user_id' => $user->id,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => 8000,
         'type' => PaymentType::CREDIT->value,
         'plan_id' => $package->id,
@@ -139,7 +117,7 @@ it('does not double-credit when the post-payment action runs twice for the same 
 
 it('verify-purchase does not double-credit when called after the webhook already credited', function (): void {
     Event::fake();
-    $secret = (string) config('payment.gateways.geniuspay.webhook_secret');
+    $secret = (string) config('payment.gateways.kpay.webhook_secret');
 
     $user = User::factory()->create(['point_balance' => 0]);
     $package = PointPackage::factory()->create([
@@ -149,25 +127,24 @@ it('verify-purchase does not double-credit when called after the webhook already
     ]);
     $payment = Payment::factory()->pending()->create([
         'user_id' => $user->id,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => 3000,
         'type' => PaymentType::CREDIT->value,
         'plan_id' => $package->id,
     ]);
 
     // 1) Webhook lands first → Payment SUCCESS + job dispatched
-    [$headers, $body] = signedGeniusPayWebhook($secret, [
-        'event' => 'payment.success',
-        'data' => [
-            'reference' => 'MTX-VERIFY-IDEM',
-            'status' => 'completed',
-            'amount' => 3000,
-            'currency' => 'XAF',
-            'metadata' => ['tx_ref' => $payment->transaction_id],
-        ],
+    [$headers, $body] = signedKpayWebhook($secret, [
+        'event' => 'payment.completed',
+        'paymentId' => 'pay_verify_idem',
+        'reference' => 'KPAY-VERIFY-IDEM',
+        'status' => 'COMPLETED',
+        'amount' => 3000,
+        'currency' => 'XAF',
+        'externalId' => $payment->transaction_id,
     ]);
 
-    $this->call('POST', '/api/v1/webhooks/geniuspay', [], [], [], $headers, $body)
+    $this->call('POST', '/api/v1/webhooks/kpay', [], [], [], $headers, $body)
         ->assertSuccessful();
 
     // Simulate the queue worker draining the webhook job (which calls execute()).
@@ -175,7 +152,7 @@ it('verify-purchase does not double-credit when called after the webhook already
 
     expect($user->fresh()->point_balance)->toBe(25);
 
-    // 2) User comes back from GeniusPay → /credits/verify-purchase fires
+    // 2) User comes back from Kpay → /credits/verify-purchase fires
     //    with the same tx_ref. The endpoint must short-circuit on the
     //    already-SUCCESS status without re-crediting.
     $this->actingAs($user)
@@ -195,18 +172,16 @@ it('verify-purchase does not double-credit when called after the webhook already
 // ─── VERIFY-PURCHASE TARGETING — PARAM tx_ref ───────────────────────────
 
 it('verify-purchase with tx_ref targets the exact payment, not the latest', function (): void {
-    // Stub the GeniusPay verify call so the "latest pending payment" branch
+    // Stub the Kpay verify call so the "latest pending payment" branch
     // doesn't reach the real API. Returns "pending" so the assertion below
     // exercises the targeting logic without short-circuiting on success.
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'reference' => 'MTX-PENDING',
-                'status' => 'pending',
-                'amount' => 2000,
-                'currency' => 'XAF',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_MTX_PENDING',
+            'reference' => 'KPAY-MTX-PENDING',
+            'status' => 'PENDING',
+            'amount' => 2000,
+            'currency' => 'XAF',
         ], 200),
     ]);
 
@@ -220,7 +195,7 @@ it('verify-purchase with tx_ref targets the exact payment, not the latest', func
     // Older successful purchase (already credited).
     $oldPayment = Payment::factory()->success()->create([
         'user_id' => $user->id,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => 2000,
         'type' => PaymentType::CREDIT->value,
         'plan_id' => $package->id,
@@ -238,11 +213,11 @@ it('verify-purchase with tx_ref targets the exact payment, not the latest', func
     // New pending purchase.
     Payment::factory()->pending()->create([
         'user_id' => $user->id,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => 2000,
         'type' => PaymentType::CREDIT->value,
         'plan_id' => $package->id,
-        'gateway_response' => ['genius_reference' => 'MTX-PENDING'],
+        'gateway_response' => ['kpay_id' => 'pay_pending'],
         'created_at' => now(),
     ]);
 
@@ -271,7 +246,7 @@ it('verify-purchase requires authentication (401 for guests)', function (): void
 
 it('public-status returns the payment status without authentication', function (): void {
     $payment = Payment::factory()->success()->create([
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'transaction_id' => 'KH-PUBSTAT01',
     ]);
 
@@ -283,7 +258,7 @@ it('public-status returns the payment status without authentication', function (
 });
 
 it('public-status returns unknown for malformed tx_ref', function (): void {
-    // Routes constraint blocks anything that doesn't look like KH-...
+    // Routes constraint blocks anything that doesn't look like a payment ref.
     $this->getJson('/api/v1/payments/PI-NOT-OURS/public-status')
         ->assertNotFound();
 
@@ -293,11 +268,79 @@ it('public-status returns unknown for malformed tx_ref', function (): void {
         ->assertJsonPath('status', 'unknown');
 });
 
+it('public-status accepts kpay sandbox redirect references', function (): void {
+    Http::fake([
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_sandbox_public',
+            'reference' => 'SANDBOX_V1A7ZXW9QSR8HHP6',
+            'status' => 'COMPLETED',
+            'amount' => 5000,
+            'currency' => 'XAF',
+        ], 200),
+    ]);
+
+    $payment = Payment::factory()->pending()->create([
+        'gateway' => 'kpay',
+        'amount' => 5000,
+        'transaction_id' => 'KH-SANDBOXPUB1',
+        'gateway_response' => [
+            'kpay_id' => 'pay_sandbox_public',
+            'reference' => 'SANDBOX_V1A7ZXW9QSR8HHP6',
+        ],
+    ]);
+
+    $this->getJson('/api/v1/payments/SANDBOX_V1A7ZXW9QSR8HHP6/public-status')
+        ->assertSuccessful()
+        ->assertJsonPath('status', 'success');
+
+    $this->assertDatabaseHas('payments', [
+        'id' => $payment->id,
+        'status' => PaymentStatus::SUCCESS->value,
+    ]);
+});
+
+it('verify-purchase accepts sandbox reference when tx_ref is missing', function (): void {
+    Event::fake();
+    Http::fake([
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_sandbox_verify',
+            'reference' => 'SANDBOX_VERIFY123',
+            'status' => 'COMPLETED',
+            'amount' => 3000,
+            'currency' => 'XAF',
+        ], 200),
+    ]);
+
+    $user = User::factory()->create();
+    $package = PointPackage::factory()->create(['price' => 3000, 'points_awarded' => 30]);
+    $payment = Payment::factory()->pending()->create([
+        'user_id' => $user->id,
+        'type' => PaymentType::CREDIT,
+        'gateway' => 'kpay',
+        'amount' => 3000,
+        'plan_id' => $package->id,
+        'gateway_response' => [
+            'kpay_id' => 'pay_sandbox_verify',
+            'reference' => 'SANDBOX_VERIFY123',
+        ],
+    ]);
+
+    $this->actingAs($user)
+        ->postJson('/api/v1/credits/verify-purchase', [
+            'reference' => 'SANDBOX_VERIFY123',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('status', 'completed');
+
+    expect($user->fresh()->point_balance)->toBe(30);
+    expect($payment->fresh()->status)->toBe(PaymentStatus::SUCCESS);
+});
+
 it('public-status never leaks PII even on a real payment', function (): void {
     $user = User::factory()->create(['email' => 'sensitive@example.com']);
     $payment = Payment::factory()->success()->create([
         'user_id' => $user->id,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => 99999,
         'phone_number' => '+237699111222',
         'transaction_id' => 'KH-LEAKCHECK1',

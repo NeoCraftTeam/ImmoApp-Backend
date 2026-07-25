@@ -2,12 +2,14 @@ import { useQuery } from '@tanstack/react-query';
 
 import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
+import { queryKeys } from '@/lib/query-keys';
 import type { PaymentTransaction, PaymentsResponse } from '@/types/payment';
+import { parseCreditsBalance } from '@/utils/credits-balance';
 import { normalizePaymentHistoryList } from '@/utils/payment-history';
 
-export function usePayments() {
+export function usePayments(enabled = true) {
   return useQuery<PaymentsResponse, Error, PaymentTransaction[]>({
-    queryKey: ['payments-history'],
+    queryKey: queryKeys.paymentsHistory(),
     queryFn: async () => {
       const { data } = await apiClient.get<PaymentsResponse>(
         ENDPOINTS.payments.history,
@@ -15,34 +17,24 @@ export function usePayments() {
       return data;
     },
     select: (payload) => normalizePaymentHistoryList(payload),
-    staleTime: 60 * 1000,
+    enabled,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnReconnect: true,
   });
 }
 
 export function useCreditsBalance(enabled = true) {
   return useQuery<Record<string, unknown> | number, Error, number>({
-    queryKey: ['credits-balance'],
+    queryKey: queryKeys.creditsBalance(),
     queryFn: async () => {
       const { data } = await apiClient.get(ENDPOINTS.credits.balance);
       return data;
     },
     enabled,
-    // Le backend renvoie { point_balance: N } — l'ancienne lecture de
-    // `balance` retombait toujours à 0 (d'où « 0 crédits » alors que le
-    // web affiche le vrai solde). On accepte point_balance / balance /
-    // credit_balance, à la racine ou sous `data`.
-    select: (payload) => {
-      if (typeof payload === 'number') return payload;
-      const root = (payload ?? {}) as Record<string, unknown>;
-      const nested = (root.data ?? {}) as Record<string, unknown>;
-      for (const src of [root, nested]) {
-        for (const key of ['point_balance', 'balance', 'credit_balance', 'credits']) {
-          const v = src[key];
-          if (typeof v === 'number') return v;
-        }
-      }
-      return 0;
-    },
-    staleTime: 30 * 1000,
+    select: parseCreditsBalance,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    refetchOnReconnect: true,
   });
 }

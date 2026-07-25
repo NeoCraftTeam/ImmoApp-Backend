@@ -13,6 +13,7 @@ import {
 import { Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useMotionPresets } from '@/hooks/useMotionPresets';
 import type { AdImage } from '@/types/ad';
 
 interface Props {
@@ -33,6 +34,7 @@ interface Props {
 export function ImageLightbox({ images, initialIndex, visible, onClose }: Props) {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
+  const { scrollAnimated, reducedMotion } = useMotionPresets();
   const [index, setIndex] = useState(initialIndex);
   const listRef = useRef<FlatList<AdImage> | null>(null);
 
@@ -56,7 +58,7 @@ export function ImageLightbox({ images, initialIndex, visible, onClose }: Props)
 
   const goTo = (next: number) => {
     const clamped = Math.max(0, Math.min(images.length - 1, next));
-    listRef.current?.scrollToIndex({ index: clamped, animated: true });
+    listRef.current?.scrollToIndex({ index: clamped, animated: scrollAnimated });
     setIndex(clamped);
   };
 
@@ -64,7 +66,7 @@ export function ImageLightbox({ images, initialIndex, visible, onClose }: Props)
     <Modal
       visible={visible}
       transparent={false}
-      animationType="fade"
+      animationType={reducedMotion ? 'none' : 'fade'}
       onRequestClose={onClose}
       statusBarTranslucent
     >

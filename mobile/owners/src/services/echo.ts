@@ -27,6 +27,17 @@ const SCHEME = process.env.EXPO_PUBLIC_REVERB_SCHEME ?? 'https';
 
 let instance: PusherClient | null = null;
 
+/** Vrai quand Reverb est configuré ET que `pusher-js` est installé. */
+export function isEchoConfigured(): boolean {
+  if (!APP_KEY || !HOST) return false;
+  try {
+    require('pusher-js/react-native');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function getEchoClient(): PusherClient | null {
   if (!APP_KEY || !HOST) return null;
   if (instance) return instance;
@@ -42,7 +53,6 @@ export function getEchoClient(): PusherClient | null {
     // un dev qui essayait d'activer Reverb voyait juste "pas de
     // realtime" sans savoir pourquoi.
     if (__DEV__) {
-      // eslint-disable-next-line no-console
       console.warn('[echo] pusher-js/react-native non installé — realtime désactivé', err);
     }
     return null;

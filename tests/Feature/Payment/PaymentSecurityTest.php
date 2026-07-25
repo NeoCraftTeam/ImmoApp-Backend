@@ -18,29 +18,26 @@ uses(RefreshDatabase::class);
 /**
  * @return array<string, string>
  */
-function paymentSecurityGeniusPayWebhookHeaders(int $timestamp, string $signature): array
+function paymentSecurityKpayWebhookHeaders(string $signature, string $event = 'payment.completed'): array
 {
     return [
         'CONTENT_TYPE' => 'application/json',
-        'HTTP_X_WEBHOOK_SIGNATURE' => $signature,
-        'HTTP_X_WEBHOOK_TIMESTAMP' => (string) $timestamp,
-        'HTTP_X_WEBHOOK_EVENT' => 'payment.success',
+        'HTTP_X_KPAY_SIGNATURE' => $signature,
+        'HTTP_X_KPAY_EVENT' => $event,
     ];
 }
 
-function paymentSecurityGeniusPayWebhookSignature(string $secret, int $timestamp, array $payload): string
+function paymentSecurityKpayWebhookSignature(string $secret, string $body): string
 {
-    $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-
-    return hash_hmac('sha256', $timestamp.'.'.$encoded, $secret);
+    return hash_hmac('sha256', $body, $secret);
 }
 
 beforeEach(function (): void {
-    config()->set('payment.default', 'geniuspay');
-    config()->set('payment.gateways.geniuspay.api_key', 'pk_sandbox_test_fake');
-    config()->set('payment.gateways.geniuspay.api_secret', 'sk_sandbox_test_fake');
-    config()->set('payment.gateways.geniuspay.webhook_secret', 'whsec_sandbox_test_secret_123');
-    config()->set('payment.gateways.geniuspay.redirect_url', 'https://test.app/payment/callback');
+    config()->set('payment.default', 'kpay');
+    config()->set('payment.gateways.kpay.api_key', 'pk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.webhook_secret', 'whsec_sandbox_test_secret_123');
+    config()->set('payment.gateways.kpay.redirect_url', 'https://test.app/payment/callback');
     config()->set('payment.gateways.flutterwave.webhook_secret', 'test_webhook_secret_123');
 });
 
@@ -49,12 +46,10 @@ beforeEach(function (): void {
 it('resolves credit price from PointPackage, not client', function (): void {
     Event::fake();
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'reference' => 'MTX-SEC',
-                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-SEC',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_MTX_SEC',
+            'reference' => 'KPAY-MTX-SEC',
+            'gatewayUrl' => 'https://admin.kpay.site/gateway/gw_MTX_SEC',
         ], 201),
     ]);
 
@@ -97,20 +92,18 @@ it('marks payment FAILED when gateway returns mismatched amount', function (): v
     Event::fake();
 
     $payment = Payment::factory()->pending()->create([
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => 5000,
-        'gateway_response' => ['genius_reference' => 'MTX-MISMATCH'],
+        'gateway_response' => ['kpay_id' => 'pay_MTX_MISMATCH'],
     ]);
 
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'reference' => 'MTX-MISMATCH',
-                'status' => 'completed',
-                'amount' => 1,
-                'currency' => 'XAF',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_MTX_MISMATCH',
+            'reference' => 'KPAY-MTX-MISMATCH',
+            'status' => 'COMPLETED',
+            'amount' => 1,
+            'currency' => 'XAF',
         ], 200),
     ]);
 
@@ -121,24 +114,22 @@ it('marks payment FAILED when gateway returns mismatched amount', function (): v
     Event::assertDispatched(PaymentFailed::class);
 });
 
-it('accepts XOF from geniuspay when ledger currency is XAF', function (): void {
+it('accepts XOF from kpay when ledger currency is XAF', function (): void {
     Event::fake();
 
     $payment = Payment::factory()->pending()->create([
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => 5000,
-        'gateway_response' => ['genius_reference' => 'SANDBOX-XOF-LEDGER'],
+        'gateway_response' => ['kpay_id' => 'pay_SANDBOX_XOF_LEDGER'],
     ]);
 
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'reference' => 'SANDBOX-XOF-LEDGER',
-                'status' => 'completed',
-                'amount' => 5000,
-                'currency' => 'XOF',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_SANDBOX_XOF_LEDGER',
+            'reference' => 'KPAY-SANDBOX-XOF-LEDGER',
+            'status' => 'COMPLETED',
+            'amount' => 5000,
+            'currency' => 'XOF',
         ], 200),
     ]);
 
@@ -153,20 +144,18 @@ it('marks payment FAILED when gateway returns wrong currency', function (): void
     Event::fake();
 
     $payment = Payment::factory()->pending()->create([
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => 5000,
-        'gateway_response' => ['genius_reference' => 'MTX-CURRENCY'],
+        'gateway_response' => ['kpay_id' => 'pay_MTX_CURRENCY'],
     ]);
 
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'reference' => 'MTX-CURRENCY',
-                'status' => 'completed',
-                'amount' => 5000,
-                'currency' => 'USD',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_MTX_CURRENCY',
+            'reference' => 'KPAY-MTX-CURRENCY',
+            'status' => 'COMPLETED',
+            'amount' => 5000,
+            'currency' => 'USD',
         ], 200),
     ]);
 
@@ -179,28 +168,26 @@ it('marks payment FAILED when gateway returns wrong currency', function (): void
 
 it('webhook with mismatched amount marks payment FAILED', function (): void {
     Event::fake();
-    $secret = config('payment.gateways.geniuspay.webhook_secret');
+    $secret = config('payment.gateways.kpay.webhook_secret');
 
     $payment = Payment::factory()->pending()->create([
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => 5000,
     ]);
 
-    $timestamp = time();
     $payloadArray = [
-        'event' => 'payment.success',
-        'data' => [
-            'reference' => 'MTX-MISMATCH',
-            'status' => 'completed',
-            'amount' => 1,
-            'currency' => 'XAF',
-            'metadata' => ['tx_ref' => $payment->transaction_id],
-        ],
+        'event' => 'payment.completed',
+        'paymentId' => 'pay_mismatch',
+        'reference' => 'KPAY-MISMATCH',
+        'status' => 'COMPLETED',
+        'amount' => 1,
+        'currency' => 'XAF',
+        'externalId' => $payment->transaction_id,
     ];
-    $signature = paymentSecurityGeniusPayWebhookSignature($secret, $timestamp, $payloadArray);
     $payload = json_encode($payloadArray, JSON_THROW_ON_ERROR);
+    $signature = paymentSecurityKpayWebhookSignature($secret, $payload);
 
-    $this->call('POST', '/api/v1/webhooks/geniuspay', [], [], [], paymentSecurityGeniusPayWebhookHeaders($timestamp, $signature), $payload)->assertSuccessful();
+    $this->call('POST', '/api/v1/webhooks/kpay', [], [], [], paymentSecurityKpayWebhookHeaders($signature), $payload)->assertSuccessful();
 
     $this->assertDatabaseHas('payments', [
         'id' => $payment->id,
@@ -217,7 +204,7 @@ it('user can cancel their own pending payment', function (): void {
     $user = User::factory()->create();
     $payment = Payment::factory()->pending()->create([
         'user_id' => $user->id,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
     ]);
 
     $this->actingAs($user)
@@ -236,7 +223,7 @@ it('user cannot cancel another users payment', function (): void {
     $intruder = User::factory()->create();
     $payment = Payment::factory()->pending()->create([
         'user_id' => $owner->id,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
     ]);
 
     $this->actingAs($intruder)
@@ -253,7 +240,7 @@ it('user cannot cancel an already successful payment', function (): void {
     $user = User::factory()->create();
     $payment = Payment::factory()->success()->create([
         'user_id' => $user->id,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
     ]);
 
     $this->actingAs($user)
@@ -279,23 +266,21 @@ it('verify sets CANCELLED when gateway returns cancelled status', function (): v
     $user = User::factory()->create();
     $payment = Payment::factory()->pending()->create([
         'user_id' => $user->id,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => 5000,
     ]);
 
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'reference' => 'MTX-CANCEL',
-                'status' => 'cancelled',
-                'amount' => 5000,
-                'currency' => 'XAF',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_MTX_CANCEL',
+            'reference' => 'KPAY-MTX-CANCEL',
+            'status' => 'CANCELLED',
+            'amount' => 5000,
+            'currency' => 'XAF',
         ], 200),
     ]);
 
-    $payment->forceFill(['gateway_response' => ['genius_reference' => 'MTX-CANCEL']])->save();
+    $payment->forceFill(['gateway_response' => ['kpay_id' => 'pay_MTX_CANCEL']])->save();
 
     $this->actingAs($user)
         ->postJson('/api/v1/payments/verify_payment', ['tx_ref' => $payment->transaction_id])
@@ -320,31 +305,29 @@ it('reopens a CANCELLED payment when a signed webhook confirms a real charge (or
     // blocked upstream by signature verification.
     Event::fake();
     Log::spy();
-    $secret = config('payment.gateways.geniuspay.webhook_secret');
+    $secret = config('payment.gateways.kpay.webhook_secret');
 
     $user = User::factory()->create();
     $payment = Payment::factory()->create([
         'user_id' => $user->id,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'status' => PaymentStatus::CANCELLED,
         'amount' => 5000,
     ]);
 
-    $timestamp = time();
     $payloadArray = [
-        'event' => 'payment.success',
-        'data' => [
-            'reference' => 'MTX-ORPHAN',
-            'status' => 'completed',
-            'amount' => 5000,
-            'currency' => 'XAF',
-            'metadata' => ['tx_ref' => $payment->transaction_id],
-        ],
+        'event' => 'payment.completed',
+        'paymentId' => 'pay_orphan',
+        'reference' => 'KPAY-ORPHAN',
+        'status' => 'COMPLETED',
+        'amount' => 5000,
+        'currency' => 'XAF',
+        'externalId' => $payment->transaction_id,
     ];
-    $signature = paymentSecurityGeniusPayWebhookSignature($secret, $timestamp, $payloadArray);
     $payload = json_encode($payloadArray, JSON_THROW_ON_ERROR);
+    $signature = paymentSecurityKpayWebhookSignature($secret, $payload);
 
-    $this->call('POST', '/api/v1/webhooks/geniuspay', [], [], [], paymentSecurityGeniusPayWebhookHeaders($timestamp, $signature), $payload)->assertSuccessful();
+    $this->call('POST', '/api/v1/webhooks/kpay', [], [], [], paymentSecurityKpayWebhookHeaders($signature), $payload)->assertSuccessful();
 
     $this->assertDatabaseHas('payments', [
         'id' => $payment->id,
@@ -357,16 +340,14 @@ it('reopens a CANCELLED payment when a signed webhook confirms a real charge (or
         ->once();
 });
 
-it('passes allowed callback_url to geniuspay for credit purchase', function (): void {
+it('passes allowed callback_url to kpay for credit purchase', function (): void {
     config()->set('app.frontend_url', 'http://localhost:3000');
     Event::fake();
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'reference' => 'MTX-SEC',
-                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-SEC',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_MTX_SEC',
+            'reference' => 'KPAY-MTX-SEC',
+            'gatewayUrl' => 'https://admin.kpay.site/gateway/gw_MTX_SEC',
         ], 201),
     ]);
 
@@ -380,15 +361,15 @@ it('passes allowed callback_url to geniuspay for credit purchase', function (): 
     ])->assertSuccessful();
 
     Http::assertSent(function (Request $request) use ($callback): bool {
-        if (!str_contains($request->url(), 'pay.genius.ci')) {
+        if (!str_contains($request->url(), 'admin.kpay.site')) {
             return false;
         }
         $data = $request->data();
 
         // appendTxRefToReturnUrl appends ?tx_ref=KH-... to the URL; verify the
-        // callback base URL is still the prefix of success_url and error_url.
-        return str_starts_with((string) ($data['success_url'] ?? ''), $callback)
-            && str_starts_with((string) ($data['error_url'] ?? ''), $callback);
+        // callback base URL is still the prefix of returnUrl and cancelUrl.
+        return str_starts_with((string) ($data['returnUrl'] ?? ''), $callback)
+            && str_starts_with((string) ($data['cancelUrl'] ?? ''), $callback);
     });
 });
 

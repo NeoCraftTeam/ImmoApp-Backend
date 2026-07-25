@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 
-import { subscribePrivate } from '@/services/echo';
+import { isEchoConfigured, subscribePrivate } from '@/services/echo';
 import type { Message } from '@/types/conversation';
 
 /**
@@ -124,7 +124,10 @@ export function useConversationRealtime(
       },
     );
 
-    setState((s) => ({ ...s, isConnected: true }));
+    // `isConnected` ne doit refléter que les cas où un vrai channel WS a
+    // été souscrit — sans config Reverb, subscribePrivate no-op et le
+    // polling reste la seule source de vérité.
+    setState((s) => ({ ...s, isConnected: isEchoConfigured() }));
     return () => {
       unsubscribe();
       setState((s) => ({ ...s, isConnected: false, typingUser: null }));

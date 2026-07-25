@@ -61,7 +61,7 @@ class PaymentMethods extends Page
         return $schema
             ->statePath('data')
             ->components([
-                Section::make('Paiement mobile (GeniusPay)')
+                Section::make('Paiement mobile (Kpay)')
                     ->description('Désactivez ces toggles pour bloquer immédiatement les paiements Mobile Money / Orange Money sur la plateforme. Les utilisateurs verront le moyen disparaître de la modale de paiement et toute tentative d\'initialisation sera rejetée par l\'API.')
                     ->icon(Heroicon::DevicePhoneMobile)
                     ->schema([

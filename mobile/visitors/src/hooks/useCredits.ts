@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
+import { queryKeys } from '@/lib/query-keys';
 
 export interface CreditPackage {
   id: string;
@@ -25,7 +26,7 @@ interface PackagesResponse {
 /** GET /credits/packages — catalogue d'achat de crédits. */
 export function useCreditPackages(enabled = true) {
   return useQuery<PackagesResponse, Error, CreditPackage[]>({
-    queryKey: ['credit-packages'],
+    queryKey: queryKeys.creditPackages(),
     queryFn: async () => {
       const { data } = await apiClient.get<PackagesResponse>(ENDPOINTS.credits.packages);
       return data;
@@ -61,6 +62,43 @@ export function usePurchaseCredits() {
   });
 }
 
+export interface UnlockAdResponse {
+  status: 'unlocked' | 'already_unlocked' | 'owner' | 'insufficient_points';
+  message?: string;
+  point_balance?: number;
+  unlock_cost?: number;
+  packages?: unknown[];
+}
+
+/**
+ * POST /payments/initialize/{ad} — déverrouille le contact d'une annonce
+ * en dépensant des crédits. 402 = solde insuffisant (le backend joint le
+ * catalogue de packs) ; le caller route alors vers l'écran crédits.
+ */
+export function useUnlockAd() {
+  const qc = useQueryClient();
+  return useMutation<UnlockAdResponse, Error, { adId: string; slugOrId: string }>({
+    mutationFn: async ({ adId }) => {
+      const { data } = await apiClient.post<UnlockAdResponse>(
+        ENDPOINTS.payments.unlock(adId),
+      );
+      return data;
+    },
+    onSuccess: (data, { slugOrId, adId }) => {
+      // Refetch l'annonce sous ses deux identifiants possibles (slug sur la
+      // fiche, id ailleurs) pour matérialiser adresse/téléphone déverrouillés.
+      qc.invalidateQueries({ queryKey: ['ad', slugOrId] });
+      qc.invalidateQueries({ queryKey: ['ad', adId] });
+      qc.invalidateQueries({ queryKey: queryKeys.creditsBalance() });
+      qc.invalidateQueries({ queryKey: queryKeys.paymentsHistory() });
+      qc.invalidateQueries({ queryKey: ['conversations'] });
+      if (typeof data.point_balance === 'number') {
+        qc.setQueryData(queryKeys.creditsBalance(), { point_balance: data.point_balance });
+      }
+    },
+  });
+}
+
 interface VerifyResponse {
   point_balance?: number;
   status?: string;
@@ -69,7 +107,7 @@ interface VerifyResponse {
 /** POST /credits/verify-purchase — met à jour le solde dès le retour du checkout. */
 export function useVerifyCreditPurchase() {
   const qc = useQueryClient();
-  return useMutation<VerifyResponse, Error, { tx_ref?: string; reference?: string }>({
+  return useMutation<VerifyResponse, Error, { tx_ref?: string; reference?: string; gateway_redirect_status?: string }>({
     mutationFn: async (input) => {
       const { data } = await apiClient.post<VerifyResponse>(
         ENDPOINTS.credits.verifyPurchase,
@@ -78,10 +116,10 @@ export function useVerifyCreditPurchase() {
       return data;
     },
     onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['credits-balance'] });
-      qc.invalidateQueries({ queryKey: ['payments-history'] });
+      qc.invalidateQueries({ queryKey: queryKeys.creditsBalance() });
+      qc.invalidateQueries({ queryKey: queryKeys.paymentsHistory() });
       if (typeof data.point_balance === 'number') {
-        qc.setQueryData(['credits-balance'], { point_balance: data.point_balance });
+        qc.setQueryData(queryKeys.creditsBalance(), { point_balance: data.point_balance });
       }
     },
   });

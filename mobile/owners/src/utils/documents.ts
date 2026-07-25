@@ -1,10 +1,9 @@
 import Constants from 'expo-constants';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
-import * as SecureStore from 'expo-secure-store';
 import * as Sharing from 'expo-sharing';
 
-import { SESSION_KEY } from '@/auth/storage-keys';
+import { resolveBearerToken } from '@/api/client';
 
 /**
  * Marketing-document helpers (pancartes / placardes, business cards, QR
@@ -33,7 +32,7 @@ export async function downloadAuthedFile(
   path: string,
   filename: string,
 ): Promise<string> {
-  const token = await SecureStore.getItemAsync(SESSION_KEY).catch(() => null);
+  const token = await resolveBearerToken();
   const url = `${resolveBaseUrl()}${path}`;
   const target = `${FileSystem.cacheDirectory ?? ''}${filename}`;
   const result = await FileSystem.downloadAsync(url, target, {

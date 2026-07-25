@@ -8,6 +8,7 @@ import { Paragraph, XStack, YStack } from 'tamagui';
 import { CompareButton } from '@/components/CompareButton';
 import { FavoriteButton } from '@/components/FavoriteButton';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useThemeColors } from '@/theme/useThemeColors';
 import { brand } from '@/theme/tokens';
 import { t } from '@/i18n';
@@ -76,6 +77,7 @@ interface AdCardProps {
 function AdCardComponent({ ad, priority = false }: AdCardProps) {
   const colors = useThemeColors();
   const { format } = useCurrency();
+  const reducedMotion = useReducedMotion();
   const scale = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = useCallback(() => {
@@ -92,9 +94,11 @@ function AdCardComponent({ ad, priority = false }: AdCardProps) {
       toValue: 1,
       useNativeDriver: true,
       speed: 40,
-      bounciness: 4,
+      // Léger rebond au relâchement (le geste a du momentum) — supprimé
+      // sous reduced motion.
+      bounciness: reducedMotion ? 0 : 4,
     }).start();
-  }, [scale]);
+  }, [scale, reducedMotion]);
 
   const cover = ad.images.find((i) => i.is_primary) ?? ad.images[0];
   const coverUri = cover?.thumb ?? cover?.url;

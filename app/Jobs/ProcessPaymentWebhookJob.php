@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Log;
  *
  * The webhook controller verifies the signature and extracts the tx_ref
  * synchronously (fast), then hands off to this job so PHP-FPM workers are
- * freed immediately and the gateway (GeniusPay / Stripe) always receives a
+ * freed immediately and the gateway (Kpay / Stripe) always receives a
  * timely 200.
  */
 final class ProcessPaymentWebhookJob implements ShouldQueue

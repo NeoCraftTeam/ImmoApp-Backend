@@ -57,7 +57,7 @@ interface PaymentGatewayInterface
     public function handleWebhook(array $payload, array $headers, ?string $rawBody = null): array;
 
     /**
-     * Return the unique gateway identifier (e.g. 'geniuspay', 'stripe').
+     * Return the unique gateway identifier (e.g. 'kpay', 'stripe').
      */
     public function getName(): string;
 

@@ -433,6 +433,60 @@ describe('OAuth Redirect Flow (Web)', function (): void {
         $response->assertOk()
             ->assertJsonStructure(['redirect_url']);
     });
+
+    it('accepts keyhome mobile deep-link redirect_uri for visitors app', function (): void {
+        Socialite::shouldReceive('driver')
+            ->with('google')
+            ->andReturnSelf();
+        Socialite::shouldReceive('stateless')
+            ->andReturnSelf();
+        Socialite::shouldReceive('with')
+            ->withArgs(function (array $args): bool {
+                $state = json_decode(base64_decode((string) ($args['state'] ?? '')), true);
+
+                return is_array($state)
+                    && ($state['redirect_uri'] ?? '') === 'keyhome://auth/callback';
+            })
+            ->andReturnSelf();
+        Socialite::shouldReceive('redirect')
+            ->andReturnSelf();
+        Socialite::shouldReceive('getTargetUrl')
+            ->andReturn('https://accounts.google.com/oauth/authorize?...');
+
+        $response = $this->getJson(
+            '/api/v1/auth/oauth/google/redirect?redirect_uri='.urlencode('keyhome://auth/callback'),
+            ['X-KeyHome-Client' => 'keyhome-mobile-visitors'],
+        );
+
+        $response->assertOk()->assertJsonStructure(['redirect_url']);
+    });
+
+    it('accepts exp redirect_uri for Expo Go during development', function (): void {
+        Socialite::shouldReceive('driver')
+            ->with('google')
+            ->andReturnSelf();
+        Socialite::shouldReceive('stateless')
+            ->andReturnSelf();
+        Socialite::shouldReceive('with')
+            ->withArgs(function (array $args): bool {
+                $state = json_decode(base64_decode((string) ($args['state'] ?? '')), true);
+
+                return is_array($state)
+                    && ($state['redirect_uri'] ?? '') === 'exp://127.0.0.1:8081/--/auth/callback';
+            })
+            ->andReturnSelf();
+        Socialite::shouldReceive('redirect')
+            ->andReturnSelf();
+        Socialite::shouldReceive('getTargetUrl')
+            ->andReturn('https://accounts.google.com/oauth/authorize?...');
+
+        $response = $this->getJson(
+            '/api/v1/auth/oauth/google/redirect?redirect_uri='.urlencode('exp://127.0.0.1:8081/--/auth/callback'),
+            ['X-KeyHome-Client' => 'keyhome-mobile-visitors'],
+        );
+
+        $response->assertOk()->assertJsonStructure(['redirect_url']);
+    });
 });
 
 describe('OAuth Error Handling', function (): void {

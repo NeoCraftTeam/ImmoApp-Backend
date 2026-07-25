@@ -1,14 +1,16 @@
-import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import { useQueryClient } from '@tanstack/react-query';
 
-import { apiClient, setBearerToken } from '@/api/client';
+import { apiClient, onUnauthorized, setBearerToken, SCOPED_SESSION_KEY } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
+import { NON_PERSISTED_QUERY_ROOTS } from '@/lib/query-keys';
+import { disconnectEcho } from '@/services/echo';
 import { clearUserContext, trackEvent } from '@/services/monitoring';
 
 export type SocialProvider = 'google' | 'facebook' | 'github';
 
-import { SESSION_KEY } from './storage-keys';
 import { useStorageState } from './useStorageState';
 
 interface SessionContextValue {
@@ -71,17 +73,13 @@ const SessionContext = createContext<SessionContextValue | null>(null);
  * individual screens can also branch on it (e.g. show "Connectez-vous
  * pour ajouter aux favoris" on the ad-detail page).
  */
-// Clé de session cloisonnée par environnement d'API : un token émis par
-// prod n'est pas valable sur preprod/local (bases + tokens distincts).
-// Sans ce suffixe, un token périmé restait « connecté » et faisait
-// échouer /auth/me (401) → l'app redemandait la connexion. SecureStore
-// n'accepte que [A-Za-z0-9._-] → on sanitize l'hôte.
-const ENV_SUFFIX = String(apiClient.defaults.baseURL ?? 'default')
-  .replace(/[^a-zA-Z0-9]/g, '')
-  .slice(-24);
-const SCOPED_SESSION_KEY = `${SESSION_KEY}.${ENV_SUFFIX}`;
-
 export function SessionProvider({ children }: { children: ReactNode }) {
+  const qc = useQueryClient();
+  const previousTokenRef = useRef<string | null | undefined>(undefined);
+
+  // La clé scoped-par-environnement vit dans client.ts (source de vérité) :
+  // provider, fallback cold-start du request interceptor et cleanup 401
+  // lisent/écrivent tous la même entrée SecureStore.
   const [[isLoading, token], setToken] = useStorageState<string>(SCOPED_SESSION_KEY);
 
   // Sync le bearer-token cache de `apiClient` chaque fois que le token
@@ -94,15 +92,47 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setBearerToken(token);
   }, [token]);
 
+  // Purge / rafraîchit le portefeuille et le profil à chaque changement de
+  // session — évite d'afficher un solde preprod (ex. 11) après bascule prod.
+  useEffect(() => {
+    if (previousTokenRef.current === token) {
+      return;
+    }
+    previousTokenRef.current = token;
+
+    if (token) {
+      for (const root of NON_PERSISTED_QUERY_ROOTS) {
+        void qc.invalidateQueries({ queryKey: [root] });
+      }
+      return;
+    }
+
+    for (const root of NON_PERSISTED_QUERY_ROOTS) {
+      qc.removeQueries({ queryKey: [root] });
+    }
+  }, [token, qc]);
+
+  // 401 « session expirée » détecté par l'intercepteur Axios → on flippe
+  // immédiatement le state React (l'intercepteur a déjà purgé SecureStore
+  // et la cache bearer). Sans ça l'UI restait « connectée » jusqu'au
+  // prochain /auth/me raté sur l'onglet Compte.
+  useEffect(() => {
+    return onUnauthorized(() => {
+      disconnectEcho();
+      setToken(null);
+    });
+  }, [setToken]);
+
   const value = useMemo<SessionContextValue>(
     () => ({
       token,
       isLoading,
       isAuthenticated: token !== null,
       signIn: async (email, password) => {
+        const normalizedEmail = email.trim().toLowerCase();
         const { data } = await apiClient.post<LoginResponse>(
           ENDPOINTS.auth.login,
-          { email, password },
+          { email: normalizedEmail, password, login_context: 'client' },
         );
         const accessToken = data?.access_token ?? data?.token;
         if (typeof accessToken !== 'string' || accessToken === '') {
@@ -175,6 +205,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signOut: () => {
         trackEvent('auth.signOut');
         clearUserContext();
+        // Coupe la connexion WebSocket AVANT de révoquer le token — sinon
+        // le socket Reverb survit avec les credentials de l'ancien user.
+        disconnectEcho();
         // Révoque le token côté serveur (best-effort, AVANT de vider le
         // bearer local — sinon la requête part sans Authorization).
         void apiClient.post(ENDPOINTS.auth.logout).catch(() => {});

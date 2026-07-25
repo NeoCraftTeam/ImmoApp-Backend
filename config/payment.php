@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'default' => env('PAYMENT_DEFAULT_GATEWAY', 'geniuspay'),
+    'default' => env('PAYMENT_DEFAULT_GATEWAY', 'kpay'),
 
     /*
     |--------------------------------------------------------------------------
@@ -35,13 +35,12 @@ return [
 
     'gateways' => [
 
-        'geniuspay' => [
-            'api_key' => env('GENIUSPAY_API_KEY'),
-            'api_secret' => env('GENIUSPAY_API_SECRET'),
-            'webhook_secret' => env('GENIUSPAY_WEBHOOK_SECRET'),
-            'base_url' => env('GENIUSPAY_BASE_URL', 'https://pay.genius.ci/api/v1/merchant'),
-            'redirect_url' => env('GENIUSPAY_REDIRECT_URL'),
-            'default_country' => env('GENIUSPAY_DEFAULT_COUNTRY', 'CM'),
+        'kpay' => [
+            'api_key' => env('KPAY_API_KEY'),
+            'api_secret' => env('KPAY_API_SECRET'),
+            'webhook_secret' => env('KPAY_WEBHOOK_SECRET'),
+            'base_url' => env('KPAY_BASE_URL', 'https://admin.kpay.site'),
+            'redirect_url' => env('KPAY_REDIRECT_URL'),
         ],
 
     ],
@@ -83,13 +82,14 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | GeniusPay payment_method codes (optional — omit for hosted checkout)
+    | Stale pending reconciliation
     |--------------------------------------------------------------------------
+    |
+    | Pending payments older than this many hours are re-verified then marked
+    | failed when the gateway still reports no success (abandoned checkouts).
+    |
     */
 
-    'geniuspay_payment_methods' => [
-        'mobile_money' => 'mtn_money',
-        'orange_money' => 'orange_money',
-    ],
+    'stale_pending_hours' => (int) env('PAYMENT_STALE_PENDING_HOURS', 6),
 
 ];

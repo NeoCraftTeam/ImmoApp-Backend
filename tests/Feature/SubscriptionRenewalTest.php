@@ -18,9 +18,9 @@ uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
     Mail::fake();
-    config()->set('payment.gateways.geniuspay.api_key', 'pk_sandbox_test_fake');
-    config()->set('payment.gateways.geniuspay.api_secret', 'sk_sandbox_test_fake');
-    config()->set('payment.gateways.geniuspay.redirect_url', 'https://test.app/payment/callback');
+    config()->set('payment.gateways.kpay.api_key', 'pk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.redirect_url', 'https://test.app/payment/callback');
 
     $this->plan = SubscriptionPlan::create([
         'name' => 'Premium',
@@ -107,12 +107,10 @@ it('returns 403 when user has no agency', function (): void {
 
 it('sends renewal reminder for auto-renew subscriptions expiring in 3 days', function (): void {
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'checkout_url' => 'https://pay.genius.ci/checkout/renewal-123',
-                'reference' => 'MTX-RENEWAL-123',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_renewal_123',
+            'reference' => 'KPAY-RENEWAL-123',
+            'gatewayUrl' => 'https://admin.kpay.site/gateway/renewal-123',
         ]),
     ]);
 
@@ -132,7 +130,7 @@ it('sends renewal reminder for auto-renew subscriptions expiring in 3 days', fun
 
     expect($count)->toBe(1);
 
-    Mail::assertQueued(SubscriptionRenewalReminderMail::class, fn ($mail) => $mail->paymentUrl === 'https://pay.genius.ci/checkout/renewal-123');
+    Mail::assertQueued(SubscriptionRenewalReminderMail::class, fn ($mail) => $mail->paymentUrl === 'https://admin.kpay.site/gateway/renewal-123');
 });
 
 it('does not send renewal for subscriptions without auto-renew', function (): void {
@@ -219,12 +217,10 @@ it('expires non-auto-renew subscriptions immediately', function (): void {
 
 it('creates a payment record for renewal', function (): void {
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'checkout_url' => 'https://pay.genius.ci/checkout/renewal-456',
-                'reference' => 'MTX-RENEWAL-456',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_renewal_456',
+            'reference' => 'KPAY-RENEWAL-456',
+            'gatewayUrl' => 'https://admin.kpay.site/gateway/renewal-456',
         ]),
     ]);
 

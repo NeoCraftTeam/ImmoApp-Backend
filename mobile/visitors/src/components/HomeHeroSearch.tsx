@@ -340,7 +340,7 @@ export function HomeHeroSearch() {
                     <SearchIcon size={18} color="white" />
                   )}
                   <Paragraph fontSize={15} fontWeight="800" color="white">
-                    {parse.isPending ? 'Analyse en cours…' : 'Rechercher'}
+                    {parse.isPending ? 'Recherche en cours…' : 'Rechercher'}
                   </Paragraph>
                 </XStack>
               </Pressable>

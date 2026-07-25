@@ -15,24 +15,22 @@ use Illuminate\Support\Facades\Http;
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
-    config()->set('payment.default', 'geniuspay');
-    config()->set('payment.gateways.geniuspay.api_key', 'pk_sandbox_test_fake');
-    config()->set('payment.gateways.geniuspay.api_secret', 'sk_sandbox_test_fake');
-    config()->set('payment.gateways.geniuspay.webhook_secret', 'whsec_sandbox_test_secret_123');
-    config()->set('payment.gateways.geniuspay.base_url', 'https://pay.genius.ci/api/v1/merchant');
-    config()->set('payment.gateways.geniuspay.redirect_url', 'https://test.app/payment/callback');
+    config()->set('payment.default', 'kpay');
+    config()->set('payment.gateways.kpay.api_key', 'pk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.webhook_secret', 'whsec_sandbox_test_secret_123');
+    config()->set('payment.gateways.kpay.base_url', 'https://admin.kpay.site');
+    config()->set('payment.gateways.kpay.redirect_url', 'https://test.app/payment/callback');
 });
 
 // ─── CRÉATION ────────────────────────────────────────────────────────────
 
 it('should create pending payment in database when payment is initiated', function (): void {
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'reference' => 'MTX-SVC-001',
-                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-SVC-001',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_MTX_SVC_001',
+            'reference' => 'KPAY-MTX-SVC-001',
+            'gatewayUrl' => 'https://admin.kpay.site/gateway/gw_MTX_SVC_001',
         ], 201),
     ]);
 
@@ -51,25 +49,23 @@ it('should create pending payment in database when payment is initiated', functi
     $this->assertDatabaseHas('payments', [
         'user_id' => $user->id,
         'status' => PaymentStatus::PENDING->value,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => 150000,
     ]);
 
     Http::assertSent(function (Request $request) use ($result): bool {
-        $successUrl = (string) ($request->data()['success_url'] ?? '');
+        $returnUrl = (string) ($request->data()['returnUrl'] ?? '');
 
-        return str_contains($successUrl, 'tx_ref='.urlencode($result['tx_ref']));
+        return str_contains($returnUrl, 'tx_ref='.urlencode($result['tx_ref']));
     });
 });
 
 it('should return payment link when payment is created', function (): void {
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'reference' => 'MTX-SVC-001',
-                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-SVC-001',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_MTX_SVC_001',
+            'reference' => 'KPAY-MTX-SVC-001',
+            'gatewayUrl' => 'https://admin.kpay.site/gateway/gw_MTX_SVC_001',
         ], 201),
     ]);
 
@@ -83,18 +79,16 @@ it('should return payment link when payment is created', function (): void {
 
     expect($result)
         ->toHaveKey('link')
-        ->and($result['link'])->toContain('pay.genius.ci/checkout');
+        ->and($result['link'])->toContain('admin.kpay.site/gateway');
 });
 
 it('should fire PaymentInitiated event when payment is created', function (): void {
     Event::fake();
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'reference' => 'MTX-SVC-001',
-                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-SVC-001',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_MTX_SVC_001',
+            'reference' => 'KPAY-MTX-SVC-001',
+            'gatewayUrl' => 'https://admin.kpay.site/gateway/gw_MTX_SVC_001',
         ], 201),
     ]);
 
@@ -111,7 +105,7 @@ it('should fire PaymentInitiated event when payment is created', function (): vo
 
 it('should mark payment as failed when gateway throws exception', function (): void {
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
+        'admin.kpay.site/*' => Http::response([
             'success' => false,
             'error' => ['message' => 'Bad request'],
         ], 400),
@@ -142,23 +136,21 @@ it('should mark payment as success when gateway confirms payment', function (): 
     Event::fake();
 
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'reference' => 'MTX-VERIFY-OK',
-                'status' => 'completed',
-                'amount' => 10000,
-                'currency' => 'XAF',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_MTX_VERIFY_OK',
+            'reference' => 'KPAY-MTX-VERIFY-OK',
+            'status' => 'COMPLETED',
+            'amount' => 10000,
+            'currency' => 'XAF',
         ], 200),
     ]);
 
     $user = User::factory()->create();
     $payment = Payment::factory()->pending()->create([
         'user_id' => $user->id,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => 10000,
-        'gateway_response' => ['genius_reference' => 'MTX-VERIFY-OK'],
+        'gateway_response' => ['kpay_id' => 'pay_MTX_VERIFY_OK'],
     ]);
 
     $service = app(PaymentService::class);
@@ -168,18 +160,16 @@ it('should mark payment as success when gateway confirms payment', function (): 
     Event::assertDispatched(PaymentSucceeded::class);
 });
 
-it('reopens FAILED geniuspay payment when sync confirms completed', function (): void {
+it('reopens FAILED kpay payment when sync confirms completed', function (): void {
     Event::fake();
 
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'reference' => 'SANDBOX-REOPEN-001',
-                'status' => 'completed',
-                'amount' => 10000,
-                'currency' => 'XOF',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_SANDBOX_REOPEN_001',
+            'reference' => 'KPAY-SANDBOX-REOPEN-001',
+            'status' => 'COMPLETED',
+            'amount' => 10000,
+            'currency' => 'XOF',
         ], 200),
     ]);
 
@@ -187,9 +177,9 @@ it('reopens FAILED geniuspay payment when sync confirms completed', function ():
     $payment = Payment::factory()->create([
         'user_id' => $user->id,
         'status' => PaymentStatus::FAILED,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => 10000,
-        'gateway_response' => ['genius_reference' => 'SANDBOX-REOPEN-001'],
+        'gateway_response' => ['kpay_id' => 'pay_SANDBOX_REOPEN_001'],
     ]);
 
     $service = app(PaymentService::class);
@@ -203,7 +193,7 @@ it('should return cached success without calling gateway when already paid', fun
     Http::preventStrayRequests();
 
     $payment = Payment::factory()->success()->create([
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
     ]);
 
     $service = app(PaymentService::class);
@@ -217,35 +207,32 @@ it('should fire PaymentSucceeded event only once for duplicate webhooks', functi
     Event::fake();
 
     $payment = Payment::factory()->pending()->create([
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => 150000,
     ]);
 
-    $secret = config('payment.gateways.geniuspay.webhook_secret');
-    $timestamp = time();
+    $secret = config('payment.gateways.kpay.webhook_secret');
     $webhookPayload = [
-        'event' => 'payment.success',
-        'data' => [
-            'reference' => 'MTX-DUP-001',
-            'status' => 'completed',
-            'amount' => 150000,
-            'currency' => 'XAF',
-            'metadata' => ['tx_ref' => $payment->transaction_id],
-        ],
+        'event' => 'payment.completed',
+        'paymentId' => 'pay_dup_001',
+        'reference' => 'KPAY-DUP-001',
+        'status' => 'COMPLETED',
+        'amount' => 150000,
+        'currency' => 'XAF',
+        'externalId' => $payment->transaction_id,
     ];
-    $encoded = json_encode($webhookPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    $signature = hash_hmac('sha256', $timestamp.'.'.$encoded, (string) $secret);
+    $rawBody = json_encode($webhookPayload, JSON_UNESCAPED_UNICODE);
+    $signature = hash_hmac('sha256', (string) $rawBody, (string) $secret);
     $headers = [
-        'X-Webhook-Signature' => $signature,
-        'X-Webhook-Timestamp' => (string) $timestamp,
-        'X-Webhook-Event' => 'payment.success',
+        'X-KPAY-Signature' => $signature,
+        'X-KPAY-Event' => 'payment.completed',
     ];
 
     $service = app(PaymentService::class);
 
-    $service->processWebhook($webhookPayload, $headers, 'geniuspay');
-    $service->processWebhook($webhookPayload, $headers, 'geniuspay');
-    $service->processWebhook($webhookPayload, $headers, 'geniuspay');
+    $service->processWebhook($webhookPayload, $headers, 'kpay', (string) $rawBody);
+    $service->processWebhook($webhookPayload, $headers, 'kpay', (string) $rawBody);
+    $service->processWebhook($webhookPayload, $headers, 'kpay', (string) $rawBody);
 
     Event::assertDispatchedTimes(PaymentSucceeded::class, 1);
 });
@@ -259,7 +246,7 @@ it('should prevent user from verifying another users payment', function (): void
     Payment::factory()->pending()->create([
         'transaction_id' => 'KH-NOTMINE',
         'user_id' => $owner->id,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
     ]);
 
     $response = $this->actingAs($intruder)

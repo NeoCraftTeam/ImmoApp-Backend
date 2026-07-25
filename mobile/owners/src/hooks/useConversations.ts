@@ -32,8 +32,8 @@ export function useConversations(enabled = true) {
   });
 }
 
-/** GET /conversations/{id}/messages — thread complet (avec polling 4s). */
-export function useConversation(id: string | undefined) {
+/** GET /conversations/{id}/messages — thread complet (polling adaptatif). */
+export function useConversation(id: string | undefined, realtimeConnected = false) {
   return useQuery<MessagesResponse, Error, ConversationMessage[]>({
     queryKey: ['owner-conversation-messages', id],
     queryFn: async () => {
@@ -46,7 +46,7 @@ export function useConversation(id: string | undefined) {
     select: (p) => (Array.isArray(p?.data) ? p.data : []),
     enabled: !!id,
     staleTime: 2 * 1000,
-    refetchInterval: 4 * 1000,
+    refetchInterval: realtimeConnected ? 30 * 1000 : 4 * 1000,
   });
 }
 
@@ -73,6 +73,7 @@ export function useSendMessage(id: string | undefined) {
         body,
         created_at: new Date().toISOString(),
         client_id: tempId,
+        is_optimistic: true,
       };
       qc.setQueryData<{ data: ConversationMessage[] } | undefined>(
         ['owner-conversation-messages', id],
@@ -86,6 +87,21 @@ export function useSendMessage(id: string | undefined) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['owner-conversation-messages', id] });
       qc.invalidateQueries({ queryKey: ['owner-conversations'] });
+    },
+    onError: (_err, _body, ctx) => {
+      if (!id || !ctx?.tempId) return;
+      qc.setQueryData<{ data: ConversationMessage[] } | undefined>(
+        ['owner-conversation-messages', id],
+        (prev) => {
+          if (!prev) return prev;
+          const list = Array.isArray(prev.data) ? prev.data : [];
+          return {
+            data: list.map((m) =>
+              m.uuid === ctx.tempId ? { ...m, is_failed: true, is_optimistic: false } : m,
+            ),
+          };
+        },
+      );
     },
   });
 }
@@ -139,20 +155,34 @@ export function useToggleReaction(conversationId: string | undefined) {
 }
 
 /**
- * Envoi d'une pièce jointe (photo) — multipart `file`, POST
- * /conversations/{uuid}/attachments. Invalide le fil au retour.
+ * Envoi d'une pièce jointe (photo) — upload multipart puis création du
+ * message avec le descripteur renvoyé (l'upload seul ne crée pas de
+ * message côté backend).
  */
 export function useUploadAttachment(id: string | undefined) {
   const qc = useQueryClient();
-  return useMutation<unknown, Error, { uri: string; name: string; type: string }>({
+  return useMutation<ConversationMessage, Error, { uri: string; name: string; type: string }>({
     mutationFn: async (file) => {
       if (!id) throw new Error('Missing conversation id');
       const form = new FormData();
       form.append('file', file as unknown as Blob);
-      const { data } = await apiClient.post(ENDPOINTS.chat.attachments(id), form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      return data;
+      const { data: uploadRes } = await apiClient.post<{ data: Record<string, unknown> }>(
+        ENDPOINTS.chat.attachments(id),
+        form,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+      );
+      const descriptor = (uploadRes?.data ?? uploadRes) as Record<string, unknown>;
+      if (typeof descriptor.url !== 'string' || typeof descriptor.signed_url !== 'string') {
+        throw new Error('Réponse pièce jointe invalide.');
+      }
+      const { data: msgRes } = await apiClient.post<{ data: ConversationMessage }>(
+        ENDPOINTS.chat.sendMessage(id),
+        {
+          type: descriptor.type ?? 'image',
+          attachments: [descriptor],
+        },
+      );
+      return msgRes.data ?? (msgRes as unknown as ConversationMessage);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['owner-conversation-messages', id] });

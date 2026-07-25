@@ -202,7 +202,7 @@ final class SubscriptionController
      *
      *         @OA\JsonContent(
      *
-     *             @OA\Property(property="payment_url", type="string", description="URL vers laquelle rediriger l'utilisateur pour payer", example="https://pay.genius.ci/checkout/..."),
+     *             @OA\Property(property="payment_url", type="string", description="URL vers laquelle rediriger l'utilisateur pour payer", example="https://admin.kpay.site/gateway/..."),
      *             @OA\Property(property="message", type="string", example="Redirigez l'utilisateur vers cette URL pour payer.")
      *         )
      *     ),

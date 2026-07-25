@@ -254,7 +254,7 @@ final class CreditController
                 'nullable',
                 'string',
                 'max:255',
-                'regex:/^(MTX-|SANDBOX_)[A-Z0-9_-]+$/i',
+                'regex:'.PaymentTransactionLookup::gatewayReferenceValidationPattern(),
             ],
             'gateway_redirect_status' => [
                 'nullable',
@@ -265,7 +265,7 @@ final class CreditController
 
         $user = $request->user();
 
-        // Target the exact checkout session via KH tx_ref or GeniusPay reference.
+        // Target the exact checkout session via KH tx_ref or Kpay reference.
         // Falls back to "latest credit purchase" only when neither is supplied (legacy).
         $payment = PaymentTransactionLookup::findForUser(
             $user,
@@ -305,12 +305,19 @@ final class CreditController
             ]);
         }
 
-        // PENDING / FAILED / CANCELLED — re-query GeniusPay (sandbox may complete
+        // PENDING / FAILED / CANCELLED — re-query Kpay (sandbox may complete
         // after an early failed verify; syncPaymentStatus reopens orphan debits).
         $synced = $this->paymentService->syncPaymentStatus(
             $payment,
             $validated['reference'] ?? null,
         );
+
+        if ($synced->status === PaymentStatus::PENDING && !empty($validated['gateway_redirect_status'])) {
+            $synced = $this->paymentService->applySafeRedirectTerminalHint(
+                $synced,
+                $validated['gateway_redirect_status'],
+            );
+        }
 
         if ($synced->status === PaymentStatus::SUCCESS) {
             $this->postPaymentActions->execute($synced, (array) ($synced->gateway_response ?? []));
@@ -322,7 +329,7 @@ final class CreditController
             ]);
         }
 
-        if ($synced->status === PaymentStatus::FAILED) {
+        if ($synced->status === PaymentStatus::FAILED || $synced->status === PaymentStatus::CANCELLED) {
             return response()->json([
                 'status' => 'failed',
                 'message' => 'Le paiement n\'a pas abouti.',
@@ -331,7 +338,7 @@ final class CreditController
         }
 
         // PENDING — keep pending. The legitimate confirmation path is the
-        // signed GeniusPay webhook (PaymentService::processWebhook, HMAC-verified),
+        // signed Kpay webhook (PaymentService::processWebhook, HMAC-verified),
         // not a client-supplied hint. The previous build trusted the
         // `gateway_redirect_status` query string returned by the hosted-checkout
         // redirect to force-promote pending → success when the gateway's verify

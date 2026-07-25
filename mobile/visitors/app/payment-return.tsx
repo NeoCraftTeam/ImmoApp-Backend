@@ -16,7 +16,7 @@ import PaymentSuccess from './payment-success';
 export default function PaymentReturn() {
   // Consume the params so the inner Suspense / link doesn't re-render
   // with empty state if Expo Router introspects them.
-  useLocalSearchParams<{ tx_ref?: string; txRef?: string }>();
+  useLocalSearchParams<{ tx_ref?: string; txRef?: string; reference?: string; paymentId?: string }>();
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />

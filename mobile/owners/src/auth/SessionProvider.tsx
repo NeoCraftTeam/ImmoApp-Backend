@@ -2,14 +2,14 @@ import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'r
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 
-import { apiClient, setBearerToken } from '@/api/client';
+import { apiClient, onUnauthorized, setBearerToken, SCOPED_SESSION_KEY } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
+import { disconnectEcho } from '@/services/echo';
 import {
   clearUserContext,
   trackEvent,
 } from '@/services/monitoring';
 
-import { SESSION_KEY } from './storage-keys';
 import { useStorageState } from './useStorageState';
 
 interface SessionContextValue {
@@ -73,14 +73,7 @@ const SessionContext = createContext<SessionContextValue | null>(null);
  * groups — unlike the visitor app, the owner app requires sign-in
  * before any dashboard surface is reachable.
  */
-// Clé de session cloisonnée par environnement d'API (voir visitors) :
-// évite qu'un token d'un serveur reste « connecté » sur un autre → 401
-// sur /auth/me → redemande de connexion. SecureStore = [A-Za-z0-9._-].
-const ENV_SUFFIX = String(apiClient.defaults.baseURL ?? 'default')
-  .replace(/[^a-zA-Z0-9]/g, '')
-  .slice(-24);
-const SCOPED_SESSION_KEY = `${SESSION_KEY}.${ENV_SUFFIX}`;
-
+// Clé scoped-par-environnement : source de vérité dans client.ts (SCOPED_SESSION_KEY).
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [[isLoading, token], setToken] = useStorageState<string>(SCOPED_SESSION_KEY);
 
@@ -90,15 +83,23 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setBearerToken(token);
   }, [token]);
 
+  useEffect(() => {
+    return onUnauthorized(() => {
+      disconnectEcho();
+      setToken(null);
+    });
+  }, [setToken]);
+
   const value = useMemo<SessionContextValue>(
     () => ({
       token,
       isLoading,
       isAuthenticated: token !== null,
       signIn: async (email, password) => {
+        const normalizedEmail = email.trim().toLowerCase();
         const { data } = await apiClient.post<LoginResponse>(
           ENDPOINTS.auth.login,
-          { email, password },
+          { email: normalizedEmail, password, login_context: 'owner' },
         );
         const accessToken = data?.access_token ?? data?.token;
         if (typeof accessToken !== 'string' || accessToken === '') {
@@ -171,6 +172,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signOut: () => {
         trackEvent('auth.signOut');
         clearUserContext();
+        disconnectEcho();
         // Révoque le token côté serveur (best-effort, AVANT de vider le
         // bearer local — sinon la requête part sans Authorization).
         void apiClient.post(ENDPOINTS.auth.logout).catch(() => {});

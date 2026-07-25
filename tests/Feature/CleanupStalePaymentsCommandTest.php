@@ -5,25 +5,25 @@ declare(strict_types=1);
 use App\Contracts\PaymentGatewayInterface;
 use App\Enums\PaymentStatus;
 use App\Models\Payment;
-use App\Services\Payment\GeniusPayPaymentService;
+use App\Services\Payment\KpayPaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
 /**
  * Fausse passerelle : `verify()` renvoie toujours l'état passé au constructeur.
- * Bindée à la place de GeniusPay pour que la commande de réconciliation
+ * Bindée à la place de Kpay pour que la commande de réconciliation
  * interroge une passerelle déterministe (pas de HTTP réel).
  */
 function fakeGateway(string $status): PaymentGatewayInterface
 {
-    return new class($status) implements PaymentGatewayInterface
+    return new readonly class($status) implements PaymentGatewayInterface
     {
         public function __construct(private string $status) {}
 
         public function initiate(array $payload): array
         {
-            return ['link' => '', 'tx_ref' => '', 'status' => 'pending', 'gateway' => 'geniuspay'];
+            return ['link' => '', 'tx_ref' => '', 'status' => 'pending', 'gateway' => 'kpay'];
         }
 
         public function verify(string $externalReference): array
@@ -45,7 +45,7 @@ function fakeGateway(string $status): PaymentGatewayInterface
 
         public function getName(): string
         {
-            return 'geniuspay';
+            return 'kpay';
         }
 
         public function refund(string $gatewayTransactionId, ?float $amount = null): array
@@ -55,11 +55,11 @@ function fakeGateway(string $status): PaymentGatewayInterface
     };
 }
 
-it('marks a still-pending stale payment as failed after reconciliation', function () {
+it('marks a still-pending stale payment as failed after reconciliation', function (): void {
     // La passerelle confirme que le paiement est toujours en attente (abandonné).
-    $this->app->instance(GeniusPayPaymentService::class, fakeGateway('pending'));
+    $this->app->instance(KpayPaymentService::class, fakeGateway('pending'));
 
-    $payment = Payment::factory()->pending()->geniuspay()->create([
+    $payment = Payment::factory()->pending()->kpay()->create([
         'created_at' => now()->subHours(48),
     ]);
 
@@ -68,10 +68,10 @@ it('marks a still-pending stale payment as failed after reconciliation', functio
     expect($payment->fresh()->status)->toBe(PaymentStatus::FAILED);
 });
 
-it('ignores recent pending payments (within the window)', function () {
-    $this->app->instance(GeniusPayPaymentService::class, fakeGateway('pending'));
+it('ignores recent pending payments (within the window)', function (): void {
+    $this->app->instance(KpayPaymentService::class, fakeGateway('pending'));
 
-    $payment = Payment::factory()->pending()->geniuspay()->create([
+    $payment = Payment::factory()->pending()->kpay()->create([
         'created_at' => now()->subMinutes(30),
     ]);
 
@@ -80,10 +80,10 @@ it('ignores recent pending payments (within the window)', function () {
     expect($payment->fresh()->status)->toBe(PaymentStatus::PENDING);
 });
 
-it('never re-opens a payment already marked success', function () {
-    $this->app->instance(GeniusPayPaymentService::class, fakeGateway('pending'));
+it('never re-opens a payment already marked success', function (): void {
+    $this->app->instance(KpayPaymentService::class, fakeGateway('pending'));
 
-    $payment = Payment::factory()->success()->geniuspay()->create([
+    $payment = Payment::factory()->success()->kpay()->create([
         'created_at' => now()->subHours(48),
     ]);
 

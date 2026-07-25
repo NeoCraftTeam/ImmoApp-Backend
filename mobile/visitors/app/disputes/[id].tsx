@@ -1,5 +1,5 @@
 import { ArrowLeft, FileText, Paperclip, Send } from '@tamagui/lucide-icons';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';

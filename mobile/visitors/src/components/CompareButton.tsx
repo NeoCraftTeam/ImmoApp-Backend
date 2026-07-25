@@ -1,8 +1,10 @@
 import { GitCompareArrows } from '@tamagui/lucide-icons';
 import * as Haptics from 'expo-haptics';
-import { useCallback } from 'react';
-import { Pressable } from 'react-native';
+import { useCallback, useRef } from 'react';
+import { Animated, Pressable } from 'react-native';
 import { YStack } from 'tamagui';
+
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 import { COMPARE_MAX_ITEMS, useCompare } from '@/providers/CompareProvider';
 import { useThemeColors } from '@/theme/useThemeColors';
@@ -26,7 +28,27 @@ interface Props {
 export function CompareButton({ ad, size = 'small' }: Props) {
   const colors = useThemeColors();
   const { isCompared, isFull, toggle } = useCompare();
+  const reducedMotion = useReducedMotion();
   const active = isCompared(ad.id);
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = useCallback(() => {
+    Animated.spring(scale, {
+      toValue: 0.92,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 0,
+    }).start();
+  }, [scale]);
+
+  const handlePressOut = useCallback(() => {
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: reducedMotion ? 0 : 4,
+    }).start();
+  }, [scale, reducedMotion]);
 
   const handlePress = useCallback(() => {
     if (!active && isFull) {
@@ -46,6 +68,8 @@ export function CompareButton({ ad, size = 'small' }: Props) {
   return (
     <Pressable
       onPress={handlePress}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       hitSlop={8}
       accessibilityRole="button"
       accessibilityState={{ selected: active, disabled: !active && isFull }}
@@ -57,6 +81,7 @@ export function CompareButton({ ad, size = 'small' }: Props) {
             : 'Ajouter à la comparaison'
       }
     >
+      <Animated.View style={{ transform: [{ scale }] }}>
       <YStack
         width={chipSize}
         height={chipSize}
@@ -70,6 +95,7 @@ export function CompareButton({ ad, size = 'small' }: Props) {
           color={active ? '$brandText' : colors.mutedIcon}
         />
       </YStack>
+      </Animated.View>
     </Pressable>
   );
 }

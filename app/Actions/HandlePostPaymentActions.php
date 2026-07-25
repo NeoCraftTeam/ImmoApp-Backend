@@ -180,16 +180,22 @@ final readonly class HandlePostPaymentActions
 
         Log::info("Points crédités: {$package->points_awarded} → user {$buyer->id}");
 
-        try {
-            Mail::to($buyer->email)->send(new CreditPurchaseConfirmationMail(
-                $buyer,
-                $package,
-                $payment,
-                (int) $buyer->fresh()->point_balance,
-            ));
-        } catch (\Exception $e) {
-            Log::error('Erreur email achat crédits: '.$e->getMessage());
-        }
+        $balance = (int) ($buyer->fresh()->point_balance ?? 0);
+
+        // The SMTP send must never run inside the surrounding DB transaction:
+        // a slow or crashing mail transport would roll back the credit itself.
+        DB::afterCommit(function () use ($buyer, $package, $payment, $balance): void {
+            try {
+                Mail::to($buyer->email)->send(new CreditPurchaseConfirmationMail(
+                    $buyer,
+                    $package,
+                    $payment,
+                    $balance,
+                ));
+            } catch (\Throwable $e) {
+                Log::error('Erreur email achat crédits: '.$e->getMessage());
+            }
+        });
     }
 
     /**

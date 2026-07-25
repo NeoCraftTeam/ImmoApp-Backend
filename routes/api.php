@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\Ad\DuplicateAdController;
 use App\Http\Controllers\Api\V1\Auth\ClerkWebhookController;
 use App\Http\Controllers\Api\V1\Auth\LoginHistoryController;
 use App\Http\Controllers\Api\V1\Auth\SessionController;
+use App\Http\Controllers\Api\V1\AuthPublicConfigController;
 use App\Http\Controllers\Api\V1\Chat\ChatE2eeIdentityController;
 use App\Http\Controllers\Api\V1\Chat\ConversationController;
 use App\Http\Controllers\Api\V1\Chat\MessageController;
@@ -68,6 +69,9 @@ Route::get('/health', HealthCheckController::class)
 Route::prefix('v1')->group(function (): void {
 
     Route::get('/config/turnstile', TurnstilePublicConfigController::class)
+        ->middleware('throttle:120,1');
+
+    Route::get('/config/auth', AuthPublicConfigController::class)
         ->middleware('throttle:120,1');
 
     // Domain route files
@@ -333,7 +337,7 @@ Route::prefix('v1')->group(function (): void {
 
     // --- RENT PAYMENTS (owner, per lease contract) ---
     // Manual ledger for out-of-band rent collection (cash / mobile money /
-    // bank transfer). Distinct from `/payments` (Stripe + GeniusPay for
+    // bank transfer). Distinct from `/payments` (Stripe + Kpay for
     // platform fees) — see App\Models\RentPayment for the rationale.
     Route::middleware(['auth:sanctum', 'owner.role'])->group(function (): void {
         Route::get('/my/lease-contracts/{leaseContract}/rent-payments', [RentPaymentController::class, 'index']);

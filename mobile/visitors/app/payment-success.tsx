@@ -20,8 +20,17 @@ const POLLING_TIMEOUT_MS = 60_000;
 export default function PaymentSuccess() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { tx_ref, txRef } = useLocalSearchParams<{ tx_ref?: string; txRef?: string }>();
-  const ref = tx_ref ?? txRef;
+  const { tx_ref, txRef, reference, paymentId } = useLocalSearchParams<{
+    tx_ref?: string;
+    txRef?: string;
+    reference?: string;
+    paymentId?: string;
+  }>();
+  const ref =
+    (typeof tx_ref === 'string' && tx_ref !== '' ? tx_ref : undefined) ??
+    (typeof txRef === 'string' && txRef !== '' ? txRef : undefined) ??
+    (typeof reference === 'string' && reference !== '' ? reference : undefined) ??
+    (typeof paymentId === 'string' && paymentId !== '' ? paymentId : undefined);
   const { data, isLoading, refetch } = usePublicPaymentStatus(ref);
 
   // Timeout 60 s : on stoppe le poll perçu et on bascule en "long"

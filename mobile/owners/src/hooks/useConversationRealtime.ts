@@ -1,40 +1,45 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
-import { subscribePrivate } from '@/services/echo';
+import { isEchoConfigured, subscribePrivate } from '@/services/echo';
 import type { ConversationMessage } from '@/types/conversation';
 
+export interface RealtimeState {
+  isConnected: boolean;
+}
+
 /**
- * Branche le thread sur Reverb pour 4 events :
- * - `message.sent` → ajoute le message dans le cache
- * - `messages.read` → bascule `read_at` côté UI
- * - `message.deleted` → retire le message
- * - `user.typing` → callback exposé pour afficher un indicateur
- *
- * `onTyping` est typé en props plutôt que côté event listener brut pour
- * laisser le screen gérer le state local. Cleanup auto via useEffect.
+ * Branche le thread sur Reverb et synchronise le cache TanStack Query.
+ * Sans config Reverb, no-op — le polling du hook `useConversation` reste
+ * la source de vérité.
  */
 export function useConversationRealtime(
   conversationId: string | undefined,
   onTyping?: (userId: string) => void,
-): void {
+): RealtimeState {
   const qc = useQueryClient();
+  const [state, setState] = useState<RealtimeState>({ isConnected: false });
 
   useEffect(() => {
     if (!conversationId) return;
 
-    return subscribePrivate(
+    const unsubscribe = subscribePrivate(
       `conversation.${conversationId}`,
-      ['message.sent', 'messages.read', 'message.deleted', 'user.typing'],
+      [
+        'message.sent',
+        'messages.read',
+        'message.deleted',
+        'message.reaction.added',
+        'message.reaction.removed',
+        'user.typing',
+      ],
       (event, raw) => {
-        // Les events backend sont PLATS : `message.sent` diffuse le message
-        // au niveau racine ({uuid, conversation_uuid, …}), pas sous `message`.
-        // `message.deleted` diffuse `{ message_uuid }`. On tolère les deux formes.
         const data = raw as {
           message?: ConversationMessage;
           uuid?: string;
           message_uuid?: string;
           user_id?: string;
+          emoji?: string;
         };
         if (event === 'message.sent') {
           const msg = (data?.message ?? (data as ConversationMessage)) as ConversationMessage;
@@ -64,10 +69,24 @@ export function useConversationRealtime(
             },
           );
         }
+        if (
+          (event === 'message.reaction.added' || event === 'message.reaction.removed')
+          && data?.message_uuid
+        ) {
+          qc.invalidateQueries({ queryKey: ['owner-conversation-messages', conversationId] });
+        }
         if (event === 'user.typing' && data?.user_id && onTyping) {
           onTyping(data.user_id);
         }
       },
     );
+
+    setState({ isConnected: isEchoConfigured() });
+    return () => {
+      unsubscribe();
+      setState({ isConnected: false });
+    };
   }, [conversationId, onTyping, qc]);
+
+  return state;
 }

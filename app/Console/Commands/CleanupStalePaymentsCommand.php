@@ -15,13 +15,13 @@ use Throwable;
 
 class CleanupStalePaymentsCommand extends Command
 {
-    protected $signature = 'app:cleanup-stale-payments {--hours=24 : Hours after which a pending payment is considered stale}';
+    protected $signature = 'app:cleanup-stale-payments {--hours= : Hours after which a pending payment is considered stale}';
 
     protected $description = 'Reconcile stale PENDING payments with the gateway, then mark the truly-abandoned ones as FAILED and notify admins';
 
     public function handle(PaymentService $paymentService): int
     {
-        $hours = (int) $this->option('hours');
+        $hours = (int) ($this->option('hours') ?: config('payment.stale_pending_hours', 6));
         $cutoff = now()->subHours($hours);
 
         $stalePayments = Payment::query()

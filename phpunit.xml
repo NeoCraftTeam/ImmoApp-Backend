@@ -35,10 +35,10 @@
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="SCOUT_DRIVER" value="null"/>
-        <env name="PAYMENT_DEFAULT_GATEWAY" value="geniuspay"/>
-        <env name="GENIUSPAY_API_KEY" value="pk_sandbox_test_fake"/>
-        <env name="GENIUSPAY_API_SECRET" value="sk_sandbox_test_fake"/>
-        <env name="GENIUSPAY_WEBHOOK_SECRET" value="whsec_sandbox_test_secret_123"/>
+        <env name="PAYMENT_DEFAULT_GATEWAY" value="kpay"/>
+        <env name="KPAY_API_KEY" value="kpay_test_fake"/>
+        <env name="KPAY_API_SECRET" value="sk_test_fake"/>
+        <env name="KPAY_WEBHOOK_SECRET" value="whsec_kpay_test_secret_123"/>
         <env name="TURNSTILE_SITE_KEY" value=""/>
         <env name="TURNSTILE_SECRET_KEY" value=""/>
         <!--

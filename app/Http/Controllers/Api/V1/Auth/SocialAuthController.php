@@ -9,6 +9,8 @@ use App\Http\Requests\Api\V1\SocialAuthRequest;
 use App\Mail\OAuthLinkAttemptMail;
 use App\Models\User;
 use App\Services\UtmAttributionService;
+use App\Support\FrontendRedirectGuard;
+use App\Support\OAuthProviderAvailability;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -209,11 +211,34 @@ final class SocialAuthController
             ], 400);
         }
 
-        $redirectUri = $request->query('redirect_uri', config('app.frontend_url').'/auth/callback');
+        if (!OAuthProviderAvailability::isSocialiteConfigured($provider)) {
+            $hint = $provider === 'google' && OAuthProviderAvailability::isClerkConfigured()
+                ? 'Utilisez la connexion Google via Clerk (application mobile).'
+                : 'Ce fournisseur OAuth n\'est pas configuré sur le serveur.';
 
-        // Validate redirect_uri against allowed hosts before encoding in state
-        if (!$this->isAllowedRedirectUri((string) $redirectUri)) {
+            return response()->json([
+                'message' => 'Connexion '.$provider.' indisponible.',
+                'code' => 'OAUTH_PROVIDER_NOT_CONFIGURED',
+                'hint' => $hint,
+            ], 503);
+        }
+
+        $requestedRedirect = (string) $request->query(
+            'redirect_uri',
+            config('app.frontend_url').'/auth/callback',
+        );
+
+        if (!FrontendRedirectGuard::isAllowedAbsoluteUrl($requestedRedirect)) {
+            if (FrontendRedirectGuard::isMobileAppRequest($request)) {
+                return response()->json([
+                    'message' => 'URL de retour OAuth non autorisée pour cette application.',
+                    'code' => 'OAUTH_REDIRECT_URI_REJECTED',
+                ], 422);
+            }
+
             $redirectUri = config('app.frontend_url').'/auth/callback';
+        } else {
+            $redirectUri = $requestedRedirect;
         }
 
         // Encode redirect_uri in state parameter (stateless approach for API).
@@ -253,9 +278,22 @@ final class SocialAuthController
             return response()->json(['message' => 'Provider OAuth non supporté'], 400);
         }
 
-        $redirectUri = $request->query('redirect_uri', config('app.frontend_url').'/auth/callback');
-        if (!$this->isAllowedRedirectUri((string) $redirectUri)) {
+        $requestedRedirect = (string) $request->query(
+            'redirect_uri',
+            config('app.frontend_url').'/auth/callback',
+        );
+
+        if (!FrontendRedirectGuard::isAllowedAbsoluteUrl($requestedRedirect)) {
+            if (FrontendRedirectGuard::isMobileAppRequest($request)) {
+                return response()->json([
+                    'message' => 'URL de retour OAuth non autorisée pour cette application.',
+                    'code' => 'OAUTH_REDIRECT_URI_REJECTED',
+                ], 422);
+            }
+
             $redirectUri = config('app.frontend_url').'/auth/callback';
+        } else {
+            $redirectUri = $requestedRedirect;
         }
 
         $linkCode = Str::random(64);
@@ -352,7 +390,7 @@ final class SocialAuthController
                 if (is_array($stateData) && isset($stateData['redirect_uri'])) {
                     $candidate = (string) $stateData['redirect_uri'];
                     // Only accept the URI if it matches our allowed hosts whitelist
-                    if ($this->isAllowedRedirectUri($candidate)) {
+                    if (FrontendRedirectGuard::isAllowedAbsoluteUrl($candidate)) {
                         $redirectUri = $candidate;
                     } else {
                         Log::warning('OAuth callback: rejected non-whitelisted redirect_uri', [
@@ -743,51 +781,6 @@ final class SocialAuthController
     private function sanitizeRequestedRole(mixed $role): string
     {
         return $role === 'agent' ? 'agent' : 'customer';
-    }
-
-    /**
-     * Check whether a redirect_uri is allowed.
-     *
-     * Validates against the configured frontend URL host and any additional
-     * hosts listed in OAUTH_ALLOWED_REDIRECT_HOSTS (comma-separated).
-     */
-    private function isAllowedRedirectUri(string $uri): bool
-    {
-        // Deep links mobiles (Expo) : keyhome://auth/callback,
-        // keyhomeowners://auth/callback. parse_url ne fournit pas de host
-        // exploitable pour un scheme custom — on valide donc par scheme
-        // contre une whitelist (OAUTH_ALLOWED_REDIRECT_SCHEMES).
-        $scheme = parse_url($uri, PHP_URL_SCHEME);
-        if (is_string($scheme) && $scheme !== '') {
-            $allowedSchemes = array_filter(array_map(
-                trim(...),
-                explode(',', (string) config('app.oauth_allowed_redirect_schemes', '')),
-            ));
-            if (in_array(mb_strtolower($scheme), array_map('mb_strtolower', $allowedSchemes), true)) {
-                return true;
-            }
-        }
-
-        $host = parse_url($uri, PHP_URL_HOST);
-
-        if (!is_string($host) || $host === '') {
-            return false;
-        }
-
-        // Always allow the configured frontend host
-        $allowedHosts = [];
-        $frontendHost = parse_url((string) config('app.frontend_url', ''), PHP_URL_HOST);
-        if (is_string($frontendHost) && $frontendHost !== '') {
-            $allowedHosts[] = $frontendHost;
-        }
-
-        // Also allow hosts from OAUTH_ALLOWED_REDIRECT_HOSTS env var
-        $extra = (string) config('app.oauth_allowed_redirect_hosts', '');
-        foreach (array_filter(array_map(trim(...), explode(',', $extra))) as $h) {
-            $allowedHosts[] = $h;
-        }
-
-        return in_array($host, $allowedHosts, true);
     }
 
     /**

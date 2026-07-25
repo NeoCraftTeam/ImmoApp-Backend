@@ -13,7 +13,7 @@ use Illuminate\Foundation\Http\FormRequest;
 /**
  * Validates a payment-initiation request for any gateway.
  *
- * Mobile money (Mobile Money / Orange Money) routes to GeniusPay hosted
+ * Mobile money (Mobile Money / Orange Money) routes to Kpay hosted
  * checkout; `card` routes to Stripe in-page Elements / saved-card reuse.
  */
 class InitiatePaymentRequest extends FormRequest

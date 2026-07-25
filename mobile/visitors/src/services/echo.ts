@@ -28,6 +28,15 @@ const SCHEME = process.env.EXPO_PUBLIC_REVERB_SCHEME ?? 'https';
 let instance: Pusher | null = null;
 
 /**
+ * Vrai quand les env vars Reverb sont présentes — les hooks temps réel
+ * s'en servent pour distinguer « connecté en WS » de « fallback polling »
+ * (avant, `isConnected` passait à true même sans aucune config).
+ */
+export function isEchoConfigured(): boolean {
+  return Boolean(APP_KEY && HOST);
+}
+
+/**
  * Retourne (et crée à la demande) l'instance Pusher globale.
  * Renvoie `null` si la config Reverb est absente — le caller doit
  * gérer ce cas (fallback polling).

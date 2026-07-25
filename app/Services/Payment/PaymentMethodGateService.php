@@ -17,8 +17,8 @@ use Illuminate\Support\Facades\Cache;
  * `GET /api/v1/payments/methods` stays in the microsecond range.
  *
  * Defaults (when no override is set) :
- *   - mobile_money  → enabled (GeniusPay)
- *   - orange_money  → enabled (GeniusPay)
+ *   - mobile_money  → enabled (Kpay)
+ *   - orange_money  → enabled (Kpay)
  *   - card          → enabled (Stripe)
  *
  * Toggling a method off through Filament hides it from the public API

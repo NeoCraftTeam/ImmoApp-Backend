@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react';
 import { Button, Input, Paragraph, Sheet, XStack, YStack, Separator } from 'tamagui';
 
 import { useAdFacets } from '@/hooks/useAdFacets';
+import { useMotionPresets } from '@/hooks/useMotionPresets';
 import { usePropertyAttributeGroups } from '@/hooks/usePropertyAttributes';
-import { brand } from '@/theme/tokens';
 import { EMPTY_FILTERS, activeFilterCount, type AdFilters } from '@/types/filters';
 import type { PropertyAttributeCategory } from '@/types/property-attribute';
 import { t } from '@/i18n';
@@ -29,6 +29,7 @@ interface Props {
  */
 export function SearchFilterSheet({ open, onOpenChange, filters, onApply }: Props) {
   const [draft, setDraft] = useState<AdFilters>(filters);
+  const { tamaguiQuick, tamaguiLazy } = useMotionPresets();
   const { data: attributeGroups } = usePropertyAttributeGroups();
   const { data: facets } = useAdFacets();
 
@@ -84,9 +85,13 @@ export function SearchFilterSheet({ open, onOpenChange, filters, onApply }: Prop
       onOpenChange={onOpenChange}
       snapPoints={[90]}
       dismissOnSnapToBottom
-      animation="quick"
+      animation={tamaguiQuick}
     >
-      <Sheet.Overlay animation="lazy" enterStyle={{ opacity: 0 }} exitStyle={{ opacity: 0 }} />
+      <Sheet.Overlay
+        animation={tamaguiLazy}
+        enterStyle={{ opacity: 0 }}
+        exitStyle={{ opacity: 0 }}
+      />
       <Sheet.Handle />
       <Sheet.Frame padding="$4" gap="$3" backgroundColor="$background">
         <XStack justifyContent="space-between" alignItems="center">

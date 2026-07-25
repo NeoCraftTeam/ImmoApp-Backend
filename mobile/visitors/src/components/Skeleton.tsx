@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Animated, Easing, type DimensionValue } from 'react-native';
 
 import { useAppTheme } from '@/providers/ThemeProvider';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { brand } from '@/theme/tokens';
 
 interface Props {
@@ -37,11 +38,19 @@ export function Skeleton({
   style,
 }: Props) {
   const { scheme } = useAppTheme();
+  const reducedMotion = useReducedMotion();
   const resolvedBackground =
     backgroundColor ?? (scheme === 'dark' ? brand.slate700 : brand.slate100);
   const pulse = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Reduced motion : placeholder statique (opacité médiane) — pas de
+    // boucle infinie qui oscille.
+    if (reducedMotion) {
+      pulse.setValue(0.5);
+      return;
+    }
+
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, {
@@ -60,7 +69,7 @@ export function Skeleton({
     );
     loop.start();
     return () => loop.stop();
-  }, [pulse]);
+  }, [pulse, reducedMotion]);
 
   const opacity = pulse.interpolate({
     inputRange: [0, 1],

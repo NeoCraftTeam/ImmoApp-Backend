@@ -24,6 +24,7 @@ import { Alert, Pressable, ScrollView } from 'react-native';
 import { Button, H2, H4, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { KeyHomeRefreshControl } from '@/components/KeyHomeRefreshControl';
 import { useSession } from '@/auth/SessionProvider';
 import { useCreditsBalance } from '@/hooks/usePayments';
 import { useMe } from '@/hooks/useMe';
@@ -47,6 +48,16 @@ export default function AccountTab() {
   const me = useMe(isAuthenticated);
   const unread = useUnreadNotificationCount();
   const balance = useCreditsBalance();
+
+  const isRefreshing =
+    me.isRefetching || balance.isRefetching || unread.isRefetching;
+  const refreshAccount = () => {
+    if (isAuthenticated) {
+      void me.refetch();
+      void balance.refetch();
+      void unread.refetch();
+    }
+  };
 
   // Si /me échoue avec 401 (token vraiment invalide) ou 404 (user
   // supprimé), on déconnecte automatiquement pour basculer en mode
@@ -113,6 +124,9 @@ export default function AccountTab() {
           gap: 18,
         }}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <KeyHomeRefreshControl refreshing={isRefreshing} onRefresh={refreshAccount} />
+        }
       >
         <H2>{t('account.title')}</H2>
 

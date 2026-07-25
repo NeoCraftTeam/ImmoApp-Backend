@@ -42,6 +42,7 @@ import { useSession } from '@/auth/SessionProvider';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { useCreditsBalance } from '@/hooks/usePayments';
 import { brand } from '@/theme/tokens';
+import { useThemeColors } from '@/theme/useThemeColors';
 import { t } from '@/i18n';
 import type { Ad } from '@/types/ad';
 
@@ -85,6 +86,7 @@ function categoryIcon(id: string | null, color: string) {
  */
 export default function Home() {
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   const router = useRouter();
   const greeting = useGreeting();
   const { isAuthenticated } = useSession();
@@ -159,8 +161,8 @@ export default function Home() {
               borderRadius={999}
               backgroundColor="$slate900"
             >
-              <RefreshCw size={14} color="white" />
-              <Paragraph fontSize={13} fontWeight="700" color="white">
+              <RefreshCw size={14} color="$background" />
+              <Paragraph fontSize={13} fontWeight="700" color="$background">
                 Réessayer
               </Paragraph>
             </XStack>
@@ -274,10 +276,10 @@ export default function Home() {
                 borderRadius={999}
                 alignItems="center"
                 gap={6}
-                backgroundColor={active ? brand.slate900 : '$slate100'}
+                backgroundColor={active ? '$slate900' : '$slate100'}
               >
-                {categoryIcon(item.id, active ? 'white' : brand.slate700)}
-                <Paragraph fontSize={13} fontWeight="700" color={active ? 'white' : '$slate700'}>
+                {categoryIcon(item.id, active ? '$background' : '$slate700')}
+                <Paragraph fontSize={13} fontWeight="700" color={active ? '$background' : '$slate700'}>
                   {item.name}
                 </Paragraph>
               </XStack>
@@ -292,7 +294,7 @@ export default function Home() {
       {showRecommendations && (
         <YStack gap={12} marginTop={8}>
           <YStack>
-            <YStack height={1} backgroundColor="$slate200" marginBottom={12} />
+            <YStack height={1} backgroundColor="$slate300" marginBottom={12} />
             <Paragraph
               fontSize={10.5}
               fontWeight="800"
@@ -325,7 +327,7 @@ export default function Home() {
       {showRecent && (
         <YStack gap={12} marginTop={8}>
           <YStack>
-            <YStack height={1} backgroundColor="$slate200" marginBottom={12} />
+            <YStack height={1} backgroundColor="$slate300" marginBottom={12} />
             <Paragraph
               fontSize={10.5}
               fontWeight="800"
@@ -367,6 +369,7 @@ export default function Home() {
         data={Array.from({ length: SKELETON_COUNT }, (_, i) => i)}
         keyExtractor={(i) => `skel-${i}`}
         numColumns={2}
+        style={{ backgroundColor: colors.background }}
         columnWrapperStyle={{ gap: 12, marginBottom: 16 }}
         contentContainerStyle={{
           paddingTop: insets.top + 8,
@@ -389,6 +392,7 @@ export default function Home() {
       data={ads ?? []}
       keyExtractor={(item) => item.id}
       numColumns={2}
+      style={{ backgroundColor: colors.background }}
       columnWrapperStyle={{ gap: 12, marginBottom: 16 }}
       contentContainerStyle={{
         paddingTop: insets.top + 8,

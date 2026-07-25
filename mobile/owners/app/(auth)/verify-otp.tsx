@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { apiClient, extractApiErrorMessage } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
+import { ClerkOtpVerifyScreen } from '@/components/ClerkOtpVerifyScreen';
 import { useResendVerification, useVerifyEmailOtp } from '@/hooks/useAuthExtras';
 import { useSession } from '@/auth/SessionProvider';
 import { brand } from '@/theme/tokens';
@@ -17,14 +18,23 @@ const RESEND_COOLDOWN_SECONDS = 60;
 /**
  * Email OTP verification — 6 paste-friendly digit boxes + a 60 s resend
  * cooldown. On success we install the returned token (if any) and route
- * to the dashboard.
+ * to the dashboard. `mode=clerk` routes to the Clerk social OTP screen.
  */
 export default function VerifyOtpScreen() {
+  const params = useLocalSearchParams<{ email?: string; mode?: string }>();
+
+  if (params.mode === 'clerk') {
+    return <ClerkOtpVerifyScreen emailHint={params.email ?? ''} />;
+  }
+
+  return <EmailVerifyOtpScreen initialEmail={params.email ?? ''} />;
+}
+
+function EmailVerifyOtpScreen({ initialEmail }: { initialEmail: string }) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ email?: string }>();
   const { setToken, isAuthenticated } = useSession();
-  const [email, setEmail] = useState(params.email ?? '');
+  const [email, setEmail] = useState(initialEmail);
   const [editingEmail, setEditingEmail] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [savingEmail, setSavingEmail] = useState(false);

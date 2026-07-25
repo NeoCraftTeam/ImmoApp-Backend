@@ -19,7 +19,6 @@ import {
 import { Paragraph, XStack, YStack } from 'tamagui';
 
 import { usePropertyAttributes } from '@/hooks/usePropertyAttributes';
-import { brand } from '@/theme/tokens';
 
 interface Props {
   attributes: string[];

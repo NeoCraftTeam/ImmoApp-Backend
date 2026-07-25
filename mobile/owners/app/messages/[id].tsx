@@ -29,6 +29,8 @@ import {
   useUploadAttachment,
 } from '@/hooks/useConversations';
 import { useConversationRealtime } from '@/hooks/useConversationRealtime';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { useMotionPresets } from '@/hooks/useMotionPresets';
 import { brand } from '@/theme/tokens';
 import type { ConversationMessage, ConversationPreview } from '@/types/conversation';
 
@@ -51,6 +53,7 @@ function groupReactions(
 }
 
 function TypingDots() {
+  const reducedMotion = useReducedMotion();
   const dots = useRef([
     new Animated.Value(0.3),
     new Animated.Value(0.3),
@@ -58,6 +61,13 @@ function TypingDots() {
   ]).current;
 
   useEffect(() => {
+    // Reduced motion : trois points statiques — l'info « en train
+    // d'écrire » reste lisible sans boucle d'oscillation.
+    if (reducedMotion) {
+      dots.forEach((d) => d.setValue(0.6));
+      return;
+    }
+
     const loop = Animated.loop(
       Animated.stagger(
         160,
@@ -81,7 +91,7 @@ function TypingDots() {
     );
     loop.start();
     return () => loop.stop();
-  }, [dots]);
+  }, [dots, reducedMotion]);
 
   return (
     <XStack gap={4} paddingHorizontal={12} paddingVertical={9} backgroundColor="$slate100" borderRadius={16} alignSelf="flex-start">
@@ -104,8 +114,29 @@ function TypingDots() {
 export default function ConversationThreadScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const me = useMe();
+  const { scrollAnimated } = useMotionPresets();
   const qc = useQueryClient();
-  const { data: messages = [], isLoading } = useConversation(id);
+  const [draft, setDraft] = useState('');
+  const [otherTyping, setOtherTyping] = useState<string | null>(null);
+  const scrollRef = useRef<ScrollView | null>(null);
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const realtime = useConversationRealtime(id, (uid) => {
+    if (!me.data || uid === me.data.id) return;
+    setOtherTyping(uid);
+    // Cleanup le timer precedent avant d'en starter un nouveau —
+    // sans ce clear, 5 messages "typing" rapproches stackent 5 timers
+    // qui fire tous a 3 s, polluant le state apres le user a tape.
+    // Pire : si l'utilisateur navigue ailleurs, ces timers leak et
+    // continuent a appeler setOtherTyping sur un component demonted
+    // (warning RN + memoire qui s'accumule).
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => {
+      setOtherTyping(null);
+      typingTimerRef.current = null;
+    }, 3000);
+  });
+  const { data: messages = [], isLoading } = useConversation(id, realtime.isConnected);
   const send = useSendMessage(id);
   const markRead = useMarkConversationRead(id);
   const setTyping = useSetTyping(id);
@@ -122,27 +153,6 @@ export default function ConversationThreadScreen() {
     return list.find((c) => c.uuid === id);
   }, [qc, id]);
 
-  const [draft, setDraft] = useState('');
-  const [otherTyping, setOtherTyping] = useState<string | null>(null);
-  const scrollRef = useRef<ScrollView | null>(null);
-  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useConversationRealtime(id, (uid) => {
-    if (!me.data || uid === me.data.id) return;
-    setOtherTyping(uid);
-    // Cleanup le timer precedent avant d'en starter un nouveau —
-    // sans ce clear, 5 messages "typing" rapproches stackent 5 timers
-    // qui fire tous a 3 s, polluant le state apres le user a tape.
-    // Pire : si l'utilisateur navigue ailleurs, ces timers leak et
-    // continuent a appeler setOtherTyping sur un component demonted
-    // (warning RN + memoire qui s'accumule).
-    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-    typingTimerRef.current = setTimeout(() => {
-      setOtherTyping(null);
-      typingTimerRef.current = null;
-    }, 3000);
-  });
-
   // Cleanup au unmount : pas de leak du timer si user navigue
   // pendant que le ping "typing" est encore valide.
   useEffect(() => {
@@ -153,18 +163,30 @@ export default function ConversationThreadScreen() {
 
   useEffect(() => {
     if (id) markRead.mutate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   useEffect(() => {
-    scrollRef.current?.scrollToEnd({ animated: true });
-  }, [messages.length]);
+    scrollRef.current?.scrollToEnd({ animated: scrollAnimated });
+  }, [messages.length, scrollAnimated]);
 
   const onSubmit = () => {
     const body = draft.trim();
     if (!body) return;
     setDraft('');
     send.mutate(body);
+  };
+
+  const handleRetry = (msg: ConversationMessage) => {
+    if (!msg.is_failed || !msg.body) return;
+    qc.setQueryData<{ data: ConversationMessage[] } | undefined>(
+      ['owner-conversation-messages', id],
+      (prev) => {
+        if (!prev) return prev;
+        const list = Array.isArray(prev.data) ? prev.data : [];
+        return { data: list.filter((m) => m.uuid !== msg.uuid) };
+      },
+    );
+    send.mutate(msg.body);
   };
 
   const handlePickImage = async () => {
@@ -311,6 +333,13 @@ export default function ConversationThreadScreen() {
                     </XStack>
                   </YStack>
                   </Pressable>
+                  {mine && m.is_failed ? (
+                    <Pressable onPress={() => handleRetry(m)} hitSlop={6}>
+                      <Paragraph fontSize={11} color={brand.danger} fontWeight="600">
+                        Échec · Réessayer
+                      </Paragraph>
+                    </Pressable>
+                  ) : null}
                   {(() => {
                     const grouped = groupReactions(m.reactions, me.data?.id);
                     if (grouped.length === 0) return null;

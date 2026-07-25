@@ -167,3 +167,58 @@ it('records login history after successful login', function (): void {
         'guard' => 'sanctum',
     ]);
 });
+
+it('allows mobile client login without turnstile when turnstile is configured', function (): void {
+    config()->set('services.turnstile.secret_key', 'real-test-secret-not-dummy-placeholder');
+
+    $user = createVerifiedUser('customer');
+
+    $response = $this->postJson('/api/v1/auth/login', [
+        'email' => $user->email,
+        'password' => 'Secret@123',
+        'login_context' => 'client',
+    ], [
+        'X-KeyHome-Client' => 'keyhome-mobile-visitors',
+    ]);
+
+    $response->assertOk()
+        ->assertJsonStructure(['access_token']);
+});
+
+it('allows mobile owner login without turnstile when turnstile is configured', function (): void {
+    config()->set('services.turnstile.secret_key', 'real-test-secret-not-dummy-placeholder');
+
+    $user = createVerifiedUser('agent');
+
+    $response = $this->postJson('/api/v1/auth/login', [
+        'email' => $user->email,
+        'password' => 'Secret@123',
+        'login_context' => 'owner',
+    ], [
+        'X-KeyHome-Client' => 'keyhome-mobile-owners',
+    ]);
+
+    $response->assertOk()
+        ->assertJsonStructure(['access_token']);
+});
+
+it('accepts email login regardless of input casing', function (): void {
+    $user = User::factory()->customers()->create([
+        'email' => 'mixedcase@example.com',
+        'password' => Hash::make('Secret@123'),
+        'email_verified_at' => now(),
+        'is_active' => true,
+    ]);
+
+    $response = $this->postJson('/api/v1/auth/login', [
+        'email' => 'MixedCase@Example.COM',
+        'password' => 'Secret@123',
+        'login_context' => 'client',
+    ], [
+        'X-KeyHome-Client' => 'keyhome-mobile-visitors',
+    ]);
+
+    $response->assertOk();
+    expect($response->json('access_token'))->toBeString()->not->toBeEmpty();
+    expect($user->fresh()->id)->toBe($user->id);
+});

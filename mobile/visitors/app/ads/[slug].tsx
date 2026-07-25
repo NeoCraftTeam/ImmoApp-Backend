@@ -22,20 +22,20 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Animated,
   FlatList,
   Linking,
   Modal,
   Pressable,
+  RefreshControl,
   Share,
   useWindowDimensions,
 } from 'react-native';
 import { Button, H2, Paragraph, ScrollView, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { extractApiErrorMessage } from '@/api/client';
+import { extractApiErrorMessage, getApiErrorStatus } from '@/api/client';
 import { CompareButton } from '@/components/CompareButton';
 import { FavoriteButton } from '@/components/FavoriteButton';
 import { AdDetailSkeleton } from '@/components/ads/AdDetailSkeleton';
@@ -55,9 +55,12 @@ import { SearchAlertButton } from '@/components/ads/SearchAlertButton';
 import { SimilarAdsCarousel } from '@/components/ads/SimilarAdsCarousel';
 import { useAd } from '@/hooks/useAd';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useStartConversation } from '@/hooks/useConversations';
+import { useUnlockAd } from '@/hooks/useCredits';
 import { useCreditsBalance } from '@/hooks/usePayments';
 import { useSession } from '@/auth/SessionProvider';
+import { resolveMediaUrl } from '@/lib/media-url';
 import { useThemeColors } from '@/theme/useThemeColors';
 import { brand } from '@/theme/tokens';
 import { t } from '@/i18n';
@@ -88,8 +91,9 @@ export default function AdDetail() {
 
   const heroHeight = Math.round(height * HERO_RATIO);
 
-  const { data: ad, isLoading, isError, error } = useAd(slug);
+  const { data: ad, isLoading, isError, error, refetch, isRefetching } = useAd(slug);
   const startConversation = useStartConversation();
+  const unlockAd = useUnlockAd();
 
   // Historise l'annonce consultée pour le carrousel « Récemment consultés »
   // de l'accueil (persisté en AsyncStorage, dédupliqué, max 10).
@@ -116,17 +120,20 @@ export default function AdDetail() {
 
   const carouselRef = useRef<FlatList<AdImage> | null>(null);
   const scrollY = useRef(new Animated.Value(0)).current;
+  const reducedMotion = useReducedMotion();
 
-  // Parallax — hero translates up at 40 % of scroll speed
+  // Parallax — hero translates up at 40 % of scroll speed.
+  // Reduced motion (HIG) : pas d'effet de profondeur — le hero suit le
+  // scroll en 1:1, comme une image ordinaire dans le flux.
   const heroTranslateY = scrollY.interpolate({
     inputRange: [-heroHeight, 0, heroHeight],
-    outputRange: [0, 0, -heroHeight * 0.4],
+    outputRange: [0, 0, reducedMotion ? -heroHeight : -heroHeight * 0.4],
     extrapolate: 'clamp',
   });
-  // Overscroll zoom — pull-to-refresh feel
+  // Overscroll zoom — pull-to-refresh feel ; désactivé sous reduced motion.
   const heroScale = scrollY.interpolate({
     inputRange: [-heroHeight, 0, 1],
-    outputRange: [1.4, 1, 1],
+    outputRange: [reducedMotion ? 1 : 1.4, 1, 1],
     extrapolate: 'clamp',
   });
   // Top chrome background fades in as user scrolls past the hero
@@ -178,6 +185,94 @@ export default function AdDetail() {
     }
   };
 
+  const unlockCost = ad.unlock_cost ?? 2;
+  const creditsLabel = `${unlockCost} crédit${unlockCost > 1 ? 's' : ''}`;
+
+  const promptBuyCredits = () => {
+    Alert.alert(
+      'Crédits insuffisants',
+      `Il vous faut ${creditsLabel} pour débloquer cette annonce. Rechargez votre solde pour continuer.`,
+      [
+        { text: 'Plus tard', style: 'cancel' },
+        { text: 'Acheter des crédits', onPress: () => router.push('/credits') },
+      ],
+    );
+  };
+
+  /**
+   * Déverrouille le contact de l'annonce (adresse exacte, téléphone,
+   * messagerie) en dépensant des crédits. `onUnlocked` est appelé après
+   * succès — utilisé par le CTA Message pour enchaîner sur la conversation.
+   */
+  const handleUnlock = (onUnlocked?: () => void) => {
+    if (!isAuthenticated) {
+      router.push('/(auth)/login');
+      return;
+    }
+    if (unlockAd.isPending) {
+      return;
+    }
+    Alert.alert(
+      'Débloquer cette annonce',
+      `Le déverrouillage utilise ${creditsLabel} et affiche l'adresse exacte, le téléphone de l'annonceur et la messagerie.`,
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: `Débloquer (${creditsLabel})`,
+          onPress: () => {
+            unlockAd.mutate(
+              { adId: ad.id, slugOrId: slug ?? ad.id },
+              {
+                onSuccess: (res) => {
+                  if (res.status === 'unlocked' || res.status === 'already_unlocked') {
+                    if (onUnlocked) {
+                      onUnlocked();
+                    } else {
+                      Alert.alert(
+                        'Annonce débloquée',
+                        'Vous pouvez maintenant contacter l’annonceur et voir l’adresse exacte.',
+                      );
+                    }
+                  } else if (res.status === 'owner') {
+                    Alert.alert('Information', 'Vous êtes l’annonceur de cette annonce.');
+                  } else {
+                    promptBuyCredits();
+                  }
+                },
+                onError: (err) => {
+                  if (getApiErrorStatus(err) === 402) {
+                    promptBuyCredits();
+                    return;
+                  }
+                  Alert.alert('Erreur', extractApiErrorMessage(err));
+                },
+              },
+            );
+          },
+        },
+      ],
+    );
+  };
+
+  const openConversation = () => {
+    if (startConversation.isPending) {
+      return;
+    }
+    startConversation.mutate(ad.id, {
+      onSuccess: (conv) => {
+        router.push(`/messages/${conv.uuid}`);
+      },
+      onError: (err) => {
+        if (getApiErrorStatus(err) === 403) {
+          // Le backend refuse tant que l'annonce n'est pas déverrouillée.
+          handleUnlock(openConversation);
+          return;
+        }
+        Alert.alert('Erreur', extractApiErrorMessage(err));
+      },
+    });
+  };
+
   return (
     <>
       <Stack.Screen options={{ headerShown: false }} />
@@ -189,6 +284,14 @@ export default function AdDetail() {
           )}
           scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={() => refetch()}
+              tintColor={brand.primary}
+              colors={[brand.primary]}
+            />
+          }
           contentContainerStyle={{
             paddingTop: heroHeight - OVERLAP,
             paddingBottom: insets.bottom + 110,
@@ -240,27 +343,20 @@ export default function AdDetail() {
         <StickyCTA
           ad={ad}
           insets={insets}
+          unlockPending={unlockAd.isPending}
+          onUnlock={() => handleUnlock()}
           onMessage={() => {
             if (!isAuthenticated) {
               router.push('/(auth)/login');
               return;
             }
-            if (startConversation.isPending) {
+            if (!ad.is_unlocked) {
+              // Contact gated par le déblocage crédits — on propose le
+              // déverrouillage puis on ouvre la conversation dans la foulée.
+              handleUnlock(openConversation);
               return;
             }
-            startConversation.mutate(ad.id, {
-              onSuccess: (conv) => {
-                router.push(`/messages/${conv.uuid}`);
-              },
-              onError: (err) => {
-                const message = extractApiErrorMessage(err);
-                Alert.alert(
-                  'Annonce verrouillée',
-                  message ??
-                    'Vous devez débloquer cette annonce avant de contacter l’annonceur.',
-                );
-              },
-            });
+            openConversation();
           }}
           onCall={() => {
             if (!isAuthenticated) {
@@ -924,9 +1020,7 @@ function PublisherCard({
 }) {
   const router = useRouter();
   const usernameOrId = ad.user?.username ?? ad.user?.id;
-  // Certains comptes anciens portent un chemin relatif (avatars/default.png)
-  // inutilisable par <Image> — on retombe alors sur l'initiale.
-  const avatarUrl = ad.user?.avatar?.startsWith('http') ? ad.user.avatar : null;
+  const avatarUrl = resolveMediaUrl(ad.user?.avatar);
   const handlePress = () => {
     if (!usernameOrId) return;
     router.push({
@@ -1033,6 +1127,8 @@ function StickyCTA({
   onCall,
   onWhatsApp,
   onBookViewing,
+  onUnlock,
+  unlockPending,
 }: {
   ad: Ad;
   insets: { bottom: number };
@@ -1040,12 +1136,15 @@ function StickyCTA({
   onCall: () => void;
   onWhatsApp: () => void;
   onBookViewing: () => void;
+  onUnlock: () => void;
+  unlockPending: boolean;
 }) {
   const { format } = useCurrency();
   const periodLabel =
     ad.price_period === 'jour' ? t('ad.perDay') : t('ad.perMonth');
   // Téléphone visible = annonce déverrouillée → appel + WhatsApp possibles.
   const hasPhone = Boolean(ad.user?.phone_number);
+  const unlockCost = ad.unlock_cost ?? 2;
 
   return (
     <YStack
@@ -1081,29 +1180,56 @@ function StickyCTA({
         <CtaIconButton label="Message" onPress={onMessage}>
           <MessageCircle size={18} color={brand.primary} />
         </CtaIconButton>
-        {hasPhone ? (
+        {ad.is_unlocked ? (
           <>
-            <CtaIconButton label="Appeler" onPress={onCall}>
-              <Phone size={18} color={brand.primary} />
-            </CtaIconButton>
-            <CtaIconButton label="WhatsApp" onPress={onWhatsApp}>
-              <MessageCircle size={18} color="#25D366" />
-            </CtaIconButton>
+            {hasPhone ? (
+              <>
+                <CtaIconButton label="Appeler" onPress={onCall}>
+                  <Phone size={18} color={brand.primary} />
+                </CtaIconButton>
+                <CtaIconButton label="WhatsApp" onPress={onWhatsApp}>
+                  <MessageCircle size={18} color="#25D366" />
+                </CtaIconButton>
+              </>
+            ) : null}
+            <Button
+              flex={1}
+              size="$4"
+              backgroundColor="$brand"
+              color="$brandText"
+              fontWeight="800"
+              borderRadius={12}
+              onPress={onBookViewing}
+              icon={<CalendarPlus size={16} color="white" />}
+              accessibilityRole="button"
+            >
+              Réserver
+            </Button>
           </>
-        ) : null}
-        <Button
-          flex={1}
-          size="$4"
-          backgroundColor="$brand"
-          color="$brandText"
-          fontWeight="800"
-          borderRadius={12}
-          onPress={onBookViewing}
-          icon={<CalendarPlus size={16} color="white" />}
-          accessibilityRole="button"
-        >
-          Réserver
-        </Button>
+        ) : (
+          <>
+            <CtaIconButton label="Réserver une visite" onPress={onBookViewing}>
+              <CalendarPlus size={18} color={brand.primary} />
+            </CtaIconButton>
+            <Button
+              flex={1}
+              size="$4"
+              backgroundColor="$brand"
+              color="$brandText"
+              fontWeight="800"
+              borderRadius={12}
+              onPress={onUnlock}
+              disabled={unlockPending}
+              opacity={unlockPending ? 0.6 : 1}
+              icon={<Wallet size={16} color="white" />}
+              accessibilityRole="button"
+            >
+              {unlockPending
+                ? 'Déblocage…'
+                : `Débloquer · ${unlockCost} crédit${unlockCost > 1 ? 's' : ''}`}
+            </Button>
+          </>
+        )}
       </XStack>
     </YStack>
   );

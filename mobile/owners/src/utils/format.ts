@@ -7,7 +7,7 @@ export function formatMoney(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) return '—';
   return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 })
     .format(value)
-    .replace(/ /g, ' ');
+    .replace(/\u202f/g, ' ');
 }
 
 export function formatFcfa(value: number | null | undefined): string {

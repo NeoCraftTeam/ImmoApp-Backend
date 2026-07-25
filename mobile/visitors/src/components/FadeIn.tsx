@@ -1,6 +1,8 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { Animated, Easing, type StyleProp, type ViewStyle } from 'react-native';
 
+import { useReducedMotion } from '@/hooks/useReducedMotion';
+
 interface Props {
   children: ReactNode;
   /** ms before the animation starts (stagger via array index). */
@@ -28,10 +30,25 @@ export function FadeIn({
   duration = 320,
   style,
 }: Props) {
+  const reducedMotion = useReducedMotion();
   const opacity = useRef(new Animated.Value(0)).current;
   const translate = useRef(new Animated.Value(from === 'none' ? 0 : 14)).current;
 
   useEffect(() => {
+    // Reduced motion : cross-fade court sans translation (pas de slide),
+    // conformément au HIG — l'opacité aide la compréhension, le
+    // déplacement est vestibulaire.
+    if (reducedMotion) {
+      translate.setValue(0);
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 160,
+        delay: 0,
+        useNativeDriver: true,
+      }).start();
+      return;
+    }
+
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 1,
@@ -48,7 +65,7 @@ export function FadeIn({
         useNativeDriver: true,
       }),
     ]).start();
-  }, [opacity, translate, delay, duration]);
+  }, [opacity, translate, delay, duration, reducedMotion]);
 
   const transform =
     from === 'top'

@@ -4,6 +4,9 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import * as WebBrowser from 'expo-web-browser';
+
+import { OptionalClerkProvider } from '@/auth/OptionalClerkProvider';
 
 import { SessionProvider, useSession } from '@/auth/SessionProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -19,6 +22,9 @@ import config from '../tamagui.config';
 // Initialise Sentry au plus tôt — avant que React mount.
 // No-op silencieux en Expo Go (pas de native module) et sans DSN.
 initMonitoring();
+
+// Required for Clerk / OAuth browser sessions on Android.
+WebBrowser.maybeCompleteAuthSession();
 
 import '@/i18n'; // side-effect import: initialises locale before any screen renders
 
@@ -82,7 +88,8 @@ function ThemedRoot() {
     <Theme name={scheme}>
       <PortalProvider shouldAddRootHost>
         <QueryProvider>
-          <SessionProvider>
+          <OptionalClerkProvider>
+            <SessionProvider>
             <CompareProvider>
               <PushNotificationsBridge />
               <OfflineBanner />
@@ -96,7 +103,8 @@ function ThemedRoot() {
               />
               <SplashGate />
             </CompareProvider>
-          </SessionProvider>
+            </SessionProvider>
+          </OptionalClerkProvider>
         </QueryProvider>
       </PortalProvider>
     </Theme>

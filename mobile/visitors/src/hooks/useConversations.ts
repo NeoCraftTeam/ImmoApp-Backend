@@ -55,13 +55,13 @@ export function useStartConversation() {
 }
 
 /**
- * Single-conversation thread. We poll the messages endpoint every
- * 4 seconds while the screen is mounted — Expo Go doesn't expose
- * Pusher/Echo natively, so polling is the lowest-friction substitute
- * for real-time. Cheap (the backend caches per-page) and the user
- * never has to pull-to-refresh.
+ * Single-conversation thread. Sans WebSocket, on poll les messages
+ * toutes les 4 secondes tant que l'écran est monté. Quand Reverb est
+ * connecté (`realtimeConnected=true`), les events WS sont la source de
+ * vérité et le polling passe à 30 s (filet de sécurité anti-drift)
+ * au lieu de marteler l'API pour rien.
  */
-export function useConversation(uuid: string | undefined) {
+export function useConversation(uuid: string | undefined, realtimeConnected = false) {
   return useQuery<MessagesResponse, Error, Message[]>({
     queryKey: ['conversation-messages', uuid],
     queryFn: async () => {
@@ -74,7 +74,7 @@ export function useConversation(uuid: string | undefined) {
     select: (payload) => (Array.isArray(payload?.data) ? payload.data : []),
     enabled: Boolean(uuid),
     staleTime: 2 * 1000,
-    refetchInterval: 4 * 1000,
+    refetchInterval: realtimeConnected ? 30 * 1000 : 4 * 1000,
   });
 }
 
@@ -152,7 +152,7 @@ export function useMarkConversationRead(uuid: string | undefined) {
   });
 }
 
-/** Upload une pièce jointe (image ou doc) à un thread. */
+/** Upload une pièce jointe puis crée le message associé (2 étapes API). */
 export function useUploadAttachment(uuid: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
@@ -160,12 +160,23 @@ export function useUploadAttachment(uuid: string | undefined) {
       if (!uuid) throw new Error('Missing conversation uuid');
       const form = new FormData();
       form.append('file', file as unknown as Blob);
-      const { data } = await apiClient.post(
+      const { data: uploadRes } = await apiClient.post<{ data: Record<string, unknown> }>(
         ENDPOINTS.conversations.attachments(uuid),
         form,
         { headers: { 'Content-Type': 'multipart/form-data' } },
       );
-      return data;
+      const descriptor = (uploadRes?.data ?? uploadRes) as Record<string, unknown>;
+      if (typeof descriptor.url !== 'string' || typeof descriptor.signed_url !== 'string') {
+        throw new Error('Réponse pièce jointe invalide.');
+      }
+      const { data: msgRes } = await apiClient.post<{ data: Message }>(
+        ENDPOINTS.conversations.messages(uuid),
+        {
+          type: descriptor.type ?? 'image',
+          attachments: [descriptor],
+        },
+      );
+      return msgRes.data ?? (msgRes as unknown as Message);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['conversation-messages', uuid] });

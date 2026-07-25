@@ -35,7 +35,7 @@
 | Cache HTTP | TanStack Query 5 + PersistQueryClient + AsyncStorage | 5 min stale, 24 h gc |
 | Auth | expo-secure-store + Sanctum bearer | header `Authorization: Bearer …` injecté par interceptor Axios |
 | Realtime | pusher-js (Reverb compat) — **lazy-required** | fallback polling 4 s sans la dep |
-| Paiement | GeniusPay (mobile money) + Stripe (card) via `expo-web-browser` | hosted checkout + deep-link return |
+| Paiement | Kpay (mobile money) + Stripe (card) via `expo-web-browser` | hosted checkout + deep-link return |
 | Push | expo-notifications (lazy-import, no-op Expo Go) | FCM token sync via `POST /fcm/token` |
 | Monitoring | Sentry lazy-init (no-op Expo Go ou sans DSN) | `services/monitoring.ts` |
 | i18n | `i18n-js` | FR par défaut, fallback EN |
@@ -214,7 +214,7 @@ incomplets. Liste non-exhaustive : `useMe`, `useMyAds` (cursor-paginé),
 
 ### 10.1 Architecture multi-gateway
 
-Le backend supporte **GeniusPay** (mobile money) et **Stripe** (cartes). Le
+Le backend supporte **Kpay** (mobile money) et **Stripe** (cartes). Le
 client mobile reste agnostique : il appelle un endpoint **unifié** qui
 renvoie une `payment_link` à ouvrir.
 
@@ -338,7 +338,7 @@ renvoie une `payment_link` à ouvrir.
 ## Historique des versions
 
 - **v0.3** (2026-06-22) : **Payments full integration** (PaymentSheet
-  unifié + GeniusPay/Stripe via WebBrowser auth-session + tx_ref deep-link
+  unifié + Kpay/Stripe via WebBrowser auth-session + tx_ref deep-link
   + polling 60s/3s + verify-purchase opportuniste) · **Splash teal**
   réanimé sans "Pro" + tagline slide-up + durée 1.4 s · **AI enhance**
   title + description dans AdForm · **Lease management** (generate from

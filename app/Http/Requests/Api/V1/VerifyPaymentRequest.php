@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Support\PaymentTransactionLookup;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * Validates a payment-verification request — accepts the KeyHome `KH-*`
- * transaction reference and/or the gateway reference (e.g. GeniusPay `MTX-*`).
+ * transaction reference and/or the gateway reference (e.g. Kpay `pay_*`, `KPAY-*`).
  */
 class VerifyPaymentRequest extends FormRequest
 {
@@ -33,7 +34,12 @@ class VerifyPaymentRequest extends FormRequest
                 'nullable',
                 'string',
                 'max:255',
-                'regex:/^(MTX-|SANDBOX_)[A-Z0-9_-]+$/i',
+                'regex:'.PaymentTransactionLookup::gatewayReferenceValidationPattern(),
+            ],
+            'gateway_redirect_status' => [
+                'nullable',
+                'string',
+                'max:50',
             ],
         ];
     }
@@ -43,12 +49,12 @@ class VerifyPaymentRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'tx_ref.required_without' => 'La référence de transaction KeyHome ou la référence GeniusPay est requise.',
+            'tx_ref.required_without' => 'La référence de transaction KeyHome ou la référence Kpay est requise.',
             'tx_ref.string' => 'La référence de transaction doit être une chaîne.',
             'tx_ref.regex' => 'La référence KeyHome est invalide.',
-            'reference.required_without' => 'La référence de transaction KeyHome ou la référence GeniusPay est requise.',
-            'reference.string' => 'La référence GeniusPay doit être une chaîne.',
-            'reference.regex' => 'La référence GeniusPay est invalide.',
+            'reference.required_without' => 'La référence de transaction KeyHome ou la référence Kpay est requise.',
+            'reference.string' => 'La référence Kpay doit être une chaîne.',
+            'reference.regex' => 'La référence Kpay est invalide.',
         ];
     }
 }

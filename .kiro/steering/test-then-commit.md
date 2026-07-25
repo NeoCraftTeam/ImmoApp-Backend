@@ -1,0 +1,49 @@
+---
+inclusion: always
+---
+
+# Grille backend — Pint, PHPStan et Rector
+
+**Règle non négociable :** dès qu’un agent exécute **Pint** et **PHPStan** sur la racine Laravel **dans la même passe de vérification**, il doit **aussi** exécuter **Rector** (bundle complet ci-dessous). Ne pas annoncer une « grille verte » backend sur Pint + PHPStan seuls sans Rector.
+
+Exception raisonnable : tâche **strictement frontend** (aucun fichier PHP modifié, `vendor/` ou racine Laravel inchangés en intention) — alors ne pas lancer la grille PHP ; si Pint/PHPStan sont quand même lancés par habitude, enchaîner Rector comme ci-dessous.
+
+# Test puis commit — grille de qualité obligatoire
+
+Lorsque l’utilisateur demande explicitement de **tester puis committer** (ou formulation équivalente), **ne pas committer** tant que la grille ci-dessous n’est pas **entièrement verte**.
+
+## Backend (Laravel, racine du dépôt)
+
+Exécuter **dans cet ordre**, puis itérer si une étape modifie des fichiers :
+
+1. **Pint** (correction style)  
+   `vendor/bin/pint --dirty --format agent`
+
+2. **PHPStan** (0 erreur)  
+   `vendor/bin/phpstan analyse`  
+   (mémoire si besoin : `vendor/bin/phpstan analyse --memory-limit=2G`)
+
+3. **Rector** (refactors appliqués **et** arbre propre)  
+   - `vendor/bin/rector process`  
+   - puis vérification : `vendor/bin/rector process --dry-run --no-progress-bar` (doit se terminer sans changements restants)
+
+4. **Repasse Pint** si Rector a touché des fichiers :  
+   `vendor/bin/pint --dirty --format agent`
+
+5. **Repasse PHPStan** si le code a encore changé : jusqu’à 0 erreur.
+
+6. **Tests**  
+   `php artisan test --compact` avec périmètre minimal si des fichiers précis ont changé ; sinon suite complète si l’utilisateur ne précise pas.
+
+7. **Commit** uniquement après succès des étapes 1–6.
+
+> L’ordre **Pint → PHPStan → Rector → Pint/PHPStan de contrôle** évite de laisser du style ou des soucis PHPStan après Rector. Aligné avec l’esprit de `./tests/quality.sh --fix`.
+
+## Frontend (`keyhome-frontend-next/`)
+
+Si le commit concerne le Next.js : **ESLint** (0 erreur), **`npm run test`** (Vitest) ou équivalent projet sur les zones touchées, **`npm run typecheck`** / build si le projet l’exige, puis commit dans ce dépôt ; mettre à jour le pointeur gitlink côté backend si le monorepo référence ce dossier.
+
+## Non négociable
+
+- Ne pas sauter PHPStan ni la **double passe Rector** (`process` + `--dry-run` clean).  
+- Ne pas pousser sur le remote sans ordre explicite de l’utilisateur.

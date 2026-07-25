@@ -1,6 +1,6 @@
 import { AlertCircle, Heart, LogIn } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
-import { ActivityIndicator, FlatList, RefreshControl } from 'react-native';
+import { FlatList, RefreshControl } from 'react-native';
 import { H2, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,7 +10,6 @@ import { EmptyState } from '@/components/EmptyState';
 import { extractApiErrorMessage } from '@/api/client';
 import { useSession } from '@/auth/SessionProvider';
 import { useFavorites } from '@/hooks/useFavorites';
-import { brand } from '@/theme/tokens';
 import { t } from '@/i18n';
 
 /**

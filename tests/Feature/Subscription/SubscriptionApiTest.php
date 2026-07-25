@@ -17,26 +17,24 @@ use Illuminate\Support\Facades\Http;
 uses(RefreshDatabase::class);
 
 /**
- * Stub the GeniusPay gateway so subscribe()/upgrade()/renew() can produce a
+ * Stub the Kpay gateway so subscribe()/upgrade()/renew() can produce a
  * checkout link without hitting the network. Tests for the state-mutation
  * contract should not depend on real gateway connectivity.
  */
-function stubGeniusPayCheckout(): void
+function stubKpayCheckout(): void
 {
-    config()->set('payment.default', 'geniuspay');
-    config()->set('payment.gateways.geniuspay.api_key', 'pk_sandbox_test_fake');
-    config()->set('payment.gateways.geniuspay.api_secret', 'sk_sandbox_test_fake');
-    config()->set('payment.gateways.geniuspay.webhook_secret', 'whsec_sandbox_test_secret_123');
-    config()->set('payment.gateways.geniuspay.redirect_url', 'https://test.app/payment/callback');
+    config()->set('payment.default', 'kpay');
+    config()->set('payment.gateways.kpay.api_key', 'pk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.webhook_secret', 'whsec_sandbox_test_secret_123');
+    config()->set('payment.gateways.kpay.redirect_url', 'https://test.app/payment/callback');
 
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'reference' => 'MTX-SUB-TEST',
-                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-SUB-TEST',
-                'status' => 'pending',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_SUB_TEST',
+            'reference' => 'KPAY-SUB-TEST',
+            'gatewayUrl' => 'https://admin.kpay.site/gateway/pay_SUB_TEST',
+            'status' => 'PENDING',
         ], 201),
     ]);
 }
@@ -187,7 +185,7 @@ it('can view subscription history', function (): void {
 });
 
 it('renew creates a payment and does not mutate state until webhook succeeds', function (): void {
-    stubGeniusPayCheckout();
+    stubKpayCheckout();
 
     $plan = SubscriptionPlan::factory()->premium()->create(['duration_days' => 30]);
     $subscription = Subscription::factory()->expired()->create([
@@ -226,7 +224,7 @@ it('cannot renew active subscription', function (): void {
 });
 
 it('upgrade creates a payment and does not flip plan until webhook succeeds', function (): void {
-    stubGeniusPayCheckout();
+    stubKpayCheckout();
 
     $basicPlan = SubscriptionPlan::factory()->basic()->create();
     $premiumPlan = SubscriptionPlan::factory()->premium()->create();

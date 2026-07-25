@@ -1,9 +1,7 @@
 import {
   ArrowLeft,
   Bell,
-  Check,
   ChevronRight,
-  Coins,
   CreditCard,
   FileText,
   HelpCircle,
@@ -17,14 +15,12 @@ import {
 } from '@tamagui/lucide-icons';
 import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, Switch } from 'react-native';
+import { Alert, Pressable, Switch } from 'react-native';
 import { H2, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSession } from '@/auth/SessionProvider';
-import { useCurrency } from '@/hooks/useCurrency';
 import { useAppTheme, type ThemeMode } from '@/providers/ThemeProvider';
-import { CURRENCY_LABELS, SUPPORTED_CURRENCIES } from '@/services/currency';
 import { brand } from '@/theme/tokens';
 
 const THEME_LABELS: Record<ThemeMode, string> = {
@@ -44,10 +40,8 @@ export default function Settings() {
   const insets = useSafeAreaInsets();
   const { isAuthenticated, signOut } = useSession();
   const { mode, scheme, setMode } = useAppTheme();
-  const { currency, setCurrency } = useCurrency();
   const [pushEnabled, setPushEnabled] = useState(true);
   const [emailEnabled, setEmailEnabled] = useState(true);
-  const [currencyOpen, setCurrencyOpen] = useState(false);
 
   const handleThemePress = () => {
     Alert.alert('Apparence', 'Choisissez le thème de l’application.', [
@@ -146,12 +140,6 @@ export default function Settings() {
               hint={mode === 'system' ? `${THEME_LABELS.system} (${scheme === 'dark' ? 'sombre' : 'clair'})` : THEME_LABELS[mode]}
               onPress={handleThemePress}
             />
-            <Row
-              icon={<Coins size={18} color="$slate700" />}
-              label="Devise d'affichage"
-              hint={`${currency} · ${CURRENCY_LABELS[currency] ?? currency}`}
-              onPress={() => setCurrencyOpen(true)}
-            />
           </Section>
 
           <Section title="Aide et confidentialité">
@@ -209,107 +197,7 @@ export default function Settings() {
           )}
         </YStack>
       </YStack>
-
-      <CurrencyPickerModal
-        open={currencyOpen}
-        current={currency}
-        onSelect={(next) => {
-          setCurrency(next);
-          setCurrencyOpen(false);
-        }}
-        onClose={() => setCurrencyOpen(false)}
-        insets={insets}
-      />
     </>
-  );
-}
-
-/**
- * Sélecteur de devise d'affichage — liste défilante des devises
- * supportées par le singleton `currencyStore`. Le choix est persisté et
- * appliqué instantanément à tous les prix de l'application.
- */
-function CurrencyPickerModal({
-  open,
-  current,
-  onSelect,
-  onClose,
-  insets,
-}: {
-  open: boolean;
-  current: string;
-  onSelect: (currency: string) => void;
-  onClose: () => void;
-  insets: { bottom: number };
-}) {
-  return (
-    <Modal
-      visible={open}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
-      <Pressable style={{ flex: 1 }} onPress={onClose}>
-        <YStack flex={1} justifyContent="flex-end" backgroundColor="rgba(0,0,0,0.4)">
-          <Pressable onPress={(e) => e.stopPropagation()}>
-            <YStack
-              backgroundColor="$background"
-              borderTopLeftRadius={20}
-              borderTopRightRadius={20}
-              paddingTop={12}
-              paddingBottom={insets.bottom + 12}
-              maxHeight={480}
-            >
-              <YStack
-                alignSelf="center"
-                width={40}
-                height={4}
-                borderRadius={2}
-                backgroundColor="$slate300"
-                marginBottom={12}
-              />
-              <Paragraph
-                fontSize={17}
-                fontWeight="800"
-                color="$slate900"
-                paddingHorizontal={20}
-                paddingBottom={8}
-              >
-                Devise d'affichage
-              </Paragraph>
-              <ScrollView>
-                {SUPPORTED_CURRENCIES.map((code) => {
-                  const active = code === current;
-                  return (
-                    <Pressable key={code} onPress={() => onSelect(code)}>
-                      <XStack
-                        alignItems="center"
-                        gap={12}
-                        paddingHorizontal={20}
-                        paddingVertical={14}
-                      >
-                        <Paragraph
-                          fontSize={15}
-                          fontWeight="800"
-                          color={active ? brand.primary : '$slate900'}
-                          width={52}
-                        >
-                          {code}
-                        </Paragraph>
-                        <Paragraph fontSize={14} color="$slate600" flex={1} numberOfLines={1}>
-                          {CURRENCY_LABELS[code] ?? code}
-                        </Paragraph>
-                        {active && <Check size={18} color={brand.primary} />}
-                      </XStack>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </YStack>
-          </Pressable>
-        </YStack>
-      </Pressable>
-    </Modal>
   );
 }
 

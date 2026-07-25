@@ -49,4 +49,8 @@ export interface ConversationMessage {
   read_at?: string | null;
   created_at: string;
   client_id?: string;
+  /** Client-only — envoi optimiste avant confirmation serveur. */
+  is_optimistic?: boolean;
+  /** Client-only — mutation échouée, proposer un réessai. */
+  is_failed?: boolean;
 }

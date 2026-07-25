@@ -239,6 +239,13 @@ final class PaymentController
             $validated['reference'] ?? null,
         );
 
+        if ($payment->status === PaymentStatus::PENDING && !empty($validated['gateway_redirect_status'])) {
+            $payment = $this->paymentService->applySafeRedirectTerminalHint(
+                $payment,
+                $validated['gateway_redirect_status'],
+            );
+        }
+
         if ($payment->isPaid()) {
             $this->postPaymentActions->execute($payment, (array) ($payment->gateway_response ?? []));
         }
@@ -261,7 +268,7 @@ final class PaymentController
      * Returns ONLY the status (`pending` | `success` | `failed` | `cancelled`)
      * for a given `tx_ref`. Designed for the post-checkout callback page
      * (`/payment/return`, `/credits/callback`, `/payment-success`) where the user's session
-     * cookie may have been lost during the cross-origin GeniusPay redirect.
+     * cookie may have been lost during the cross-origin Kpay redirect.
      *
      * Security:
      *  - The `tx_ref` is opaque (`KH-XXXXXXXXXXXX`, ~62-bit entropy) and acts
@@ -283,15 +290,35 @@ final class PaymentController
      *     @OA\Response(response=200, description="Statut du paiement (jamais de PII)")
      * )
      */
-    public function publicStatus(string $txRef): JsonResponse
+    public function publicStatus(Request $request, string $txRef): JsonResponse
     {
-        // Hard-validate the format BEFORE hitting the DB so a flood of
-        // malformed requests can't produce a SQL injection attempt against
-        // the UUID-shaped column.
         $payment = PaymentTransactionLookup::findByPublicReference($txRef);
 
         if ($payment === null) {
             return response()->json(['status' => 'unknown']);
+        }
+
+        $redirectStatus = $request->query('redirect_status') ?? $request->query('status');
+
+        // Session-less callback pages poll this endpoint after hosted-checkout
+        // redirects. When webhooks are disabled or delayed, actively re-query
+        // the gateway so the status can transition without auth.
+        if ($payment->status === PaymentStatus::PENDING) {
+            $payment = $this->paymentService->syncPaymentStatus(
+                $payment,
+                PaymentTransactionLookup::isGatewayReference($txRef) ? $txRef : null,
+            );
+
+            if ($payment->status === PaymentStatus::PENDING && is_string($redirectStatus) && $redirectStatus !== '') {
+                $payment = $this->paymentService->applySafeRedirectTerminalHint($payment, $redirectStatus);
+            }
+
+            if ($payment->isPaid()) {
+                $this->postPaymentActions->execute(
+                    $payment,
+                    (array) ($payment->gateway_response ?? []),
+                );
+            }
         }
 
         return response()->json([
@@ -371,7 +398,7 @@ final class PaymentController
      *     summary="Webhook passerelle de paiement",
      *     tags={"💰 Paiements"},
      *
-     *     @OA\Parameter(name="gateway", in="path", required=true, @OA\Schema(type="string", enum={"geniuspay"})),
+     *     @OA\Parameter(name="gateway", in="path", required=true, @OA\Schema(type="string", enum={"kpay"})),
      *
      *     @OA\Response(response=200, description="Webhook traité"),
      *     @OA\Response(response=401, description="Signature invalide")
@@ -462,16 +489,16 @@ final class PaymentController
     {
         Log::info("--- WEBHOOK {$gateway} START ---");
 
-        // The `{gateway}` route is constrained to `geniuspay`; Stripe has its
+        // The `{gateway}` route is constrained to `kpay`; Stripe has its
         // own dedicated webhook endpoint (`handleStripeWebhook`).
-        if ($gateway === 'geniuspay') {
-            return $this->handleGeniusPayWebhook($request);
+        if ($gateway === 'kpay') {
+            return $this->handleKpayWebhook($request);
         }
 
         return response()->json(['status' => 'error', 'message' => 'Unsupported gateway'], 404);
     }
 
-    private function handleGeniusPayWebhook(Request $request): JsonResponse
+    private function handleKpayWebhook(Request $request): JsonResponse
     {
         $rawPayload = (string) $request->getContent();
         if ($rawPayload === '') {
@@ -485,26 +512,25 @@ final class PaymentController
         }
 
         $headers = [
-            'X-Webhook-Signature' => (string) $request->header('X-Webhook-Signature', ''),
-            'X-Webhook-Timestamp' => (string) $request->header('X-Webhook-Timestamp', ''),
-            'X-Webhook-Event' => (string) $request->header('X-Webhook-Event', ''),
+            'X-KPAY-Signature' => (string) $request->header('X-KPAY-Signature', ''),
+            'X-KPAY-Event' => (string) $request->header('X-KPAY-Event', ''),
         ];
 
         try {
-            $data = $this->paymentService->processWebhook($decoded, $headers, 'geniuspay', $rawPayload);
+            $data = $this->paymentService->processWebhook($decoded, $headers, 'kpay', $rawPayload);
             $txRef = (string) ($data['tx_ref'] ?? '');
         } catch (InvalidWebhookSignatureException) {
             return response()->json(['status' => 'error', 'message' => 'Invalid signature'], 401);
         } catch (PaymentGatewayException|\Exception $e) {
-            Log::error('geniuspay webhook signature/parse error: '.$e->getMessage());
+            Log::error('kpay webhook signature/parse error: '.$e->getMessage());
 
             return response()->json(['status' => 'error'], 500);
         }
 
-        if ($txRef !== '' && in_array((string) ($data['event'] ?? ''), ['payment.success'], true)) {
+        if ($txRef !== '' && in_array((string) ($data['event'] ?? ''), ['payment.completed'], true)) {
             ProcessPaymentWebhookJob::dispatch(
                 $txRef,
-                'geniuspay',
+                'kpay',
                 (array) ($data['raw'] ?? []),
                 $request->header('X-Request-ID'),
                 $request->header('X-Correlation-ID'),

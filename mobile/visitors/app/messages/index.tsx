@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
 import { useConversations } from '@/hooks/useConversations';
+import { resolveMediaUrl } from '@/lib/media-url';
 import { useSession } from '@/auth/SessionProvider';
 import { brand } from '@/theme/tokens';
 import type { Conversation } from '@/types/conversation';
@@ -107,7 +108,7 @@ function ConversationRow({
 }) {
   const other = conversation.other_participant ?? null;
   const otherName = other?.name?.trim() || 'Conversation';
-  const avatarUrl = other?.avatar?.startsWith('http') ? other.avatar : null;
+  const avatarUrl = resolveMediaUrl(other?.avatar);
   const lastMessage = conversation.last_message;
   const unread = (conversation.unread_count ?? 0) > 0;
   const timestamp = lastMessage?.created_at ?? conversation.last_message_at;

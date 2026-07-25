@@ -16,7 +16,7 @@ defaults:
 
 jobs:
   typecheck-and-test:
-    name: TS + Jest
+    name: Lint + TS + Jest
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -28,6 +28,8 @@ jobs:
           cache-dependency-path: mobile/visitors/package-lock.json
       - name: Install
         run: npm ci --legacy-peer-deps
+      - name: ESLint
+        run: npm run lint -- --max-warnings=0
       - name: TypeScript
         run: npx tsc --noEmit
       - name: Jest

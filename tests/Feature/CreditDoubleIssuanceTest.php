@@ -31,21 +31,19 @@ uses(RefreshDatabase::class);
 // ── Helper ────────────────────────────────────────────────────────────────────
 
 /**
- * Mock the GeniusPay verify endpoint to return a successful transaction.
+ * Mock the Kpay verify endpoint to return a successful transaction.
  */
-function mockGeniusPayApproved(): void
+function mockKpayApproved(): void
 {
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'status' => 'completed',
-                'amount' => 1000,
-                'currency' => 'XAF',
-                'reference' => 'test-ref',
-                'payment_method' => 'mtn_mobile_money',
-                'created_at' => now()->toIso8601String(),
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_test_verify',
+            'reference' => 'KPAY-TEST-VERIFY',
+            'status' => 'COMPLETED',
+            'amount' => 1000,
+            'currency' => 'XAF',
+            'provider' => 'mtn_mobile_money',
+            'completedAt' => now()->toIso8601String(),
         ], 200),
     ]);
 }
@@ -82,7 +80,7 @@ it('the point_transactions table rejects two rows with the same payment_id', fun
 
 it('verify-purchase does not re-credit points when the webhook already processed the payment', function (): void {
     Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
-    mockGeniusPayApproved();
+    mockKpayApproved();
 
     $user = User::factory()->create(['point_balance' => 0]);
     $package = PointPackage::factory()->create(['price' => 1000, 'points_awarded' => 10]);
@@ -93,8 +91,9 @@ it('verify-purchase does not re-credit points when the webhook already processed
         'status' => PaymentStatus::SUCCESS,
         'type' => PaymentType::CREDIT,
         'payment_method' => PaymentMethod::MOBILE_MONEY,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => $package->price,
+        'gateway_response' => ['kpay_id' => 'pay_test_verify'],
     ]);
 
     // Simulate the PointTransaction that the webhook inserted and the resulting balance
@@ -121,7 +120,7 @@ it('verify-purchase does not re-credit points when the webhook already processed
 
 it('verify-purchase credits points exactly once even when called twice for a pending payment', function (): void {
     Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
-    mockGeniusPayApproved();
+    mockKpayApproved();
 
     $user = User::factory()->create(['point_balance' => 0]);
     $package = PointPackage::factory()->create(['price' => 1000, 'points_awarded' => 10]);
@@ -132,8 +131,9 @@ it('verify-purchase credits points exactly once even when called twice for a pen
         'status' => PaymentStatus::PENDING,
         'type' => PaymentType::CREDIT,
         'payment_method' => PaymentMethod::MOBILE_MONEY,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => $package->price,
+        'gateway_response' => ['kpay_id' => 'pay_test_verify'],
     ]);
 
     $this->actingAs($user)
@@ -158,7 +158,7 @@ it('verify-purchase credits points exactly once even when called twice for a pen
 
 it('Pack Starter at 1000 FCFA awards exactly 10 credits via verify-purchase', function (): void {
     Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
-    mockGeniusPayApproved();
+    mockKpayApproved();
 
     $user = User::factory()->create(['point_balance' => 0]);
     $packStarter = PointPackage::factory()->create([
@@ -174,8 +174,9 @@ it('Pack Starter at 1000 FCFA awards exactly 10 credits via verify-purchase', fu
         'status' => PaymentStatus::PENDING,
         'type' => PaymentType::CREDIT,
         'payment_method' => PaymentMethod::MOBILE_MONEY,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => $packStarter->price,
+        'gateway_response' => ['kpay_id' => 'pay_test_verify'],
     ]);
 
     $this->actingAs($user)
@@ -192,10 +193,10 @@ it('Pack Starter at 1000 FCFA awards exactly 10 credits via verify-purchase', fu
 it('webhook followed by verify-purchase results in exactly one credit of 10 points', function (): void {
     Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
     $secret = 'whsec_sandbox_test_secret_123';
-    config()->set('payment.default', 'geniuspay');
-    config()->set('payment.gateways.geniuspay.api_key', 'pk_sandbox_test_fake');
-    config()->set('payment.gateways.geniuspay.api_secret', 'sk_sandbox_test_fake');
-    config()->set('payment.gateways.geniuspay.webhook_secret', $secret);
+    config()->set('payment.default', 'kpay');
+    config()->set('payment.gateways.kpay.api_key', 'pk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.webhook_secret', $secret);
 
     $user = User::factory()->create(['point_balance' => 0]);
     $package = PointPackage::factory()->create(['price' => 1000, 'points_awarded' => 10]);
@@ -206,32 +207,20 @@ it('webhook followed by verify-purchase results in exactly one credit of 10 poin
         'status' => PaymentStatus::PENDING,
         'type' => PaymentType::CREDIT,
         'payment_method' => PaymentMethod::MOBILE_MONEY,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => $package->price,
         'plan_id' => $package->id,
     ]);
 
-    $timestamp = time();
-    $payload = [
-        'event' => 'payment.success',
-        'data' => [
-            'status' => 'completed',
-            'reference' => 'MTX-WHTHENVERIFY',
-            'amount' => 1000,
-            'currency' => 'XAF',
-            'metadata' => ['tx_ref' => 'KH-WHTHENVERIFY', 'package_id' => $package->id],
-        ],
-    ];
-    $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    $signature = hash_hmac('sha256', $timestamp.'.'.$encoded, $secret);
-    $body = json_encode($payload, JSON_THROW_ON_ERROR);
+    $payload = kpayCompletedWebhookPayload([
+        'paymentId' => 'pay_wh_then_verify',
+        'reference' => 'KPAY-WHTHENVERIFY',
+        'amount' => 1000,
+        'externalId' => 'KH-WHTHENVERIFY',
+    ]);
+    [$headers, $body] = signedKpayWebhook($secret, $payload);
 
-    $this->call('POST', '/api/v1/webhooks/geniuspay', [], [], [], [
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_X_WEBHOOK_SIGNATURE' => $signature,
-        'HTTP_X_WEBHOOK_TIMESTAMP' => (string) $timestamp,
-        'HTTP_X_WEBHOOK_EVENT' => 'payment.success',
-    ], $body)->assertOk();
+    $this->call('POST', '/api/v1/webhooks/kpay', [], [], [], $headers, $body)->assertOk();
 
     expect($user->fresh()->point_balance)->toBe(10);
 

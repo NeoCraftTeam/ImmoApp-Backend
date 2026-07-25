@@ -2,7 +2,7 @@ import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import axios, { type AxiosError, type AxiosInstance } from 'axios';
 
-import { SESSION_KEY } from '@/auth/storage-keys';
+import { SESSION_KEY, scopedSessionKey } from '@/auth/storage-keys';
 
 /**
  * Resolve the API base URL, preferring an explicit `EXPO_PUBLIC_API_BASE_URL`
@@ -27,7 +27,13 @@ function resolveBaseUrl(): string {
   return extra.apiBaseUrl ?? 'https://api.keyhome.app/api/v1';
 }
 
-const RESOLVED_BASE_URL = resolveBaseUrl();
+export const RESOLVED_BASE_URL = resolveBaseUrl();
+
+/**
+ * Clé SecureStore effective pour cette build (cloisonnée par backend).
+ * Unique source de vérité — le SessionProvider l'importe d'ici.
+ */
+export const SCOPED_SESSION_KEY = scopedSessionKey(RESOLVED_BASE_URL);
 
 if (__DEV__) {
   // Diagnostic : confirme contre quel backend l'app tape réellement.
@@ -54,6 +60,7 @@ export const apiClient: AxiosInstance = axios.create({
   headers: {
     Accept: 'application/json',
     'Content-Type': 'application/json',
+    'X-KeyHome-Client': 'keyhome-mobile-visitors',
   },
 });
 
@@ -77,11 +84,32 @@ export function setBearerToken(token: string | null): void {
   bearerTokenCache = token && token !== 'null' && token !== '' ? token : null;
 }
 
+/**
+ * Abonnés notifiés quand une réponse 401 invalide la session (token
+ * révoqué / expiré). Le SessionProvider s'y branche pour remettre son
+ * state React à null immédiatement — sans ça l'UI restait « connectée »
+ * jusqu'au prochain mount de l'onglet Compte.
+ */
+type UnauthorizedListener = () => void;
+const unauthorizedListeners = new Set<UnauthorizedListener>();
+
+export function onUnauthorized(listener: UnauthorizedListener): () => void {
+  unauthorizedListeners.add(listener);
+  return () => unauthorizedListeners.delete(listener);
+}
+
+/**
+ * Routes d'auth dont un 401 signifie « mauvais identifiants », pas
+ * « session expirée » — on ne doit PAS y purger la session existante
+ * (ex. un login raté pendant qu'un compte est déjà connecté).
+ */
+const AUTH_401_EXEMPT = ['/auth/login', '/auth/registerCustomer', '/auth/verify-email-otp', '/auth/oauth/'];
+
 apiClient.interceptors.request.use(async (config) => {
   let token: string | null = bearerTokenCache;
   if (token === null) {
     try {
-      const stored = await SecureStore.getItemAsync(SESSION_KEY);
+      const stored = await SecureStore.getItemAsync(SCOPED_SESSION_KEY);
       if (stored && stored !== 'null' && stored !== '') {
         token = stored;
         bearerTokenCache = stored; // populate la cache pour les prochains calls
@@ -104,16 +132,27 @@ apiClient.interceptors.response.use(
     // SessionProvider re-runs its gate. We do NOT trigger a navigation
     // from here (the API layer must not know about the router); the
     // provider observes the cleared state and redirects.
-    if (error.response?.status === 401) {
+    const url = String(error.config?.url ?? '');
+    const isAuthAttempt = AUTH_401_EXEMPT.some((p) => url.includes(p));
+    if (error.response?.status === 401 && !isAuthAttempt) {
       // Vider la cache en premier (sync, atomique) — sinon une
       // requete in-flight pourrait re-lire l'ancien token via
       // bearerTokenCache pendant que deleteItemAsync est encore
       // en cours (P0 token zombie). Puis cleanup SecureStore.
       bearerTokenCache = null;
       try {
+        await SecureStore.deleteItemAsync(SCOPED_SESSION_KEY);
+        // Nettoie aussi l'ancienne clé non-scopée (builds antérieures).
         await SecureStore.deleteItemAsync(SESSION_KEY);
       } catch {
         /* fall through */
+      }
+      for (const listener of unauthorizedListeners) {
+        try {
+          listener();
+        } catch {
+          /* listener must never break the error chain */
+        }
       }
     }
     return Promise.reject(error);
@@ -126,36 +165,9 @@ apiClient.interceptors.response.use(
  * toast / inline rendering. Falls back to a generic French error
  * message rather than exposing raw HTTP details.
  */
-export function extractApiErrorMessage(err: unknown): string {
-  if (axios.isAxiosError(err)) {
-    const msg = (err.response?.data as { message?: string } | undefined)?.message;
-    if (typeof msg === 'string' && msg.trim() !== '') {
-      return msg;
-    }
-    if (err.response?.status === 401) {
-      return 'Identifiants incorrects.';
-    }
-    if (err.response?.status === 422) {
-      return 'Données invalides.';
-    }
-    if (err.code === 'ECONNABORTED') {
-      return 'Délai d’attente dépassé. Vérifiez votre connexion.';
-    }
-    // No response received — typiquement une erreur TLS / DNS / Wi-Fi /
-    // backend down. On expose le code axios sous-jacent pour aider à
-    // distinguer "Wi-Fi off" de "backend down" de "URL inaccessible".
-    // (Pas de mention d'un nom d'hôte spécifique — l'app est utilisée
-    // par des bailleurs hors-dev qui n'ont jamais entendu parler de
-    // `keyhome.test` ; le message générique reste actionnable.)
-    if (!err.response) {
-      const code = err.code ?? 'ERR_NETWORK';
-      return `Connexion au serveur impossible (${code}). Vérifiez votre connexion internet.`;
-    }
-  }
-  // Non-axios Error — surface its own message instead of the generic
-  // fallback so caller code's `throw new Error('…')` actually reaches the UI.
-  if (err instanceof Error && err.message.trim() !== '') {
-    return err.message;
-  }
-  return 'Une erreur est survenue. Réessayez plus tard.';
-}
+export {
+  extractApiErrorMessage,
+  extractAuthErrorMessage,
+  getApiErrorStatus,
+  parseApiErrorPayload,
+} from './auth-errors';

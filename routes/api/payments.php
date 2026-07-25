@@ -32,13 +32,13 @@ Route::get('/payments/methods', [PaymentMethodController::class, 'index'])
 // Throttled to 60 req/min/IP — enough for an aggressive callback poll
 // (1 req/s for 60 s) but not enough to brute-force `tx_ref` space.
 Route::get('/payments/{txRef}/public-status', [PaymentController::class, 'publicStatus'])
-    ->where('txRef', 'KH-[A-Za-z0-9]+')
+    ->where('txRef', 'KH-[A-Za-z0-9]+|pay_[A-Za-z0-9_]+|KPAY-[A-Za-z0-9_-]+|SANDBOX_[A-Za-z0-9_-]+')
     ->middleware('throttle:60,1');
 
 // --- PAYMENTS — multi-gateway webhooks ---
-// GeniusPay mobile-money hosted-checkout webhook (`{gateway}` placeholder).
+// Kpay mobile-money hosted-checkout webhook (`{gateway}` placeholder).
 Route::post('/webhooks/{gateway}', [PaymentController::class, 'handleWebhook'])
-    ->where('gateway', 'geniuspay')
+    ->where('gateway', 'kpay')
     ->middleware('throttle:payments.webhook');
 
 // Stripe: dedicated endpoint — verifies `Stripe-Signature` against the

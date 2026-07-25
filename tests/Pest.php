@@ -46,3 +46,5 @@ function something()
 {
     // ..
 }
+
+require_once __DIR__.'/Support/KpayTestHelpers.php';

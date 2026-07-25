@@ -6,6 +6,7 @@ import { Animated, Easing, Pressable } from 'react-native';
 import { Paragraph, XStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { brand } from '@/theme/tokens';
 
 /**
@@ -22,13 +23,25 @@ export function OfflineBanner() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const [state, setState] = useState<'online' | 'offline' | 'recovered'>('online');
+  const reducedMotion = useReducedMotion();
   const translateY = useRef(new Animated.Value(-80)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const recoveredTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wasOfflineRef = useRef(false);
 
   useEffect(() => {
+    // Reduced motion : cross-fade seul, la pill n'est jamais translatée.
     const animate = (toY: number, toOpacity: number, duration = 260) => {
+      if (reducedMotion) {
+        translateY.setValue(0);
+        Animated.timing(opacity, {
+          toValue: toOpacity,
+          duration: Math.min(duration, 180),
+          useNativeDriver: true,
+        }).start();
+        return;
+      }
+
       Animated.parallel([
         Animated.timing(translateY, {
           toValue: toY,
@@ -73,7 +86,7 @@ export function OfflineBanner() {
       unsubscribe();
       if (recoveredTimer.current) clearTimeout(recoveredTimer.current);
     };
-  }, [translateY, opacity]);
+  }, [translateY, opacity, reducedMotion]);
 
   const isOffline = state === 'offline';
 

@@ -1,7 +1,7 @@
 import { Check, Minus, Plus, Sparkles } from '@tamagui/lucide-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, TextInput } from 'react-native';
+import { Alert, Pressable, ScrollView } from 'react-native';
 import { Button, Input, Paragraph, Spinner, TextArea, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -179,7 +179,6 @@ export function AdForm({ mode, ad }: { mode: 'create' | 'edit'; ad?: Ad }) {
     return () => {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form]);
 
   const buildPayload = (asDraft: boolean): AdFormPayload => ({

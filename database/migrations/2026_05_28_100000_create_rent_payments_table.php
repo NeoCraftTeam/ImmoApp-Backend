@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Schema;
  * One row per actual rent received by the landlord (cash, mobile-money,
  * bank transfer, or other). Distinct from `payments` — that table is for
  * platform fees (credits / subscriptions / unlocks / boosts) flowing
- * through Stripe or GeniusPay. Rent collection in CEMAC is mostly
+ * through Stripe or Kpay. Rent collection in CEMAC is mostly
  * out-of-band (cash, MM transfer), so this is a manual ledger the
  * landlord maintains, with the option to capture partial payments as
  * multiple rows for the same `period_month`.

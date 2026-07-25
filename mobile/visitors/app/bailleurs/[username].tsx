@@ -14,7 +14,6 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
-  ScrollView as RNScrollView,
 } from 'react-native';
 import { Button, H2, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +23,7 @@ import { AdCard } from '@/components/AdCard';
 import { MarkdownText } from '@/components/MarkdownText';
 import { useBailleur, useBailleurFollow } from '@/hooks/useBailleur';
 import { useSession } from '@/auth/SessionProvider';
+import { resolveMediaUrl } from '@/lib/media-url';
 import { brand } from '@/theme/tokens';
 
 /**
@@ -133,9 +133,9 @@ export default function BailleurProfile() {
                   alignItems="center"
                   justifyContent="center"
                 >
-                  {data.avatar?.startsWith('http') ? (
+                  {resolveMediaUrl(data.avatar) ? (
                     <Image
-                      source={{ uri: data.avatar }}
+                      source={{ uri: resolveMediaUrl(data.avatar)! }}
                       style={{ width: '100%', height: '100%' }}
                       contentFit="cover"
                       accessibilityLabel={firstName || 'Bailleur'}

@@ -25,14 +25,14 @@ enum PaymentMethod: string
     /**
      * Routing rule: which gateway processes this method.
      *
-     * Mobile Money & Orange Money → GeniusPay (CEMAC mobile rails).
+     * Mobile Money & Orange Money → Kpay (CEMAC/UEMOA mobile money rails, pawaPay-backed).
      * Carte bancaire → Stripe (PCI-compliant card processor, EUR billing).
      */
     public function gateway(): PaymentGateway
     {
         return match ($this) {
             self::ORANGE_MONEY,
-            self::MOBILE_MONEY => PaymentGateway::GeniusPay,
+            self::MOBILE_MONEY => PaymentGateway::Kpay,
             self::CARD => PaymentGateway::Stripe,
         };
     }

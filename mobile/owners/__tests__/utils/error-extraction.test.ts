@@ -1,4 +1,4 @@
-import { extractApiErrorMessage } from '@/api/extract-error';
+import { extractApiErrorMessage, extractAuthErrorMessage } from '@/api/extract-error';
 import axios, { AxiosError, type AxiosResponse } from 'axios';
 
 function makeAxiosError(response?: Partial<AxiosResponse>, code?: string): AxiosError {
@@ -26,6 +26,15 @@ describe('extractApiErrorMessage', () => {
   it('message 401 par défaut', () => {
     const err = makeAxiosError({ status: 401, data: {} } as Partial<AxiosResponse>);
     expect(extractApiErrorMessage(err)).toMatch(/incorrects/i);
+    expect(extractApiErrorMessage(err)).toMatch(/Google/i);
+  });
+
+  it('explique le mauvais panneau (client sur app bailleur)', () => {
+    const err = makeAxiosError({
+      status: 401,
+      data: { message: 'Identifiants incorrects', code: 'PANEL_ACCESS_DENIED' },
+    } as Partial<AxiosResponse>);
+    expect(extractAuthErrorMessage(err)).toMatch(/Visiteur/i);
   });
 
   it('message 403 par défaut', () => {

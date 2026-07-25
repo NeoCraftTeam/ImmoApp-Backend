@@ -18,6 +18,7 @@ const STATUS_COLOR: Record<PaymentStatus, string> = {
   failed: brand.danger,
   refunded: brand.secondary,
   cancelled: brand.slate500,
+  requires_action: brand.warning,
 };
 
 const STATUS_LABEL: Record<PaymentStatus, string> = {
@@ -27,6 +28,7 @@ const STATUS_LABEL: Record<PaymentStatus, string> = {
   failed: 'Échec',
   refunded: 'Remboursé',
   cancelled: 'Annulé',
+  requires_action: 'Action requise',
 };
 
 function PaymentRow({ p }: { p: PaymentEntry }) {

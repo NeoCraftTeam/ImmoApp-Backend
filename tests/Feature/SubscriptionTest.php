@@ -14,9 +14,9 @@ use Laravel\Sanctum\Sanctum;
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
-    config()->set('payment.gateways.geniuspay.api_key', 'pk_sandbox_test_fake');
-    config()->set('payment.gateways.geniuspay.api_secret', 'sk_sandbox_test_fake');
-    config()->set('payment.gateways.geniuspay.redirect_url', 'https://test.app/payment/callback');
+    config()->set('payment.gateways.kpay.api_key', 'pk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.redirect_url', 'https://test.app/payment/callback');
 
     $this->plan = SubscriptionPlan::create([
         'name' => 'Premium',
@@ -129,12 +129,10 @@ test('user without agency cannot subscribe', function (): void {
 
 test('agent can initiate subscription payment', function (): void {
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'checkout_url' => 'https://pay.genius.ci/checkout/sub-123',
-                'reference' => 'MTX-SUB-123',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_sub_123',
+            'reference' => 'KPAY-SUB-123',
+            'gatewayUrl' => 'https://admin.kpay.site/gateway/sub-123',
         ], 200),
     ]);
 
@@ -158,12 +156,10 @@ test('agent can initiate subscription payment', function (): void {
 
 test('agent can subscribe yearly with correct amount', function (): void {
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'checkout_url' => 'https://pay.genius.ci/checkout/sub-yearly',
-                'reference' => 'MTX-SUB-YEARLY',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_sub_yearly',
+            'reference' => 'KPAY-SUB-YEARLY',
+            'gatewayUrl' => 'https://admin.kpay.site/gateway/sub-yearly',
         ], 200),
     ]);
 

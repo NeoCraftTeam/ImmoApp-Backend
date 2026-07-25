@@ -35,7 +35,14 @@ function fakeClerkPayload(array $overrides = []): array
         'image_url' => 'https://img.clerk.dev/avatar.jpg',
         'primary_email_address_id' => 'iea_1',
         'email_addresses' => [
-            ['id' => 'iea_1', 'email_address' => 'jean@example.com'],
+            [
+                'id' => 'iea_1',
+                'email_address' => 'jean@example.com',
+                'verification' => ['status' => 'verified'],
+            ],
+        ],
+        'external_accounts' => [
+            ['provider' => 'oauth_google', 'verification' => ['status' => 'verified']],
         ],
     ], $overrides);
 }
@@ -104,24 +111,69 @@ describe('Clerk Exchange – authentication flows', function (): void {
         expect($user->fresh()->clerk_id)->toBe('clerk_google_new');
     });
 
-    it('returns otp_required for a brand-new email not in the database', function (): void {
+    it('creates a new OAuth user immediately without sending an OTP email', function (): void {
         $this->mock(ClerkJwtService::class)
             ->shouldReceive('verifyAndFetchUser')
             ->once()
             ->andReturn(fakeClerkPayload([
                 'id' => 'clerk_brand_new',
                 'email_addresses' => [
-                    ['id' => 'iea_1', 'email_address' => 'newuser@example.com'],
+                    [
+                        'id' => 'iea_1',
+                        'email_address' => 'newuser@example.com',
+                        'verification' => ['status' => 'verified'],
+                    ],
                 ],
                 'primary_email_address_id' => 'iea_1',
+                'external_accounts' => [
+                    ['provider' => 'oauth_google', 'verification' => ['status' => 'verified']],
+                ],
             ]));
 
         $response = $this->withToken('fake-clerk-jwt')
             ->postJson('/api/v1/auth/clerk/exchange');
 
-        $response->assertOk()
-            ->assertJsonStructure(['state', 'email_hint'])
-            ->assertJson(['state' => 'otp_required']);
+        $response->assertCreated()
+            ->assertJsonStructure(['access_token', 'user', 'panel_sso_url']);
+
+        Mail::assertNothingSent();
+
+        $this->assertDatabaseHas('users', [
+            'clerk_id' => 'clerk_brand_new',
+            'email' => 'newuser@example.com',
+        ]);
+
+        expect(User::query()->where('email', 'newuser@example.com')->first()?->email_verified_at)->not->toBeNull();
+    });
+
+    it('creates an agent account when registration_intent is agent', function (): void {
+        $this->mock(ClerkJwtService::class)
+            ->shouldReceive('verifyAndFetchUser')
+            ->once()
+            ->andReturn(fakeClerkPayload([
+                'id' => 'clerk_owner_new',
+                'email_addresses' => [
+                    [
+                        'id' => 'iea_1',
+                        'email_address' => 'owner-new@example.com',
+                        'verification' => ['status' => 'verified'],
+                    ],
+                ],
+            ]));
+
+        $response = $this->withToken('fake-clerk-jwt')
+            ->postJson('/api/v1/auth/clerk/exchange', [
+                'registration_intent' => 'agent',
+                'login_context' => 'owner',
+            ]);
+
+        $response->assertCreated()
+            ->assertJsonPath('user.role', 'agent');
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'owner-new@example.com',
+            'clerk_id' => 'clerk_owner_new',
+        ]);
     });
 
     it('returns 401 when the Clerk token is invalid', function (): void {

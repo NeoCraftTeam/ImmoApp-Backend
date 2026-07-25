@@ -3,6 +3,7 @@ import { Animated, Easing } from 'react-native';
 import { Paragraph, YStack } from 'tamagui';
 
 import { KeyHomeLogo } from '@/components/KeyHomeLogo';
+import { useMotionPresets } from '@/hooks/useMotionPresets';
 
 /** Fond clair façon splash éditorial (proche du blanc cassé Anthropic). */
 const SPLASH_BG = '#F7F5F2';
@@ -25,6 +26,7 @@ interface Props {
  * `ready=true`, l'overlay fade out en 380 ms.
  */
 export function SplashView({ ready }: Props) {
+  const { reducedMotion, splashFadeMs } = useMotionPresets();
   const fade = useRef(new Animated.Value(1)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.96)).current;
@@ -32,6 +34,24 @@ export function SplashView({ ready }: Props) {
   const [visible, setVisible] = useState(true);
 
   useEffect(() => {
+    // Reduced motion : cross-fades seuls, pas de scale-up.
+    if (reducedMotion) {
+      logoScale.setValue(1);
+      Animated.parallel([
+        Animated.timing(logoOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(signatureOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      return;
+    }
+
     Animated.parallel([
       Animated.timing(logoOpacity, {
         toValue: 1,
@@ -52,17 +72,17 @@ export function SplashView({ ready }: Props) {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [logoOpacity, logoScale, signatureOpacity]);
+  }, [logoOpacity, logoScale, signatureOpacity, reducedMotion]);
 
   useEffect(() => {
     if (!ready) return;
     Animated.timing(fade, {
       toValue: 0,
-      duration: 380,
+      duration: splashFadeMs,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start(() => setVisible(false));
-  }, [ready, fade]);
+  }, [ready, fade, splashFadeMs]);
 
   if (!visible) return null;
 

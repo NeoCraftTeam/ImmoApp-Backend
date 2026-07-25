@@ -4,8 +4,6 @@ import { Pressable } from 'react-native';
 import { Button, H2, Paragraph, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { brand } from '@/theme/tokens';
-
 export default function Offline() {
   const router = useRouter();
   const insets = useSafeAreaInsets();

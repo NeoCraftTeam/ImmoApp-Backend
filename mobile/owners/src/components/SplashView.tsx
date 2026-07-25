@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing } from 'react-native';
 import { Paragraph, YStack } from 'tamagui';
 
+import { useMotionPresets } from '@/hooks/useMotionPresets';
 import { brand } from '@/theme/tokens';
 
 interface Props {
@@ -20,6 +21,7 @@ interface Props {
  * légèrement le splash visiteur comme demandé.
  */
 export function SplashView({ ready }: Props) {
+  const { reducedMotion, splashFadeMs } = useMotionPresets();
   const fade = useRef(new Animated.Value(1)).current;
   const [visible, setVisible] = useState(true);
 
@@ -27,11 +29,11 @@ export function SplashView({ ready }: Props) {
     if (!ready) return;
     Animated.timing(fade, {
       toValue: 0,
-      duration: 380,
+      duration: splashFadeMs,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start(() => setVisible(false));
-  }, [ready, fade]);
+  }, [ready, fade, splashFadeMs]);
 
   if (!visible) return null;
 
@@ -50,13 +52,13 @@ export function SplashView({ ready }: Props) {
         opacity: fade,
       }}
     >
-      <Wordmark />
-      <Tagline />
+      <Wordmark reducedMotion={reducedMotion} />
+      <Tagline reducedMotion={reducedMotion} />
     </Animated.View>
   );
 }
 
-function Wordmark() {
+function Wordmark({ reducedMotion }: { reducedMotion: boolean }) {
   const letters = ['K', 'e', 'y', 'H', 'o', 'm', 'e'];
   const animations = useRef(letters.map(() => new Animated.Value(0.4))).current;
   const dotScale = useRef(new Animated.Value(0.6)).current;
@@ -64,12 +66,21 @@ function Wordmark() {
   const haloOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Reduced motion : wordmark statique, pas de stagger / halo / pulse.
+    if (reducedMotion) {
+      animations.forEach((anim) => anim.setValue(1));
+      dotScale.setValue(1);
+      return;
+    }
+
+    // Out-cubic sans overshoot : les lettres n'ont aucun momentum, un
+    // rebond (Easing.back) serait décoratif et contraire aux règles motion.
     const stagger = animations.map((anim, i) =>
       Animated.timing(anim, {
         toValue: 1,
         duration: 360,
         delay: i * 70,
-        easing: Easing.out(Easing.back(1.6)),
+        easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }),
     );
@@ -118,7 +129,7 @@ function Wordmark() {
     );
     loop.start();
     return () => loop.stop();
-  }, [animations, dotScale, haloOpacity, haloScale]);
+  }, [animations, dotScale, haloOpacity, haloScale, reducedMotion]);
 
   return (
     <YStack alignItems="center" gap={24}>
@@ -166,11 +177,22 @@ function Wordmark() {
   );
 }
 
-function Tagline() {
+function Tagline({ reducedMotion }: { reducedMotion: boolean }) {
   const slide = useRef(new Animated.Value(14)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Reduced motion : fade court sans slide ni délai chorégraphié.
+    if (reducedMotion) {
+      slide.setValue(0);
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+      return;
+    }
+
     Animated.sequence([
       Animated.delay(820),
       Animated.parallel([
@@ -187,7 +209,7 @@ function Tagline() {
         }),
       ]),
     ]).start();
-  }, [slide, opacity]);
+  }, [slide, opacity, reducedMotion]);
 
   return (
     <Animated.View

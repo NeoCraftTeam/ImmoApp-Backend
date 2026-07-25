@@ -1,15 +1,21 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLocales } from 'expo-localization';
 
 /**
- * Conversion de devises — SINGLETON in-memory, zéro requête API.
+ * Devise d'affichage — résolue AUTOMATIQUEMENT, zéro requête API,
+ * AUCUN choix manuel utilisateur.
  *
- * Règle absolue (comme le web) : le backend stocke TOUJOURS les prix en
- * XAF (FCFA) ; l'affichage dans une autre devise est purement visuel,
- * les paiements se font en FCFA. Les taux sont un snapshot statique
- * (base XAF), suffisant car ils bougent lentement — on évite ainsi tout
- * appel réseau récurrent. La devise d'affichage est résolue UNE fois
- * depuis la région de l'appareil, persistée, et modifiable par l'user.
+ * Règle absolue (comme le web `keyhome-frontend-next`) : le backend stocke
+ * TOUJOURS les prix en XAF (FCFA) ; l'affichage dans une autre devise est
+ * purement visuel, les paiements se font en FCFA. La devise d'affichage est
+ * dérivée UNE fois de la région/locale de l'appareil (l'équivalent mobile de
+ * la géo-détection `CF-IPCountry` du web) et affichée de façon cohérente
+ * partout. Il n'existe volontairement pas de sélecteur de devise : la page
+ * Paramètres du web n'en propose pas non plus (le sélecteur web vit dans la
+ * barre de navigation et le panneau bailleur reste toujours en FCFA).
+ *
+ * Les taux sont un snapshot statique aligné sur le fallback statique du web
+ * (`/api/exchange-rates`), suffisant car ils bougent lentement — on évite
+ * ainsi tout appel réseau récurrent.
  */
 export const BASE_CURRENCY = 'XAF';
 
@@ -33,8 +39,6 @@ const RATES: Record<string, number> = {
   MAD: 0.01636,
 };
 
-export const SUPPORTED_CURRENCIES = Object.keys(RATES);
-
 const SYMBOLS: Record<string, string> = {
   XAF: 'FCFA',
   XOF: 'FCFA',
@@ -54,25 +58,6 @@ const SYMBOLS: Record<string, string> = {
   MAD: 'MAD',
 };
 
-export const CURRENCY_LABELS: Record<string, string> = {
-  XAF: 'Franc CFA (CEMAC)',
-  XOF: 'Franc CFA (UEMOA)',
-  EUR: 'Euro',
-  USD: 'Dollar US',
-  GBP: 'Livre Sterling',
-  CHF: 'Franc Suisse',
-  CAD: 'Dollar Canadien',
-  NGN: 'Naira',
-  GHS: 'Cedi',
-  KES: 'Shilling Kényan',
-  ZAR: 'Rand',
-  AED: 'Dirham EAU',
-  CNY: 'Yuan',
-  JPY: 'Yen',
-  INR: 'Roupie',
-  MAD: 'Dirham Marocain',
-};
-
 const COUNTRY_TO_CURRENCY: Record<string, string> = {
   CM: 'XAF', GA: 'XAF', CG: 'XAF', TD: 'XAF', CF: 'XAF', GQ: 'XAF',
   SN: 'XOF', CI: 'XOF', BJ: 'XOF', TG: 'XOF', BF: 'XOF', ML: 'XOF', NE: 'XOF',
@@ -81,8 +66,6 @@ const COUNTRY_TO_CURRENCY: Record<string, string> = {
   NG: 'NGN', GH: 'GHS', KE: 'KES', ZA: 'ZAR', MA: 'MAD',
   AE: 'AED', CN: 'CNY', JP: 'JPY', IN: 'INR',
 };
-
-const STORAGE_KEY = 'keyhome.display_currency';
 
 function deviceDefaultCurrency(): string {
   try {
@@ -98,44 +81,21 @@ function deviceDefaultCurrency(): string {
 }
 
 /**
- * Store singleton : une seule source de vérité pour la devise
- * d'affichage. `useSyncExternalStore` s'y abonne pour la réactivité.
+ * Store singleton : une seule source de vérité pour la devise d'affichage,
+ * résolue automatiquement depuis l'appareil et immuable pour la session.
+ * `useSyncExternalStore` s'y abonne pour lire la valeur.
  */
 class CurrencyStore {
-  private currency: string = deviceDefaultCurrency();
-  private hydrated = false;
-  private listeners = new Set<() => void>();
-
-  constructor() {
-    // Réhydrate le choix persisté une seule fois (async, non bloquant).
-    void AsyncStorage.getItem(STORAGE_KEY).then((saved) => {
-      this.hydrated = true;
-      if (saved && RATES[saved] && saved !== this.currency) {
-        this.currency = saved;
-        this.emit();
-      }
-    });
-  }
+  private readonly currency: string = deviceDefaultCurrency();
 
   getCurrency = (): string => this.currency;
 
-  isHydrated = (): boolean => this.hydrated;
-
-  setCurrency = (next: string): void => {
-    if (!RATES[next] || next === this.currency) return;
-    this.currency = next;
-    void AsyncStorage.setItem(STORAGE_KEY, next).catch(() => {});
-    this.emit();
-  };
-
-  subscribe = (fn: () => void): (() => void) => {
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
-  };
-
-  private emit(): void {
-    this.listeners.forEach((fn) => fn());
-  }
+  /**
+   * La devise étant dérivée automatiquement et immuable, aucun changement
+   * n'est jamais émis — l'abonnement est un simple no-op requis par
+   * `useSyncExternalStore`.
+   */
+  subscribe = (_fn: () => void): (() => void) => () => {};
 }
 
 export const currencyStore = new CurrencyStore();
@@ -144,29 +104,51 @@ export function symbolFor(currency: string): string {
   return SYMBOLS[currency] ?? currency;
 }
 
+/**
+ * Résout le montant + la devise réellement affichés à partir d'un montant XAF.
+ * XAF/XOF sont pegés 1:1 (aucune conversion). Pour toute autre devise, on ne
+ * convertit que si un taux valide existe — sinon on retombe sur XAF pour ne
+ * jamais afficher un montant FCFA avec un symbole étranger (parité web
+ * `resolveDisplayedMoney`).
+ */
+function resolveDisplayedMoney(
+  amountXAF: number,
+  target: string,
+): { amount: number; displayCurrency: string } {
+  if (!Number.isFinite(amountXAF)) return { amount: 0, displayCurrency: BASE_CURRENCY };
+  if (target === 'XAF' || target === 'XOF') {
+    return { amount: amountXAF, displayCurrency: target };
+  }
+  const rate = RATES[target];
+  if (!rate || !Number.isFinite(rate) || rate <= 0) {
+    return { amount: amountXAF, displayCurrency: BASE_CURRENCY };
+  }
+
+  return { amount: amountXAF * rate, displayCurrency: target };
+}
+
 /** Convertit un montant XAF vers la devise cible (repli XAF si taux absent). */
 export function convertFromXAF(amountXAF: number, target: string): number {
-  const rate = RATES[target];
-  if (!rate || !Number.isFinite(rate)) return amountXAF;
-  return amountXAF * rate;
+  return resolveDisplayedMoney(amountXAF, target).amount;
 }
 
 /**
  * Formate un montant XAF dans la devise cible. XAF/XOF : entier + « FCFA »
- * suffixe. Autres : 2 décimales + symbole préfixe (€, $) ou suffixe.
+ * suffixe. Autres : 2 décimales + symbole préfixe (€, $) ou suffixe. Repli
+ * automatique sur XAF quand aucun taux valide n'est disponible.
  */
 export function formatFromXAF(amountXAF: number, target: string): string {
-  const converted = convertFromXAF(amountXAF, target);
-  const sym = symbolFor(target);
-  if (target === 'XAF' || target === 'XOF') {
-    return `${Math.round(converted).toLocaleString('fr-FR')} ${sym}`;
+  const { amount, displayCurrency } = resolveDisplayedMoney(amountXAF, target);
+  const sym = symbolFor(displayCurrency);
+  if (displayCurrency === 'XAF' || displayCurrency === 'XOF') {
+    return `${Math.round(amount).toLocaleString('fr-FR')} ${sym}`;
   }
-  const value = converted.toLocaleString('fr-FR', {
+  const value = amount.toLocaleString('fr-FR', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
   // Symbole devant pour les devises occidentales, derrière sinon.
-  return ['EUR', 'USD', 'GBP', 'CAD', 'CHF'].includes(target)
+  return ['EUR', 'USD', 'GBP', 'CAD', 'CHF'].includes(displayCurrency)
     ? `${sym}${value}`
     : `${value} ${sym}`;
 }

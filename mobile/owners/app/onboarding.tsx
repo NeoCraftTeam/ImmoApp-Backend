@@ -7,6 +7,7 @@ import { Button, H1, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ONBOARDING_DONE_KEY } from '@/auth/storage-keys';
+import { useMotionPresets } from '@/hooks/useMotionPresets';
 import { brand } from '@/theme/tokens';
 import { t } from '@/i18n';
 
@@ -27,6 +28,7 @@ export default function Onboarding() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [index, setIndex] = useState(0);
+  const { scrollAnimated } = useMotionPresets();
   const listRef = useRef<FlatList>(null);
   const slides = t('onboarding.slides') as unknown as { title: string; body: string }[];
 
@@ -50,7 +52,7 @@ export default function Onboarding() {
 
   const next = () => {
     if (index < slides.length - 1) {
-      listRef.current?.scrollToIndex({ index: index + 1 });
+      listRef.current?.scrollToIndex({ index: index + 1, animated: scrollAnimated });
     } else {
       finish();
     }

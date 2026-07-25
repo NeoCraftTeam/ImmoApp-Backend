@@ -73,6 +73,8 @@ export interface Ad {
   status: string;
   is_currently_available: boolean;
   is_unlocked: boolean;
+  /** Coût en crédits pour déverrouiller le contact (Setting `unlock_cost_points`). */
+  unlock_cost?: number;
   is_favorited?: boolean;
   is_verified?: boolean;
   is_boosted?: boolean;

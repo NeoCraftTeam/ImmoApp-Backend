@@ -6,6 +6,7 @@ import { Animated, Pressable } from 'react-native';
 import { Paragraph, XStack, YStack } from 'tamagui';
 
 import { StatusBadge } from '@/components/StatusBadge';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { brand } from '@/theme/tokens';
 import { formatFcfa, formatCompact } from '@/utils/format';
 import type { Ad } from '@/types/ad';
@@ -18,15 +19,23 @@ import type { Ad } from '@/types/ad';
  */
 function OwnerAdCardComponent({ ad }: { ad: Ad }) {
   const router = useRouter();
+  const reducedMotion = useReducedMotion();
   const scale = useRef(new Animated.Value(1)).current;
   const cover = ad.images?.find((i) => i.is_primary)?.url ?? ad.images?.[0]?.url;
 
+  // Press-in critiquement amorti (pas d'overshoot sur un simple appui) ;
+  // léger rebond au relâchement uniquement — supprimé sous reduced motion.
   const pressIn = useCallback(() => {
-    Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, speed: 50, bounciness: 6 }).start();
+    Animated.spring(scale, { toValue: 0.97, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
   }, [scale]);
   const pressOut = useCallback(() => {
-    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 50, bounciness: 6 }).start();
-  }, [scale]);
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: reducedMotion ? 0 : 4,
+    }).start();
+  }, [scale, reducedMotion]);
 
   return (
     <Pressable

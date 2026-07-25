@@ -104,9 +104,9 @@ it('approved webhook for CREDIT payment credits points to the user', function ()
     Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
 
     $secret = 'test-webhook-secret';
-    config()->set('payment.default', 'geniuspay');
-    config()->set('payment.gateways.geniuspay.api_secret', 'sk_sandbox_test_fake');
-    config()->set('payment.gateways.geniuspay.webhook_secret', $secret);
+    config()->set('payment.default', 'kpay');
+    config()->set('payment.gateways.kpay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.webhook_secret', $secret);
 
     $user = User::factory()->create(['point_balance' => 0]);
     $package = PointPackage::factory()->create(['points_awarded' => 50, 'price' => 5000]);
@@ -117,34 +117,20 @@ it('approved webhook for CREDIT payment credits points to the user', function ()
         'status' => PaymentStatus::PENDING,
         'type' => PaymentType::CREDIT,
         'payment_method' => PaymentMethod::MOBILE_MONEY,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
         'amount' => 5000,
         'plan_id' => $package->id,
     ]);
 
-    $timestamp = time();
-    $payload = [
-        'event' => 'payment.success',
-        'data' => [
-            'reference' => 'MTX-CREDITAPPROVED',
-            'status' => 'completed',
-            'amount' => 5000,
-            'currency' => 'XAF',
-            'metadata' => [
-                'tx_ref' => 'KH-CREDITAPPROVED',
-                'package_id' => $package->id,
-            ],
-        ],
-    ];
-    $encoded = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    $signature = hash_hmac('sha256', $timestamp.'.'.$encoded, $secret);
+    $payload = kpayCompletedWebhookPayload([
+        'paymentId' => 'pay_credit_approved',
+        'reference' => 'KPAY-CREDITAPPROVED',
+        'amount' => 5000,
+        'externalId' => 'KH-CREDITAPPROVED',
+    ]);
+    [$headers, $body] = signedKpayWebhook($secret, $payload);
 
-    $this->call('POST', '/api/v1/webhooks/geniuspay', [], [], [], [
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_X_WEBHOOK_SIGNATURE' => $signature,
-        'HTTP_X_WEBHOOK_TIMESTAMP' => (string) $timestamp,
-        'HTTP_X_WEBHOOK_EVENT' => 'payment.success',
-    ], $encoded)->assertOk();
+    $this->call('POST', '/api/v1/webhooks/kpay', [], [], [], $headers, $body)->assertOk();
 
     expect($user->fresh()->point_balance)->toBe(50);
 

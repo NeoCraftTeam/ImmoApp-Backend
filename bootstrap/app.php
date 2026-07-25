@@ -205,7 +205,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
             // 422 validation errors carry user-friendly French field-level
             // messages translated by the gateway service (e.g. "La valeur
-            // du champ « devise » n'est pas acceptée par GeniusPay."). On
+            // du champ « devise » n'est pas acceptée par Kpay."). On
             // surface ces messages directement pour que le frontend puisse
             // afficher le détail au lieu d'un mur générique. Pour les
             // autres statuts (5xx, 502, etc.) on conserve un message
@@ -217,6 +217,8 @@ return Application::configure(basePath: dirname(__DIR__))
             return response()->json([
                 'message' => $message,
                 'code' => $status === 422 ? 'PAYMENT_VALIDATION_ERROR' : 'PAYMENT_GATEWAY_ERROR',
+                // Cause réelle exposée uniquement en debug local — jamais en prod.
+                'error' => config('app.debug') ? $e->getMessage() : null,
             ], $status);
         });
 

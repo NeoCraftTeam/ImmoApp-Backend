@@ -20,7 +20,7 @@ use App\Models\PersonalAccessToken;
 use App\Models\User;
 use App\Services\Ai\AiSearchService;
 use App\Services\Ai\RecommendationEngine;
-use App\Services\Payment\GeniusPayPaymentService;
+use App\Services\Payment\KpayPaymentService;
 use App\Services\Payment\PaymentMethodGateService;
 use App\Services\Payment\PaymentService;
 use App\Services\Payment\StripePaymentService;
@@ -84,7 +84,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(PaymentMethodGateService::class);
 
         $this->app->singleton(PaymentService::class, function ($app): PaymentService {
-            $defaultName = (string) config('payment.default', 'geniuspay');
+            $defaultName = (string) config('payment.default', 'kpay');
             $fallbackName = config('payment.fallback');
 
             $gateway = $this->resolvePaymentGateway($app, $defaultName);
@@ -101,7 +101,7 @@ class AppServiceProvider extends ServiceProvider
                 $registry[$fallback->getName()] = $fallback;
             }
             // Always register Stripe so card payments work even when the
-            // default gateway is GeniusPay.
+            // default gateway is Kpay.
             $stripe = $app->make(StripePaymentService::class);
             $registry[$stripe->getName()] = $stripe;
 
@@ -280,7 +280,7 @@ class AppServiceProvider extends ServiceProvider
     private function resolvePaymentGateway(mixed $app, string $name): PaymentGatewayInterface
     {
         return match ($name) {
-            'geniuspay' => $app->make(GeniusPayPaymentService::class),
+            'kpay' => $app->make(KpayPaymentService::class),
             'stripe' => $app->make(StripePaymentService::class),
             default => throw new \InvalidArgumentException("Payment gateway [{$name}] not supported."),
         };

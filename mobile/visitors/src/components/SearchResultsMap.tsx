@@ -4,6 +4,7 @@ import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { Paragraph, YStack } from 'tamagui';
 
 import { useCurrency } from '@/hooks/useCurrency';
+import { useMotionPresets } from '@/hooks/useMotionPresets';
 import { brand } from '@/theme/tokens';
 import type { Ad } from '@/types/ad';
 
@@ -21,6 +22,7 @@ interface Props {
 export function SearchResultsMap({ ads }: Props) {
   const router = useRouter();
   const { format } = useCurrency();
+  const { scrollAnimated } = useMotionPresets();
   const mapRef = useRef<MapView | null>(null);
 
   const located = useMemo(
@@ -40,10 +42,10 @@ export function SearchResultsMap({ ads }: Props) {
       located.map((ad) => ad.location),
       {
         edgePadding: { top: 60, right: 60, bottom: 60, left: 60 },
-        animated: true,
+        animated: scrollAnimated,
       },
     );
-  }, [located]);
+  }, [located, scrollAnimated]);
 
   const first = located[0];
   if (!first) {

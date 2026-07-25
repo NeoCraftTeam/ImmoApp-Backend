@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Validator as ValidatorFacade;
 /**
  * FormRequest jetable exposant le trait pour le tester en isolation.
  */
-function makeTurnstileGateRequest(bool $withSession): FormRequest
+function makeTurnstileGateRequest(bool $withSession, ?string $mobileClient = null): FormRequest
 {
     $request = new class extends FormRequest
     {
@@ -21,6 +21,10 @@ function makeTurnstileGateRequest(bool $withSession): FormRequest
             $this->enforceTurnstileForCreditPurchase($validator);
         }
     };
+
+    if ($mobileClient !== null) {
+        $request->headers->set('X-KeyHome-Client', $mobileClient);
+    }
 
     if ($withSession) {
         $request->setLaravelSession(app('session')->driver('array'));
@@ -53,3 +57,18 @@ it('skips turnstile when the request is stateless (mobile bearer)', function ():
 
     expect($validator->errors()->has('turnstile_token'))->toBeFalse();
 });
+
+it('skips turnstile for a native mobile app request even with a web session', function (string $client): void {
+    // Native apps may inherit a session via EnsureFrontendRequestsAreStateful,
+    // but the `X-KeyHome-Client` header must exempt them from Turnstile —
+    // exactly like the login/register exemption.
+    $request = makeTurnstileGateRequest(withSession: true, mobileClient: $client);
+    $validator = ValidatorFacade::make([], []);
+
+    $request->runGate($validator);
+
+    expect($validator->errors()->has('turnstile_token'))->toBeFalse();
+})->with([
+    'visitors' => 'keyhome-mobile-visitors',
+    'owners' => 'keyhome-mobile-owners',
+]);
