@@ -81,8 +81,8 @@
       "policy": "appVersion"
     },
     "extra": {
-      "apiBaseUrl": "https://api.keyhome.neocraft.dev/api/v1",
-      "apiBaseUrlDev": "https://api.keyhome.neocraft.dev/api/v1",
+      "apiBaseUrl": "https://api.keyhome.app/api/v1",
+      "apiBaseUrlDev": "https://api.keyhome.app/api/v1",
       "eas": {
         "projectId": "TODO_EAS_PROJECT_ID"
       }
