@@ -4,6 +4,7 @@ import { Paragraph, Spinner, XStack, YStack } from 'tamagui';
 
 import { useSession } from '@/auth/SessionProvider';
 import { EmptyState } from '@/components/EmptyState';
+import { SavedCardsSection } from '@/components/payments/SavedCardsSection';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { usePayments } from '@/hooks/usePayments';
 import { brand } from '@/theme/tokens';
@@ -54,6 +55,11 @@ function PaymentRow({ p }: { p: PaymentEntry }) {
         <Paragraph fontSize={14} fontWeight="700" color="$slate900" numberOfLines={1}>
           {p.description ?? p.tx_ref}
         </Paragraph>
+        {(p.payment_method_label || p.payment_method_detail) ? (
+          <Paragraph fontSize={11.5} color="$slate500" numberOfLines={2}>
+            {[p.payment_method_label, p.payment_method_detail].filter(Boolean).join(' · ')}
+          </Paragraph>
+        ) : null}
         <Paragraph fontSize={11.5} color="$slate500">
           {formatDateTime(p.created_at)}
         </Paragraph>
@@ -79,11 +85,17 @@ export default function PaymentsScreen() {
     <YStack flex={1} backgroundColor="$background">
       <ScreenHeader title="Historique des paiements" />
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 10 }}
+        contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 16 }}
         refreshControl={
           <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={brand.primary} />
         }
       >
+        <SavedCardsSection enabled={isAuthenticated} />
+
+        <Paragraph fontSize={16} fontWeight="900" color="$slate900">
+          Historique
+        </Paragraph>
+
         {isLoading ? (
           <YStack height={320} alignItems="center" justifyContent="center">
             <Spinner color={brand.primary} size="large" />

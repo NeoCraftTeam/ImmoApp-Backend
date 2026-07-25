@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
+import { normalizePaymentHistoryPayload } from '@/utils/payment-history';
 import type {
   InitiatePaymentInput,
   InitiatePaymentResponse,
@@ -24,7 +25,8 @@ export function usePayments(enabled = true) {
         ENDPOINTS.payments.history,
         { params: { per_page: 50 } },
       );
-      return data;
+
+      return normalizePaymentHistoryPayload(data);
     },
     enabled,
     staleTime: 60 * 1000,

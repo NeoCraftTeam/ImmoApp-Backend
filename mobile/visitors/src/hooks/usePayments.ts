@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import type { PaymentTransaction, PaymentsResponse } from '@/types/payment';
+import { normalizePaymentHistoryList } from '@/utils/payment-history';
 
 export function usePayments() {
   return useQuery<PaymentsResponse, Error, PaymentTransaction[]>({
@@ -13,7 +14,7 @@ export function usePayments() {
       );
       return data;
     },
-    select: (payload) => (Array.isArray(payload?.data) ? payload.data : []),
+    select: (payload) => normalizePaymentHistoryList(payload),
     staleTime: 60 * 1000,
   });
 }

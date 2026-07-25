@@ -8,7 +8,8 @@ export type PaymentStatus =
   | 'success'
   | 'failed'
   | 'refunded'
-  | 'cancelled';
+  | 'cancelled'
+  | 'requires_action';
 
 export interface PaymentEntry {
   id: string;
@@ -19,6 +20,8 @@ export interface PaymentEntry {
   status_label?: string;
   description?: string | null;
   method?: string | null;
+  payment_method_label?: string | null;
+  payment_method_detail?: string | null;
   created_at: string;
   reference_type?: string | null;
   reference_id?: string | null;
@@ -39,7 +42,7 @@ export interface PaymentMethod {
   id: string;
   code: string;
   label: string;
-  gateway: 'geniuspay' | 'stripe' | string;
+  gateway: 'kpay' | 'stripe' | string;
   channel?: 'mobile_money' | 'card' | 'wallet' | string;
   icon?: string | null;
   requires_phone?: boolean;

@@ -33,6 +33,7 @@ import { useCreditsBalance, usePayments } from '@/hooks/usePayments';
 import { useSession } from '@/auth/SessionProvider';
 import { brand } from '@/theme/tokens';
 import type { PaymentTransaction } from '@/types/payment';
+import { extractPaymentReturnParams, resolvePaymentLookupRef } from '@/services/checkout';
 
 type PaymentOutcome = 'completed' | 'failed' | 'pending';
 
@@ -54,20 +55,35 @@ const PAYMENT_METHODS: {
 
 /**
  * Confirme un achat en RÉCONCILIANT ACTIVEMENT avec la passerelle via
- * POST /credits/verify-purchase (syncPaymentStatus re-query GeniusPay/Stripe).
+ * POST /credits/verify-purchase (syncPaymentStatus re-query Kpay/Stripe).
  * Contrairement au webhook, ça fonctionne même quand le webhook ne peut
  * pas joindre le backend (local/sandbox). Codes : 200 = completed,
  * 202 = pending, 422 = failed. Boucle ~90 s, arrêt sur état terminal.
  */
 async function pollVerifyPurchase(
-  txRef: string,
-  { attempts = 36, intervalMs = 2500 }: { attempts?: number; intervalMs?: number } = {},
+  lookupRef: string,
+  {
+    attempts = 36,
+    intervalMs = 2500,
+    gatewayRedirectStatus,
+  }: {
+    attempts?: number;
+    intervalMs?: number;
+    gatewayRedirectStatus?: string | null;
+  } = {},
 ): Promise<PaymentOutcome> {
+  const payload: Record<string, string> =
+    lookupRef.startsWith('KH-') ? { tx_ref: lookupRef } : { reference: lookupRef };
+
+  if (gatewayRedirectStatus) {
+    payload.gateway_redirect_status = gatewayRedirectStatus;
+  }
+
   for (let i = 0; i < attempts; i++) {
     try {
       const { data } = await apiClient.post<{ status?: string }>(
         ENDPOINTS.credits.verifyPurchase,
-        { tx_ref: txRef },
+        payload,
       );
       if (data?.status === 'completed') {
         return 'completed';
@@ -155,7 +171,7 @@ export default function CreditsScreen() {
   const totalSpent = useMemo(
     () =>
       filtered
-        .filter((tx) => tx.status === 'success')
+        .filter((tx) => tx.status === 'success' || tx.status === 'succeeded')
         .reduce((acc, tx) => acc + (tx.amount ?? 0), 0),
     [filtered],
   );
@@ -358,19 +374,39 @@ function PacksModal({
         preferEphemeralSession: true,
       });
 
+      const returnParams =
+        browserResult.type === 'success' && browserResult.url
+          ? extractPaymentReturnParams(browserResult.url)
+          : null;
+      const lookupRef =
+        resolvePaymentLookupRef(
+          returnParams?.txRef ?? res.tx_ref,
+          returnParams?.reference,
+          returnParams?.paymentId,
+        ) ?? res.tx_ref;
+
       // Écran « Confirmation en cours » pendant la réconciliation. Le webhook
       // signé (source de vérité) crédite côté serveur ; verify-purchase renvoie
       // « completed » dès que le solde est à jour. Fenêtre courte pour ne pas
       // faire attendre : ~12 s au retour du checkout, ~4,5 s sur annulation.
       setProcessing(true);
       const outcome = await pollVerifyPurchase(
-        res.tx_ref,
-        browserResult.type === 'success' ? { attempts: 8, intervalMs: 1500 } : { attempts: 3, intervalMs: 1500 },
+        lookupRef,
+        {
+          attempts: browserResult.type === 'success' ? 8 : 3,
+          intervalMs: 1500,
+          gatewayRedirectStatus: returnParams?.status ?? null,
+        },
       );
       setProcessing(false);
 
       if (outcome === 'completed') {
-        await verify.mutateAsync({ tx_ref: res.tx_ref }).catch(() => {});
+        const verifyPayload: { tx_ref?: string; reference?: string; gateway_redirect_status?: string } =
+          lookupRef.startsWith('KH-') ? { tx_ref: lookupRef } : { reference: lookupRef };
+        if (returnParams?.status) {
+          verifyPayload.gateway_redirect_status = returnParams.status;
+        }
+        await verify.mutateAsync(verifyPayload).catch(() => {});
         onRefresh();
         setResult({ outcome: 'completed', credits });
       } else if (outcome === 'failed') {
@@ -661,7 +697,7 @@ function TxRow({
   verifying: boolean;
   disabled: boolean;
 }) {
-  const status = statusFor(tx.status);
+  const status = statusFor(tx.status, tx.status_label);
   const relative = (() => {
     try {
       return tx.created_at
@@ -672,9 +708,12 @@ function TxRow({
     }
   })();
 
+  const methodLine = [tx.provider, tx.payment_method_detail].filter(Boolean).join(' · ');
+
   // Une transaction en attente avec une référence KH peut être re-vérifiée
   // manuellement (tap) — utile si le callback n'a pas confirmé le paiement.
-  const canVerify = tx.status === 'pending' && typeof tx.reference === 'string' && tx.reference !== '';
+  const lookupRef = tx.reference ?? '';
+  const canVerify = tx.status === 'pending' && lookupRef !== '';
 
   const body = (
     <XStack
@@ -693,8 +732,9 @@ function TxRow({
         <Paragraph fontSize={14} fontWeight="700" color="$slate900" numberOfLines={1}>
           {tx.description ?? 'Transaction'}
         </Paragraph>
-        <Paragraph fontSize={12} color="$slate500">
-          {relative} · {tx.provider ?? 'KeyHome'}
+        <Paragraph fontSize={12} color="$slate500" numberOfLines={2}>
+          {relative}
+          {methodLine ? ` · ${methodLine}` : ''}
         </Paragraph>
         {canVerify ? (
           <Paragraph fontSize={11.5} fontWeight="700" color={brand.primary}>
@@ -719,7 +759,7 @@ function TxRow({
 
   return (
     <Pressable
-      onPress={() => onVerify(tx.reference as string)}
+      onPress={() => onVerify(lookupRef)}
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel="Vérifier le statut du paiement"
@@ -729,15 +769,42 @@ function TxRow({
   );
 }
 
-function statusFor(s: string): { icon: React.ReactNode; color: string; label: string } {
-  if (s === 'success') {
-    return { icon: <CheckCircle2 size={18} color={brand.success} />, color: brand.success, label: 'Réussi' };
+function statusFor(
+  s: string,
+  statusLabel?: string,
+): { icon: React.ReactNode; color: string; label: string } {
+  if (s === 'success' || s === 'succeeded') {
+    return {
+      icon: <CheckCircle2 size={18} color={brand.success} />,
+      color: brand.success,
+      label: statusLabel ?? 'Réussi',
+    };
   }
   if (s === 'failed') {
-    return { icon: <XCircle size={18} color={brand.danger} />, color: brand.danger, label: 'Échoué' };
+    return {
+      icon: <XCircle size={18} color={brand.danger} />,
+      color: brand.danger,
+      label: statusLabel ?? 'Échoué',
+    };
   }
   if (s === 'refunded') {
-    return { icon: <CheckCircle2 size={18} color={brand.info} />, color: brand.info, label: 'Remboursé' };
+    return {
+      icon: <CheckCircle2 size={18} color={brand.info} />,
+      color: brand.info,
+      label: statusLabel ?? 'Remboursé',
+    };
   }
-  return { icon: <Clock size={18} color={brand.warning} />, color: brand.warning, label: 'En attente' };
+  if (s === 'cancelled') {
+    return {
+      icon: <XCircle size={18} color={brand.slate500} />,
+      color: brand.slate500,
+      label: statusLabel ?? 'Annulé',
+    };
+  }
+
+  return {
+    icon: <Clock size={18} color={brand.warning} />,
+    color: brand.warning,
+    label: statusLabel ?? 'En attente',
+  };
 }
