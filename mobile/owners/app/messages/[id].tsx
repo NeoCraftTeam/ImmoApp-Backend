@@ -1,4 +1,6 @@
-import { Check, CheckCheck, ImagePlus, Send } from '@tamagui/lucide-icons';
+import { ImagePlus, Send, Trash2 } from '@tamagui/lucide-icons';
+import { format, isToday, isYesterday } from 'date-fns';
+import { fr } from 'date-fns/locale';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams } from 'expo-router';
@@ -7,11 +9,11 @@ import {
   Alert,
   Animated,
   Easing,
+  FlatList,
   KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
-  ScrollView,
   TextInput,
 } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
@@ -22,6 +24,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { useMe } from '@/hooks/useMe';
 import {
   useConversation,
+  useDeleteMessage,
   useMarkConversationRead,
   useSendMessage,
   useSetTyping,
@@ -35,6 +38,9 @@ import { brand } from '@/theme/tokens';
 import type { ConversationMessage, ConversationPreview } from '@/types/conversation';
 
 const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
+
+/** Fenêtre de regroupement des messages consécutifs d'un même expéditeur. */
+const CLUSTER_GAP_MS = 5 * 60 * 1000;
 
 /**
  * Normalise les réactions (déjà groupées par le backend :
@@ -117,31 +123,19 @@ export default function ConversationThreadScreen() {
   const { scrollAnimated } = useMotionPresets();
   const qc = useQueryClient();
   const [draft, setDraft] = useState('');
-  const [otherTyping, setOtherTyping] = useState<string | null>(null);
-  const scrollRef = useRef<ScrollView | null>(null);
-  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const listRef = useRef<FlatList<ConversationMessage> | null>(null);
 
-  const realtime = useConversationRealtime(id, (uid) => {
-    if (!me.data || uid === me.data.id) return;
-    setOtherTyping(uid);
-    // Cleanup le timer precedent avant d'en starter un nouveau —
-    // sans ce clear, 5 messages "typing" rapproches stackent 5 timers
-    // qui fire tous a 3 s, polluant le state apres le user a tape.
-    // Pire : si l'utilisateur navigue ailleurs, ces timers leak et
-    // continuent a appeler setOtherTyping sur un component demonted
-    // (warning RN + memoire qui s'accumule).
-    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-    typingTimerRef.current = setTimeout(() => {
-      setOtherTyping(null);
-      typingTimerRef.current = null;
-    }, 3000);
-  });
+  // Signature stable (currentUserId) — le hook gère l'état « typing » en
+  // interne et ne se ré-abonne plus à chaque frappe.
+  const realtime = useConversationRealtime(id, me.data?.id);
+  const otherTyping = realtime.typingUser?.user_id ?? null;
   const { data: messages = [], isLoading } = useConversation(id, realtime.isConnected);
   const send = useSendMessage(id);
   const markRead = useMarkConversationRead(id);
   const setTyping = useSetTyping(id);
   const upload = useUploadAttachment(id);
   const toggleReaction = useToggleReaction(id);
+  const deleteMessage = useDeleteMessage(id);
   const [reactionTarget, setReactionTarget] = useState<ConversationMessage | null>(null);
 
   // Préfetch depuis la cache des conversations (header info instant)
@@ -153,20 +147,19 @@ export default function ConversationThreadScreen() {
     return list.find((c) => c.uuid === id);
   }, [qc, id]);
 
-  // Cleanup au unmount : pas de leak du timer si user navigue
-  // pendant que le ping "typing" est encore valide.
+  // markRead au montage / changement de conversation uniquement — la
+  // mutation est recréée à chaque render, on ne la met donc PAS en dep
+  // (sinon boucle de PATCH /read). Ref pour appeler la version courante.
+  const markReadRef = useRef(markRead);
+  markReadRef.current = markRead;
   useEffect(() => {
-    return () => {
-      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (id) markRead.mutate();
+    if (id) markReadRef.current.mutate();
   }, [id]);
 
   useEffect(() => {
-    scrollRef.current?.scrollToEnd({ animated: scrollAnimated });
+    if (messages.length > 0) {
+      listRef.current?.scrollToEnd({ animated: scrollAnimated });
+    }
   }, [messages.length, scrollAnimated]);
 
   const onSubmit = () => {
@@ -250,137 +243,63 @@ export default function ConversationThreadScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
       >
-        <ScrollView
-          ref={scrollRef}
-          contentContainerStyle={{ padding: 14, paddingBottom: 20, gap: 8 }}
-          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
-        >
-          {isLoading ? (
-            <YStack height={200} alignItems="center" justifyContent="center">
-              <Spinner color={brand.primary} size="large" />
-            </YStack>
-          ) : (
-            messages.map((m) => {
-              const mine = m.sender_id === me.data?.id || m.sender_id === '__me__';
+        {isLoading ? (
+          <YStack flex={1} alignItems="center" justifyContent="center">
+            <Spinner color={brand.primary} size="large" />
+          </YStack>
+        ) : (
+          <FlatList
+            ref={listRef}
+            data={messages}
+            keyExtractor={(item) => item.uuid}
+            contentContainerStyle={{ paddingVertical: 14, paddingHorizontal: 12, gap: 4 }}
+            ListEmptyComponent={
+              <YStack padding={20} alignItems="center">
+                <Paragraph color="$slate500">Écrivez le premier message.</Paragraph>
+              </YStack>
+            }
+            ListFooterComponent={otherTyping ? <TypingDots /> : null}
+            renderItem={({ item, index }) => {
+              const mine = item.sender_id === me.data?.id || item.sender_id === '__me__';
+              const prev = messages[index - 1];
+              const next = messages[index + 1];
+              const showDateSeparator = !prev || !sameDay(prev.created_at, item.created_at);
+              const isTail =
+                !next ||
+                next.sender_id !== item.sender_id ||
+                Math.abs(
+                  new Date(next.created_at).getTime() - new Date(item.created_at).getTime(),
+                ) >= CLUSTER_GAP_MS;
+
               return (
-                <XStack
-                  key={m.uuid}
-                  justifyContent={mine ? 'flex-end' : 'flex-start'}
-                  paddingHorizontal={2}
-                >
-                  <YStack maxWidth="78%" alignItems={mine ? 'flex-end' : 'flex-start'} gap={3}>
-                  <Pressable onLongPress={() => setReactionTarget(m)} delayLongPress={250}>
-                  <YStack
-                    paddingHorizontal={12}
-                    paddingVertical={9}
-                    borderRadius={16}
-                    backgroundColor={mine ? brand.primary : '$slate100'}
-                    borderBottomRightRadius={mine ? 4 : 16}
-                    borderBottomLeftRadius={mine ? 16 : 4}
-                  >
-                    {Array.isArray(m.attachments) && m.attachments.length > 0
-                      ? m.attachments.map((att) => (
-                          <YStack
-                            key={att.id ?? att.url}
-                            width={200}
-                            height={200}
-                            borderRadius={12}
-                            overflow="hidden"
-                            backgroundColor="$slate200"
-                            marginBottom={m.body ? 6 : 0}
-                          >
-                            <Image
-                              source={{ uri: att.url }}
-                              style={{ width: '100%', height: '100%' }}
-                              contentFit="cover"
-                              transition={150}
-                            />
-                          </YStack>
-                        ))
-                      : null}
-                    {m.body ? (
-                      <Paragraph fontSize={14} color={mine ? 'white' : '$slate900'} lineHeight={19}>
-                        {m.body}
-                      </Paragraph>
-                    ) : m.is_client_sealed ? (
-                      <Paragraph
-                        fontSize={13}
-                        fontStyle="italic"
-                        color={mine ? 'rgba(255,255,255,0.85)' : '$slate500'}
-                      >
-                        🔒 Message chiffré
-                      </Paragraph>
-                    ) : null}
-                    <XStack alignItems="center" gap={4} justifyContent="flex-end" marginTop={2}>
-                      {m.created_at ? (
-                        <Paragraph
-                          fontSize={10}
-                          color={mine ? 'rgba(255,255,255,0.75)' : '$slate500'}
-                        >
-                          {new Date(m.created_at).toLocaleTimeString('fr-FR', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </Paragraph>
-                      ) : null}
-                      {mine ? (
-                        m.read_at ? (
-                          <CheckCheck size={12} color="rgba(255,255,255,0.85)" />
-                        ) : (
-                          <Check size={12} color="rgba(255,255,255,0.65)" />
-                        )
-                      ) : null}
-                    </XStack>
-                  </YStack>
-                  </Pressable>
-                  {mine && m.is_failed ? (
-                    <Pressable onPress={() => handleRetry(m)} hitSlop={6}>
-                      <Paragraph fontSize={11} color={brand.danger} fontWeight="600">
-                        Échec · Réessayer
-                      </Paragraph>
-                    </Pressable>
+                <YStack gap={4}>
+                  {showDateSeparator ? (
+                    <Paragraph
+                      fontSize={11}
+                      color="$slate500"
+                      textAlign="center"
+                      marginTop={index === 0 ? 0 : 10}
+                      marginBottom={6}
+                    >
+                      {formatDay(item.created_at)}
+                    </Paragraph>
                   ) : null}
-                  {(() => {
-                    const grouped = groupReactions(m.reactions, me.data?.id);
-                    if (grouped.length === 0) return null;
-                    return (
-                      <XStack gap={4} flexWrap="wrap">
-                        {grouped.map((g) => (
-                          <Pressable
-                            key={g.emoji}
-                            onPress={() =>
-                              toggleReaction.mutate({ messageId: m.uuid, emoji: g.emoji, reacted: g.mine })
-                            }
-                          >
-                            <XStack
-                              alignItems="center"
-                              gap={3}
-                              paddingHorizontal={7}
-                              paddingVertical={2}
-                              borderRadius={999}
-                              backgroundColor={g.mine ? brand.primaryAlpha10 : '$slate100'}
-                              borderWidth={g.mine ? 1 : 0}
-                              borderColor={g.mine ? brand.primary : 'transparent'}
-                            >
-                              <Paragraph fontSize={12}>{g.emoji}</Paragraph>
-                              {g.count > 1 ? (
-                                <Paragraph fontSize={11} fontWeight="700" color="$slate700">
-                                  {g.count}
-                                </Paragraph>
-                              ) : null}
-                            </XStack>
-                          </Pressable>
-                        ))}
-                      </XStack>
-                    );
-                  })()}
-                  </YStack>
-                </XStack>
+                  <MessageBubble
+                    message={item}
+                    mine={mine}
+                    isTail={isTail}
+                    myId={me.data?.id}
+                    onLongPress={() => setReactionTarget(item)}
+                    onRetry={() => handleRetry(item)}
+                    onToggleReaction={(emoji, reacted) =>
+                      toggleReaction.mutate({ messageId: item.uuid, emoji, reacted })
+                    }
+                  />
+                </YStack>
               );
-            })
-          )}
-          {otherTyping ? <TypingDots /> : null}
-        </ScrollView>
+            }}
+          />
+        )}
 
         <XStack
           padding={10}
@@ -453,7 +372,7 @@ export default function ConversationThreadScreen() {
         onRequestClose={() => setReactionTarget(null)}
       >
         <Pressable style={{ flex: 1 }} onPress={() => setReactionTarget(null)}>
-          <YStack flex={1} justifyContent="center" alignItems="center" backgroundColor="rgba(0,0,0,0.4)">
+          <YStack flex={1} justifyContent="center" alignItems="center" backgroundColor="rgba(0,0,0,0.4)" gap={12}>
             <XStack
               backgroundColor="$background"
               borderRadius={999}
@@ -480,9 +399,278 @@ export default function ConversationThreadScreen() {
                 </Pressable>
               ))}
             </XStack>
+
+            {/* Supprimer — uniquement mes propres messages déjà envoyés */}
+            {reactionTarget &&
+            (reactionTarget.sender_id === me.data?.id || reactionTarget.sender_id === '__me__') &&
+            !reactionTarget.is_optimistic &&
+            !reactionTarget.is_failed &&
+            !reactionTarget.uuid.startsWith('temp:') ? (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation();
+                  const target = reactionTarget;
+                  setReactionTarget(null);
+                  if (!target) return;
+                  Alert.alert(
+                    'Supprimer le message',
+                    'Ce message sera retiré de la conversation. Cette action est définitive.',
+                    [
+                      { text: 'Annuler', style: 'cancel' },
+                      {
+                        text: 'Supprimer',
+                        style: 'destructive',
+                        onPress: () => deleteMessage.mutate(target.uuid),
+                      },
+                    ],
+                  );
+                }}
+              >
+                <XStack
+                  backgroundColor="$background"
+                  borderRadius={14}
+                  paddingHorizontal={20}
+                  paddingVertical={12}
+                  alignItems="center"
+                  gap={8}
+                >
+                  <Trash2 size={18} color={brand.danger} />
+                  <Paragraph fontSize={15} fontWeight="700" color={brand.danger}>
+                    Supprimer
+                  </Paragraph>
+                </XStack>
+              </Pressable>
+            ) : null}
           </YStack>
         </Pressable>
       </Modal>
     </YStack>
   );
+}
+
+/**
+ * Bulle de message façon Messenger : pièces jointes, texte (ou placeholder
+ * scellé), réactions, et sur le message de fin de cluster (`isTail`) la
+ * ligne méta (heure, envoi…/livré/lu, réessai) + avatar pour les reçus.
+ */
+function MessageBubble({
+  message,
+  mine,
+  isTail,
+  myId,
+  onLongPress,
+  onRetry,
+  onToggleReaction,
+}: {
+  message: ConversationMessage;
+  mine: boolean;
+  isTail: boolean;
+  myId?: string;
+  onLongPress: () => void;
+  onRetry: () => void;
+  onToggleReaction: (emoji: string, reacted: boolean) => void;
+}) {
+  const time = (() => {
+    try {
+      return format(new Date(message.created_at), 'HH:mm', { locale: fr });
+    } catch {
+      return '';
+    }
+  })();
+
+  const hasAttachments = Array.isArray(message.attachments) && message.attachments.length > 0;
+  const grouped = groupReactions(message.reactions, myId);
+  const isRead = Boolean(message.read_at);
+  const isDelivered = Boolean(message.delivered_at) && !isRead;
+
+  const bubble = (
+    <YStack maxWidth="80%" alignItems={mine ? 'flex-end' : 'flex-start'} gap={3}>
+      <Pressable onLongPress={onLongPress} delayLongPress={250}>
+        <YStack
+          paddingHorizontal={hasAttachments && !message.body ? 0 : 12}
+          paddingVertical={hasAttachments && !message.body ? 0 : 9}
+          borderRadius={18}
+          backgroundColor={
+            message.is_failed
+              ? `${brand.danger}20`
+              : mine
+                ? brand.primary
+                : '$slate100'
+          }
+          borderBottomRightRadius={mine && isTail ? 6 : 18}
+          borderBottomLeftRadius={!mine && isTail ? 6 : 18}
+          borderWidth={message.is_failed ? 1 : 0}
+          borderColor={message.is_failed ? brand.danger : 'transparent'}
+          opacity={message.is_optimistic ? 0.7 : 1}
+          overflow="hidden"
+        >
+          {hasAttachments
+            ? (message.attachments ?? []).map((att) => (
+                <YStack
+                  key={att.id ?? att.url}
+                  width={220}
+                  height={220}
+                  borderRadius={12}
+                  overflow="hidden"
+                  backgroundColor="$slate200"
+                  marginBottom={message.body ? 6 : 0}
+                >
+                  <Image
+                    source={{ uri: att.url }}
+                    style={{ width: '100%', height: '100%' }}
+                    contentFit="cover"
+                    transition={150}
+                  />
+                </YStack>
+              ))
+            : null}
+          {message.body ? (
+            <Paragraph
+              fontSize={14.5}
+              color={mine && !message.is_failed ? 'white' : '$slate900'}
+              lineHeight={20}
+            >
+              {message.body}
+            </Paragraph>
+          ) : !hasAttachments && message.is_client_sealed ? (
+            <Paragraph
+              fontSize={13}
+              fontStyle="italic"
+              color={mine ? 'rgba(255,255,255,0.85)' : '$slate500'}
+            >
+              🔒 Message chiffré
+            </Paragraph>
+          ) : null}
+        </YStack>
+      </Pressable>
+
+      {grouped.length > 0 ? (
+        <XStack gap={4} flexWrap="wrap">
+          {grouped.map((g) => (
+            <Pressable key={g.emoji} onPress={() => onToggleReaction(g.emoji, g.mine)}>
+              <XStack
+                alignItems="center"
+                gap={3}
+                paddingHorizontal={7}
+                paddingVertical={2}
+                borderRadius={999}
+                backgroundColor={g.mine ? brand.primaryAlpha10 : '$slate100'}
+                borderWidth={g.mine ? 1 : 0}
+                borderColor={g.mine ? brand.primary : 'transparent'}
+              >
+                <Paragraph fontSize={12}>{g.emoji}</Paragraph>
+                {g.count > 1 ? (
+                  <Paragraph fontSize={11} fontWeight="700" color="$slate700">
+                    {g.count}
+                  </Paragraph>
+                ) : null}
+              </XStack>
+            </Pressable>
+          ))}
+        </XStack>
+      ) : null}
+
+      {isTail ? (
+        <XStack alignItems="center" gap={4} marginTop={1}>
+          {message.is_failed ? (
+            <Pressable onPress={onRetry} hitSlop={4}>
+              <Paragraph fontSize={10} fontWeight="700" color={brand.danger}>
+                Échec — réessayer
+              </Paragraph>
+            </Pressable>
+          ) : (
+            <>
+              <Paragraph fontSize={10} color="$slate500">
+                {time}
+              </Paragraph>
+              {message.is_optimistic ? (
+                <Paragraph fontSize={10} color="$slate500">
+                  · envoi…
+                </Paragraph>
+              ) : null}
+              {mine && isRead ? (
+                <Paragraph fontSize={10} fontWeight="700" color={brand.primary}>
+                  · lu
+                </Paragraph>
+              ) : mine && isDelivered ? (
+                <Paragraph fontSize={10} color="$slate500">
+                  · livré
+                </Paragraph>
+              ) : null}
+            </>
+          )}
+        </XStack>
+      ) : null}
+    </YStack>
+  );
+
+  if (mine) {
+    return (
+      <XStack justifyContent="flex-end" paddingHorizontal={2}>
+        {bubble}
+      </XStack>
+    );
+  }
+
+  // Message reçu : avatar aligné sur la bulle de fin de cluster (Messenger).
+  return (
+    <XStack justifyContent="flex-start" alignItems="flex-end" gap={6} paddingHorizontal={2}>
+      {isTail ? (
+        <MessageAvatar uri={message.sender?.avatar} name={message.sender?.name ?? '?'} />
+      ) : (
+        <YStack width={26} />
+      )}
+      {bubble}
+    </XStack>
+  );
+}
+
+/** Avatar rond compact : photo si dispo, sinon initiale sur fond neutre. */
+function MessageAvatar({ uri, name }: { uri?: string | null; name: string }) {
+  if (uri) {
+    return (
+      <YStack width={26} height={26} borderRadius={13} overflow="hidden" backgroundColor="$slate200">
+        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+      </YStack>
+    );
+  }
+  return (
+    <YStack
+      width={26}
+      height={26}
+      borderRadius={13}
+      alignItems="center"
+      justifyContent="center"
+      backgroundColor={brand.primaryAlpha10}
+    >
+      <Paragraph fontSize={11} fontWeight="800" color={brand.primary}>
+        {(name[0] ?? '?').toUpperCase()}
+      </Paragraph>
+    </YStack>
+  );
+}
+
+function sameDay(a: string, b: string): boolean {
+  try {
+    const da = new Date(a);
+    const db = new Date(b);
+    return (
+      da.getFullYear() === db.getFullYear() &&
+      da.getMonth() === db.getMonth() &&
+      da.getDate() === db.getDate()
+    );
+  } catch {
+    return false;
+  }
+}
+
+function formatDay(iso: string): string {
+  try {
+    const date = new Date(iso);
+    if (isToday(date)) return "Aujourd'hui";
+    if (isYesterday(date)) return 'Hier';
+    return format(date, 'd MMMM', { locale: fr });
+  } catch {
+    return '';
+  }
 }

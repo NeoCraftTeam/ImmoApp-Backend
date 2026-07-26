@@ -155,6 +155,44 @@ export function useToggleReaction(conversationId: string | undefined) {
 }
 
 /**
+ * Suppression d'un message (le backend limite à l'expéditeur, < 24 h).
+ * Retrait optimiste immédiat du cache pour un retour instantané.
+ */
+export function useDeleteMessage(conversationId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation<void, Error, string, { previous?: { data: ConversationMessage[] } }>({
+    mutationFn: async (messageId) => {
+      await apiClient.delete(ENDPOINTS.chat.deleteMessage(messageId));
+    },
+    onMutate: async (messageId) => {
+      if (!conversationId) return {};
+      await qc.cancelQueries({ queryKey: ['owner-conversation-messages', conversationId] });
+      const previous = qc.getQueryData<{ data: ConversationMessage[] }>([
+        'owner-conversation-messages',
+        conversationId,
+      ]);
+      qc.setQueryData<{ data: ConversationMessage[] } | undefined>(
+        ['owner-conversation-messages', conversationId],
+        (prev) => {
+          if (!prev || !Array.isArray(prev.data)) return prev;
+          return { data: prev.data.filter((m) => m.uuid !== messageId) };
+        },
+      );
+      return { previous };
+    },
+    onError: (_err, _messageId, ctx) => {
+      if (conversationId && ctx?.previous) {
+        qc.setQueryData(['owner-conversation-messages', conversationId], ctx.previous);
+      }
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['owner-conversation-messages', conversationId] });
+      qc.invalidateQueries({ queryKey: ['owner-conversations'] });
+    },
+  });
+}
+
+/**
  * Envoi d'une pièce jointe (photo) — upload multipart puis création du
  * message avec le descripteur renvoyé (l'upload seul ne crée pas de
  * message côté backend).

@@ -47,6 +47,8 @@ export interface ConversationMessage {
   /** Déjà groupées par le backend (MessageResource::buildReactions). */
   reactions?: { emoji: string; count: number; user_ids: string[] }[];
   read_at?: string | null;
+  /** Horodatage de remise (livré, pas encore lu) diffusé par le backend. */
+  delivered_at?: string | null;
   created_at: string;
   client_id?: string;
   /** Client-only — envoi optimiste avant confirmation serveur. */
