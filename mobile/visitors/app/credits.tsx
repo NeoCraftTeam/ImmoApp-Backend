@@ -16,13 +16,13 @@ import { fr } from 'date-fns/locale';
 import { Stack, useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Modal, Pressable } from 'react-native';
 import { H2, Paragraph, Spinner, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQueryClient } from '@tanstack/react-query';
 
-import { apiClient, extractApiErrorMessage } from '@/api/client';
-import { ENDPOINTS } from '@/api/endpoints';
+import { extractApiErrorMessage } from '@/api/client';
 import {
   useCreditPackages,
   usePurchaseCredits,
@@ -31,11 +31,17 @@ import {
 } from '@/hooks/useCredits';
 import { useCreditsBalance, usePayments } from '@/hooks/usePayments';
 import { useSession } from '@/auth/SessionProvider';
+import { queryKeys } from '@/lib/query-keys';
 import { brand } from '@/theme/tokens';
 import type { PaymentTransaction } from '@/types/payment';
 import { extractPaymentReturnParams, resolvePaymentLookupRef } from '@/services/checkout';
-
-type PaymentOutcome = 'completed' | 'failed' | 'pending';
+import {
+  clearPendingCreditPurchase,
+  loadPendingCreditPurchase,
+  pollVerifyPurchase,
+  savePendingCreditPurchase,
+  type PaymentOutcome,
+} from '@/services/credit-purchase';
 
 type PaymentResult = { outcome: PaymentOutcome; credits?: number; message?: string };
 
@@ -52,58 +58,6 @@ const PAYMENT_METHODS: {
   { key: 'orange_money', label: 'Orange Money', sub: 'OM', Icon: Smartphone },
   { key: 'card', label: 'Carte bancaire', sub: 'Visa · Mastercard', Icon: CreditCard },
 ];
-
-/**
- * Confirme un achat en RÉCONCILIANT ACTIVEMENT avec la passerelle via
- * POST /credits/verify-purchase (syncPaymentStatus re-query Kpay/Stripe).
- * Contrairement au webhook, ça fonctionne même quand le webhook ne peut
- * pas joindre le backend (local/sandbox). Codes : 200 = completed,
- * 202 = pending, 422 = failed. Boucle ~90 s, arrêt sur état terminal.
- */
-async function pollVerifyPurchase(
-  lookupRef: string,
-  {
-    attempts = 36,
-    intervalMs = 2500,
-    gatewayRedirectStatus,
-  }: {
-    attempts?: number;
-    intervalMs?: number;
-    gatewayRedirectStatus?: string | null;
-  } = {},
-): Promise<PaymentOutcome> {
-  const payload: Record<string, string> =
-    lookupRef.startsWith('KH-') ? { tx_ref: lookupRef } : { reference: lookupRef };
-
-  if (gatewayRedirectStatus) {
-    payload.gateway_redirect_status = gatewayRedirectStatus;
-  }
-
-  for (let i = 0; i < attempts; i++) {
-    try {
-      const { data } = await apiClient.post<{ status?: string }>(
-        ENDPOINTS.credits.verifyPurchase,
-        payload,
-      );
-      if (data?.status === 'completed') {
-        return 'completed';
-      }
-      if (data?.status === 'failed') {
-        return 'failed';
-      }
-      // 'pending' / 'not_found' → on retente.
-    } catch (err) {
-      // 422 = paiement échoué (verify renvoie status:failed en erreur).
-      const status = (err as { response?: { data?: { status?: string } } })?.response?.data?.status;
-      if (status === 'failed') {
-        return 'failed';
-      }
-      /* autres erreurs transitoires → on retente */
-    }
-    await new Promise((r) => setTimeout(r, intervalMs));
-  }
-  return 'pending';
-}
 
 type Period = 'all' | '30d' | '90d';
 
@@ -130,6 +84,37 @@ export default function CreditsScreen() {
   const [period, setPeriod] = useState<Period>('all');
   // tx_ref en cours de re-vérification manuelle (tap sur une ligne « En attente »).
   const [verifyingRef, setVerifyingRef] = useState<string | null>(null);
+  const reconcileRanRef = useRef(false);
+
+  // Réconciliation silencieuse au montage : si l'app a été tuée pendant un
+  // paiement (tx_ref persisté avant l'ouverture du checkout), on re-vérifie
+  // sans bloquer l'UI. Terminal → on nettoie ; pending → on garde pour la
+  // prochaine visite, la ligne « En attente » de l'historique reste tapable.
+  useEffect(() => {
+    if (!isAuthenticated || reconcileRanRef.current) {
+      return;
+    }
+    reconcileRanRef.current = true;
+    void (async () => {
+      const pendingPurchase = await loadPendingCreditPurchase();
+      if (!pendingPurchase) {
+        return;
+      }
+      try {
+        const res = await verify.mutateAsync({ tx_ref: pendingPurchase.txRef });
+        if (res.status === 'completed') {
+          await clearPendingCreditPurchase();
+          Alert.alert('Paiement confirmé', 'Vos crédits ont été ajoutés à votre solde.');
+        }
+      } catch (err) {
+        const status = (err as { response?: { data?: { status?: string } } })?.response?.data?.status;
+        if (status === 'failed') {
+          await clearPendingCreditPurchase();
+        }
+        /* erreur transitoire → on retentera à la prochaine visite */
+      }
+    })();
+  }, [isAuthenticated, verify]);
 
   const verifyPending = async (txRef: string) => {
     if (verifyingRef) return;
@@ -338,6 +323,7 @@ function PacksModal({
   onRefresh: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const packages = useCreditPackages(open);
   const purchase = usePurchaseCredits();
   const verify = useVerifyCreditPurchase();
@@ -347,9 +333,19 @@ function PacksModal({
   // Écran de confirmation après retour du checkout.
   const [processing, setProcessing] = useState(false);
   const [result, setResult] = useState<PaymentResult | null>(null);
+  // Incrémenté à chaque fermeture : un buy() encore en vol après un close()
+  // (back Android) ne doit plus écrire dans l'état du modal — sinon la
+  // prochaine ouverture montrerait un résultat périmé.
+  const sessionRef = useRef(0);
 
   const buy = async (pkg: CreditPackage, method: PaymentMethodChoice) => {
     if (busyId) return;
+    const session = sessionRef.current;
+    const ifCurrent = (fn: () => void) => {
+      if (sessionRef.current === session) {
+        fn();
+      }
+    };
     setPendingPack(null);
     setBusyId(pkg.id);
     const credits = pkg.points_awarded ?? 0;
@@ -365,6 +361,16 @@ function PacksModal({
         throw new Error('Lien de paiement indisponible.');
       }
 
+      // Persisté AVANT d'ouvrir le checkout : si iOS tue l'app pendant la
+      // validation mobile money, l'achat reste réconciliable au relaunch
+      // (écran crédits ou deep-link credits/callback).
+      await savePendingCreditPurchase({
+        txRef: res.tx_ref,
+        packageId: pkg.id,
+        credits,
+        startedAt: Date.now(),
+      });
+
       // Checkout hébergé ouvert IN-APP (ASWebAuthenticationSession). La
       // passerelle redirige en fin de paiement vers un pont HTTPS backend qui
       // renvoie un 302 vers `callbackUrl` (deep-link natif) → l'onglet se ferme
@@ -374,10 +380,10 @@ function PacksModal({
         preferEphemeralSession: true,
       });
 
-      const returnParams =
-        browserResult.type === 'success' && browserResult.url
-          ? extractPaymentReturnParams(browserResult.url)
-          : null;
+      const cameBackViaDeepLink = browserResult.type === 'success' && Boolean(browserResult.url);
+      const returnParams = cameBackViaDeepLink
+        ? extractPaymentReturnParams(browserResult.url as string)
+        : null;
       const lookupRef =
         resolvePaymentLookupRef(
           returnParams?.txRef ?? res.tx_ref,
@@ -389,16 +395,24 @@ function PacksModal({
       // signé (source de vérité) crédite côté serveur ; verify-purchase renvoie
       // « completed » dès que le solde est à jour. Fenêtre courte pour ne pas
       // faire attendre : ~12 s au retour du checkout, ~4,5 s sur annulation.
-      setProcessing(true);
+      ifCurrent(() => setProcessing(true));
       const outcome = await pollVerifyPurchase(
         lookupRef,
         {
-          attempts: browserResult.type === 'success' ? 8 : 3,
+          attempts: cameBackViaDeepLink ? 8 : 3,
           intervalMs: 1500,
           gatewayRedirectStatus: returnParams?.status ?? null,
         },
       );
-      setProcessing(false);
+      ifCurrent(() => setProcessing(false));
+
+      if (outcome !== 'pending') {
+        await clearPendingCreditPurchase();
+      }
+      // Invalidation globale (header home, fiche annonce…) quelle que soit
+      // l'issue — indépendante du POST verify ci-dessous qui peut échouer.
+      queryClient.invalidateQueries({ queryKey: queryKeys.creditsBalance() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.paymentsHistory() });
 
       if (outcome === 'completed') {
         const verifyPayload: { tx_ref?: string; reference?: string; gateway_redirect_status?: string } =
@@ -408,32 +422,52 @@ function PacksModal({
         }
         await verify.mutateAsync(verifyPayload).catch(() => {});
         onRefresh();
-        setResult({ outcome: 'completed', credits });
+        ifCurrent(() => setResult({ outcome: 'completed', credits }));
       } else if (outcome === 'failed') {
         onRefresh();
-        setResult({ outcome: 'failed' });
+        ifCurrent(() => setResult({ outcome: 'failed' }));
       } else {
         onRefresh();
-        setResult({ outcome: 'pending' });
+        // Onglet fermé sans retour passerelle = très probablement un abandon
+        // volontaire : message honnête, sans promettre un paiement en cours.
+        ifCurrent(() =>
+          setResult({
+            outcome: 'pending',
+            message: cameBackViaDeepLink
+              ? undefined
+              : 'Paiement non finalisé. Si vous avez validé le paiement sur votre téléphone, il sera confirmé automatiquement — suivez le statut dans l’historique.',
+          }),
+        );
       }
     } catch (err) {
-      setProcessing(false);
-      setResult({ outcome: 'failed', message: extractApiErrorMessage(err) });
+      ifCurrent(() => {
+        setProcessing(false);
+        setResult({ outcome: 'failed', message: extractApiErrorMessage(err) });
+      });
     } finally {
-      setBusyId(null);
+      ifCurrent(() => setBusyId(null));
     }
   };
 
   // Réinitialise l'état interne à la fermeture pour repartir propre.
   const close = () => {
+    sessionRef.current += 1;
     setResult(null);
     setProcessing(false);
     setPendingPack(null);
+    setBusyId(null);
     onClose();
   };
 
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={close}>
+    <Modal
+      visible={open}
+      transparent
+      animationType="slide"
+      // Back Android : ignoré pendant la confirmation pour ne pas perdre
+      // l'écran de résultat (cohérent avec le backdrop et la croix).
+      onRequestClose={processing ? () => {} : close}
+    >
       <YStack flex={1} justifyContent="flex-end" backgroundColor="rgba(0,0,0,0.45)">
         <Pressable style={{ flex: 1 }} onPress={processing ? undefined : close} />
         <YStack
@@ -621,6 +655,7 @@ function PaymentResultView({
       icon: <Clock size={40} color={brand.warning} />,
       title: 'Paiement en cours',
       message:
+        result.message ??
         'Nous confirmons votre paiement auprès de la passerelle. Vos crédits s’ajouteront automatiquement dès validation — vous pouvez suivre le statut dans l’historique.',
     },
     failed: {

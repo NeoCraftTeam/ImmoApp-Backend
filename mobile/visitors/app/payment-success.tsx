@@ -35,10 +35,15 @@ export default function PaymentSuccess() {
 
   // Timeout 60 s : on stoppe le poll perçu et on bascule en "long"
   // pour laisser le user choisir entre réessayer ou écrire au support.
+  // Sans référence ou sur statut inattendu (poll arrêté par le hook), le
+  // timer doit s'armer aussi — sinon l'écran reste figé sur « en cours ».
   const [timedOut, setTimedOut] = useState(false);
   useEffect(() => {
-    if (!ref) return;
-    if (data?.status && data.status !== 'pending') return;
+    if (!ref) {
+      setTimedOut(true);
+      return;
+    }
+    if (data?.status === 'success' || data?.status === 'failed') return;
     const t = setTimeout(() => setTimedOut(true), POLLING_TIMEOUT_MS);
     return () => clearTimeout(t);
   }, [ref, data?.status]);
@@ -48,7 +53,13 @@ export default function PaymentSuccess() {
   let body = 'Nous confirmons votre transaction. Cela ne prend que quelques secondes.';
   let tint: string = brand.warning;
 
-  if (timedOut && (!data?.status || data.status === 'pending')) {
+  if (!ref) {
+    icon = <XCircle size={56} color={brand.warning} />;
+    title = 'Référence introuvable';
+    body =
+      'Nous n\'avons pas reçu la référence de ce paiement. Si vous avez validé un paiement, il sera confirmé automatiquement — consultez votre historique dans Crédits.';
+    tint = brand.warning;
+  } else if (timedOut && (!data?.status || data.status === 'pending')) {
     icon = <Clock size={56} color={brand.warning} />;
     title = 'Vérification plus longue que prévu';
     body =
@@ -68,6 +79,15 @@ export default function PaymentSuccess() {
     title = 'Paiement échoué';
     body = data.message ?? 'La transaction n\'a pas pu aboutir. Réessayez ou contactez le support.';
     tint = brand.danger;
+  } else if (ref && data?.status && data.status !== 'pending') {
+    // Statut terminal inattendu (cancelled, refunded…) : le poll est arrêté
+    // par le hook — ne jamais rester figé sur « Paiement en cours… ».
+    icon = <XCircle size={56} color={brand.slate500} />;
+    title = data.status === 'cancelled' ? 'Paiement annulé' : 'Transaction clôturée';
+    body =
+      data.message ??
+      'Cette transaction est terminée. Consultez votre historique dans Crédits pour le détail.';
+    tint = brand.slate500;
   }
 
   return (
