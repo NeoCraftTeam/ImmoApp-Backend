@@ -1,6 +1,6 @@
 import { Bell, MapPin } from '@tamagui/lucide-icons';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Location from 'expo-location';
-import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import { useCallback, useState } from 'react';
@@ -58,10 +58,17 @@ export default function PermissionsPriming() {
     } catch {
       /* simulateur / permission indisponible — on continue */
     }
-    try {
-      await Notifications.requestPermissionsAsync();
-    } catch {
-      /* Expo Go : les push distants sont indisponibles — non bloquant */
+    // expo-notifications logge une ERROR dès l'IMPORT dans Expo Go
+    // (SDK 53 a retiré les push distants du client Store) — d'où le
+    // require paresseux derrière la garde, jamais d'import statique.
+    if (Constants.executionEnvironment !== ExecutionEnvironment.StoreClient) {
+      try {
+        const Notifications =
+          require('expo-notifications') as typeof import('expo-notifications');
+        await Notifications.requestPermissionsAsync();
+      } catch {
+        /* simulateur / module indisponible — non bloquant */
+      }
     }
     setRequesting(false);
     await finish();

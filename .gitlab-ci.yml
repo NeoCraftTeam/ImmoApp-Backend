@@ -556,6 +556,11 @@ test_suite:
       fi
   after_script:
     - docker logout $CI_REGISTRY 2>/dev/null || true
+    # Filet de sécurité : le script fait `artisan down` AVANT le pull — si
+    # le job échoue entre les deux (registry, réseau, migration), l'app
+    # resterait en maintenance (503) pour toujours. after_script s'exécute
+    # succès OU échec : on force `artisan up` (no-op si déjà up).
+    - cd $DEPLOY_DIR 2>/dev/null && APP_IMAGE="${CI_REGISTRY_IMAGE}/app:${DEPLOY_BRANCH}" docker compose exec -T app php artisan up 2>/dev/null || true
 
 # --- ETAPE 2bis : FRONTEND TESTS ---
 # The Next.js submodule used to be tested only on GitHub Actions. Since

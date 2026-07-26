@@ -24,8 +24,12 @@ import { Alert, Pressable, ScrollView } from 'react-native';
 import { Button, H2, H4, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Image } from 'expo-image';
+
 import { KeyHomeRefreshControl } from '@/components/KeyHomeRefreshControl';
+import { Skeleton } from '@/components/Skeleton';
 import { useSession } from '@/auth/SessionProvider';
+import { resolveMediaUrl } from '@/lib/media-url';
 import { useCreditsBalance } from '@/hooks/usePayments';
 import { useMe } from '@/hooks/useMe';
 import { useUnreadNotificationCount } from '@/hooks/useNotifications';
@@ -184,6 +188,36 @@ export default function AccountTab() {
         ) : null}
 
         {!isGuest && !unverified ? (
+          !meData && me.isPending ? (
+            /* Skeleton — jamais de « Chargement… » textuel : la carte garde
+               exactement sa géométrie finale (avatar 56 + 2 lignes). */
+            <XStack
+              padding={16}
+              borderRadius={16}
+              backgroundColor="$slate100"
+              gap={14}
+              alignItems="center"
+            >
+              <Skeleton width={56} height={56} radius={28} />
+              <YStack flex={1} gap={8}>
+                <Skeleton width="52%" height={15} radius={7} />
+                <Skeleton width="72%" height={11} radius={6} />
+              </YStack>
+            </XStack>
+          ) : !meData && me.isError ? (
+            /* Erreur non-auth (réseau/5xx) : état actionnable, pas d'attente
+               sans issue. Les 401/404 déconnectent plus haut. */
+            <Pressable onPress={() => me.refetch()} accessibilityRole="button" accessibilityLabel="Réessayer de charger le profil">
+              <YStack padding={16} borderRadius={16} backgroundColor="$slate100" gap={8}>
+                <Paragraph fontSize={14} fontWeight="700" color="$slate900">
+                  Profil momentanément indisponible
+                </Paragraph>
+                <Paragraph fontSize={12.5} color="$slate500">
+                  Vérifiez votre connexion, puis touchez pour réessayer.
+                </Paragraph>
+              </YStack>
+            </Pressable>
+          ) : meData ? (
           <Pressable onPress={() => router.push('/profile')}>
             <YStack
               padding={16}
@@ -199,17 +233,27 @@ export default function AccountTab() {
                   backgroundColor={brand.primary}
                   alignItems="center"
                   justifyContent="center"
+                  overflow="hidden"
                 >
-                  <Paragraph fontSize={22} fontWeight="800" color="white">
-                    {meData?.firstname?.charAt(0).toUpperCase() ?? '?'}
-                  </Paragraph>
+                  {resolveMediaUrl(meData.avatar) ? (
+                    <Image
+                      source={{ uri: resolveMediaUrl(meData.avatar) ?? undefined }}
+                      style={{ width: '100%', height: '100%' }}
+                      contentFit="cover"
+                      transition={150}
+                    />
+                  ) : (
+                    <Paragraph fontSize={22} fontWeight="800" color="white">
+                      {meData.firstname?.charAt(0).toUpperCase() ?? '·'}
+                    </Paragraph>
+                  )}
                 </YStack>
                 <YStack flex={1} gap={2}>
                   <H4 fontSize={17} fontWeight="700" color="$slate900">
-                    {meData ? `${meData.firstname} ${meData.lastname ?? ''}`.trim() : 'Chargement…'}
+                    {`${meData.firstname} ${meData.lastname ?? ''}`.trim()}
                   </H4>
                   <Paragraph fontSize={13} color="$slate500" numberOfLines={1}>
-                    {meData?.email ?? ''}
+                    {meData.email ?? ''}
                   </Paragraph>
                   {balance.data != null && (
                     <XStack alignItems="center" gap={4} marginTop={2}>
@@ -224,6 +268,7 @@ export default function AccountTab() {
               </XStack>
             </YStack>
           </Pressable>
+          ) : null
         ) : (
           <YStack
             padding={16}
