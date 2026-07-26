@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\SubscriptionResource\Pages\ManageSubscriptions;
 use App\Models\Subscription;
 use Filament\Actions\DeleteAction;
@@ -24,6 +25,12 @@ use Filament\Tables\Table;
 class SubscriptionResource extends Resource
 {
     protected static ?string $model = Subscription::class;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::SubscriptionsManage) ?? false;
+    }
 
     protected static string|null|\UnitEnum $navigationGroup = 'Abonnements';
 

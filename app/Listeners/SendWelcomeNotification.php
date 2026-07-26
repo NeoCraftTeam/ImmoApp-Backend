@@ -7,7 +7,7 @@ declare(strict_types=1);
 namespace App\Listeners;
 
 use App\Models\User;
-use App\Services\UserWelcomeService;
+use App\Services\User\UserWelcomeService;
 use Exception;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\Queue\ShouldQueue;

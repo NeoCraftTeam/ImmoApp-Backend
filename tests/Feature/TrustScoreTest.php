@@ -14,7 +14,7 @@ use App\Models\Payment;
 use App\Models\TentativeReservation;
 use App\Models\TrustScore;
 use App\Models\User;
-use App\Services\TrustScoreService;
+use App\Services\Trust\TrustScoreService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 

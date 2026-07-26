@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\SiteVisit;
 use App\Models\User;
+use App\Services\Ai\AcquisitionChannelClassifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 

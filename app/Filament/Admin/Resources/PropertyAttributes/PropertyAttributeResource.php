@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\PropertyAttributes;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\PropertyAttributes\Pages\CreatePropertyAttribute;
 use App\Filament\Admin\Resources\PropertyAttributes\Pages\EditPropertyAttribute;
 use App\Filament\Admin\Resources\PropertyAttributes\Pages\ListPropertyAttributes;
@@ -19,6 +20,12 @@ use Filament\Tables\Table;
 class PropertyAttributeResource extends Resource
 {
     protected static ?string $model = PropertyAttribute::class;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::PropertyAttributesManage) ?? false;
+    }
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTag;
 

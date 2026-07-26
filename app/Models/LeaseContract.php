@@ -4,16 +4,23 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\LeaseStatus;
 use Database\Factories\LeaseContractFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
  * @property Carbon|null $lease_start
  * @property Carbon|null $lease_end
+ * @property LeaseStatus $status
+ * @property Carbon|null $terminated_at
+ * @property string|null $termination_reason
+ * @property Carbon|null $archived_at
  */
 class LeaseContract extends Model
 {
@@ -41,6 +48,10 @@ class LeaseContract extends Model
         'deposit_amount',
         'special_conditions',
         'pdf_path',
+        'status',
+        'terminated_at',
+        'termination_reason',
+        'archived_at',
     ];
 
     /** @return BelongsTo<User, $this> */
@@ -61,6 +72,12 @@ class LeaseContract extends Model
         return $this->belongsTo(Tenant::class);
     }
 
+    /** @return HasMany<TenantScreeningRequest, $this> */
+    public function screeningRequests(): HasMany
+    {
+        return $this->hasMany(TenantScreeningRequest::class);
+    }
+
     #[\Override]
     protected function casts(): array
     {
@@ -69,6 +86,33 @@ class LeaseContract extends Model
             'lease_end' => 'date',
             'monthly_rent' => 'decimal:2',
             'deposit_amount' => 'decimal:2',
+            'status' => LeaseStatus::class,
+            'terminated_at' => 'datetime',
+            'archived_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Active = status flag is Active AND archive timestamp is null. The
+     * date window is enforced by the scheduled expiry sweep flipping
+     * passed-end leases to {@see LeaseStatus::Expired}, so we don't
+     * double-check `lease_end` here.
+     *
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('status', LeaseStatus::Active->value)
+            ->whereNull('archived_at');
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopeNotArchived(Builder $query): Builder
+    {
+        return $query->whereNull('archived_at');
     }
 }

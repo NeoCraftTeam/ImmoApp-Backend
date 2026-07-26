@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Contracts\ReservationServiceInterface;
+use App\Contracts\ViewingScheduleServiceInterface;
 use App\Enums\ReservationStatus;
 use App\Exceptions\Viewing\ClientHasActiveReservationForAdException;
 use App\Exceptions\Viewing\SelfReservationException;
@@ -11,8 +13,6 @@ use App\Models\Ad;
 use App\Models\TentativeReservation;
 use App\Models\UnlockedAd;
 use App\Models\User;
-use App\Services\Contracts\ReservationServiceInterface;
-use App\Services\Contracts\ViewingScheduleServiceInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;

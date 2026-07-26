@@ -93,7 +93,7 @@ function fakeStripeService(array $config = []): PaymentGatewayInterface
             return ['status' => 'pending', 'amount' => 0.0, 'currency' => 'XAF', 'payment_method' => null, 'paid_at' => null, 'raw' => []];
         }
 
-        public function handleWebhook(array $payload, array $headers): array
+        public function handleWebhook(array $payload, array $headers, ?string $rawBody = null): array
         {
             return ['event' => '', 'tx_ref' => '', 'status' => 'pending', 'amount' => 0.0, 'currency' => 'XAF', 'payment_method' => null, 'raw' => []];
         }
@@ -175,9 +175,9 @@ function bindStripeService(PaymentGatewayInterface $stub): PaymentGatewayInterfa
 }
 
 beforeEach(function (): void {
-    config()->set('payment.default', 'flutterwave');
-    config()->set('payment.gateways.flutterwave.secret_key', 'FLWSECK_TEST-fake');
-    config()->set('payment.gateways.flutterwave.webhook_secret', 'test_webhook_secret_123');
+    config()->set('payment.default', 'kpay');
+    config()->set('payment.gateways.kpay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.webhook_secret', 'test_webhook_secret_123');
     config()->set('services.stripe.secret', 'sk_test_fake_FOR_TESTS_ONLY');
 });
 
@@ -224,7 +224,7 @@ it('surfaces a 502 when Stripe is unreachable on list', function (): void {
     $this->actingAs($user)
         ->getJson('/api/v1/payments/stripe/payment-methods')
         ->assertStatus(502)
-        ->assertJsonPath('message', 'Stripe list failed.');
+        ->assertJsonPath('message', 'Impossible de récupérer vos cartes. Veuillez réessayer.');
 });
 
 it('rejects unauthenticated access to the saved-cards endpoints', function (): void {

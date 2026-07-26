@@ -8,7 +8,9 @@ use App\Enums\ReservationStatus;
 use App\Models\Ad;
 use App\Models\AdBoost;
 use App\Models\Conversation;
+use App\Models\Expense;
 use App\Models\LeaseContract;
+use App\Models\RentPayment;
 use App\Models\TentativeReservation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -50,7 +52,9 @@ final class OwnerDashboardController
      *                 @OA\Property(property="pending_viewings_count", type="integer", example=2),
      *                 @OA\Property(property="confirmed_viewings_count", type="integer", example=1),
      *                 @OA\Property(property="active_boosts_count", type="integer", example=1),
-     *                 @OA\Property(property="unread_conversations_count", type="integer", example=4)
+     *                 @OA\Property(property="unread_conversations_count", type="integer", example=4),
+     *                 @OA\Property(property="expenses_total_xaf_30d", type="number", example=125000),
+     *                 @OA\Property(property="rent_collected_xaf_30d", type="integer", example=450000)
      *             )
      *         )
      *     ),
@@ -69,9 +73,13 @@ final class OwnerDashboardController
                 ->publiclyListed()
                 ->count();
 
+            // Use the lifecycle status flag — kept in sync by the
+            // `leases:expire-overdue` scheduled command — instead of
+            // re-deriving from `lease_end`. This way terminated /
+            // archived leases drop out of the KPI immediately.
             $activeLeasesCount = LeaseContract::query()
                 ->where('user_id', $userId)
-                ->whereDate('lease_end', '>=', now()->toDateString())
+                ->active()
                 ->count();
 
             $occupancyRate = $activeAdsCount > 0
@@ -80,7 +88,7 @@ final class OwnerDashboardController
 
             $monthlyRentTotal = (float) LeaseContract::query()
                 ->where('user_id', $userId)
-                ->whereDate('lease_end', '>=', now()->toDateString())
+                ->active()
                 ->sum('monthly_rent');
 
             $adIds = Ad::query()->where('user_id', $userId)->pluck('id');
@@ -109,6 +117,19 @@ final class OwnerDashboardController
                 })
                 ->count();
 
+            $expensesTotal30d = (float) Expense::query()
+                ->where('user_id', $userId)
+                ->whereDate('expense_date', '>=', now()->subDays(30)->toDateString())
+                ->sum('amount');
+
+            // Actual rent collected (out-of-band ledger) — distinct from
+            // `monthly_rent_total_xaf` which is the accrual figure derived
+            // from active lease contracts.
+            $rentCollected30d = (int) RentPayment::query()
+                ->whereIn('lease_contract_id', LeaseContract::query()->where('user_id', $userId)->select('id'))
+                ->whereDate('received_at', '>=', now()->subDays(30)->toDateString())
+                ->sum('amount');
+
             return [
                 'active_ads_count' => $activeAdsCount,
                 'active_leases_count' => $activeLeasesCount,
@@ -118,6 +139,8 @@ final class OwnerDashboardController
                 'confirmed_viewings_count' => $confirmedViewingsCount,
                 'active_boosts_count' => $activeBoostsCount,
                 'unread_conversations_count' => $unreadConversationsCount,
+                'expenses_total_xaf_30d' => $expensesTotal30d,
+                'rent_collected_xaf_30d' => $rentCollected30d,
             ];
         });
 

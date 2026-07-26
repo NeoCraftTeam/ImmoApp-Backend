@@ -14,9 +14,15 @@ final class CityResource extends JsonResource
     #[\Override]
     public function toArray(Request $request): array
     {
+        $lat = $this->location?->getY() ?? ($this->latitude !== null ? (float) $this->latitude : null);
+        $lng = $this->location?->getX() ?? ($this->longitude !== null ? (float) $this->longitude : null);
+
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'country' => $this->country,
+            'latitude' => $lat,
+            'longitude' => $lng,
         ];
     }
 }

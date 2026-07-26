@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\Agencies;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\Agencies\Pages\CreateAgency;
 use App\Filament\Admin\Resources\Agencies\Pages\EditAgency;
 use App\Filament\Admin\Resources\Agencies\Pages\ListAgencies;
@@ -27,6 +28,12 @@ class AgencyResource extends Resource
     protected static ?string $model = Agency::class;
 
     protected static bool $isScopedToTenant = false;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::UsersView) ?? false;
+    }
 
     protected static string|null|\UnitEnum $navigationGroup = 'Membres';
 

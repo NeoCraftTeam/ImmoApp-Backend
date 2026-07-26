@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Contracts\ReservationServiceInterface;
 use App\Enums\ReservationStatus;
 use App\Models\TentativeReservation;
-use App\Services\Contracts\ReservationServiceInterface;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;

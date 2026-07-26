@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\Invoices;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\Invoices\Pages\ManageInvoices;
 use App\Models\Invoice;
 use Filament\Actions\ViewAction;
@@ -22,6 +23,12 @@ final class InvoiceResource extends Resource
     protected static ?string $model = Invoice::class;
 
     protected static bool $isScopedToTenant = false;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::PaymentsView) ?? false;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::DocumentText;
 

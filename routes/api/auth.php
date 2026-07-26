@@ -2,15 +2,16 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Api\V1\ApiMfaController;
-use App\Http\Controllers\Api\V1\AuthController;
-use App\Http\Controllers\Api\V1\ClerkAuthController;
+use App\Http\Controllers\Api\V1\Auth\ApiMfaController;
+use App\Http\Controllers\Api\V1\Auth\AuthController;
+use App\Http\Controllers\Api\V1\Auth\ClerkAuthController;
+use App\Http\Controllers\Api\V1\Auth\PasswordController;
+use App\Http\Controllers\Api\V1\Auth\RegistrationController;
+use App\Http\Controllers\Api\V1\Auth\SocialAuthController;
+use App\Http\Controllers\Api\V1\Auth\UserMfaSetupController;
 use App\Http\Controllers\Api\V1\EmailVerificationController;
-use App\Http\Controllers\Api\V1\PasswordController;
-use App\Http\Controllers\Api\V1\RegistrationController;
-use App\Http\Controllers\Api\V1\SocialAuthController;
-use App\Http\Controllers\Api\V1\UserPreferenceController;
-use App\Http\Controllers\Api\V1\WebAuthnApiController;
+use App\Http\Controllers\Api\V1\User\UserPreferenceController;
+use App\Http\Controllers\Api\V1\User\WebAuthnApiController;
 use App\Http\Controllers\EmailPreferenceController;
 use App\Http\Middleware\DynamicWebAuthnRelyingParty;
 use Illuminate\Support\Facades\Route;
@@ -36,6 +37,10 @@ Route::prefix('auth')->group(function (): void {
     // Email verification
     Route::post('resend-verification', [EmailVerificationController::class, 'resendVerificationEmail'])
         ->middleware('throttle:auth.resend-verify');
+    // Correction d'une adresse mal saisie AVANT vérification (compte
+    // authentifié mais non vérifié) — renvoie l'OTP à la nouvelle adresse.
+    Route::post('update-unverified-email', [EmailVerificationController::class, 'updateUnverifiedEmail'])
+        ->middleware(['auth:sanctum', 'throttle:auth.resend-verify']);
     Route::get('email/verify/{id}/{hash}', [EmailVerificationController::class, 'verifyEmail'])
         ->middleware('throttle:auth.verify-email')
         ->name('api.verification.verify');
@@ -58,22 +63,28 @@ Route::prefix('auth')->group(function (): void {
     Route::prefix('oauth')->controller(SocialAuthController::class)->group(function (): void {
         Route::post('{provider}', 'authenticate')
             ->middleware('throttle:auth.social')
-            ->where('provider', 'google|facebook|apple');
+            ->where('provider', 'google|facebook|apple|github');
 
         Route::get('{provider}/redirect', 'redirect')
             ->middleware('throttle:auth.social')
-            ->where('provider', 'google|facebook|apple');
+            ->where('provider', 'google|facebook|apple|github');
 
         Route::get('{provider}/callback', 'callback')
             ->middleware('throttle:auth.social')
-            ->where('provider', 'google|facebook|apple');
+            ->where('provider', 'google|facebook|apple|github');
 
         Route::middleware('auth:sanctum')->group(function (): void {
+            // Liaison via le flux redirect pour un utilisateur authentifié
+            // (mobile : pas de token provider natif pour `link`).
+            Route::get('{provider}/link-redirect', 'linkRedirect')
+                ->middleware('throttle:auth.social')
+                ->where('provider', 'google|facebook|apple|github');
+
             Route::post('{provider}/link', 'link')
-                ->where('provider', 'google|facebook|apple');
+                ->where('provider', 'google|facebook|apple|github');
 
             Route::delete('{provider}/unlink', 'unlink')
-                ->where('provider', 'google|facebook|apple');
+                ->where('provider', 'google|facebook|apple|github');
         });
 
         Route::post('confirm-link', 'confirmOAuthLink')
@@ -85,10 +96,25 @@ Route::prefix('auth')->group(function (): void {
             ->middleware('throttle:20,1');
     });
 
-    // MFA for admin API access
-    Route::middleware('auth:sanctum')->prefix('mfa')->controller(ApiMfaController::class)->group(function (): void {
-        Route::get('/status', 'status')->middleware('throttle:60,1');
-        Route::post('/verify', 'verify')->middleware('throttle:10,1');
+    // MFA for admin API access (verification only).
+    // Setup endpoints (TOTP / Email enrol) sit under /mfa/setup and are
+    // open to any authenticated user — customers can opt in to step-up MFA.
+    Route::middleware('auth:sanctum')->prefix('mfa')->group(function (): void {
+        Route::get('/status', [ApiMfaController::class, 'status'])->middleware('throttle:60,1');
+        Route::post('/verify', [ApiMfaController::class, 'verify'])->middleware('throttle:10,1');
+
+        Route::prefix('setup')->controller(UserMfaSetupController::class)->group(function (): void {
+            // TOTP enrol flow — start -> confirm -> (optional) disable
+            Route::post('/totp/start', 'startTotp')->middleware('throttle:5,1');
+            Route::post('/totp/confirm', 'confirmTotp')->middleware('throttle:10,1');
+            Route::post('/totp/disable', 'disableTotp')->middleware('throttle:5,1');
+            Route::post('/totp/recovery-codes/regenerate', 'regenerateRecoveryCodes')->middleware('throttle:5,1');
+
+            // Email MFA enrol flow — enable -> confirm -> (optional) disable
+            Route::post('/email/enable', 'enableEmail')->middleware('throttle:5,1');
+            Route::post('/email/confirm', 'confirmEmail')->middleware('throttle:10,1');
+            Route::post('/email/disable', 'disableEmail')->middleware('throttle:5,1');
+        });
     });
 
     // ── WebAuthn / Passkeys (API) ─────────────────────────────────

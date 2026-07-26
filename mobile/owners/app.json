@@ -1,0 +1,92 @@
+{
+  "expo": {
+    "name": "KeyHome Owner",
+    "slug": "keyhome-owners",
+    "version": "0.3.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "scheme": "keyhomeowners",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0D9488"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "requireFullScreen": false,
+      "bundleIdentifier": "com.keyhome.owners",
+      "buildNumber": "3",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "Pour positionner précisément vos biens sur la carte lors de la création d'une annonce.",
+        "NSPhotoLibraryUsageDescription": "Pour ajouter des photos à vos annonces et joindre des pièces à vos messages.",
+        "NSCameraUsageDescription": "Pour photographier vos biens et votre profil directement depuis l'application.",
+        "NSUserNotificationsUsageDescription": "Pour vous prévenir des nouvelles demandes de visite, messages, et confirmations de paiement."
+      }
+    },
+    "android": {
+      "package": "com.keyhome.owners",
+      "versionCode": 3,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0D9488"
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE",
+        "POST_NOTIFICATIONS",
+        "INTERNET"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-location",
+      "expo-image-picker",
+      "expo-notifications",
+      "expo-web-browser",
+      "expo-updates",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0D9488",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200
+        }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "keyhome",
+          "project": "mobile-owners"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "extra": {
+      "apiBaseUrl": "https://api.keyhome.app/api/v1",
+      "apiBaseUrlDev": "https://api.keyhome.app/api/v1",
+      "eas": {
+        "projectId": "TODO_EAS_PROJECT_ID"
+      }
+    }
+  }
+}

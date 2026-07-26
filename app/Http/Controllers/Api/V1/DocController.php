@@ -78,7 +78,7 @@ namespace App\Http\Controllers\Api\V1;
  * @OA\Tag(name="⚖️ Litiges",          description="Ouverture de litiges, messages, preuves, transitions de statut")
  *
  * ─── Tags — Paiements ────────────────────────────────────────────────────────
- * @OA\Tag(name="� Paiements",         description="Initialisation, vérification, webhooks (GeniusPay, Stripe, Flutterwave)")
+ * @OA\Tag(name="� Paiements",         description="Initialisation, vérification, webhooks (Kpay, Stripe)")
  * @OA\Tag(name="💳 Méthodes de paiement", description="Gestion des méthodes de paiement Stripe (cartes)")
  * @OA\Tag(name="💰 Remboursements",    description="Demandes et traitements de remboursements")
  * @OA\Tag(name="� Crédits / Points",  description="Solde, achats de packs, dépenses en points")

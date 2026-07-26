@@ -1,0 +1,91 @@
+{
+  "expo": {
+    "name": "KeyHome",
+    "slug": "keyhome-visitors",
+    "version": "0.6.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "scheme": "keyhome",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#F7F5F2"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "requireFullScreen": false,
+      "bundleIdentifier": "com.keyhome.visitors",
+      "buildNumber": "6",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "Pour vous montrer les biens à proximité et calculer la distance entre vous et un logement.",
+        "NSPhotoLibraryUsageDescription": "Pour joindre des photos à vos messages, litiges et votre profil.",
+        "NSCameraUsageDescription": "Pour prendre une photo et l'attacher à votre profil ou à un message.",
+        "NSUserNotificationsUsageDescription": "Pour vous prévenir des nouveaux messages, alertes et confirmations de réservation."
+      }
+    },
+    "android": {
+      "package": "com.keyhome.visitors",
+      "versionCode": 6,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#F6475F"
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE",
+        "CAMERA",
+        "POST_NOTIFICATIONS",
+        "INTERNET"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-location",
+      "expo-image-picker",
+      "expo-notifications",
+      "expo-updates",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F7F5F2",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 200
+        }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "keyhome",
+          "project": "mobile-visitors"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "extra": {
+      "apiBaseUrl": "https://api.keyhome.app/api/v1",
+      "apiBaseUrlDev": "https://api.keyhome.app/api/v1",
+      "eas": {
+        "projectId": "TODO_EAS_PROJECT_ID"
+      }
+    }
+  }
+}

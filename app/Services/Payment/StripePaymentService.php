@@ -33,7 +33,7 @@ use Stripe\Webhook;
  * (stored in `payments.amount`), the EUR equivalent travels with the
  * PaymentIntent metadata for receipt reconciliation.
  *
- * Unlike Flutterwave, Stripe is NOT redirect-based: `initiate()` returns
+ * Unlike Kpay (which uses hosted checkout), Stripe is NOT redirect-based: `initiate()` returns
  * a `clientSecret` (in the `link` field for interface symmetry) which the
  * frontend hands to `<PaymentElement>` for in-page card collection.
  *
@@ -131,6 +131,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
      *     customer_id?: string|null,
      *     save_payment_method?: bool,
      *     payment_method_id?: string|null,
+     *     stripe_hosted?: bool,
      *     meta?: array<string, mixed>
      * } $payload
      * @return array{link: string, tx_ref: string, status: string, gateway: string, stripe_flow: string}
@@ -221,6 +222,58 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
                 'status' => $normalisedStatus,
                 'gateway' => $this->getName(),
                 'stripe_flow' => 'payment_intent',
+            ];
+        }
+
+        // ── Checkout Session HÉBERGÉE (mobile / clients sans Stripe.js) ──────
+        // Les apps mobiles n'embarquent pas le SDK Stripe : elles ne peuvent
+        // pas confirmer un PaymentIntent ni monter un Payment Element. On leur
+        // renvoie donc l'URL d'une Checkout Session hébergée par Stripe, ouverte
+        // dans le navigateur in-app (comme Kpay). Le webhook
+        // `checkout.session.completed` reste la source de vérité.
+        if (!empty($payload['stripe_hosted'])) {
+            $hostedParams = [
+                'mode' => 'payment',
+                'line_items' => [[
+                    'price_data' => [
+                        'currency' => $currency,
+                        'product_data' => ['name' => mb_substr($description, 0, 250)],
+                        'unit_amount' => $eurCents,
+                    ],
+                    'quantity' => 1,
+                ]],
+                'locale' => 'fr',
+                'metadata' => $meta,
+                'payment_intent_data' => ['metadata' => $meta, 'description' => mb_substr($description, 0, 1000)],
+                'success_url' => $payload['redirect_url'],
+                'cancel_url' => $payload['redirect_url'],
+                'customer_email' => $payload['email'],
+            ];
+
+            try {
+                $session = $this->stripe->checkout->sessions->create(
+                    $hostedParams,
+                    ['idempotency_key' => 'kh_cshosted:'.$txRef],
+                );
+            } catch (ApiErrorException $e) {
+                Log::error('Stripe hosted checkout session creation failed', [
+                    'tx_ref' => $txRef,
+                    'message' => $e->getMessage(),
+                    'stripe_code' => $e->getStripeCode(),
+                ]);
+
+                throw new PaymentGatewayException(
+                    'Stripe a refusé l\'initialisation du paiement. Réessayez ou choisissez un autre moyen de paiement.',
+                    previous: $e,
+                );
+            }
+
+            return [
+                'link' => (string) $session->url,
+                'tx_ref' => $txRef,
+                'status' => 'pending',
+                'gateway' => $this->getName(),
+                'stripe_flow' => 'checkout_hosted',
             ];
         }
 
@@ -483,7 +536,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
 
             // Legacy fallback: only the local `tx_ref` is known. Use the
             // metadata search and accept the indexing latency. This path
-            // is exercised by the Flutterwave-style callback page when no
+            // is exercised by the hosted-checkout callback page when no
             // `pi_xxx` is available.
             $list = $this->stripe->paymentIntents->search([
                 'query' => sprintf('metadata[\'tx_ref\']:\'%s\'', addslashes($externalReference)),
@@ -620,9 +673,9 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
      *
      * @param  array<string, mixed>  $payload  Decoded payload (we re-encode for verification)
      * @param  array<string, mixed>  $headers
-     * @return array{event: string, tx_ref: string, status: string, amount: float, currency: string, payment_method: string|null, raw: array<string, mixed>}
+     * @return array{event: string, event_id: string|null, tx_ref: string, status: string, amount: float, currency: string, payment_method: string|null, raw: array<string, mixed>}
      */
-    public function handleWebhook(array $payload, array $headers): array
+    public function handleWebhook(array $payload, array $headers, ?string $rawBody = null): array
     {
         $signature = (string) ($headers['stripe-signature'] ?? $headers['Stripe-Signature'] ?? '');
         $secret = (string) config('services.stripe.webhook_secret');
@@ -653,10 +706,11 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
 
         $object = $event->data->object ?? null;
         $eventName = (string) $event->type;
+        $eventId = (string) $event->id;
 
         // Checkout Session events (ui_mode: 'custom' — Payment Element flow).
         if ($object instanceof CheckoutSession) {
-            return $this->normaliseCheckoutSessionEvent($eventName, $object);
+            return $this->normaliseCheckoutSessionEvent($eventName, $eventId, $object);
         }
 
         // We only care about PaymentIntent events for the orchestrator.
@@ -664,6 +718,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
         if (!$object instanceof PaymentIntent) {
             return [
                 'event' => $eventName,
+                'event_id' => $eventId !== '' ? $eventId : null,
                 'tx_ref' => '',
                 'status' => 'ignored',
                 'amount' => 0.0,
@@ -689,6 +744,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
 
         return [
             'event' => $eventName,
+            'event_id' => $eventId !== '' ? $eventId : null,
             'tx_ref' => (string) ($object->metadata->tx_ref ?? ''),
             'status' => $normalised['status'],
             'amount' => $normalised['amount'],
@@ -705,9 +761,9 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
      * The XAF amount is read from `session.metadata.xaf_amount` (written at
      * session creation time) to avoid a lossy EUR-cents → XAF round-trip.
      *
-     * @return array{event: string, tx_ref: string, status: string, amount: float, currency: string, payment_method: string|null, raw: array<string, mixed>}
+     * @return array{event: string, event_id: string|null, tx_ref: string, status: string, amount: float, currency: string, payment_method: string|null, raw: array<string, mixed>}
      */
-    private function normaliseCheckoutSessionEvent(string $eventName, CheckoutSession $session): array
+    private function normaliseCheckoutSessionEvent(string $eventName, string $eventId, CheckoutSession $session): array
     {
         $txRef = (string) ($session->metadata->tx_ref ?? '');
         $paymentStatus = (string) ($session->payment_status ?? '');
@@ -725,6 +781,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
 
         return [
             'event' => $eventName,
+            'event_id' => $eventId !== '' ? $eventId : null,
             'tx_ref' => $txRef,
             'status' => $normalisedStatus,
             'amount' => $xafAmount,

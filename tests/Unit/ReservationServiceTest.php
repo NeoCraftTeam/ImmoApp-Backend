@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Contracts\ViewingScheduleServiceInterface;
 use App\Enums\CancelledBy;
 use App\Enums\ReservationStatus;
 use App\Exceptions\Viewing\ScheduleHasActiveReservationsException;
@@ -9,8 +10,7 @@ use App\Models\Ad;
 use App\Models\TentativeReservation;
 use App\Models\User;
 use App\Models\Zap\Schedule;
-use App\Services\Contracts\ViewingScheduleServiceInterface;
-use App\Services\ReservationService;
+use App\Services\Rental\ReservationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
 
@@ -71,6 +72,37 @@ describe('Google OAuth Authentication', function (): void {
             ]);
     });
 
+    it('issues role-sealed tokens (never wildcard) for OAuth logins', function (): void {
+        $user = User::factory()->create([
+            'email' => 'sealed@example.com',
+            'google_id' => 'google-sealed-1',
+        ]);
+
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
+        $socialiteUser->shouldReceive('getId')->andReturn('google-sealed-1');
+        $socialiteUser->shouldReceive('getEmail')->andReturn('sealed@example.com');
+        $socialiteUser->shouldReceive('getName')->andReturn('Sealed User');
+        $socialiteUser->shouldReceive('getAvatar')->andReturn(null);
+
+        Socialite::shouldReceive('driver')->with('google')->andReturnSelf();
+        Socialite::shouldReceive('userFromToken')
+            ->with('valid-google-token')
+            ->andReturn($socialiteUser);
+
+        $this->postJson('/api/v1/auth/oauth/google', ['token' => 'valid-google-token'])
+            ->assertOk();
+
+        $accessToken = $user->tokens()->latest('id')->first();
+
+        expect($accessToken)->not->toBeNull()
+            ->and($accessToken->abilities)->toContain('role:'.$user->role->value)
+            ->and($accessToken->abilities)->toContain('api:access')
+            ->and($accessToken->abilities)->not->toContain('*')
+            ->and($accessToken->name)->toStartWith($user->sanctumSessionPrefix().'_oauth_google_')
+            ->and($accessToken->family_id)->not->toBeNull()
+            ->and($accessToken->expires_at)->not->toBeNull();
+    });
+
     it('creates new user with Google OAuth', function (): void {
         $socialiteUser = Mockery::mock(SocialiteUser::class);
         $socialiteUser->shouldReceive('getId')->andReturn('google-new-456');
@@ -107,7 +139,7 @@ describe('Google OAuth Authentication', function (): void {
         ]);
     });
 
-    it('always creates customer accounts via OAuth (agents need manual setup)', function (): void {
+    it('creates an agent account via OAuth when role=agent is requested', function (): void {
         $socialiteUser = Mockery::mock(SocialiteUser::class);
         $socialiteUser->shouldReceive('getId')->andReturn('google-agent-789');
         $socialiteUser->shouldReceive('getEmail')->andReturn('agent@example.com');
@@ -121,18 +153,66 @@ describe('Google OAuth Authentication', function (): void {
         Socialite::shouldReceive('userFromToken')
             ->andReturn($socialiteUser);
 
-        // Even if role=agent is requested, OAuth creates customer accounts
-        // because agents need type (INDIVIDUAL/AGENCY) setup that OAuth can't provide
+        // Owner panel / owners mobile app pass role=agent — the account is
+        // created as agent (type individual, agency linking via onboarding)
         $response = $this->postJson('/api/v1/auth/oauth/google', [
             'token' => 'valid-google-token',
-            'role' => 'agent', // This is ignored
+            'role' => 'agent',
         ]);
 
         $response->assertOk();
 
         $this->assertDatabaseHas('users', [
             'email' => 'agent@example.com',
-            'role' => UserRole::CUSTOMER->value, // Always customer via OAuth
+            'role' => UserRole::AGENT->value,
+            'type' => 'individual',
+        ]);
+    });
+
+    it('rejects a non-whitelisted OAuth role with a validation error', function (): void {
+        $response = $this->postJson('/api/v1/auth/oauth/google', [
+            'token' => 'valid-google-token',
+            'role' => 'admin',
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['role']);
+
+        $this->assertDatabaseMissing('users', [
+            'email' => 'wannabe-admin@example.com',
+        ]);
+    });
+
+    it('never changes the role of an existing account whatever role is requested', function (): void {
+        User::factory()->create([
+            'email' => 'customer@example.com',
+            'google_id' => 'google-existing-111',
+            'role' => UserRole::CUSTOMER,
+        ]);
+
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
+        $socialiteUser->shouldReceive('getId')->andReturn('google-existing-111');
+        $socialiteUser->shouldReceive('getEmail')->andReturn('customer@example.com');
+        $socialiteUser->shouldReceive('getName')->andReturn('Existing Customer');
+        $socialiteUser->shouldReceive('getAvatar')->andReturn(null);
+        $socialiteUser->shouldReceive('getRaw')->andReturn([]);
+
+        Socialite::shouldReceive('driver')
+            ->with('google')
+            ->andReturnSelf();
+        Socialite::shouldReceive('userFromToken')
+            ->andReturn($socialiteUser);
+
+        $response = $this->postJson('/api/v1/auth/oauth/google', [
+            'token' => 'valid-google-token',
+            'role' => 'agent',
+        ]);
+
+        $response->assertOk();
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'customer@example.com',
+            'role' => UserRole::CUSTOMER->value,
         ]);
     });
 
@@ -199,6 +279,33 @@ describe('Facebook OAuth Authentication', function (): void {
         $this->assertDatabaseHas('users', [
             'email' => 'fbuser@example.com',
             'facebook_id' => 'fb-123',
+        ]);
+    });
+
+    it('authenticates user with GitHub', function (): void {
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
+        $socialiteUser->shouldReceive('getId')->andReturn('gh-123');
+        $socialiteUser->shouldReceive('getEmail')->andReturn('ghuser@example.com');
+        $socialiteUser->shouldReceive('getName')->andReturn('GH User');
+        $socialiteUser->shouldReceive('getAvatar')->andReturn('https://github.com/avatar.jpg');
+        $socialiteUser->shouldReceive('getRaw')->andReturn([]);
+
+        Socialite::shouldReceive('driver')
+            ->with('github')
+            ->andReturnSelf();
+        Socialite::shouldReceive('userFromToken')
+            ->andReturn($socialiteUser);
+
+        $response = $this->postJson('/api/v1/auth/oauth/github', [
+            'token' => 'valid-gh-token',
+        ]);
+
+        $response->assertOk()
+            ->assertJsonStructure(['message', 'user', 'token', 'is_new_user']);
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'ghuser@example.com',
+            'github_id' => 'gh-123',
         ]);
     });
 });
@@ -340,6 +447,10 @@ describe('OAuth Provider Link/Unlink', function (): void {
 });
 
 describe('OAuth Redirect Flow (Web)', function (): void {
+    beforeEach(function (): void {
+        Config::set('services.google.client_id', 'test-google-client-id-for-redirect');
+    });
+
     it('returns redirect URL for OAuth provider', function (): void {
         Socialite::shouldReceive('driver')
             ->with('google')
@@ -358,6 +469,60 @@ describe('OAuth Redirect Flow (Web)', function (): void {
         $response->assertOk()
             ->assertJsonStructure(['redirect_url']);
     });
+
+    it('accepts keyhome mobile deep-link redirect_uri for visitors app', function (): void {
+        Socialite::shouldReceive('driver')
+            ->with('google')
+            ->andReturnSelf();
+        Socialite::shouldReceive('stateless')
+            ->andReturnSelf();
+        Socialite::shouldReceive('with')
+            ->withArgs(function (array $args): bool {
+                $state = json_decode(base64_decode((string) ($args['state'] ?? '')), true);
+
+                return is_array($state)
+                    && ($state['redirect_uri'] ?? '') === 'keyhome://auth/callback';
+            })
+            ->andReturnSelf();
+        Socialite::shouldReceive('redirect')
+            ->andReturnSelf();
+        Socialite::shouldReceive('getTargetUrl')
+            ->andReturn('https://accounts.google.com/oauth/authorize?...');
+
+        $response = $this->getJson(
+            '/api/v1/auth/oauth/google/redirect?redirect_uri='.urlencode('keyhome://auth/callback'),
+            ['X-KeyHome-Client' => 'keyhome-mobile-visitors'],
+        );
+
+        $response->assertOk()->assertJsonStructure(['redirect_url']);
+    });
+
+    it('accepts exp redirect_uri for Expo Go during development', function (): void {
+        Socialite::shouldReceive('driver')
+            ->with('google')
+            ->andReturnSelf();
+        Socialite::shouldReceive('stateless')
+            ->andReturnSelf();
+        Socialite::shouldReceive('with')
+            ->withArgs(function (array $args): bool {
+                $state = json_decode(base64_decode((string) ($args['state'] ?? '')), true);
+
+                return is_array($state)
+                    && ($state['redirect_uri'] ?? '') === 'exp://127.0.0.1:8081/--/auth/callback';
+            })
+            ->andReturnSelf();
+        Socialite::shouldReceive('redirect')
+            ->andReturnSelf();
+        Socialite::shouldReceive('getTargetUrl')
+            ->andReturn('https://accounts.google.com/oauth/authorize?...');
+
+        $response = $this->getJson(
+            '/api/v1/auth/oauth/google/redirect?redirect_uri='.urlencode('exp://127.0.0.1:8081/--/auth/callback'),
+            ['X-KeyHome-Client' => 'keyhome-mobile-visitors'],
+        );
+
+        $response->assertOk()->assertJsonStructure(['redirect_url']);
+    });
 });
 
 describe('OAuth Error Handling', function (): void {
@@ -373,7 +538,7 @@ describe('OAuth Error Handling', function (): void {
         ]);
 
         $response->assertStatus(401)
-            ->assertJson(['message' => 'Échec de l\'authentification OAuth']);
+            ->assertJson(['message' => 'Échec de l\'authentification. Veuillez réessayer.']);
     });
 
     it('handles missing email from OAuth provider', function (): void {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\Ads;
 
+use App\Enums\AdminPermission;
 use App\Enums\AdStatus;
 use App\Filament\Admin\Resources\Ads\Pages\CreateAd;
 use App\Filament\Admin\Resources\Ads\Pages\EditAd;
@@ -52,6 +53,12 @@ class AdResource extends Resource
     use SharedAdResource;
 
     protected static ?string $model = Ad::class;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::AdsView) ?? false;
+    }
 
     protected static string|null|UnitEnum $navigationGroup = 'Annonces';
 
@@ -111,6 +118,12 @@ class AdResource extends Resource
                 SelectFilter::make('type_id')
                     ->label('Type de bien')
                     ->relationship('ad_type', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->native(false),
+                SelectFilter::make('city')
+                    ->label('Ville')
+                    ->relationship('quarter.city', 'name')
                     ->searchable()
                     ->preload()
                     ->native(false),
@@ -177,6 +190,7 @@ class AdResource extends Resource
                 DeleteAction::make()
                     ->successNotificationTitle('Annonce supprimée'),
                 ForceDeleteAction::make()
+                    ->visible(fn (): bool => auth()->user()?->isSuperAdmin() ?? false)
                     ->successNotificationTitle('Annonce supprimée définitivement'),
                 RestoreAction::make()
                     ->successNotificationTitle('Annonce restaurée'),
@@ -240,7 +254,8 @@ class AdResource extends Resource
                             Ad::query()->whereKey($records->modelKeys())->delete();
                         }),
                     DeleteBulkAction::make(),
-                    ForceDeleteBulkAction::make(),
+                    ForceDeleteBulkAction::make()
+                        ->visible(fn (): bool => auth()->user()?->isSuperAdmin() ?? false),
                     RestoreBulkAction::make(),
                 ]),
             ]);

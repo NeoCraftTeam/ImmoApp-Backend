@@ -64,6 +64,14 @@ class UserPolicy
      */
     public function forceDelete(User $user, User $model): bool
     {
-        return $user->isAdmin();
+        if ($user->id === $model->id) {
+            return false;
+        }
+
+        if ($model->isSuperAdmin() && User::where('is_super_admin', true)->count() <= 1) {
+            return false;
+        }
+
+        return $user->isSuperAdmin();
     }
 }

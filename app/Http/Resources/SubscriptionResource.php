@@ -28,10 +28,16 @@ class SubscriptionResource extends JsonResource
             'amount_paid_formatted' => number_format((float) $this->amount_paid, 0, ',', ' ').' FCFA',
             'starts_at' => $this->starts_at?->toIso8601String(),
             'ends_at' => $this->ends_at?->toIso8601String(),
+            'trial_ends_at' => $this->trial_ends_at?->toIso8601String(),
+            'is_on_trial' => $this->isOnTrial(),
+            'trial_days_remaining' => $this->trialDaysRemaining(),
             'days_remaining' => $this->daysRemaining(),
             'is_active' => $this->isActive(),
             'auto_renew' => $this->auto_renew,
+            'renewal_count' => $this->renewal_count,
+            'renewed_at' => $this->renewed_at?->toIso8601String(),
             'cancelled_at' => $this->cancelled_at?->toIso8601String(),
+            'cancellation_reason' => $this->cancellation_reason,
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }

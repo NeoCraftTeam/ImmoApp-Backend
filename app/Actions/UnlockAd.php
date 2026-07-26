@@ -10,7 +10,7 @@ use App\Models\AdInteraction;
 use App\Models\UnlockedAd;
 use App\Models\User;
 use App\Services\Chat\ConversationService;
-use App\Services\PointService;
+use App\Services\Monetization\PointService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\Documents;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\Documents\Pages\ManageDocuments;
 use App\Models\Document;
 use Filament\Actions\ViewAction;
@@ -22,6 +23,12 @@ final class DocumentResource extends Resource
     protected static ?string $model = Document::class;
 
     protected static bool $isScopedToTenant = false;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::UsersView) ?? false;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::PaperClip;
 

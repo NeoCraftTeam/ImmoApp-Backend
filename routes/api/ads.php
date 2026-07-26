@@ -2,27 +2,26 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Api\V1\AdAiController;
-use App\Http\Controllers\Api\V1\AdAnalyticsController;
-use App\Http\Controllers\Api\V1\AdController;
-use App\Http\Controllers\Api\V1\AdDraftEditController;
-use App\Http\Controllers\Api\V1\AdGeoController;
-use App\Http\Controllers\Api\V1\AdImageSearchController;
-use App\Http\Controllers\Api\V1\AdInteractionController;
-use App\Http\Controllers\Api\V1\AdPdfController;
-use App\Http\Controllers\Api\V1\AdRankEstimateController;
-use App\Http\Controllers\Api\V1\AdReportController;
-use App\Http\Controllers\Api\V1\AdSearchController;
-use App\Http\Controllers\Api\V1\AdSimilarController;
-use App\Http\Controllers\Api\V1\AdStatusController;
-use App\Http\Controllers\Api\V1\BulkAdController;
-use App\Http\Controllers\Api\V1\KeyScoreController;
-use App\Http\Controllers\Api\V1\MyAdsController;
-use App\Http\Controllers\Api\V1\NeighborhoodScorecardController;
+use App\Http\Controllers\Api\V1\Ad\AdAiController;
+use App\Http\Controllers\Api\V1\Ad\AdAnalyticsController;
+use App\Http\Controllers\Api\V1\Ad\AdController;
+use App\Http\Controllers\Api\V1\Ad\AdDraftEditController;
+use App\Http\Controllers\Api\V1\Ad\AdGeoController;
+use App\Http\Controllers\Api\V1\Ad\AdInteractionController;
+use App\Http\Controllers\Api\V1\Ad\AdPdfController;
+use App\Http\Controllers\Api\V1\Ad\AdRankEstimateController;
+use App\Http\Controllers\Api\V1\Ad\AdReportController;
+use App\Http\Controllers\Api\V1\Ad\AdSearchController;
+use App\Http\Controllers\Api\V1\Ad\AdSimilarController;
+use App\Http\Controllers\Api\V1\Ad\AdStatusController;
+use App\Http\Controllers\Api\V1\Ad\BulkAdController;
+use App\Http\Controllers\Api\V1\Ad\MyAdsController;
+use App\Http\Controllers\Api\V1\Geo\NeighborhoodScorecardController;
 use App\Http\Controllers\Api\V1\PrescreeningController;
 use App\Http\Controllers\Api\V1\QrCodeController;
-use App\Http\Controllers\Api\V1\ReviewController;
 use App\Http\Controllers\Api\V1\TourController;
+use App\Http\Controllers\Api\V1\User\KeyScoreController;
+use App\Http\Controllers\Api\V1\User\ReviewController;
 use App\Models\Review;
 use Illuminate\Support\Facades\Route;
 
@@ -42,9 +41,6 @@ Route::prefix('ads')->middleware('optional.auth')->group(function (): void {
     Route::get('/search', [AdSearchController::class, 'search'])->name('ads.search')->middleware('throttle:60,1');
     Route::get('/autocomplete', [AdSearchController::class, 'autocomplete'])->name('ads.autocomplete')->middleware('throttle:60,1');
     Route::get('/facets', [AdSearchController::class, 'facets'])->name('ads.facets')->middleware('throttle:60,1');
-
-    // Image search — vision LLM (GPT-4o / Gemini Vision). Throttled tightly: vision calls are expensive.
-    Route::post('/search/image', AdImageSearchController::class)->middleware('throttle:20,1');
 
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('/ai/enhance-description', AdAiController::class)
@@ -119,6 +115,9 @@ Route::middleware('optional.auth')->group(function (): void {
 
 // Recently viewed ads (authenticated only)
 Route::middleware('auth:sanctum')->get('/my/recently-viewed', [AdInteractionController::class, 'recentlyViewed']);
+
+// My favorites — list of ads the current user has favorited.
+Route::middleware('auth:sanctum')->get('/my/favorites', [AdInteractionController::class, 'favorites']);
 
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/ads/{ad}/favorite', [AdInteractionController::class, 'toggleFavorite'])

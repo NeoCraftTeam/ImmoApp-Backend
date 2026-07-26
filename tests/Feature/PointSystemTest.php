@@ -9,7 +9,7 @@ use App\Models\PointPackage;
 use App\Models\PointTransaction;
 use App\Models\Setting;
 use App\Models\User;
-use App\Services\PointService;
+use App\Services\Monetization\PointService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -104,8 +104,9 @@ it('approved webhook for CREDIT payment credits points to the user', function ()
     Setting::set('welcome_bonus_points', 0, 'Bonus bienvenue', 'points');
 
     $secret = 'test-webhook-secret';
-    config()->set('payment.gateways.flutterwave.webhook_secret', $secret);
-    config()->set('payment.gateways.flutterwave.secret_key', 'FLWSECK_TEST-fake');
+    config()->set('payment.default', 'kpay');
+    config()->set('payment.gateways.kpay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.webhook_secret', $secret);
 
     $user = User::factory()->create(['point_balance' => 0]);
     $package = PointPackage::factory()->create(['points_awarded' => 50, 'price' => 5000]);
@@ -115,27 +116,21 @@ it('approved webhook for CREDIT payment credits points to the user', function ()
         'transaction_id' => 'KH-CREDITAPPROVED',
         'status' => PaymentStatus::PENDING,
         'type' => PaymentType::CREDIT,
-        'payment_method' => PaymentMethod::FLUTTERWAVE,
-        'gateway' => 'flutterwave',
+        'payment_method' => PaymentMethod::MOBILE_MONEY,
+        'gateway' => 'kpay',
         'amount' => 5000,
         'plan_id' => $package->id,
     ]);
 
-    $payload = json_encode([
-        'event' => 'charge.completed',
-        'data' => [
-            'status' => 'successful',
-            'tx_ref' => 'KH-CREDITAPPROVED',
-            'amount' => 5000,
-            'currency' => 'XAF',
-            'meta' => ['package_id' => $package->id],
-        ],
+    $payload = kpayCompletedWebhookPayload([
+        'paymentId' => 'pay_credit_approved',
+        'reference' => 'KPAY-CREDITAPPROVED',
+        'amount' => 5000,
+        'externalId' => 'KH-CREDITAPPROVED',
     ]);
+    [$headers, $body] = signedKpayWebhook($secret, $payload);
 
-    $this->call('POST', '/api/v1/webhooks/flutterwave', [], [], [], [
-        'CONTENT_TYPE' => 'application/json',
-        'HTTP_VERIF_HASH' => $secret,
-    ], $payload)->assertOk();
+    $this->call('POST', '/api/v1/webhooks/kpay', [], [], [], $headers, $body)->assertOk();
 
     expect($user->fresh()->point_balance)->toBe(50);
 
@@ -159,7 +154,7 @@ it('verify-purchase returns completed when credit payment is already successful'
         'transaction_id' => 'txn-verify-completed',
         'status' => PaymentStatus::SUCCESS,
         'type' => PaymentType::CREDIT,
-        'payment_method' => PaymentMethod::FLUTTERWAVE,
+        'payment_method' => PaymentMethod::MOBILE_MONEY,
         'gateway' => 'flutterwave',
     ]);
 

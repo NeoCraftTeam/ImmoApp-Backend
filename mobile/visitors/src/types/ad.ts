@@ -1,0 +1,123 @@
+/**
+ * Mobile mirror of the backend `AdResource::toArray()` shape. Kept
+ * intentionally narrow — only fields the visitor app reads. Adding a
+ * field on the backend doesn't break the mobile app (extra keys are
+ * ignored at JSON parse time); removing a field will, so sync this
+ * file when removing/renaming fields in `AdResource`.
+ */
+export interface AdLocation {
+  latitude: number;
+  longitude: number;
+}
+
+export interface TourScene {
+  id?: string;
+  title?: string;
+  /** URL de la photo équirectangulaire (signée par le backend). */
+  image_url?: string;
+  thumbnail_url?: string;
+}
+
+export interface TourConfig {
+  default_scene?: string;
+  scenes: TourScene[];
+}
+
+export interface AdImage {
+  id: number;
+  url: string;
+  thumb?: string;
+  large?: string;
+  mime_type: string;
+  is_primary: boolean;
+}
+
+export interface AdQuarter {
+  id?: string;
+  name: string;
+  city_name?: string;
+}
+
+export interface AdType {
+  id: string;
+  name: string;
+}
+
+export interface AdUser {
+  id: string;
+  username?: string;
+  firstname: string;
+  lastname?: string;
+  avatar?: string | null;
+  phone_number?: string | null;
+  phone_is_whatsapp?: boolean;
+  email?: string;
+  is_verified?: boolean;
+  trust_tier?: string;
+  trust_score?: number;
+}
+
+export interface Ad {
+  id: string;
+  slug?: string;
+  title: string;
+  description: string;
+  adresse: string;
+  price: number | null;
+  price_period?: 'mois' | 'jour' | null;
+  surface_area?: number | null;
+  bedrooms?: number | null;
+  bathrooms?: number | null;
+  has_parking?: boolean;
+  location?: AdLocation | null;
+  status: string;
+  is_currently_available: boolean;
+  is_unlocked: boolean;
+  /** Coût en crédits pour déverrouiller le contact (Setting `unlock_cost_points`). */
+  unlock_cost?: number;
+  is_favorited?: boolean;
+  is_verified?: boolean;
+  is_boosted?: boolean;
+  is_subscription_sponsored?: boolean;
+  sponsorship_tier?: string;
+  rating?: number | null;
+  reviews_count: number;
+  view_count?: number;
+  keyscore?: number | null;
+  images: AdImage[];
+  total_images: number;
+  has_3d_tour: boolean;
+  /** Nombre de pièces de la visite 360° (présent si has_3d_tour). */
+  tour_scenes_count?: number | null;
+  /** Config du viewer 360° — présent seulement si has_3d_tour ET déverrouillé. */
+  tour_config?: TourConfig | null;
+  transaction_type?: 'location' | 'vente' | null;
+  quarter?: AdQuarter;
+  type?: AdType;
+  user?: AdUser;
+  created_at?: string;
+  available_from?: string | null;
+  /** Equipment slugs (resolved to labels via /property-attributes). */
+  attributes?: string[];
+  /** Optional pre-formatted distance from the user, set by the search/feed endpoint. */
+  distance?: number | null;
+  /** Infos supplémentaires — présentes uniquement quand l'annonce est déverrouillée. */
+  deposit_amount?: string | null;
+  minimum_lease_duration?: string | null;
+  detailed_charges?: string | null;
+  charges_forfaitaires?: boolean | null;
+  charges_montant_forfait?: number | string | null;
+  charges_eau?: number | string | null;
+  charges_electricite?: number | string | null;
+  charges_autres?: string | null;
+  property_condition_pdf?: string | null;
+}
+
+export interface AdFeedResponse {
+  data: Ad[];
+  meta?: {
+    next_cursor?: string | null;
+    per_page?: number;
+  };
+  total_approximate?: number;
+}

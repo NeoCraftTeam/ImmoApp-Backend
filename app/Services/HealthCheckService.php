@@ -11,12 +11,12 @@ use Illuminate\Support\Facades\Http;
 /**
  * Enterprise health-check service.
  *
- * Checks: Database · Redis · Queue · Storage · Meilisearch · GeniusPay
+ * Checks: Database · Redis · Queue · Storage · Meilisearch · Kpay
  *
  * Status tiers
  * ─────────────
  *  healthy   — all checks pass
- *  degraded  — non-critical check failed (Redis, Queue, Meilisearch, GeniusPay)
+ *  degraded  — non-critical check failed (Redis, Queue, Meilisearch, Kpay)
  *  unhealthy — critical check failed (Database or Storage)
  *
  * Results are cached for CACHE_TTL seconds so monitoring bursts don't
@@ -64,7 +64,7 @@ final readonly class HealthCheckService
             'queue' => $this->checkQueue(),
             'storage' => $this->checkStorage(),
             'meilisearch' => $this->checkMeilisearch(),
-            'geniuspay' => $this->checkGeniusPay(),
+            'kpay' => $this->checkKpay(),
         ];
 
         $status = $this->resolveOverallStatus($checks);
@@ -253,20 +253,23 @@ final readonly class HealthCheckService
         }
     }
 
-    private function checkGeniusPay(): array
+    private function checkKpay(): array
     {
         $start = hrtime(true);
-        $baseUrl = rtrim((string) config('payment.gateways.geniuspay.base_url', 'https://pay.genius.ci/api/v1/merchant'), '/');
+        $baseUrl = rtrim((string) config('payment.gateways.kpay.base_url', 'https://admin.kpay.site'), '/');
 
         try {
             $response = Http::timeout(5)
                 ->connectTimeout(3)
-                ->withoutVerifying()
-                ->head($baseUrl.'/account');
+                ->withHeaders([
+                    'X-API-Key' => (string) config('payment.gateways.kpay.api_key', ''),
+                    'X-Secret-Key' => (string) config('payment.gateways.kpay.api_secret', ''),
+                ])
+                ->get($baseUrl.'/api/v1/payments/me');
 
             $latency = $this->ms($start);
 
-            if ($response->status() < 500) {
+            if ($response->successful()) {
                 return [
                     'status' => 'healthy',
                     'latency_ms' => $latency,

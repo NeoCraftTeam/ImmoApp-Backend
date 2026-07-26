@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Mail\VerificationCodeMail;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 
 uses(RefreshDatabase::class);
@@ -96,7 +98,7 @@ it('returns 403 for inactive account', function (): void {
     $response->assertForbidden();
 });
 
-it('returns 403 for unverified email', function (): void {
+it('returns 403 for unverified email and signals the client to verify', function (): void {
     $user = User::factory()->customers()->unverified()->create([
         'password' => Hash::make('Secret@123'),
         'is_active' => true,
@@ -107,7 +109,27 @@ it('returns 403 for unverified email', function (): void {
         'password' => 'Secret@123',
     ]);
 
-    $response->assertForbidden();
+    $response->assertForbidden()
+        ->assertJsonPath('email_verification_required', true)
+        ->assertJsonPath('email', $user->email);
+});
+
+it('never re-sends an OTP code when an unverified account logs in', function (): void {
+    Mail::fake();
+
+    $user = User::factory()->customers()->unverified()->create([
+        'password' => Hash::make('Secret@123'),
+        'is_active' => true,
+    ]);
+
+    $this->postJson('/api/v1/auth/login', [
+        'email' => $user->email,
+        'password' => 'Secret@123',
+    ])->assertForbidden();
+
+    // L'OTP appartient à l'inscription : se connecter ne doit JAMAIS
+    // déclencher l'envoi d'un nouveau code de vérification.
+    Mail::assertNotQueued(VerificationCodeMail::class);
 });
 
 it('returns 401 for role context mismatch — customer as owner', function (): void {
@@ -166,4 +188,59 @@ it('records login history after successful login', function (): void {
         'successful' => true,
         'guard' => 'sanctum',
     ]);
+});
+
+it('allows mobile client login without turnstile when turnstile is configured', function (): void {
+    config()->set('services.turnstile.secret_key', 'real-test-secret-not-dummy-placeholder');
+
+    $user = createVerifiedUser('customer');
+
+    $response = $this->postJson('/api/v1/auth/login', [
+        'email' => $user->email,
+        'password' => 'Secret@123',
+        'login_context' => 'client',
+    ], [
+        'X-KeyHome-Client' => 'keyhome-mobile-visitors',
+    ]);
+
+    $response->assertOk()
+        ->assertJsonStructure(['access_token']);
+});
+
+it('allows mobile owner login without turnstile when turnstile is configured', function (): void {
+    config()->set('services.turnstile.secret_key', 'real-test-secret-not-dummy-placeholder');
+
+    $user = createVerifiedUser('agent');
+
+    $response = $this->postJson('/api/v1/auth/login', [
+        'email' => $user->email,
+        'password' => 'Secret@123',
+        'login_context' => 'owner',
+    ], [
+        'X-KeyHome-Client' => 'keyhome-mobile-owners',
+    ]);
+
+    $response->assertOk()
+        ->assertJsonStructure(['access_token']);
+});
+
+it('accepts email login regardless of input casing', function (): void {
+    $user = User::factory()->customers()->create([
+        'email' => 'mixedcase@example.com',
+        'password' => Hash::make('Secret@123'),
+        'email_verified_at' => now(),
+        'is_active' => true,
+    ]);
+
+    $response = $this->postJson('/api/v1/auth/login', [
+        'email' => 'MixedCase@Example.COM',
+        'password' => 'Secret@123',
+        'login_context' => 'client',
+    ], [
+        'X-KeyHome-Client' => 'keyhome-mobile-visitors',
+    ]);
+
+    $response->assertOk();
+    expect($response->json('access_token'))->toBeString()->not->toBeEmpty();
+    expect($user->fresh()->id)->toBe($user->id);
 });

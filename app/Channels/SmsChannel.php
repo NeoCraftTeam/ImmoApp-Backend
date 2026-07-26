@@ -6,7 +6,7 @@ namespace App\Channels;
 
 use App\Models\NotificationPreference;
 use App\Models\User;
-use App\Services\SmsService;
+use App\Services\Notification\SmsService;
 use Illuminate\Notifications\Notification;
 
 /**

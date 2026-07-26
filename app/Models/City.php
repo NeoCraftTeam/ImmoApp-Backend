@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\CityFactory;
 use Eloquent;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,6 +21,10 @@ use Spatie\Activitylog\Traits\LogsActivity;
 /**
  * @property string $id
  * @property string $name
+ * @property string|null $country
+ * @property float|null $latitude
+ * @property float|null $longitude
+ * @property Point|null $location
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
@@ -52,6 +57,10 @@ class City extends Model
 
     protected $fillable = [
         'name',
+        'country',
+        'latitude',
+        'longitude',
+        'location',
     ];
 
     protected $hidden = [
@@ -82,10 +91,18 @@ class City extends Model
         return $this->hasMany(User::class);
     }
 
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'location' => Point::class,
+        ];
+    }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name'])
+            ->logOnly(['name', 'country'])
             ->logOnlyDirty()
             ->setDescriptionForEvent(fn (string $eventName): string => "Ville {$eventName}");
     }

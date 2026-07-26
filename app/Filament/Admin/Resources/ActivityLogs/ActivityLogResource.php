@@ -87,32 +87,40 @@ class ActivityLogResource extends Resource
                         $action = $props['action'] ?? $record->event ?? 'unknown';
                         $event = AuditDescription::actionLabel($record);
 
-                        [$eventColor, $eventBg] = $isSecurityLog
+                        // Per-event pill classes — listed explicitly so
+                        // Tailwind's JIT picks them up at build time (dynamic
+                        // class names cannot be detected). Each tuple is
+                        // [background+text, border]; both halves include
+                        // their dark-mode counterparts.
+                        $eventPillClass = $isSecurityLog
                             ? match ($action) {
-                                'login' => ['#0369a1', '#e0f2fe'],
-                                'logout' => ['#64748b', '#f1f5f9'],
-                                'login_failed', 'lockout' => ['#dc2626', '#fee2e2'],
-                                'password_reset' => ['#7c3aed', '#ede9fe'],
-                                default => ['#64748b', '#f1f5f9'],
+                                'login' => 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200',
+                                'logout' => 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
+                                'login_failed', 'lockout' => 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-200',
+                                'password_reset' => 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-200',
+                                default => 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
                             }
                         : match ($record->event) {
-                            'created' => ['#166534', '#dcfce7'],
-                            'updated' => ['#92400e', '#fef3c7'],
-                            'deleted' => ['#991b1b', '#fee2e2'],
-                            default => ['#64748b', '#f1f5f9'],
+                            'created' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200',
+                            'updated' => 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200',
+                            'deleted' => 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200',
+                            default => 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
                         };
 
-                        $accentBorder = $isSecurityLog ? '#F6475F' : match ($record->event) {
-                            'created' => '#22c55e',
-                            'updated' => '#f59e0b',
-                            'deleted' => '#ef4444',
-                            default => '#94a3b8',
-                        };
+                        // Left accent strip — also class-based for dark mode parity.
+                        $accentBorderClass = $isSecurityLog
+                            ? 'border-l-rose-500 dark:border-l-rose-400'
+                            : match ($record->event) {
+                                'created' => 'border-l-emerald-500 dark:border-l-emerald-400',
+                                'updated' => 'border-l-amber-500 dark:border-l-amber-400',
+                                'deleted' => 'border-l-red-500 dark:border-l-red-400',
+                                default => 'border-l-slate-400 dark:border-l-slate-500',
+                            };
 
                         $logBadgeLabel = $isSecurityLog ? 'Sécurité' : 'Action Admin';
-                        $logBadgeBg = $isSecurityLog ? '#fef2f2' : '#eff6ff';
-                        $logBadgeColor = $isSecurityLog ? '#F6475F' : '#1d4ed8';
-                        $logBadgeBorder = $isSecurityLog ? '#fecdd3' : '#bfdbfe';
+                        $logBadgeClass = $isSecurityLog
+                            ? 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-900/30 dark:text-rose-200 dark:ring-rose-700/50'
+                            : 'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:ring-blue-700/50';
 
                         $date = $record->created_at->format('d/m/Y à H:i:s');
                         $description = AuditDescription::forActivity($record);
@@ -124,47 +132,53 @@ class ActivityLogResource extends Resource
                         $uaShort = $ua ? (mb_strlen($ua) > 72 ? mb_substr($ua, 0, 72).'…' : $ua) : null;
 
                         return json_encode(compact(
-                            'adminName', 'adminEmail', 'entity', 'event', 'eventColor', 'eventBg',
-                            'accentBorder', 'logBadgeLabel', 'logBadgeBg', 'logBadgeColor', 'logBadgeBorder',
+                            'adminName', 'adminEmail', 'entity', 'event', 'eventPillClass',
+                            'accentBorderClass', 'logBadgeLabel', 'logBadgeClass',
                             'date', 'description', 'isSecurityLog', 'ip', 'uaShort', 'guard', 'action'
                         ), JSON_UNESCAPED_UNICODE);
                     })
                     ->formatStateUsing(function (string $state): string {
                         $d = json_decode($state, true);
 
-                        $pill = fn (string $label, string $value, string $bg, string $color, string $border = 'transparent'): string => '<div style="display:flex;align-items:center;gap:6px;">'
-                            .'<span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700;letter-spacing:0.06em;white-space:nowrap;">'.e($label).'</span>'
-                            .'<span style="display:inline-block;padding:2px 10px;border-radius:9999px;font-size:12px;font-weight:600;background:'.e($bg).';color:'.e($color).';border:1px solid '.e($border).';">'.e($value).'</span>'
+                        // Pill helper — `$pillClasses` is a pre-validated
+                        // Tailwind class string (see $eventPillClass match
+                        // in getStateUsing) so the JIT compiles each variant.
+                        $pill = fn (string $label, string $value, string $pillClasses): string => '<div class="flex items-center gap-1.5">'
+                            .'<span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500 whitespace-nowrap">'.e($label).'</span>'
+                            .'<span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ring-1 ring-inset '.$pillClasses.'">'.e($value).'</span>'
                             .'</div>';
 
-                        $metaText = fn (string $label, string $value): string => '<div style="display:flex;align-items:baseline;gap:6px;">'
-                            .'<span style="font-size:10px;color:#94a3b8;text-transform:uppercase;font-weight:700;letter-spacing:0.06em;white-space:nowrap;">'.e($label).'</span>'
-                            .'<span style="font-size:12px;color:#334155;font-weight:500;">'.e($value).'</span>'
+                        $metaText = fn (string $label, string $value): string => '<div class="flex items-baseline gap-1.5">'
+                            .'<span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500 whitespace-nowrap">'.e($label).'</span>'
+                            .'<span class="text-xs font-medium text-slate-700 dark:text-slate-300">'.e($value).'</span>'
                             .'</div>';
 
-                        $html = '<div style="border-left:4px solid '.e($d['accentBorder']).';background:#f8fafc;border-radius:0 12px 12px 0;padding:18px 22px;border:1px solid #e2e8f0;border-left-width:4px;">';
+                        // Outer card — borders + bg are now class-based with
+                        // dark-mode counterparts so the activity-log
+                        // slide-over stays legible in either theme.
+                        $html = '<div class="border-l-4 '.$d['accentBorderClass'].' bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-r-xl p-[18px_22px]">';
 
-                        $html .= '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">';
-                        $html .= '<span style="display:inline-block;padding:3px 12px;border-radius:9999px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;background:'.e($d['logBadgeBg']).';color:'.e($d['logBadgeColor']).';border:1px solid '.e($d['logBadgeBorder']).';">';
+                        $html .= '<div class="flex items-center gap-2.5 mb-3.5 flex-wrap">';
+                        $html .= '<span class="inline-block px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ring-1 ring-inset '.$d['logBadgeClass'].'">';
                         $html .= e($d['logBadgeLabel']);
                         $html .= '</span>';
-                        $html .= '<span style="font-size:12px;color:#94a3b8;">'.e($d['date']).'</span>';
+                        $html .= '<span class="text-xs text-slate-400 dark:text-slate-500">'.e($d['date']).'</span>';
                         $html .= '</div>';
 
-                        $html .= '<div style="font-size:15px;color:#0f172a;font-weight:600;margin-bottom:16px;line-height:1.6;">'.e($d['description']).'</div>';
+                        $html .= '<div class="text-[15px] font-semibold text-slate-900 dark:text-slate-100 mb-4 leading-relaxed">'.e($d['description']).'</div>';
 
-                        $html .= '<div style="display:flex;flex-wrap:wrap;gap:12px 24px;">';
-                        $html .= $pill('Action', $d['event'], $d['eventBg'], $d['eventColor']);
+                        $html .= '<div class="flex flex-wrap gap-x-6 gap-y-3">';
+                        $html .= $pill('Action', $d['event'], $d['eventPillClass']);
                         if ($d['entity'] !== '—') {
-                            $html .= $pill('Entité', $d['entity'], '#dbeafe', '#1d4ed8', '#bfdbfe');
+                            $html .= $pill('Entité', $d['entity'], 'bg-blue-100 text-blue-700 ring-blue-200 dark:bg-blue-900/40 dark:text-blue-200 dark:ring-blue-700/50');
                         }
                         $html .= $metaText('Admin', $d['adminName'].($d['adminEmail'] ? ' · '.$d['adminEmail'] : ''));
                         $html .= '</div>';
 
                         if ($d['isSecurityLog'] && ($d['ip'] || $d['uaShort'] || $d['guard'])) {
-                            $html .= '<div style="margin-top:14px;padding:14px 18px;background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;">';
-                            $html .= '<div style="font-size:10px;font-weight:700;color:#c2410c;text-transform:uppercase;letter-spacing:0.07em;margin-bottom:10px;">Informations réseau</div>';
-                            $html .= '<div style="display:flex;flex-wrap:wrap;gap:10px 28px;">';
+                            $html .= '<div class="mt-3.5 p-[14px_18px] bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800/60 rounded-lg">';
+                            $html .= '<div class="text-[10px] font-bold uppercase tracking-wider text-orange-700 dark:text-orange-300 mb-2.5">Informations réseau</div>';
+                            $html .= '<div class="flex flex-wrap gap-x-7 gap-y-2.5">';
                             if ($d['ip']) {
                                 $html .= $metaText('Adresse IP', $d['ip']);
                             }
@@ -354,20 +368,29 @@ class ActivityLogResource extends Resource
     private static function renderDiffTable(array $old, array $new, ?string $event = null): string
     {
         $ignoredKeys = ['updated_at', 'created_at', 'id'];
-        $old = array_diff_key($old, array_flip($ignoredKeys));
-        $new = array_diff_key($new, array_flip($ignoredKeys));
+        $sensitiveKeys = ['password', 'remember_token', 'app_authentication_secret', 'app_authentication_recovery_codes', 'two_factor_secret', 'two_factor_recovery_codes', 'api_token', 'stripe_id', 'pm_last_four'];
+        $old = array_diff_key($old, array_flip($ignoredKeys), array_flip($sensitiveKeys));
+        $new = array_diff_key($new, array_flip($ignoredKeys), array_flip($sensitiveKeys));
 
         $allKeys = array_unique(array_merge(array_keys($old), array_keys($new)));
 
         if (empty($allKeys)) {
-            return '<div style="padding:12px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;color:#94a3b8;font-style:italic;font-size:13px;">Aucune modification enregistrée.</div>';
+            return '<div class="px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-400 dark:text-slate-500 italic text-sm">Aucune modification enregistrée.</div>';
         }
 
-        $accentColor = match ($event) {
-            'created' => '#22c55e',
-            'updated' => '#f59e0b',
-            'deleted' => '#ef4444',
-            default => '#F6475F',
+        // Accent strip + header underline — full class strings so JIT can
+        // compile them. Was a single hex shared across both visuals.
+        $accentStripClass = match ($event) {
+            'created' => 'bg-emerald-500 dark:bg-emerald-400',
+            'updated' => 'bg-amber-500 dark:bg-amber-400',
+            'deleted' => 'bg-red-500 dark:bg-red-400',
+            default => 'bg-rose-500 dark:bg-rose-400',
+        };
+        $accentBorderClass = match ($event) {
+            'created' => 'border-b-emerald-500 dark:border-b-emerald-400',
+            'updated' => 'border-b-amber-500 dark:border-b-amber-400',
+            'deleted' => 'border-b-red-500 dark:border-b-red-400',
+            default => 'border-b-rose-500 dark:border-b-rose-400',
         };
 
         $rows = '';
@@ -380,35 +403,40 @@ class ActivityLogResource extends Resource
             $oldDisplay = self::formatCellValue($oldVal);
             $newDisplay = self::formatCellValue($newVal);
 
-            $oldCellBg = $isOnlyNew ? '#f8fafc' : '#fef2f2';
-            $newCellBg = $isOnlyOld ? '#f8fafc' : '#f0fdf4';
-            $oldTextColor = $isOnlyNew ? '#94a3b8' : '#991b1b';
-            $newTextColor = $isOnlyOld ? '#94a3b8' : '#166534';
+            // Per-cell theming. The `null` case is a muted neutral; the
+            // populated case is a red/green wash. Both halves include
+            // dark-mode counterparts so the diff table stays legible.
+            $oldCellClass = $isOnlyNew
+                ? 'bg-slate-50 dark:bg-slate-900 text-slate-400 dark:text-slate-500'
+                : 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300';
+            $newCellClass = $isOnlyOld
+                ? 'bg-slate-50 dark:bg-slate-900 text-slate-400 dark:text-slate-500'
+                : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300';
 
             $rows .= '<tr>'
-                .'<td style="padding:9px 14px;font-size:12px;font-weight:600;color:#475569;border-bottom:1px solid #f1f5f9;vertical-align:top;white-space:nowrap;">'.e(self::humanizeFieldName($key)).'</td>'
-                .'<td style="padding:9px 14px;font-size:12px;color:'.$oldTextColor.';background:'.$oldCellBg.';border-bottom:1px solid #f1f5f9;word-break:break-all;vertical-align:top;">'.$oldDisplay.'</td>'
-                .'<td style="padding:9px 6px;font-size:14px;color:#cbd5e1;border-bottom:1px solid #f1f5f9;text-align:center;vertical-align:top;width:28px;">&#8594;</td>'
-                .'<td style="padding:9px 14px;font-size:12px;color:'.$newTextColor.';background:'.$newCellBg.';border-bottom:1px solid #f1f5f9;word-break:break-all;vertical-align:top;">'.$newDisplay.'</td>'
+                .'<td class="px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800 align-top whitespace-nowrap">'.e(self::humanizeFieldName($key)).'</td>'
+                .'<td class="px-3.5 py-2 text-xs border-b border-slate-100 dark:border-slate-800 align-top break-all '.$oldCellClass.'">'.$oldDisplay.'</td>'
+                .'<td class="px-1.5 py-2 text-sm text-slate-300 dark:text-slate-600 border-b border-slate-100 dark:border-slate-800 text-center align-top w-7">&#8594;</td>'
+                .'<td class="px-3.5 py-2 text-xs border-b border-slate-100 dark:border-slate-800 align-top break-all '.$newCellClass.'">'.$newDisplay.'</td>'
                 .'</tr>';
         }
 
         $countLabel = count($allKeys).' champ'.(count($allKeys) > 1 ? 's' : '').' modifié'.(count($allKeys) > 1 ? 's' : '');
 
-        return '<div style="margin-top:4px;">'
-            .'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'
-            .'<div style="height:3px;width:24px;background:'.$accentColor.';border-radius:2px;"></div>'
-            .'<span style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.07em;">Modifications détaillées</span>'
-            .'<span style="font-size:11px;color:#94a3b8;">— '.$countLabel.'</span>'
+        return '<div class="mt-1">'
+            .'<div class="flex items-center gap-2.5 mb-2">'
+            .'<div class="h-[3px] w-6 rounded-sm '.$accentStripClass.'"></div>'
+            .'<span class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Modifications détaillées</span>'
+            .'<span class="text-[11px] text-slate-400 dark:text-slate-500">— '.$countLabel.'</span>'
             .'</div>'
-            .'<div style="overflow-x:auto;border-radius:10px;border:1px solid #e2e8f0;">'
-            .'<table style="width:100%;border-collapse:collapse;table-layout:fixed;min-width:380px;">'
-            .'<colgroup><col style="width:20%;"><col style="width:36%;"><col style="width:5%;"><col style="width:39%;"></colgroup>'
-            .'<thead><tr style="background:#f8fafc;">'
-            .'<th style="padding:9px 14px;font-size:10px;font-weight:700;color:#64748b;text-align:left;border-bottom:2px solid '.e($accentColor).';text-transform:uppercase;letter-spacing:0.06em;">Champ</th>'
-            .'<th style="padding:9px 14px;font-size:10px;font-weight:700;color:#991b1b;text-align:left;border-bottom:2px solid '.e($accentColor).';text-transform:uppercase;letter-spacing:0.06em;">Avant</th>'
-            .'<th style="padding:9px 4px;border-bottom:2px solid '.e($accentColor).';"></th>'
-            .'<th style="padding:9px 14px;font-size:10px;font-weight:700;color:#166534;text-align:left;border-bottom:2px solid '.e($accentColor).';text-transform:uppercase;letter-spacing:0.06em;">Après</th>'
+            .'<div class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">'
+            .'<table class="w-full border-collapse table-fixed min-w-[380px]">'
+            .'<colgroup><col class="w-[20%]"><col class="w-[36%]"><col class="w-[5%]"><col class="w-[39%]"></colgroup>'
+            .'<thead><tr class="bg-slate-50 dark:bg-slate-900">'
+            .'<th class="px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-left border-b-2 '.$accentBorderClass.'">Champ</th>'
+            .'<th class="px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-red-700 dark:text-red-300 text-left border-b-2 '.$accentBorderClass.'">Avant</th>'
+            .'<th class="px-1 py-2 border-b-2 '.$accentBorderClass.'"></th>'
+            .'<th class="px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 text-left border-b-2 '.$accentBorderClass.'">Après</th>'
             .'</tr></thead>'
             .'<tbody>'.$rows.'</tbody>'
             .'</table></div></div>';
@@ -420,7 +448,7 @@ class ActivityLogResource extends Resource
     private static function formatCellValue(mixed $value): string
     {
         if (is_null($value) || $value === '') {
-            return '<span style="color: #94a3b8; font-style: italic;">—</span>';
+            return '<span class="italic text-slate-400 dark:text-slate-500">—</span>';
         }
 
         if (is_bool($value)) {

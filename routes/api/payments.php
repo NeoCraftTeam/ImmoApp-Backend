@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-use App\Http\Controllers\Api\V1\CreditController;
-use App\Http\Controllers\Api\V1\InvoiceController;
-use App\Http\Controllers\Api\V1\PaymentController;
-use App\Http\Controllers\Api\V1\PaymentMethodController;
-use App\Http\Controllers\Api\V1\PromoCodeController;
-use App\Http\Controllers\Api\V1\RefundController;
+use App\Http\Controllers\Api\V1\Payment\CreditController;
+use App\Http\Controllers\Api\V1\Payment\InvoiceController;
+use App\Http\Controllers\Api\V1\Payment\PaymentController;
+use App\Http\Controllers\Api\V1\Payment\PaymentMethodController;
+use App\Http\Controllers\Api\V1\Payment\PromoCodeController;
+use App\Http\Controllers\Api\V1\Payment\RefundController;
+use App\Http\Controllers\Api\V1\Payment\StripePaymentMethodController;
+use App\Http\Controllers\Api\V1\Payment\SubscriptionController;
 use App\Http\Controllers\Api\V1\ResendWebhookController;
-use App\Http\Controllers\Api\V1\StripePaymentMethodController;
-use App\Http\Controllers\Api\V1\SubscriptionController;
 use Illuminate\Support\Facades\Route;
 
 // --- PAYMENT METHODS CATALOGUE (public) ---
@@ -32,13 +32,13 @@ Route::get('/payments/methods', [PaymentMethodController::class, 'index'])
 // Throttled to 60 req/min/IP — enough for an aggressive callback poll
 // (1 req/s for 60 s) but not enough to brute-force `tx_ref` space.
 Route::get('/payments/{txRef}/public-status', [PaymentController::class, 'publicStatus'])
-    ->where('txRef', 'KH-[A-Za-z0-9]+')
+    ->where('txRef', 'KH-[A-Za-z0-9]+|pay_[A-Za-z0-9_]+|KPAY-[A-Za-z0-9_-]+|SANDBOX_[A-Za-z0-9_-]+')
     ->middleware('throttle:60,1');
 
 // --- PAYMENTS — multi-gateway webhooks ---
-// GeniusPay + legacy Flutterwave (`{gateway}` placeholder).
+// Kpay mobile-money hosted-checkout webhook (`{gateway}` placeholder).
 Route::post('/webhooks/{gateway}', [PaymentController::class, 'handleWebhook'])
-    ->where('gateway', 'geniuspay|flutterwave')
+    ->where('gateway', 'kpay')
     ->middleware('throttle:payments.webhook');
 
 // Stripe: dedicated endpoint — verifies `Stripe-Signature` against the
@@ -118,6 +118,12 @@ Route::middleware('auth:sanctum')->prefix('subscriptions')->group(function (): v
     Route::post('/subscribe', [SubscriptionController::class, 'subscribe'])
         ->middleware('throttle:5,1');
     Route::post('/cancel', [SubscriptionController::class, 'cancel'])
+        ->middleware('throttle:5,1');
+    Route::post('/renew', [SubscriptionController::class, 'renew'])
+        ->middleware('throttle:5,1');
+    Route::post('/upgrade', [SubscriptionController::class, 'upgrade'])
+        ->middleware('throttle:5,1');
+    Route::post('/downgrade', [SubscriptionController::class, 'downgrade'])
         ->middleware('throttle:5,1');
     Route::patch('/auto-renew', [SubscriptionController::class, 'toggleAutoRenew'])
         ->middleware('throttle:10,1');

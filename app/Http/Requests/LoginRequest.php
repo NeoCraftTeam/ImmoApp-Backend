@@ -18,8 +18,19 @@ final class LoginRequest extends FormRequest
     }
 
     /**
-     * Get the validation rules that apply to the request.
-     *
+     * Normalize email before validation.
+     */
+    #[\Override]
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('email')) {
+            $this->merge([
+                'email' => mb_strtolower(trim((string) $this->input('email'))),
+            ]);
+        }
+    }
+
+    /**
      * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array

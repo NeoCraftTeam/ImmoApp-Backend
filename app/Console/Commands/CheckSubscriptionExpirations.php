@@ -7,7 +7,7 @@ namespace App\Console\Commands;
 use App\Enums\SubscriptionStatus;
 use App\Mail\SubscriptionExpiringEmail;
 use App\Models\Subscription;
-use App\Services\SubscriptionService;
+use App\Services\Monetization\SubscriptionService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;

@@ -75,6 +75,32 @@ final class SearchAlertController
 
         $user = $request->user();
 
+        // Dedup: if an identical alert (same search criteria) already exists,
+        // return it instead of creating a near-duplicate the user would then have
+        // to manage twice. Only the search-defining fields are compared — not the
+        // label / notification settings / frequency.
+        $criteriaKeys = [
+            'city_id', 'city_name', 'type_id', 'type_name', 'quarter_id',
+            'price_min', 'price_max', 'bedrooms_min', 'surface_min', 'has_parking', 'query',
+        ];
+
+        $existing = $user->searchAlerts()
+            ->where(function ($query) use ($data, $criteriaKeys): void {
+                foreach ($criteriaKeys as $key) {
+                    $value = $data[$key] ?? null;
+                    if ($value === null) {
+                        $query->whereNull($key);
+                    } else {
+                        $query->where($key, $value);
+                    }
+                }
+            })
+            ->first();
+
+        if ($existing !== null) {
+            return response()->json(new JsonResource($existing), 200);
+        }
+
         if ($user->searchAlerts()->where('is_active', true)->count() >= 10) {
             return response()->json(['message' => 'Limite de 10 alertes actives atteinte.'], 422);
         }

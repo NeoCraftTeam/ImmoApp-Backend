@@ -64,3 +64,6 @@ scripts/.venv-smoke/
 
 # Firecrawl research cache
 .firecrawl/
+
+# Claude Code local state (per-user, never tracked)
+.claude/

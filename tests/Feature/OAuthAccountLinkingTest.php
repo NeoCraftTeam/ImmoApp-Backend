@@ -76,3 +76,43 @@ it('clears all pending oauth fields after confirmation', function (): void {
     expect($fresh->pending_oauth_expires_at)->toBeNull();
     expect($fresh->facebook_id)->toBe('fb-id-456');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Authenticated link via the redirect flow (mobile) + /me linked_providers
+|--------------------------------------------------------------------------
+*/
+
+it('returns a provider redirect_url for an authenticated link request', function (): void {
+    $user = User::factory()->create();
+
+    $response = $this->actingAs($user)
+        ->getJson('/api/v1/auth/oauth/google/link-redirect?redirect_uri='.urlencode('keyhome://auth/callback'));
+
+    $response->assertOk()->assertJsonStructure(['redirect_url']);
+    expect($response->json('redirect_url'))->toContain('google');
+});
+
+it('exposes linked_providers and has_password on /me', function (): void {
+    $user = User::factory()->create(['google_id' => 'g-1', 'facebook_id' => null]);
+
+    $response = $this->actingAs($user)->getJson('/api/v1/auth/me');
+
+    $response->assertOk()
+        ->assertJsonPath('data.linked_providers', ['google'])
+        ->assertJsonPath('data.has_password', true);
+});
+
+it('rejects unlinking the only sign-in method without a password', function (): void {
+    $user = User::factory()->create([
+        'google_id' => 'g-only',
+        'password' => null,
+        'facebook_id' => null,
+    ]);
+
+    $this->actingAs($user)
+        ->deleteJson('/api/v1/auth/oauth/google/unlink')
+        ->assertStatus(400);
+
+    expect($user->fresh()->google_id)->toBe('g-only');
+});

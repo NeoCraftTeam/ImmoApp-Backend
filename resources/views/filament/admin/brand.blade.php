@@ -1,3 +1,3 @@
-<span class="text-xl font-bold tracking-tight leading-none" style="color: #F6475F;">
+<span class="text-xl font-bold tracking-tight leading-none text-primary-600 dark:text-primary-400">
     KeyHome
 </span>

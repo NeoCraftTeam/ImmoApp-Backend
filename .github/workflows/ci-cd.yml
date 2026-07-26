@@ -3,10 +3,68 @@ name: CI/CD Pipeline
 on:
   push:
     branches: [ "main", "develop", "preprod" ]
+    # Docs-only / agent-prompt-only / IDE-config-only changes don't need
+    # the full ~10-min Pest + frontend pipeline. The deploy job already
+    # gates by branch, not paths, so production is unaffected.
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - '.vscode/**'
+      - '.idea/**'
+      - '.cursor/**'
+      - '.agents/**'
   pull_request:
     branches: [ "main", "develop", "preprod" ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - '.vscode/**'
+      - '.idea/**'
+      - '.cursor/**'
+      - '.agents/**'
 
 jobs:
+  # -----------------------------------------------------------------------------
+  # JOB 0: Repo hygiene — secret scan + .env leak guard
+  # Runs first because it's cheap and stops a leaked credential before
+  # the rest of the pipeline gets to log/cache anything.
+  # -----------------------------------------------------------------------------
+  hygiene:
+    name: Repo Hygiene (gitleaks + .env guard)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          # gitleaks needs commit history to scan the diff on PRs and the
+          # full set on push. Shallow clones miss reachable commits.
+          fetch-depth: 0
+
+      - name: Secret scan (gitleaks)
+        # Pinned to v2.3.7 by SHA — `@v2` is a moving tag, and this step
+        # has access to GITHUB_TOKEN.
+        uses: gitleaks/gitleaks-action@cb7149b9b57195b609c63e8518d2c37e83c2a064 # v2.3.7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify no tracked .env files
+        # `.env*` is git-ignored except `.env.example` / `.env.preprod.example`.
+        # A misnamed `.env.staging` or `.env.dev.local` would slip through
+        # the negation list. Fail the pipeline if anything tracked matches
+        # the .env pattern outside the two allowed example files.
+        run: |
+          LEAKED=$(git ls-files | grep -E '^\.env(\..+)?$' | grep -vE '\.env\.(example|preprod\.example)$' || true)
+          if [ -n "$LEAKED" ]; then
+            echo "::error::Tracked .env files detected:"
+            echo "$LEAKED"
+            exit 1
+          fi
+
+
   # -----------------------------------------------------------------------------
   # JOB 1: CI (Continuous Integration) - Run Tests
   # -----------------------------------------------------------------------------
@@ -110,64 +168,69 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: 10
+
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: keyhome-frontend-next/package-lock.json
+        cache: 'pnpm'
+        cache-dependency-path: keyhome-frontend-next/pnpm-lock.yaml
 
     - name: Install Dependencies
-      run: npm ci
+      run: pnpm install --frozen-lockfile
+
+    # Block CI on any CRITICAL production dependency advisory (HIGH stays
+    # informational — the @sentry/webpack build-time chain ships HIGHs that
+    # are not part of the runtime bundle).
+    - name: Audit production dependencies (block on CRITICAL)
+      run: pnpm audit --prod --audit-level=critical
 
     - name: TypeScript Check
-      run: npx tsc --noEmit
+      run: pnpm exec tsc --noEmit
 
     - name: Lint
-      run: npm run lint
+      run: pnpm lint
 
     - name: Unit Tests (Vitest)
-      run: npm run test
+      run: pnpm test
 
-    - name: Build for Lighthouse
-      run: npm run build
+    # Build must pass — broken Next.js builds (typed import errors, env
+    # validation failures) used to ship as green checks because of
+    # `continue-on-error: true` here. Production Vercel deploys then
+    # failed out-of-band with no PR signal.
+    - name: Build (Next.js)
+      run: pnpm build
       env:
         NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
         NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_placeholder
         SKIP_ENV_VALIDATION: 1
-      continue-on-error: true
 
-    - name: Lighthouse CI (SEO + Core Web Vitals)
+    # Lighthouse stays informational for now — assertions in
+    # `lighthouserc.json` are mostly `warn`, so even on regression
+    # the step would only post a comment. Marked accordingly.
+    - name: Lighthouse CI (SEO + Core Web Vitals, informational)
       run: npx @lhci/cli@0.14.x autorun
       env:
         LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
       continue-on-error: true
 
   # -----------------------------------------------------------------------------
-  # JOB 2: CD (Continuous Deployment) - Deploy to VPS
+  # NOTE — GitHub Actions is CI-only on this repository.
+  #
+  # Production CD runs through GitLab (.gitlab-ci.yml `production_deploy` /
+  # `preprod_deploy` jobs) which builds a Docker image, pushes to the GitLab
+  # registry, then SSHes to the VPS and runs `docker compose pull && up -d`
+  # against the production stack.
+  #
+  # The previous GitHub `deploy` job here invoked `bash deploy.sh` on the
+  # same VPS — but `deploy.sh` is documented as [DEPRECATED] (see the
+  # file header) and does a bare-metal `git pull` + `sudo chown` +
+  # `systemctl restart`. Running it alongside the GitLab Docker deploy
+  # produced a race that could overwrite ownership and pull a branch
+  # that did not match the running container image. Removed to keep
+  # exactly one CD path.
   # -----------------------------------------------------------------------------
-  deploy:
-    name: Deploy to Production
-    needs: [test, frontend-test] # Wait for both backend and frontend tests
-    if: github.ref == 'refs/heads/main' # Only deploy on main branch
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: SSH Deploy
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USERNAME }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        port: 22
-        script: |
-          cd ${{ secrets.PROJECT_PATH }}
-          bash deploy.sh
-
-    - name: Smoke Test (Health Check)
-      run: |
-        sleep 30
-        curl -f https://${{ secrets.APP_DOMAIN }}/api/health || exit 1

@@ -37,14 +37,27 @@ interface PaymentGatewayInterface
      * Validate and parse an incoming webhook payload.
      * Must verify the signature and return normalised data.
      *
+     * `event_id` is the gateway-provided unique event identifier and
+     * MUST be returned when available so the orchestrator can dedupe
+     * provider retries. When the gateway doesn't expose an explicit
+     * id (e.g. mobile-money providers that re-POST on retry without a
+     * stable id), the implementation should derive one from a stable
+     * payload+timestamp tuple. Returning `null` opts out of dedup —
+     * the orchestrator's row-lock + terminal-state guards still apply.
+     *
+     * `$rawBody` is the exact bytes of the incoming request body. HMAC
+     * signatures MUST be verified against these bytes — re-encoding the
+     * parsed `$payload` can produce a different string (slash/unicode
+     * escaping, key order, number formatting) and break verification.
+     *
      * @param  array<string, mixed>  $payload
      * @param  array<string, mixed>  $headers
-     * @return array{event: string, tx_ref: string, status: string, amount: float, currency: string, payment_method: string|null, raw: array<string, mixed>}
+     * @return array{event: string, event_id: string|null, tx_ref: string, status: string, amount: float, currency: string, payment_method: string|null, raw: array<string, mixed>}
      */
-    public function handleWebhook(array $payload, array $headers): array;
+    public function handleWebhook(array $payload, array $headers, ?string $rawBody = null): array;
 
     /**
-     * Return the unique gateway identifier (e.g. 'flutterwave').
+     * Return the unique gateway identifier (e.g. 'kpay', 'stripe').
      */
     public function getName(): string;
 

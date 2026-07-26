@@ -21,7 +21,7 @@ test('admin can update any ad', function (): void {
         'surface_area' => 50,
         'bedrooms' => 2,
         'bathrooms' => 1,
-        'has_parking' => 'true',
+        'has_parking' => '1',
         'quarter_id' => $ad->quarter_id,
         'type_id' => $ad->type_id,
         'status' => 'available',

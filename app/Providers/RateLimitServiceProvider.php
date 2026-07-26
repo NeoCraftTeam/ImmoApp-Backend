@@ -87,9 +87,29 @@ class RateLimitServiceProvider extends ServiceProvider
 
         RateLimiter::for('payments.history', fn (Request $r) => Limit::perMinute(config('rate_limiting.payments.history', 60))->by(optional($r->user())->id ?? $r->ip()));
 
-        // ── Viewing limiters ─────────────────────────────────────────────────
+        // ── Viewing limiters ──────────────────────────────────────────
 
         RateLimiter::for('viewings.reserve', fn (Request $r) => Limit::perMinute(max(1, config('rate_limiting.viewings.reserve', 20)))
             ->by(optional($r->user())->id ?? $r->ip()));
+
+        // ── AI Search — NL parser (OWASP LLM10:2025 Unbounded Consumption guard) ──
+
+        RateLimiter::for(
+            'ai_search.parse.minute',
+            fn (Request $r) => Limit::perMinute(max(1, (int) config('rate_limiting.ai_search.parse_minute', 30)))
+                ->by(optional($r->user())->id ?? $r->ip()),
+        );
+
+        RateLimiter::for(
+            'ai_search.parse.day',
+            fn (Request $r) => Limit::perDay(max(1, (int) config('rate_limiting.ai_search.parse_day', 200)))
+                ->by(optional($r->user())->id ?? $r->ip()),
+        );
+
+        RateLimiter::for(
+            'ai_search.parse.hourly_global',
+            fn () => Limit::perHour(max(1, (int) config('rate_limiting.ai_search.parse_hourly_global', 10000)))
+                ->by('ai_search.parse.hourly_global'),
+        );
     }
 }

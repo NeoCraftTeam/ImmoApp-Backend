@@ -22,7 +22,7 @@ class PaymentFactory extends Factory
             'status' => fake()->randomElement(['pending', 'success', 'failed']),
             'transaction_id' => 'KH-'.strtoupper(Str::random(12)),
             'payment_method' => fake()->randomElement(['orange_money', 'mobile_money']),
-            'gateway' => 'flutterwave',
+            'gateway' => 'kpay',
             'phone_number' => '+237'.fake()->numerify('6########'),
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
@@ -47,8 +47,13 @@ class PaymentFactory extends Factory
         return $this->state(['status' => 'failed']);
     }
 
-    public function flutterwave(): static
+    public function stripe(): static
     {
-        return $this->state(['gateway' => 'flutterwave']);
+        return $this->state(['gateway' => 'stripe', 'payment_method' => 'card']);
+    }
+
+    public function kpay(): static
+    {
+        return $this->state(['gateway' => 'kpay']);
     }
 }

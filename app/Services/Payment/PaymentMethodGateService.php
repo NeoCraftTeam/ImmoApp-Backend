@@ -17,10 +17,9 @@ use Illuminate\Support\Facades\Cache;
  * `GET /api/v1/payments/methods` stays in the microsecond range.
  *
  * Defaults (when no override is set) :
- *   - mobile_money  → enabled (Flutterwave)
- *   - orange_money  → enabled (Flutterwave)
+ *   - mobile_money  → enabled (Kpay)
+ *   - orange_money  → enabled (Kpay)
  *   - card          → enabled (Stripe)
- *   - flutterwave   → enabled (legacy umbrella; kept for backwards compat)
  *
  * Toggling a method off through Filament hides it from the public API
  * response and rejects any new payment initiation that targets it.
@@ -61,8 +60,7 @@ final class PaymentMethodGateService
         return match ($method) {
             PaymentMethod::ORANGE_MONEY,
             PaymentMethod::MOBILE_MONEY,
-            PaymentMethod::CARD,
-            PaymentMethod::FLUTTERWAVE => true,
+            PaymentMethod::CARD => true,
         };
     }
 

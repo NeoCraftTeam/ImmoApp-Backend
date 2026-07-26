@@ -12,6 +12,7 @@ final class CityRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            'country' => ['nullable', 'string', 'max:100'],
         ];
     }
 

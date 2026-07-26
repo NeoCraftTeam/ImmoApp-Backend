@@ -153,6 +153,16 @@
                             });
 
                             // — Interactions —
+                            // Mid-tone text for popup bodies. Recompute at
+                            // each popup so a theme switch after init still
+                            // renders legible labels. `#666` (the previous
+                            // hardcoded value) blended into the dark popup
+                            // tip in dark mode.
+                            const popupBodyColor = () =>
+                                document.documentElement.classList.contains('dark')
+                                    ? '#cbd5e1'
+                                    : '#475569';
+
                             // Popup on city click
                             this.map.on('click', 'city-circles', (e) => {
                                 const f = e.features[0];
@@ -165,7 +175,7 @@
                                     .setHTML(`
                                         <div style='font-family:system-ui;padding:4px 0'>
                                             <div style='font-weight:700;font-size:14px;margin-bottom:4px'>${p.name}</div>
-                                            <div style='font-size:12px;color:#666'>
+                                            <div style="font-size:12px;color:${popupBodyColor()}">
                                                 <strong>${p.ad_count}</strong> annonce${p.ad_count > 1 ? 's' : ''}<br>
                                                 Prix moy. <strong>${priceFormatted} FCFA</strong>
                                             </div>
@@ -188,7 +198,7 @@
                                     .setHTML(`
                                         <div style='font-family:system-ui;padding:4px 0'>
                                             <div style='font-weight:700;font-size:13px;line-height:1.3;margin-bottom:3px'>${p.title}</div>
-                                            <div style='font-size:12px;color:#666'>
+                                            <div style="font-size:12px;color:${popupBodyColor()}">
                                                 ${p.quarter}, ${p.city}<br>
                                                 <strong>${priceFormatted} FCFA</strong>
                                             </div>
@@ -286,7 +296,7 @@
                                     </span>
                                 </td>
                                 <td class="px-3 py-2 text-right">{{ number_format($zone['avg_price'], 0, ',', ' ') }} FCFA</td>
-                                <td class="px-3 py-2 text-right {{ $zone['price_trend'] > 0 ? 'text-emerald-600 dark:text-emerald-400' : ($zone['price_trend'] < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-500') }}">
+                                <td class="px-3 py-2 text-right {{ $zone['price_trend'] > 0 ? 'text-emerald-600 dark:text-emerald-400' : ($zone['price_trend'] < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-gray-400') }}">
                                     {{ $zone['price_trend'] > 0 ? '+' : '' }}{{ $zone['price_trend'] }}%
                                 </td>
                             </tr>

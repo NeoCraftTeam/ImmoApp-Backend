@@ -7,8 +7,10 @@ namespace App\Providers;
 use App\Contracts\AiSearchServiceInterface;
 use App\Contracts\PaymentGatewayInterface;
 use App\Contracts\RecommendationEngineInterface;
+use App\Contracts\ReservationServiceInterface;
 use App\Contracts\StripeSavedCardServiceInterface;
 use App\Contracts\TrustScoreServiceInterface;
+use App\Contracts\ViewingScheduleServiceInterface;
 use App\Enums\UserRole;
 use App\Enums\UserType;
 use App\Models\CashierSubscription;
@@ -16,18 +18,15 @@ use App\Models\CashierSubscriptionItem;
 use App\Models\EmailSuppression;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
-use App\Services\AiSearchService;
-use App\Services\Contracts\ReservationServiceInterface;
-use App\Services\Contracts\ViewingScheduleServiceInterface;
-use App\Services\Payment\FlutterwavePaymentService;
-use App\Services\Payment\GeniusPayPaymentService;
+use App\Services\Ai\AiSearchService;
+use App\Services\Ai\RecommendationEngine;
+use App\Services\Payment\KpayPaymentService;
 use App\Services\Payment\PaymentMethodGateService;
 use App\Services\Payment\PaymentService;
 use App\Services\Payment\StripePaymentService;
-use App\Services\RecommendationEngine;
-use App\Services\ReservationService;
-use App\Services\TrustScoreService;
-use App\Services\ViewingScheduleService;
+use App\Services\Rental\ReservationService;
+use App\Services\Rental\ViewingScheduleService;
+use App\Services\Trust\TrustScoreService;
 use App\Services\WebAuthn\CacheChallengeRepository;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Auth\Notifications\VerifyEmail;
@@ -85,7 +84,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(PaymentMethodGateService::class);
 
         $this->app->singleton(PaymentService::class, function ($app): PaymentService {
-            $defaultName = (string) config('payment.default', 'geniuspay');
+            $defaultName = (string) config('payment.default', 'kpay');
             $fallbackName = config('payment.fallback');
 
             $gateway = $this->resolvePaymentGateway($app, $defaultName);
@@ -102,13 +101,9 @@ class AppServiceProvider extends ServiceProvider
                 $registry[$fallback->getName()] = $fallback;
             }
             // Always register Stripe so card payments work even when the
-            // default gateway is GeniusPay.
+            // default gateway is Kpay.
             $stripe = $app->make(StripePaymentService::class);
             $registry[$stripe->getName()] = $stripe;
-
-            // Legacy Flutterwave rows may still exist in the database.
-            $flutterwave = $app->make(FlutterwavePaymentService::class);
-            $registry[$flutterwave->getName()] = $flutterwave;
 
             return new PaymentService($gateway, $fallback, $registry);
         });
@@ -285,8 +280,7 @@ class AppServiceProvider extends ServiceProvider
     private function resolvePaymentGateway(mixed $app, string $name): PaymentGatewayInterface
     {
         return match ($name) {
-            'geniuspay' => $app->make(GeniusPayPaymentService::class),
-            'flutterwave' => $app->make(FlutterwavePaymentService::class),
+            'kpay' => $app->make(KpayPaymentService::class),
             'stripe' => $app->make(StripePaymentService::class),
             default => throw new \InvalidArgumentException("Payment gateway [{$name}] not supported."),
         };

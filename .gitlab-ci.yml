@@ -53,7 +53,7 @@ prepare_ci_image:
       docker pull $CACHE_FROM || true
       docker build --cache-from $CACHE_FROM -t $CI_IMAGE -f - . <<'DOCKERFILE'
       FROM php:8.4-cli-alpine
-      RUN apk add --no-cache git libzip-dev icu-dev postgresql-dev libpng-dev oniguruma-dev gettext-dev freetype-dev libjpeg-turbo-dev libwebp-dev $PHPIZE_DEPS \
+      RUN apk add --no-cache bash git libzip-dev icu-dev postgresql-dev libpng-dev oniguruma-dev gettext-dev freetype-dev libjpeg-turbo-dev libwebp-dev $PHPIZE_DEPS \
         && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
         && docker-php-ext-install bcmath intl pdo_pgsql mbstring zip gd exif gettext \
         && pecl install redis && docker-php-ext-enable redis \
@@ -62,9 +62,18 @@ prepare_ci_image:
       WORKDIR /app
       # Layer 1: install deps (cached until composer.lock changes)
       COPY composer.json composer.lock ./
+      # `composer install` retry : codeload.github.com renvoie
+      # ponctuellement des HTTP 400/5xx transitoires sur les dist
+      # `legacy.zip`. 5 tentatives + backoff 15 s absorbent ces aléas
+      # GitHub sans faire échouer tout le pipeline sur un blip réseau.
       RUN mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
         && touch .env \
-        && composer install --no-interaction --no-ansi --no-scripts -q
+        && for i in 1 2 3 4 5; do \
+             composer install --no-interaction --no-ansi --no-scripts --prefer-dist -q && break; \
+             echo "composer install a echoue, nouvelle tentative $i/5 dans 15s..."; \
+             sleep 15; \
+             [ "$i" = "5" ] && echo "composer install a echoue apres 5 tentatives" && exit 1; \
+           done
       # Layer 2: copy code (fast, does not re-run composer install)
       COPY . .
       DOCKERFILE
@@ -83,12 +92,23 @@ prepare_ci_image:
 phpstan:
   stage: quality
   needs: [prepare_ci_image]
+  # On monte un cache `phpstan/` partagé entre exécutions sur le
+  # runner. Le cache rend phpstan ~5× plus rapide quand seul un
+  # sous-ensemble de fichiers PHP a changé : il ne ré-analyse que
+  # les fichiers dont le hash a bougé.
   script:
-    - docker run --rm -e APP_KEY="base64:$(openssl rand -base64 32)" $CI_IMAGE ./vendor/bin/phpstan analyse --memory-limit=512M
+    - mkdir -p /tmp/phpstan-cache-$CI_PROJECT_ID
+    - docker run --rm
+        -e APP_KEY="base64:$(openssl rand -base64 32)"
+        -v "/tmp/phpstan-cache-$CI_PROJECT_ID:/tmp/phpstan"
+        -e PHPSTAN_TMPDIR=/tmp/phpstan
+        $CI_IMAGE ./vendor/bin/phpstan analyse --memory-limit=512M --no-progress
   rules:
     - if: $CI_COMMIT_BRANCH
       changes:
         - '**/*.php'
+        - phpstan.neon
+        - phpstan.neon.dist
 
 style_check:
   stage: quality
@@ -103,10 +123,25 @@ style_check:
 composer_security:
   stage: quality
   needs: [prepare_ci_image]
+  # `--locked` audite uniquement les versions verrouillées dans
+  # `composer.lock` sans tenter de résoudre la fenêtre de dispatch
+  # (~2× plus rapide). `--abandoned=ignore` ne fail pas sur les
+  # paquets abandonnés (par ex. `doctrine/annotations`) — c'est un
+  # signal de dette technique, pas une vulnérabilité.
   script:
-    - docker run --rm $CI_IMAGE composer audit --abandoned=ignore
+    - docker run --rm $CI_IMAGE composer audit --locked --abandoned=ignore --no-cache
   rules:
+    # Quand ni composer.json ni composer.lock ne changent, l'audit
+    # ne peut RIEN trouver de neuf — skip pour économiser ~30 s par
+    # pipeline branche feature.
     - if: $CI_COMMIT_BRANCH
+      changes:
+        - composer.json
+        - composer.lock
+    # Mais sur main/preprod on audite TOUJOURS (même un commit
+    # docs-only) : un advisory peut apparaître sans changement de
+    # lockfile entre nos pipelines.
+    - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
 
 # Rector — automated refactor checks. Runs in --dry-run so it never modifies CI;
 # fails the job if there are unapplied automatic upgrades / fixes that should be
@@ -126,17 +161,26 @@ rector:
 sast:
   stage: quality
   needs: [prepare_ci_image]
-  allow_failure: true
+  # Was `allow_failure: true` — the scan ran but never blocked. The
+  # `--error` flag instructs Semgrep to exit non-zero on findings.
   script:
     - docker run --rm -v $(pwd):/src semgrep/semgrep semgrep --config=p/php --quiet --error /src
   rules:
     - if: $CI_COMMIT_BRANCH
       changes:
         - '**/*.php'
+        - rector.php
 
 # --- ETAPE 2 : BUILD & PUSH (en parallèle avec tests) ---
 build_image:
   stage: build_and_test
+  # A push that gets interrupted mid-`docker push` can leave a
+  # partially-uploaded manifest under `:latest`. The next deploy
+  # would then `docker compose pull` an incomplete image. The
+  # global `interruptible: true` (line ~24) protects the test
+  # suite (cancel-and-restart is fine there); the build must
+  # complete or fail cleanly.
+  interruptible: false
   variables:
     DOCKER_BUILDKIT: "1"
   needs:
@@ -167,21 +211,30 @@ build_image:
 trivy_scan:
   stage: build_and_test
   needs: [build_image]
-  allow_failure: true
+  # Was `allow_failure: true` AND `--exit-code 0` — the scan ran but
+  # could never block. CRITICAL CVEs on the production image now fail
+  # the pipeline. HIGH stays informational (logged, doesn't block) and
+  # `--ignore-unfixed` skips advisories with no available patch.
   script:
     - docker run --rm
         -v /var/run/docker.sock:/var/run/docker.sock
         aquasec/trivy:latest image
-        --exit-code 0 --severity HIGH,CRITICAL --no-progress
+        --exit-code 1 --severity CRITICAL --ignore-unfixed --no-progress
         $APP_IMAGE:$IMAGE_TAG
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
 
 # --- ETAPE 2 : TESTS (en parallèle avec build) ---
+#
+# Timeout 20 min : la suite tourne ~10 min en séquentiel. Avec
+# `--parallel --processes=4` on tombe sous 5 min, mais on garde la
+# marge pour absorber le démarrage des conteneurs PG/Redis/Meili
+# (~20 s de warmup) + la migration initiale (~10 s) + une éventuelle
+# reprise de test flaky en sequential fallback.
 test_suite:
   stage: build_and_test
   needs: [prepare_ci_image]
-  timeout: 10 minutes
+  timeout: 20 minutes
   retry:
     max: 2
     when: runner_system_failure
@@ -199,6 +252,27 @@ test_suite:
         -e POSTGRES_PASSWORD=test_pass \
         postgis/postgis:15-3.3-alpine
 
+      # Start Redis (cache + queue) — must run with the same image
+      # version as prod so a Redis-feature regression fails CI rather
+      # than slipping into release. The phpunit.xml still defaults
+      # CACHE/QUEUE/SESSION to array/sync for stability, but tests
+      # explicitly opting in via env can now hit a real Redis.
+      docker run -d \
+        --name redis-$CI_JOB_ID \
+        --network ci-net-$CI_JOB_ID \
+        redis:alpine
+
+      # Start Meilisearch — same `v1.10` tag as prod. Was absent from
+      # the GitLab pipeline, so any Scout/Meili regression slipped
+      # through CI (the team specifically called out an
+      # "ads in DB vs Meilisearch" drift bug in .env.example).
+      docker run -d \
+        --name meili-$CI_JOB_ID \
+        --network ci-net-$CI_JOB_ID \
+        -e MEILI_NO_ANALYTICS=true \
+        -e MEILI_ENV=development \
+        getmeili/meilisearch:v1.10
+
       # Wait until PostgreSQL accepts TCP connections (not just Unix socket).
       # pg_isready without -h checks /var/run/postgresql (Unix socket) which
       # becomes ready before TCP is bound — causing cross-container ECONNREFUSED.
@@ -209,7 +283,42 @@ test_suite:
         sleep 2
       done
 
-      # Run test suite inside CI image
+      # PostGIS dans template1 : `php artisan test --parallel` cree une
+      # base par worker via `CREATE DATABASE testing_test_N`, qui herite
+      # de template1. L'image postgis n'active l'extension que dans la
+      # base `testing` (POSTGRES_DB), donc les bases parallèles n'ont PAS
+      # postgis → la migration `create_ad` (colonne geometry) casse sur
+      # "type public.geometry does not exist". On l'active une fois dans
+      # template1 pour que toutes les bases filles en heritent.
+      echo "Enabling PostGIS in template1..."
+      docker exec pg-$CI_JOB_ID psql -U gitlab -d template1 \
+        -c "CREATE EXTENSION IF NOT EXISTS postgis;"
+
+      echo "Waiting for Redis..."
+      for i in $(seq 1 15); do
+        docker exec redis-$CI_JOB_ID redis-cli ping 2>/dev/null | grep -q PONG && break
+        [ "$i" = "15" ] && echo "Redis failed to start" && exit 1
+        sleep 1
+      done
+
+      echo "Waiting for Meilisearch..."
+      for i in $(seq 1 20); do
+        docker run --rm --network ci-net-$CI_JOB_ID curlimages/curl:latest \
+          curl --silent --fail "http://meili-$CI_JOB_ID:7700/health" >/dev/null 2>&1 && break
+        [ "$i" = "20" ] && echo "Meilisearch failed to start" && exit 1
+        sleep 2
+      done
+
+      # Run test suite inside CI image.
+      #
+      # IMPORTANT : on passe le script via `bash -s` + heredoc
+      # single-quoted (`<<'TEST_SCRIPT'`). Le précédent `sh -c '...'`
+      # cassait sur la moindre apostrophe dans les commentaires
+      # francais (les chaînes single-quoted shell ne supportent PAS
+      # \' comme echappement — l'apostrophe FERME la chaîne et la
+      # suite est ré-interprétée par le shell HÔTE gitlab-runner).
+      # Conséquence du bug : `php artisan test` était exécuté sur
+      # le runner (sans vendor/autoload.php) au lieu du container.
       docker run --rm \
         --network ci-net-$CI_JOB_ID \
         -e DB_CONNECTION=pgsql \
@@ -218,24 +327,43 @@ test_suite:
         -e DB_DATABASE=testing \
         -e DB_USERNAME=gitlab \
         -e DB_PASSWORD=test_pass \
+        -e REDIS_HOST=redis-$CI_JOB_ID \
+        -e REDIS_PORT=6379 \
+        -e MEILISEARCH_HOST=http://meili-$CI_JOB_ID:7700 \
+        -e MEILISEARCH_KEY= \
         -e SCOUT_DRIVER=null \
         -e MAIL_MAILER=array \
         -e RESEND_KEY= \
-        $CI_IMAGE sh -c \
-        'set -e
-        cp .env.example .env
-        cp .env.example .env.testing
-        rm -f database/data/cities.sql
-        php artisan key:generate --env=testing
-        php artisan migrate --env=testing --force
-        echo "=== RUNNING TESTS ==="
-        set +e
-        php artisan test --env=testing -v 2>&1
+        -i \
+        $CI_IMAGE bash -s <<'TEST_SCRIPT'
+      set -e
+      cp .env.example .env
+      cp .env.example .env.testing
+      rm -f database/data/cities.sql
+      php artisan key:generate --env=testing
+      php artisan migrate --env=testing --force
+      echo "=== RUNNING TESTS (parallel, 4 processes, compact) ==="
+      set +e
+      # --parallel --processes=4 divise le wall-time par ~3 sur ce
+      # repo (Pest fork-pool sur 4 workers ; chaque worker recoit son
+      # propre schema testing_{N} cree a la volee par ParaTest).
+      # --compact reduit le bruit pour rester sous la limite de 4 Mo
+      # de log GitLab. Fallback sequentiel si Pest sort != 0 :
+      # certains tests peuvent se concurrencer sur la cache locale.
+      php artisan test --env=testing --parallel --processes=4 --compact 2>&1
+      TEST_RC=$?
+      if [ $TEST_RC -ne 0 ]; then
+        echo "=== PARALLEL FAILED (RC=$TEST_RC) - RETRY SEQUENTIAL ==="
+        php artisan test --env=testing --compact 2>&1
         TEST_RC=$?
-        echo "=== TESTS FINISHED WITH RC=$TEST_RC ==="
-        exit $TEST_RC'
+      fi
+      echo "=== TESTS FINISHED WITH RC=$TEST_RC ==="
+      exit $TEST_RC
+      TEST_SCRIPT
   after_script:
     - docker rm -f pg-$CI_JOB_ID 2>/dev/null || true
+    - docker rm -f redis-$CI_JOB_ID 2>/dev/null || true
+    - docker rm -f meili-$CI_JOB_ID 2>/dev/null || true
     - docker network rm ci-net-$CI_JOB_ID 2>/dev/null || true
   rules:
     - if: $CI_COMMIT_BRANCH
@@ -267,15 +395,32 @@ test_suite:
     - cp -rf .docker/nginx/templates/. $DEPLOY_DIR/.docker/nginx/templates/
     - cp .docker/php/www.conf $DEPLOY_DIR/.docker/php/www.conf
     # ── Sync codebase to VPS for reference and manual artisan commands ─────────
+    # The CI_JOB_TOKEN is needed transiently to authenticate the clone /
+    # fetch, but must NOT linger in `.git/config` afterwards — anyone
+    # with shell access on the runner (or a co-tenant on a shared VPS)
+    # could otherwise `cat .git/config` while the next job runs and
+    # exfiltrate the token. Strategy:
+    #   1. Build the authenticated URL into a local variable
+    #   2. Fetch/clone using that URL
+    #   3. Immediately reset the remote URL to the token-less form
+    #   4. `chmod 600` the git config as a belt-and-braces measure
     - |
       AUTHENTICATED_URL="https://gitlab-ci-token:${CI_JOB_TOKEN}@gitlab.com/${CI_PROJECT_PATH}.git"
+      CLEAN_URL="https://gitlab.com/${CI_PROJECT_PATH}.git"
       if [ -d $DEPLOY_DIR/codebase/.git ]; then
         cd $DEPLOY_DIR/codebase
         git remote set-url origin "$AUTHENTICATED_URL"
         git fetch origin $DEPLOY_BRANCH && git reset --hard origin/$DEPLOY_BRANCH
+        git remote set-url origin "$CLEAN_URL"
+        chmod 600 .git/config 2>/dev/null || true
       else
         git clone --depth 1 --branch $DEPLOY_BRANCH "$AUTHENTICATED_URL" $DEPLOY_DIR/codebase
+        cd $DEPLOY_DIR/codebase
+        git remote set-url origin "$CLEAN_URL"
+        chmod 600 .git/config 2>/dev/null || true
+        cd -
       fi
+      unset AUTHENTICATED_URL
     # ── Optional .env guard (preprod only: REQUIRE_ENV_CHECK=true) ─────────────
     - |
       if [ "${REQUIRE_ENV_CHECK}" = "true" ] && [ ! -f "$DEPLOY_DIR/.env" ]; then
@@ -360,9 +505,14 @@ test_suite:
         echo "✅ Database '${DB_NAME}' already exists."
       fi
     # ── Run migrations with automatic rollback on failure ──────────────────────
+    # `--isolated` takes a Postgres advisory lock so two concurrent
+    # `production_deploy` jobs (e.g. retry + manual trigger overlap)
+    # can't both run migrations simultaneously and corrupt the
+    # migrations table. The lock is released automatically on
+    # process exit.
     - |
       echo "🗾 Running migrations..."
-      if ! APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan migrate --force; then
+      if ! APP_IMAGE=$FULL_IMAGE docker compose exec -T app php artisan migrate --force --isolated; then
         echo "❌ Migration failed — rolling back to previous image..."
         APP_IMAGE=$FULL_IMAGE docker compose logs app --tail=30
         if [ -n "$ROLLBACK_IMAGE" ]; then
@@ -407,9 +557,57 @@ test_suite:
   after_script:
     - docker logout $CI_REGISTRY 2>/dev/null || true
 
+# --- ETAPE 2bis : FRONTEND TESTS ---
+# The Next.js submodule used to be tested only on GitHub Actions. Since
+# the team's primary CD path is GitLab, that left the frontend with no
+# gate when GitHub was bypassed (direct push, GitHub outage, secondary
+# branch). This job mirrors the GitHub `frontend-test` exactly:
+# `frozen-lockfile install` + `pnpm audit --prod` + `tsc --noEmit` +
+# `pnpm lint` + `pnpm test` + a real `pnpm build`. It runs on every
+# branch that changed frontend files.
+frontend_test:
+  stage: build_and_test
+  image: node:20-alpine
+  needs: []
+  before_script:
+    - apk add --no-cache git
+    - corepack enable
+    - corepack prepare pnpm@10 --activate
+  script:
+    - cd keyhome-frontend-next
+    - pnpm install --frozen-lockfile
+    - pnpm audit --prod --audit-level=critical
+    - pnpm exec tsc --noEmit
+    - pnpm lint
+    - pnpm test
+    # Block on broken `pnpm build` — same contract as the GitHub workflow.
+    - SKIP_ENV_VALIDATION=1 NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_placeholder pnpm build
+  cache:
+    key:
+      files:
+        - keyhome-frontend-next/pnpm-lock.yaml
+    paths:
+      - keyhome-frontend-next/node_modules/
+      - keyhome-frontend-next/.next/cache/
+  rules:
+    - if: $CI_COMMIT_BRANCH
+      changes:
+        - 'keyhome-frontend-next/**/*'
+
 # --- ETAPE 3 : DEPLOIEMENT ---
 production_deploy:
   <<: *deploy_template
+  # Production deploys require an explicit click. Was fully automatic
+  # on every merge to `main` — a bad commit reached live within ~15
+  # min with no human in the loop. The `environment` block also gives
+  # GitLab a Deployments record, per-env secret scoping, and freeze
+  # windows.
+  environment:
+    name: production
+    url: https://api.keyhome.app
+    deployment_tier: production
+  when: manual
+  allow_failure: false
   variables:
     DEPLOY_DIR: /opt/keyhome
     DEPLOY_BRANCH: main
@@ -423,6 +621,12 @@ production_deploy:
 # --- DEPLOIEMENT PREPROD ---
 preprod_deploy:
   <<: *deploy_template
+  # Preprod stays auto — it's the staging environment and acts as the
+  # smoke target for the production manual approval upstream.
+  environment:
+    name: preprod
+    url: https://preprod.api.keyhome.app
+    deployment_tier: staging
   variables:
     DEPLOY_DIR: /opt/keyhome-preprod
     DEPLOY_BRANCH: preprod
@@ -445,12 +649,28 @@ production_smoke_test:
       SMOKE_URL="${PROD_API_URL:-https://api.keyhome.app}"
       echo "Smoke URL: $SMOKE_URL"
       set +e
+      # Hit /api/health (not /api/ping) — /ping returns 200 even when
+      # the DB is down or Filament 500s. /api/health probes DB +
+      # Redis + Queue + Storage + Meilisearch and returns 503 if any
+      # subsystem is unhealthy. The deeper probe catches the class of
+      # post-deploy break the old smoke test silently passed through.
+      # If HEALTH_CHECK_TOKEN is set on prod, smoke needs to send it.
+      AUTH_HEADER=""
+      if [ -n "${PROD_HEALTH_CHECK_TOKEN:-}" ]; then
+        AUTH_HEADER="-H Authorization: Bearer ${PROD_HEALTH_CHECK_TOKEN}"
+      fi
       for i in $(seq 1 10); do
-        STATUS=$(curl --globoff --silent --output /dev/null --write-out "%{http_code}" "${SMOKE_URL}/api/ping" 2>/dev/null)
+        RESPONSE=$(curl --globoff --silent --write-out "\n%{http_code}" $AUTH_HEADER "${SMOKE_URL}/api/health" 2>/dev/null)
+        STATUS=$(echo "$RESPONSE" | tail -n 1)
+        BODY=$(echo "$RESPONSE" | sed '$d')
         echo "Attempt $i — HTTP $STATUS"
         if [ "$STATUS" = "200" ]; then
           echo "✅ Smoke test passed"
+          echo "Health: $BODY"
           exit 0
+        fi
+        if [ "$STATUS" = "503" ]; then
+          echo "⚠️  Service responded 503 — body: $BODY"
         fi
         sleep 5
       done
@@ -470,12 +690,26 @@ preprod_smoke_test:
       PREPROD_PORT=${PREPROD_PORT:-9091}
       FULL_IMAGE="${CI_REGISTRY_IMAGE}/app:preprod"
       echo "Using port: $PREPROD_PORT"
+      # Match the production smoke depth — `/api/health` probes DB,
+      # Redis, Queue, Storage, Meilisearch and reports 503 when any
+      # subsystem is unhealthy. `/api/ping` always returns 200 even
+      # against a broken stack.
+      AUTH_HEADER=""
+      if [ -n "${PREPROD_HEALTH_CHECK_TOKEN:-}" ]; then
+        AUTH_HEADER="-H Authorization: Bearer ${PREPROD_HEALTH_CHECK_TOKEN}"
+      fi
       for i in $(seq 1 15); do
-        STATUS=$(curl --globoff --silent --output /dev/null --write-out "%{http_code}" "http://127.0.0.1:${PREPROD_PORT}/api/ping" 2>/dev/null)
-        echo "Attempt $i — HTTP $STATUS (GET /api/ping)"
+        RESPONSE=$(curl --globoff --silent --write-out "\n%{http_code}" $AUTH_HEADER "http://127.0.0.1:${PREPROD_PORT}/api/health" 2>/dev/null)
+        STATUS=$(echo "$RESPONSE" | tail -n 1)
+        BODY=$(echo "$RESPONSE" | sed '$d')
+        echo "Attempt $i — HTTP $STATUS"
         if [ "$STATUS" = "200" ]; then
           echo "✅ Smoke test passed"
+          echo "Health: $BODY"
           exit 0
+        fi
+        if [ "$STATUS" = "503" ]; then
+          echo "⚠️  Service responded 503 — body: $BODY"
         fi
         sleep 5
       done
@@ -490,10 +724,36 @@ preprod_smoke_test:
   rules:
     - if: $CI_COMMIT_BRANCH == "preprod"
 
-# --- ETAPE 5 : NOTIFICATION SLACK ---
-slack_success:
+# ─────────────────────────────────────────────────────────────────────
+# ETAPE 5 : NOTIFICATIONS EMAIL (via Resend)
+# ─────────────────────────────────────────────────────────────────────
+#
+# Variables GitLab CI/CD a configurer (Settings → CI/CD → Variables) :
+#   RESEND_API_KEY         (Masked, Protected) — cle API Resend
+#   DEPLOY_NOTIFY_EMAIL    (Protected)         — destinataire(s), CSV
+#                                                ex: "cedrick@neocraft.com,ops@keyhome.app"
+#   DEPLOY_NOTIFY_FROM     (optionnel)         — expediteur,
+#                                                default "KeyHome CI <ci@keyhome.app>"
+#
+# Le domaine `keyhome.app` doit etre verifie dans Resend (DNS SPF +
+# DKIM). En attendant la verification, fallback `onboarding@resend.dev`
+# fonctionne pour tester (rate-limite a 100 mails/jour).
+#
+# Template HTML : table-based + CSS inline pour la compat email clients
+# (Gmail / Outlook / Apple Mail / mobile). Tons KeyHome (rose #F6475F
+# pour les CTAs, vert/rouge pour le status banner).
+
+.email_notify_base: &email_notify_base
   stage: notify
   allow_failure: true
+  variables:
+    # Note : pas de `set -euo pipefail` dans les scripts notify — on
+    # ne veut PAS qu'un email rate fasse echouer la pipeline (allow_
+    # failure deja, mais double ceinture). Tout est en `|| true`.
+    RESEND_ENDPOINT: "https://api.resend.com/emails"
+
+email_success:
+  <<: *email_notify_base
   needs:
     - job: production_smoke_test
       optional: true
@@ -503,59 +763,25 @@ slack_success:
       optional: true
     - job: preprod_deploy
       optional: true
-  script:
-    - |
-      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
-        WEBHOOK="$SLACK_WEBHOOK_PROD"
-        DEPLOY_ENV="Production"
-      else
-        WEBHOOK="${SLACK_WEBHOOK_PREPROD:-$SLACK_WEBHOOK_PROD}"
-        DEPLOY_ENV="Preproduction"
-      fi
-      if [ -z "$WEBHOOK" ]; then
-        echo "No Slack webhook configured for branch $CI_COMMIT_BRANCH, skipping"
-        exit 0
-      fi
-      SHORT_SHA="${CI_COMMIT_SHA:0:8}"
-
-      curl --globoff -sS -X POST -H 'Content-type: application/json' \
-      --data "{
-        \"attachments\": [{
-          \"color\": \"#28a745\",
-          \"blocks\": [
-            {
-              \"type\": \"header\",
-              \"text\": {\"type\": \"plain_text\", \"text\": \"✅ Déploiement Backend $DEPLOY_ENV Réussi\", \"emoji\": true}
-            },
-            {
-              \"type\": \"section\",
-              \"fields\": [
-                {\"type\": \"mrkdwn\", \"text\": \"*Environnement:*\\n$DEPLOY_ENV\"},
-                {\"type\": \"mrkdwn\", \"text\": \"*Branche:*\\n\`$CI_COMMIT_REF_NAME\`\"},
-                {\"type\": \"mrkdwn\", \"text\": \"*Auteur:*\\n$GITLAB_USER_NAME\"},
-                {\"type\": \"mrkdwn\", \"text\": \"*Commit:*\\n\`$SHORT_SHA\`\"}
-              ]
-            },
-            {
-              \"type\": \"section\",
-              \"text\": {\"type\": \"mrkdwn\", \"text\": \"📝 _${CI_COMMIT_TITLE}_\"}
-            },
-            {
-              \"type\": \"actions\",
-              \"elements\": [
-                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"🚀 Voir la pipeline\"}, \"style\": \"primary\", \"url\": \"$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID\"}
-              ]
-            }
-          ]
-        }]
-      }" "$WEBHOOK"
   when: on_success
   rules:
     - if: $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH == "preprod"
+  script:
+    - |
+      RECIPIENTS="${DEPLOY_NOTIFY_EMAIL:-}"
+      API_KEY="${RESEND_API_KEY:-}"
+      if [ -z "$RECIPIENTS" ] || [ -z "$API_KEY" ]; then
+        echo "ℹ  Email skipped (DEPLOY_NOTIFY_EMAIL ou RESEND_API_KEY non configuree)"
+        exit 0
+      fi
+      export EMAIL_STATUS="success"
+      bash .gitlab/notify-email.sh
+  artifacts:
+    when: always
+    paths: []
 
-slack_failure:
-  stage: notify
-  allow_failure: true
+email_failure:
+  <<: *email_notify_base
   needs:
     - job: production_smoke_test
       optional: true
@@ -571,66 +797,25 @@ slack_failure:
       optional: true
     - job: style_check
       optional: true
-  script:
-    - |
-      if [ "$CI_COMMIT_BRANCH" = "main" ]; then
-        WEBHOOK="$SLACK_WEBHOOK_PROD"
-      else
-        WEBHOOK="${SLACK_WEBHOOK_PREPROD:-$SLACK_WEBHOOK_PROD}"
-      fi
-      if [ -z "$WEBHOOK" ]; then
-        echo "No Slack webhook configured for branch $CI_COMMIT_BRANCH, skipping"
-        exit 0
-      fi
-      SHORT_SHA="${CI_COMMIT_SHA:0:8}"
-
-      # Récupérer le vrai job qui a échoué via l'API GitLab
-      FAILED_JOBS_JSON=$(curl --globoff -sS --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-        "$CI_API_V4_URL/projects/$CI_PROJECT_ID/pipelines/$CI_PIPELINE_ID/jobs?scope[]=failed" 2>/dev/null || echo "[]")
-
-      # Extraire le premier job échoué (sans jq, avec grep/sed)
-      FAILED_JOB=$(echo "$FAILED_JOBS_JSON" | grep -o '"name":"[^"]*"' | head -1 | sed 's/"name":"//;s/"//' || echo "unknown")
-      FAILED_STAGE=$(echo "$FAILED_JOBS_JSON" | grep -o '"stage":"[^"]*"' | head -1 | sed 's/"stage":"//;s/"//' || echo "unknown")
-
-      # Fallback si l'API ne retourne rien
-      [ -z "$FAILED_JOB" ] && FAILED_JOB="Voir la pipeline"
-      [ -z "$FAILED_STAGE" ] && FAILED_STAGE="unknown"
-
-      curl --globoff -sS -X POST -H 'Content-type: application/json' \
-      --data "{
-        \"attachments\": [{
-          \"color\": \"#dc3545\",
-          \"blocks\": [
-            {
-              \"type\": \"header\",
-              \"text\": {\"type\": \"plain_text\", \"text\": \"🚨 Pipeline Backend Échouée\", \"emoji\": true}
-            },
-            {
-              \"type\": \"section\",
-              \"fields\": [
-                {\"type\": \"mrkdwn\", \"text\": \"*Étape échouée:*\n\`$FAILED_STAGE\`\"},
-                {\"type\": \"mrkdwn\", \"text\": \"*Job:*\n\`$FAILED_JOB\`\"},
-                {\"type\": \"mrkdwn\", \"text\": \"*Branche:*\n\`$CI_COMMIT_REF_NAME\`\"},
-                {\"type\": \"mrkdwn\", \"text\": \"*Auteur:*\n$GITLAB_USER_NAME\"}
-              ]
-            },
-            {
-              \"type\": \"section\",
-              \"text\": {\"type\": \"mrkdwn\", \"text\": \"📝 _${CI_COMMIT_TITLE}_\"}
-            },
-            {
-              \"type\": \"actions\",
-              \"elements\": [
-                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"🔴 Voir l'erreur\"}, \"style\": \"danger\", \"url\": \"$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID\"},
-                {\"type\": \"button\", \"text\": {\"type\": \"plain_text\", \"text\": \"📋 Logs\"}, \"url\": \"$CI_PROJECT_URL/-/pipelines/$CI_PIPELINE_ID/failures\"}
-              ]
-            }
-          ]
-        }]
-      }" "$WEBHOOK"
+    - job: composer_security
+      optional: true
+    - job: build_image
+      optional: true
+    - job: trivy_scan
+      optional: true
   when: on_failure
   rules:
     - if: $CI_COMMIT_BRANCH
+  script:
+    - |
+      RECIPIENTS="${DEPLOY_NOTIFY_EMAIL:-}"
+      API_KEY="${RESEND_API_KEY:-}"
+      if [ -z "$RECIPIENTS" ] || [ -z "$API_KEY" ]; then
+        echo "ℹ  Email skipped (DEPLOY_NOTIFY_EMAIL ou RESEND_API_KEY non configuree)"
+        exit 0
+      fi
+      export EMAIL_STATUS="failure"
+      bash .gitlab/notify-email.sh
 
 # --- ETAPE 6 : NETTOYAGE INTELLIGENT ---
 cleanup:

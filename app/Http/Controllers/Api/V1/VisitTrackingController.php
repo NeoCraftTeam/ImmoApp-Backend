@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1;
 
 use App\Models\SiteVisit;
-use App\Services\AcquisitionChannelClassifier;
+use App\Services\Ai\AcquisitionChannelClassifier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;

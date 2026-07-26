@@ -7,36 +7,37 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 uses(RefreshDatabase::class);
 
 test('payment webhook rejects invalid signature when secret is configured', function (): void {
-    config()->set('payment.gateways.flutterwave.webhook_secret', 'test-secret');
-    config()->set('payment.gateways.flutterwave.secret_key', 'FLWSECK_TEST-fake');
+    config()->set('payment.default', 'kpay');
+    config()->set('payment.gateways.kpay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.webhook_secret', 'test-secret');
 
     $payment = Payment::factory()->create([
         'transaction_id' => 'KH-CRITICALINVALID',
         'status' => PaymentStatus::PENDING,
-        'gateway' => 'flutterwave',
+        'gateway' => 'kpay',
     ]);
 
-    $payload = json_encode([
-        'event' => 'charge.completed',
-        'data' => [
-            'status' => 'successful',
-            'tx_ref' => 'KH-CRITICALINVALID',
-            'amount' => 5000,
-            'currency' => 'XAF',
-        ],
-    ], JSON_THROW_ON_ERROR);
+    $payload = [
+        'event' => 'payment.completed',
+        'paymentId' => 'pay_critical_invalid',
+        'status' => 'COMPLETED',
+        'amount' => 5000,
+        'externalId' => 'KH-CRITICALINVALID',
+    ];
+    $body = json_encode($payload, JSON_THROW_ON_ERROR);
 
     $response = $this->call(
         'POST',
-        '/api/v1/webhooks/flutterwave',
+        '/api/v1/webhooks/kpay',
         [],
         [],
         [],
         [
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_VERIF_HASH' => 'invalid-signature',
+            'HTTP_X_KPAY_SIGNATURE' => 'invalid-signature',
+            'HTTP_X_KPAY_EVENT' => 'payment.completed',
         ],
-        $payload
+        $body
     );
 
     $response->assertUnauthorized();
@@ -45,37 +46,41 @@ test('payment webhook rejects invalid signature when secret is configured', func
 
 test('payment webhook accepts valid signature and updates payment', function (): void {
     $secret = 'test-secret';
-    config()->set('payment.gateways.flutterwave.webhook_secret', $secret);
-    config()->set('payment.gateways.flutterwave.secret_key', 'FLWSECK_TEST-fake');
+    config()->set('payment.default', 'kpay');
+    config()->set('payment.gateways.kpay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.webhook_secret', $secret);
 
     $payment = Payment::factory()->create([
         'transaction_id' => 'KH-CRITICALVALID',
         'status' => PaymentStatus::PENDING,
-        'gateway' => 'flutterwave',
+        'gateway' => 'kpay',
         'amount' => 5000,
     ]);
 
-    $payload = json_encode([
-        'event' => 'charge.completed',
-        'data' => [
-            'status' => 'successful',
-            'tx_ref' => 'KH-CRITICALVALID',
-            'amount' => 5000,
-            'currency' => 'XAF',
-        ],
-    ], JSON_THROW_ON_ERROR);
+    $payload = [
+        'event' => 'payment.completed',
+        'paymentId' => 'pay_critical_valid',
+        'reference' => 'KPAY-CRITICAL-VALID',
+        'status' => 'COMPLETED',
+        'amount' => 5000,
+        'currency' => 'XAF',
+        'externalId' => 'KH-CRITICALVALID',
+    ];
+    $body = json_encode($payload, JSON_THROW_ON_ERROR);
+    $signature = hash_hmac('sha256', $body, $secret);
 
     $response = $this->call(
         'POST',
-        '/api/v1/webhooks/flutterwave',
+        '/api/v1/webhooks/kpay',
         [],
         [],
         [],
         [
             'CONTENT_TYPE' => 'application/json',
-            'HTTP_VERIF_HASH' => $secret,
+            'HTTP_X_KPAY_SIGNATURE' => $signature,
+            'HTTP_X_KPAY_EVENT' => 'payment.completed',
         ],
-        $payload
+        $body
     );
 
     $response->assertOk()

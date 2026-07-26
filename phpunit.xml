@@ -35,14 +35,19 @@
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
         <env name="SCOUT_DRIVER" value="null"/>
-        <env name="PAYMENT_DEFAULT_GATEWAY" value="geniuspay"/>
-        <env name="GENIUSPAY_API_KEY" value="pk_sandbox_test_fake"/>
-        <env name="GENIUSPAY_API_SECRET" value="sk_sandbox_test_fake"/>
-        <env name="GENIUSPAY_WEBHOOK_SECRET" value="whsec_sandbox_test_secret_123"/>
-        <env name="FLW_SECRET_KEY" value="FLWSECK_TEST-fake"/>
-        <env name="FLW_WEBHOOK_SECRET" value="test_webhook_secret_123"/>
+        <env name="PAYMENT_DEFAULT_GATEWAY" value="kpay"/>
+        <env name="KPAY_API_KEY" value="kpay_test_fake"/>
+        <env name="KPAY_API_SECRET" value="sk_test_fake"/>
+        <env name="KPAY_WEBHOOK_SECRET" value="whsec_kpay_test_secret_123"/>
         <env name="TURNSTILE_SITE_KEY" value=""/>
         <env name="TURNSTILE_SECRET_KEY" value=""/>
-        <env name="CHAT_ENCRYPTION_KEY" value="0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"/>
+        <!--
+            CHAT_ENCRYPTION_KEY is generated at runtime in tests/bootstrap.php.
+            It used to be a deterministic 32-byte hex string committed here
+            (and in tests/bootstrap.php) which meant every test database
+            seeded by every developer was decryptable by anyone with repo
+            access. The boot-time key is unique per test process and never
+            persists.
+        -->
     </php>
 </phpunit>

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Ad;
 use App\Models\User;
-use App\Services\AdUrlBuilder;
+use App\Services\Ad\AdUrlBuilder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

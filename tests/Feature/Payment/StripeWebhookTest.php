@@ -56,7 +56,7 @@ function fakeStripeGateway(array $payload): PaymentGatewayInterface
             return ['status' => 'pending', 'amount' => 0.0, 'currency' => 'XAF', 'payment_method' => null, 'paid_at' => null, 'raw' => []];
         }
 
-        public function handleWebhook(array $payload, array $headers): array
+        public function handleWebhook(array $payload, array $headers, ?string $rawBody = null): array
         {
             return $this->payload;
         }

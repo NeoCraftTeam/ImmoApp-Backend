@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Services\AiSearchService;
+use App\Services\Ai\AiSearchService;
 
 /**
  * Targets the robust JSON extractor that replaces the previous shallow regex

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\Ad;
 use App\Models\Conversation;
 use App\Models\LeaseContract;
+use App\Models\RentPayment;
 use App\Models\TentativeReservation;
 use App\Models\User;
 use Carbon\Carbon;
@@ -46,11 +47,9 @@ it('returns correct occupancy_rate', function (): void {
     ]);
 
     // 1 expired lease — should NOT count
-    LeaseContract::factory()->create([
+    LeaseContract::factory()->expired()->create([
         'user_id' => $owner->id,
         'ad_id' => $ads[1]->id,
-        'lease_start' => '2025-01-01',
-        'lease_end' => '2025-12-31',
     ]);
 
     $response = $this->getJson('/api/v1/my/stats')->assertOk();
@@ -198,15 +197,64 @@ it('returns monthly_rent_total for active leases only', function (): void {
     ]);
 
     // expired
-    LeaseContract::factory()->create([
+    LeaseContract::factory()->expired()->create([
         'user_id' => $owner->id,
         'ad_id' => $ad->id,
-        'lease_start' => '2025-01-01',
-        'lease_end' => '2025-12-31',
         'monthly_rent' => 100000,
     ]);
 
     $data = $this->getJson('/api/v1/my/stats')->assertOk()->json('data');
 
     expect($data['monthly_rent_total_xaf'])->toEqual(250000);
+});
+
+it('returns rent_collected_xaf_30d for the landlord — last 30 days only', function (): void {
+    Carbon::setTestNow(Carbon::parse('2026-06-01'));
+
+    $owner = User::factory()->agents()->create();
+    Sanctum::actingAs($owner);
+
+    $ad = null;
+    Ad::withoutSyncingToSearch(function () use (&$ad, $owner): void {
+        $ad = Ad::factory()->create(['user_id' => $owner->id, 'status' => 'available']);
+    });
+
+    $lease = LeaseContract::factory()->create([
+        'user_id' => $owner->id,
+        'ad_id' => $ad->id,
+    ]);
+
+    // Two collections inside the 30-day window — should sum.
+    RentPayment::factory()->create([
+        'lease_contract_id' => $lease->id,
+        'recorded_by_user_id' => $owner->id,
+        'amount' => 150000,
+        'received_at' => '2026-05-20',
+    ]);
+    RentPayment::factory()->create([
+        'lease_contract_id' => $lease->id,
+        'recorded_by_user_id' => $owner->id,
+        'amount' => 75000,
+        'received_at' => '2026-06-01',
+    ]);
+
+    // Outside the 30-day window — should NOT count.
+    RentPayment::factory()->create([
+        'lease_contract_id' => $lease->id,
+        'recorded_by_user_id' => $owner->id,
+        'amount' => 999999,
+        'received_at' => '2026-04-01',
+    ]);
+
+    // Belongs to another landlord — should NOT count.
+    $otherLease = LeaseContract::factory()->create();
+    RentPayment::factory()->create([
+        'lease_contract_id' => $otherLease->id,
+        'amount' => 500000,
+        'received_at' => '2026-05-25',
+    ]);
+
+    $data = $this->getJson('/api/v1/my/stats')->assertOk()->json('data');
+
+    expect($data['rent_collected_xaf_30d'])->toBe(225000);
 });

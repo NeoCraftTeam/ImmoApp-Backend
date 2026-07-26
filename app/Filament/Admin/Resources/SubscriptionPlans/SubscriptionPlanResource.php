@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\SubscriptionPlans;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\SubscriptionPlans\Pages\CreateSubscriptionPlan;
 use App\Filament\Admin\Resources\SubscriptionPlans\Pages\EditSubscriptionPlan;
 use App\Filament\Admin\Resources\SubscriptionPlans\Pages\ListSubscriptionPlans;
@@ -22,6 +23,12 @@ use Filament\Tables\Table;
 class SubscriptionPlanResource extends Resource
 {
     protected static ?string $model = SubscriptionPlan::class;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::SubscriptionsManage) ?? false;
+    }
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 

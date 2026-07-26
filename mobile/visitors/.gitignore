@@ -1,0 +1,44 @@
+node_modules/
+.expo/
+.tamagui/
+dist/
+web-build/
+.metro-health-check*
+
+# Alt package managers (npm is canonical here)
+pnpm-lock.yaml
+yarn.lock
+
+# macOS
+.DS_Store
+
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# Local env
+.env
+.env.local
+.env*.local
+
+# Native build artefacts
+ios/Pods/
+ios/build/
+ios/Podfile.lock
+ios/*.xcworkspace
+ios/*.xcodeproj
+android/.gradle/
+android/.idea/
+android/app/build/
+android/build/
+android/local.properties
+*.keystore
+*.jks
+
+# IDE
+.vscode/
+.idea/
+
+# Generated
+expo-env.d.ts

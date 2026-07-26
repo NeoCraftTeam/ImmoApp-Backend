@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\PendingAds;
 
+use App\Enums\AdminPermission;
 use App\Enums\AdStatus;
 use App\Filament\Admin\Resources\PendingAds\Pages\ManagePendingAds;
 use App\Filament\Resources\Ads\Concerns\SharedAdResource;
 use App\Mail\AdDeclinedMail;
 use App\Models\Ad;
-use App\Services\AiDescriptionEnhancer;
+use App\Services\Ai\AiDescriptionEnhancer;
 use App\Support\AdScoutSync;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -34,6 +35,12 @@ class PendingAdResource extends Resource
     use SharedAdResource;
 
     protected static ?string $model = Ad::class;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::AdsModerate) ?? false;
+    }
 
     protected static string|null|UnitEnum $navigationGroup = 'Annonces';
 

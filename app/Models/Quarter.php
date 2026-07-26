@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\QuarterFactory;
 use Eloquent;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,6 +21,9 @@ use Spatie\Activitylog\Traits\LogsActivity;
 /**
  * @property string $id
  * @property string $name
+ * @property float|null $latitude
+ * @property float|null $longitude
+ * @property Point|null $location
  * @property string $city_id
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -51,6 +55,9 @@ class Quarter extends Model
     protected $fillable = [
         'name',
         'city_id',
+        'latitude',
+        'longitude',
+        'location',
         'avg_price',
         'avg_price_per_sqm',
         'active_ads_count',
@@ -81,6 +88,7 @@ class Quarter extends Model
     protected function casts(): array
     {
         return [
+            'location' => Point::class,
             'avg_price' => 'decimal:2',
             'avg_price_per_sqm' => 'decimal:2',
             'pricing_updated_at' => 'datetime',

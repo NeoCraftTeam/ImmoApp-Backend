@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
-use App\Services\AiDescriptionEnhancer;
+use App\Services\Ai\AiDescriptionEnhancer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);

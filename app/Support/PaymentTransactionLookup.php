@@ -10,7 +10,7 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Resolves {@see Payment} rows from KeyHome {@code tx_ref} (KH-*) or gateway references (MTX-*, SANDBOX_*).
+ * Resolves {@see Payment} rows from KeyHome {@code tx_ref} (KH-*) or Kpay references (pay_*, KPAY-*).
  */
 final class PaymentTransactionLookup
 {
@@ -19,13 +19,34 @@ final class PaymentTransactionLookup
         return (bool) preg_match('/^KH-[A-Z0-9]{6,32}$/i', $value);
     }
 
+    /**
+     * Kpay payment id accepted by `GET /api/v1/payments/{id}`.
+     */
+    public static function isKpayApiPaymentId(string $value): bool
+    {
+        return (bool) preg_match('/^pay_[A-Z0-9_-]+$/i', $value);
+    }
+
+    /**
+     * Any opaque reference Kpay may echo on redirect or store on the Payment row.
+     *
+     * Includes sandbox redirect refs (`SANDBOX_*`) which are lookup keys only —
+     * they must never be passed to the Kpay verify API (use stored `pay_*` id).
+     */
     public static function isGatewayReference(string $value): bool
     {
         if (self::isKeyhomeTxRef($value)) {
             return false;
         }
 
-        return (bool) preg_match('/^(MTX-|SANDBOX_)[A-Z0-9_-]+$/i', $value);
+        return self::isKpayApiPaymentId($value)
+            || (bool) preg_match('/^(KPAY-|SANDBOX_)[A-Z0-9_-]+$/i', $value);
+    }
+
+    /** Regex for Form Request validation of gateway redirect references. */
+    public static function gatewayReferenceValidationPattern(): string
+    {
+        return '/^(pay_|KPAY-|SANDBOX_)[A-Z0-9_-]+$/i';
     }
 
     /**
@@ -34,13 +55,15 @@ final class PaymentTransactionLookup
     public static function applyGatewayReferenceFilter(Builder $query, string $gatewayReference): void
     {
         $query->where(function (Builder $inner) use ($gatewayReference): void {
-            $inner->where('gateway_response->genius_reference', $gatewayReference)
+            $inner->where('gateway_response->kpay_id', $gatewayReference)
+                ->orWhere('gateway_response->id', $gatewayReference)
+                ->orWhere('gateway_response->paymentId', $gatewayReference)
                 ->orWhere('gateway_response->reference', $gatewayReference);
         });
     }
 
     /**
-     * Find a payment owned by the user using either KeyHome tx_ref or a GeniusPay reference.
+     * Find a payment owned by the user using either KeyHome tx_ref or a Kpay reference.
      */
     public static function findForUser(
         User $user,

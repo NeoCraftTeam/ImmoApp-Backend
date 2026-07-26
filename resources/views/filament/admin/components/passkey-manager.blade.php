@@ -202,7 +202,11 @@
                     type="button"
                     x-show="!registering"
                     @click="showNameInput = false; passkeyName = ''; error = null"
-                    class="rounded-lg px-3 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition"
+                    {{-- Sibling buttons in this component declare a
+                         `focus:ring-2 focus:ring-primary-500` focus ring;
+                         this Cancel one had only a hover state, leaving
+                         keyboard users with no visible focus cue. --}}
+                    class="rounded-lg px-3 py-2 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 focus:ring-offset-1"
                 >
                     Annuler
                 </button>

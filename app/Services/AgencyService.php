@@ -11,7 +11,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
-class AgencyService
+final class AgencyService
 {
     /**
      * Promote a user to an Agency Owner.

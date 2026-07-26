@@ -59,23 +59,37 @@ final class PublishAdRequest extends FormRequest
                 return;
             }
 
-            /** @var array<string, string> $requiredFields Field attribute => French label */
+            /** @var array<string, array{label: string, numeric?: bool}> $requiredFields */
             $requiredFields = [
-                'title' => 'titre',
-                'description' => 'description',
-                'adresse' => 'adresse',
-                'price' => 'prix',
-                'surface_area' => 'surface',
-                'quarter_id' => 'quartier',
-                'type_id' => 'type',
+                'title' => ['label' => 'titre'],
+                'description' => ['label' => 'description'],
+                'adresse' => ['label' => 'adresse'],
+                'price' => ['label' => 'prix', 'numeric' => true],
+                'surface_area' => ['label' => 'surface', 'numeric' => true],
+                'bedrooms' => ['label' => 'chambres', 'numeric' => true],
+                'bathrooms' => ['label' => 'salles de bain', 'numeric' => true],
+                'quarter_id' => ['label' => 'quartier'],
+                'type_id' => ['label' => 'type'],
             ];
 
             $missing = [];
 
-            foreach ($requiredFields as $attribute => $label) {
-                if ($ad->getAttribute($attribute) === null || $ad->getAttribute($attribute) === '') {
+            foreach ($requiredFields as $attribute => $config) {
+                $value = $ad->getAttribute($attribute);
+                $label = $config['label'];
+
+                if ($value === null || $value === '') {
                     $missing[] = $label;
                     $v->errors()->add($attribute, "Le champ \"{$label}\" est obligatoire pour publier l'annonce.");
+
+                    continue;
+                }
+
+                // Numeric required fields must be parseable (e.g. a stringly-
+                // typed "abc" bedrooms slipped past autosave's nullable rule).
+                if (($config['numeric'] ?? false) && !is_numeric($value)) {
+                    $missing[] = $label;
+                    $v->errors()->add($attribute, "Le champ \"{$label}\" doit être un nombre valide.");
                 }
             }
 

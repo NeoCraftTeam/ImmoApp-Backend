@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Support\TourAssetToken;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
 /** @mixin Ad */
@@ -53,6 +54,7 @@ final class AdResource extends JsonResource
             'adresse' => $this->adresse ?? '',
             'price' => $this->price === null ? null : (float) $this->price,
             'price_period' => $this->price_period,
+            'transaction_type' => $this->transaction_type?->value,
             'surface_area' => $this->surface_area,
             'bedrooms' => $this->bedrooms,
             'bathrooms' => $this->bathrooms,
@@ -91,12 +93,18 @@ final class AdResource extends JsonResource
                 : null,
             'boost_score' => $this->isBoosted() ? (int) ($this->boost_score ?? 0) : 0,
 
-            // Proximity & accessibility — always visible (helps users decide to unlock)
-            'distance_main_road_m' => $this->distance_main_road_m,
-            'distance_shops_m' => $this->distance_shops_m,
-            'distance_transport_m' => $this->distance_transport_m,
-            'distance_school_m' => $this->distance_school_m,
-            'distance_hospital_m' => $this->distance_hospital_m,
+            // Sponsorship — visible so cards can render the tiered badge
+            // (premium / subscription / manual / organic).
+            'is_subscription_sponsored' => (bool) ($this->is_subscription_sponsored ?? false),
+            'sponsorship_tier' => $this->sponsorshipTier()->value,
+
+            // KeyScore — cached integer (0–100) read from the same hourly
+            // cache key written by `KeyScoreController::show`. Cards on the
+            // feed render the badge straight from this field when warm and
+            // fall back to the per-ad `/keyscore` fetch when null. We never
+            // compute here: a feed page must not pay 15× the cost of a
+            // detail-page request.
+            'keyscore' => $this->keyscoreFromCache(),
 
             // Premium info - only visible when unlocked
             'deposit_amount' => $this->when($this->isUnlockedFor($user), $this->deposit_amount),
@@ -136,8 +144,15 @@ final class AdResource extends JsonResource
                 $isUnlocked = $this->isUnlockedFor($user);
                 $isOwnerOrAdmin = $user?->id === $owner->id || $user?->isAdmin();
 
-                // Item 6 — Trust badge: compute tier lazily from cached trust score
-                $trustScore = $owner->trustScores()->latest('computed_at')->first();
+                // Item 6 — Trust badge: read the eager-loaded latest score.
+                // Calling `->trustScores()->latest(...)->first()` always
+                // built a fresh query and ignored any preloaded relation,
+                // firing one extra SELECT per ad. The `latestTrustScore`
+                // HasOne (defined on User) is eager-loadable via the
+                // controllers' `->with(['user.latestTrustScore', ...])`.
+                $trustScore = $owner->relationLoaded('latestTrustScore')
+                    ? $owner->latestTrustScore
+                    : $owner->trustScores()->latest('computed_at')->first();
 
                 return [
                     'id' => $owner->id,
@@ -174,6 +189,26 @@ final class AdResource extends JsonResource
             ]),
             'reviews' => ReviewResource::collection($this->whenLoaded('reviews')),
         ];
+    }
+
+    /**
+     * Cache-only read of the ad's KeyScore. Mirrors the key shape used
+     * by `KeyScoreController::show`:
+     * `keyscore_<adId>_<Ymd_H>`. Returning `null` on miss is the contract
+     * the frontend expects — `KeyScoreBadge` falls back to its per-ad
+     * fetch then. Never computes; never writes; never touches the DB.
+     */
+    private function keyscoreFromCache(): ?int
+    {
+        $cacheKey = 'keyscore_'.$this->id.'_'.now()->format('Ymd_H');
+        $cached = Cache::get($cacheKey);
+        if (!is_array($cached)) {
+            return null;
+        }
+
+        $score = $cached['score'] ?? null;
+
+        return is_int($score) ? $score : null;
     }
 
     private function buildSeoTitle(): string

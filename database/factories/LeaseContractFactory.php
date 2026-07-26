@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Enums\LeaseStatus;
 use App\Models\Ad;
 use App\Models\LeaseContract;
 use App\Models\User;
@@ -36,6 +37,33 @@ final class LeaseContractFactory extends Factory
             'deposit_amount' => fake()->numberBetween(50000, 1000000),
             'special_conditions' => fake()->optional(0.3)->sentence(),
             'pdf_path' => 'lease-contracts/test-'.fake()->uuid().'.pdf',
+            'status' => LeaseStatus::Active,
         ];
+    }
+
+    public function expired(): self
+    {
+        return $this->state(fn (): array => [
+            'status' => LeaseStatus::Expired,
+            'lease_start' => fake()->dateTimeBetween('-3 years', '-2 years'),
+            'lease_end' => fake()->dateTimeBetween('-1 year', '-1 month'),
+        ]);
+    }
+
+    public function terminated(): self
+    {
+        return $this->state(fn (): array => [
+            'status' => LeaseStatus::Terminated,
+            'terminated_at' => fake()->dateTimeBetween('-6 months', 'now'),
+            'termination_reason' => fake()->sentence(),
+        ]);
+    }
+
+    public function archived(): self
+    {
+        return $this->state(fn (): array => [
+            'status' => LeaseStatus::Archived,
+            'archived_at' => fake()->dateTimeBetween('-3 months', 'now'),
+        ]);
     }
 }

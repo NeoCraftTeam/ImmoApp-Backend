@@ -11,7 +11,6 @@ use App\Models\Refund;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\Payment\StripePaymentService;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 
 beforeEach(function (): void {
@@ -20,18 +19,24 @@ beforeEach(function (): void {
 
 it('allows admin to refund a successful payment via API', function (): void {
     $admin = User::factory()->admin()->create();
-    $payment = Payment::factory()->success()->flutterwave()->create([
+    $payment = Payment::factory()->success()->stripe()->create([
         'type' => 'credit',
         'amount' => 10000,
-        'gateway_response' => ['id' => 12345, 'status' => 'successful'],
+        'gateway_response' => ['id' => 'pi_refund001', 'status' => 'succeeded'],
     ]);
 
-    Http::fake([
-        '*/transactions/12345/refund' => Http::response([
-            'status' => 'success',
-            'data' => ['id' => 'FLW-REF-001', 'status' => 'completed', 'amount_refunded' => 10000],
-        ]),
-    ]);
+    $spy = Mockery::mock(PaymentGatewayInterface::class);
+    $spy->shouldReceive('refund')
+        ->once()
+        ->with('pi_refund001', 10000.0)
+        ->andReturn([
+            'refund_id' => 're_refund001',
+            'status' => 'succeeded',
+            'amount_refunded' => 10000.0,
+            'raw' => ['id' => 're_refund001', 'status' => 'succeeded'],
+        ]);
+
+    $this->app->instance(StripePaymentService::class, $spy);
 
     $response = $this->actingAs($admin, 'sanctum')
         ->postJson("/api/v1/admin/payments/{$payment->id}/refund", [
@@ -72,7 +77,7 @@ it('rejects unauthenticated refund requests', function (): void {
 
 it('rejects refund for non-success payment', function (): void {
     $admin = User::factory()->admin()->create();
-    $payment = Payment::factory()->pending()->flutterwave()->create();
+    $payment = Payment::factory()->pending()->stripe()->create();
 
     $response = $this->actingAs($admin, 'sanctum')
         ->postJson("/api/v1/admin/payments/{$payment->id}/refund", [
@@ -80,12 +85,12 @@ it('rejects refund for non-success payment', function (): void {
         ]);
 
     $response->assertStatus(422);
-    $response->assertJsonFragment(['message' => 'Seuls les paiements réussis peuvent être remboursés.']);
+    $response->assertJsonFragment(['message' => 'Le remboursement n\'a pas pu être traité. Vérifiez les conditions requises.']);
 });
 
 it('rejects duplicate full refund for same payment', function (): void {
     $admin = User::factory()->admin()->create();
-    $payment = Payment::factory()->success()->flutterwave()->create([
+    $payment = Payment::factory()->success()->stripe()->create([
         'gateway_response' => ['id' => 99999],
     ]);
 
@@ -102,22 +107,28 @@ it('rejects duplicate full refund for same payment', function (): void {
         ]);
 
     $response->assertStatus(422);
-    $response->assertJsonFragment(['message' => 'Ce paiement a déjà été remboursé intégralement.']);
+    $response->assertJsonFragment(['message' => 'Le remboursement n\'a pas pu être traité. Vérifiez les conditions requises.']);
 });
 
 it('supports partial refunds', function (): void {
     $admin = User::factory()->admin()->create();
-    $payment = Payment::factory()->success()->flutterwave()->create([
+    $payment = Payment::factory()->success()->stripe()->create([
         'amount' => 20000,
-        'gateway_response' => ['id' => 54321],
+        'gateway_response' => ['id' => 'pi_refund002', 'status' => 'succeeded'],
     ]);
 
-    Http::fake([
-        '*/transactions/54321/refund' => Http::response([
-            'status' => 'success',
-            'data' => ['id' => 'FLW-REF-002', 'status' => 'completed', 'amount_refunded' => 5000],
-        ]),
-    ]);
+    $spy = Mockery::mock(PaymentGatewayInterface::class);
+    $spy->shouldReceive('refund')
+        ->once()
+        ->with('pi_refund002', 5000.0)
+        ->andReturn([
+            'refund_id' => 're_refund002',
+            'status' => 'succeeded',
+            'amount_refunded' => 5000.0,
+            'raw' => ['id' => 're_refund002', 'status' => 'succeeded'],
+        ]);
+
+    $this->app->instance(StripePaymentService::class, $spy);
 
     $response = $this->actingAs($admin, 'sanctum')
         ->postJson("/api/v1/admin/payments/{$payment->id}/refund", [
@@ -166,11 +177,11 @@ it('reverses credit points on full refund', function (): void {
 
     $admin = User::factory()->admin()->create();
     $customer = User::factory()->create(['point_balance' => 100]);
-    $payment = Payment::factory()->success()->flutterwave()->create([
+    $payment = Payment::factory()->success()->stripe()->create([
         'type' => 'credit',
         'amount' => 5000,
         'user_id' => $customer->id,
-        'gateway_response' => ['id' => 77777],
+        'gateway_response' => ['id' => 'pi_refund003', 'status' => 'succeeded'],
     ]);
 
     PointTransaction::create([
@@ -181,12 +192,18 @@ it('reverses credit points on full refund', function (): void {
         'payment_id' => $payment->id,
     ]);
 
-    Http::fake([
-        '*/transactions/77777/refund' => Http::response([
-            'status' => 'success',
-            'data' => ['id' => 'FLW-REF-003', 'status' => 'completed', 'amount_refunded' => 5000],
-        ]),
-    ]);
+    $spy = Mockery::mock(PaymentGatewayInterface::class);
+    $spy->shouldReceive('refund')
+        ->once()
+        ->with('pi_refund003', 5000.0)
+        ->andReturn([
+            'refund_id' => 're_refund003',
+            'status' => 'succeeded',
+            'amount_refunded' => 5000.0,
+            'raw' => ['id' => 're_refund003', 'status' => 'succeeded'],
+        ]);
+
+    $this->app->instance(StripePaymentService::class, $spy);
 
     $this->actingAs($admin, 'sanctum')
         ->postJson("/api/v1/admin/payments/{$payment->id}/refund", [
@@ -206,16 +223,22 @@ it('reverses credit points on full refund', function (): void {
 
 it('sends confirmation email after successful refund', function (): void {
     $admin = User::factory()->admin()->create();
-    $payment = Payment::factory()->success()->flutterwave()->create([
-        'gateway_response' => ['id' => 88888],
+    $payment = Payment::factory()->success()->stripe()->create([
+        'gateway_response' => ['id' => 'pi_refund004', 'status' => 'succeeded'],
     ]);
 
-    Http::fake([
-        '*/transactions/88888/refund' => Http::response([
-            'status' => 'success',
-            'data' => ['id' => 'FLW-REF-004', 'status' => 'completed', 'amount_refunded' => $payment->amount],
-        ]),
-    ]);
+    $spy = Mockery::mock(PaymentGatewayInterface::class);
+    $spy->shouldReceive('refund')
+        ->once()
+        ->with('pi_refund004', (float) $payment->amount)
+        ->andReturn([
+            'refund_id' => 're_refund004',
+            'status' => 'succeeded',
+            'amount_refunded' => (float) $payment->amount,
+            'raw' => ['id' => 're_refund004', 'status' => 'succeeded'],
+        ]);
+
+    $this->app->instance(StripePaymentService::class, $spy);
 
     $this->actingAs($admin, 'sanctum')
         ->postJson("/api/v1/admin/payments/{$payment->id}/refund", [
@@ -239,8 +262,8 @@ it('creates refund model with correct relationships', function (): void {
 | Stripe gateway routing — regression guard
 |--------------------------------------------------------------------------
 |
-| Before the fix, `RefundService::resolveGateway()` only mapped
-| `flutterwave` → `FlutterwavePaymentService` and threw
+| Before the fix, `RefundService::resolveGateway()` did not map
+| `stripe` to a gateway implementation and threw
 | « Gateway non supporté: stripe » for every card payment, blocking
 | admin refunds in production. These tests lock in the new behaviour:
 |   1. card payments resolve to a Stripe gateway implementation

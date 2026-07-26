@@ -51,4 +51,21 @@ return [
         'reserve' => (int) env('RL_VIEWINGS_RESERVE', 20),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | AI Search — natural-language parser (POST /ads/search/parse)
+    |--------------------------------------------------------------------------
+    |
+    | The endpoint forwards each query to a paid LLM provider. Without a daily
+    | ceiling a single IP could burn through Groq+OpenAI credits at full speed.
+    | The route stacks the per-minute and per-day limiters; the global hourly
+    | ceiling caps cluster-wide cost spikes (OWASP LLM10:2025).
+    |
+    */
+    'ai_search' => [
+        'parse_minute' => (int) env('RL_AI_SEARCH_PARSE_MINUTE', 30),
+        'parse_day' => (int) env('RL_AI_SEARCH_PARSE_DAY', 200),
+        'parse_hourly_global' => (int) env('RL_AI_SEARCH_PARSE_HOURLY_GLOBAL', 10000),
+    ],
+
 ];

@@ -25,7 +25,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Throwable;
 
-class DisputeService
+final class DisputeService
 {
     /**
      * Default SLA window for admin to take charge of a dispute (in days).

@@ -16,7 +16,9 @@ use App\Models\Payment;
 use App\Models\PointPackage;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
+use App\Support\FrontendRedirectGuard;
 use App\Support\PaymentTransactionLookup;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -76,6 +78,7 @@ final readonly class PaymentService
      *     period?: string|null,
      *     description?: string,
      *     redirect_url?: string|null,
+     *     stripe_hosted?: bool,
      *     save_payment_method?: bool,
      *     payment_method_id?: string|null,
      *     meta?: array<string, mixed>
@@ -98,9 +101,21 @@ final readonly class PaymentService
         $redirectUrl = $data['redirect_url'] ?? null;
         $redirectUrl = is_string($redirectUrl) && $redirectUrl !== '' ? $redirectUrl : null;
 
+        // Les passerelles hosted-checkout (Kpay/Stripe…) exigent une URL
+        // http(s) pour returnUrl/cancelUrl. Un deep-link mobile
+        // (keyhome://, keyhomeowners://, exp://…) est rejeté par la passerelle :
+        // on l'enveloppe dans un pont (payment.native-return) qui renverra un
+        // 302 vers le deep-link une fois le paiement terminé — l'onglet in-app
+        // se ferme alors nativement et l'app reprend la main. Un schéma inconnu
+        // (ni http(s), ni whitelisté) est ignoré → repli sur l'URL web de retour.
+        if ($redirectUrl !== null && preg_match('#^https?://#i', $redirectUrl) !== 1) {
+            $redirectUrl = FrontendRedirectGuard::isAllowedAppScheme($redirectUrl)
+                ? self::buildNativeReturnBridgeUrl($redirectUrl)
+                : null;
+        }
+
         if ($redirectUrl === null) {
-            $configured = config('payment.gateways.geniuspay.redirect_url')
-                ?? config('payment.gateways.flutterwave.redirect_url');
+            $configured = config('payment.gateways.kpay.redirect_url');
             $redirectUrl = (is_string($configured) && $configured !== '')
                 ? $configured
                 : $this->defaultFrontendPaymentReturnUrl(
@@ -120,7 +135,11 @@ final readonly class PaymentService
             'tx_ref' => $txRef,
             'redirect_url' => $redirectUrl,
             'description' => $data['description'] ?? 'Paiement KeyHome',
-            'payment_method' => $data['payment_method'] ?? 'flutterwave',
+            'payment_method' => $data['payment_method'] ?? 'mobile_money',
+            // Force la Checkout Session Stripe hébergée (URL) pour les clients
+            // sans Stripe.js/SDK (apps mobiles) — sinon Stripe renvoie un
+            // client_secret inutilisable côté natif.
+            'stripe_hosted' => (bool) ($data['stripe_hosted'] ?? false),
             'meta' => $meta,
         ];
 
@@ -147,8 +166,8 @@ final readonly class PaymentService
 
         // Route to the gateway implied by the chosen `payment_method`. If
         // the method is unknown or its gateway isn't registered, we fall
-        // back to the legacy default (GeniusPay). Mobile money +
-        // Orange Money → GeniusPay; Card → Stripe.
+        // back to the legacy default (Kpay). Mobile money +
+        // Orange Money → Kpay; Card → Stripe.
         $primaryGateway = $this->resolveGatewayForMethod($data['payment_method'] ?? null);
 
         [$result, $usedGateway] = $this->initiateWithFallback($gatewayPayload, $primaryGateway);
@@ -165,7 +184,7 @@ final readonly class PaymentService
             $payment->type = PaymentType::from((string) $data['type']);
             $payment->amount = (int) round((float) $data['amount']);
             $payment->transaction_id = $txRef;
-            $payment->payment_method = PaymentMethod::from((string) ($data['payment_method'] ?? 'flutterwave'));
+            $payment->payment_method = PaymentMethod::from((string) ($data['payment_method'] ?? 'mobile_money'));
             $payment->user_id = $user->id;
             $payment->status = $initialStatus;
             $payment->gateway = $usedGateway->getName();
@@ -221,7 +240,7 @@ final readonly class PaymentService
     {
         // No gateway constraint here — a tx_ref is unique per Payment, and
         // restricting by `$this->gateway->getName()` would break verification
-        // for Stripe-issued payments when Flutterwave is the default gateway.
+        // for Stripe-issued payments when Kpay is the default gateway.
         $payment = Payment::where('transaction_id', $txRef)->firstOrFail();
 
         return $this->syncPaymentStatus($payment);
@@ -234,7 +253,7 @@ final readonly class PaymentService
      */
     public function syncPaymentStatus(Payment $payment, ?string $gatewayReferenceOverride = null): Payment
     {
-        // Re-query GeniusPay when locally FAILED/CANCELLED — sandbox may have
+        // Re-query Kpay when locally FAILED/CANCELLED — sandbox may have
         // completed after an early verify (wrong ref or race). SUCCESS/REFUNDED
         // are not re-opened here (webhook duplicate guard applies there).
         if ($payment->isPaid() || $payment->isRefunded()) {
@@ -247,7 +266,7 @@ final readonly class PaymentService
 
         // Verify with the gateway that originally handled the payment, not
         // the default one. This is critical now that we run multiple
-        // gateways simultaneously (Flutterwave + Stripe).
+        // gateways simultaneously (Kpay + Stripe).
         $gatewayName = (string) ($payment->gateway ?? $this->gateway->getName());
         $verifyingGateway = $this->resolveGateway($gatewayName);
 
@@ -262,7 +281,7 @@ final readonly class PaymentService
             'stripe' => !empty($payment->payment_link)
                 ? (string) $payment->payment_link
                 : (string) $payment->transaction_id,
-            'geniuspay' => self::resolveGeniusPayVerifyReference($payment, $gatewayReferenceOverride),
+            'kpay' => self::resolveKpayVerifyReference($payment, $gatewayReferenceOverride),
             default => (string) $payment->transaction_id,
         };
 
@@ -328,8 +347,8 @@ final readonly class PaymentService
                 }
 
                 $gatewayResponse = $result['raw'];
-                if ($gatewayName === 'geniuspay' && is_string($gatewayReferenceOverride) && $gatewayReferenceOverride !== '') {
-                    $gatewayResponse['genius_reference'] = $gatewayReferenceOverride;
+                if ($gatewayName === 'kpay' && is_string($gatewayReferenceOverride) && $gatewayReferenceOverride !== '') {
+                    $gatewayResponse['kpay_id'] = $gatewayReferenceOverride;
                 }
 
                 $updateData = [
@@ -374,18 +393,93 @@ final readonly class PaymentService
     }
 
     /**
+     * Apply a hosted-checkout redirect hint for terminal failure states only.
+     *
+     * Never promotes pending → success (that would allow free credits). Safe to
+     * mark failed/cancelled when the gateway redirect URL says so.
+     */
+    public function applySafeRedirectTerminalHint(Payment $payment, ?string $redirectStatus): Payment
+    {
+        if ($redirectStatus === null || trim($redirectStatus) === '') {
+            return $payment;
+        }
+
+        if ($payment->status !== PaymentStatus::PENDING) {
+            return $payment;
+        }
+
+        $normalized = strtolower(trim($redirectStatus));
+
+        $terminalHint = match (true) {
+            in_array($normalized, ['cancelled', 'canceled'], true) => PaymentStatus::CANCELLED,
+            in_array($normalized, ['failed', 'declined', 'error', 'expired'], true) => PaymentStatus::FAILED,
+            default => null,
+        };
+
+        if ($terminalHint === null) {
+            return $payment;
+        }
+
+        // Conditional UPDATE: the in-memory PENDING check above can be stale —
+        // a webhook may have committed SUCCESS since this row was loaded, and
+        // an unconditional save() would overwrite a settled payment. The
+        // WHERE clause makes the transition pending→terminal atomic; zero
+        // rows affected means someone else already resolved it.
+        $updated = Payment::query()
+            ->whereKey($payment->id)
+            ->where('status', PaymentStatus::PENDING)
+            ->update(['status' => $terminalHint]);
+
+        if ($updated === 1) {
+            PaymentFailed::dispatch($payment->fresh() ?? $payment);
+        }
+
+        return $payment->fresh() ?? $payment;
+    }
+
+    /**
      * Process an incoming webhook from a specific gateway.
      *
      * @param  array<string, mixed>  $payload
      * @param  array<string, mixed>  $headers
      * @return array<string, mixed> Normalised webhook data from the gateway's handleWebhook
      */
-    public function processWebhook(array $payload, array $headers, string $gatewayName): array
+    public function processWebhook(array $payload, array $headers, string $gatewayName, ?string $rawBody = null): array
     {
         $gateway = $this->resolveGateway($gatewayName);
-        $data = $gateway->handleWebhook($payload, $headers);
+        $data = $gateway->handleWebhook($payload, $headers, $rawBody);
 
         $txRef = $data['tx_ref'];
+
+        // ── Event-ID deduplication ──────────────────────────────────────
+        // Stripe and Kpay both retry on non-200 responses. The
+        // orchestrator's row-lock + terminal-state guards prevent
+        // double-credit on simultaneous retries within a single
+        // request lifecycle, but a retry that arrives minutes later
+        // (after the payment is already SUCCESS) would normally
+        // still hit the gateway service, the DB lookup, the
+        // transaction begin, and only then short-circuit on the
+        // terminal-state guard. With many retries on a single event,
+        // that adds load and noise.
+        //
+        // Cache the event id for 24 h post-success — well past
+        // Stripe's 3-day retry window and Kpay's hours-long
+        // schedule. A second processWebhook call for the same event
+        // returns the cached payload without re-running side effects.
+        $eventId = $data['event_id'] ?? null;
+        if (is_string($eventId) && $eventId !== '') {
+            $cacheKey = 'payment_webhook_event:'.$gatewayName.':'.$eventId;
+            $cached = Cache::get($cacheKey);
+            if (is_array($cached)) {
+                Log::info('Webhook replay short-circuit (event already processed)', [
+                    'gateway' => $gatewayName,
+                    'event_id' => $eventId,
+                    'tx_ref' => $txRef,
+                ]);
+
+                return $cached;
+            }
+        }
 
         // CRITICAL: lockForUpdate must run inside a DB::transaction() so the row
         // lock is held until commit. Without this, two concurrent webhooks can both
@@ -400,7 +494,11 @@ final readonly class PaymentService
             if (!$payment) {
                 Log::warning('Webhook: payment not found', ['tx_ref' => $txRef, 'gateway' => $gatewayName]);
 
-                return ['event' => null];
+                // `payment_missing` lets the controller answer non-2xx so the
+                // provider retries later: a webhook can outrun the DB commit
+                // of createPayment (the row is inserted AFTER initiate()),
+                // and a 200 here would acknowledge the event forever.
+                return ['event' => null, 'payment_missing' => true];
             }
 
             // Orphan-debit guard: a payment may already be terminal (legitimately
@@ -510,6 +608,10 @@ final readonly class PaymentService
             return ['event' => null];
         });
 
+        if (($eventToDispatch['payment_missing'] ?? false) === true) {
+            $data['payment_found'] = false;
+        }
+
         // Dispatch events AFTER commit so listeners see the final state.
         if ($eventToDispatch['event'] !== null) {
             $payment = Payment::find($eventToDispatch['payment_id']);
@@ -520,6 +622,20 @@ final readonly class PaymentService
                     PaymentFailed::dispatch($payment);
                 }
             }
+        }
+
+        // Record the event for dedup AFTER the side effects committed,
+        // so a crash mid-transaction still allows the next retry to
+        // re-run the orchestrator. 24 h window covers Stripe's
+        // 3-day exponential retry schedule well past the point where
+        // a duplicate would still be ambiguous (longer windows risk
+        // legitimate replays after long outages being suppressed).
+        if (is_string($eventId) && $eventId !== '' && $eventToDispatch['event'] !== null) {
+            Cache::put(
+                'payment_webhook_event:'.$gatewayName.':'.$eventId,
+                $data,
+                now()->addHours(24),
+            );
         }
 
         return $data;
@@ -628,43 +744,34 @@ final readonly class PaymentService
 
     private function resolveGateway(string $name): PaymentGatewayInterface
     {
-        // Final-resort container resolution — keeps the legacy Flutterwave
-        // path working when a webhook arrives before the registry was wired
-        // (rare, but possible during deploys / artisan commands).
+        // Final-resort container resolution — covers a webhook that arrives
+        // before the registry was wired (rare, but possible during deploys /
+        // artisan commands).
         return $this->registry[$name] ?? match ($name) {
-            'geniuspay' => app(GeniusPayPaymentService::class),
-            'flutterwave' => app(FlutterwavePaymentService::class),
+            'kpay' => app(KpayPaymentService::class),
             'stripe' => app(StripePaymentService::class),
             default => throw new \InvalidArgumentException("Gateway [{$name}] not supported."),
         };
     }
 
     /**
-     * GeniusPay verify endpoint expects the MTX/SANDBOX reference, not our KH tx_ref.
+     * Kpay's `GET /payments/:id` verify endpoint expects the Kpay `id`
+     * (e.g. `pay_abc123`), not our KH tx_ref.
      *
      * Resolution order:
-     *  1. gateway_response['genius_reference'] or gateway_response['reference']
-     *  2. Last path segment of payment_link (e.g. SANDBOX_R2YUJPRMF62CQXYI)
+     *  1. gateway_response['kpay_id'] (or ['id']) captured at initiate time.
+     *  2. Explicit override (e.g. supplied by a redirect callback), if it
+     *     looks like a Kpay reference.
+     *  3. Fall back to the KH tx_ref — Kpay will 404, but this keeps the
+     *     call shape defensive rather than throwing before hitting the API.
      */
-    private static function geniusPayReferenceFromPayment(Payment $payment): ?string
+    private static function kpayIdFromPayment(Payment $payment): ?string
     {
         $response = $payment->gateway_response;
         if (is_array($response)) {
-            $reference = $response['genius_reference'] ?? $response['reference'] ?? null;
-            if (is_string($reference) && $reference !== '') {
-                return $reference;
-            }
-        }
-
-        // Extract from checkout URL: https://pay.genius.ci/checkout/SANDBOX_R2YUJPRMF62CQXYI
-        $link = $payment->payment_link;
-        if (is_string($link) && $link !== '') {
-            $path = parse_url($link, PHP_URL_PATH);
-            if (is_string($path)) {
-                $ref = basename($path);
-                if (PaymentTransactionLookup::isGatewayReference($ref)) {
-                    return $ref;
-                }
+            $id = $response['kpay_id'] ?? $response['id'] ?? null;
+            if (is_string($id) && $id !== '') {
+                return $id;
             }
         }
 
@@ -672,38 +779,29 @@ final readonly class PaymentService
     }
 
     /**
-     * Resolve the reference to pass to GeniusPay's verify endpoint.
-     *
-     * GeniusPay uses two distinct reference types:
-     *  - Checkout reference (SANDBOX_R…  / MTX-R…): assigned during initiate,
-     *    stored in gateway_response['genius_reference'] and payment_link.
-     *    This is what GET /payments/{ref} expects.
-     *  - Transaction reference (SANDBOX_N… / MTX-T…): appended to the redirect
-     *    URL after the customer completes checkout. Useful for display only.
-     *
-     * When the caller provides an explicit override (e.g. from the redirect
-     * callback), that value is fresher than what was stored at initiate time
-     * (sandbox may reassign the reference after the hosted-checkout flow).
-     * We therefore prefer the override, then the stored reference.
+     * Resolve the reference to pass to Kpay's verify endpoint.
      */
-    private static function resolveGeniusPayVerifyReference(Payment $payment, ?string $override): string
+    private static function resolveKpayVerifyReference(Payment $payment, ?string $override): string
     {
-        // 1. Explicit override from the redirect callback (fresher in sandbox flows).
-        if (is_string($override) && $override !== '' && PaymentTransactionLookup::isGatewayReference($override)) {
-            return $override;
+        // 1. Stored Kpay `id` recorded at initiate time (stable, doesn't
+        //    change between initiate/verify — unlike a checkout
+        //    vs transaction reference split).
+        $storedId = self::kpayIdFromPayment($payment);
+        if ($storedId !== null) {
+            return $storedId;
         }
 
-        // 2. Stored checkout reference recorded at initiate time.
-        $storedRef = self::geniusPayReferenceFromPayment($payment);
-        if ($storedRef !== null) {
-            return $storedRef;
+        // 2. Explicit override from the redirect callback — only `pay_*` ids
+        // are valid Kpay verify path segments (not KPAY-* / SANDBOX_* labels).
+        if (is_string($override) && $override !== '' && PaymentTransactionLookup::isKpayApiPaymentId($override)) {
+            return $override;
         }
 
         return (string) $payment->transaction_id;
     }
 
     /**
-     * GeniusPay reports XOF while our ledger stores XAF — both are CFA francs at 1:1.
+     * Kpay reports XOF while our ledger stores XAF — both are CFA francs at 1:1.
      */
     private static function ledgerCurrencyMatches(string $expected, string $paid, string $gatewayName): bool
     {
@@ -714,7 +812,7 @@ final readonly class PaymentService
             return true;
         }
 
-        if ($gatewayName !== 'geniuspay') {
+        if ($gatewayName !== 'kpay') {
             return false;
         }
 
@@ -724,7 +822,7 @@ final readonly class PaymentService
     }
 
     /**
-     * Default hosted-checkout return URL on the PWA (GeniusPay / legacy Flutterwave).
+     * Default hosted-checkout return URL on the PWA (Kpay).
      *
      * The gateway redirects after its own confirmation UI, appending
      * `status`, `tx_ref`, and related query parameters.
@@ -753,6 +851,26 @@ final readonly class PaymentService
     }
 
     /**
+     * Construit l'URL du pont de retour natif à passer à la passerelle.
+     *
+     * On utilise le schéma+hôte RÉELS de la requête entrante (ce que le client
+     * a utilisé pour joindre l'API) plutôt que `route()`/`config('app.url')` :
+     * `URL::forceScheme('https')` forcerait sinon un https, ce qui casse le
+     * retour en local (artisan serve = http://localhost:8000, sans TLS). En
+     * preprod/prod la requête arrive déjà en https sur le bon domaine, donc le
+     * pont hérite naturellement du bon schéma/hôte.
+     */
+    private static function buildNativeReturnBridgeUrl(string $deepLink): string
+    {
+        $base = request()->getSchemeAndHttpHost();
+        if ($base === '') {
+            $base = rtrim((string) config('app.url'), '/');
+        }
+
+        return $base.route('payment.native-return', ['callback' => $deepLink], absolute: false);
+    }
+
+    /**
      * Narrow a `mixed` payload value to a non-empty string or null.
      *
      * Centralises the `is_string + !== ''` guard so PHPStan sees a single,
@@ -769,7 +887,7 @@ final readonly class PaymentService
     }
 
     /**
-     * GeniusPay appends `reference` + `status` on redirect; preserve our KH tx_ref
+     * Kpay appends `reference` + `status` on redirect; preserve our KH tx_ref
      * so the PWA can verify even when the gateway omits metadata in the query string.
      */
     private static function appendTxRefToReturnUrl(string $returnUrl, string $txRef): string

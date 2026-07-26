@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Services\AdBoostService;
-use App\Services\BoostService;
+use App\Services\Ad\AdBoostService;
+use App\Services\Monetization\BoostService;
 use Illuminate\Console\Command;
 
 /**

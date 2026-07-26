@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\BoostPacks;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\BoostPacks\Pages\CreateBoostPack;
 use App\Filament\Admin\Resources\BoostPacks\Pages\EditBoostPack;
 use App\Filament\Admin\Resources\BoostPacks\Pages\ListBoostPacks;
@@ -19,6 +20,12 @@ use Filament\Tables\Table;
 class BoostPackResource extends Resource
 {
     protected static ?string $model = BoostPack::class;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::CreditsManage) ?? false;
+    }
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedBolt;
 

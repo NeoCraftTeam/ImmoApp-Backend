@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\Expenses;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\Expenses\Pages\ManageExpenses;
 use App\Models\Expense;
 use Filament\Actions\ViewAction;
@@ -21,6 +22,12 @@ final class ExpenseResource extends Resource
     protected static ?string $model = Expense::class;
 
     protected static bool $isScopedToTenant = false;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::PaymentsView) ?? false;
+    }
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::CurrencyDollar;
 

@@ -1,0 +1,107 @@
+import { Heart } from '@tamagui/lucide-icons';
+import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
+import { useCallback, useRef } from 'react';
+import { Animated, Easing, Pressable } from 'react-native';
+import { YStack } from 'tamagui';
+
+import { useSession } from '@/auth/SessionProvider';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { useToggleFavorite } from '@/hooks/useToggleFavorite';
+import { useThemeColors } from '@/theme/useThemeColors';
+
+interface Props {
+  adId: string;
+  isFavorited: boolean;
+  size?: 'small' | 'medium';
+  /** Render variant — `bare` = no chrome, `chip` = circular filled bg. */
+  variant?: 'bare' | 'chip';
+}
+
+/**
+ * Heart bookmark with a keyframed "burst" on add — the icon springs
+ * through [1, 1.5, 0.85, 1.15, 1] mirroring the web component's
+ * framer-motion sequence. Animation runs on the UI thread via RN's
+ * `Animated` with `useNativeDriver: true`.
+ *
+ * Visitors who tap without an account are sent to the login screen
+ * (the backend's POST /ads/{ad}/favorite is sanctum-gated).
+ */
+export function FavoriteButton({
+  adId,
+  isFavorited,
+  size = 'medium',
+  variant = 'chip',
+}: Props) {
+  const router = useRouter();
+  const colors = useThemeColors();
+  const { isAuthenticated } = useSession();
+  const toggle = useToggleFavorite();
+  const reducedMotion = useReducedMotion();
+
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const playBurst = useCallback(() => {
+    const ease = Easing.inOut(Easing.ease);
+    scale.setValue(1);
+    Animated.sequence([
+      Animated.timing(scale, { toValue: 1.5, duration: 130, easing: ease, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 0.85, duration: 110, easing: ease, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1.15, duration: 130, easing: ease, useNativeDriver: true }),
+      Animated.timing(scale, { toValue: 1, duration: 130, easing: ease, useNativeDriver: true }),
+    ]).start();
+  }, [scale]);
+
+  const handlePress = useCallback(() => {
+    if (!isAuthenticated) {
+      router.push('/(auth)/login');
+      return;
+    }
+    // Guard double-tap : sans ce check, un user qui tap 2 fois en
+    // < 1 tick spawns 2 toggle.mutate consecutifs. Backend traite
+    // dans l'ordre arbitraire → l'ad peut finir dans le mauvais
+    // etat (favorited puis re-unfavorited par la 2e requete).
+    if (toggle.isPending) return;
+    // Reduced motion : le burst saute, le haptic + changement de couleur
+    // suffisent comme confirmation (feedback non vestibulaire).
+    if (!isFavorited && !reducedMotion) {
+      playBurst();
+    }
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    toggle.mutate({ adId });
+  }, [adId, isAuthenticated, isFavorited, playBurst, reducedMotion, router, toggle]);
+
+  const iconSize = size === 'small' ? 16 : 20;
+  const chipSize = size === 'small' ? 30 : 38;
+
+  return (
+    <Pressable
+      onPress={handlePress}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityState={{ selected: isFavorited }}
+      accessibilityLabel={
+        isFavorited ? 'Retirer des favoris' : 'Ajouter aux favoris'
+      }
+    >
+      <YStack
+        width={variant === 'chip' ? chipSize : undefined}
+        height={variant === 'chip' ? chipSize : undefined}
+        borderRadius={variant === 'chip' ? chipSize / 2 : undefined}
+        backgroundColor={
+          variant === 'chip' ? colors.chromeOverlay : 'transparent'
+        }
+        alignItems="center"
+        justifyContent="center"
+      >
+        <Animated.View style={{ transform: [{ scale }] }}>
+          <Heart
+            size={iconSize}
+            color={isFavorited ? '$brand' : colors.mutedIcon}
+            fill={isFavorited ? '$brand' : 'transparent'}
+          />
+        </Animated.View>
+      </YStack>
+    </Pressable>
+  );
+}

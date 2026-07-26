@@ -4,14 +4,55 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Http\Controllers\Payment\PaymentNativeReturnController;
+use Illuminate\Http\Request;
+
 /**
- * Validates absolute URLs used as post-payment redirects (Flutterwave callback_url).
+ * Validates absolute URLs used as post-payment redirects (hosted-checkout callback_url).
  *
- * Host must match {@see config('app.frontend_url')} and optional
- * {@see config('app.oauth_allowed_redirect_hosts')} entries — same policy as OAuth redirects.
+ * Two families are accepted:
+ *  - Web (http/https): host must match {@see config('app.frontend_url')} and optional
+ *    {@see config('app.oauth_allowed_redirect_hosts')} entries — same policy as OAuth redirects.
+ *  - Mobile deep-links: the scheme must be one of {@see config('app.oauth_allowed_redirect_schemes')}
+ *    (e.g. `keyhome://`, `keyhomeowners://`), or `exp://` for Expo Go during development.
+ *    The scheme itself is the whitelist — only our app registers it on the device.
  */
 final class FrontendRedirectGuard
 {
+    /**
+     * True when the request originates from a KeyHome React Native app
+     * (visitors or owners). Used to skip browser-only checks (Turnstile)
+     * and to reject invalid OAuth redirect URIs instead of silently
+     * falling back to the web callback.
+     */
+    public static function isMobileAppRequest(Request $request): bool
+    {
+        $client = mb_strtolower(trim((string) $request->header('X-KeyHome-Client', '')));
+
+        return in_array($client, ['keyhome-mobile-visitors', 'keyhome-mobile-owners'], true);
+    }
+
+    /**
+     * App deep-link schemes allowed as post-payment redirects (mobile).
+     *
+     * @return list<string>
+     */
+    public static function allowedAppSchemes(): array
+    {
+        // `exp` = Expo Go (utilisé pour tester les builds mobiles contre un
+        // serveur distant, y compris preprod). On le garde autorisé partout :
+        // c'est un custom scheme (handoff OS), non exploitable en open-redirect
+        // web, et le callback est posé par le client authentifié lui-même.
+        $schemes = ['exp'];
+        $configured = (string) config('app.oauth_allowed_redirect_schemes', '');
+        foreach (array_filter(array_map(trim(...), explode(',', $configured))) as $s) {
+            $schemes[] = mb_strtolower($s);
+        }
+
+        /** @var list<string> */
+        return array_values(array_unique($schemes));
+    }
+
     /**
      * @return list<string>
      */
@@ -32,6 +73,28 @@ final class FrontendRedirectGuard
         return array_values(array_unique($allowed));
     }
 
+    /**
+     * True when the URI is a whitelisted mobile deep-link (custom app scheme).
+     *
+     * Hosted-checkout gateways require an http(s) success URL, so a deep-link
+     * cannot be handed to them directly — it must first be wrapped in the
+     * HTTPS return-bridge ({@see PaymentNativeReturnController})
+     * which 302-redirects to it once the gateway comes back.
+     */
+    public static function isAllowedAppScheme(string $uri): bool
+    {
+        if ($uri === '' || strlen($uri) > 2048) {
+            return false;
+        }
+
+        $scheme = parse_url($uri, PHP_URL_SCHEME);
+        if (!is_string($scheme) || $scheme === '') {
+            return false;
+        }
+
+        return in_array(mb_strtolower($scheme), self::allowedAppSchemes(), true);
+    }
+
     public static function isAllowedAbsoluteUrl(string $uri): bool
     {
         if ($uri === '' || strlen($uri) > 2048) {
@@ -39,11 +102,22 @@ final class FrontendRedirectGuard
         }
 
         $parts = parse_url($uri);
-        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+        if (!is_array($parts) || empty($parts['scheme'])) {
             return false;
         }
 
         $scheme = mb_strtolower($parts['scheme']);
+
+        // Mobile deep-link : the app scheme is the whitelist. No host check —
+        // `keyhome://credits/callback` has an authority-less path.
+        if (in_array($scheme, self::allowedAppSchemes(), true)) {
+            return true;
+        }
+
+        if (empty($parts['host'])) {
+            return false;
+        }
+
         if ($scheme !== 'http' && $scheme !== 'https') {
             return false;
         }

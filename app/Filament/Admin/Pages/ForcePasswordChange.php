@@ -22,6 +22,12 @@ class ForcePasswordChange extends Page
 
     protected string $view = 'filament.admin.pages.force-password-change';
 
+    #[\Override]
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->hasMustChangePassword() ?? false;
+    }
+
     /** @var array<string, mixed> */
     public array $data = [];
 

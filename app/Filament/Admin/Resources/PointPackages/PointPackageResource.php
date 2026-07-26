@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Resources\PointPackages;
 
+use App\Enums\AdminPermission;
 use App\Filament\Admin\Resources\PointPackages\Pages\CreatePointPackage;
 use App\Filament\Admin\Resources\PointPackages\Pages\EditPointPackage;
 use App\Filament\Admin\Resources\PointPackages\Pages\ListPointPackages;
@@ -19,6 +20,12 @@ use Filament\Tables\Table;
 class PointPackageResource extends Resource
 {
     protected static ?string $model = PointPackage::class;
+
+    #[\Override]
+    public static function canViewAny(): bool
+    {
+        return auth()->user()?->hasAdminPermission(AdminPermission::CreditsManage) ?? false;
+    }
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedStar;
 

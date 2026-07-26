@@ -12,11 +12,11 @@ use Illuminate\Support\Facades\Http;
 uses(RefreshDatabase::class);
 
 beforeEach(function (): void {
-    config()->set('payment.default', 'geniuspay');
-    config()->set('payment.gateways.geniuspay.api_key', 'pk_sandbox_test_fake');
-    config()->set('payment.gateways.geniuspay.api_secret', 'sk_sandbox_test_fake');
-    config()->set('payment.gateways.geniuspay.webhook_secret', 'whsec_sandbox_test_secret_123');
-    config()->set('payment.gateways.geniuspay.redirect_url', 'https://test.app/payment/callback');
+    config()->set('payment.default', 'kpay');
+    config()->set('payment.gateways.kpay.api_key', 'pk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.api_secret', 'sk_sandbox_test_fake');
+    config()->set('payment.gateways.kpay.webhook_secret', 'whsec_sandbox_test_secret_123');
+    config()->set('payment.gateways.kpay.redirect_url', 'https://test.app/payment/callback');
 });
 
 // ─── AUTHENTIFICATION ────────────────────────────────────────────────────
@@ -67,12 +67,10 @@ it('should return 422 when credit is missing plan_id', function (): void {
 it('should ignore client-sent amount and use server price', function (): void {
     Event::fake();
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'reference' => 'MTX-TEST123',
-                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-TEST123',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_MTX_TEST123',
+            'reference' => 'KPAY-MTX-TEST123',
+            'gatewayUrl' => 'https://admin.kpay.site/gateway/gw_MTX_TEST123',
         ], 201),
     ]);
 
@@ -98,12 +96,10 @@ it('should ignore client-sent amount and use server price', function (): void {
 it('should return 200 with payment link when payload is valid', function (): void {
     Event::fake();
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'reference' => 'MTX-TEST123',
-                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-TEST123',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_MTX_TEST123',
+            'reference' => 'KPAY-MTX-TEST123',
+            'gatewayUrl' => 'https://admin.kpay.site/gateway/gw_MTX_TEST123',
         ], 201),
     ]);
 
@@ -119,12 +115,12 @@ it('should return 200 with payment link when payload is valid', function (): voi
 
     $response->assertSuccessful()
         ->assertJsonStructure(['reference', 'payment_link', 'tx_ref', 'gateway'])
-        ->assertJsonPath('gateway', 'geniuspay');
+        ->assertJsonPath('gateway', 'kpay');
 
     $this->assertDatabaseHas('payments', [
         'user_id' => $user->id,
         'status' => PaymentStatus::PENDING->value,
-        'gateway' => 'geniuspay',
+        'gateway' => 'kpay',
     ]);
 
     Event::assertDispatched(PaymentInitiated::class);
@@ -134,12 +130,10 @@ it('should return 200 with payment link when payload is valid', function (): voi
 
 it('should return 429 when user exceeds request rate limit', function (): void {
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'reference' => 'MTX-RATE',
-                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-RATE',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_MTX_RATE',
+            'reference' => 'KPAY-MTX-RATE',
+            'gatewayUrl' => 'https://admin.kpay.site/gateway/gw_MTX_RATE',
         ], 201),
     ]);
 
@@ -164,12 +158,10 @@ it('should return 429 when user exceeds request rate limit', function (): void {
 
 it('should not expose other users data in initiate response', function (): void {
     Http::fake([
-        'pay.genius.ci/*' => Http::response([
-            'success' => true,
-            'data' => [
-                'reference' => 'MTX-RATE',
-                'checkout_url' => 'https://pay.genius.ci/checkout/MTX-RATE',
-            ],
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_MTX_RATE',
+            'reference' => 'KPAY-MTX-RATE',
+            'gatewayUrl' => 'https://admin.kpay.site/gateway/gw_MTX_RATE',
         ], 201),
     ]);
 

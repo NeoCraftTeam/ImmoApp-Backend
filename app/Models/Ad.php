@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\AdStatus;
 use App\Enums\PropertyAttribute;
+use App\Enums\SponsorshipTier;
 use App\Enums\TransactionType;
 use App\Enums\UserType;
 use App\Enums\VerificationStatus;
@@ -145,11 +146,6 @@ class Ad extends Model implements HasMedia
         'tour_published_at',
         // SEC-007: is_verified, verified_at, verification_status, verification_notes,
         // verification_requested_at excluded — use forceFill() in admin/verification flows only.
-        'distance_main_road_m',
-        'distance_shops_m',
-        'distance_transport_m',
-        'distance_school_m',
-        'distance_hospital_m',
         'draft_payload',
         'prescreening_questions',
     ];
@@ -178,6 +174,10 @@ class Ad extends Model implements HasMedia
         'is_boosted' => 'boolean',
         'boost_expires_at' => 'datetime',
         'boosted_at' => 'datetime',
+        'is_subscription_sponsored' => 'boolean',
+        'subscription_tier' => SponsorshipTier::class,
+        'last_shown_at' => 'datetime',
+        'impression_count' => 'integer',
         'charges_forfaitaires' => 'boolean',
         'charges_montant_forfait' => 'integer',
         'charges_eau' => 'integer',
@@ -220,9 +220,25 @@ class Ad extends Model implements HasMedia
         });
 
         static::updating(function ($ad): void {
-            if ($ad->isDirty('title')) {
-                $ad->slug = self::generateUniqueSlug($ad->title, $ad->id);
+            // Only regenerate the slug on title edits BEFORE the ad has
+            // been published. Post-publish, the slug is a stable SEO URL
+            // — typo fixes on the title shouldn't break inbound links or
+            // bust CDN canonicals. Saves the bulk of `exists()` calls
+            // because most title edits happen post-PENDING.
+            if (!$ad->isDirty('title')) {
+                return;
             }
+
+            $original = $ad->getOriginal('status');
+            $previousStatus = $original instanceof AdStatus
+                ? $original
+                : AdStatus::tryFrom((string) $original);
+
+            if ($previousStatus !== null && $previousStatus !== AdStatus::PENDING) {
+                return;
+            }
+
+            $ad->slug = self::generateUniqueSlug($ad->title, $ad->id);
         });
     }
 
@@ -269,19 +285,27 @@ class Ad extends Model implements HasMedia
 
     public static function generateUniqueSlug(string $title, ?string $ignoreId = null): string
     {
-        $slug = Str::slug($title);
-        $original = $slug;
-        $i = 1;
-        while (
-            self::where('slug', $slug)
-                ->when($ignoreId, fn ($query) => $query->where('id', '!=', $ignoreId))
-                ->exists()
-        ) {
-            $slug = $original.'-'.$i;
-            $i++;
+        $base = Str::slug($title);
+
+        // Bound the linear `exists()` probe — try the base slug and the
+        // next few numeric suffixes, then fall back to a random suffix.
+        // Common-title bulk imports (e.g. "Appartement à louer Douala")
+        // used to fire 5-10 `exists()` queries per insertion; this caps
+        // the worst case at 4 queries.
+        foreach ([null, 1, 2, 3] as $suffix) {
+            $candidate = $suffix === null ? $base : "{$base}-{$suffix}";
+            $exists = self::query()
+                ->where('slug', $candidate)
+                ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
+                ->exists();
+            if (!$exists) {
+                return $candidate;
+            }
         }
 
-        return $slug;
+        // Past three collisions, append a short random suffix and trust
+        // that 36^6 collisions are vanishingly unlikely.
+        return $base.'-'.Str::lower(Str::random(6));
     }
 
     /**
@@ -319,6 +343,8 @@ class Ad extends Model implements HasMedia
 
             // Relations — vérifier qu'elles existent
             'city' => $this->quarter?->city?->name,
+            'city_id' => $this->quarter?->city_id,
+            'country' => $this->quarter?->city?->country,
             'quarter' => $this->quarter?->name,
             'type' => $this->ad_type?->name,
             'type_id' => $this->type_id,
@@ -394,6 +420,9 @@ class Ad extends Model implements HasMedia
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * @return BelongsTo<Agency, $this>
+     */
     public function agency(): BelongsTo
     {
         return $this->belongsTo(Agency::class);
@@ -659,6 +688,10 @@ class Ad extends Model implements HasMedia
             'boost_score' => $score,
             'boost_expires_at' => now()->addDays($durationDays),
             'boosted_at' => now(),
+            'subscription_tier' => SponsorshipTier::fromFlags(
+                (bool) $this->is_subscription_sponsored,
+                true,
+            ),
         ])->save();
     }
 
@@ -671,6 +704,10 @@ class Ad extends Model implements HasMedia
             'is_boosted' => false,
             'boost_score' => 0,
             'boost_expires_at' => null,
+            'subscription_tier' => SponsorshipTier::fromFlags(
+                (bool) $this->is_subscription_sponsored,
+                false,
+            ),
         ])->save();
     }
 
@@ -812,6 +849,118 @@ class Ad extends Model implements HasMedia
         }
 
         return true;
+    }
+
+    /**
+     * Lazy cache for sponsorshipTier(). The flags it depends on
+     * (is_subscription_sponsored, is_boosted, boost_expires_at) flip
+     * via mutators that all funnel through setAttribute(), which
+     * resets this field — so the cache invariant holds: a null cache
+     * means "needs recompute".
+     */
+    private ?SponsorshipTier $cachedSponsorshipTier = null;
+
+    /**
+     * Derive the current sponsorship tier from the underlying flags.
+     *
+     * Canonical truth — the persisted `subscription_tier` column is a
+     * denormalised copy kept in sync via boost()/unboost() and observers.
+     *
+     * Memoised because the feed render path calls this three times per
+     * ad (twice in AdResource, once in AdFeedRankingService::bucketize).
+     * The cache lives on the instance and is dropped whenever any input
+     * flag is reassigned via setAttribute().
+     */
+    public function sponsorshipTier(): SponsorshipTier
+    {
+        return $this->cachedSponsorshipTier ??= SponsorshipTier::fromFlags(
+            (bool) $this->is_subscription_sponsored,
+            $this->isBoosted(),
+        );
+    }
+
+    /**
+     * Reset the sponsorship-tier memo on any write to its inputs.
+     *
+     * Eloquent funnels every property write through `setAttribute`
+     * (including `forceFill`, mass assignment, and the `$ad->foo = bar`
+     * style). Intercepting it here is the cheapest place to keep the
+     * memo invariant intact without scattering invalidation calls
+     * across every mutator.
+     */
+    #[\Override]
+    public function setAttribute($key, $value)
+    {
+        if (in_array($key, ['is_subscription_sponsored', 'is_boosted', 'boost_expires_at', 'subscription_tier'], true)) {
+            $this->cachedSponsorshipTier = null;
+        }
+
+        return parent::setAttribute($key, $value);
+    }
+
+    /**
+     * Ranking multiplier for the sponsored-feed algorithm.
+     */
+    public function rankingMultiplier(): float
+    {
+        return $this->sponsorshipTier()->multiplier();
+    }
+
+    /**
+     * Recompute and persist `subscription_tier` from current flags.
+     */
+    public function syncSponsorshipTier(): void
+    {
+        $tier = $this->sponsorshipTier();
+
+        if ($this->subscription_tier === $tier) {
+            return;
+        }
+
+        $this->forceFill(['subscription_tier' => $tier])->saveQuietly();
+    }
+
+    /**
+     * Compute the final ranking score with time decay and rotation penalty.
+     */
+    public function computeRankingScore(): float
+    {
+        $baseScore = max(1, (int) ($this->boost_score ?? 0));
+
+        // Time decay: lose 1% per day since creation, floored at 10%.
+        $ageInDays = $this->created_at->diffInDays(now(), false);
+        $timeDecayFactor = max(0.1, 1 - ($ageInDays / 100));
+
+        // Rotation penalty: down-rank ads shown in the last 6h to fight fatigue.
+        $rotationPenalty = $this->last_shown_at && $this->last_shown_at->isAfter(now()->subHours(6))
+            ? 0.7
+            : 1.0;
+
+        return $baseScore * $this->rankingMultiplier() * $timeDecayFactor * $rotationPenalty;
+    }
+
+    /**
+     * Record an impression for this ad.
+     */
+    public function recordImpression(): void
+    {
+        $this->increment('impression_count');
+        $this->update(['last_shown_at' => now()]);
+    }
+
+    /**
+     * Scope to order by sponsorship ranking with distribution strategy.
+     *
+     * This ensures 60% sponsored ads, 40% organic in the feed.
+     */
+    #[Scope]
+    protected function orderBySponsorship($query)
+    {
+        return $query
+            ->orderByDesc('is_subscription_sponsored')
+            ->orderByDesc('boost_score')
+            ->orderByDesc('created_at')
+            ->orderByDesc('id');
     }
 
     public function getActivitylogOptions(): LogOptions

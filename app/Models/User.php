@@ -12,8 +12,8 @@ use App\Mail\ForgotPasswordMail;
 use App\Mail\VerificationCodeMail;
 use App\Mail\VerifyEmailMail;
 use App\Models\Concerns\HasAdminPermissions;
+use App\Services\Auth\OtpService;
 use App\Services\AvatarGeneratorService;
-use App\Services\OtpService;
 use App\Support\ChatAvatarUrl;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\UserFactory;
@@ -194,6 +194,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         'google_id',
         'facebook_id',
         'apple_id',
+        'github_id',
         'clerk_id',
         'oauth_provider',
         'oauth_avatar',
@@ -221,7 +222,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
      *
      * @var list<string>
      */
-    protected $hidden = ['password', 'app_authentication_secret', 'app_authentication_recovery_codes', 'remember_token', 'location', 'created_at', 'updated_at', 'google_id', 'facebook_id', 'apple_id'];
+    protected $hidden = ['password', 'app_authentication_secret', 'app_authentication_recovery_codes', 'remember_token', 'location', 'created_at', 'updated_at', 'google_id', 'facebook_id', 'apple_id', 'github_id'];
 
     // =========================================================================
     // Boot
@@ -525,6 +526,25 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function trustScores(): HasMany
     {
         return $this->hasMany(TrustScore::class);
+    }
+
+    /**
+     * Eager-loadable "latest trust score" — avoids the per-row
+     * `$owner->trustScores()->latest('computed_at')->first()` N+1 fired
+     * by AdResource for every ad in a feed/index/search response.
+     *
+     * We cannot use `latestOfMany('computed_at')` here: that helper
+     * generates a `MAX(id)` secondary aggregate as a tiebreaker, and
+     * Postgres has no `max(uuid)` function. Trust-score history is
+     * small (a handful of rows per user at most), so a plain `hasOne`
+     * with `latest('computed_at')` eager-loads cheaply and Laravel
+     * keeps the first row per parent (= the latest score per user).
+     *
+     * @return HasOne<TrustScore, $this>
+     */
+    public function latestTrustScore(): HasOne
+    {
+        return $this->hasOne(TrustScore::class)->latest('computed_at');
     }
 
     // =========================================================================

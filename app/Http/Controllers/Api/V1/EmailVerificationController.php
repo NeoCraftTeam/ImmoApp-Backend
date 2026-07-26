@@ -7,7 +7,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Enums\UserRole;
 use App\Http\Resources\UserResource;
 use App\Models\User;
-use App\Services\TokenService;
+use App\Services\Auth\TokenService;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -106,7 +106,7 @@ final readonly class EmailVerificationController
 
         } catch (\Throwable $e) {
             Log::error('Email verification failed', [
-                'error' => config('app.debug') ? $e->getMessage() : 'An internal error occurred.',
+                'error' => $e->getMessage(),
                 'user_id' => $id,
             ]);
 
@@ -261,6 +261,49 @@ final readonly class EmailVerificationController
 
         return response()->json([
             'message' => 'Si cette adresse est enregistrée et non vérifiée, un email a été envoyé.',
+        ]);
+    }
+
+    /**
+     * Corrige l'adresse email d'un compte PAS ENCORE vérifié (faute de
+     * frappe à l'inscription) puis renvoie un OTP à la nouvelle adresse.
+     *
+     * Vit sous le préfixe `auth/` exempté par EnsureEmailIsVerified —
+     * c'est la seule mutation autorisée à un compte non vérifié, et elle
+     * est refusée dès que l'email est vérifié (le changement d'email
+     * post-vérification passe par PUT /users/{id}, avec ses garde-fous).
+     */
+    public function updateUnverifiedEmail(Request $request): JsonResponse
+    {
+        $request->validate([
+            'email' => 'required|email|max:255|unique:users,email',
+        ]);
+
+        /** @var User $user */
+        $user = $request->user();
+
+        if ($user->hasVerifiedEmail()) {
+            return response()->json([
+                'message' => 'Votre email est déjà vérifié — utilisez la modification de profil.',
+            ], 403);
+        }
+
+        $key = 'update-unverified-email:'.$user->id;
+        if (RateLimiter::tooManyAttempts($key, 3)) {
+            $seconds = RateLimiter::availableIn($key);
+
+            return response()->json([
+                'message' => 'Trop de demandes. Réessayez dans '.$seconds.' secondes.',
+            ], 429);
+        }
+        RateLimiter::hit($key, 600);
+
+        $user->update(['email' => strtolower(trim((string) $request->input('email')))]);
+        $user->sendEmailVerificationNotification();
+
+        return response()->json([
+            'message' => 'Adresse corrigée. Un nouveau code a été envoyé.',
+            'email' => $user->email,
         ]);
     }
 }

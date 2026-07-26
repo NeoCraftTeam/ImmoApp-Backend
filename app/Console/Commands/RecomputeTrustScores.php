@@ -6,7 +6,7 @@ namespace App\Console\Commands;
 
 use App\Exceptions\TrustScoreConsentMissingException;
 use App\Models\User;
-use App\Services\TrustScoreService;
+use App\Services\Trust\TrustScoreService;
 use Illuminate\Console\Command;
 
 final class RecomputeTrustScores extends Command

@@ -1,0 +1,903 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Api\V1\Payment;
+
+use App\Enums\PaymentType;
+use App\Http\Requests\Api\V1\SubscribeRequest;
+use App\Http\Resources\SubscriptionPlanResource;
+use App\Http\Resources\SubscriptionResource;
+use App\Models\Agency;
+use App\Models\Subscription;
+use App\Models\SubscriptionPlan;
+use App\Models\User;
+use App\Services\Monetization\SubscriptionService;
+use App\Services\Payment\PaymentService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
+use OpenApi\Annotations as OA;
+
+/**
+ * @OA\Tag(
+ *     name="📦 Abonnements Agences",
+ *     description="Gestion des abonnements pour les agences immobilières. Permet de consulter les plans disponibles, souscrire via la passerelle configurée, consulter l'abonnement actif, l'annuler et voir l'historique. Les agences reçoivent une facture par email à chaque souscription."
+ * )
+ */
+final class SubscriptionController
+{
+    public function __construct(
+        protected PaymentService $paymentService,
+        protected SubscriptionService $subscriptionService,
+    ) {}
+
+    /**
+     * @OA\Get(
+     *     path="/api/v1/subscriptions/plans",
+     *     operationId="listSubscriptionPlans",
+     *     summary="Lister les plans d'abonnement disponibles",
+     *     description="Retourne la liste de tous les plans d'abonnement actifs, triés par ordre de priorité. Chaque plan inclut les tarifs mensuels et annuels, les économies réalisées sur un abonnement annuel, les limites d'annonces, le score de boost, et la liste des fonctionnalités incluses. **Endpoint public** : aucune authentification requise.",
+     *     tags={"📦 Abonnements Agences"},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Liste des plans d'abonnement actifs",
+     *
+     *         @OA\JsonContent(
+     *             type="object",
+     *
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *
+     *                 @OA\Items(
+     *                     type="object",
+     *
+     *                     @OA\Property(property="id", type="string", format="uuid", example="9e2f3a4b-5c6d-7e8f-9a0b-1c2d3e4f5a6b"),
+     *                     @OA\Property(property="name", type="string", example="Premium"),
+     *                     @OA\Property(property="slug", type="string", example="premium"),
+     *                     @OA\Property(property="description", type="string", example="Plan premium pour les agences en croissance."),
+     *                     @OA\Property(property="price_monthly", type="integer", example=35000, description="Prix mensuel en FCFA"),
+     *                     @OA\Property(property="price_yearly", type="integer", example=350000, description="Prix annuel en FCFA (null si indisponible)"),
+     *                     @OA\Property(property="price_monthly_formatted", type="string", example="35 000 FCFA"),
+     *                     @OA\Property(property="price_yearly_formatted", type="string", example="350 000 FCFA"),
+     *                     @OA\Property(property="yearly_savings", type="integer", example=70000, description="Économie annuelle en FCFA par rapport au mensuel"),
+     *                     @OA\Property(property="duration_days", type="integer", example=30),
+     *                     @OA\Property(property="boost_score", type="integer", example=25, description="Points de boost appliqués aux annonces de l'agence"),
+     *                     @OA\Property(property="boost_duration_days", type="integer", example=14, description="Durée du boost en jours"),
+     *                     @OA\Property(property="max_ads", type="integer", nullable=true, example=50, description="Nombre max d'annonces (null = illimité)"),
+     *                     @OA\Property(property="is_unlimited", type="boolean", example=false),
+     *                     @OA\Property(property="features", type="array", @OA\Items(type="string", example="Boost de +25 points pendant 14 jours")),
+     *                     @OA\Property(property="sort_order", type="integer", example=2)
+     *                 )
+     *             )
+     *         )
+     *     )
+     * )
+     */
+    public function plans(): AnonymousResourceCollection
+    {
+        $plans = Cache::remember('subscription:plans:active', now()->addHours(24), fn () => SubscriptionPlan::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->get());
+
+        return SubscriptionPlanResource::collection($plans);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/v1/subscriptions/current",
+     *     operationId="currentSubscription",
+     *     summary="Consulter l'abonnement actif de mon agence",
+     *     description="Retourne l'abonnement actuellement actif de l'agence à laquelle appartient l'utilisateur authentifié, avec les détails du plan, le nombre de jours restants, et des statistiques (nombre d'annonces boostées, etc.). Si aucun abonnement n'est actif, `has_subscription` vaut `false` et `subscription` est `null`.",
+     *     tags={"📦 Abonnements Agences"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Abonnement actif trouvé (ou aucun abonnement)",
+     *
+     *         @OA\JsonContent(
+     *             type="object",
+     *
+     *             @OA\Property(property="has_subscription", type="boolean", example=true),
+     *             @OA\Property(
+     *                 property="subscription",
+     *                 nullable=true,
+     *                 type="object",
+     *                 @OA\Property(property="id", type="string", format="uuid"),
+     *                 @OA\Property(property="plan", type="object", description="Détails du plan souscrit"),
+     *                 @OA\Property(property="billing_period", type="string", enum={"monthly", "yearly"}, example="monthly"),
+     *                 @OA\Property(property="status", type="string", enum={"pending", "active", "expired", "cancelled"}, example="active"),
+     *                 @OA\Property(property="amount_paid", type="integer", example=35000),
+     *                 @OA\Property(property="amount_paid_formatted", type="string", example="35 000 FCFA"),
+     *                 @OA\Property(property="starts_at", type="string", format="date-time"),
+     *                 @OA\Property(property="ends_at", type="string", format="date-time"),
+     *                 @OA\Property(property="days_remaining", type="integer", example=24),
+     *                 @OA\Property(property="is_active", type="boolean", example=true),
+     *                 @OA\Property(property="auto_renew", type="boolean", example=false)
+     *             ),
+     *             @OA\Property(
+     *                 property="stats",
+     *                 type="object",
+     *                 @OA\Property(property="has_active_subscription", type="boolean", example=true),
+     *                 @OA\Property(property="current_plan", type="string", example="Premium"),
+     *                 @OA\Property(property="days_remaining", type="integer", example=24),
+     *                 @OA\Property(property="expires_at", type="string", format="date-time"),
+     *                 @OA\Property(property="total_boosted_ads", type="integer", example=12)
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Non authentifié — Token Sanctum manquant ou invalide"),
+     *     @OA\Response(
+     *         response=403,
+     *         description="L'utilisateur n'appartient à aucune agence",
+     *
+     *         @OA\JsonContent(@OA\Property(property="message", type="string", example="Vous n'appartenez à aucune agence."))
+     *     )
+     * )
+     */
+    public function current(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        /** @var Agency|null $agency */
+        $agency = $user->agency;
+
+        if (!$agency) {
+            return response()->json([
+                'message' => 'Vous n\'appartenez à aucune agence.',
+            ], 403);
+        }
+
+        $subscription = $agency->getCurrentSubscription();
+
+        if (!$subscription) {
+            return response()->json([
+                'has_subscription' => false,
+                'subscription' => null,
+            ]);
+        }
+
+        $subscription->load('plan');
+
+        return response()->json([
+            'has_subscription' => true,
+            'subscription' => new SubscriptionResource($subscription),
+            'stats' => $this->subscriptionService->getAgencyStats($agency),
+        ]);
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/v1/subscriptions/subscribe",
+     *     operationId="subscribe",
+     *     summary="Souscrire à un plan d'abonnement",
+     *     description="Initie le processus de souscription à un plan d'abonnement pour l'agence de l'utilisateur. Crée une transaction de paiement et retourne l'URL de paiement. Le frontend (mobile ou web) doit **rediriger l'utilisateur** vers `payment_url` pour finaliser le paiement. Une fois le paiement confirmé par le webhook, l'abonnement est activé automatiquement, les annonces de l'agence sont boostées, et une **facture est envoyée par email** à tous les membres de l'agence.",
+     *     tags={"📦 Abonnements Agences"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Données de souscription",
+     *
+     *         @OA\JsonContent(
+     *             required={"plan_id", "billing_period"},
+     *
+     *             @OA\Property(property="plan_id", type="string", format="uuid", description="UUID du plan choisi (obtenu via GET /subscriptions/plans)", example="9e2f3a4b-5c6d-7e8f-9a0b-1c2d3e4f5a6b"),
+     *             @OA\Property(property="billing_period", type="string", enum={"monthly", "yearly"}, description="Période de facturation : mensuel ou annuel (annuel = ~2 mois offerts)", example="monthly"),
+     *             @OA\Property(property="callback_url", type="string", description="URL de retour après paiement (optionnel, par défaut l'URL du frontend)", example="https://app.keyhome.cm/subscription/callback")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Paiement initialisé — Redirigez l'utilisateur vers payment_url",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="payment_url", type="string", description="URL vers laquelle rediriger l'utilisateur pour payer", example="https://admin.kpay.site/gateway/..."),
+     *             @OA\Property(property="message", type="string", example="Redirigez l'utilisateur vers cette URL pour payer.")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Non authentifié"),
+     *     @OA\Response(
+     *         response=403,
+     *         description="L'utilisateur n'appartient à aucune agence",
+     *
+     *         @OA\JsonContent(@OA\Property(property="message", type="string", example="Vous devez appartenir à une agence pour souscrire."))
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=422,
+     *         description="Données invalides ou plan indisponible",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="Ce plan n'est plus disponible."),
+     *             @OA\Property(property="errors", type="object", description="Détails des erreurs de validation (si applicable)")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=500, description="Erreur technique serveur")
+     * )
+     */
+    public function subscribe(SubscribeRequest $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        /** @var Agency|null $agency */
+        $agency = $user->agency;
+
+        if (!$agency) {
+            return response()->json([
+                'message' => 'Vous devez appartenir à une agence pour souscrire.',
+            ], 403);
+        }
+
+        // OWASP A01 — only the agency owner may engage agency funds via a
+        // subscription payment. A viewer/manager attached to the agency
+        // must not be allowed to launch a paid flow on the company's
+        // behalf. `cancel()` does not enforce this for legacy UX reasons,
+        // but `subscribe()` carries financial commitment so we gate it.
+        if ($agency->owner_id !== $user->id) {
+            return response()->json([
+                'message' => 'Seul le propriétaire de l\'agence peut souscrire un abonnement.',
+            ], 403);
+        }
+
+        $plan = SubscriptionPlan::findOrFail($request->validated('plan_id'));
+        $period = $request->validated('billing_period');
+
+        if (!$plan->is_active) {
+            return response()->json([
+                'message' => 'Ce plan n\'est plus disponible.',
+            ], 422);
+        }
+
+        $amount = $period === 'yearly' ? (int) $plan->price_yearly : (int) $plan->price;
+
+        if ($amount <= 0) {
+            return response()->json([
+                'message' => 'Tarification indisponible pour cette période.',
+            ], 422);
+        }
+
+        // SEC: Prevent double subscription payment — reject if already active.
+        $existingActive = $agency->getCurrentSubscription();
+        if ($existingActive && !$existingActive->isExpired()) {
+            return response()->json([
+                'message' => 'Votre agence a déjà un abonnement actif.',
+            ], 409);
+        }
+
+        // Idempotency guard: prevent double-click / retry from creating duplicate payments
+        $lockKey = "subscribe:{$agency->id}:{$plan->id}:{$period}";
+        $lock = Cache::lock($lockKey, 15);
+
+        if (!$lock->get()) {
+            return response()->json([
+                'message' => 'Paiement en cours de traitement, veuillez patienter.',
+            ], 409);
+        }
+
+        try {
+            $result = $this->paymentService->createPayment($user, [
+                'amount' => (float) $amount,
+                'type' => PaymentType::SUBSCRIPTION->value,
+                'payment_method' => 'orange_money',
+                'agency_id' => $agency->id,
+                'plan_id' => $plan->id,
+                'period' => $period,
+                'description' => "Abonnement {$plan->name} ({$period})",
+                'meta' => [
+                    'payment_type' => 'subscription',
+                    'agency_id' => $agency->id,
+                    'plan_id' => $plan->id,
+                    'period' => $period,
+                ],
+            ]);
+
+            $lock->release();
+
+            return response()->json([
+                'payment_url' => $result['link'],
+                'message' => 'Redirigez l\'utilisateur vers cette URL pour payer.',
+            ]);
+        } catch (\Exception $e) {
+            $lock->release();
+            Log::error('Erreur création paiement abonnement: '.$e->getMessage());
+
+            return response()->json([
+                'message' => 'Erreur technique lors de l\'initialisation.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/v1/subscriptions/cancel",
+     *     operationId="cancelSubscription",
+     *     summary="Annuler l'abonnement actif de mon agence",
+     *     description="Annule l'abonnement actif de l'agence. **L'abonnement reste fonctionnel jusqu'à sa date d'expiration** (`ends_at`), mais ne sera pas renouvelé. L'agence conserve donc l'accès aux fonctionnalités premium jusqu'à la fin de la période payée. Une raison d'annulation peut être fournie (optionnel).",
+     *     tags={"📦 Abonnements Agences"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\RequestBody(
+     *         required=false,
+     *         description="Raison de l'annulation (optionnel)",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="reason", type="string", description="Raison de l'annulation", example="Nous n'avons plus besoin du service pour le moment.")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Abonnement annulé avec succès",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="Votre abonnement a été annulé. Il reste actif jusqu'au 15/03/2026."),
+     *             @OA\Property(property="subscription", type="object", description="Détails de l'abonnement annulé")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Non authentifié"),
+     *     @OA\Response(
+     *         response=403,
+     *         description="L'utilisateur n'appartient à aucune agence",
+     *
+     *         @OA\JsonContent(@OA\Property(property="message", type="string", example="Vous n'appartenez à aucune agence."))
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=404,
+     *         description="Aucun abonnement actif trouvé pour cette agence",
+     *
+     *         @OA\JsonContent(@OA\Property(property="message", type="string", example="Aucun abonnement actif à annuler."))
+     *     )
+     * )
+     */
+    public function cancel(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        /** @var Agency|null $agency */
+        $agency = $user->agency;
+
+        if (!$agency) {
+            return response()->json([
+                'message' => 'Vous n\'appartenez à aucune agence.',
+            ], 403);
+        }
+
+        // OWASP A01 — only the agency owner may cancel the agency's
+        // subscription. A viewer/manager shouldn't be able to disrupt
+        // billing on the company's behalf.
+        if ($agency->owner_id !== $user->id) {
+            return response()->json([
+                'message' => 'Seul le propriétaire de l\'agence peut annuler l\'abonnement.',
+            ], 403);
+        }
+
+        $subscription = $agency->getCurrentSubscription();
+
+        if (!$subscription) {
+            return response()->json([
+                'message' => 'Aucun abonnement actif à annuler.',
+            ], 404);
+        }
+
+        $reason = $request->input('reason', 'Annulé par l\'utilisateur via l\'API');
+        $subscription->cancel($reason);
+
+        return response()->json([
+            'message' => 'Votre abonnement a été annulé. Il reste actif jusqu\'au '
+                .$subscription->ends_at->format('d/m/Y').'. ',
+            'subscription' => new SubscriptionResource($subscription->load('plan')),
+        ]);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/v1/subscriptions/history",
+     *     operationId="subscriptionHistory",
+     *     summary="Historique des abonnements de mon agence",
+     *     description="Retourne l'historique paginé de tous les abonnements (actifs, expirés, annulés) de l'agence à laquelle appartient l'utilisateur. Chaque entrée inclut les détails du plan, la période de facturation, le montant payé et les dates. Utile pour afficher un récapitulatif ou un historique de facturation dans l'application mobile ou web.",
+     *     tags={"📦 Abonnements Agences"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Parameter(
+     *         name="page",
+     *         in="query",
+     *         required=false,
+     *         description="Numéro de page pour la pagination (15 éléments par page)",
+     *
+     *         @OA\Schema(type="integer", default=1, example=1)
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Historique paginé des abonnements",
+     *
+     *         @OA\JsonContent(
+     *             type="object",
+     *
+     *             @OA\Property(
+     *                 property="data",
+     *                 type="array",
+     *
+     *                 @OA\Items(
+     *                     type="object",
+     *
+     *                     @OA\Property(property="id", type="string", format="uuid"),
+     *                     @OA\Property(property="plan", type="object", description="Détails du plan souscrit"),
+     *                     @OA\Property(property="billing_period", type="string", enum={"monthly", "yearly"}),
+     *                     @OA\Property(property="status", type="string", enum={"pending", "active", "expired", "cancelled"}),
+     *                     @OA\Property(property="amount_paid", type="integer", example=35000),
+     *                     @OA\Property(property="amount_paid_formatted", type="string", example="35 000 FCFA"),
+     *                     @OA\Property(property="starts_at", type="string", format="date-time"),
+     *                     @OA\Property(property="ends_at", type="string", format="date-time"),
+     *                     @OA\Property(property="days_remaining", type="integer"),
+     *                     @OA\Property(property="is_active", type="boolean"),
+     *                     @OA\Property(property="cancelled_at", type="string", format="date-time", nullable=true),
+     *                     @OA\Property(property="created_at", type="string", format="date-time")
+     *                 )
+     *             ),
+     *             @OA\Property(
+     *                 property="links",
+     *                 type="object",
+     *                 description="Liens de pagination",
+     *                 @OA\Property(property="first", type="string"),
+     *                 @OA\Property(property="last", type="string"),
+     *                 @OA\Property(property="prev", type="string", nullable=true),
+     *                 @OA\Property(property="next", type="string", nullable=true)
+     *             ),
+     *             @OA\Property(
+     *                 property="meta",
+     *                 type="object",
+     *                 description="Métadonnées de pagination",
+     *                 @OA\Property(property="current_page", type="integer", example=1),
+     *                 @OA\Property(property="last_page", type="integer", example=3),
+     *                 @OA\Property(property="per_page", type="integer", example=15),
+     *                 @OA\Property(property="total", type="integer", example=42)
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Non authentifié"),
+     *     @OA\Response(
+     *         response=403,
+     *         description="L'utilisateur n'appartient à aucune agence",
+     *
+     *         @OA\JsonContent(@OA\Property(property="message", type="string", example="Vous n'appartenez à aucune agence."))
+     *     )
+     * )
+     */
+    public function history(Request $request): AnonymousResourceCollection
+    {
+        /** @var User $user */
+        $user = $request->user();
+        /** @var Agency|null $agency */
+        $agency = $user->agency;
+
+        if (!$agency) {
+            abort(403, 'Vous n\'appartenez à aucune agence.');
+        }
+
+        $subscriptions = $agency->subscriptions()
+            ->with('plan')
+            ->latest()
+            ->paginate(15);
+
+        return SubscriptionResource::collection($subscriptions);
+    }
+
+    /**
+     * Toggle auto-renewal for the agency's current subscription.
+     */
+    public function toggleAutoRenew(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        /** @var Agency|null $agency */
+        $agency = $user->agency;
+
+        if (!$agency) {
+            return response()->json([
+                'message' => 'Vous n\'appartenez à aucune agence.',
+            ], 403);
+        }
+
+        $subscription = $agency->getCurrentSubscription();
+
+        if (!$subscription) {
+            return response()->json([
+                'message' => 'Aucun abonnement actif.',
+            ], 404);
+        }
+
+        $subscription->update(['auto_renew' => !$subscription->auto_renew]);
+
+        return response()->json([
+            'message' => $subscription->auto_renew
+                ? 'Le renouvellement automatique est activé.'
+                : 'Le renouvellement automatique est désactivé.',
+            'auto_renew' => $subscription->auto_renew,
+            'subscription' => new SubscriptionResource($subscription->load('plan')),
+        ]);
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/v1/subscriptions/renew",
+     *     operationId="renewSubscription",
+     *     summary="Renouveler un abonnement expiré",
+     *     description="Permet de renouveler manuellement un abonnement expiré. Cette action réactive immédiatement l'abonnement pour une nouvelle période de facturation. Le paiement doit être effectué séparément via le système de paiement.",
+     *     tags={"📦 Abonnements Agences"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Abonnement renouvelé avec succès",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="Abonnement renouvelé avec succès."),
+     *             @OA\Property(property="subscription", type="object", description="Détails de l'abonnement renouvelé")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Non authentifié"),
+     *     @OA\Response(
+     *         response=403,
+     *         description="L'utilisateur n'appartient à aucune agence",
+     *
+     *         @OA\JsonContent(@OA\Property(property="message", type="string", example="Vous n'appartenez à aucune agence."))
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=404,
+     *         description="Aucun abonnement trouvé",
+     *
+     *         @OA\JsonContent(@OA\Property(property="message", type="string", example="Aucun abonnement trouvé."))
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=422,
+     *         description="L'abonnement est déjà actif",
+     *
+     *         @OA\JsonContent(@OA\Property(property="message", type="string", example="L'abonnement est déjà actif."))
+     *     )
+     * )
+     */
+    public function renew(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        /** @var Agency|null $agency */
+        $agency = $user->agency;
+
+        if (!$agency) {
+            return response()->json([
+                'message' => 'Vous n\'appartenez à aucune agence.',
+            ], 403);
+        }
+
+        // OWASP A01 — only the agency owner may engage agency funds on a
+        // renewal. Symmetric with `subscribe()`. Without this gate any
+        // agency member could trigger a payment on the owner's behalf.
+        if ($agency->owner_id !== $user->id) {
+            return response()->json([
+                'message' => 'Seul le propriétaire de l\'agence peut renouveler l\'abonnement.',
+            ], 403);
+        }
+
+        /** @var Subscription|null $subscription */
+        $subscription = $agency->subscriptions()->latest()->first();
+
+        if (!$subscription) {
+            return response()->json([
+                'message' => 'Aucun abonnement trouvé.',
+            ], 404);
+        }
+
+        if ($subscription->isActive() && !$subscription->isExpired()) {
+            return response()->json([
+                'message' => 'L\'abonnement est déjà actif.',
+            ], 422);
+        }
+
+        $plan = $subscription->plan;
+        if (!$plan || !$plan->is_active) {
+            return response()->json([
+                'message' => 'Le plan associé à votre abonnement n\'est plus disponible.',
+            ], 422);
+        }
+
+        $period = $subscription->billing_period ?? 'monthly';
+        $amount = $period === 'yearly' ? (int) $plan->price_yearly : (int) $plan->price;
+
+        if ($amount <= 0) {
+            return response()->json([
+                'message' => 'Tarification indisponible pour cette période.',
+            ], 422);
+        }
+
+        // SECURITY: the state mutation (Subscription::renew()) used to happen
+        // inline here, free of charge. It now runs from
+        // HandlePostPaymentActions::activateSubscription() ONLY after a signed
+        // gateway webhook confirms payment. We only create the payment row
+        // and hand back the gateway link here.
+        try {
+            $result = $this->paymentService->createPayment($user, [
+                'amount' => (float) $amount,
+                'type' => PaymentType::SUBSCRIPTION->value,
+                'payment_method' => 'orange_money',
+                'agency_id' => $agency->id,
+                'plan_id' => $plan->id,
+                'period' => $period,
+                'description' => "Renouvellement {$plan->name} ({$period})",
+                'meta' => [
+                    'payment_type' => 'subscription',
+                    'action' => 'renew',
+                    'agency_id' => $agency->id,
+                    'plan_id' => $plan->id,
+                    'subscription_id' => $subscription->id,
+                    'period' => $period,
+                ],
+            ]);
+
+            return response()->json([
+                'payment_url' => $result['link'],
+                'message' => 'Redirigez l\'utilisateur vers cette URL pour finaliser le renouvellement.',
+            ], 202);
+        } catch (\Exception $e) {
+            Log::error('Erreur création paiement renouvellement: '.$e->getMessage());
+
+            return response()->json([
+                'message' => 'Erreur technique lors de l\'initialisation.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/v1/subscriptions/upgrade",
+     *     operationId="upgradeSubscription",
+     *     summary="Mettre à niveau vers un plan supérieur",
+     *     description="Permet de passer à un plan d'abonnement supérieur. La mise à niveau prend effet **immédiatement** et le nouveau plan s'applique pour la période restante. Un paiement proportionnel sera requis pour la différence de prix.",
+     *     tags={"📦 Abonnements Agences"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Détails de la mise à niveau",
+     *
+     *         @OA\JsonContent(
+     *             required={"plan_id", "billing_period"},
+     *
+     *             @OA\Property(property="plan_id", type="string", format="uuid", description="UUID du nouveau plan", example="9e2f3a4b-5c6d-7e8f-9a0b-1c2d3e4f5a6b"),
+     *             @OA\Property(property="billing_period", type="string", enum={"monthly", "yearly"}, description="Période de facturation", example="monthly")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Abonnement mis à niveau avec succès",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="Abonnement mis à niveau avec succès."),
+     *             @OA\Property(property="subscription", type="object", description="Détails du nouvel abonnement")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Non authentifié"),
+     *     @OA\Response(response=403, description="Non autorisé"),
+     *     @OA\Response(response=404, description="Aucun abonnement actif"),
+     *     @OA\Response(response=422, description="Plan invalide ou déjà souscrit")
+     * )
+     */
+    public function upgrade(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'plan_id' => ['required', 'string', 'exists:subscription_plans,id'],
+            'billing_period' => ['required', 'string', Rule::in(['monthly', 'yearly'])],
+        ]);
+
+        /** @var User $user */
+        $user = $request->user();
+        /** @var Agency|null $agency */
+        $agency = $user->agency;
+
+        if (!$agency) {
+            return response()->json([
+                'message' => 'Vous n\'appartenez à aucune agence.',
+            ], 403);
+        }
+
+        // OWASP A01 — only the agency owner may engage agency funds on an
+        // upgrade. Symmetric with `subscribe()`.
+        if ($agency->owner_id !== $user->id) {
+            return response()->json([
+                'message' => 'Seul le propriétaire de l\'agence peut mettre à niveau l\'abonnement.',
+            ], 403);
+        }
+
+        $subscription = $agency->getCurrentSubscription();
+
+        if (!$subscription) {
+            return response()->json([
+                'message' => 'Aucun abonnement actif.',
+            ], 404);
+        }
+
+        $newPlan = SubscriptionPlan::findOrFail($validated['plan_id']);
+
+        if (!$newPlan->is_active) {
+            return response()->json([
+                'message' => 'Ce plan n\'est plus disponible.',
+            ], 422);
+        }
+
+        if ($newPlan->id === $subscription->subscription_plan_id) {
+            return response()->json([
+                'message' => 'Vous êtes déjà abonné à ce plan.',
+            ], 422);
+        }
+
+        $period = $validated['billing_period'];
+        $amount = $period === 'yearly' ? (int) $newPlan->price_yearly : (int) $newPlan->price;
+
+        if ($amount <= 0) {
+            return response()->json([
+                'message' => 'Tarification indisponible pour cette période.',
+            ], 422);
+        }
+
+        // SECURITY: the state mutation (Subscription::upgradeTo()) used to
+        // happen inline here, free of charge — any agency member could call
+        // this endpoint with a higher-tier plan_id and receive premium
+        // service without paying. The mutation now runs from
+        // HandlePostPaymentActions::activateSubscription() ONLY after a
+        // signed gateway webhook confirms payment for the new plan's full
+        // period. We only create the payment row here and hand back the
+        // gateway checkout link.
+        try {
+            $result = $this->paymentService->createPayment($user, [
+                'amount' => (float) $amount,
+                'type' => PaymentType::SUBSCRIPTION->value,
+                'payment_method' => 'orange_money',
+                'agency_id' => $agency->id,
+                'plan_id' => $newPlan->id,
+                'period' => $period,
+                'description' => "Mise à niveau vers {$newPlan->name} ({$period})",
+                'meta' => [
+                    'payment_type' => 'subscription',
+                    'action' => 'upgrade',
+                    'agency_id' => $agency->id,
+                    'plan_id' => $newPlan->id,
+                    'subscription_id' => $subscription->id,
+                    'period' => $period,
+                ],
+            ]);
+
+            return response()->json([
+                'payment_url' => $result['link'],
+                'message' => 'Redirigez l\'utilisateur vers cette URL pour finaliser la mise à niveau.',
+            ], 202);
+        } catch (\Exception $e) {
+            Log::error('Erreur création paiement upgrade: '.$e->getMessage());
+
+            return response()->json([
+                'message' => 'Erreur technique lors de l\'initialisation.',
+                'error' => config('app.debug') ? $e->getMessage() : null,
+            ], 500);
+        }
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/v1/subscriptions/downgrade",
+     *     operationId="downgradeSubscription",
+     *     summary="Rétrograder vers un plan inférieur",
+     *     description="Permet de passer à un plan d'abonnement inférieur. La rétrogradation prendra effet **à la fin de la période de facturation actuelle**, permettant à l'agence de continuer à bénéficier du plan actuel jusqu'à son expiration.",
+     *     tags={"📦 Abonnements Agences"},
+     *     security={{"sanctum":{}}},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *         description="Détails de la rétrogradation",
+     *
+     *         @OA\JsonContent(
+     *             required={"plan_id", "billing_period"},
+     *
+     *             @OA\Property(property="plan_id", type="string", format="uuid", description="UUID du nouveau plan", example="9e2f3a4b-5c6d-7e8f-9a0b-1c2d3e4f5a6b"),
+     *             @OA\Property(property="billing_period", type="string", enum={"monthly", "yearly"}, description="Période de facturation", example="monthly")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Rétrogradation programmée avec succès",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="L'abonnement sera rétrogradé à la fin de la période actuelle."),
+     *             @OA\Property(property="subscription", type="object", description="Détails de l'abonnement")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=401, description="Non authentifié"),
+     *     @OA\Response(response=403, description="Non autorisé"),
+     *     @OA\Response(response=404, description="Aucun abonnement actif"),
+     *     @OA\Response(response=422, description="Plan invalide ou déjà souscrit")
+     * )
+     */
+    public function downgrade(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'plan_id' => ['required', 'string', 'exists:subscription_plans,id'],
+            'billing_period' => ['required', 'string', Rule::in(['monthly', 'yearly'])],
+        ]);
+
+        /** @var User $user */
+        $user = $request->user();
+        /** @var Agency|null $agency */
+        $agency = $user->agency;
+
+        if (!$agency) {
+            return response()->json([
+                'message' => 'Vous n\'appartenez à aucune agence.',
+            ], 403);
+        }
+
+        // OWASP A01 — only the agency owner may schedule a plan change.
+        if ($agency->owner_id !== $user->id) {
+            return response()->json([
+                'message' => 'Seul le propriétaire de l\'agence peut rétrograder l\'abonnement.',
+            ], 403);
+        }
+
+        $subscription = $agency->getCurrentSubscription();
+
+        if (!$subscription) {
+            return response()->json([
+                'message' => 'Aucun abonnement actif.',
+            ], 404);
+        }
+
+        $newPlan = SubscriptionPlan::findOrFail($validated['plan_id']);
+
+        if (!$newPlan->is_active) {
+            return response()->json([
+                'message' => 'Ce plan n\'est plus disponible.',
+            ], 422);
+        }
+
+        if ($newPlan->id === $subscription->subscription_plan_id) {
+            return response()->json([
+                'message' => 'Vous êtes déjà abonné à ce plan.',
+            ], 422);
+        }
+
+        $subscription->downgradeTo($newPlan, $validated['billing_period']);
+
+        return response()->json([
+            'message' => 'L\'abonnement sera rétrogradé à la fin de la période actuelle.',
+            'subscription' => new SubscriptionResource($subscription->fresh()->load('plan')),
+        ]);
+    }
+}

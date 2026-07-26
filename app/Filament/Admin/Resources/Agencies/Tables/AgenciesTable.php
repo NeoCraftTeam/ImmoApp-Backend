@@ -59,6 +59,7 @@ class AgenciesTable
                 DeleteAction::make()
                     ->successNotificationTitle('Agence supprimée'),
                 ForceDeleteAction::make()
+                    ->visible(fn (): bool => auth()->user()?->isSuperAdmin() ?? false)
                     ->successNotificationTitle('Agence supprimée définitivement'),
                 RestoreAction::make()
                     ->successNotificationTitle('Agence restaurée'),
@@ -66,7 +67,8 @@ class AgenciesTable
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
-                    ForceDeleteBulkAction::make(),
+                    ForceDeleteBulkAction::make()
+                        ->visible(fn (): bool => auth()->user()?->isSuperAdmin() ?? false),
                     RestoreBulkAction::make(),
                 ]),
             ]);

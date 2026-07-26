@@ -47,11 +47,6 @@ it('autosave persists every supported text/number field on the draft', function 
             'charges_autres' => 'Gardiennage : 6 000 FCFA/mois',
             'transaction_type' => 'location',
             'quarter_id' => $newQuarter->id,
-            'distance_main_road_m' => 80,
-            'distance_shops_m' => 200,
-            'distance_transport_m' => 350,
-            'distance_school_m' => 600,
-            'distance_hospital_m' => 1200,
         ])
         ->assertOk();
 
@@ -69,8 +64,6 @@ it('autosave persists every supported text/number field on the draft', function 
     expect((int) $draft->charges_electricite)->toBe(9800);
     expect($draft->charges_autres)->toBe('Gardiennage : 6 000 FCFA/mois');
     expect($draft->quarter_id)->toBe($newQuarter->id);
-    expect($draft->distance_main_road_m)->toBe(80);
-    expect($draft->distance_hospital_m)->toBe(1200);
 });
 
 it('autosave updates the PostGIS location only when both coordinates are supplied', function (): void {

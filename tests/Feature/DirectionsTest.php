@@ -2,12 +2,13 @@
 
 declare(strict_types=1);
 
-use App\Services\DirectionsService;
+use App\Services\Geo\DirectionsService;
 use GuzzleHttp\Psr7\Response as Psr7Response;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Response as ClientResponse;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\RateLimiter;
 
 uses(RefreshDatabase::class);
 
@@ -183,4 +184,38 @@ it('returns 503 when ORS returns a non-200 status', function (): void {
 
     $this->getJson('/api/v1/directions?from_lat=4.05&from_lng=9.76&to_lat=4.06&to_lng=9.77')
         ->assertStatus(503);
+});
+
+// Gap 7: prevent an unauth'd client from draining the ORS free tier
+// (2000 calls/day) from a single IP. 30 hits/min/IP matches the
+// sibling /isochrones route.
+it('throttles directions at 30 requests per minute per IP', function (): void {
+    config(['services.ors.key' => 'test-ors-key']);
+
+    // Serve cheap cached responses — the limit kicks in regardless.
+    // Cache key matches DirectionsService::get format (3-dp rounding).
+    Cache::put(
+        'directions_driving-car_4.050_9.760_4.060_9.770',
+        [
+            'geojson' => ['type' => 'FeatureCollection', 'features' => []],
+            'summary' => ['distance_m' => 1000, 'duration_s' => 120, 'distance_label' => '1 km', 'duration_label' => '2 min'],
+            'profile' => 'driving-car',
+            'profile_label' => 'En voiture',
+            'cached' => false,
+        ],
+        3600
+    );
+
+    // Fresh limiter slot — the test runner shares the RateLimiter cache,
+    // so isolate by clearing the key Laravel uses for the throttle.
+    RateLimiter::clear(sha1('127.0.0.1'));
+
+    $url = '/api/v1/directions?from_lat=4.05&from_lng=9.76&to_lat=4.06&to_lng=9.77';
+
+    for ($i = 0; $i < 30; $i++) {
+        $this->getJson($url)->assertOk();
+    }
+
+    // 31st call from the same IP within the window returns 429.
+    $this->getJson($url)->assertStatus(429);
 });

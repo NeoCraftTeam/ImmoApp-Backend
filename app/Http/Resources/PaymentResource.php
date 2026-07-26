@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Enums\PaymentStatus;
 use App\Models\Payment;
 use App\Support\PaymentPresentation;
 use Illuminate\Http\Request;
@@ -21,6 +22,7 @@ final class PaymentResource extends JsonResource
             'id' => $this->id,
             'reference' => $this->transaction_id,
             'status' => $this->status->value,
+            'status_label' => self::statusLabel($this->status),
             'type' => $this->type->value,
             'amount' => $this->amount,
             'gateway' => $this->gateway,
@@ -36,5 +38,16 @@ final class PaymentResource extends JsonResource
             'points_awarded' => $this->whenLoaded('pointPackage', fn () => $this->pointPackage?->points_awarded),
             'created_at' => $this->created_at,
         ];
+    }
+
+    private static function statusLabel(PaymentStatus $status): string
+    {
+        return match ($status) {
+            PaymentStatus::SUCCESS => 'Payé',
+            PaymentStatus::FAILED => 'Échoué',
+            PaymentStatus::CANCELLED => 'Annulé',
+            PaymentStatus::REFUNDED => 'Remboursé',
+            PaymentStatus::PENDING => 'En attente',
+        };
     }
 }

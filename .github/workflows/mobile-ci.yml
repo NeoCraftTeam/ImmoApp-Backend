@@ -1,0 +1,63 @@
+name: Mobile CI
+
+on:
+  push:
+    branches: [main, preprod]
+    paths:
+      - 'mobile/visitors/**'
+      - '.github/workflows/mobile-ci.yml'
+  pull_request:
+    paths:
+      - 'mobile/visitors/**'
+
+defaults:
+  run:
+    working-directory: mobile/visitors
+
+jobs:
+  typecheck-and-test:
+    name: Lint + TS + Jest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: mobile/visitors/package-lock.json
+      - name: Install
+        run: npm ci --legacy-peer-deps
+      - name: ESLint
+        run: npm run lint -- --max-warnings=0
+      - name: TypeScript
+        run: npx tsc --noEmit
+      - name: Jest
+        run: npm test -- --ci --runInBand --silent
+
+  preview-build:
+    name: EAS preview build (PR)
+    needs: typecheck-and-test
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: mobile/visitors/package-lock.json
+      - name: Install
+        run: npm ci --legacy-peer-deps
+      - name: Setup EAS
+        run: npm install -g eas-cli
+      - name: Build preview (no submit)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "EXPO_TOKEN not set — skipping preview build"
+            exit 0
+          fi
+          eas build --profile preview --platform ios --non-interactive --no-wait

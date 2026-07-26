@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 use App\DTOs\RegistrationResult;
 use App\Exceptions\RegistrationEmailTakenException;
+use App\Mail\VerificationCodeMail;
 use App\Models\User;
-use App\Services\RegistrationService;
+use App\Services\Auth\RegistrationService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 
 uses(RefreshDatabase::class);
@@ -57,6 +59,28 @@ it('registers a customer successfully and returns 201', function (): void {
     ]);
 });
 
+it('sends the OTP verification code at registration (customer)', function (): void {
+    Mail::fake();
+
+    $data = validRegistrationData();
+
+    $this->postJson('/api/v1/auth/registerCustomer', $data)->assertCreated();
+
+    // L'OTP est déclenché à la CRÉATION du compte (via l'événement
+    // Registered) — c'est le seul moment où un code est envoyé.
+    Mail::assertQueued(VerificationCodeMail::class, fn ($m) => $m->hasTo($data['email']));
+});
+
+it('sends the OTP verification code at registration (agent)', function (): void {
+    Mail::fake();
+
+    $data = validRegistrationData(['role' => 'agent']);
+
+    $this->postJson('/api/v1/auth/registerAgent', $data)->assertCreated();
+
+    Mail::assertQueued(VerificationCodeMail::class, fn ($m) => $m->hasTo($data['email']));
+});
+
 it('registers an agent successfully and returns 201', function (): void {
     $data = validRegistrationData(['role' => 'agent']);
 
@@ -70,48 +94,41 @@ it('registers an agent successfully and returns 201', function (): void {
     ]);
 });
 
-it('returns 422 with use_login_or_reset when email already exists and account is verified', function (): void {
+it('returns a generic 422 without leaking account existence or provider (OWASP)', function (): void {
     App::setLocale('fr');
-    $existing = User::factory()->customers()->create([
+    $generic = __('auth.registration_generic_conflict');
+
+    // Trois états de compte différents doivent produire EXACTEMENT la
+    // même réponse : aucun facteur de distinction (anti-énumération),
+    // aucune divulgation du fournisseur, aucun code `registration_conflict`.
+    $verified = User::factory()->customers()->create([
         'email_verified_at' => now(),
         'clerk_id' => null,
     ]);
-    $data = validRegistrationData(['email' => $existing->email]);
-
-    $response = $this->postJson('/api/v1/auth/registerCustomer', $data);
-
-    $response->assertUnprocessable()
-        ->assertJsonPath('registration_conflict', 'use_login_or_reset')
-        ->assertJsonPath('errors.email.0', __('auth.registration_email_taken_login_or_reset'));
-});
-
-it('returns 422 with use_clerk_sso when email exists and user is linked to Clerk', function (): void {
-    App::setLocale('fr');
-    $existing = User::factory()->customers()->create([
+    $clerk = User::factory()->customers()->create([
         'clerk_id' => 'user_'.uniqid(),
         'email_verified_at' => now(),
     ]);
-    $data = validRegistrationData(['email' => $existing->email]);
-
-    $response = $this->postJson('/api/v1/auth/registerCustomer', $data);
-
-    $response->assertUnprocessable()
-        ->assertJsonPath('registration_conflict', 'use_clerk_sso')
-        ->assertJsonPath('errors.email.0', __('auth.registration_email_taken_use_clerk'));
-});
-
-it('returns 422 with complete_email_verification when email exists but is unverified', function (): void {
-    App::setLocale('fr');
-    $existing = User::factory()->customers()->unverified()->create([
+    $unverified = User::factory()->customers()->unverified()->create([
         'clerk_id' => null,
     ]);
-    $data = validRegistrationData(['email' => $existing->email]);
 
-    $response = $this->postJson('/api/v1/auth/registerCustomer', $data);
+    foreach ([$verified, $clerk, $unverified] as $existing) {
+        $response = $this->withHeaders(['Accept-Language' => 'fr'])->postJson(
+            '/api/v1/auth/registerCustomer',
+            validRegistrationData(['email' => $existing->email]),
+        );
 
-    $response->assertUnprocessable()
-        ->assertJsonPath('registration_conflict', 'complete_email_verification')
-        ->assertJsonPath('errors.email.0', __('auth.registration_email_taken_verify_email'));
+        $response->assertUnprocessable()
+            ->assertJsonPath('errors.email.0', $generic)
+            ->assertJsonMissingPath('registration_conflict');
+    }
+
+    // Le message générique ne doit pas révéler le fournisseur de connexion
+    // (Google/SSO) ni affirmer qu'un compte existe (formulation conditionnelle
+    // « Si vous avez déjà un compte » tolérée — OWASP password-recovery style).
+    expect($generic)->not->toContain('Google')
+        ->and($generic)->not->toContain('connexion sécurisée');
 });
 
 it('throws RegistrationEmailTakenException from service when email is taken', function (): void {
@@ -126,6 +143,46 @@ it('throws RegistrationEmailTakenException from service when email is taken', fu
 
     expect(fn () => $service->register($data, $request))
         ->toThrow(RegistrationEmailTakenException::class);
+});
+
+it('allows stateless (mobile) registration when turnstile is configured', function (): void {
+    // Turnstile actif côté serveur, mais la requête est stateless (bearer
+    // pur, sans session) comme l'app mobile Expo. Le widget Turnstile ne
+    // peut pas tourner hors d'un navigateur, donc on ne doit PAS l'exiger.
+    // Avant le fix, ceci renvoyait 422 {turnstile_token} et bloquait toute
+    // inscription mobile en prod.
+    config()->set('services.turnstile.secret_key', 'real-test-secret-not-dummy-placeholder');
+
+    $data = validRegistrationData();
+
+    $response = $this->postJson('/api/v1/auth/registerCustomer', $data);
+
+    $response->assertCreated();
+
+    $this->assertDatabaseHas('users', [
+        'email' => $data['email'],
+        'role' => 'customer',
+    ]);
+});
+
+it('allows mobile client registration without turnstile when turnstile is configured', function (): void {
+    // Requête native mobile identifiée par `X-KeyHome-Client`. Même si un
+    // domaine stateful attachait une session, le guard `isMobileAppRequest`
+    // doit exempter le mobile de Turnstile (aucun widget navigateur possible).
+    config()->set('services.turnstile.secret_key', 'real-test-secret-not-dummy-placeholder');
+
+    $data = validRegistrationData();
+
+    $response = $this->postJson('/api/v1/auth/registerCustomer', $data, [
+        'X-KeyHome-Client' => 'keyhome-mobile-visitors',
+    ]);
+
+    $response->assertCreated();
+
+    $this->assertDatabaseHas('users', [
+        'email' => $data['email'],
+        'role' => 'customer',
+    ]);
 });
 
 it('returns 429 when rate limited', function (): void {

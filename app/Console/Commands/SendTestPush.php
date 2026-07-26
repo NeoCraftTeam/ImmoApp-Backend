@@ -6,7 +6,7 @@ namespace App\Console\Commands;
 
 use App\Models\PushSubscription;
 use App\Models\User;
-use App\Services\WebPushService;
+use App\Services\Notification\WebPushService;
 use Illuminate\Console\Command;
 
 class SendTestPush extends Command
