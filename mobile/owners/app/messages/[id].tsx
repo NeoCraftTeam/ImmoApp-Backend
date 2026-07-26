@@ -37,6 +37,7 @@ import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useMotionPresets } from '@/hooks/useMotionPresets';
 import { showToast } from '@/services/toast';
 import { brand } from '@/theme/tokens';
+import { formatPresence } from '@/utils/presence';
 import type { ConversationMessage, ConversationPreview } from '@/types/conversation';
 
 const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
@@ -209,12 +210,15 @@ export default function ConversationThreadScreen() {
   };
 
   const otherName = conversation?.other_participant?.name?.trim() || 'Conversation';
+  // Présence façon Messenger : « En ligne » / « Vu à … » prime sur le
+  // titre d'annonce dans le sous-titre du header.
+  const presence = formatPresence(conversation?.other_participant?.last_seen_at);
 
   return (
     <YStack flex={1} backgroundColor="$background">
       <ScreenHeader
         title={otherName}
-        subtitle={conversation?.ad?.title}
+        subtitle={presence.label ?? conversation?.ad?.title}
         right={
           conversation?.other_participant?.avatar ? (
             <YStack width={36} height={36} borderRadius={18} overflow="hidden" backgroundColor="$slate100">

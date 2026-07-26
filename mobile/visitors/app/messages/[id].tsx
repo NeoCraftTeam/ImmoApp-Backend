@@ -24,6 +24,7 @@ import { extractApiErrorMessage } from '@/api/client';
 import { resolveMediaUrl } from '@/lib/media-url';
 import {
   useConversation,
+  useConversations,
   useDeleteMessage,
   useMarkConversationRead,
   useSendMessage,
@@ -31,6 +32,7 @@ import {
   useToggleReaction,
   useUploadAttachment,
 } from '@/hooks/useConversations';
+import { formatPresence } from '@/lib/presence';
 import { useConversationRealtime } from '@/hooks/useConversationRealtime';
 import { useMe } from '@/hooks/useMe';
 import { useMotionPresets } from '@/hooks/useMotionPresets';
@@ -106,12 +108,28 @@ export default function ConversationScreen() {
     );
   }, [messages, myId]);
 
-  // Interlocuteur dérivé des messages reçus (nom + avatar) pour un
-  // en-tête façon Messenger. Fallback neutre si aucun message reçu.
-  const otherParticipant = useMemo(
+  // Interlocuteur : d'abord la fiche conversation (nom + avatar +
+  // last_seen_at — présente même sans message reçu), sinon dérivé des
+  // messages reçus. En-tête façon Messenger : « En ligne » / « Vu à … ».
+  const conversationsList = useConversations();
+  const conversationMeta = useMemo(
+    () => conversationsList.data?.find((c) => c.uuid === id) ?? null,
+    [conversationsList.data, id],
+  );
+  const otherFromMessages = useMemo(
     () => messages.find((m) => m.sender && m.sender_id !== myId)?.sender ?? null,
     [messages, myId],
   );
+  const otherParticipant = conversationMeta?.other_participant ?? otherFromMessages;
+
+  // Tick minute : les libellés relatifs (« Vu à … » ↔ « En ligne »)
+  // doivent basculer même sans re-render déclenché par une requête.
+  const [, setPresenceTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setPresenceTick((n) => n + 1), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  const presence = formatPresence(conversationMeta?.other_participant?.last_seen_at);
 
   useEffect(() => {
     if (messagesResolved.length > 0) {
@@ -243,10 +261,19 @@ export default function ConversationScreen() {
                 <Paragraph fontSize={11} color={brand.primary} fontWeight="600">
                   En train d'écrire…
                 </Paragraph>
-              ) : realtime.isConnected ? (
-                <Paragraph fontSize={11} color="$slate500">
-                  En direct
-                </Paragraph>
+              ) : presence.label ? (
+                <XStack alignItems="center" gap={5}>
+                  {presence.online && (
+                    <YStack width={7} height={7} borderRadius={4} backgroundColor="#22C55E" />
+                  )}
+                  <Paragraph
+                    fontSize={11}
+                    color={presence.online ? '#16A34A' : '$slate500'}
+                    fontWeight={presence.online ? '700' : '500'}
+                  >
+                    {presence.label}
+                  </Paragraph>
+                </XStack>
               ) : null}
             </YStack>
           </XStack>

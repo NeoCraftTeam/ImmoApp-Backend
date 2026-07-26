@@ -48,12 +48,13 @@ export default function Onboarding() {
       return;
     }
     await persistDone();
-    router.replace('/(tabs)/home');
+    // Priming des autorisations juste après l'onboarding (une fois).
+    router.replace('/permissions');
   }, [activeIndex, slides.length, persistDone, router, scrollAnimated]);
 
   const handleSkip = useCallback(async () => {
     await persistDone();
-    router.replace('/(tabs)/home');
+    router.replace('/permissions');
   }, [persistDone, router]);
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {

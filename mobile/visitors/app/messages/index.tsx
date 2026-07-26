@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { extractApiErrorMessage } from '@/api/client';
 import { useConversations } from '@/hooks/useConversations';
 import { resolveMediaUrl } from '@/lib/media-url';
+import { formatPresence } from '@/lib/presence';
 import { useSession } from '@/auth/SessionProvider';
 import { brand } from '@/theme/tokens';
 import type { Conversation } from '@/types/conversation';
@@ -109,6 +110,7 @@ function ConversationRow({
   const other = conversation.other_participant ?? null;
   const otherName = other?.name?.trim() || 'Conversation';
   const avatarUrl = resolveMediaUrl(other?.avatar);
+  const isOnline = formatPresence(other?.last_seen_at).online;
   const lastMessage = conversation.last_message;
   const unread = (conversation.unread_count ?? 0) > 0;
   const timestamp = lastMessage?.created_at ?? conversation.last_message_at;
@@ -124,21 +126,37 @@ function ConversationRow({
   return (
     <Pressable onPress={onPress} accessibilityRole="button">
       <XStack paddingVertical={14} paddingHorizontal={16} gap={12} alignItems="center">
-        <YStack
-          width={48}
-          height={48}
-          borderRadius={24}
-          backgroundColor={brand.primaryAlpha10}
-          alignItems="center"
-          justifyContent="center"
-          overflow="hidden"
-        >
-          {avatarUrl ? (
-            <Image source={{ uri: avatarUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
-          ) : (
-            <Paragraph fontSize={18} fontWeight="700" color={brand.primary}>
-              {otherName.charAt(0).toUpperCase()}
-            </Paragraph>
+        <YStack width={48} height={48}>
+          <YStack
+            width={48}
+            height={48}
+            borderRadius={24}
+            backgroundColor={brand.primaryAlpha10}
+            alignItems="center"
+            justifyContent="center"
+            overflow="hidden"
+          >
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+            ) : (
+              <Paragraph fontSize={18} fontWeight="700" color={brand.primary}>
+                {otherName.charAt(0).toUpperCase()}
+              </Paragraph>
+            )}
+          </YStack>
+          {/* Pastille « en ligne » façon Messenger, ancrée sur l'avatar. */}
+          {isOnline && (
+            <YStack
+              position="absolute"
+              bottom={0}
+              right={0}
+              width={13}
+              height={13}
+              borderRadius={7}
+              backgroundColor="#22C55E"
+              borderWidth={2}
+              borderColor="$background"
+            />
           )}
         </YStack>
         <YStack flex={1} gap={3}>

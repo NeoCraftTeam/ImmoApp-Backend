@@ -1,5 +1,4 @@
 import {
-  Bell,
   Building2,
   CheckCircle2,
   Home as HomeIcon,
@@ -26,7 +25,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { extractApiErrorMessage } from '@/api/client';
 import { AdCard } from '@/components/AdCard';
 import { AdCardSkeleton } from '@/components/AdCardSkeleton';
-import { CountBadge } from '@/components/CountBadge';
 import { ClientProfileBanner } from '@/components/ClientProfileBanner';
 import { EmptyState } from '@/components/EmptyState';
 import { FadeIn } from '@/components/FadeIn';
@@ -39,7 +37,6 @@ import { useMe } from '@/hooks/useMe';
 import { useRecentlyViewed } from '@/hooks/useRecentlyViewed';
 import { useRecommendations } from '@/hooks/useRecommendations';
 import { useSession } from '@/auth/SessionProvider';
-import { useUnreadNotificationCount } from '@/hooks/useNotifications';
 import { useCreditsBalance } from '@/hooks/usePayments';
 import { brand } from '@/theme/tokens';
 import { useThemeColors } from '@/theme/useThemeColors';
@@ -91,7 +88,6 @@ export default function Home() {
   const greeting = useGreeting();
   const { isAuthenticated } = useSession();
   const me = useMe(isAuthenticated);
-  const unread = useUnreadNotificationCount();
   const creditsBalance = useCreditsBalance(isAuthenticated);
   const adTypes = useAdTypes();
 
@@ -161,7 +157,7 @@ export default function Home() {
   // réconciliation du header (2 FlatList imbriquées) pendant le scroll.
   const ListHeader = useMemo(() => (
     <YStack marginBottom={16}>
-      {/* Cluster top-right : solde crédits + cloche notifications */}
+      {/* Cluster top-right : solde crédits (cloche retirée volontairement) */}
       <XStack
         alignItems="center"
         gap={8}
@@ -189,14 +185,6 @@ export default function Home() {
             </XStack>
           </Pressable>
         )}
-        <Link href="/notifications" asChild>
-          <Pressable hitSlop={6} accessibilityLabel="Notifications">
-            <YStack width={40} height={40} borderRadius={20} alignItems="center" justifyContent="center">
-              <Bell size={22} color="$slate700" />
-              <CountBadge count={unread.data ?? 0} size={16} style={{ position: 'absolute', top: 3, right: 3 }} />
-            </YStack>
-          </Pressable>
-        </Link>
       </XStack>
 
       {/* Greeting inline — « Il se fait tard Test » (prénom en couleur
@@ -346,7 +334,6 @@ export default function Home() {
   ), [
     isAuthenticated,
     creditsBalance.data,
-    unread.data,
     firstName,
     greeting,
     me.data,
