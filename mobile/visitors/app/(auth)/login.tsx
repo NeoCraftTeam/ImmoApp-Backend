@@ -324,7 +324,7 @@ export default function Login() {
             <SocialLoginButtons
               variant="icons"
               disabled={submitting || succeeded}
-              onSuccess={() => playSuccess(() => router.replace('/(tabs)/home'))}
+              onSuccess={() => router.replace('/(tabs)/home')}
             />
 
             {__DEV__ ? (

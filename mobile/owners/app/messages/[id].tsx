@@ -1,6 +1,7 @@
 import { ImagePlus, Send, Trash2 } from '@tamagui/lucide-icons';
 import { format, isToday, isYesterday } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams } from 'expo-router';
@@ -167,6 +168,7 @@ export default function ConversationThreadScreen() {
     const body = draft.trim();
     if (!body) return;
     setDraft('');
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     send.mutate(body);
   };
 
@@ -388,6 +390,7 @@ export default function ConversationThreadScreen() {
                     const target = reactionTarget;
                     setReactionTarget(null);
                     if (!target) return;
+                    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     const mine = groupReactions(target.reactions, me.data?.id).some(
                       (g) => g.emoji === emoji && g.mine,
                     );

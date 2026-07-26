@@ -1,21 +1,23 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLocales } from 'expo-localization';
 
+import { apiClient } from '@/api/client';
+import { ENDPOINTS } from '@/api/endpoints';
+
 /**
- * Devise d'affichage — résolue AUTOMATIQUEMENT, zéro requête API,
- * AUCUN choix manuel utilisateur.
+ * Devise d'affichage. Le backend stocke TOUJOURS les prix en XAF (FCFA) ;
+ * l'affichage dans une autre devise est purement visuel (paiements en FCFA).
  *
- * Règle absolue (comme le web `keyhome-frontend-next`) : le backend stocke
- * TOUJOURS les prix en XAF (FCFA) ; l'affichage dans une autre devise est
- * purement visuel, les paiements se font en FCFA. La devise d'affichage est
- * dérivée UNE fois de la région/locale de l'appareil (l'équivalent mobile de
- * la géo-détection `CF-IPCountry` du web) et affichée de façon cohérente
- * partout. Il n'existe volontairement pas de sélecteur de devise : la page
- * Paramètres du web n'en propose pas non plus (le sélecteur web vit dans la
- * barre de navigation et le panneau bailleur reste toujours en FCFA).
+ * Résolution de la devise (première source valable gagne) :
+ *   1. Choix manuel de l'utilisateur (persisté) — prime toujours.
+ *   2. Géolocalisation par IP via le backend (`GET /geo/currency`,
+ *      MaxMind) — fiable même si le locale du téléphone est dans une autre
+ *      langue (un téléphone en français en Suisse ne doit pas voir EUR).
+ *   3. Repli local : `regionCode` de l'appareil (PAS `currencyCode`, qui
+ *      est lié à la LANGUE et non à la position), puis XAF.
  *
- * Les taux sont un snapshot statique aligné sur le fallback statique du web
- * (`/api/exchange-rates`), suffisant car ils bougent lentement — on évite
- * ainsi tout appel réseau récurrent.
+ * Le store est mutable : la détection IP arrive de façon asynchrone et un
+ * sélecteur permet à l'utilisateur de changer de devise.
  */
 export const BASE_CURRENCY = 'XAF';
 
@@ -67,35 +69,94 @@ const COUNTRY_TO_CURRENCY: Record<string, string> = {
   AE: 'AED', CN: 'CNY', JP: 'JPY', IN: 'INR',
 };
 
+/** Devises proposées dans le sélecteur (celles avec un taux connu). */
+export const SUPPORTED_CURRENCIES = Object.keys(RATES);
+
+/**
+ * Repli local : privilégie le `regionCode` (où est physiquement l'appareil)
+ * plutôt que le `currencyCode` (lié à la LANGUE — un téléphone en français
+ * rapporte EUR même en Suisse). On ne retombe sur `currencyCode` que si la
+ * région est inconnue.
+ */
 function deviceDefaultCurrency(): string {
   try {
     const locales = getLocales();
-    const region = locales[0]?.regionCode ?? '';
+    const region = (locales[0]?.regionCode ?? '').toUpperCase();
     const cur = locales[0]?.currencyCode ?? '';
-    if (cur && RATES[cur]) return cur;
     if (region && COUNTRY_TO_CURRENCY[region]) return COUNTRY_TO_CURRENCY[region];
+    if (cur && RATES[cur]) return cur;
   } catch {
     /* ignore */
   }
   return BASE_CURRENCY;
 }
 
+const STORAGE_KEY = 'kh_currency_choice_v1';
+
 /**
- * Store singleton : une seule source de vérité pour la devise d'affichage,
- * résolue automatiquement depuis l'appareil et immuable pour la session.
- * `useSyncExternalStore` s'y abonne pour lire la valeur.
+ * Store de devise mutable. Ordre de résolution : choix persisté → détection
+ * IP backend (asynchrone) → repli locale/région. `useSyncExternalStore` s'y
+ * abonne ; un changement (détection IP arrivée, ou sélection utilisateur)
+ * notifie les abonnés.
  */
 class CurrencyStore {
-  private readonly currency: string = deviceDefaultCurrency();
+  private currency: string = deviceDefaultCurrency();
+
+  private readonly listeners = new Set<() => void>();
+
+  private bootstrapped = false;
 
   getCurrency = (): string => this.currency;
 
-  /**
-   * La devise étant dérivée automatiquement et immuable, aucun changement
-   * n'est jamais émis — l'abonnement est un simple no-op requis par
-   * `useSyncExternalStore`.
-   */
-  subscribe = (_fn: () => void): (() => void) => () => {};
+  subscribe = (fn: () => void): (() => void) => {
+    this.listeners.add(fn);
+    // Résolution paresseuse au premier abonnement (premier écran monté).
+    void this.bootstrap();
+    return () => {
+      this.listeners.delete(fn);
+    };
+  };
+
+  /** Sélection manuelle — persistée et prioritaire sur la détection IP. */
+  setCurrency = (next: string): void => {
+    if (!RATES[next]) return;
+    this.apply(next);
+    void AsyncStorage.setItem(STORAGE_KEY, next).catch(() => {});
+  };
+
+  private apply(next: string): void {
+    if (next === this.currency) return;
+    this.currency = next;
+    this.listeners.forEach((l) => l());
+  }
+
+  private async bootstrap(): Promise<void> {
+    if (this.bootstrapped) return;
+    this.bootstrapped = true;
+
+    // 1. Choix manuel persisté — prime sur tout.
+    try {
+      const saved = await AsyncStorage.getItem(STORAGE_KEY);
+      if (saved && RATES[saved]) {
+        this.apply(saved);
+        return;
+      }
+    } catch {
+      /* ignore */
+    }
+
+    // 2. Détection par IP côté backend (MaxMind). Le locale/région reste
+    // affiché en attendant la réponse (pas de flash FCFA au démarrage).
+    try {
+      const { data } = await apiClient.get<{ currency?: string }>(ENDPOINTS.geo.currency);
+      const detected = data?.currency;
+      if (detected && RATES[detected]) {
+        this.apply(detected);
+      }
+    } catch {
+      /* réseau indisponible → on garde le repli locale/région */
+    }
+  }
 }
 
 export const currencyStore = new CurrencyStore();

@@ -102,3 +102,26 @@ it('returns false for a non-existent conversation channel', function (): void {
         ])
         ->assertForbidden();
 });
+
+it('presence channel authorizes but no longer leaks name or avatar (only id + device)', function (): void {
+    $user = User::factory()->create([
+        'firstname' => 'Jean',
+        'lastname' => 'Dupont',
+    ]);
+
+    $response = $this->actingAs($user)
+        ->postJson('/broadcasting/auth', [
+            'socket_id' => '123.456',
+            'channel_name' => 'presence-online-users',
+        ])
+        ->assertOk();
+
+    // Le channel_data d'un canal de présence contient les infos du membre.
+    // Il ne doit plus exposer le nom ni l'avatar (fuite de vie privée) —
+    // seulement l'id et le device, ce que les clients consomment.
+    $channelData = (string) $response->json('channel_data');
+    expect($channelData)->toContain((string) $user->id)
+        ->and($channelData)->not->toContain('Jean')
+        ->and($channelData)->not->toContain('Dupont')
+        ->and($channelData)->not->toContain('avatar');
+});

@@ -34,8 +34,13 @@ Broadcast::channel('user.{userId}', fn (User $user, string $userId): bool => $us
 
 /*
 |--------------------------------------------------------------------------
-| Chat — Presence Channel (online/offline status)
+| Chat — Presence Channel (online status)
 |--------------------------------------------------------------------------
+| Canal de présence global consommé par l'indicateur « en ligne » du web
+| (GlobalPresenceChannel + usePresence). Le payload NE DIFFUSE PLUS le nom
+| ni l'avatar : ils étaient exposés à tout utilisateur connecté (fuite de
+| vie privée) alors que les clients ne lisent que l'`id` et le `device`.
+| On n'expose donc que ces deux champs — présence préservée, PII retirée.
 */
 Broadcast::channel('online-users', function (User $user): array {
     $ua = (string) request()->header('User-Agent', '');
@@ -43,8 +48,6 @@ Broadcast::channel('online-users', function (User $user): array {
 
     return [
         'id' => $user->id,
-        'name' => trim("{$user->firstname} {$user->lastname}"),
-        'avatar' => $user->avatar,
         'device' => $isMobile ? 'mobile' : 'desktop',
     ];
 });

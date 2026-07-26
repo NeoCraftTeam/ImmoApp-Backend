@@ -167,7 +167,7 @@ final readonly class ConversationService
      */
     public function markAsRead(Conversation $conv, User $reader): void
     {
-        DB::transaction(function () use ($conv, $reader): void {
+        $markedCount = DB::transaction(function () use ($conv, $reader): int {
             $now = now();
 
             if ($reader->id === $conv->tenant_id) {
@@ -176,7 +176,7 @@ final readonly class ConversationService
                 $conv->update(['landlord_last_read_at' => $now]);
             }
 
-            $conv->messages()
+            return $conv->messages()
                 ->where('sender_id', '!=', $reader->id)
                 ->whereIn('status', [MessageStatus::Sent->value, MessageStatus::Delivered->value])
                 ->update(['status' => MessageStatus::Read->value, 'read_at' => $now]);
@@ -184,11 +184,18 @@ final readonly class ConversationService
 
         $this->invalidateUnreadCache($reader->id);
 
-        try {
-            broadcast(new MessageRead($conv->id, $reader->id, now()->toIso8601String()))
-                ->toOthers();
-        } catch (\Throwable) {
-            // Reverb may be unavailable in local dev — do not fail the HTTP response
+        // Ne diffuser que si des messages ont RÉELLEMENT été marqués lus :
+        // GET /messages (via MarkConversationReadJob) et PATCH /read appellent
+        // tous deux markAsRead — sans cette garde, deux MessageRead partaient
+        // pour la même lecture, et un simple rechargement d'un fil sans
+        // nouveau message rebroadcastait dans le vide.
+        if ($markedCount > 0) {
+            try {
+                broadcast(new MessageRead($conv->id, $reader->id, now()->toIso8601String()))
+                    ->toOthers();
+            } catch (\Throwable) {
+                // Reverb may be unavailable in local dev — do not fail the HTTP response
+            }
         }
     }
 

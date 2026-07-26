@@ -4,9 +4,15 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\Ad\AdSearchIsochroneController;
 use App\Http\Controllers\Api\V1\Geo\DirectionsController;
+use App\Http\Controllers\Api\V1\Geo\GeoCurrencyController;
 use App\Http\Controllers\Api\V1\Geo\GeoFindOrCreateController;
 use App\Http\Controllers\Api\V1\Geo\IsochroneController;
 use Illuminate\Support\Facades\Route;
+
+// Devise d'affichage détectée depuis l'IP du visiteur (MaxMind GeoLite2).
+// Public — surchargeable côté client par un choix manuel.
+Route::get('/geo/currency', GeoCurrencyController::class)
+    ->middleware(['optional.auth', 'throttle:60,1']);
 
 // Isochrones — zone accessible en X minutes depuis un point (ORS, cached 24h)
 Route::get('/isochrones', IsochroneController::class)

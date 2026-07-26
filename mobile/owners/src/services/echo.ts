@@ -34,6 +34,33 @@ const SCHEME = process.env.EXPO_PUBLIC_REVERB_SCHEME ?? 'https';
 
 let instance: PusherClient | null = null;
 
+type PusherCtor = new (key: string, opts: Record<string, unknown>) => PusherClient;
+
+/**
+ * Résout le constructeur Pusher quel que soit le format du bundle.
+ * Le dist react-native de pusher-js 8.5+ exporte `module.exports.Pusher`
+ * (export nommé) — lire `.default` renvoyait `undefined` et le
+ * `new Pusher()` en aval jetait « constructor is not callable ». On teste
+ * toutes les formes connues et on renvoie null (repli polling) plutôt que
+ * de crasher l'app au montage.
+ */
+function resolvePusherCtor(mod: unknown): PusherCtor | null {
+  const m = mod as Record<string, unknown> | null;
+  const candidates: unknown[] = [
+    mod,
+    m?.default,
+    m?.Pusher,
+    (m?.Pusher as Record<string, unknown> | undefined)?.default,
+    (m?.default as Record<string, unknown> | undefined)?.default,
+  ];
+  for (const candidate of candidates) {
+    if (typeof candidate === 'function') {
+      return candidate as PusherCtor;
+    }
+  }
+  return null;
+}
+
 /** Vrai quand Reverb est configuré ET que `pusher-js` est installé. */
 export function isEchoConfigured(): boolean {
   if (!APP_KEY || !HOST) return false;
@@ -49,9 +76,16 @@ export function getEchoClient(): PusherClient | null {
   if (!APP_KEY || !HOST) return null;
   if (instance) return instance;
 
-  let Pusher: new (key: string, opts: Record<string, unknown>) => PusherClient;
+  let Pusher: PusherCtor;
   try {
-    Pusher = require('pusher-js/react-native').default;
+    const resolved = resolvePusherCtor(require('pusher-js/react-native'));
+    if (!resolved) {
+      if (__DEV__) {
+        console.warn('[echo] constructeur Pusher introuvable dans pusher-js/react-native — repli polling');
+      }
+      return null;
+    }
+    Pusher = resolved;
   } catch (err) {
     // Le package n'est pas installe. Cas attendu pour les dev qui
     // n'ont pas configure Reverb — on log en DEV pour faciliter

@@ -2,6 +2,7 @@ import {
   ArrowLeft,
   Bell,
   ChevronRight,
+  Coins,
   CreditCard,
   FileText,
   HelpCircle,
@@ -19,6 +20,8 @@ import { Alert, Pressable, Switch } from 'react-native';
 import { H2, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CurrencySelectorModal } from '@/components/CurrencySelectorModal';
+import { useCurrency } from '@/hooks/useCurrency';
 import { useSession } from '@/auth/SessionProvider';
 import { useAppTheme, type ThemeMode } from '@/providers/ThemeProvider';
 import { brand } from '@/theme/tokens';
@@ -40,8 +43,10 @@ export default function Settings() {
   const insets = useSafeAreaInsets();
   const { isAuthenticated, signOut } = useSession();
   const { mode, scheme, setMode } = useAppTheme();
+  const { currency, symbol } = useCurrency();
   const [pushEnabled, setPushEnabled] = useState(true);
   const [emailEnabled, setEmailEnabled] = useState(true);
+  const [currencyOpen, setCurrencyOpen] = useState(false);
 
   const handleThemePress = () => {
     Alert.alert('Apparence', 'Choisissez le thème de l’application.', [
@@ -140,6 +145,12 @@ export default function Settings() {
               hint={mode === 'system' ? `${THEME_LABELS.system} (${scheme === 'dark' ? 'sombre' : 'clair'})` : THEME_LABELS[mode]}
               onPress={handleThemePress}
             />
+            <Row
+              icon={<Coins size={18} color="$slate700" />}
+              label="Devise d’affichage"
+              hint={`${currency} · ${symbol}`}
+              onPress={() => setCurrencyOpen(true)}
+            />
           </Section>
 
           <Section title="Aide et confidentialité">
@@ -197,6 +208,8 @@ export default function Settings() {
           )}
         </YStack>
       </YStack>
+
+      <CurrencySelectorModal open={currencyOpen} onClose={() => setCurrencyOpen(false)} />
     </>
   );
 }

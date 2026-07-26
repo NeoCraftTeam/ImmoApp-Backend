@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Monetization;
 
 use App\Enums\PointTransactionType;
+use App\Events\Credits\CreditsBalanceUpdated;
 use App\Models\PointTransaction;
 use App\Models\Setting;
 use App\Models\User;
@@ -12,6 +13,24 @@ use Illuminate\Support\Facades\DB;
 
 final class PointService
 {
+    /**
+     * Diffuse le nouveau solde + la transaction sur le canal privé de
+     * l'utilisateur (temps réel web + mobile). Enveloppé pour ne jamais
+     * faire échouer l'opération métier si Reverb est indisponible.
+     */
+    private function broadcastBalanceChange(User $user, PointTransaction $transaction): void
+    {
+        try {
+            broadcast(new CreditsBalanceUpdated(
+                (string) $user->id,
+                (int) $user->point_balance,
+                $transaction,
+            ));
+        } catch (\Throwable) {
+            // Reverb absent en local/dev — ne bloque pas la réponse HTTP.
+        }
+    }
+
     /** Return the current cost in points to unlock an ad contact. */
     public function unlockCost(): int
     {
@@ -42,7 +61,7 @@ final class PointService
         ?string $adId = null,
         PointTransactionType $type = PointTransactionType::UNLOCK,
     ): PointTransaction {
-        return DB::transaction(function () use ($user, $cost, $description, $adId, $type): PointTransaction {
+        $transaction = DB::transaction(function () use ($user, $cost, $description, $adId, $type): PointTransaction {
             /** @var User $freshUser */
             $freshUser = User::query()
                 ->lockForUpdate()
@@ -63,6 +82,10 @@ final class PointService
                 'ad_id' => $adId,
             ]);
         });
+
+        $this->broadcastBalanceChange($user, $transaction);
+
+        return $transaction;
     }
 
     /**
@@ -75,7 +98,7 @@ final class PointService
         string $description,
         ?string $paymentId = null
     ): PointTransaction {
-        return DB::transaction(function () use ($user, $points, $type, $description, $paymentId): PointTransaction {
+        $transaction = DB::transaction(function () use ($user, $points, $type, $description, $paymentId): PointTransaction {
             /** @var User $freshUser */
             $freshUser = User::query()
                 ->lockForUpdate()
@@ -92,5 +115,9 @@ final class PointService
                 'payment_id' => $paymentId,
             ]);
         });
+
+        $this->broadcastBalanceChange($user, $transaction);
+
+        return $transaction;
     }
 }

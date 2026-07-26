@@ -37,6 +37,17 @@ return [
         'token' => env('POSTMARK_TOKEN'),
     ],
 
+    /*
+    | MaxMind GeoLite2 — géolocalisation IP (pays → devise d'affichage).
+    | La base .mmdb n'est PAS versionnée (licence MaxMind). L'ops la place
+    | au chemin ci-dessous et la met à jour via `geoipupdate` (cron mensuel).
+    | Si le fichier est absent, le service retombe gracieusement sur
+    | l'en-tête CF-IPCountry puis sur null — l'app ne plante jamais.
+    */
+    'maxmind' => [
+        'db_path' => env('MAXMIND_DB_PATH', storage_path('app/geoip/GeoLite2-Country.mmdb')),
+    ],
+
     'resend' => [
         'key' => env('RESEND_KEY'),
         'webhook_secret' => env('RESEND_WEBHOOK_SECRET'),

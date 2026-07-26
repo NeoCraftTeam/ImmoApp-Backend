@@ -13,7 +13,7 @@ import {
 } from '@tamagui/lucide-icons';
 import { Image } from 'expo-image';
 import { Link, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -138,45 +138,28 @@ export default function Home() {
     [adTypes.data],
   );
 
-  // ── Error state ──────────────────────────────────────────────────
-  if (isError && !ads) {
-    return (
-      <YStack
-        flex={1}
-        backgroundColor="$background"
-        paddingTop={insets.top + 16}
-        paddingHorizontal="$5"
-      >
-        <H2>{t('home.title')}</H2>
-        <YStack flex={1} alignItems="center" justifyContent="center" gap={12}>
-          <Paragraph size="$4" color="$slate700" textAlign="center">
-            {extractApiErrorMessage(error)}
-          </Paragraph>
-          <Pressable onPress={() => refetch()} hitSlop={6}>
-            <XStack
-              alignItems="center"
-              gap={6}
-              paddingHorizontal={14}
-              paddingVertical={10}
-              borderRadius={999}
-              backgroundColor="$slate900"
-            >
-              <RefreshCw size={14} color="$background" />
-              <Paragraph fontSize={13} fontWeight="700" color="$background">
-                Réessayer
-              </Paragraph>
-            </XStack>
-          </Pressable>
-        </YStack>
+  // renderItem / keyExtractor stables : une closure inline recréée à
+  // chaque render invalide le cache d'items de la FlatList et fait
+  // re-render toutes les cartes visibles pendant le scroll.
+  const keyExtractor = useCallback((item: Ad) => item.id, []);
+  const renderFeedItem = useCallback(
+    ({ item, index }: { item: Ad; index: number }) => (
+      <YStack flex={1}>
+        <FadeIn delay={Math.min(index, 6) * 40}>
+          <AdCard ad={item} priority={index < TOP_PRIORITY_COUNT} />
+        </FadeIn>
       </YStack>
-    );
-  }
+    ),
+    [],
+  );
 
   // ── Header (rendered above feed) ─────────────────────────────────
   // Layout asymetrique editorial : prénom XL aligné gauche + bell
   // discrete top-right (relative donc s'insere sans s'imposer).
   // Tagline en italic pour break le rythme typo.
-  const ListHeader = (
+  // Mémoïsé : recréer cet arbre à chaque render du parent forçait la
+  // réconciliation du header (2 FlatList imbriquées) pendant le scroll.
+  const ListHeader = useMemo(() => (
     <YStack marginBottom={16}>
       {/* Cluster top-right : solde crédits + cloche notifications */}
       <XStack
@@ -360,7 +343,57 @@ export default function Home() {
         {selectedType ? `${selectedType} · à la une` : t('home.title')}
       </Paragraph>
     </YStack>
-  );
+  ), [
+    isAuthenticated,
+    creditsBalance.data,
+    unread.data,
+    firstName,
+    greeting,
+    me.data,
+    categoryChips,
+    selectedType,
+    showRecommendations,
+    recommendations.data,
+    showRecent,
+    recentAds,
+    router,
+  ]);
+
+  // ── Error state ──────────────────────────────────────────────────
+  // (Après tous les hooks — un early-return avant un hook casserait
+  // les Rules of Hooks quand l'état d'erreur bascule.)
+  if (isError && !ads) {
+    return (
+      <YStack
+        flex={1}
+        backgroundColor="$background"
+        paddingTop={insets.top + 16}
+        paddingHorizontal="$5"
+      >
+        <H2>{t('home.title')}</H2>
+        <YStack flex={1} alignItems="center" justifyContent="center" gap={12}>
+          <Paragraph size="$4" color="$slate700" textAlign="center">
+            {extractApiErrorMessage(error)}
+          </Paragraph>
+          <Pressable onPress={() => refetch()} hitSlop={6}>
+            <XStack
+              alignItems="center"
+              gap={6}
+              paddingHorizontal={14}
+              paddingVertical={10}
+              borderRadius={999}
+              backgroundColor="$slate900"
+            >
+              <RefreshCw size={14} color="$background" />
+              <Paragraph fontSize={13} fontWeight="700" color="$background">
+                Réessayer
+              </Paragraph>
+            </XStack>
+          </Pressable>
+        </YStack>
+      </YStack>
+    );
+  }
 
   // ── Loading state — skeleton grid (matches AdCard geometry) ───────
   if (isLoading && !ads) {
@@ -390,7 +423,6 @@ export default function Home() {
   return (
     <FlatList
       data={ads ?? []}
-      keyExtractor={(item) => item.id}
       numColumns={2}
       style={{ backgroundColor: colors.background }}
       columnWrapperStyle={{ gap: 12, marginBottom: 16 }}
@@ -400,6 +432,8 @@ export default function Home() {
         paddingHorizontal: 12,
       }}
       ListHeaderComponent={ListHeader}
+      keyExtractor={keyExtractor}
+      renderItem={renderFeedItem}
       ListEmptyComponent={
         <YStack paddingVertical={24} alignItems="center" gap={12}>
           <EmptyState
@@ -420,13 +454,6 @@ export default function Home() {
           )}
         </YStack>
       }
-      renderItem={({ item, index }) => (
-        <YStack flex={1}>
-          <FadeIn delay={Math.min(index, 6) * 40}>
-            <AdCard ad={item} priority={index < TOP_PRIORITY_COUNT} />
-          </FadeIn>
-        </YStack>
-      )}
       refreshControl={
         <RefreshControl
           refreshing={isRefetching}
@@ -521,9 +548,17 @@ function FeedFooter({
 /**
  * Carte compacte horizontale pour le carrousel "Recommandées".
  * Reprend le design language d'AdCard mais à une échelle plus petite
- * pour qu'environ deux cartes tiennent à l'écran.
+ * pour qu'environ deux cartes tiennent à l'écran. Mémoïsée : les
+ * carrousels du header ne doivent pas re-render leurs cartes quand le
+ * feed principal pagine.
  */
-function RecommendationCard({ ad, priority }: { ad: Ad; priority: boolean }) {
+const RecommendationCard = memo(function RecommendationCard({
+  ad,
+  priority,
+}: {
+  ad: Ad;
+  priority: boolean;
+}) {
   const { format } = useCurrency();
   const cover = ad.images?.find((i) => i.is_primary) ?? ad.images?.[0];
   const coverUri = cover?.thumb ?? cover?.url;
@@ -582,4 +617,4 @@ function RecommendationCard({ ad, priority }: { ad: Ad; priority: boolean }) {
       </Pressable>
     </Link>
   );
-}
+});
