@@ -12,6 +12,7 @@ import { SessionProvider, useSession } from '@/auth/SessionProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { SplashView } from '@/components/SplashView';
+import { ToastHost } from '@/components/ToastHost';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { CompareProvider } from '@/providers/CompareProvider';
 import { QueryProvider } from '@/providers/QueryProvider';
@@ -101,6 +102,7 @@ function ThemedRoot() {
                   animation: 'slide_from_right',
                 }}
               />
+              <ToastHost />
               <SplashGate />
             </CompareProvider>
             </SessionProvider>

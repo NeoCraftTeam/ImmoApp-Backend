@@ -20,6 +20,7 @@ import { SessionProvider, useSession } from '@/auth/SessionProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { SplashView } from '@/components/SplashView';
+import { ToastHost } from '@/components/ToastHost';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { QueryProvider } from '@/providers/QueryProvider';
 import { initMonitoring, reportError } from '@/services/monitoring';
@@ -69,6 +70,7 @@ export default function RootLayout() {
                       <OfflineBanner />
                       <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
                       <Slot />
+                      <ToastHost />
                       <SplashGate />
                     </SessionProvider>
                   </OptionalClerkProvider>

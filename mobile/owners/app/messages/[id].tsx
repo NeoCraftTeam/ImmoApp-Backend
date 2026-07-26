@@ -34,6 +34,7 @@ import {
 import { useConversationRealtime } from '@/hooks/useConversationRealtime';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useMotionPresets } from '@/hooks/useMotionPresets';
+import { showToast } from '@/services/toast';
 import { brand } from '@/theme/tokens';
 import type { ConversationMessage, ConversationPreview } from '@/types/conversation';
 
@@ -201,7 +202,7 @@ export default function ConversationThreadScreen() {
         type: asset.mimeType ?? 'image/jpeg',
       });
     } catch (err) {
-      Alert.alert('Erreur', extractApiErrorMessage(err));
+      showToast({ type: 'error', message: extractApiErrorMessage(err) });
     }
   };
 
