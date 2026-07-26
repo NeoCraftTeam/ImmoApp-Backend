@@ -73,7 +73,16 @@ final readonly class LoginService
 
         $user = User::where('email', $email)->first();
 
-        if (!$user || !Hash::check($password, $user->password)) {
+        // Anti-énumération temporelle : quand l'email n'existe pas, un
+        // court-circuit booléen sautait le Hash::check (~100 ms de bcrypt)
+        // et la réponse revenait nettement plus vite que pour un compte
+        // existant — le message générique ne suffisait donc pas. On calcule
+        // toujours une comparaison bcrypt pour égaliser le temps de réponse.
+        $passwordMatches = $user !== null
+            ? Hash::check($password, (string) $user->password)
+            : Hash::check($password, self::dummyPasswordHash()) && false;
+
+        if (!$user || !$passwordMatches) {
             RateLimiter::hit($key, 300);
 
             Log::warning('Failed login attempt', [
@@ -153,6 +162,17 @@ final readonly class LoginService
         $prefix = $loginContext === 'owner' ? 'owner' : 'client';
 
         return $this->tokenService->rotateForUser($user, 'token', "{$prefix}_token_%", $prefix);
+    }
+
+    /**
+     * Hash bcrypt factice, mis en cache statique, comparé quand l'email
+     * n'existe pas — jamais un hash d'utilisateur réel.
+     */
+    private static function dummyPasswordHash(): string
+    {
+        static $hash = null;
+
+        return $hash ??= Hash::make('keyhome-timing-equalizer');
     }
 
     private function checkRateLimit(string $key, LoginRequest $request, string $email): void

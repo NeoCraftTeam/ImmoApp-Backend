@@ -72,6 +72,37 @@ describe('Google OAuth Authentication', function (): void {
             ]);
     });
 
+    it('issues role-sealed tokens (never wildcard) for OAuth logins', function (): void {
+        $user = User::factory()->create([
+            'email' => 'sealed@example.com',
+            'google_id' => 'google-sealed-1',
+        ]);
+
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
+        $socialiteUser->shouldReceive('getId')->andReturn('google-sealed-1');
+        $socialiteUser->shouldReceive('getEmail')->andReturn('sealed@example.com');
+        $socialiteUser->shouldReceive('getName')->andReturn('Sealed User');
+        $socialiteUser->shouldReceive('getAvatar')->andReturn(null);
+
+        Socialite::shouldReceive('driver')->with('google')->andReturnSelf();
+        Socialite::shouldReceive('userFromToken')
+            ->with('valid-google-token')
+            ->andReturn($socialiteUser);
+
+        $this->postJson('/api/v1/auth/oauth/google', ['token' => 'valid-google-token'])
+            ->assertOk();
+
+        $accessToken = $user->tokens()->latest('id')->first();
+
+        expect($accessToken)->not->toBeNull()
+            ->and($accessToken->abilities)->toContain('role:'.$user->role->value)
+            ->and($accessToken->abilities)->toContain('api:access')
+            ->and($accessToken->abilities)->not->toContain('*')
+            ->and($accessToken->name)->toStartWith($user->sanctumSessionPrefix().'_oauth_google_')
+            ->and($accessToken->family_id)->not->toBeNull()
+            ->and($accessToken->expires_at)->not->toBeNull();
+    });
+
     it('creates new user with Google OAuth', function (): void {
         $socialiteUser = Mockery::mock(SocialiteUser::class);
         $socialiteUser->shouldReceive('getId')->andReturn('google-new-456');

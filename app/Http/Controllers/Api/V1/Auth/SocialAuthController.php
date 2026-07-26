@@ -8,6 +8,7 @@ use App\Enums\UserRole;
 use App\Http\Requests\Api\V1\SocialAuthRequest;
 use App\Mail\OAuthLinkAttemptMail;
 use App\Models\User;
+use App\Services\Auth\TokenService;
 use App\Services\UtmAttributionService;
 use App\Support\FrontendRedirectGuard;
 use App\Support\OAuthProviderAvailability;
@@ -31,6 +32,8 @@ use OpenApi\Attributes as OA;
 #[OA\Tag(name: 'OAuth', description: 'Social authentication endpoints')]
 final class SocialAuthController
 {
+    public function __construct(private readonly TokenService $tokenService) {}
+
     /**
      * Supported OAuth providers.
      *
@@ -139,7 +142,7 @@ final class SocialAuthController
             ])->save();
 
             // Create Sanctum token
-            $token = $user->createToken('oauth-'.$provider)->plainTextToken;
+            $token = $this->tokenService->createForUser($user, 'oauth_'.$provider)->plainTextToken;
 
             Log::info('OAuth authentication successful', [
                 'provider' => $provider,
@@ -426,7 +429,7 @@ final class SocialAuthController
                 'last_login_ip' => $request->ip(),
             ])->save();
 
-            $token = $user->createToken('oauth-'.$provider)->plainTextToken;
+            $token = $this->tokenService->createForUser($user, 'oauth_'.$provider)->plainTextToken;
 
             // Store the real token in cache under a short-lived exchange code.
             // The URL only carries the exchange code — never the raw Sanctum token.
@@ -639,7 +642,7 @@ final class SocialAuthController
             'pending_oauth_expires_at' => null,
         ]);
 
-        $token = $user->createToken('oauth-link-confirmed')->plainTextToken;
+        $token = $this->tokenService->createForUser($user, 'oauth_link')->plainTextToken;
 
         return response()->json([
             'message' => 'Liaison de compte confirmée avec succès.',
