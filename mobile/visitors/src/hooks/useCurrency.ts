@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 
 import {
   currencyStore,
+  formatCompactFromXAF,
   formatFromXAF,
   SUPPORTED_CURRENCIES,
   symbolFor,
@@ -27,5 +28,7 @@ export function useCurrency() {
     supported: SUPPORTED_CURRENCIES,
     setCurrency: currencyStore.setCurrency,
     format: (amountXAF: number) => formatFromXAF(amountXAF, currency),
+    /** Pastilles carte : pas de décimales, abrégé (18,5 k / 1,2 M). */
+    formatCompact: (amountXAF: number) => formatCompactFromXAF(amountXAF, currency),
   };
 }

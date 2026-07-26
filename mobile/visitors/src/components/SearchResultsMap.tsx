@@ -6,7 +6,6 @@ import { Paragraph, XStack, YStack } from 'tamagui';
 
 import { useCurrency } from '@/hooks/useCurrency';
 import { useMotionPresets } from '@/hooks/useMotionPresets';
-import { brand } from '@/theme/tokens';
 import type { Ad } from '@/types/ad';
 
 interface Props {
@@ -28,7 +27,7 @@ interface Props {
  */
 export function SearchResultsMap({ ads }: Props) {
   const router = useRouter();
-  const { format } = useCurrency();
+  const { format, formatCompact } = useCurrency();
   const { scrollAnimated } = useMotionPresets();
   const mapRef = useRef<MapView | null>(null);
 
@@ -87,7 +86,7 @@ export function SearchResultsMap({ ads }: Props) {
           title={ad.title}
           description={ad.price != null ? format(ad.price) : undefined}
           tracksViewChanges={false}
-          anchor={{ x: 0.5, y: 1 }}
+          anchor={{ x: 0.5, y: 0.5 }}
           onCalloutPress={() =>
             router.push({
               pathname: '/ads/[slug]',
@@ -95,40 +94,31 @@ export function SearchResultsMap({ ads }: Props) {
             })
           }
         >
-          <YStack alignItems="center">
-            <XStack
-              paddingHorizontal={10}
-              paddingVertical={5}
-              borderRadius={999}
-              backgroundColor={brand.primary}
-              // Ombre légère pour détacher la pastille du fond de carte.
-              style={
-                Platform.OS === 'ios'
-                  ? {
-                      shadowColor: '#000',
-                      shadowOpacity: 0.25,
-                      shadowRadius: 3,
-                      shadowOffset: { width: 0, height: 1 },
-                    }
-                  : { elevation: 3 }
-              }
-            >
-              <Paragraph fontSize={12} fontWeight="800" color="white" numberOfLines={1}>
-                {ad.price != null ? format(ad.price) : '—'}
-              </Paragraph>
-            </XStack>
-            {/* Petite pointe sous la pastille, ancrée sur la coordonnée. */}
-            <YStack
-              width={0}
-              height={0}
-              borderLeftWidth={5}
-              borderRightWidth={5}
-              borderTopWidth={6}
-              borderLeftColor="transparent"
-              borderRightColor="transparent"
-              borderTopColor={brand.primary}
-            />
-          </YStack>
+          {/* Pastille façon Airbnb : blanche, texte sombre, prix compact
+              (jamais de décimales, abrégé au-delà de 10 k), ombre douce,
+              pas de queue — centrée sur la coordonnée. */}
+          <XStack
+            paddingHorizontal={11}
+            paddingVertical={6}
+            borderRadius={999}
+            backgroundColor="white"
+            borderWidth={0.5}
+            borderColor="rgba(0,0,0,0.12)"
+            style={
+              Platform.OS === 'ios'
+                ? {
+                    shadowColor: '#000',
+                    shadowOpacity: 0.18,
+                    shadowRadius: 4,
+                    shadowOffset: { width: 0, height: 2 },
+                  }
+                : { elevation: 4 }
+            }
+          >
+            <Paragraph fontSize={12.5} fontWeight="800" color="#111827" numberOfLines={1}>
+              {ad.price != null ? formatCompact(ad.price) : '—'}
+            </Paragraph>
+          </XStack>
         </Marker>
       ))}
     </MapView>

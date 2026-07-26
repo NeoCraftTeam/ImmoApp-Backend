@@ -63,7 +63,8 @@ export default function SearchTab() {
   const [filters, setFilters] = useState<AdFilters>(EMPTY_FILTERS);
   const [sort, setSort] = useState<AdSort>(DEFAULT_SORT);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  // Carte par défaut (choix produit) — le toggle bascule vers la liste.
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('map');
   const [inputFocused, setInputFocused] = useState(false);
   const blurTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedQuery = useDebounce(query, 350);
