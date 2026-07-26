@@ -105,8 +105,12 @@ final readonly class LoginService
         }
 
         if ($user->email_verified_at === null) {
-            // Re-trigger OTP so the user can verify immediately.
-            $user->sendEmailVerificationNotification();
+            // L'OTP appartient au flux d'INSCRIPTION, pas à la connexion :
+            // on ne renvoie jamais de nouveau code ici. Le client route vers
+            // l'écran de vérification (seule voie pour activer le compte) où
+            // l'utilisateur saisit le code d'inscription ou touche « Renvoyer »
+            // (à la demande, protégé par cooldown). Se connecter ne doit pas
+            // déclencher l'envoi d'un code.
             throw new EmailNotVerifiedException(
                 email: $user->email,
                 role: $user->role->value,

@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 use App\DTOs\RegistrationResult;
 use App\Exceptions\RegistrationEmailTakenException;
+use App\Mail\VerificationCodeMail;
 use App\Models\User;
 use App\Services\Auth\RegistrationService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\App;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 
 uses(RefreshDatabase::class);
@@ -55,6 +57,28 @@ it('registers a customer successfully and returns 201', function (): void {
         'email' => $data['email'],
         'role' => 'customer',
     ]);
+});
+
+it('sends the OTP verification code at registration (customer)', function (): void {
+    Mail::fake();
+
+    $data = validRegistrationData();
+
+    $this->postJson('/api/v1/auth/registerCustomer', $data)->assertCreated();
+
+    // L'OTP est déclenché à la CRÉATION du compte (via l'événement
+    // Registered) — c'est le seul moment où un code est envoyé.
+    Mail::assertQueued(VerificationCodeMail::class, fn ($m) => $m->hasTo($data['email']));
+});
+
+it('sends the OTP verification code at registration (agent)', function (): void {
+    Mail::fake();
+
+    $data = validRegistrationData(['role' => 'agent']);
+
+    $this->postJson('/api/v1/auth/registerAgent', $data)->assertCreated();
+
+    Mail::assertQueued(VerificationCodeMail::class, fn ($m) => $m->hasTo($data['email']));
 });
 
 it('registers an agent successfully and returns 201', function (): void {
