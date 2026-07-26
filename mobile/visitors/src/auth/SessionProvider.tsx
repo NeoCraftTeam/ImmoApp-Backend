@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { apiClient, onUnauthorized, setBearerToken, SCOPED_SESSION_KEY } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
+import { markOAuthFlowActive } from '@/auth/oauth-flow';
 import { NON_PERSISTED_QUERY_ROOTS } from '@/lib/query-keys';
 import { clearPersistedQueryCache } from '@/providers/QueryProvider';
 import { disconnectEcho } from '@/services/echo';
@@ -165,29 +166,37 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           throw new Error('Impossible de démarrer la connexion.');
         }
 
-        const result = await WebBrowser.openAuthSessionAsync(redirect.redirect_url, returnUrl);
-        if (result.type !== 'success' || !('url' in result) || !result.url) {
-          // L'utilisateur a fermé le navigateur — pas une erreur.
-          return { cancelled: true };
-        }
+        // Drapeau lu par l'écran auth/callback : sur Android l'intent du
+        // deep-link est aussi routé vers cet écran — sans le drapeau, il
+        // rédimerait le même exchange_code (usage unique) en parallèle.
+        markOAuthFlowActive(true);
+        try {
+          const result = await WebBrowser.openAuthSessionAsync(redirect.redirect_url, returnUrl);
+          if (result.type !== 'success' || !('url' in result) || !result.url) {
+            // L'utilisateur a fermé le navigateur — pas une erreur.
+            return { cancelled: true };
+          }
 
-        const { queryParams } = Linking.parse(result.url);
-        const code = queryParams?.exchange_code;
-        if (typeof code !== 'string' || code === '') {
-          throw new Error('Échec de l’authentification. Veuillez réessayer.');
-        }
+          const { queryParams } = Linking.parse(result.url);
+          const code = queryParams?.exchange_code;
+          if (typeof code !== 'string' || code === '') {
+            throw new Error('Échec de l’authentification. Veuillez réessayer.');
+          }
 
-        const { data } = await apiClient.get<LoginResponse>(ENDPOINTS.auth.oauthExchange, {
-          params: { exchange_code: code },
-        });
-        const accessToken = data?.access_token ?? data?.token;
-        if (typeof accessToken !== 'string' || accessToken === '') {
-          throw new Error('Réponse de connexion invalide.');
+          const { data } = await apiClient.get<LoginResponse>(ENDPOINTS.auth.oauthExchange, {
+            params: { exchange_code: code },
+          });
+          const accessToken = data?.access_token ?? data?.token;
+          if (typeof accessToken !== 'string' || accessToken === '') {
+            throw new Error('Réponse de connexion invalide.');
+          }
+          setBearerToken(accessToken);
+          setToken(accessToken);
+          trackEvent('auth.signInSocial', { provider });
+          return { cancelled: false };
+        } finally {
+          markOAuthFlowActive(false);
         }
-        setBearerToken(accessToken);
-        setToken(accessToken);
-        trackEvent('auth.signInSocial', { provider });
-        return { cancelled: false };
       },
       signUp: async (input) => {
         const { data } = await apiClient.post<LoginResponse>(
