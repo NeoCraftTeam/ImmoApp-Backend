@@ -13,6 +13,8 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { SplashView } from '@/components/SplashView';
 import { ToastHost } from '@/components/ToastHost';
+import { useCreditsRealtime } from '@/hooks/useCreditsRealtime';
+import { useMe } from '@/hooks/useMe';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { CompareProvider } from '@/providers/CompareProvider';
 import { QueryProvider } from '@/providers/QueryProvider';
@@ -140,5 +142,6 @@ function SplashGate() {
  */
 function PushNotificationsBridge() {
   usePushNotifications();
+  useCreditsRealtime(useMe().data?.id);
   return null;
 }

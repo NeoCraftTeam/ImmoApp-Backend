@@ -21,6 +21,8 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { SplashView } from '@/components/SplashView';
 import { ToastHost } from '@/components/ToastHost';
+import { useCreditsRealtime } from '@/hooks/useCreditsRealtime';
+import { useMe } from '@/hooks/useMe';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { QueryProvider } from '@/providers/QueryProvider';
 import { initMonitoring, reportError } from '@/services/monitoring';
@@ -110,6 +112,9 @@ function AuthGate() {
 
   // Push notifications — registers FCM token at signed-in mount.
   usePushNotifications();
+  // Crédits en temps réel : solde + transactions mis à jour via le canal
+  // privé user.{id} (achat crédité, boost dépensé…), sans polling.
+  useCreditsRealtime(useMe(isAuthenticated).data?.id);
 
   useEffect(() => {
     if (isLoading) return;
