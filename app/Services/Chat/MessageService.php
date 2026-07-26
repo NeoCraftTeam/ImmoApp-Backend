@@ -202,7 +202,7 @@ final readonly class MessageService
             return $msg;
         });
 
-        $message->load(['sender:id,firstname,lastname,avatar', 'replyTo']);
+        $message->load(['sender:id,firstname,lastname,avatar', 'sender.media', 'replyTo']);
 
         try {
             broadcast(new MessageSent($message))->toOthers();
@@ -295,6 +295,7 @@ final readonly class MessageService
         return $conv->messages()
             ->with([
                 'sender:id,firstname,lastname,avatar',
+                'sender.media',
                 ChatE2eeSchema::messageReplyToEagerLoadSpec(),
                 'reactions:id,message_id,user_id,emoji',
             ])
