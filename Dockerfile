@@ -17,7 +17,7 @@ RUN composer install \
 # ── Stage 2: Node.js asset builder ─────────────────────────────────────────
 # Node.js is ONLY needed to compile Vite/Filament assets.
 # Keeping it in a separate stage removes ~80 MB from the production image.
-FROM node:20-alpine AS node-builder
+FROM node:26-alpine AS node-builder
 WORKDIR /app
 # Cache-friendly: only re-runs npm ci when package-lock.json changes
 COPY package.json package-lock.json ./
