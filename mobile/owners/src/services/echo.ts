@@ -14,10 +14,17 @@ interface PusherChannel {
   unbind: (event: string) => void;
 }
 
+interface PusherConnection {
+  bind: (event: string, cb: (data?: unknown) => void) => void;
+  unbind: (event: string, cb: (data?: unknown) => void) => void;
+  state?: string;
+}
+
 interface PusherClient {
   subscribe: (channel: string) => PusherChannel;
   unsubscribe: (channel: string) => void;
   disconnect: () => void;
+  connection: PusherConnection;
 }
 
 const APP_KEY = process.env.EXPO_PUBLIC_REVERB_APP_KEY;
@@ -94,6 +101,36 @@ export function disconnectEcho(): void {
     /* ignore */
   }
   instance = null;
+}
+
+/**
+ * S'abonne à l'état réel du socket Reverb (connected/disconnected).
+ * Permet à l'UI d'afficher « En direct » seulement quand le WS est
+ * vraiment ouvert — et non juste parce que les env vars sont présentes.
+ * Renvoie une fonction de désabonnement ; no-op si Reverb non configuré.
+ */
+export function onConnectionState(cb: (connected: boolean) => void): () => void {
+  const client = getEchoClient();
+  if (!client?.connection) return () => {};
+  const conn = client.connection;
+  const handleConnected = () => cb(true);
+  const handleDisconnected = () => cb(false);
+  conn.bind('connected', handleConnected);
+  conn.bind('disconnected', handleDisconnected);
+  conn.bind('unavailable', handleDisconnected);
+  conn.bind('failed', handleDisconnected);
+  // État courant immédiat (le socket peut déjà être connecté).
+  cb(conn.state === 'connected');
+  return () => {
+    try {
+      conn.unbind('connected', handleConnected);
+      conn.unbind('disconnected', handleDisconnected);
+      conn.unbind('unavailable', handleDisconnected);
+      conn.unbind('failed', handleDisconnected);
+    } catch {
+      /* ignore */
+    }
+  };
 }
 
 export function subscribePrivate(

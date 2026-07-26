@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 
-import { isEchoConfigured, subscribePrivate } from '@/services/echo';
+import { isEchoConfigured, onConnectionState, subscribePrivate } from '@/services/echo';
 import type { Message } from '@/types/conversation';
 
 /**
@@ -124,12 +124,20 @@ export function useConversationRealtime(
       },
     );
 
-    // `isConnected` ne doit refléter que les cas où un vrai channel WS a
-    // été souscrit — sans config Reverb, subscribePrivate no-op et le
-    // polling reste la seule source de vérité.
-    setState((s) => ({ ...s, isConnected: isEchoConfigured() }));
+    // `isConnected` reflète l'état RÉEL du socket : « En direct » ne
+    // s'affiche que si le WS est ouvert, et le polling adaptatif repasse
+    // à 4 s dès que la connexion tombe (au lieu de rester à 30 s en
+    // croyant le WS vivant).
+    setState((s) => ({ ...s, isConnected: false }));
+    const unsubscribeConn = isEchoConfigured()
+      ? onConnectionState((connected) =>
+          setState((s) => ({ ...s, isConnected: connected })),
+        )
+      : () => {};
+
     return () => {
       unsubscribe();
+      unsubscribeConn();
       setState((s) => ({ ...s, isConnected: false, typingUser: null }));
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     };

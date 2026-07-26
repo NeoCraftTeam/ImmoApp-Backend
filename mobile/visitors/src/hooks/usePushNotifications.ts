@@ -1,4 +1,5 @@
 import Constants, { ExecutionEnvironment } from 'expo-constants';
+import { useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 
@@ -6,6 +7,25 @@ import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import { useSession } from '@/auth/SessionProvider';
 import { setRegisteredPushToken } from '@/services/push-token';
+
+/**
+ * Extrait l'uuid de conversation d'une notification de chat, quel que soit
+ * le format du payload (data.conversation_uuid direct, ou dans l'URL de
+ * deep-link `/messages/{uuid}` posée par le backend).
+ */
+function conversationUuidFromNotification(data: unknown): string | null {
+  if (!data || typeof data !== 'object') return null;
+  const d = data as Record<string, unknown>;
+  if (d.type !== 'chat_message') return null;
+  if (typeof d.conversation_uuid === 'string' && d.conversation_uuid) {
+    return d.conversation_uuid;
+  }
+  if (typeof d.url === 'string') {
+    const match = d.url.match(/messages\/([^/?#]+)/);
+    if (match?.[1]) return decodeURIComponent(match[1]);
+  }
+  return null;
+}
 
 /**
  * Expo Go on SDK 53+ stripped remote-push delivery for both iOS and
@@ -31,7 +51,42 @@ const IS_EXPO_GO =
  */
 export function usePushNotifications() {
   const { isAuthenticated, token } = useSession();
+  const router = useRouter();
   const registeredRef = useRef(false);
+
+  // Deep-link : taper une notification de message ouvre la conversation
+  // (à chaud via le listener, et au démarrage à froid via la dernière
+  // réponse). L'audit avait relevé que ce câblage était absent.
+  useEffect(() => {
+    if (!isAuthenticated || IS_EXPO_GO || Constants.isDevice === false) return;
+    let subscription: { remove: () => void } | null = null;
+    let cancelled = false;
+
+    void (async () => {
+      const Notifications: typeof import('expo-notifications') =
+        await import('expo-notifications');
+
+      const openFromData = (data: unknown): void => {
+        const uuid = conversationUuidFromNotification(data);
+        if (uuid) router.push(`/messages/${uuid}` as never);
+      };
+
+      const last = await Notifications.getLastNotificationResponseAsync();
+      if (!cancelled && last) {
+        openFromData(last.notification.request.content.data);
+      }
+
+      if (cancelled) return;
+      subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+        openFromData(response.notification.request.content.data);
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+      subscription?.remove();
+    };
+  }, [isAuthenticated, router]);
 
   useEffect(() => {
     if (!isAuthenticated) {

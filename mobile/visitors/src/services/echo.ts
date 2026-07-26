@@ -85,6 +85,35 @@ export function disconnectEcho(): void {
 }
 
 /**
+ * S'abonne à l'état réel du socket Reverb (connected/disconnected) pour
+ * que l'UI affiche « En direct » seulement quand le WS est vraiment
+ * ouvert — et non juste parce que les env vars sont présentes. Renvoie
+ * une fonction de désabonnement ; no-op si Reverb non configuré.
+ */
+export function onConnectionState(cb: (connected: boolean) => void): () => void {
+  const client = getEchoClient();
+  if (!client) return () => {};
+  const conn = client.connection;
+  const handleConnected = (): void => cb(true);
+  const handleDown = (): void => cb(false);
+  conn.bind('connected', handleConnected);
+  conn.bind('disconnected', handleDown);
+  conn.bind('unavailable', handleDown);
+  conn.bind('failed', handleDown);
+  cb(conn.state === 'connected');
+  return () => {
+    try {
+      conn.unbind('connected', handleConnected);
+      conn.unbind('disconnected', handleDown);
+      conn.unbind('unavailable', handleDown);
+      conn.unbind('failed', handleDown);
+    } catch {
+      /* ignore */
+    }
+  };
+}
+
+/**
  * Subscribe à un channel privé Laravel Echo (`private-{name}`) et
  * appelle `onEvent(eventName, payload)` pour chaque message reçu.
  *
