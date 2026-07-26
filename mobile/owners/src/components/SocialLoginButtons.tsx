@@ -1,11 +1,15 @@
-import { Github } from '@tamagui/lucide-icons';
 import { useState } from 'react';
-import { Alert } from 'react-native';
+import { Alert, useColorScheme } from 'react-native';
 import { Paragraph, Spinner, XStack, YStack } from 'tamagui';
 
 import { extractApiErrorMessage } from '@/api/client';
 import { useSession, type SocialProvider } from '@/auth/SessionProvider';
 import { ClerkSocialSignInButton } from '@/components/ClerkSocialSignInButton';
+import {
+  FacebookBrandIcon,
+  GithubBrandIcon,
+  GoogleBrandIcon,
+} from '@/components/SocialBrandIcons';
 import {
   buildFallbackAuthPublicConfig,
   useAuthPublicConfig,
@@ -28,32 +32,6 @@ const PROVIDER_LABELS: Record<SocialProvider, string> = {
   github: 'GitHub',
 };
 
-const GoogleIcon = (
-  <Paragraph fontSize={18} fontWeight="900" color="#4285F4" lineHeight={20}>
-    G
-  </Paragraph>
-);
-
-const FacebookIcon = (
-  <Paragraph fontSize={18} fontWeight="900" color="#1877F2" lineHeight={20}>
-    f
-  </Paragraph>
-);
-
-// `$color` se résout par thème (slate foncé en clair, clair en sombre) →
-// contraste maintenu du glyphe GitHub dans les deux modes.
-const GithubIcon = <Github size={20} color="$color" />;
-
-const SOCIAL_META: {
-  key: SocialProvider;
-  label: string;
-  icon: React.ReactNode;
-}[] = [
-  { key: 'google', label: 'Continuer avec Google', icon: GoogleIcon },
-  { key: 'facebook', label: 'Continuer avec Facebook', icon: FacebookIcon },
-  { key: 'github', label: 'Continuer avec GitHub', icon: GithubIcon },
-];
-
 /**
  * Boutons de connexion sociale bailleur (Google / Facebook / GitHub).
  *
@@ -66,8 +44,21 @@ const SOCIAL_META: {
 export function SocialLoginButtons({ onSuccess, disabled, variant = 'stacked' }: Props) {
   const { signInWithProvider } = useSession();
   const iconOnly = variant === 'icons';
+  const scheme = useColorScheme();
   const { data: authConfig, isLoading: authConfigLoading, isFetched } = useAuthPublicConfig();
   const [pending, setPending] = useState<SocialProvider | null>(null);
+
+  // GitHub monochrome : blanc en sombre, quasi-noir en clair.
+  const githubColor = scheme === 'dark' ? '#FFFFFF' : '#1A1A1A';
+  const SOCIAL_META: {
+    key: SocialProvider;
+    label: string;
+    icon: React.ReactNode;
+  }[] = [
+    { key: 'google', label: 'Continuer avec Google', icon: <GoogleBrandIcon /> },
+    { key: 'facebook', label: 'Continuer avec Facebook', icon: <FacebookBrandIcon /> },
+    { key: 'github', label: 'Continuer avec GitHub', icon: <GithubBrandIcon color={githubColor} /> },
+  ];
 
   const config = authConfig ?? buildFallbackAuthPublicConfig();
   const clerkEnabled = config.clerk.enabled;

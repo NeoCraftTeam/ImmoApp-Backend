@@ -10,6 +10,7 @@ import { consumePendingRoute } from '@/auth/pending-route';
 import { useSession } from '@/auth/SessionProvider';
 import { PasswordInput } from '@/components/PasswordInput';
 import { PhoneInput } from '@/components/PhoneInput';
+import { SocialLoginButtons } from '@/components/SocialLoginButtons';
 import { t } from '@/i18n';
 
 /**
@@ -161,6 +162,15 @@ export default function Register() {
         >
           {t('auth.signUp')}
         </Button>
+
+        {/* Création de compte via OAuth (compte créé déjà vérifié côté
+            provider → aucun OTP). role=agent est appliqué par le flux. */}
+        <SocialLoginButtons
+          disabled={submitting}
+          onSuccess={() =>
+            router.replace((consumePendingRoute() ?? '/(tabs)/dashboard') as never)
+          }
+        />
 
         <XStack justifyContent="center" gap="$2">
           <Paragraph color="$slate500">{t('auth.haveAccount')}</Paragraph>

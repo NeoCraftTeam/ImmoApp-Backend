@@ -10,6 +10,7 @@ import { useSession } from '@/auth/SessionProvider';
 import { KeyHomeLogo } from '@/components/KeyHomeLogo';
 import { PasswordInput } from '@/components/PasswordInput';
 import { PhoneInput } from '@/components/PhoneInput';
+import { SocialLoginButtons } from '@/components/SocialLoginButtons';
 import { t } from '@/i18n';
 
 /**
@@ -261,6 +262,13 @@ export default function Register() {
         >
           {t('auth.signUp')}
         </Button>
+
+        {/* Création de compte via OAuth (compte créé déjà vérifié côté
+            provider → aucun OTP). Même composant que le login. */}
+        <SocialLoginButtons
+          disabled={submitting}
+          onSuccess={() => router.replace('/(tabs)/home')}
+        />
 
         <XStack justifyContent="center" gap="$2">
           <Paragraph color="$slate500">{t('auth.haveAccount')}</Paragraph>
