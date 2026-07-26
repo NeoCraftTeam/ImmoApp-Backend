@@ -9,8 +9,8 @@ import { reportError, trackEvent } from '@/services/monitoring';
  *
  *  1. On reçoit du backend `payment_link` (URL HTTPS).
  *  2. On ouvre `WebBrowser.openAuthSessionAsync` avec un return URL
- *     `keyhome://payment-success?tx_ref={tx_ref}` — ce schéma est
- *     déclaré dans `app.json` (`scheme: "keyhome"`).
+ *     `keyhomeowners://payment-success?tx_ref={tx_ref}` — ce schéma est
+ *     déclaré dans `app.json` (`scheme: "keyhomeowners"`).
  *  3. Le gateway redirige vers ce return URL après succès/échec/abandon.
  *  4. Le browser session se ferme et nous renvoie `result.url` — on en
  *     extrait `tx_ref` pour ensuite naviguer vers `/payment-success`.
@@ -58,10 +58,9 @@ export function buildCallbackUrl(): string {
 
 /**
  * Ouvre le hosted-checkout dans un WebBrowser auth-session. Bloque
- * jusqu'à fermeture (succès/cancel). En cas d'environnement où
- * `openAuthSessionAsync` n'est pas dispo (rare), fallback sur
- * `openBrowserAsync` non-bloquant — le caller doit alors compter sur
- * le deep-link Linking + AppState pour détecter le retour.
+ * jusqu'à fermeture (succès/cancel). Si `openAuthSessionAsync` échoue
+ * (rare), on retourne `error` — la route expo-router `/payment-success`
+ * couvre de toute façon le deep-link direct (cold start compris).
  */
 export async function openHostedCheckout(
   paymentLink: string,

@@ -199,7 +199,18 @@ export function PaymentSheet({
       const result = await openHostedCheckout(link, txRef);
 
       if (result.cancelled) {
-        Alert.alert('Paiement annule', 'Vous avez ferme la fenetre de paiement.');
+        // Cas fréquent en mobile money : l'utilisateur valide le push USSD
+        // puis ferme l'onglet AVANT la redirection — on possède le tx_ref,
+        // on ne conclut donc jamais « annulé » sans proposer de vérifier
+        // (l'écran de résultat tranche via le poll public-status).
+        Alert.alert(
+          'Paiement non finalisé',
+          'Vous avez fermé la fenêtre de paiement. Si vous avez validé le paiement sur votre téléphone, il sera confirmé automatiquement.',
+          [
+            { text: 'Vérifier le statut', onPress: () => finishWithTxRef(txRef) },
+            { text: 'Fermer', style: 'cancel' },
+          ],
+        );
         return;
       }
       if (result.error) {

@@ -59,12 +59,12 @@ export default function PaymentSuccessOwner() {
         >
           <AlertTriangle size={48} color={brand.warning} />
           <H2 fontSize={22} fontWeight="800" textAlign="center" color={brand.warning}>
-            Reference de transaction manquante
+            Référence de transaction manquante
           </H2>
           <Paragraph fontSize={14} color="$slate700" textAlign="center" lineHeight={20}>
-            Nous n'avons pas recu l'identifiant de paiement (tx_ref). Si vous venez
-            de payer, retournez a l'ecran precedent puis touchez « Reessayer ».
-            Sinon ouvrez votre historique de paiements pour verifier le statut.
+            Nous n'avons pas reçu l'identifiant de paiement (tx_ref). Si vous venez
+            de payer, retournez à l'écran précédent puis touchez « Réessayer ».
+            Sinon ouvrez votre historique de paiements pour vérifier le statut.
           </Paragraph>
           <XStack gap={10} marginTop={6}>
             <Button
@@ -130,12 +130,15 @@ export default function PaymentSuccessOwner() {
     }
   }, [data?.status, qc]);
 
+  // Armé dès qu'on a une référence quelconque (tx_ref OU reference
+  // passerelle, ex. retour Stripe) — sinon l'écran resterait figé sur
+  // « en cours » sans jamais proposer Réessayer.
   useEffect(() => {
-    if (!ref) return;
+    if (!ref && !gatewayReference) return;
     if (data?.status && data.status !== 'pending') return;
     const t = setTimeout(() => setTimedOut(true), POLLING_TIMEOUT_MS);
     return () => clearTimeout(t);
-  }, [ref, data?.status]);
+  }, [ref, gatewayReference, data?.status]);
 
   let icon = <Clock size={56} color={brand.warning} />;
   let title = 'Paiement en cours…';
@@ -152,6 +155,14 @@ export default function PaymentSuccessOwner() {
     tint = brand.warning;
   }
 
+  // Statut terminal hors success/failed/cancelled : le poll est arrêté par
+  // le hook (refunded, statut backend inattendu) — ne jamais rester figé
+  // sur « Paiement en cours… » sans issue.
+  const isOtherTerminal = Boolean(
+    data?.status
+      && !['pending', 'success', 'succeeded', 'failed', 'cancelled'].includes(data.status),
+  );
+
   if (data?.status === 'success' || data?.status === 'succeeded') {
     icon = <CheckCircle2 size={56} color={brand.success} />;
     title = 'Paiement confirmé';
@@ -164,6 +175,13 @@ export default function PaymentSuccessOwner() {
       data.message ??
       'La transaction n’a pas pu aboutir. Réessayez ou contactez le support.';
     tint = brand.danger;
+  } else if (isOtherTerminal) {
+    icon = <XCircle size={56} color={brand.slate500} />;
+    title = data?.status === 'refunded' ? 'Paiement remboursé' : 'Transaction clôturée';
+    body =
+      data?.message ??
+      'Cette transaction est terminée. Consultez votre historique de paiements pour le détail.';
+    tint = brand.slate500;
   }
 
   const goHome = () => router.replace('/(tabs)/dashboard');
@@ -222,7 +240,7 @@ export default function PaymentSuccessOwner() {
               Retour au tableau de bord
             </Button>
           ) : null}
-          {(data?.status === 'failed' || data?.status === 'cancelled') ? (
+          {(data?.status === 'failed' || data?.status === 'cancelled' || isOtherTerminal) ? (
             <XStack gap={10} marginTop={6}>
               <Button
                 backgroundColor="$slate100"

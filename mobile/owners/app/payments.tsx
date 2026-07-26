@@ -1,5 +1,6 @@
 import { CreditCard, Receipt } from '@tamagui/lucide-icons';
-import { RefreshControl, ScrollView } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Pressable, RefreshControl, ScrollView } from 'react-native';
 import { Paragraph, Spinner, XStack, YStack } from 'tamagui';
 
 import { useSession } from '@/auth/SessionProvider';
@@ -31,9 +32,14 @@ const STATUS_LABEL: Record<PaymentStatus, string> = {
   requires_action: 'Action requise',
 };
 
-function PaymentRow({ p }: { p: PaymentEntry }) {
+function PaymentRow({ p, onVerify }: { p: PaymentEntry; onVerify?: (txRef: string) => void }) {
   const color = STATUS_COLOR[p.status] ?? brand.slate500;
-  return (
+  // Une transaction en attente avec une référence peut être re-vérifiée
+  // (tap) — l'écran de résultat tranche via le poll public-status. Utile
+  // quand l'utilisateur a fermé l'onglet avant la confirmation.
+  const canVerify = p.status === 'pending' && Boolean(p.tx_ref) && Boolean(onVerify);
+
+  const body = (
     <XStack
       padding={14}
       gap={12}
@@ -65,6 +71,11 @@ function PaymentRow({ p }: { p: PaymentEntry }) {
         <Paragraph fontSize={11.5} color="$slate500">
           {formatDateTime(p.created_at)}
         </Paragraph>
+        {canVerify ? (
+          <Paragraph fontSize={11.5} fontWeight="700" color={brand.primary}>
+            Toucher pour vérifier le statut
+          </Paragraph>
+        ) : null}
       </YStack>
       <YStack alignItems="flex-end" gap={3}>
         <Paragraph fontSize={14} fontWeight="800" color="$slate900">
@@ -76,12 +87,31 @@ function PaymentRow({ p }: { p: PaymentEntry }) {
       </YStack>
     </XStack>
   );
+
+  if (!canVerify) {
+    return body;
+  }
+
+  return (
+    <Pressable
+      onPress={() => onVerify?.(p.tx_ref)}
+      accessibilityRole="button"
+      accessibilityLabel="Vérifier le statut du paiement"
+    >
+      {body}
+    </Pressable>
+  );
 }
 
 export default function PaymentsScreen() {
+  const router = useRouter();
   const { isAuthenticated } = useSession();
   const { data, isLoading, isRefetching, refetch } = usePayments(isAuthenticated);
   const list = data?.data ?? [];
+
+  const verifyPending = (txRef: string) => {
+    router.push({ pathname: '/payment-success', params: { tx_ref: txRef } } as never);
+  };
 
   return (
     <YStack flex={1} backgroundColor="$background">
@@ -111,7 +141,7 @@ export default function PaymentsScreen() {
             />
           </YStack>
         ) : (
-          list.map((p) => <PaymentRow key={p.id} p={p} />)
+          list.map((p) => <PaymentRow key={p.id} p={p} onVerify={verifyPending} />)
         )}
       </ScrollView>
     </YStack>

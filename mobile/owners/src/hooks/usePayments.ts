@@ -101,7 +101,7 @@ export function useVerifyPayment() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['credits-balance'] });
       qc.invalidateQueries({ queryKey: ['payments-history'] });
-      qc.invalidateQueries({ queryKey: ['current-subscription'] });
+      qc.invalidateQueries({ queryKey: ['subscription-current'] });
     },
   });
 }

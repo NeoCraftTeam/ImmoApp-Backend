@@ -61,6 +61,10 @@ export default function CreditsScreen() {
    * ouvre le browser, on récupère le tx_ref.
    */
   const handleQuickPurchase = async (pkg: CreditPackage) => {
+    // Garde synchrone anti double-initiation : pendant qu'un achat est en
+    // vol, un tap sur N'IMPORTE QUEL pack (pas seulement celui-ci) ne doit
+    // pas créer un second tx_ref / une double charge potentielle.
+    if (purchase.isPending) return;
     setSelectedPkg(pkg);
     try {
       const init = await purchase.mutateAsync({
@@ -75,7 +79,25 @@ export default function CreditsScreen() {
         return;
       }
       const result = await openHostedCheckout(link, init.tx_ref);
-      if (result.cancelled) return;
+      if (result.cancelled) {
+        // L'onglet peut avoir été fermé APRÈS la validation du push mobile
+        // money : réconciliation silencieuse + proposition de suivre le
+        // statut (l'écran de résultat tranche via le poll public-status).
+        verify.mutate({ tx_ref: init.tx_ref });
+        Alert.alert(
+          'Paiement non finalisé',
+          'Vous avez fermé la fenêtre de paiement. Si vous avez validé le paiement sur votre téléphone, il sera confirmé automatiquement.',
+          [
+            {
+              text: 'Vérifier le statut',
+              onPress: () =>
+                router.push({ pathname: '/payment-success', params: { tx_ref: init.tx_ref } } as never),
+            },
+            { text: 'Fermer', style: 'cancel' },
+          ],
+        );
+        return;
+      }
       if (result.error) {
         Alert.alert('Erreur', result.error.message);
         return;
@@ -215,7 +237,7 @@ export default function CreditsScreen() {
                     color="white"
                     fontWeight="800"
                     borderRadius={10}
-                    disabled={purchase.isPending && selectedPkg?.id === pkg.id}
+                    disabled={purchase.isPending}
                     onPress={() => handleQuickPurchase(pkg)}
                   >
                     {purchase.isPending && selectedPkg?.id === pkg.id ? 'Connexion…' : 'Acheter'}
