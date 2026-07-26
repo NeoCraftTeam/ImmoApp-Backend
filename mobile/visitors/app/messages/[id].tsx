@@ -24,7 +24,7 @@ import { extractApiErrorMessage } from '@/api/client';
 import { resolveMediaUrl } from '@/lib/media-url';
 import {
   useConversation,
-  useConversations,
+  useConversationMeta,
   useDeleteMessage,
   useMarkConversationRead,
   useSendMessage,
@@ -32,6 +32,7 @@ import {
   useToggleReaction,
   useUploadAttachment,
 } from '@/hooks/useConversations';
+import { Skeleton } from '@/components/Skeleton';
 import { formatPresence } from '@/lib/presence';
 import { useConversationRealtime } from '@/hooks/useConversationRealtime';
 import { useMe } from '@/hooks/useMe';
@@ -108,19 +109,15 @@ export default function ConversationScreen() {
     );
   }, [messages, myId]);
 
-  // Interlocuteur : d'abord la fiche conversation (nom + avatar +
-  // last_seen_at — présente même sans message reçu), sinon dérivé des
-  // messages reçus. En-tête façon Messenger : « En ligne » / « Vu à … ».
-  const conversationsList = useConversations();
-  const conversationMeta = useMemo(
-    () => conversationsList.data?.find((c) => c.uuid === id) ?? null,
-    [conversationsList.data, id],
-  );
+  // Interlocuteur : fiche dédiée `GET /conversations/{uuid}` (nom, avatar,
+  // last_seen_at) — fiable même en arrivant depuis une annonce ou un push,
+  // quand la liste n'est pas en cache. Repli : expéditeur des messages.
+  const meta = useConversationMeta(id);
   const otherFromMessages = useMemo(
     () => messages.find((m) => m.sender && m.sender_id !== myId)?.sender ?? null,
     [messages, myId],
   );
-  const otherParticipant = conversationMeta?.other_participant ?? otherFromMessages;
+  const otherParticipant = meta.data?.other_participant ?? otherFromMessages;
 
   // Tick minute : les libellés relatifs (« Vu à … » ↔ « En ligne »)
   // doivent basculer même sans re-render déclenché par une requête.
@@ -129,7 +126,7 @@ export default function ConversationScreen() {
     const timer = setInterval(() => setPresenceTick((n) => n + 1), 60_000);
     return () => clearInterval(timer);
   }, []);
-  const presence = formatPresence(conversationMeta?.other_participant?.last_seen_at);
+  const presence = formatPresence(meta.data?.other_participant?.last_seen_at);
 
   useEffect(() => {
     if (messagesResolved.length > 0) {
@@ -150,18 +147,105 @@ export default function ConversationScreen() {
     );
   }
 
+  // Header façon Messenger — TOUJOURS rendu (y compris pendant le
+  // chargement et en erreur) : l'utilisateur sait immédiatement à qui il
+  // parle. Avatar + nom depuis la fiche conversation ; skeleton tant que
+  // la fiche n'est pas arrivée (jamais de « Conversation » générique).
+  const header = (
+    <XStack
+      paddingTop={insets.top + 8}
+      paddingHorizontal={14}
+      paddingBottom={10}
+      alignItems="center"
+      gap={10}
+      borderBottomWidth={1}
+      borderBottomColor="$slate300"
+    >
+      <Pressable
+        onPress={() => router.back()}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel="Retour à mes conversations"
+      >
+        <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
+          <ArrowLeft size={18} color="$slate700" />
+        </YStack>
+      </Pressable>
+      {otherParticipant ? (
+        <>
+          <YStack width={38} height={38}>
+            <Avatar uri={otherParticipant.avatar} name={otherParticipant.name ?? '?'} size={38} />
+            {presence.online && (
+              <YStack
+                position="absolute"
+                bottom={0}
+                right={0}
+                width={11}
+                height={11}
+                borderRadius={6}
+                backgroundColor="#22C55E"
+                borderWidth={2}
+                borderColor="$background"
+              />
+            )}
+          </YStack>
+          <YStack flex={1} gap={1}>
+            <Paragraph fontSize={16} fontWeight="700" color="$slate900" numberOfLines={1}>
+              {otherParticipant.name}
+            </Paragraph>
+            {realtime.typingUser?.is_typing ? (
+              <Paragraph fontSize={11} color={brand.primary} fontWeight="600">
+                En train d'écrire…
+              </Paragraph>
+            ) : presence.label ? (
+              <Paragraph
+                fontSize={11}
+                color={presence.online ? '#16A34A' : '$slate500'}
+                fontWeight={presence.online ? '700' : '500'}
+              >
+                {presence.label}
+              </Paragraph>
+            ) : meta.data?.ad?.title ? (
+              <Paragraph fontSize={11} color="$slate500" numberOfLines={1}>
+                {meta.data.ad.title}
+              </Paragraph>
+            ) : null}
+          </YStack>
+        </>
+      ) : (
+        <>
+          <Skeleton width={38} height={38} radius={19} />
+          <YStack flex={1} gap={6}>
+            <Skeleton width="45%" height={13} radius={6} />
+            <Skeleton width="28%" height={9} radius={5} />
+          </YStack>
+        </>
+      )}
+    </XStack>
+  );
+
   if (isLoading) {
     return (
-      <YStack flex={1} backgroundColor="$background" justifyContent="center" alignItems="center">
-        <ActivityIndicator />
+      <YStack flex={1} backgroundColor="$background">
+        {header}
+        <ThreadSkeleton />
       </YStack>
     );
   }
 
   if (isError) {
     return (
-      <YStack flex={1} backgroundColor="$background" justifyContent="center" alignItems="center" padding="$5">
-        <Paragraph color="$slate700" textAlign="center">{extractApiErrorMessage(error)}</Paragraph>
+      <YStack flex={1} backgroundColor="$background">
+        {header}
+        <YStack flex={1} justifyContent="center" alignItems="center" padding="$5" gap={12}>
+          <Paragraph color="$slate700" textAlign="center">{extractApiErrorMessage(error)}</Paragraph>
+          <Pressable onPress={() => refetch()} hitSlop={6} accessibilityRole="button" accessibilityLabel="Réessayer">
+            <XStack alignItems="center" gap={6} paddingHorizontal={16} paddingVertical={10} borderRadius={999} backgroundColor="$slate900">
+              <RotateCw size={14} color="white" />
+              <Paragraph fontSize={13} fontWeight="700" color="white">Réessayer</Paragraph>
+            </XStack>
+          </Pressable>
+        </YStack>
       </YStack>
     );
   }
@@ -229,54 +313,7 @@ export default function ConversationScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <YStack flex={1} backgroundColor="$background">
-          <XStack
-            paddingTop={insets.top + 8}
-            paddingHorizontal={14}
-            paddingBottom={10}
-            alignItems="center"
-            gap={10}
-            borderBottomWidth={1}
-            borderBottomColor="$slate300"
-          >
-            <Pressable
-              onPress={() => router.back()}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="Retour à mes conversations"
-            >
-              <YStack width={36} height={36} borderRadius={18} backgroundColor="$slate100" alignItems="center" justifyContent="center">
-                <ArrowLeft size={18} color="$slate700" />
-              </YStack>
-            </Pressable>
-            <Avatar
-              uri={otherParticipant?.avatar}
-              name={otherParticipant?.name ?? 'Conversation'}
-              size={38}
-            />
-            <YStack flex={1} gap={1}>
-              <Paragraph fontSize={16} fontWeight="700" color="$slate900" numberOfLines={1}>
-                {otherParticipant?.name ?? 'Conversation'}
-              </Paragraph>
-              {realtime.typingUser?.is_typing ? (
-                <Paragraph fontSize={11} color={brand.primary} fontWeight="600">
-                  En train d'écrire…
-                </Paragraph>
-              ) : presence.label ? (
-                <XStack alignItems="center" gap={5}>
-                  {presence.online && (
-                    <YStack width={7} height={7} borderRadius={4} backgroundColor="#22C55E" />
-                  )}
-                  <Paragraph
-                    fontSize={11}
-                    color={presence.online ? '#16A34A' : '$slate500'}
-                    fontWeight={presence.online ? '700' : '500'}
-                  >
-                    {presence.label}
-                  </Paragraph>
-                </XStack>
-              ) : null}
-            </YStack>
-          </XStack>
+          {header}
 
           <FlatList
             ref={listRef}
@@ -795,4 +832,37 @@ function formatDay(iso: string): string {
   } catch {
     return '';
   }
+}
+
+/**
+ * Skeleton du fil pendant le premier chargement : silhouettes de bulles
+ * alternées (comme une vraie conversation) sous le header — jamais de
+ * spinner plein écran qui donne l'impression d'une app cassée. Les
+ * messages en cache (persistés) court-circuitent cet état.
+ */
+function ThreadSkeleton() {
+  const rows: Array<{ mine: boolean; width: number }> = [
+    { mine: false, width: 62 },
+    { mine: false, width: 44 },
+    { mine: true, width: 58 },
+    { mine: false, width: 70 },
+    { mine: true, width: 38 },
+    { mine: true, width: 52 },
+    { mine: false, width: 47 },
+  ];
+  return (
+    <YStack flex={1} paddingHorizontal={14} paddingTop={20} gap={10}>
+      {rows.map((row, i) => (
+        <XStack
+          key={i}
+          justifyContent={row.mine ? 'flex-end' : 'flex-start'}
+          alignItems="flex-end"
+          gap={6}
+        >
+          {!row.mine && <Skeleton width={24} height={24} radius={12} />}
+          <Skeleton width={`${row.width}%`} height={i % 3 === 0 ? 44 : 34} radius={16} />
+        </XStack>
+      ))}
+    </YStack>
+  );
 }

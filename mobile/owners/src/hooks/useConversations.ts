@@ -15,6 +15,41 @@ interface MessagesResponse {
   data?: ConversationMessage[];
 }
 
+interface ConversationDetailResponse {
+  data?: ConversationPreview;
+}
+
+/**
+ * Fiche d'UNE conversation (`GET /conversations/{id}`) — nom, avatar,
+ * `last_seen_at` de l'interlocuteur, annonce liée. Source de vérité du
+ * header du thread : ne pas dépendre du cache de la liste (vide en
+ * arrivant par deep-link push → header sans nom ni présence).
+ * `placeholderData` sème depuis la liste si disponible ; le refetch
+ * 60 s tient la présence (« En ligne » / « Vu à … ») à jour.
+ */
+export function useConversationMeta(id: string | undefined) {
+  const qc = useQueryClient();
+  return useQuery<ConversationDetailResponse, Error, ConversationPreview | undefined>({
+    queryKey: ['owner-conversation-meta', id],
+    queryFn: async () => {
+      if (!id) throw new Error('Missing conversation id');
+      const { data } = await apiClient.get<ConversationDetailResponse>(
+        ENDPOINTS.chat.conversation(id),
+      );
+      return data;
+    },
+    select: (p) => p?.data,
+    enabled: Boolean(id),
+    placeholderData: () => {
+      const list = qc.getQueryData<ConversationsResponse>(['owner-conversations']);
+      const found = list?.data?.find((c) => c.uuid === id);
+      return found ? { data: found } : undefined;
+    },
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
+  });
+}
+
 /** GET /conversations — liste des conversations du bailleur (avec preview). */
 export function useConversations(enabled = true) {
   return useQuery<ConversationsResponse, Error, ConversationPreview[]>({
