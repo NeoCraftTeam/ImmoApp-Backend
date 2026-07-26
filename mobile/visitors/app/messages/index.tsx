@@ -1,13 +1,14 @@
-import { ArrowLeft, MessageCircle } from '@tamagui/lucide-icons';
+import { ArrowLeft, MessageCircle, RotateCw } from '@tamagui/lucide-icons';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Image } from 'expo-image';
 import { Stack, useRouter } from 'expo-router';
-import { ActivityIndicator, FlatList, Pressable } from 'react-native';
+import { FlatList, Pressable } from 'react-native';
 import { H2, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
+import { Skeleton } from '@/components/Skeleton';
 import { useConversations } from '@/hooks/useConversations';
 import { resolveMediaUrl } from '@/lib/media-url';
 import { formatPresence } from '@/lib/presence';
@@ -29,14 +30,6 @@ export default function MessagesInbox() {
 
   if (!isAuthenticated) {
     return <SignInWall onSignIn={() => router.push('/(auth)/login')} insets={insets} />;
-  }
-
-  if (isLoading) {
-    return (
-      <YStack flex={1} backgroundColor="$background" justifyContent="center" alignItems="center">
-        <ActivityIndicator />
-      </YStack>
-    );
   }
 
   return (
@@ -62,9 +55,17 @@ export default function MessagesInbox() {
           </H2>
         </XStack>
 
-        {isError ? (
-          <YStack padding="$5" alignItems="center">
-            <Paragraph color="$slate700">{extractApiErrorMessage(error)}</Paragraph>
+        {isLoading ? (
+          <InboxSkeleton />
+        ) : isError ? (
+          <YStack flex={1} justifyContent="center" alignItems="center" padding="$5" gap={12}>
+            <Paragraph color="$slate700" textAlign="center">{extractApiErrorMessage(error)}</Paragraph>
+            <Pressable onPress={() => refetch()} hitSlop={6} accessibilityRole="button" accessibilityLabel="Réessayer">
+              <XStack alignItems="center" gap={6} paddingHorizontal={16} paddingVertical={10} borderRadius={999} backgroundColor="$slate900">
+                <RotateCw size={14} color="white" />
+                <Paragraph fontSize={13} fontWeight="700" color="white">Réessayer</Paragraph>
+              </XStack>
+            </Pressable>
           </YStack>
         ) : (
           <FlatList
@@ -247,6 +248,28 @@ function SignInWall({
           </Paragraph>
         </XStack>
       </Pressable>
+    </YStack>
+  );
+}
+
+/**
+ * Skeleton de l'inbox : silhouettes de lignes de conversation (avatar +
+ * deux lignes de texte) sous le header — pas de spinner plein écran.
+ * Le cache persisté court-circuite cet état dès la deuxième ouverture.
+ */
+function InboxSkeleton() {
+  return (
+    <YStack paddingTop={6}>
+      {Array.from({ length: 7 }, (_, i) => (
+        <XStack key={i} paddingVertical={14} paddingHorizontal={16} gap={12} alignItems="center">
+          <Skeleton width={48} height={48} radius={24} />
+          <YStack flex={1} gap={7}>
+            <Skeleton width={`${52 + (i % 3) * 12}%`} height={13} radius={6} />
+            <Skeleton width={`${70 - (i % 4) * 8}%`} height={10} radius={5} />
+          </YStack>
+          <Skeleton width={34} height={9} radius={5} />
+        </XStack>
+      ))}
     </YStack>
   );
 }

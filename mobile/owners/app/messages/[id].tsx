@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -25,6 +25,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { useMe } from '@/hooks/useMe';
 import {
   useConversation,
+  useConversationMeta,
   useDeleteMessage,
   useMarkConversationRead,
   useSendMessage,
@@ -38,7 +39,7 @@ import { useMotionPresets } from '@/hooks/useMotionPresets';
 import { showToast } from '@/services/toast';
 import { brand } from '@/theme/tokens';
 import { formatPresence } from '@/utils/presence';
-import type { ConversationMessage, ConversationPreview } from '@/types/conversation';
+import type { ConversationMessage } from '@/types/conversation';
 
 const REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
@@ -141,14 +142,10 @@ export default function ConversationThreadScreen() {
   const deleteMessage = useDeleteMessage(id);
   const [reactionTarget, setReactionTarget] = useState<ConversationMessage | null>(null);
 
-  // Préfetch depuis la cache des conversations (header info instant)
-  const conversation = useMemo<ConversationPreview | undefined>(() => {
-    const data = qc.getQueryData<{ data: ConversationPreview[] } | undefined>([
-      'owner-conversations',
-    ]);
-    const list = Array.isArray(data?.data) ? data!.data : [];
-    return list.find((c) => c.uuid === id);
-  }, [qc, id]);
+  // Fiche conversation dédiée (GET /conversations/{id}) — header fiable
+  // (nom, avatar, présence) même en arrivant par deep-link push, quand
+  // la liste n'est pas en cache. Seed instantané depuis la liste.
+  const { data: conversation } = useConversationMeta(id);
 
   // markRead au montage / changement de conversation uniquement — la
   // mutation est recréée à chaque render, on ne la met donc PAS en dep

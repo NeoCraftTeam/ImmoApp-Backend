@@ -28,6 +28,44 @@ export function useConversations() {
   });
 }
 
+interface ConversationDetailResponse {
+  data: Conversation;
+}
+
+/**
+ * Fiche d'UNE conversation (`GET /conversations/{uuid}`) — nom, avatar,
+ * `last_seen_at` de l'interlocuteur, annonce liée. C'est la source de
+ * vérité du header du thread : ne JAMAIS dépendre du cache de la liste
+ * (vide quand on arrive depuis une annonce ou un deep-link push — le
+ * header affichait « Conversation » sans avatar).
+ *
+ * `placeholderData` sème depuis la liste si elle est déjà en cache →
+ * header instantané, puis rafraîchi par le fetch. Le refetch 60 s tient
+ * la présence (« En ligne » / « Vu à … ») à jour.
+ */
+export function useConversationMeta(uuid: string | undefined) {
+  const qc = useQueryClient();
+  return useQuery<ConversationDetailResponse, Error, Conversation>({
+    queryKey: ['conversation-meta', uuid],
+    queryFn: async () => {
+      if (!uuid) throw new Error('Missing conversation uuid');
+      const { data } = await apiClient.get<ConversationDetailResponse>(
+        ENDPOINTS.conversations.detail(uuid),
+      );
+      return data;
+    },
+    select: (payload) => payload.data,
+    enabled: Boolean(uuid),
+    placeholderData: () => {
+      const list = qc.getQueryData<ConvListResponse>(['conversations']);
+      const found = list?.data?.find((c) => c.uuid === uuid);
+      return found ? { data: found } : undefined;
+    },
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
+  });
+}
+
 interface StartConversationResponse {
   data: Conversation;
 }
