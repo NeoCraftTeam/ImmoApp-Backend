@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { apiClient, extractApiErrorMessage } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
+import { consumePendingRoute } from '@/auth/pending-route';
 import { ClerkOtpVerifyScreen } from '@/components/ClerkOtpVerifyScreen';
 import { useResendVerification, useVerifyEmailOtp } from '@/hooks/useAuthExtras';
 import { useSession } from '@/auth/SessionProvider';
@@ -133,7 +134,7 @@ function EmailVerifyOtpScreen({ initialEmail }: { initialEmail: string }) {
       const result = await verify.mutateAsync({ email: email as string, otp });
       const token = result?.token ?? result?.access_token;
       if (token) setToken(token);
-      router.replace('/(tabs)/dashboard');
+      router.replace((consumePendingRoute() ?? '/(tabs)/dashboard') as never);
     } catch (err) {
       Alert.alert('Code invalide', extractApiErrorMessage(err));
     }

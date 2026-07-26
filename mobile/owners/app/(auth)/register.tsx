@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
 import { extractApiErrorMessage } from '@/api/client';
+import { consumePendingRoute } from '@/auth/pending-route';
 import { useSession } from '@/auth/SessionProvider';
 import { PasswordInput } from '@/components/PasswordInput';
 import { PhoneInput } from '@/components/PhoneInput';
@@ -93,7 +94,7 @@ export default function Register() {
           params: { email: parsed.data.email },
         } as never);
       } else {
-        router.replace('/(tabs)/dashboard');
+        router.replace((consumePendingRoute() ?? '/(tabs)/dashboard') as never);
       }
     } catch (err) {
       Alert.alert(t('common.error'), extractApiErrorMessage(err));

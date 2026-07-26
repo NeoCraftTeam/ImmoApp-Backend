@@ -15,6 +15,7 @@ import { Button, H1, Input, Paragraph, Spinner, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractAuthErrorMessage, parseApiErrorPayload } from '@/api/extract-error';
+import { consumePendingRoute } from '@/auth/pending-route';
 import { useSession } from '@/auth/SessionProvider';
 import { PasswordInput } from '@/components/PasswordInput';
 import { SocialLoginButtons } from '@/components/SocialLoginButtons';
@@ -144,7 +145,7 @@ export default function Login() {
     setSubmitting(true);
     try {
       await signIn(email.trim(), password);
-      playSuccess(() => router.replace('/(tabs)/dashboard'));
+      playSuccess(() => router.replace((consumePendingRoute() ?? '/(tabs)/dashboard') as never));
     } catch (err) {
       const payload = parseApiErrorPayload(err);
       if (payload?.email_verification_required) {
@@ -340,7 +341,11 @@ export default function Login() {
             <SocialLoginButtons
               variant="icons"
               disabled={submitting || succeeded}
-              onSuccess={() => playSuccess(() => router.replace('/(tabs)/dashboard'))}
+              onSuccess={() =>
+                playSuccess(() =>
+                  router.replace((consumePendingRoute() ?? '/(tabs)/dashboard') as never),
+                )
+              }
             />
 
             <XStack justifyContent="center" gap="$2" marginTop="auto">
