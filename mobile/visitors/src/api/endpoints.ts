@@ -151,5 +151,6 @@ export const ENDPOINTS = {
   searchParse: '/search/parse',
   geo: {
     directions: '/directions',
+    currency: '/geo/currency',
   },
 } as const;
