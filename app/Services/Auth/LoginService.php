@@ -78,9 +78,15 @@ final readonly class LoginService
         // et la réponse revenait nettement plus vite que pour un compte
         // existant — le message générique ne suffisait donc pas. On calcule
         // toujours une comparaison bcrypt pour égaliser le temps de réponse.
-        $passwordMatches = $user !== null
-            ? Hash::check($password, (string) $user->password)
-            : Hash::check($password, self::dummyPasswordHash()) && false;
+        if ($user === null) {
+            // Compare contre un hash bidon uniquement pour dépenser le même
+            // temps CPU ; le résultat est volontairement ignoré (le compte
+            // n'existe pas, l'authentification échoue).
+            Hash::check($password, self::dummyPasswordHash());
+            $passwordMatches = false;
+        } else {
+            $passwordMatches = Hash::check($password, (string) $user->password);
+        }
 
         if (!$user || !$passwordMatches) {
             RateLimiter::hit($key, 300);

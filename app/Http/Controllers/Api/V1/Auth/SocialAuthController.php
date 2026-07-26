@@ -30,9 +30,9 @@ use OpenApi\Attributes as OA;
  * Usage: Mobile apps and SPAs send OAuth tokens directly
  */
 #[OA\Tag(name: 'OAuth', description: 'Social authentication endpoints')]
-final class SocialAuthController
+final readonly class SocialAuthController
 {
-    public function __construct(private readonly TokenService $tokenService) {}
+    public function __construct(private TokenService $tokenService) {}
 
     /**
      * Supported OAuth providers.
