@@ -48,15 +48,35 @@ function setupChatTrio(): array
 // ── MessageRead must use ShouldBroadcastNow + toOthers ──────────────────────
 
 it('broadcasts MessageRead immediately (now) to others only', function (): void {
-    Event::fake([MessageRead::class]);
+    ['tenant' => $tenant, 'landlord' => $landlord, 'conversation' => $conv] = setupChatTrio();
 
-    ['tenant' => $tenant, 'conversation' => $conv] = setupChatTrio();
+    // Un message non lu du bailleur pour qu'il y ait quelque chose à marquer.
+    $this->actingAs($landlord)
+        ->postJson("/api/v1/conversations/{$conv->id}/messages", ['body' => 'Bonjour'])
+        ->assertCreated();
+
+    Event::fake([MessageRead::class]);
 
     $this->actingAs($tenant)
         ->patchJson("/api/v1/conversations/{$conv->id}/read")
         ->assertOk();
 
     Event::assertDispatched(MessageRead::class, fn (MessageRead $event): bool => $event instanceof ShouldBroadcastNow);
+});
+
+it('does not broadcast MessageRead when there is nothing to mark read', function (): void {
+    Event::fake([MessageRead::class]);
+
+    ['tenant' => $tenant, 'conversation' => $conv] = setupChatTrio();
+
+    // Conversation sans message non lu : lire ne doit rien diffuser (évite
+    // le double MessageRead GET /messages + PATCH /read et les broadcasts
+    // à vide sur un simple rechargement).
+    $this->actingAs($tenant)
+        ->patchJson("/api/v1/conversations/{$conv->id}/read")
+        ->assertOk();
+
+    Event::assertNotDispatched(MessageRead::class);
 });
 
 // ── MessageDeleted broadcasts to others only ────────────────────────────────
