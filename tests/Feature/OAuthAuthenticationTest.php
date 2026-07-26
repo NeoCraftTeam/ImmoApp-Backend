@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Config;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
 
@@ -415,6 +416,10 @@ describe('OAuth Provider Link/Unlink', function (): void {
 });
 
 describe('OAuth Redirect Flow (Web)', function (): void {
+    beforeEach(function (): void {
+        Config::set('services.google.client_id', 'test-google-client-id-for-redirect');
+    });
+
     it('returns redirect URL for OAuth provider', function (): void {
         Socialite::shouldReceive('driver')
             ->with('google')
