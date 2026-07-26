@@ -342,9 +342,7 @@ export default function Login() {
               variant="icons"
               disabled={submitting || succeeded}
               onSuccess={() =>
-                playSuccess(() =>
-                  router.replace((consumePendingRoute() ?? '/(tabs)/dashboard') as never),
-                )
+                router.replace((consumePendingRoute() ?? '/(tabs)/dashboard') as never)
               }
             />
 
