@@ -171,6 +171,86 @@ it('Kpay webhook with failed status marks payment FAILED', function (): void {
     Event::assertDispatched(PaymentFailed::class);
 });
 
+it('answers 404 on a success webhook for an unknown tx_ref so Kpay retries', function (): void {
+    Event::fake();
+    $secret = 'whsec_kpay_test_secret_123';
+    kpayWebhookConfig($secret);
+
+    $payload = [
+        'event' => 'payment.completed',
+        'paymentId' => 'pay_unknown',
+        'reference' => 'KPAY-UNKNOWN',
+        'status' => 'COMPLETED',
+        'amount' => 5000,
+        'externalId' => 'KH-NOT-IN-DB',
+    ];
+    $body = json_encode($payload, JSON_THROW_ON_ERROR);
+    $signature = kpayWebhookSignature($secret, $body);
+
+    $this->call('POST', '/api/v1/webhooks/kpay', [], [], [], kpayWebhookHeaders($signature), $body)
+        ->assertNotFound();
+
+    Event::assertNotDispatched(PaymentSucceeded::class);
+});
+
+it('still acknowledges a failed webhook for an unknown tx_ref with 200', function (): void {
+    Event::fake();
+    $secret = 'whsec_kpay_test_secret_123';
+    kpayWebhookConfig($secret);
+
+    $payload = [
+        'event' => 'payment.failed',
+        'paymentId' => 'pay_unknown_failed',
+        'status' => 'FAILED',
+        'amount' => 5000,
+        'externalId' => 'KH-NOT-IN-DB-2',
+    ];
+    $body = json_encode($payload, JSON_THROW_ON_ERROR);
+    $signature = kpayWebhookSignature($secret, $body);
+
+    $this->call('POST', '/api/v1/webhooks/kpay', [], [], [], kpayWebhookHeaders($signature, 'payment.failed'), $body)
+        ->assertSuccessful();
+});
+
+it('rejects a webhook when the signature header is missing (fail-closed)', function (): void {
+    Event::fake();
+    kpayWebhookConfig('whsec_kpay_test_secret_123');
+
+    $payload = [
+        'event' => 'payment.completed',
+        'status' => 'COMPLETED',
+        'amount' => 1000,
+        'externalId' => 'KH-NOSIG',
+    ];
+    $body = json_encode($payload, JSON_THROW_ON_ERROR);
+
+    $this->call('POST', '/api/v1/webhooks/kpay', [], [], [], [
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_X_KPAY_EVENT' => 'payment.completed',
+    ], $body)->assertUnauthorized();
+
+    Event::assertNotDispatched(PaymentSucceeded::class);
+});
+
+it('rejects a webhook when the webhook secret is not configured (fail-closed)', function (): void {
+    Event::fake();
+    kpayWebhookConfig('');
+
+    $payload = [
+        'event' => 'payment.completed',
+        'status' => 'COMPLETED',
+        'amount' => 1000,
+        'externalId' => 'KH-NOSECRET',
+    ];
+    $body = json_encode($payload, JSON_THROW_ON_ERROR);
+    $signature = kpayWebhookSignature('whatever', $body);
+
+    $this->call('POST', '/api/v1/webhooks/kpay', [], [], [], kpayWebhookHeaders($signature), $body)
+        ->assertUnauthorized();
+
+    Event::assertNotDispatched(PaymentSucceeded::class);
+});
+
 it('second Kpay webhook on already-SUCCESS payment is idempotent', function (): void {
     Event::fake();
     $secret = 'whsec_kpay_test_secret_123';

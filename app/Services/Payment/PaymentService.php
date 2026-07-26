@@ -410,21 +410,31 @@ final readonly class PaymentService
 
         $normalized = strtolower(trim($redirectStatus));
 
-        if (in_array($normalized, ['cancelled', 'canceled'], true)) {
-            $payment->forceFill(['status' => PaymentStatus::CANCELLED])->save();
-            PaymentFailed::dispatch($payment->fresh() ?? $payment);
+        $terminalHint = match (true) {
+            in_array($normalized, ['cancelled', 'canceled'], true) => PaymentStatus::CANCELLED,
+            in_array($normalized, ['failed', 'declined', 'error', 'expired'], true) => PaymentStatus::FAILED,
+            default => null,
+        };
 
-            return $payment->fresh() ?? $payment;
+        if ($terminalHint === null) {
+            return $payment;
         }
 
-        if (in_array($normalized, ['failed', 'declined', 'error', 'expired'], true)) {
-            $payment->forceFill(['status' => PaymentStatus::FAILED])->save();
-            PaymentFailed::dispatch($payment->fresh() ?? $payment);
+        // Conditional UPDATE: the in-memory PENDING check above can be stale —
+        // a webhook may have committed SUCCESS since this row was loaded, and
+        // an unconditional save() would overwrite a settled payment. The
+        // WHERE clause makes the transition pending→terminal atomic; zero
+        // rows affected means someone else already resolved it.
+        $updated = Payment::query()
+            ->whereKey($payment->id)
+            ->where('status', PaymentStatus::PENDING)
+            ->update(['status' => $terminalHint]);
 
-            return $payment->fresh() ?? $payment;
+        if ($updated === 1) {
+            PaymentFailed::dispatch($payment->fresh() ?? $payment);
         }
 
-        return $payment;
+        return $payment->fresh() ?? $payment;
     }
 
     /**
@@ -484,7 +494,11 @@ final readonly class PaymentService
             if (!$payment) {
                 Log::warning('Webhook: payment not found', ['tx_ref' => $txRef, 'gateway' => $gatewayName]);
 
-                return ['event' => null];
+                // `payment_missing` lets the controller answer non-2xx so the
+                // provider retries later: a webhook can outrun the DB commit
+                // of createPayment (the row is inserted AFTER initiate()),
+                // and a 200 here would acknowledge the event forever.
+                return ['event' => null, 'payment_missing' => true];
             }
 
             // Orphan-debit guard: a payment may already be terminal (legitimately
@@ -593,6 +607,10 @@ final readonly class PaymentService
 
             return ['event' => null];
         });
+
+        if (($eventToDispatch['payment_missing'] ?? false) === true) {
+            $data['payment_found'] = false;
+        }
 
         // Dispatch events AFTER commit so listeners see the final state.
         if ($eventToDispatch['event'] !== null) {

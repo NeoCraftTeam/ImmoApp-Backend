@@ -61,8 +61,19 @@ class CleanupStalePaymentsCommand extends Command
             }
 
             if ($synced->status === PaymentStatus::PENDING) {
-                $synced->update(['status' => PaymentStatus::FAILED]);
-                $failedIds[] = $synced->id;
+                $updated = Payment::query()
+                    ->whereKey($synced->id)
+                    ->where('status', PaymentStatus::PENDING)
+                    ->update(['status' => PaymentStatus::FAILED]);
+
+                if ($updated === 1) {
+                    $failedIds[] = $synced->id;
+                } else {
+                    Log::info('Stale payment resolved concurrently, skip FAILED flag', [
+                        'payment_id' => $synced->id,
+                        'status' => $synced->fresh()?->status?->value,
+                    ]);
+                }
             }
         }
 

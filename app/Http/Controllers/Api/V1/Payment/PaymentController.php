@@ -527,6 +527,14 @@ final class PaymentController
             return response()->json(['status' => 'error'], 500);
         }
 
+        // A success event for a tx_ref we don't know yet usually means the
+        // webhook outran the createPayment commit. Answer 404 so Kpay
+        // retries once the row exists — a 200 would acknowledge the event
+        // definitively and the payment would only resolve via polling.
+        if (($data['payment_found'] ?? true) === false && (string) ($data['status'] ?? '') === 'success') {
+            return response()->json(['status' => 'error', 'message' => 'Payment not found'], 404);
+        }
+
         if ($txRef !== '' && in_array((string) ($data['event'] ?? ''), ['payment.completed'], true)) {
             ProcessPaymentWebhookJob::dispatch(
                 $txRef,

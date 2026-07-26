@@ -253,6 +253,13 @@ final readonly class KpayPaymentService implements PaymentGatewayInterface
             default => 'pending',
         };
 
+        if (!in_array($status, ['COMPLETED', 'CANCELLED', 'FAILED', 'PENDING', 'PROCESSING'], true)) {
+            Log::warning('Kpay: unmapped transaction status, treated as pending', [
+                'status' => $status,
+                'reference' => $data['reference'] ?? ($data['id'] ?? null),
+            ]);
+        }
+
         $paidAt = null;
         if ($mappedStatus === 'success') {
             $paidAt = (string) ($data['completedAt'] ?? now()->toISOString());

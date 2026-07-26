@@ -69,7 +69,16 @@ final readonly class HandlePostPaymentActions
             return;
         }
 
-        $agency = Agency::find($agencyId);
+        /**
+         * Serialise concurrent fulfilment attempts (webhook + client verify
+         * arriving within milliseconds) on the agency row: the second caller
+         * blocks here until the first commits, then its existence checks see
+         * the committed subscription and no-op. The unique constraint on
+         * subscriptions.payment_id is the DB-level backstop.
+         *
+         * @var Agency|null $agency
+         */
+        $agency = Agency::query()->whereKey($agencyId)->lockForUpdate()->first();
 
         if (!$agency) {
             return;
