@@ -1,6 +1,7 @@
 import { ArrowLeft, ImagePlus, RotateCw, Send, X } from '@tamagui/lucide-icons';
 import { format, isToday, isYesterday } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -151,6 +152,7 @@ export default function ConversationScreen() {
     const body = text.trim();
     if (!body || send.isPending) return;
     setText('');
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
       await send.mutateAsync(body);
     } catch {
@@ -427,6 +429,7 @@ export default function ConversationScreen() {
                         key={emoji}
                         onPress={() => {
                           if (!reactionTarget) return;
+                          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                           toggleReaction.mutate({
                             messageUuid: reactionTarget.uuid,
                             emoji,
