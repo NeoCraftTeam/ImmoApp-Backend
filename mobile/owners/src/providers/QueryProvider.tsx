@@ -20,6 +20,21 @@ import { AppState, Platform } from 'react-native';
  *  persistence after a breaking API change.
  */
 const CACHE_BUSTER = 'kh-owners-v1';
+const QUERY_CACHE_STORAGE_KEY = 'kh-owners-query-cache';
+
+/**
+ * Supprime le cache de queries déshydraté d'AsyncStorage. Appelé au
+ * signOut : les données du compte précédent (annonces, paiements,
+ * locataires…) ne doivent ni se réhydrater au prochain cold start, ni
+ * rester en clair sur le disque après déconnexion.
+ */
+export async function clearPersistedQueryCache(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(QUERY_CACHE_STORAGE_KEY);
+  } catch {
+    /* best-effort — le buster de version couvrira les cas résiduels */
+  }
+}
 
 onlineManager.setEventListener((setOnline) => {
   return NetInfo.addEventListener((state) => {

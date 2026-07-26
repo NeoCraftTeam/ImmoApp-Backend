@@ -26,6 +26,21 @@ import { NON_PERSISTED_QUERY_ROOTS } from '@/lib/query-keys';
  *  persistance après un changement breaking côté API.
  */
 const CACHE_BUSTER = 'kh-v2-wallet-fresh';
+const QUERY_CACHE_STORAGE_KEY = 'kh-query-cache';
+
+/**
+ * Supprime le cache de queries déshydraté d'AsyncStorage. Appelé au
+ * signOut : les données user-spécifiques du compte précédent (favoris,
+ * réservations, conversations…) ne doivent ni se réhydrater au prochain
+ * cold start, ni rester en clair sur le disque après déconnexion.
+ */
+export async function clearPersistedQueryCache(): Promise<void> {
+  try {
+    await AsyncStorage.removeItem(QUERY_CACHE_STORAGE_KEY);
+  } catch {
+    /* best-effort — le buster de version couvrira les cas résiduels */
+  }
+}
 
 // Online / offline detection branchée sur NetInfo (single subscription).
 onlineManager.setEventListener((setOnline) => {

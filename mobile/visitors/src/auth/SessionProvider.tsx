@@ -6,8 +6,10 @@ import { useQueryClient } from '@tanstack/react-query';
 import { apiClient, onUnauthorized, setBearerToken, SCOPED_SESSION_KEY } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import { NON_PERSISTED_QUERY_ROOTS } from '@/lib/query-keys';
+import { clearPersistedQueryCache } from '@/providers/QueryProvider';
 import { disconnectEcho } from '@/services/echo';
 import { clearUserContext, trackEvent } from '@/services/monitoring';
+import { getRegisteredPushToken, setRegisteredPushToken } from '@/services/push-token';
 
 export type SocialProvider = 'google' | 'facebook' | 'github';
 
@@ -120,8 +122,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return onUnauthorized(() => {
       disconnectEcho();
       setToken(null);
+      // Session invalidée par le serveur : mêmes garanties qu'un signOut —
+      // aucune donnée du compte ne doit survivre en mémoire ni sur disque.
+      qc.clear();
+      void clearPersistedQueryCache();
     });
-  }, [setToken]);
+  }, [setToken, qc]);
 
   const value = useMemo<SessionContextValue>(
     () => ({
@@ -143,7 +149,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // requetes au moment du re-render ont deja le bon token.
         setBearerToken(accessToken);
         setToken(accessToken);
-        trackEvent('auth.signIn', { email });
+        trackEvent('auth.signIn');
       },
       signInWithProvider: async (provider) => {
         // Deep link de retour (keyhome://auth/callback en build natif,
@@ -208,17 +214,43 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // Coupe la connexion WebSocket AVANT de révoquer le token — sinon
         // le socket Reverb survit avec les credentials de l'ancien user.
         disconnectEcho();
-        // Révoque le token côté serveur (best-effort, AVANT de vider le
-        // bearer local — sinon la requête part sans Authorization).
-        void apiClient.post(ENDPOINTS.auth.logout).catch(() => {});
+        // Le header Authorization est passé EXPLICITEMENT : l'intercepteur
+        // axios s'exécute en microtâche, APRÈS la purge synchrone du bearer
+        // ci-dessous — sans header capturé, la révocation partait sans
+        // Authorization et le token restait valide côté serveur.
+        const authHeader = token ? { Authorization: `Bearer ${token}` } : undefined;
+        const pushToken = getRegisteredPushToken();
+        setRegisteredPushToken(null);
+        void (async () => {
+          if (pushToken && authHeader) {
+            // Désenregistre le push AVANT la révocation (elle invalide le
+            // token) — sinon l'appareil reçoit encore les notifications de
+            // l'ancien compte.
+            await apiClient
+              .delete(ENDPOINTS.notifications.fcmToken, {
+                data: { token: pushToken },
+                headers: authHeader,
+              })
+              .catch(() => {});
+          }
+          await apiClient
+            .post(ENDPOINTS.auth.logout, undefined, { headers: authHeader })
+            .catch(() => {});
+        })();
         // Vider la cache AVANT le setToken — sinon une derniere
         // requete qui fire pendant le re-render lit encore l'ancien
         // token et envoie une auth zombie.
         setBearerToken(null);
         setToken(null);
+        // Purge mémoire + disque de TOUTES les queries : favoris,
+        // réservations, conversations… du compte déconnecté ne doivent pas
+        // être visibles par le compte suivant (l'app browse-first refetch
+        // le feed anonyme au prochain écran).
+        qc.clear();
+        void clearPersistedQueryCache();
       },
     }),
-    [token, isLoading, setToken],
+    [token, isLoading, setToken, qc],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

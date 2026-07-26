@@ -1,14 +1,17 @@
 import { createContext, useContext, useEffect, useMemo, type ReactNode } from 'react';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { apiClient, onUnauthorized, setBearerToken, SCOPED_SESSION_KEY } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
+import { clearPersistedQueryCache } from '@/providers/QueryProvider';
 import { disconnectEcho } from '@/services/echo';
 import {
   clearUserContext,
   trackEvent,
 } from '@/services/monitoring';
+import { getRegisteredPushToken, setRegisteredPushToken } from '@/services/push-token';
 
 import { useStorageState } from './useStorageState';
 
@@ -76,6 +79,7 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 // Clé scoped-par-environnement : source de vérité dans client.ts (SCOPED_SESSION_KEY).
 export function SessionProvider({ children }: { children: ReactNode }) {
   const [[isLoading, token], setToken] = useStorageState<string>(SCOPED_SESSION_KEY);
+  const queryClient = useQueryClient();
 
   // Sync le bearer-token cache de apiClient — voir client.ts pour
   // le rationale (cache in-memory pour eviter SecureStore race).
@@ -87,8 +91,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return onUnauthorized(() => {
       disconnectEcho();
       setToken(null);
+      // Session invalidée par le serveur : mêmes garanties qu'un signOut —
+      // aucune donnée du compte ne doit survivre en mémoire ni sur disque.
+      queryClient.clear();
+      void clearPersistedQueryCache();
     });
-  }, [setToken]);
+  }, [setToken, queryClient]);
 
   const value = useMemo<SessionContextValue>(
     () => ({
@@ -109,7 +117,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         // ont deja le bon token (sinon race avec le re-render).
         setBearerToken(accessToken);
         setToken(accessToken);
-        trackEvent('auth.signIn', { email });
+        trackEvent('auth.signIn');
       },
       signUp: async (input) => {
         const { data } = await apiClient.post<LoginResponse>(
@@ -173,16 +181,40 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         trackEvent('auth.signOut');
         clearUserContext();
         disconnectEcho();
-        // Révoque le token côté serveur (best-effort, AVANT de vider le
-        // bearer local — sinon la requête part sans Authorization).
-        void apiClient.post(ENDPOINTS.auth.logout).catch(() => {});
+        // Le header Authorization est passé EXPLICITEMENT : l'intercepteur
+        // axios s'exécute en microtâche, APRÈS la purge synchrone du bearer
+        // ci-dessous — sans header capturé, la révocation partait sans
+        // Authorization et le token restait valide côté serveur.
+        const authHeader = token ? { Authorization: `Bearer ${token}` } : undefined;
+        const pushToken = getRegisteredPushToken();
+        setRegisteredPushToken(null);
+        void (async () => {
+          if (pushToken && authHeader) {
+            // Désenregistre le push AVANT la révocation (elle invalide le
+            // token) — sinon l'appareil reçoit encore les notifications de
+            // l'ancien compte.
+            await apiClient
+              .delete(ENDPOINTS.notifications.fcmToken, {
+                data: { token: pushToken },
+                headers: authHeader,
+              })
+              .catch(() => {});
+          }
+          await apiClient
+            .post(ENDPOINTS.auth.logout, undefined, { headers: authHeader })
+            .catch(() => {});
+        })();
         // Vider cache AVANT le setToken pour eviter qu'une
         // derniere requete in-flight lise un token zombie.
         setBearerToken(null);
         setToken(null);
+        // Purge mémoire + disque : les annonces, paiements et locataires du
+        // compte déconnecté ne doivent pas être visibles par le suivant.
+        queryClient.clear();
+        void clearPersistedQueryCache();
       },
     }),
-    [token, isLoading, setToken],
+    [token, isLoading, setToken, queryClient],
   );
 
   return (

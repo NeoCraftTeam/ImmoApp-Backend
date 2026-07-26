@@ -6,6 +6,7 @@ import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import { useSession } from '@/auth/SessionProvider';
 import { trackEvent } from '@/services/monitoring';
+import { setRegisteredPushToken } from '@/services/push-token';
 
 const IS_EXPO_GO =
   Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
@@ -29,7 +30,13 @@ export function usePushNotifications() {
   const registeredRef = useRef(false);
 
   useEffect(() => {
-    if (!isAuthenticated || registeredRef.current) return;
+    if (!isAuthenticated) {
+      // Reset au signOut : le compte suivant sur le même appareil doit
+      // ré-enregistrer SON token (le POST upsert réassigne le user_id).
+      registeredRef.current = false;
+      return;
+    }
+    if (registeredRef.current) return;
     if (IS_EXPO_GO) return;
     if (Constants.isDevice === false) return;
     registeredRef.current = true;
@@ -79,6 +86,8 @@ export function usePushNotifications() {
           platform: Platform.OS,
           provider: 'expo',
         });
+        // Mémorisé pour le DELETE /fcm/token du signOut.
+        setRegisteredPushToken(expoToken);
         trackEvent('owner.push.registered', { platform: Platform.OS });
       } catch {
         /* swallow — push best-effort */

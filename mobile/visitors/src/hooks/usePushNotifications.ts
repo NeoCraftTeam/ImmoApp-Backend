@@ -5,6 +5,7 @@ import { Platform } from 'react-native';
 import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import { useSession } from '@/auth/SessionProvider';
+import { setRegisteredPushToken } from '@/services/push-token';
 
 /**
  * Expo Go on SDK 53+ stripped remote-push delivery for both iOS and
@@ -33,7 +34,13 @@ export function usePushNotifications() {
   const registeredRef = useRef(false);
 
   useEffect(() => {
-    if (!isAuthenticated || registeredRef.current) {
+    if (!isAuthenticated) {
+      // Reset au signOut : le compte suivant sur le même appareil doit
+      // ré-enregistrer SON token (le POST upsert réassigne le user_id).
+      registeredRef.current = false;
+      return;
+    }
+    if (registeredRef.current) {
       return;
     }
     if (IS_EXPO_GO) {
@@ -92,6 +99,8 @@ export function usePushNotifications() {
           platform: Platform.OS,
           provider: 'expo',
         });
+        // Mémorisé pour le DELETE /fcm/token du signOut.
+        setRegisteredPushToken(expoToken);
       } catch {
         /* swallow — push is best-effort and shouldn't break the app */
       }
