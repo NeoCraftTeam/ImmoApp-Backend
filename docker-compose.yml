@@ -38,6 +38,11 @@ services:
       - keyhome-storage-data:/var/www/storage
       - ./.env:/var/www/.env
       - .docker/php/www.conf:/usr/local/etc/php-fpm.d/www.conf:ro
+      # Base MaxMind GeoLite2 maintenue par `geoipupdate` sur l'HÔTE
+      # (/var/lib/GeoIP) — sans ce montage, le conteneur ne voit pas le
+      # .mmdb et /geo/currency retombe silencieusement sur XAF.
+      # `.env` prod : MAXMIND_DB_PATH=/var/lib/GeoIP/GeoLite2-Country.mmdb
+      - /var/lib/GeoIP:/var/lib/GeoIP:ro
     networks:
       - keyhome-network
     environment:

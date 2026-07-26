@@ -41,6 +41,9 @@ services:
       - preprod-app-code:/var/www
       - preprod-storage-data:/var/www/storage
       - ./.env:/var/www/.env
+      # Base MaxMind GeoLite2 de l'hôte (maintenue par geoipupdate) —
+      # requise pour /geo/currency ; `.env` : MAXMIND_DB_PATH=/var/lib/GeoIP/GeoLite2-Country.mmdb
+      - /var/lib/GeoIP:/var/lib/GeoIP:ro
     networks:
       - preprod-network
       - keyhome-prod-network
