@@ -60,11 +60,20 @@ export function useChangePassword() {
   });
 }
 
-/** DELETE /my/account — suppression définitive du compte. */
+/** Phrase de confirmation exacte exigée par le backend (GdprController). */
+export const DELETE_ACCOUNT_CONFIRMATION = 'SUPPRIMER MON COMPTE';
+
+/**
+ * DELETE /my/account — suppression définitive du compte. Le backend exige
+ * une phrase de confirmation exacte (`confirmation`) — sans elle la requête
+ * échoue en 422. On l'envoie donc toujours.
+ */
 export function useDeleteAccount() {
   return useMutation({
     mutationFn: async () => {
-      await apiClient.delete(ENDPOINTS.my.deleteAccount);
+      await apiClient.delete(ENDPOINTS.my.deleteAccount, {
+        data: { confirmation: DELETE_ACCOUNT_CONFIRMATION },
+      });
     },
   });
 }

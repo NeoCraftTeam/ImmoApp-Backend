@@ -6,8 +6,10 @@ import { Button, H2, Paragraph, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
+import { PasswordInput } from '@/components/PasswordInput';
 import { useResetPassword } from '@/hooks/useAuthExtras';
 import { brand } from '@/theme/tokens';
+import { validatePasswordRule } from '@/utils/password-rule';
 
 /**
  * Reset password — token (pasted from email) + new password +
@@ -29,8 +31,9 @@ export default function ResetPasswordScreen() {
       Alert.alert('Champs manquants', 'Email et code sont requis.');
       return;
     }
-    if (password.length < 8) {
-      Alert.alert('Mot de passe trop court', 'Au moins 8 caractères.');
+    const ruleError = validatePasswordRule(password);
+    if (ruleError) {
+      Alert.alert('Mot de passe trop faible', ruleError);
       return;
     }
     if (password !== confirm) {
@@ -87,14 +90,25 @@ export default function ResetPasswordScreen() {
                 Nouveau mot de passe
               </H2>
               <Paragraph fontSize={14} color="$slate500">
-                Saisissez votre email et le code reçu dans le mail.
+                Saisissez votre email et le code de réinitialisation reçu par
+                email (dans le lien, après « token= »).
               </Paragraph>
             </YStack>
 
             <Field label="Email" value={email} onChange={setEmail} keyboardType="email-address" autoCapitalize="none" />
-            <Field label="Code de réinitialisation" value={token} onChange={setToken} placeholder="Collez le code du lien reçu par email (token=…)" autoCapitalize="none" />
-            <Field label="Nouveau mot de passe" value={password} onChange={setPassword} secure />
-            <Field label="Confirmation" value={confirm} onChange={setConfirm} secure />
+            <Field label="Code de réinitialisation" value={token} onChange={setToken} placeholder="Code reçu par email" autoCapitalize="none" />
+            <YStack gap={6}>
+              <Paragraph fontSize={12} fontWeight="700" color="$slate500" textTransform="uppercase">
+                Nouveau mot de passe
+              </Paragraph>
+              <PasswordInput value={password} onChangeText={setPassword} autoComplete="new-password" placeholder="8 caractères, min/MAJ, chiffre, symbole" />
+            </YStack>
+            <YStack gap={6}>
+              <Paragraph fontSize={12} fontWeight="700" color="$slate500" textTransform="uppercase">
+                Confirmation
+              </Paragraph>
+              <PasswordInput value={confirm} onChangeText={setConfirm} autoComplete="new-password" />
+            </YStack>
 
             <Button size="$5" backgroundColor="$brand" color="white" fontWeight="700" borderRadius={14} disabled={mutation.isPending} onPress={handleSubmit}>
               {mutation.isPending ? 'Mise à jour…' : 'Réinitialiser'}

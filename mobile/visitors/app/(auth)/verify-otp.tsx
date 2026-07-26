@@ -143,8 +143,17 @@ function EmailVerifyOtpScreen({ initialEmail }: { initialEmail: string }) {
       const result = await verify.mutateAsync({ email: email as string, otp });
       if (result?.token) {
         setToken(result.token);
+        router.replace('/(tabs)/home');
+        return;
       }
-      router.replace('/(tabs)/home');
+      // Email vérifié mais le backend n'a pas renvoyé de session : ne pas
+      // atterrir sur le feed déconnecté — router vers le login avec un
+      // message clair.
+      Alert.alert(
+        'Email vérifié',
+        'Votre adresse est confirmée. Connectez-vous pour accéder à votre compte.',
+      );
+      router.replace('/(auth)/login');
     } catch (err) {
       Alert.alert('Code invalide', extractApiErrorMessage(err));
     }

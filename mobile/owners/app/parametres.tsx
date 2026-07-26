@@ -7,6 +7,10 @@ import { Paragraph, Spinner, XStack, YStack } from 'tamagui';
 import { apiClient, extractApiErrorMessage } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import { useSession } from '@/auth/SessionProvider';
+import {
+  DeleteAccountModal,
+  DELETE_ACCOUNT_CONFIRMATION,
+} from '@/components/DeleteAccountModal';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useMe } from '@/hooks/useMe';
 import { useUpdateProfile } from '@/hooks/useProfile';
@@ -28,6 +32,7 @@ export default function SettingsScreen() {
   const [emailOn, setEmailOn] = useState(false);
   const [pushOn, setPushOn] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (!me.data) return;
@@ -71,33 +76,22 @@ export default function SettingsScreen() {
     ]);
   };
 
-  const handleDeleteAccount = () => {
-    Alert.alert(
-      t('settings.deleteAccount'),
-      'Cette action est définitive : votre compte et vos données seront supprimés. Continuer ?',
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: async () => {
-            setDeleting(true);
-            try {
-              // Le backend exige une phrase de confirmation exacte.
-              await apiClient.delete(ENDPOINTS.my.deleteAccount, {
-                data: { confirmation: 'SUPPRIMER MON COMPTE' },
-              });
-              signOut();
-              router.replace('/(auth)/login');
-            } catch (err) {
-              Alert.alert(t('common.error'), extractApiErrorMessage(err));
-            } finally {
-              setDeleting(false);
-            }
-          },
-        },
-      ],
-    );
+  const runDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      // Le backend exige la phrase de confirmation exacte (déjà validée
+      // par la saisie de l'utilisateur dans le modal).
+      await apiClient.delete(ENDPOINTS.my.deleteAccount, {
+        data: { confirmation: DELETE_ACCOUNT_CONFIRMATION },
+      });
+      setDeleteOpen(false);
+      signOut();
+      router.replace('/(auth)/login');
+    } catch (err) {
+      Alert.alert(t('common.error'), extractApiErrorMessage(err));
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -134,7 +128,7 @@ export default function SettingsScreen() {
         </YStack>
 
         <YStack marginTop={12} gap={10}>
-          <Pressable onPress={handleDeleteAccount} disabled={deleting}>
+          <Pressable onPress={() => setDeleteOpen(true)} disabled={deleting}>
             <XStack
               alignItems="center"
               gap={12}
@@ -168,6 +162,13 @@ export default function SettingsScreen() {
           </Pressable>
         </YStack>
       </ScrollView>
+
+      <DeleteAccountModal
+        open={deleteOpen}
+        pending={deleting}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={runDeleteAccount}
+      />
     </YStack>
   );
 }

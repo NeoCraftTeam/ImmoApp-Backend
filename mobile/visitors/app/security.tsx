@@ -6,12 +6,14 @@ import { Button, H2, Paragraph, Spinner, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
+import { DeleteAccountModal } from '@/components/DeleteAccountModal';
 import { PasswordInput } from '@/components/PasswordInput';
 import { useLinkProvider, useUnlinkProvider } from '@/hooks/useLinkedAccounts';
 import { useMe } from '@/hooks/useMe';
 import { useChangePassword, useDeleteAccount } from '@/hooks/useUpdateProfile';
 import { useSession, type SocialProvider } from '@/auth/SessionProvider';
 import { brand } from '@/theme/tokens';
+import { validatePasswordRule } from '@/utils/password-rule';
 
 const LINKABLE: { key: SocialProvider; label: string }[] = [
   { key: 'google', label: 'Google' },
@@ -86,6 +88,7 @@ export default function SecurityScreen() {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   const submitPassword = () => {
     if (current === '' || next === '' || confirm === '') {
@@ -96,8 +99,9 @@ export default function SecurityScreen() {
       Alert.alert('Erreur', 'Le nouveau mot de passe et sa confirmation ne correspondent pas.');
       return;
     }
-    if (next.length < 8) {
-      Alert.alert('Mot de passe trop court', '8 caractères minimum.');
+    const ruleError = validatePasswordRule(next);
+    if (ruleError) {
+      Alert.alert('Mot de passe trop faible', ruleError);
       return;
     }
     changePassword.mutate(
@@ -114,26 +118,15 @@ export default function SecurityScreen() {
     );
   };
 
-  const confirmDelete = () => {
-    Alert.alert(
-      'Supprimer le compte',
-      'Cette action est irréversible. Vos favoris, messages et données seront définitivement effacés.',
-      [
-        { text: 'Annuler', style: 'cancel' },
-        {
-          text: 'Supprimer définitivement',
-          style: 'destructive',
-          onPress: () =>
-            deleteAccount.mutate(undefined, {
-              onSuccess: () => {
-                signOut();
-                router.replace('/(tabs)/home');
-              },
-              onError: (err) => Alert.alert('Erreur', extractApiErrorMessage(err)),
-            }),
-        },
-      ],
-    );
+  const runDelete = () => {
+    deleteAccount.mutate(undefined, {
+      onSuccess: () => {
+        setDeleteOpen(false);
+        signOut();
+        router.replace('/(tabs)/home');
+      },
+      onError: (err) => Alert.alert('Erreur', extractApiErrorMessage(err)),
+    });
   };
 
   if (!isAuthenticated) {
@@ -295,7 +288,7 @@ export default function SecurityScreen() {
             <Paragraph fontSize={13} color="$slate500" lineHeight={19}>
               La suppression de votre compte est définitive et efface toutes vos données.
             </Paragraph>
-            <Pressable onPress={confirmDelete} accessibilityRole="button" disabled={deleteAccount.isPending}>
+            <Pressable onPress={() => setDeleteOpen(true)} accessibilityRole="button" disabled={deleteAccount.isPending}>
               <XStack
                 alignItems="center"
                 justifyContent="center"
@@ -318,6 +311,13 @@ export default function SecurityScreen() {
           </YStack>
         </ScrollView>
       </YStack>
+
+      <DeleteAccountModal
+        open={deleteOpen}
+        pending={deleteAccount.isPending}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={runDelete}
+      />
     </>
   );
 }

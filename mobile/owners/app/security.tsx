@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { ChevronRight, Fingerprint, Key, ShieldAlert, Smartphone } from '@tamagui/lucide-icons';
 import { Alert, ScrollView } from 'react-native';
-import { Button, Input, Paragraph, XStack, YStack } from 'tamagui';
+import { Button, Paragraph, XStack, YStack } from 'tamagui';
 
 import { extractApiErrorMessage } from '@/api/client';
+import { PasswordInput } from '@/components/PasswordInput';
 import { useChangePassword } from '@/hooks/useProfile';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { brand } from '@/theme/tokens';
+import { validatePasswordRule } from '@/utils/password-rule';
 
 interface RowProps {
   icon: React.ReactNode;
@@ -54,8 +56,9 @@ export default function SecurityScreen() {
   const [confirm, setConfirm] = useState('');
 
   const onSubmitPassword = () => {
-    if (next.length < 8) {
-      Alert.alert('Mot de passe trop court', 'Au moins 8 caractères.');
+    const ruleError = validatePasswordRule(next);
+    if (ruleError) {
+      Alert.alert('Mot de passe trop faible', ruleError);
       return;
     }
     if (next !== confirm) {
@@ -105,19 +108,19 @@ export default function SecurityScreen() {
               <Paragraph fontSize={12.5} fontWeight="700" color="$slate700">
                 Mot de passe actuel
               </Paragraph>
-              <Input value={current} onChangeText={setCurrent} secureTextEntry />
+              <PasswordInput value={current} onChangeText={setCurrent} autoComplete="current-password" />
             </YStack>
             <YStack gap={6}>
               <Paragraph fontSize={12.5} fontWeight="700" color="$slate700">
                 Nouveau mot de passe
               </Paragraph>
-              <Input value={next} onChangeText={setNext} secureTextEntry />
+              <PasswordInput value={next} onChangeText={setNext} autoComplete="new-password" />
             </YStack>
             <YStack gap={6}>
               <Paragraph fontSize={12.5} fontWeight="700" color="$slate700">
                 Confirmer
               </Paragraph>
-              <Input value={confirm} onChangeText={setConfirm} secureTextEntry />
+              <PasswordInput value={confirm} onChangeText={setConfirm} autoComplete="new-password" />
             </YStack>
             <Button
               size="$3"
