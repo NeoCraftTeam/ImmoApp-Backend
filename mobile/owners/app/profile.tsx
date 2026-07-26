@@ -10,9 +10,17 @@ import {
   X,
 } from '@tamagui/lucide-icons';
 import { Image } from 'expo-image';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView } from 'react-native';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+} from 'react-native';
 import {
   Button,
   Input,
@@ -136,9 +144,22 @@ export default function ProfileScreen() {
     const asset = result.canceled ? undefined : result.assets[0];
     if (!asset) return;
     const name = asset.fileName ?? `avatar-${Date.now()}.jpg`;
-    const type = asset.mimeType ?? 'image/jpeg';
+    // Redimensionne côté client (512 px max) : le picker sort du 3-4 Mo,
+    // inutile pour un avatar et lent sur réseau faible. Jamais d'upscale.
+    let upload = { uri: asset.uri, name, type: asset.mimeType ?? 'image/jpeg' };
     try {
-      await uploadAvatar.mutateAsync({ uri: asset.uri, name, type });
+      if ((asset.width ?? 0) > 512) {
+        const context = ImageManipulator.manipulate(asset.uri);
+        context.resize({ width: 512 });
+        const rendered = await context.renderAsync();
+        const saved = await rendered.saveAsync({ compress: 0.8, format: SaveFormat.JPEG });
+        upload = {
+          uri: saved.uri,
+          name: name.replace(/\.[a-z0-9]+$/i, '') + '.jpg',
+          type: 'image/jpeg',
+        };
+      }
+      await uploadAvatar.mutateAsync(upload);
     } catch (err) {
       Alert.alert(t('common.error'), extractApiErrorMessage(err));
     }
@@ -177,7 +198,19 @@ export default function ProfileScreen() {
     <YStack flex={1} backgroundColor="$background">
       <ScreenHeader title={t('profile.title')} />
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+      {/* KeyboardAvoidingView : sans lui, le clavier iOS recouvre les
+          champs du bas (ville, bio). `keyboardShouldPersistTaps` permet
+          de taper une option du picker clavier ouvert. */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+      <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+      >
         {/* Avatar + trust */}
         <YStack alignItems="center" gap={12} marginBottom={20}>
           <Pressable onPress={handlePickAvatar} disabled={uploadAvatar.isPending}>
@@ -334,6 +367,7 @@ export default function ProfileScreen() {
           />
         </YStack>
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* QR modal */}
       <Modal visible={qrOpen} transparent animationType="fade" onRequestClose={() => setQrOpen(false)}>

@@ -8,6 +8,7 @@
  */
 export const SESSION_KEY = 'keyhome.session.token';
 export const ONBOARDING_DONE_KEY = 'keyhome.onboarding.done';
+export const PERMISSIONS_PRIMED_KEY = 'keyhome.permissions.primed';
 
 /**
  * Clé de session cloisonnée par environnement d'API : un token émis par

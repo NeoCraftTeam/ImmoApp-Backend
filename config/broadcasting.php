@@ -48,8 +48,16 @@ return [
                 'scheme' => env('REVERB_BROADCAST_SCHEME', env('REVERB_SCHEME', 'https')),
                 'useTLS' => env('REVERB_BROADCAST_SCHEME', env('REVERB_SCHEME', 'https')) === 'https',
             ],
+            /*
+            | Timeouts Guzzle OBLIGATOIRES : les événements chat/crédits sont
+            | `ShouldBroadcastNow` (diffusés DANS la requête HTTP). Sans borne,
+            | un Reverb injoignable en half-open (TCP accepté, aucune réponse)
+            | bloque le worker FPM jusqu'à max_execution_time — pool saturé,
+            | toute l'API timeout. 2 s bornent le pire cas par requête.
+            */
             'client_options' => [
-                // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
+                'timeout' => (float) env('REVERB_BROADCAST_TIMEOUT', 2),
+                'connect_timeout' => (float) env('REVERB_BROADCAST_CONNECT_TIMEOUT', 1),
             ],
         ],
 
@@ -67,7 +75,8 @@ return [
                 'useTLS' => env('PUSHER_SCHEME', 'https') === 'https',
             ],
             'client_options' => [
-                // Guzzle client options: https://docs.guzzlephp.org/en/stable/request-options.html
+                'timeout' => (float) env('PUSHER_BROADCAST_TIMEOUT', 2),
+                'connect_timeout' => (float) env('PUSHER_BROADCAST_CONNECT_TIMEOUT', 1),
             ],
         ],
 

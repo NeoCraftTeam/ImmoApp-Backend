@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLocales } from 'expo-localization';
+import * as Location from 'expo-location';
 
 import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
@@ -124,6 +125,17 @@ class CurrencyStore {
     void AsyncStorage.setItem(STORAGE_KEY, next).catch(() => {});
   };
 
+  /**
+   * Relance la détection (API géo puis GPS) — appelée après que
+   * l'utilisateur a accordé la permission de localisation sur l'écran
+   * d'autorisations : le GPS peut maintenant résoudre le pays même si
+   * l'API est injoignable. Un choix manuel persisté reste prioritaire.
+   */
+  redetect = (): void => {
+    this.bootstrapped = false;
+    void this.bootstrap();
+  };
+
   private apply(next: string): void {
     if (next === this.currency) return;
     this.currency = next;
@@ -147,16 +159,60 @@ class CurrencyStore {
 
     // 2. Détection par IP côté backend (MaxMind). Le locale/région reste
     // affiché en attendant la réponse (pas de flash FCFA au démarrage).
+    // On n'applique QUE une vraie détection (`source: 'ip'`) : quand le
+    // serveur répond son repli XAF (`source: 'fallback'`), l'imposer
+    // écraserait une meilleure info locale (GPS/région de l'appareil).
     try {
-      const { data } = await apiClient.get<{ currency?: string }>(ENDPOINTS.geo.currency);
-      const detected = data?.currency;
-      if (detected && RATES[detected]) {
-        this.apply(detected);
+      const { data } = await apiClient.get<{ currency?: string; source?: string }>(
+        ENDPOINTS.geo.currency,
+        { timeout: 6_000 },
+      );
+      if (data?.source === 'ip' && data.currency && RATES[data.currency]) {
+        this.apply(data.currency);
+        return;
       }
     } catch {
-      /* réseau indisponible → on garde le repli locale/région */
+      /* réseau indisponible → sources locales ci-dessous */
+    }
+
+    // 3. Pays via GPS (uniquement si la permission est DÉJÀ accordée —
+    // jamais de prompt ici) : robuste même API down, et corrige le cas
+    // « téléphone en français en Suisse » (région FR → EUR au lieu de CHF).
+    try {
+      const country = await deviceCountryFromGps();
+      const fromGps = country ? COUNTRY_TO_CURRENCY[country] : undefined;
+      if (fromGps && RATES[fromGps]) {
+        this.apply(fromGps);
+      }
+    } catch {
+      /* GPS indisponible → le repli locale/région du constructeur reste */
     }
   }
+}
+
+/**
+ * Résout le code pays ISO via la position de l'appareil. Ne demande JAMAIS
+ * la permission (no prompt) ; borne la lecture GPS à 4 s pour ne pas
+ * retarder l'affichage.
+ */
+async function deviceCountryFromGps(): Promise<string | null> {
+  const permission = await Location.getForegroundPermissionsAsync();
+  if (!permission.granted) return null;
+
+  const position =
+    (await Location.getLastKnownPositionAsync()) ??
+    (await Promise.race([
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Lowest }),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 4_000)),
+    ]));
+  if (!position) return null;
+
+  const places = await Location.reverseGeocodeAsync({
+    latitude: position.coords.latitude,
+    longitude: position.coords.longitude,
+  });
+  const iso = places[0]?.isoCountryCode;
+  return iso ? iso.toUpperCase() : null;
 }
 
 export const currencyStore = new CurrencyStore();

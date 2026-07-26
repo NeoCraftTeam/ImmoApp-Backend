@@ -1,11 +1,14 @@
 import { ArrowLeft, Camera, CheckCircle2 } from '@tamagui/lucide-icons';
 import { Image } from 'expo-image';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   TextInput,
@@ -127,12 +130,27 @@ export default function ProfileEdit() {
       });
       if (result.canceled || !result.assets[0]) return;
       const asset = result.assets[0];
+      // Redimensionne côté client (512 px max) : un avatar sort du picker
+      // en 3-4 Mo — inutile pour un rond de 104 px, et lent sur réseau
+      // faible. On ne redimensionne jamais vers le haut.
       const filename = asset.fileName ?? asset.uri.split('/').pop() ?? 'avatar.jpg';
-      await uploadAvatar.mutateAsync({
+      let upload = {
         uri: asset.uri,
         name: filename,
         type: asset.mimeType ?? 'image/jpeg',
-      });
+      };
+      if ((asset.width ?? 0) > 512) {
+        const context = ImageManipulator.manipulate(asset.uri);
+        context.resize({ width: 512 });
+        const rendered = await context.renderAsync();
+        const saved = await rendered.saveAsync({ compress: 0.8, format: SaveFormat.JPEG });
+        upload = {
+          uri: saved.uri,
+          name: filename.replace(/\.[a-z0-9]+$/i, '') + '.jpg',
+          type: 'image/jpeg',
+        };
+      }
+      await uploadAvatar.mutateAsync(upload);
     } catch (err) {
       Alert.alert('Erreur', extractApiErrorMessage(err));
     }
@@ -161,6 +179,14 @@ export default function ProfileEdit() {
           </H2>
         </XStack>
 
+        {/* KeyboardAvoidingView : sans lui, le clavier iOS recouvre les
+            champs du bas (ville, téléphone). `keyboardShouldPersistTaps`
+            permet de taper une suggestion d'autocomplete clavier ouvert
+            (sinon le 1er tap ne fait que fermer le clavier). */}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
         <ScrollView
           contentContainerStyle={{
             paddingHorizontal: 20,
@@ -169,6 +195,8 @@ export default function ProfileEdit() {
             gap: 18,
           }}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
         >
           <YStack alignItems="center" gap={10}>
             <Pressable onPress={handlePickAvatar} disabled={uploadAvatar.isPending}>
@@ -260,6 +288,7 @@ export default function ProfileEdit() {
             </Pressable>
           </YStack>
         </ScrollView>
+        </KeyboardAvoidingView>
       </YStack>
     </>
   );

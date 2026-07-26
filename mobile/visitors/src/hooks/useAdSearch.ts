@@ -6,7 +6,6 @@ import type { Ad, AdFeedResponse } from '@/types/ad';
 import {
   DEFAULT_SORT,
   EMPTY_FILTERS,
-  activeFilterCount,
   filtersToParams,
   sortToParams,
   type AdFilters,
@@ -33,7 +32,6 @@ export function useAdSearch(
   sort: AdSort = DEFAULT_SORT,
 ) {
   const trimmed = query.trim();
-  const hasFilters = activeFilterCount(filters) > 0;
   const hasQuery = trimmed.length >= 2;
 
   return useInfiniteQuery<
@@ -69,7 +67,9 @@ export function useAdSearch(
       Array.isArray(data?.pages)
         ? data.pages.flatMap((p) => (Array.isArray(p?.data) ? p.data : []))
         : [],
-    enabled: hasQuery || hasFilters,
+    // Toujours actif : sans requête ni filtre, `/ads/search` renvoie les
+    // dernières annonces (tri par défaut) — l'onglet recherche et la carte
+    // affichent du contenu dès l'ouverture, comme la page search du web.
     staleTime: 60 * 1000,
   });
 }

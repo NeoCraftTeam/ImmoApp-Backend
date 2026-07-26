@@ -391,15 +391,7 @@ export default function SearchTab() {
         ) : null}
       </YStack>
 
-      {!isSearching && (
-        <YStack flex={1} justifyContent="center" alignItems="center" padding="$5">
-          <Paragraph color="$slate500" size="$4" textAlign="center">
-            {t('search.empty')}
-          </Paragraph>
-        </YStack>
-      )}
-
-      {isSearching && isError && (
+      {isError && (
         <YStack flex={1} alignItems="center" justifyContent="center" padding="$5" gap={12}>
           <Paragraph color="$slate700" textAlign="center" fontSize={14}>
             {extractApiErrorMessage(error)}
@@ -427,11 +419,11 @@ export default function SearchTab() {
         </YStack>
       )}
 
-      {isSearching && !isError && viewMode === 'map' && (
+      {!isError && viewMode === 'map' && (
         <SearchResultsMap ads={results ?? []} />
       )}
 
-      {isSearching && !isError && viewMode === 'list' && (
+      {!isError && viewMode === 'list' && (
         <FlatList
           data={results ?? []}
           keyExtractor={(item) => item.id}
@@ -514,7 +506,7 @@ export default function SearchTab() {
         />
       )}
 
-      {isLoading && isSearching && (
+      {isLoading && (
         <YStack
           position="absolute"
           left={0}
