@@ -32,6 +32,10 @@ function resolveBaseUrl(): string {
  */
 const RESOLVED_BASE_URL = resolveBaseUrl();
 
+/** URL de base API effective (env → dérivée plateforme). Sert aussi à
+ *  reconstruire les URLs médias absolues (`src/lib/media-url.ts`). */
+export { RESOLVED_BASE_URL };
+
 /**
  * Clé SecureStore effective pour cette build (cloisonnée par backend).
  * Unique source de vérité — SessionProvider et utils/documents l'importent

@@ -101,6 +101,16 @@ export default function MessagesInbox() {
   );
 }
 
+/** Preview inbox : corps du message, sinon libellé pièce jointe / scellé. */
+function previewText(conversation: Conversation): string {
+  const last = conversation.last_message;
+  if (!last) return 'Aucun message';
+  if (last.is_client_sealed) return '🔐 Message sécurisé';
+  if (last.body) return last.body;
+  if (last.type === 'image') return '📷 Photo';
+  return '📎 Pièce jointe';
+}
+
 function ConversationRow({
   conversation,
   onPress,
@@ -138,7 +148,14 @@ function ConversationRow({
             overflow="hidden"
           >
             {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+              <Image
+                source={{ uri: avatarUrl }}
+                style={{ width: '100%', height: '100%' }}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                recyclingKey={avatarUrl}
+                transition={150}
+              />
             ) : (
               <Paragraph fontSize={18} fontWeight="700" color={brand.primary}>
                 {otherName.charAt(0).toUpperCase()}
@@ -188,7 +205,7 @@ function ConversationRow({
               numberOfLines={1}
               flex={1}
             >
-              {lastMessage?.body ?? 'Aucun message'}
+              {previewText(conversation)}
             </Paragraph>
             {unread && (
               <YStack

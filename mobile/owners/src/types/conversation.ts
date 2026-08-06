@@ -25,6 +25,10 @@ export interface ConversationPreview {
     body: string | null;
     created_at?: string;
     sender_id?: string;
+    /** `image` | `file` | `text` — sert au fallback preview (« 📷 Photo »). */
+    type?: string;
+    /** `true` = message scellé E2EE (legacy) — preview « 🔐 Message sécurisé ». */
+    is_client_sealed?: boolean;
   } | null;
   last_message_at?: string | null;
   unread_count: number;

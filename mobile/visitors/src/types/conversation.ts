@@ -22,6 +22,10 @@ export interface Conversation {
     /** `null` si message scellé (E2EE) — afficher un fallback neutre. */
     body: string | null;
     created_at?: string;
+    /** `image` | `file` | `text` — sert au fallback preview (« 📷 Photo »). */
+    type?: string;
+    /** `true` = message scellé E2EE (legacy) — preview « 🔐 Message sécurisé ». */
+    is_client_sealed?: boolean;
   } | null;
   last_message_at?: string | null;
   unread_count?: number;

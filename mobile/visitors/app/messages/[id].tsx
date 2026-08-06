@@ -785,6 +785,8 @@ function Avatar({
           source={{ uri: resolveMediaUrl(uri)! }}
           style={{ width: size, height: size }}
           contentFit="cover"
+          cachePolicy="memory-disk"
+          recyclingKey={resolveMediaUrl(uri)!}
           transition={150}
         />
       ) : (
