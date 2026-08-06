@@ -364,7 +364,7 @@
                         <tr class="{{ $i % 2 === 1 ? 'tx-row-even' : '' }}">
                             <td style="font-size:8.5pt; color:#64748b; white-space:nowrap;">
                                 {{ $payment->created_at->format('d/m/Y') }}<br>
-                                <span style="font-size:7.5pt;">{{ $payment->created_at->format('H:i') }}</span>
+                                <span style="font-size:7.5pt;">{{ $payment->created_at->format('H:i') }} UTC</span>
                             </td>
                             <td>
                                 <span class="type-badge type-{{ $typeKey }}">{{ $typeLbl }}</span>

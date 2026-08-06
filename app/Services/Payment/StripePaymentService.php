@@ -10,6 +10,7 @@ use App\Enums\PaymentGateway;
 use App\Enums\PaymentMethod;
 use App\Exceptions\InvalidWebhookSignatureException;
 use App\Exceptions\PaymentGatewayException;
+use App\Exceptions\StripeCustomerMissingException;
 use App\Support\XafEurConverter;
 use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Cashier;
@@ -194,6 +195,15 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
                     ['idempotency_key' => 'kh_initiate:'.$txRef],
                 );
             } catch (ApiErrorException $e) {
+                // Customer (ou carte rattachée à l'ancien Customer) inconnu :
+                // exception dédiée pour que l'orchestrateur s'auto-répare.
+                if ($e->getStripeCode() === 'resource_missing' && $customerId !== null) {
+                    throw new StripeCustomerMissingException(
+                        'Client Stripe introuvable : '.$customerId,
+                        previous: $e,
+                    );
+                }
+
                 Log::error('Stripe initiate (off-session) failed', [
                     'tx_ref' => $txRef,
                     'message' => $e->getMessage(),
@@ -362,6 +372,19 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
             $customer = $this->stripe->customers->retrieve($customerId);
             $defaultPaymentMethod = (string) ($customer->invoice_settings->default_payment_method ?? '');
         } catch (ApiErrorException $e) {
+            // Client Stripe inexistant (ex. stripe_id créé avec des clés de
+            // test, ou Customer supprimé côté Stripe) : ce n'est PAS une
+            // erreur pour l'utilisateur — il n'a simplement aucune carte.
+            // On renvoie une liste vide au lieu d'un 5xx qui afficherait
+            // « Impossible de récupérer vos cartes » dans le profil.
+            if ($e->getStripeCode() === 'resource_missing') {
+                Log::info('Stripe listSavedCards: customer inconnu, liste vide renvoyée', [
+                    'customer_id' => $customerId,
+                ]);
+
+                return [];
+            }
+
             Log::error('Stripe listSavedCards failed', [
                 'customer_id' => $customerId,
                 'message' => $e->getMessage(),
@@ -473,6 +496,15 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
                 'usage' => 'off_session',
             ]);
         } catch (ApiErrorException $e) {
+            // Customer inconnu (stripe_id périmé) : exception dédiée pour que
+            // l'appelant puisse s'auto-réparer (nouveau Customer + retry).
+            if ($e->getStripeCode() === 'resource_missing') {
+                throw new StripeCustomerMissingException(
+                    'Client Stripe introuvable : '.$customerId,
+                    previous: $e,
+                );
+            }
+
             Log::error('Stripe createSetupIntent failed', [
                 'customer_id' => $customerId,
                 'message' => $e->getMessage(),

@@ -71,7 +71,7 @@ final class PasskeyNotificationMail extends Mailable implements ShouldQueue
                 'deviceName' => $this->deviceName ?: 'Appareil inconnu',
                 'ipAddress' => $this->ipAddress ?: 'Non disponible',
                 'userAgent' => $this->userAgent ?: 'Non disponible',
-                'timestamp' => now()->timezone('Africa/Douala')->format('d/m/Y à H:i'),
+                'timestamp' => now()->utc()->format('d/m/Y \à H:i').' (UTC)',
                 'securityUrl' => $isOwner
                     ? rtrim((string) config('app.frontend_url', config('app.url')), '/').'/owner/security'
                     : rtrim((string) config('app.frontend_url', config('app.url')), '/').'/settings/security',

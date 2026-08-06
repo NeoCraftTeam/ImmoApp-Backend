@@ -108,6 +108,47 @@ services:
           memory: 256m
           cpus: "0.50"
 
+  # Le Scheduler Laravel — tâches planifiées de routes/console.php
+  # (réconciliation paiements, rappels J-1, expirations, rapports…).
+  # SANS ce service, aucune tâche planifiée ne tourne en preprod.
+  scheduler:
+    image: ${APP_IMAGE:-keyhome-backend}
+    container_name: ${COMPOSE_PREFIX:-keyhome-preprod}-scheduler
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan schedule:work
+    depends_on:
+      code-sync:
+        condition: service_completed_successfully
+      app:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - preprod-app-code:/var/www
+      - preprod-storage-data:/var/www/storage
+      - ./.env:/var/www/.env
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'schedule:work' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - preprod-network
+      - keyhome-prod-network
+    environment:
+      - DB_SSLMODE=prefer
+      - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
+      - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+      - REVERB_BROADCAST_HOST=reverb
+      - REVERB_BROADCAST_PORT=8080
+      - REVERB_BROADCAST_SCHEME=http
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.50"
+
   # ── Reverb — WebSocket server for chat real-time pipeline ────────────────
   # Uses the SHARED prod Redis (keyhome-prod-redis) for broadcast pub/sub via
   # the keyhome-prod-network. Isolated from prod by REDIS_PREFIX in .env.

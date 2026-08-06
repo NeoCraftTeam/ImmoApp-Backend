@@ -76,20 +76,6 @@ final class LoginHistoryResource extends Resource
                             ->label('Email')
                             ->icon(Heroicon::Envelope)
                             ->copyable(),
-                        TextEntry::make('ip_address')
-                            ->label('Adresse IP')
-                            ->icon(Heroicon::GlobeAlt)
-                            ->formatStateUsing(function (?string $state): ?string {
-                                if (!$state) {
-                                    return $state;
-                                }
-                                $parts = explode('.', $state);
-                                if (count($parts) === 4) {
-                                    return $parts[0].'.'.$parts[1].'.***.***';
-                                }
-
-                                return mb_substr($state, 0, (int) ceil(mb_strlen($state) / 2)).'••••';
-                            }),
                         TextEntry::make('guard')
                             ->label('Guard')
                             ->badge(),
@@ -97,8 +83,8 @@ final class LoginHistoryResource extends Resource
                             ->label('Succès')
                             ->boolean(),
                         TextEntry::make('created_at')
-                            ->label('Date')
-                            ->dateTime('d/m/Y H:i:s'),
+                            ->label('Date (UTC)')
+                            ->dateTime('d/m/Y H:i:s', 'UTC'),
                     ]),
                 Section::make('Appareil')
                     ->icon(Heroicon::DevicePhoneMobile)
@@ -131,20 +117,6 @@ final class LoginHistoryResource extends Resource
                     ->label('Utilisateur')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('ip_address')
-                    ->label('IP')
-                    ->searchable()
-                    ->formatStateUsing(function (?string $state): ?string {
-                        if (!$state) {
-                            return $state;
-                        }
-                        $parts = explode('.', $state);
-                        if (count($parts) === 4) {
-                            return $parts[0].'.'.$parts[1].'.***.***';
-                        }
-
-                        return mb_substr($state, 0, (int) ceil(mb_strlen($state) / 2)).'••••';
-                    }),
                 TextColumn::make('country')
                     ->label('Pays')
                     ->searchable(),
@@ -163,8 +135,8 @@ final class LoginHistoryResource extends Resource
                     ->label('Succès')
                     ->boolean(),
                 TextColumn::make('created_at')
-                    ->label('Date')
-                    ->dateTime('d/m/Y H:i')
+                    ->label('Date (UTC)')
+                    ->dateTime('d/m/Y H:i', 'UTC')
                     ->sortable(),
             ])
             ->defaultSort('created_at', 'desc')

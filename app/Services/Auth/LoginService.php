@@ -227,9 +227,12 @@ final readonly class LoginService
 
         $parsed = UserAgentParser::parse($request->userAgent() ?? '');
 
+        // NB : l'adresse IP n'est plus historisée (retirée du journal de
+        // connexions — minimisation des données personnelles). La détection
+        // de nouvel appareil s'appuie sur users.last_login_ip, pas sur ce journal.
         LoginHistory::create([
             'user_id' => $user->id,
-            'ip_address' => $request->ip(),
+            'ip_address' => null,
             'user_agent' => $request->userAgent(),
             'device_type' => $parsed['device_type'],
             'browser' => $parsed['browser_name'],
@@ -261,11 +264,9 @@ final readonly class LoginService
 
         $ua = UserAgentParser::parse($request->userAgent() ?? '');
 
-        $tz = config('app.timezone', 'Africa/Douala');
-        $carbonNow = now()->setTimezone($tz);
-        $offset = $carbonNow->format('P'); // +01:00
-        $loginAt = $carbonNow->translatedFormat('d F Y \\à H:i')
-            .' (UTC'.str_replace(':00', '', $offset).')';
+        // Horodatage en UTC : les utilisateurs sont répartis dans plusieurs
+        // fuseaux — une seule référence temporelle commune et non ambiguë.
+        $loginAt = now()->utc()->translatedFormat('d F Y \\à H:i').' (UTC)';
 
         $locationLabel = match (true) {
             $currentCity !== '' && $currentCountry !== '' => $currentCity.', '.$currentCountry,

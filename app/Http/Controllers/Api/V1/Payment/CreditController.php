@@ -185,7 +185,9 @@ final class CreditController
 
             $status = $e->getCode();
             if ($status < 400 || $status >= 600) {
-                $status = 502;
+                // 503 plutôt que 502 : ne pas confondre avec un Bad Gateway
+                // d'infrastructure (nginx/Cloudflare).
+                $status = 503;
             }
 
             return response()->json([

@@ -330,8 +330,14 @@ php artisan backup:clean
 docker compose exec app php artisan backup:run
 ```
 
-> Le scheduler cron requis :
-> `* * * * * php /var/www/artisan schedule:run >> /dev/null 2>&1`
+> Le scheduler tourne en service dédié dans `docker-compose.yml` / `docker-compose.preprod.yml`
+> (`scheduler` — `php artisan schedule:work`, même image que `worker`). Sans lui, AUCUNE tâche
+> planifiée ne s'exécute (réconciliation des paiements, rappels J-1, backups, rapports…).
+> Après déploiement : `docker compose up -d scheduler`.
+>
+> Fuseaux : `APP_TIMEZONE=UTC` (affichage, factures, mails, logs — référence unique pour des
+> utilisateurs multi-fuseaux) et `APP_BUSINESS_TIMEZONE=Africa/Douala` (interprétation des
+> créneaux de visite stockés en heure locale Cameroun — ne pas mélanger les deux).
 
 ## Authentification
 

@@ -1697,8 +1697,29 @@ La liste des conversations et les fils de discussion s'affichent **instantanéme
 
 ---
 
-## Enterprise Audit — Mai 2026
+### UTC global, scheduler prod, journal de sécurité sans IP & Stripe auto-réparation (Août 2026)
 
+**Scheduler Laravel enfin actif en prod/preprod** : les `docker-compose*.yml` n'avaient AUCUN service scheduler — aucune tâche de `routes/console.php` ne tournait en prod (réconciliation des paiements `app:cleanup-stale-payments`, rappels de visite J-1, expirations d'abonnements, backups nocturnes…). Un service `scheduler` (`php artisan schedule:work`, copie conforme du `worker`, healthcheck `pgrep -f 'schedule:work'`) a été ajouté aux deux compose. **Ops** : `docker compose up -d scheduler` après déploiement.
+
+**UTC partout** : `config/app.php` `timezone` = `env('APP_TIMEZONE', 'UTC')` — affichage Filament, factures PDF (suffixe « UTC »), mails et logs partagent une référence unique (utilisateurs multi-fuseaux). **Exception métier** : les créneaux de visite (`slot_date` + `slot_starts_at`) restent des heures locales Cameroun — ils sont interprétés via la nouvelle clé `config('app.business_timezone')` (`APP_BUSINESS_TIMEZONE`, défaut `Africa/Douala`) consommée par `CalendarExportController` et `CompleteStaleReservationsJob`. Ne JAMAIS utiliser `config('app.timezone')` pour parser un créneau.
+
+**Journal de sécurité sans IP** (minimisation des données personnelles) :
+- `LoginService::recordLogin()` n'historise plus `ip_address` (colonne conservée pour les lignes anciennes) ; la détection de nouvel appareil continue d'utiliser `users.last_login_ip` (non exposé).
+- `LogAuthenticationEvents` ne verse plus `ip` dans les propriétés d'activité (le canal fichier `security-*.log` la conserve à des fins forensiques uniquement).
+- `AuditDescription::securityDescription()` ne suffixe plus « (IP …) » ; `ActivityLogResource` (colonne IP + carte « Session ») et `LoginHistoryResource` (colonne + entrée infolist IP) n'affichent plus l'IP ; dates Filament des journaux explicitement en UTC.
+- API `GET /auth/login-history` ne renvoie plus `ip_address` ni `current_login.last_login_ip` ; le web (`owner/security`) affiche « Localisation inconnue » en repli.
+
+**Erreurs passerelle : 503, pas 502** — un 502 applicatif se confondait avec un Bad Gateway nginx/Cloudflare (et le navigateur affichait alors une erreur CORS trompeuse, la page d'erreur du proxy n'ayant pas d'en-têtes CORS). `bootstrap/app.php`, `CreditController` et `StripePaymentMethodController` renvoient désormais **503**.
+
+**Stripe — auto-réparation des `stripe_id` périmés** (Customers créés avec d'anciennes clés test, ou supprimés côté Stripe → `resource_missing`) :
+- `StripePaymentService::listSavedCards()` → renvoie `[]` (le profil affiche « Aucune carte enregistrée » au lieu d'une erreur).
+- `createSetupIntent()` et l'initiation off-session → lancent la nouvelle `App\Exceptions\StripeCustomerMissingException`.
+- `StripePaymentMethodController::setupIntent()` et `PaymentService::createPayment()` attrapent cette exception, oublient le `stripe_id` local, recréent un Customer via Cashier et **réessaient une fois** (le paiement off-session repart sans `payment_method_id`, la carte étant partie avec l'ancien Customer).
+- Tests : `tests/Feature/Payment/StripeSavedCardTest.php` (fakes duck-typés `extends StripeClient` bindés via `app()->bind(...)` — JAMAIS `app()->instance(...)` : Cashier résout `app(StripeClient::class, ['config' => …])` et le conteneur ignore une instance partagée dès que des paramètres sont fournis).
+
+---
+
+## Enterprise Audit — Mai 2026
 Audit multi-agents exhaustif réalisé le 2 mai 2026. 7 agents parallèles ont couvert : backend/SOLID, auth/sécurité, paiement/chat, IA/geo, PWA/push, frontend/design, DevOps.
 
 ### Bugs critiques à corriger en priorité (CRITICAL / HIGH)

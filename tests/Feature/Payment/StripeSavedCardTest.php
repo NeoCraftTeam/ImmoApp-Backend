@@ -9,12 +9,15 @@ use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
 use App\Events\PaymentSucceeded;
 use App\Exceptions\PaymentGatewayException;
+use App\Exceptions\StripeCustomerMissingException;
 use App\Models\PointPackage;
 use App\Models\User;
 use App\Services\Payment\PaymentService;
 use App\Services\Payment\StripePaymentService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
+use Stripe\Exception\InvalidRequestException;
+use Stripe\StripeClient;
 
 uses(RefreshDatabase::class);
 
@@ -70,6 +73,12 @@ function fakeStripeService(array $config = []): PaymentGatewayInterface
         public function initiate(array $payload): array
         {
             $this->calls['initiate'][] = $payload;
+
+            // Simule un Customer périmé au PREMIER appel uniquement — le
+            // PaymentService doit alors recréer un Customer et réussir au second.
+            if (($this->config['missingCustomerOnce'] ?? false) && count($this->calls['initiate']) === 1) {
+                throw new StripeCustomerMissingException('No such customer: '.($payload['customer_id'] ?? ''));
+            }
 
             if (in_array('initiate', $this->config['throwOn'] ?? [], true)) {
                 throw new PaymentGatewayException('Stripe initiate failed (forced).');
@@ -146,6 +155,12 @@ function fakeStripeService(array $config = []): PaymentGatewayInterface
         {
             $this->calls['createSetupIntent'][] = ['customer_id' => $customerId];
 
+            // Simule un Customer périmé au PREMIER appel uniquement — le
+            // contrôleur doit alors recréer un Customer et réussir au second.
+            if (($this->config['missingCustomerOnce'] ?? false) && count($this->calls['createSetupIntent']) === 1) {
+                throw new StripeCustomerMissingException('No such customer: '.$customerId);
+            }
+
             if (in_array('createSetupIntent', $this->config['throwOn'] ?? [], true)) {
                 throw new PaymentGatewayException('Stripe setup-intent failed.');
             }
@@ -172,6 +187,41 @@ function bindStripeService(PaymentGatewayInterface $stub): PaymentGatewayInterfa
     app()->forgetInstance(PaymentService::class);
 
     return $stub;
+}
+
+/**
+ * Bind a duck-typed `StripeClient` whose `customers->create()` returns a
+ * fresh Customer id — simule la création Cashier `createAsStripeCustomer()`
+ * sans appeler la vraie API Stripe (utilisé par les tests d'auto-réparation).
+ */
+function bindFreshCustomerStripeClient(string $freshCustomerId): void
+{
+    // `extends StripeClient` : les propriétés publiques prennent le pas sur
+    // le `__get` magique du SDK, et le typage `StripeClient` est respecté
+    // (le vrai service a une propriété typée `private StripeClient $stripe`).
+    // NB : `bind` (closure) et non `instance` — Cashier résout le client avec
+    // `app(StripeClient::class, ['config' => …])` et le conteneur IGNORE une
+    // instance partagée dès que des paramètres sont fournis.
+    app()->bind(StripeClient::class, fn () => new class($freshCustomerId) extends StripeClient
+    {
+        public object $customers;
+
+        public function __construct(string $freshCustomerId)
+        {
+            parent::__construct('sk_test_fake_FOR_TESTS_ONLY');
+
+            $this->customers = new readonly class($freshCustomerId)
+            {
+                public function __construct(private string $freshCustomerId) {}
+
+                /** @param array<string, mixed> $options */
+                public function create(array $options = [], mixed $requestOptions = null): object
+                {
+                    return (object) ['id' => $this->freshCustomerId];
+                }
+            };
+        }
+    });
 }
 
 beforeEach(function (): void {
@@ -216,15 +266,30 @@ it('lists saved cards for a user with a Stripe Customer', function (): void {
         ->assertJsonPath('data.1.is_default', false);
 });
 
-it('surfaces a 502 when Stripe is unreachable on list', function (): void {
+it('surfaces a 503 when Stripe is unreachable on list', function (): void {
     $user = User::factory()->create(['stripe_id' => 'cus_test_999']);
 
     bindStripeService(fakeStripeService(['throwOn' => ['listSavedCards']]));
 
     $this->actingAs($user)
         ->getJson('/api/v1/payments/stripe/payment-methods')
-        ->assertStatus(502)
+        ->assertStatus(503)
         ->assertJsonPath('message', 'Impossible de récupérer vos cartes. Veuillez réessayer.');
+});
+
+it('returns an empty list when the stored stripe_id points to a deleted Customer', function (): void {
+    // Couvre le cas réel : stripe_id créé avec d'anciennes clés (test) alors
+    // que le backend tourne en clés live — Stripe répond resource_missing et
+    // le service renvoie [] au lieu d'une erreur (le profil affiche alors
+    // « Aucune carte enregistrée » plutôt qu'un message d'échec).
+    $user = User::factory()->create(['stripe_id' => 'cus_stale_123']);
+
+    bindStripeService(fakeStripeService(['list' => []]));
+
+    $this->actingAs($user)
+        ->getJson('/api/v1/payments/stripe/payment-methods')
+        ->assertOk()
+        ->assertExactJson(['data' => []]);
 });
 
 it('rejects unauthenticated access to the saved-cards endpoints', function (): void {
@@ -308,6 +373,127 @@ it('returns a SetupIntent client secret for an existing Stripe Customer', functi
     expect($stub->calls['createSetupIntent'])->toHaveCount(1)
         ->and($stub->calls['createSetupIntent'][0]['customer_id'])->toBe('cus_test_123');
 });
+
+it('self-heals a stale stripe_id on setup-intent and retries with a fresh Customer', function (): void {
+    $user = User::factory()->create(['stripe_id' => 'cus_stale_123']);
+
+    bindFreshCustomerStripeClient('cus_fresh_789');
+    $stub = bindStripeService(fakeStripeService(['missingCustomerOnce' => true]));
+
+    $this->actingAs($user)
+        ->postJson('/api/v1/payments/stripe/setup-intent')
+        ->assertOk()
+        ->assertJsonPath('data.client_secret', 'seti_test_secret_xxx');
+
+    expect($stub->calls['createSetupIntent'])->toHaveCount(2)
+        ->and($stub->calls['createSetupIntent'][0]['customer_id'])->toBe('cus_stale_123')
+        ->and($stub->calls['createSetupIntent'][1]['customer_id'])->toBe('cus_fresh_789')
+        ->and($user->fresh()->stripe_id)->toBe('cus_fresh_789');
+});
+
+it('self-heals a stale stripe_id during off-session payment and retries without the saved card', function (): void {
+    Event::fake();
+
+    $package = PointPackage::factory()->create(['price' => 1000, 'is_active' => true]);
+    $user = User::factory()->create(['stripe_id' => 'cus_stale_123']);
+
+    bindFreshCustomerStripeClient('cus_fresh_789');
+    $stub = bindStripeService(fakeStripeService(['missingCustomerOnce' => true]));
+
+    // La carte « pm_gone_123 » appartenait à l'ancien Customer : le retry
+    // doit se faire en saisie classique (payment_method_id retiré).
+    $this->actingAs($user)
+        ->postJson('/api/v1/payments/initiate_payment', [
+            'type' => 'credit',
+            'plan_id' => $package->id,
+            'payment_method' => 'card',
+            'payment_method_id' => 'pm_gone_123',
+        ])
+        ->assertOk()
+        ->assertJsonPath('gateway', 'stripe');
+
+    expect($stub->calls['initiate'])->toHaveCount(2)
+        ->and($stub->calls['initiate'][0]['customer_id'])->toBe('cus_stale_123')
+        ->and($stub->calls['initiate'][0]['payment_method_id'])->toBe('pm_gone_123')
+        ->and($stub->calls['initiate'][1]['customer_id'])->toBe('cus_fresh_789')
+        ->and($stub->calls['initiate'][1]['payment_method_id'])->toBeNull()
+        ->and($user->fresh()->stripe_id)->toBe('cus_fresh_789');
+});
+
+// ────────────────────────────────────────────────────────────────────
+// StripePaymentService (réel) — gestion resource_missing
+// ────────────────────────────────────────────────────────────────────
+
+/**
+ * Bind a duck-typed `StripeClient` qui répond `resource_missing` partout —
+ * simule un stripe_id périmé contre le VRAI service (pas le fake).
+ */
+function bindMissingCustomerStripeClient(): void
+{
+    $exception = new InvalidRequestException('No such customer: cus_stale');
+    $exception->setStripeCode('resource_missing');
+
+    // `bind` (closure) et non `instance` : voir bindFreshCustomerStripeClient().
+    app()->bind(StripeClient::class, fn () => new class($exception) extends StripeClient
+    {
+        public object $paymentMethods;
+
+        public object $customers;
+
+        public object $setupIntents;
+
+        public function __construct(private readonly InvalidRequestException $exception)
+        {
+            parent::__construct('sk_test_fake_FOR_TESTS_ONLY');
+
+            $this->paymentMethods = new readonly class($exception)
+            {
+                public function __construct(private InvalidRequestException $e) {}
+
+                /** @param array<string, mixed> $params */
+                public function all(array $params): never
+                {
+                    throw $this->e;
+                }
+            };
+            $this->customers = new readonly class($exception)
+            {
+                public function __construct(private InvalidRequestException $e) {}
+
+                public function retrieve(string $id): never
+                {
+                    throw $this->e;
+                }
+            };
+            $this->setupIntents = new readonly class($exception)
+            {
+                public function __construct(private InvalidRequestException $e) {}
+
+                /** @param array<string, mixed> $params */
+                public function create(array $params): never
+                {
+                    throw $this->e;
+                }
+            };
+        }
+    });
+}
+
+it('returns an empty card list from the real service when Stripe reports a missing customer', function (): void {
+    bindMissingCustomerStripeClient();
+
+    $service = new StripePaymentService;
+
+    expect($service->listSavedCards('cus_stale'))->toBe([]);
+});
+
+it('throws StripeCustomerMissingException from the real service on setup-intent for a missing customer', function (): void {
+    bindMissingCustomerStripeClient();
+
+    $service = new StripePaymentService;
+
+    $service->createSetupIntent('cus_stale');
+})->throws(StripeCustomerMissingException::class);
 
 // ────────────────────────────────────────────────────────────────────
 // POST /credits/purchase/{package} — save_payment_method=true
