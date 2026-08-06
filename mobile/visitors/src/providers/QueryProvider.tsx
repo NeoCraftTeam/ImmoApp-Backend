@@ -1,22 +1,25 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { focusManager, onlineManager, QueryClient } from '@tanstack/react-query';
-import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
-import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import {
+  PersistQueryClientProvider,
+  type Persister,
+} from '@tanstack/react-query-persist-client';
 import { useEffect, useState, type ReactNode } from 'react';
 import { AppState, Platform } from 'react-native';
 
 import { apiClient } from '@/api/client';
 import { NON_PERSISTED_QUERY_ROOTS } from '@/lib/query-keys';
+import { createEncryptedPersister } from '@/lib/secure-persister';
 
 /**
  * Single QueryClient + offline persistence layer.
  *
  *  - **5 min stale**, **24 h gc** : matches backend CDN cache + lets
  *    users browse cached pages while offline.
- *  - **AsyncStorage persister** : sérialise tout le cache toutes les
- *    1 s (debounce intégré), réhydrate au cold-start → l'utilisateur
- *    voit son feed même sans réseau.
+ *  - **Persister CHIFFRÉ (modèle WhatsApp)** : le cache est sérialisé
+ *    dans AsyncStorage chiffré en AES-256 (clé dans le SecureStore) —
+ *    réhydratation instantanée au cold-start, resync en arrière-plan.
  *  - **online/focus managers** : on délègue à `NetInfo` pour suspendre
  *    les fetch quand offline, et à `AppState` pour refresh quand l'app
  *    revient au premier plan (équivalent `refetchOnWindowFocus` web
@@ -25,7 +28,7 @@ import { NON_PERSISTED_QUERY_ROOTS } from '@/lib/query-keys';
  *  Cache versionné via `CACHE_BUSTER` — bump pour invalider toute
  *  persistance après un changement breaking côté API.
  */
-const CACHE_BUSTER = 'kh-v2-wallet-fresh';
+const CACHE_BUSTER = 'kh-v3-encrypted-cache';
 const QUERY_CACHE_STORAGE_KEY = 'kh-query-cache';
 
 /**
@@ -91,18 +94,30 @@ export function QueryProvider({ children }: { children: ReactNode }) {
     return qc;
   });
 
-  const [persister] = useState(() =>
-    createAsyncStoragePersister({
-      storage: AsyncStorage,
-      key: 'kh-query-cache',
-      throttleTime: 1000,
-    }),
-  );
+  // Persister chiffré : construit de façon asynchrone (la clé AES vit
+  // dans le SecureStore). Le court délai (~10-30 ms, une seule fois)
+  // est couvert par le splash natif — ensuite chaque cold-start
+  // réhydrate l'UI instantanément depuis le cache chiffré.
+  const [persister, setPersister] = useState<Persister | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void createEncryptedPersister(QUERY_CACHE_STORAGE_KEY).then((p) => {
+      if (alive) setPersister(p);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', onAppStateChange);
     return () => sub.remove();
   }, []);
+
+  if (!persister) {
+    return null;
+  }
 
   return (
     <PersistQueryClientProvider

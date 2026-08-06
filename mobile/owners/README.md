@@ -67,5 +67,14 @@ src/
   applique le boost (`POST /my/ads/{id}/boost`).
 - **Token isolé** du visiteur (`keyhome.owners.session.token`) — les deux
   apps cohabitent sur un même appareil avec des sessions distinctes.
+- **Cache chat chiffré on-device (modèle WhatsApp)** : le cache TanStack
+  Query (conversations + fils) est persisté dans AsyncStorage **chiffré en
+  AES-256** (`src/lib/secure-persister.ts`, `crypto-es`), clé dans
+  `expo-secure-store` (`WHEN_UNLOCKED_THIS_DEVICE_ONLY`). Inbox et fils
+  s'affichent instantanément au cold-start, puis resynchronisent en
+  arrière-plan. Snapshot corrompu/legacy purgé silencieusement ; buster
+  `kh-owners-v2-encrypted`. npm reste le package manager canonique —
+  regénérer le lock avec `npm install --package-lock-only --legacy-peer-deps`
+  après tout changement de `package.json`.
 
 L'équivalent web est `keyhome-frontend-next/src/app/(owner)/…`.

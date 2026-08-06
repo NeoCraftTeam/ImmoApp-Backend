@@ -398,6 +398,17 @@ neuve. Les notifications Laravel passent par le channel `broadcast` avec
 > En production : `BROADCAST_CONNECTION=reverb` requis (défaut `null` = temps
 > réel muet). Auth canal : chacun ne peut s'abonner qu'à son propre
 > `user.{id}` et aux conversations dont il est participant (403/404 sinon).
+
+### Cache chat chiffré on-device (modèle WhatsApp)
+
+Les trois clients (web, mobile visitors, mobile owners) **persistent le cache
+TanStack Query du chat chiffré sur l'appareil** : inbox et fils s'affichent
+instantanément au cold-start, puis resynchronisent en arrière-plan. Web :
+AES-GCM 256, clé non-extractible WebCrypto en IndexedDB. Mobile : AES-256
+(`crypto-es`), clé dans le SecureStore (Keychain/Keystore,
+`THIS_DEVICE_ONLY`). Snapshot purgé au logout. Détails dans `AGENTS.md`
+(« Cache chat chiffré on-device — modèle WhatsApp »).
+
 20. **Codes promo** — `PromoCode` + `PromoCodeUsage`.
 
 ## Architecture des couches

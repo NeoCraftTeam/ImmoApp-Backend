@@ -18,7 +18,6 @@ export const queryKeys = {
 /** Query roots that must never be persisted offline (live wallet / auth). */
 export const NON_PERSISTED_QUERY_ROOTS = new Set([
   'me',
-  'conversation-messages',
   'notifications-unread-count',
   'credits-balance',
   'payments-history',
