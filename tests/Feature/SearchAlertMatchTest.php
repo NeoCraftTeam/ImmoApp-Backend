@@ -75,6 +75,49 @@ it('buffers a match and sends an instant notification when criteria match', func
     expect(SearchAlertMatch::query()->where('search_alert_id', $alert->id)->whereNotNull('digest_sent_at')->exists())->toBeTrue();
 });
 
+it('sends the instant match notification over the realtime broadcast channel', function (): void {
+    Notification::fake();
+
+    $quarter = Quarter::factory()->create();
+    $adType = AdType::factory()->create();
+    $landlord = User::factory()->create();
+    $client = User::factory()->create();
+
+    SearchAlert::create([
+        'user_id' => $client->id,
+        'city_id' => $quarter->city_id,
+        'type_id' => $adType->id,
+        'is_active' => true,
+        'notify_email' => true,
+        'notify_push' => true,
+    ]);
+
+    $ad = Ad::factory()->create([
+        'user_id' => $landlord->id,
+        'quarter_id' => $quarter->id,
+        'type_id' => $adType->id,
+        'status' => AdStatus::AVAILABLE,
+        'price' => 100_000,
+    ]);
+
+    new MatchSearchAlertsForAdJob($ad)->handle();
+
+    Notification::assertSentTo(
+        $client,
+        SearchAlertMatchNotification::class,
+        fn (SearchAlertMatchNotification $notification, array $channels): bool => in_array('broadcast', $channels, true)
+            && in_array('database', $channels, true)
+            && $notification->broadcastAs() === 'search_alert.match'
+            && $notification->broadcastType() === 'search_alert_match'
+    );
+});
+
+it('routes realtime notifications to the user.{id} private channel', function (): void {
+    $user = User::factory()->create();
+
+    expect($user->receivesBroadcastNotificationsOn())->toBe("user.{$user->id}");
+});
+
 it('matches alert by city_name when city_id is absent (case-insensitive)', function (): void {
     Notification::fake();
 

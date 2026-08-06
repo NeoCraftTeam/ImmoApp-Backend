@@ -7,6 +7,7 @@ use App\Events\Chat\ConversationArchived;
 use App\Events\Chat\ConversationUnarchived;
 use App\Events\Chat\MessageDeleted;
 use App\Events\Chat\MessageRead;
+use App\Events\Chat\MessageReceived;
 use App\Events\Chat\MessageSent;
 use App\Models\Ad;
 use App\Models\Conversation;
@@ -258,4 +259,59 @@ it('still broadcasts MessageSent on send', function (): void {
         ->assertCreated();
 
     Event::assertDispatched(MessageSent::class);
+});
+
+// ── MessageReceived : signal temps réel sur le canal user.{destinataire} ────
+
+it('broadcasts MessageReceived on the recipient user channel when a message is sent', function (): void {
+    // MessageSent est faké aussi : sinon son vrai broadcast tente une
+    // connexion Reverb (BROADCAST_CONNECTION=reverb dans .env local).
+    Event::fake([MessageSent::class, MessageReceived::class]);
+
+    ['tenant' => $tenant, 'landlord' => $landlord, 'conversation' => $conv] = setupChatTrio();
+
+    $this->actingAs($tenant)
+        ->postJson("/api/v1/conversations/{$conv->id}/messages", ['body' => 'Bonjour, le logement est-il libre ?'])
+        ->assertCreated();
+
+    Event::assertDispatched(MessageReceived::class, fn (MessageReceived $event): bool => $event instanceof ShouldBroadcastNow
+        && $event->recipientId === (string) $landlord->id
+        && $event->broadcastAs() === 'message.received'
+        && $event->broadcastOn()[0]->name === "private-user.{$landlord->id}");
+});
+
+it('targets the sender user channel when the landlord replies', function (): void {
+    Event::fake([MessageSent::class, MessageReceived::class]);
+
+    ['tenant' => $tenant, 'landlord' => $landlord, 'conversation' => $conv] = setupChatTrio();
+
+    $this->actingAs($landlord)
+        ->postJson("/api/v1/conversations/{$conv->id}/messages", ['body' => 'Oui, disponible de suite'])
+        ->assertCreated();
+
+    Event::assertDispatched(MessageReceived::class, fn (MessageReceived $event): bool => $event->recipientId === (string) $tenant->id);
+});
+
+it('exposes a truncated preview and sender identity in the MessageReceived payload', function (): void {
+    Event::fake([MessageSent::class, MessageReceived::class]);
+
+    ['tenant' => $tenant, 'conversation' => $conv] = setupChatTrio();
+
+    $longBody = str_repeat('Lorem ipsum dolor sit amet. ', 20); // 560 car. > 120
+
+    $this->actingAs($tenant)
+        ->postJson("/api/v1/conversations/{$conv->id}/messages", ['body' => $longBody])
+        ->assertCreated();
+
+    Event::assertDispatched(MessageReceived::class, function (MessageReceived $event) use ($tenant, $conv, $longBody): bool {
+        $payload = $event->broadcastWith();
+
+        return $payload['uuid'] !== null
+            && $payload['conversation_uuid'] === $conv->id
+            && $payload['sender_id'] === $tenant->id
+            && $payload['sender']['name'] === trim("{$tenant->firstname} {$tenant->lastname}")
+            && $payload['body'] === mb_substr($longBody, 0, 120)
+            && $payload['is_client_sealed'] === false
+            && $payload['created_at'] !== null;
+    });
 });

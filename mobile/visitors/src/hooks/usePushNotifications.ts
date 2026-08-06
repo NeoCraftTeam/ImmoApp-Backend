@@ -28,6 +28,25 @@ function conversationUuidFromNotification(data: unknown): string | null {
 }
 
 /**
+ * Extrait le slug d'annonce d'une notification d'alerte de recherche
+ * (`search_alert_match`) : `data.ad_slug` direct si présent, sinon le
+ * slug dans l'URL web `/ads/{slug}` posée par le backend FCM.
+ */
+function adSlugFromNotification(data: unknown): string | null {
+  if (!data || typeof data !== 'object') return null;
+  const d = data as Record<string, unknown>;
+  if (d.type !== 'search_alert_match') return null;
+  if (typeof d.ad_slug === 'string' && d.ad_slug) {
+    return d.ad_slug;
+  }
+  if (typeof d.url === 'string') {
+    const match = d.url.match(/\/ads\/([^/?#]+)/);
+    if (match?.[1]) return decodeURIComponent(match[1]);
+  }
+  return null;
+}
+
+/**
  * Expo Go on SDK 53+ stripped remote-push delivery for both iOS and
  * Android. Importing `expo-notifications` in that environment spams
  * three deprecation warnings on every cold start. We detect Expo Go
@@ -68,7 +87,13 @@ export function usePushNotifications() {
 
       const openFromData = (data: unknown): void => {
         const uuid = conversationUuidFromNotification(data);
-        if (uuid) router.push(`/messages/${uuid}` as never);
+        if (uuid) {
+          router.push(`/messages/${uuid}` as never);
+          return;
+        }
+        // Alerte de recherche : taper la push ouvre la fiche annonce.
+        const slug = adSlugFromNotification(data);
+        if (slug) router.push(`/ads/${slug}` as never);
       };
 
       const last = await Notifications.getLastNotificationResponseAsync();

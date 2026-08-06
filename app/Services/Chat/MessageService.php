@@ -8,6 +8,7 @@ use App\Enums\ConversationStatus;
 use App\Enums\MessageStatus;
 use App\Enums\MessageType;
 use App\Events\Chat\MessageDeleted;
+use App\Events\Chat\MessageReceived;
 use App\Events\Chat\MessageSent;
 use App\Jobs\SendChatPushNotificationJob;
 use App\Jobs\SendOfflineEmailNotificationJob;
@@ -204,15 +205,25 @@ final readonly class MessageService
 
         $message->load(['sender:id,firstname,lastname,avatar', 'sender.media', 'replyTo']);
 
+        $recipientId = $sender->id === $conv->tenant_id
+            ? $conv->landlord_id
+            : $conv->tenant_id;
+
         try {
             broadcast(new MessageSent($message))->toOthers();
         } catch (\Throwable) {
             // Reverb may be unavailable in local dev — do not fail the HTTP response
         }
 
-        $recipientId = $sender->id === $conv->tenant_id
-            ? $conv->landlord_id
-            : $conv->tenant_id;
+        try {
+            // Signal temps réel sur le canal personnel du destinataire :
+            // toast + badge + inbox live même hors conversation ouverte
+            // (web et mobile), y compris pour une conversation toute neuve.
+            // try/catch dédié : un échec de MessageSent ne doit pas le faire taire.
+            broadcast(new MessageReceived($message, (string) $recipientId));
+        } catch (\Throwable) {
+            // Reverb may be unavailable — never fail the HTTP response
+        }
 
         $this->conversations->invalidateUnreadCache($recipientId);
 

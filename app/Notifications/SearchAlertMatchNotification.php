@@ -32,7 +32,11 @@ class SearchAlertMatchNotification extends Notification
      */
     public function via(object $notifiable): array
     {
-        $channels = ['database'];
+        // 'broadcast' : livraison temps réel sur le canal privé `user.{id}`
+        // (event `search_alert.match`) — badge + toast live sur web et
+        // mobile, sans attendre le prochain polling du centre de
+        // notifications.
+        $channels = ['database', 'broadcast'];
 
         if ($this->alert->notify_email) {
             $preference = EmailPreference::getOrCreateForUser($notifiable);
@@ -48,6 +52,24 @@ class SearchAlertMatchNotification extends Notification
         }
 
         return $channels;
+    }
+
+    /**
+     * Nom d'event WebSocket court et stable côté clients (au lieu du FQCN
+     * `Illuminate\Notifications\Events\BroadcastNotificationCreated`).
+     */
+    public function broadcastAs(): string
+    {
+        return 'search_alert.match';
+    }
+
+    /**
+     * Valeur du champ `type` dans le payload — alignée sur le `type` des
+     * données FCM pour que web et mobile partagent le même routage.
+     */
+    public function broadcastType(): string
+    {
+        return 'search_alert_match';
     }
 
     public function toMail(object $notifiable): SearchAlertMatchMail
