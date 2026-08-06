@@ -244,7 +244,7 @@ vendor/bin/rector process --dry-run
 - `Chat/EncryptionService` — AES-256-CBC with HMAC-SHA256 MAC (authenticated encryption). Key from `CHAT_ENCRYPTION_KEY` env (32-byte hex). `encrypt()` returns `{ciphertext, iv}`; `decrypt()` verifies MAC before decrypting.
 - `Chat/AttachmentService` — upload files to Cloudflare R2 (`chat-attachments/` prefix). MIME/size validated (images: JPEG/PNG/WEBP/GIF ≤5 MB; files: PDF/doc ≤20 MB). Returns descriptor with `signed_url` (1-hour TTL). `getSignedUrl()` refreshes URLs.
 - `Chat/ConversationService` — find-or-create (gated on `UnlockedAd`), list (paginated), mark-as-read (broadcasts `MessageRead`), archive, unread count (Cache 30s TTL).
-- `Chat/MessageService` — send (encrypt + update `last_message_id` + broadcast + FCM push + email 5min delay), soft-delete (sender only, 24h window), cursor-paginated history.
+- `Chat/MessageService` — send (encrypt + update `last_message_id` + broadcast `MessageSent` on `conversation.{uuid}` + broadcast `MessageReceived` on the recipient's `user.{id}` + FCM push + email 5min delay), soft-delete (sender only, 24h window), cursor-paginated history.
 - `HealthCheckService` — enterprise health check service. 6 checks: Database, Redis, Queue, Storage, Meilisearch, Kpay. 3-tier status: `healthy` / `degraded` / `unhealthy`. Results cached 30 s (Redis). Critical checks: Database + Storage → failure = `unhealthy`. All others → `degraded`. Used by `GET /api/health` and `php artisan app:health-check --force`.
 - `PropertyAttributeImportService` — bulk attribute import.
 - `UserAgentParser` — browser/device detection.
@@ -540,6 +540,8 @@ All prefixed `/api/v1/`: `auth.php`, `ads.php`, `payments.php`, `viewings.php`, 
 
 ### Events & Listeners
 - Events: `AdCreated`, `AdStatusTransitioned`, `PaymentFailed`, `PaymentInitiated`, `PaymentSucceeded`.
+- Chat events (`app/Events/Chat/`, all `ShouldBroadcastNow`): `MessageSent` (channel `conversation.{uuid}`), `MessageReceived` (channel `user.{recipientId}`, event `message.received` — toast + inbox + badge live hors fil ouvert), `MessageRead`, `MessageDeleted`, `MessageReactionAdded/Removed`, `UserTyping`, `ConversationArchived/Unarchived`.
+- Credits event (`app/Events/Credits/`): `CreditsBalanceUpdated` (channel `user.{id}`, event `credits.updated`) — solde + transactions temps réel, émis par `PointService::credit()`/`deduct()`.
 - Listeners: `AutoBoostNewAd`, `LogAuthenticationEvents`, `MatchSearchAlertsOnAdAvailable`,
   `NotifyAdminsOfPendingAd`, `NotifyOwnerOfStatusChange`, `SendAdminActivityEmails`,
   `SendBackupByEmailListener`, `SendWelcomeNotification`.
@@ -1652,6 +1654,26 @@ Quand `false` (défaut), `MessageService::send()` **ignore** silencieusement tou
 5. À ce moment-là : `CHAT_CLIENT_SEALED_ENABLED=true` côté env, dé-commenter le bootstrap dans `AuthProvider` (+ les imports `syncChatE2eePublicKeyWithServer` / `rtrimPem`), remettre la vraie condition `wantsE2ee` dans `useChat.ts` (à côté du `false`).
 
 **Rétrocompatibilité.** Les anciens clients (mobile, vieux PWA cachés) qui continuent d'envoyer `is_client_sealed=true` ne sont **jamais rejetés** : le serveur dégrade gracieusement et stocke le `body` plaintext. Aucun message n'est perdu pendant la transition.
+
+---
+
+### Notifications temps réel unifiées — canal `user.{id}` (Août 2026)
+
+Toutes les notifications temps réel passent désormais par le **canal privé personnel `user.{id}`** (auth Sanctum via `/broadcasting/auth`, chacun ne peut s'abonner qu'au sien — `routes/channels.php`). Trois events y circulent :
+
+| Event | Émetteur | Payload | Consommateurs |
+|---|---|---|---|
+| `message.received` | `App\Events\Chat\MessageReceived` (dans `MessageService::send`, try/catch dédié) | uuid, conversation_uuid, sender {id,name,avatar}, type, body tronqué (120 car.), is_client_sealed, created_at | Web `ChatNotificationListener` ; mobile `useChatNotificationsRealtime` (2 apps) |
+| `credits.updated` | `App\Events\Credits\CreditsBalanceUpdated` (dans `PointService::credit`/`deduct`) | balance absolue + transaction | Web `CreditsRealtimeListener` ; mobile `useCreditsRealtime` (2 apps) |
+| `search_alert.match` | `SearchAlertMatchNotification` via le channel `broadcast` Laravel | toArray + id + type (`broadcastType: search_alert_match`) | Web `NotificationsRealtimeListener` ; mobile `useNotificationsRealtime` (visitors) |
+
+**Règles d'architecture qui en découlent :**
+
+- **`message.received` est la source UNIQUE** pour inbox list + badge non-lu + toast côté web. Les bindings par conversation (`ChatNotificationListener`, cap `MAX_BACKGROUND_WS_CONVERSATIONS`) ne gèrent plus que le cache du fil ouvert + read receipts + archivage — doubler ces effets compterait les non-lus en double.
+- **Mobile** : le hook toast ne touche jamais le cache des messages du fil (géré par `useConversationRealtime` sur `conversation.{uuid}`) et ne s'affiche pas quand le fil concerné est ouvert (`usePathname`).
+- **`User::receivesBroadcastNotificationsOn()` retourne `user.{id}`** — sans ça Laravel diffuserait sur `App.Models.User.{id}` que personne n'écoute. Toute notification Laravel peut gagner le temps réel en ajoutant `'broadcast'` à `via()` + un `broadcastAs()` court.
+- **Cleanup Echo côté web** : `stopListening('.event', handler)` et jamais `leave()` — le canal `user.{id}` est partagé entre plusieurs listeners (chat, crédits, alertes).
+- **Deep-link push mobile** : `usePushNotifications` route `chat_message` → `/messages/{uuid}` et `search_alert_match` → `/ads/{slug}` (slug extrait de `data.url` si `ad_slug` absent).
 
 ---
 

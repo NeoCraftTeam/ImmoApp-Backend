@@ -368,11 +368,36 @@ docker compose exec app php artisan backup:run
 12. **IA** — Amélioration de descriptions, digest, recherche naturelle multi-LLM.
 13. **Géolocalisation** — Isochrones, directions, score de quartier (OpenStreetMap Overpass + ORS).
 14. **Analytics** — Vues, impressions, clics, favoris, partages. Dashboard admin.
-15. **Notifications** — Database, email (45+ mailables), Web Push, WhatsApp.
-16. **Newsletter** — Campagnes, abonnements, unsubscribe.
-17. **Sondages** — Anonymes et authentifiés.
-18. **RGPD** — Anonymisation, export des données utilisateur.
-19. **Multi-tenant agence** — Équipes, invitations, rôles scopés.
+15. **Messagerie temps réel** — Chat visiteur ↔ bailleur (Reverb WebSocket), chiffré au repos, réactions, pièces jointes, push FCM + email différé.
+16. **Notifications** — Database, email (45+ mailables), Web Push, WhatsApp, broadcast temps réel.
+17. **Newsletter** — Campagnes, abonnements, unsubscribe.
+18. **Sondages** — Anonymes et authentifiés.
+19. **RGPD** — Anonymisation, export des données utilisateur.
+20. **Multi-tenant agence** — Équipes, invitations, rôles scopés.
+
+## Temps réel (Laravel Reverb)
+
+Le broadcasting utilise **Laravel Reverb** (protocole Pusher) avec des canaux
+privés authentifiés via Sanctum (`POST /broadcasting/auth`). Tous les events
+implémentent `ShouldBroadcastNow` et sont diffusés après commit DB, dans un
+`try/catch` qui ne fait jamais échouer la réponse HTTP si Reverb est indisponible.
+
+| Canal | Events | Consommateurs |
+|---|---|---|
+| `conversation.{uuid}` (2 participants seulement) | `message.sent`, `messages.read`, `message.deleted`, `message.reaction.added/removed`, `user.typing`, `conversation.archived/unarchived` | Fil de discussion ouvert (web + mobile) |
+| `user.{id}` (le propriétaire seulement) | `message.received` (toast + inbox + badge), `credits.updated` (solde + transactions), `search_alert.match` (alerte de recherche) | Listeners globaux : web (`ChatNotificationListener`, `CreditsRealtimeListener`, `NotificationsRealtimeListener`), mobile (`useChatNotificationsRealtime`, `useCreditsRealtime`, `useNotificationsRealtime`) |
+
+`message.received` est le complément clé de `message.sent` : ce dernier
+n'atteint que les clients déjà abonnés au canal de la conversation, alors que
+le premier notifie le destinataire **partout dans l'app** (toast « Voir »,
+badge non-lu, inbox remontée en tête) — y compris pour une conversation toute
+neuve. Les notifications Laravel passent par le channel `broadcast` avec
+`User::receivesBroadcastNotificationsOn()` = `user.{id}` et un
+`broadcastAs()` court (`search_alert.match`).
+
+> En production : `BROADCAST_CONNECTION=reverb` requis (défaut `null` = temps
+> réel muet). Auth canal : chacun ne peut s'abonner qu'à son propre
+> `user.{id}` et aux conversations dont il est participant (403/404 sinon).
 20. **Codes promo** — `PromoCode` + `PromoCodeUsage`.
 
 ## Architecture des couches
