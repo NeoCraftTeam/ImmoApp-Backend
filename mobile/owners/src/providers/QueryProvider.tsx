@@ -1,25 +1,30 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { focusManager, onlineManager, QueryClient } from '@tanstack/react-query';
-import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
-import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
+import {
+  PersistQueryClientProvider,
+  type Persister,
+} from '@tanstack/react-query-persist-client';
 import { useEffect, useState, type ReactNode } from 'react';
 import { AppState, Platform } from 'react-native';
+
+import { createEncryptedPersister } from '@/lib/secure-persister';
 
 /**
  * Single QueryClient + offline persistence layer for the owner app.
  *
  *  - **5 min stale**, **24 h gc**: lets owners review cached lists while
  *    offline.
- *  - **AsyncStorage persister**: serialises the cache (1 s debounce),
- *    rehydrates at cold-start.
+ *  - **Persister CHIFFRÉ (modèle WhatsApp)**: le cache est sérialisé dans
+ *    AsyncStorage chiffré en AES-256 (clé dans le SecureStore) — réhydratation
+ *    instantanée au cold-start, resync en arrière-plan.
  *  - **online/focus managers**: NetInfo suspends fetches when offline;
  *    AppState refetches when the app returns to the foreground.
  *
  *  Cache versioned via `CACHE_BUSTER` — bump to invalidate all
  *  persistence after a breaking API change.
  */
-const CACHE_BUSTER = 'kh-owners-v1';
+const CACHE_BUSTER = 'kh-owners-v2-encrypted';
 const QUERY_CACHE_STORAGE_KEY = 'kh-owners-query-cache';
 
 /**
@@ -67,18 +72,29 @@ export function QueryProvider({ children }: { children: ReactNode }) {
       }),
   );
 
-  const [persister] = useState(() =>
-    createAsyncStoragePersister({
-      storage: AsyncStorage,
-      key: 'kh-owners-query-cache',
-      throttleTime: 1000,
-    }),
-  );
+  // Persister chiffré : construit de façon asynchrone (la clé AES vit
+  // dans le SecureStore). Le court délai (~10-30 ms, une seule fois)
+  // est couvert par le splash natif.
+  const [persister, setPersister] = useState<Persister | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void createEncryptedPersister(QUERY_CACHE_STORAGE_KEY).then((p) => {
+      if (alive) setPersister(p);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', onAppStateChange);
     return () => sub.remove();
   }, []);
+
+  if (!persister) {
+    return null;
+  }
 
   return (
     <PersistQueryClientProvider

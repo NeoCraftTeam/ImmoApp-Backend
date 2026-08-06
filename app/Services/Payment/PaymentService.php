@@ -12,6 +12,7 @@ use App\Events\PaymentFailed;
 use App\Events\PaymentInitiated;
 use App\Events\PaymentSucceeded;
 use App\Exceptions\PaymentGatewayException;
+use App\Exceptions\StripeCustomerMissingException;
 use App\Models\Payment;
 use App\Models\PointPackage;
 use App\Models\SubscriptionPlan;
@@ -170,7 +171,28 @@ final readonly class PaymentService
         // Orange Money → Kpay; Card → Stripe.
         $primaryGateway = $this->resolveGatewayForMethod($data['payment_method'] ?? null);
 
-        [$result, $usedGateway] = $this->initiateWithFallback($gatewayPayload, $primaryGateway);
+        try {
+            [$result, $usedGateway] = $this->initiateWithFallback($gatewayPayload, $primaryGateway);
+        } catch (StripeCustomerMissingException $e) {
+            // stripe_id périmé (Customer supprimé ou créé avec d'anciennes
+            // clés) : la carte enregistrée est partie avec l'ancien Customer.
+            // Auto-réparation : oublier l'id local, recréer un Customer neuf
+            // et relancer UNE fois en saisie de carte classique (sans
+            // payment_method_id, invalide par construction).
+            if (!isset($gatewayPayload['customer_id'])) {
+                throw $e;
+            }
+
+            Log::info('Paiement Stripe: stripe_id périmé, recréation du Customer et relance', [
+                'user_id' => $user->id,
+            ]);
+
+            $user->forceFill(['stripe_id' => null])->save();
+            $gatewayPayload['customer_id'] = (string) $user->createAsStripeCustomer()->id;
+            $gatewayPayload['payment_method_id'] = null;
+
+            [$result, $usedGateway] = $this->initiateWithFallback($gatewayPayload, $primaryGateway);
+        }
 
         $initialStatus = match ($result['status']) {
             'success' => PaymentStatus::SUCCESS,

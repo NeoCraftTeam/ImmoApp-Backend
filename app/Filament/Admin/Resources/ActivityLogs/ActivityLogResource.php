@@ -122,10 +122,11 @@ class ActivityLogResource extends Resource
                             ? 'bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-900/30 dark:text-rose-200 dark:ring-rose-700/50'
                             : 'bg-blue-50 text-blue-700 ring-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:ring-blue-700/50';
 
-                        $date = $record->created_at->format('d/m/Y à H:i:s');
+                        $date = $record->created_at->format('d/m/Y à H:i:s').' UTC';
                         $description = AuditDescription::forActivity($record);
 
-                        $ip = $props['ip'] ?? null;
+                        // L'adresse IP est volontairement ignorée (retirée du
+                        // journal — minimisation des données personnelles).
                         $ua = $props['user_agent'] ?? null;
                         $guard = $props['guard'] ?? null;
 
@@ -134,7 +135,7 @@ class ActivityLogResource extends Resource
                         return json_encode(compact(
                             'adminName', 'adminEmail', 'entity', 'event', 'eventPillClass',
                             'accentBorderClass', 'logBadgeLabel', 'logBadgeClass',
-                            'date', 'description', 'isSecurityLog', 'ip', 'uaShort', 'guard', 'action'
+                            'date', 'description', 'isSecurityLog', 'uaShort', 'guard', 'action'
                         ), JSON_UNESCAPED_UNICODE);
                     })
                     ->formatStateUsing(function (string $state): string {
@@ -175,13 +176,10 @@ class ActivityLogResource extends Resource
                         $html .= $metaText('Admin', $d['adminName'].($d['adminEmail'] ? ' · '.$d['adminEmail'] : ''));
                         $html .= '</div>';
 
-                        if ($d['isSecurityLog'] && ($d['ip'] || $d['uaShort'] || $d['guard'])) {
+                        if ($d['isSecurityLog'] && ($d['uaShort'] || $d['guard'])) {
                             $html .= '<div class="mt-3.5 p-[14px_18px] bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800/60 rounded-lg">';
-                            $html .= '<div class="text-[10px] font-bold uppercase tracking-wider text-orange-700 dark:text-orange-300 mb-2.5">Informations réseau</div>';
+                            $html .= '<div class="text-[10px] font-bold uppercase tracking-wider text-orange-700 dark:text-orange-300 mb-2.5">Session</div>';
                             $html .= '<div class="flex flex-wrap gap-x-7 gap-y-2.5">';
-                            if ($d['ip']) {
-                                $html .= $metaText('Adresse IP', $d['ip']);
-                            }
                             if ($d['guard']) {
                                 $html .= $metaText('Guard', $d['guard']);
                             }
@@ -242,8 +240,8 @@ class ActivityLogResource extends Resource
                     })
                     ->sortable(),
                 TextColumn::make('created_at')
-                    ->label('Date')
-                    ->dateTime('d/m/Y H:i')
+                    ->label('Date (UTC)')
+                    ->dateTime('d/m/Y H:i', 'UTC')
                     ->sortable()
                     ->icon('heroicon-o-clock')
                     ->size('sm'),
@@ -259,13 +257,6 @@ class ActivityLogResource extends Resource
                     ->color('info')
                     ->formatStateUsing(fn ($record): string => AuditDescription::entityLabel($record))
                     ->sortable(),
-                TextColumn::make('ip_address')
-                    ->label('IP')
-                    ->icon('heroicon-o-globe-alt')
-                    ->size('sm')
-                    ->getStateUsing(fn ($record): string => (string) ($record->properties->get('ip') ?? '—'))
-                    ->color('gray')
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 SelectFilter::make('log_name')

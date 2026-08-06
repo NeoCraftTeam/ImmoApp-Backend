@@ -117,6 +117,53 @@ services:
           memory: 512m
           cpus: "1.00"
 
+  # Le Scheduler Laravel — tâches planifiées de routes/console.php :
+  # réconciliation des paiements en attente (horaire), rappels de visite J-1,
+  # expirations/renouvellements d'abonnements, backups nocturnes, rapports…
+  # SANS ce service, aucune tâche planifiée ne tourne en production.
+  scheduler:
+    image: ${APP_IMAGE:-keyhome-backend}
+    container_name: ${COMPOSE_PREFIX:-keyhome-prod}-scheduler
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan schedule:work
+    depends_on:
+      code-sync:
+        condition: service_completed_successfully
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      app:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - keyhome-app-code:/var/www
+      - keyhome-storage-data:/var/www/storage
+      - ./.env:/var/www/.env
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'schedule:work' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - keyhome-network
+    environment:
+      - DB_HOST=pgbouncer
+      - DB_HOST_READ=${DB_HOST_READ:-db-replica}
+      - DB_SSLMODE=disable
+      - NIGHTWATCH_TOKEN=${NIGHTWATCH_TOKEN}
+      - NIGHTWATCH_INGEST_URI=nightwatch-agent:2407
+      - REVERB_BROADCAST_HOST=reverb
+      - REVERB_BROADCAST_PORT=8080
+      - REVERB_BROADCAST_SCHEME=http
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.50"
+
   worker-tours:
     image: ${APP_IMAGE:-keyhome-backend}
     container_name: ${COMPOSE_PREFIX:-keyhome-prod}-worker-tours

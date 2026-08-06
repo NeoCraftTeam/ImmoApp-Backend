@@ -33,9 +33,12 @@ class CompleteStaleReservationsJob implements ShouldQueue
             ->with(['ad', 'client'])
             ->get()
             ->filter(function (TentativeReservation $r): bool {
+                // Les créneaux sont des heures locales Cameroun (wall-clock) :
+                // toujours les interpréter dans le fuseau métier, jamais dans
+                // le fuseau d'affichage de l'app (UTC).
                 $endsAt = Carbon::parse(
                     $r->slot_date->toDateString().' '.$r->slot_ends_at,
-                    config('app.timezone', 'Africa/Douala'),
+                    config('app.business_timezone', 'Africa/Douala'),
                 );
 
                 return $endsAt->isPast();

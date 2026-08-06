@@ -134,15 +134,15 @@ final class AuditDescription
     {
         $action = (string) $activity->properties->get('action', $activity->event ?? '');
         $email = (string) $activity->properties->get('email', '');
-        $ip = (string) $activity->properties->get('ip', '');
 
+        // L'adresse IP est volontairement absente du rendu (retirée du
+        // journal — minimisation des données personnelles).
         $subject = $email !== '' ? " sur le compte {$email}" : '';
-        $context = $ip !== '' ? " (IP {$ip})" : '';
 
         return match ($action) {
-            'login' => "s'est connecté à l'administration{$context}",
-            'logout' => "s'est déconnecté{$context}",
-            'login_failed' => "échec de connexion{$subject}{$context}",
+            'login' => "s'est connecté à l'administration",
+            'logout' => "s'est déconnecté",
+            'login_failed' => "échec de connexion{$subject}",
             'lockout' => "compte verrouillé après plusieurs tentatives{$subject}",
             'password_reset' => "a réinitialisé le mot de passe{$subject}",
             default => $activity->description ?: 'événement de sécurité',

@@ -28,7 +28,14 @@ use Spatie\IcalendarGenerator\Enums\EventStatus;
  */
 final class CalendarExportController
 {
-    private const string TIMEZONE = 'Africa/Douala';
+    /**
+     * Visit slots are stored as Cameroon wall-clock times — always parse them
+     * in the business timezone, never in the app (display) timezone.
+     */
+    private static function businessTimezone(): string
+    {
+        return (string) config('app.business_timezone', 'Africa/Douala');
+    }
 
     // ── Client feed ────────────────────────────────────────────────────────────
 
@@ -126,11 +133,11 @@ final class CalendarExportController
     {
         $start = Carbon::parse(
             $r->slot_date->toDateString().' '.$r->slot_starts_at,
-            self::TIMEZONE,
+            self::businessTimezone(),
         );
         $end = Carbon::parse(
             $r->slot_date->toDateString().' '.$r->slot_ends_at,
-            self::TIMEZONE,
+            self::businessTimezone(),
         );
 
         $location = implode(', ', array_filter([

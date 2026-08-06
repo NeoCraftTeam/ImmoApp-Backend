@@ -244,7 +244,7 @@ vendor/bin/rector process --dry-run
 - `Chat/EncryptionService` — AES-256-CBC with HMAC-SHA256 MAC (authenticated encryption). Key from `CHAT_ENCRYPTION_KEY` env (32-byte hex). `encrypt()` returns `{ciphertext, iv}`; `decrypt()` verifies MAC before decrypting.
 - `Chat/AttachmentService` — upload files to Cloudflare R2 (`chat-attachments/` prefix). MIME/size validated (images: JPEG/PNG/WEBP/GIF ≤5 MB; files: PDF/doc ≤20 MB). Returns descriptor with `signed_url` (1-hour TTL). `getSignedUrl()` refreshes URLs.
 - `Chat/ConversationService` — find-or-create (gated on `UnlockedAd`), list (paginated), mark-as-read (broadcasts `MessageRead`), archive, unread count (Cache 30s TTL).
-- `Chat/MessageService` — send (encrypt + update `last_message_id` + broadcast + FCM push + email 5min delay), soft-delete (sender only, 24h window), cursor-paginated history.
+- `Chat/MessageService` — send (encrypt + update `last_message_id` + broadcast `MessageSent` on `conversation.{uuid}` + broadcast `MessageReceived` on the recipient's `user.{id}` + FCM push + email 5min delay), soft-delete (sender only, 24h window), cursor-paginated history.
 - `HealthCheckService` — enterprise health check service. 6 checks: Database, Redis, Queue, Storage, Meilisearch, Kpay. 3-tier status: `healthy` / `degraded` / `unhealthy`. Results cached 30 s (Redis). Critical checks: Database + Storage → failure = `unhealthy`. All others → `degraded`. Used by `GET /api/health` and `php artisan app:health-check --force`.
 - `PropertyAttributeImportService` — bulk attribute import.
 - `UserAgentParser` — browser/device detection.
@@ -540,6 +540,8 @@ All prefixed `/api/v1/`: `auth.php`, `ads.php`, `payments.php`, `viewings.php`, 
 
 ### Events & Listeners
 - Events: `AdCreated`, `AdStatusTransitioned`, `PaymentFailed`, `PaymentInitiated`, `PaymentSucceeded`.
+- Chat events (`app/Events/Chat/`, all `ShouldBroadcastNow`): `MessageSent` (channel `conversation.{uuid}`), `MessageReceived` (channel `user.{recipientId}`, event `message.received` — toast + inbox + badge live hors fil ouvert), `MessageRead`, `MessageDeleted`, `MessageReactionAdded/Removed`, `UserTyping`, `ConversationArchived/Unarchived`.
+- Credits event (`app/Events/Credits/`): `CreditsBalanceUpdated` (channel `user.{id}`, event `credits.updated`) — solde + transactions temps réel, émis par `PointService::credit()`/`deduct()`.
 - Listeners: `AutoBoostNewAd`, `LogAuthenticationEvents`, `MatchSearchAlertsOnAdAvailable`,
   `NotifyAdminsOfPendingAd`, `NotifyOwnerOfStatusChange`, `SendAdminActivityEmails`,
   `SendBackupByEmailListener`, `SendWelcomeNotification`.
@@ -1655,8 +1657,69 @@ Quand `false` (défaut), `MessageService::send()` **ignore** silencieusement tou
 
 ---
 
-## Enterprise Audit — Mai 2026
+### Notifications temps réel unifiées — canal `user.{id}` (Août 2026)
 
+Toutes les notifications temps réel passent désormais par le **canal privé personnel `user.{id}`** (auth Sanctum via `/broadcasting/auth`, chacun ne peut s'abonner qu'au sien — `routes/channels.php`). Trois events y circulent :
+
+| Event | Émetteur | Payload | Consommateurs |
+|---|---|---|---|
+| `message.received` | `App\Events\Chat\MessageReceived` (dans `MessageService::send`, try/catch dédié) | uuid, conversation_uuid, sender {id,name,avatar}, type, body tronqué (120 car.), is_client_sealed, created_at | Web `ChatNotificationListener` ; mobile `useChatNotificationsRealtime` (2 apps) |
+| `credits.updated` | `App\Events\Credits\CreditsBalanceUpdated` (dans `PointService::credit`/`deduct`) | balance absolue + transaction | Web `CreditsRealtimeListener` ; mobile `useCreditsRealtime` (2 apps) |
+| `search_alert.match` | `SearchAlertMatchNotification` via le channel `broadcast` Laravel | toArray + id + type (`broadcastType: search_alert_match`) | Web `NotificationsRealtimeListener` ; mobile `useNotificationsRealtime` (visitors) |
+
+**Règles d'architecture qui en découlent :**
+
+- **`message.received` est la source UNIQUE** pour inbox list + badge non-lu + toast côté web. Les bindings par conversation (`ChatNotificationListener`, cap `MAX_BACKGROUND_WS_CONVERSATIONS`) ne gèrent plus que le cache du fil ouvert + read receipts + archivage — doubler ces effets compterait les non-lus en double.
+- **Mobile** : le hook toast ne touche jamais le cache des messages du fil (géré par `useConversationRealtime` sur `conversation.{uuid}`) et ne s'affiche pas quand le fil concerné est ouvert (`usePathname`).
+- **`User::receivesBroadcastNotificationsOn()` retourne `user.{id}`** — sans ça Laravel diffuserait sur `App.Models.User.{id}` que personne n'écoute. Toute notification Laravel peut gagner le temps réel en ajoutant `'broadcast'` à `via()` + un `broadcastAs()` court.
+- **Cleanup Echo côté web** : `stopListening('.event', handler)` et jamais `leave()` — le canal `user.{id}` est partagé entre plusieurs listeners (chat, crédits, alertes).
+- **Deep-link push mobile** : `usePushNotifications` route `chat_message` → `/messages/{uuid}` et `search_alert_match` → `/ads/{slug}` (slug extrait de `data.url` si `ad_slug` absent).
+
+---
+
+### Cache chat chiffré on-device — modèle WhatsApp (Août 2026)
+
+La liste des conversations et les fils de discussion s'affichent **instantanément** au cold-start, sans skeleton après le premier lancement : le cache TanStack Query est **persisté chiffré sur l'appareil**, réhydraté immédiatement, puis resynchronisé en arrière-plan (stale-while-revalidate). Implémenté sur les 3 surfaces.
+
+| Surface | Persister | Chiffrement | Clé |
+|---|---|---|---|
+| Web (`keyhome-frontend-next`) | `src/lib/query-persister.ts` (`createChatCachePersister`, whitelist `conversations` / `chat-messages` / `chat-unread`, localStorage, throttle 1 s) | `src/lib/query-cache-crypto.ts` — **AES-GCM 256**, IV 96 bits préfixé, base64 | **CryptoKey non-extractible** WebCrypto rangée en IndexedDB (`kh-secure-store`) — le XSS ne peut pas l'exporter |
+| Mobile visitors + owners | `src/lib/secure-persister.ts` (`createEncryptedPersister`, AsyncStorage, throttle trailing 1 s) | `crypto-es` **AES-256** (format OpenSSL, IV aléatoire par écriture) | 32 octets aléatoires en hex dans **expo-secure-store** (`WHEN_UNLOCKED_THIS_DEVICE_ONLY` — Keychain iOS / Keystore Android, pas de sync cloud) |
+
+**Règles d'architecture qui en découlent :**
+
+- **Fail-safe restore** : snapshot corrompu, legacy en clair ou clé régénérée → `removeItem` + `undefined`, démarrage propre (l'API refera foi). La persistance ne doit JAMAIS casser l'app (try/catch partout).
+- **Purge au logout** : web `wipeBrowserStoragesForLogout()` efface le snapshot, et `clearChatCacheSnapshot()` (appelé dans `useAuthActions.logout`) pose un **verrou anti-réécriture** — sans lui, une mutation du cache dans la fenêtre de throttle (1 s) entre le wipe et la navigation dure réécrirait le snapshot chiffré (résurrection sur poste partagé). Le verrou est vérifié dans `persistClient` ET dans le `flush`.
+- **Busters versionnés** : web `kh-web-chat-v1`, visitors `kh-v3-encrypted-cache`, owners `kh-owners-v2-encrypted` — bumper pour invalider toute persistance après un breaking change API.
+- **Mobile** : `conversation-messages` a été retiré des `NON_PERSISTED_QUERY_ROOTS` (visitors) ; owners persiste tout sauf sa liste d'exclusions (auth, solde, paiement). Le persister est construit de façon asynchrone (SecureStore) avant le montage du `PersistQueryClientProvider` — délai ~10-30 ms couvert par le splash natif.
+- **Paquets mobiles** : le PM canonique reste **npm** (`package-lock.json` tracké) — regénérer le lock avec `npm install --package-lock-only --legacy-peer-deps` après tout changement de `package.json` (jest-expo 56 vs expo 54 impose `--legacy-peer-deps`). `expo-crypto` est épinglé `~15.0.9` (compatible SDK 54 — le `^57` précédent cassait les development builds).
+- **Tests** : web `src/tests/lib/query-persister.test.ts` (17 cas, crypto mockée) + `query-cache-crypto.test.ts` (6 cas, vraie WebCrypto + `fake-indexeddb`) ; mobile `__tests__/lib/secure-persister.test.ts` (5 cas par app, SecureStore/expo-crypto mockés).
+
+---
+
+### UTC global, scheduler prod, journal de sécurité sans IP & Stripe auto-réparation (Août 2026)
+
+**Scheduler Laravel enfin actif en prod/preprod** : les `docker-compose*.yml` n'avaient AUCUN service scheduler — aucune tâche de `routes/console.php` ne tournait en prod (réconciliation des paiements `app:cleanup-stale-payments`, rappels de visite J-1, expirations d'abonnements, backups nocturnes…). Un service `scheduler` (`php artisan schedule:work`, copie conforme du `worker`, healthcheck `pgrep -f 'schedule:work'`) a été ajouté aux deux compose. **Ops** : `docker compose up -d scheduler` après déploiement.
+
+**UTC partout** : `config/app.php` `timezone` = `env('APP_TIMEZONE', 'UTC')` — affichage Filament, factures PDF (suffixe « UTC »), mails et logs partagent une référence unique (utilisateurs multi-fuseaux). **Exception métier** : les créneaux de visite (`slot_date` + `slot_starts_at`) restent des heures locales Cameroun — ils sont interprétés via la nouvelle clé `config('app.business_timezone')` (`APP_BUSINESS_TIMEZONE`, défaut `Africa/Douala`) consommée par `CalendarExportController` et `CompleteStaleReservationsJob`. Ne JAMAIS utiliser `config('app.timezone')` pour parser un créneau.
+
+**Journal de sécurité sans IP** (minimisation des données personnelles) :
+- `LoginService::recordLogin()` n'historise plus `ip_address` (colonne conservée pour les lignes anciennes) ; la détection de nouvel appareil continue d'utiliser `users.last_login_ip` (non exposé).
+- `LogAuthenticationEvents` ne verse plus `ip` dans les propriétés d'activité (le canal fichier `security-*.log` la conserve à des fins forensiques uniquement).
+- `AuditDescription::securityDescription()` ne suffixe plus « (IP …) » ; `ActivityLogResource` (colonne IP + carte « Session ») et `LoginHistoryResource` (colonne + entrée infolist IP) n'affichent plus l'IP ; dates Filament des journaux explicitement en UTC.
+- API `GET /auth/login-history` ne renvoie plus `ip_address` ni `current_login.last_login_ip` ; le web (`owner/security`) affiche « Localisation inconnue » en repli.
+
+**Erreurs passerelle : 503, pas 502** — un 502 applicatif se confondait avec un Bad Gateway nginx/Cloudflare (et le navigateur affichait alors une erreur CORS trompeuse, la page d'erreur du proxy n'ayant pas d'en-têtes CORS). `bootstrap/app.php`, `CreditController` et `StripePaymentMethodController` renvoient désormais **503**.
+
+**Stripe — auto-réparation des `stripe_id` périmés** (Customers créés avec d'anciennes clés test, ou supprimés côté Stripe → `resource_missing`) :
+- `StripePaymentService::listSavedCards()` → renvoie `[]` (le profil affiche « Aucune carte enregistrée » au lieu d'une erreur).
+- `createSetupIntent()` et l'initiation off-session → lancent la nouvelle `App\Exceptions\StripeCustomerMissingException`.
+- `StripePaymentMethodController::setupIntent()` et `PaymentService::createPayment()` attrapent cette exception, oublient le `stripe_id` local, recréent un Customer via Cashier et **réessaient une fois** (le paiement off-session repart sans `payment_method_id`, la carte étant partie avec l'ancien Customer).
+- Tests : `tests/Feature/Payment/StripeSavedCardTest.php` (fakes duck-typés `extends StripeClient` bindés via `app()->bind(...)` — JAMAIS `app()->instance(...)` : Cashier résout `app(StripeClient::class, ['config' => …])` et le conteneur ignore une instance partagée dès que des paramètres sont fournis).
+
+---
+
+## Enterprise Audit — Mai 2026
 Audit multi-agents exhaustif réalisé le 2 mai 2026. 7 agents parallèles ont couvert : backend/SOLID, auth/sécurité, paiement/chat, IA/geo, PWA/push, frontend/design, DevOps.
 
 ### Bugs critiques à corriger en priorité (CRITICAL / HIGH)

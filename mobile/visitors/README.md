@@ -99,6 +99,16 @@ Plus the foundation:
 - `useStorageState` hook (matches the canonical Expo Router auth pattern).
 - i18n with French default + English fallback, device-locale detection.
 - `expo-image` for cached, prioritised image rendering.
+- **Encrypted on-device chat cache (WhatsApp model)**: the TanStack Query
+  cache (conversations + threads) is persisted to AsyncStorage **encrypted
+  AES-256** (`src/lib/secure-persister.ts`, `crypto-es`), key held in
+  `expo-secure-store` (`WHEN_UNLOCKED_THIS_DEVICE_ONLY`). Inbox and threads
+  render instantly at cold-start, then resync in the background. Corrupt or
+  legacy plaintext snapshots are purged silently; the cache buster
+  (`kh-v3-encrypted-cache`) invalidates everything on breaking API changes.
+  Note: npm is the canonical package manager here — after editing
+  `package.json`, refresh the lock with
+  `npm install --package-lock-only --legacy-peer-deps`.
 
 ## What's NOT shipped yet — roadmap
 

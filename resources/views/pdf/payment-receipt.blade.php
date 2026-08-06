@@ -109,7 +109,7 @@
         <table class="kv-table">
             <tr>
                 <td class="kv-label">Date</td>
-                <td class="kv-val">{{ $payment->created_at?->format('d/m/Y H:i') }}</td>
+                <td class="kv-val">{{ $payment->created_at?->format('d/m/Y H:i') }} UTC</td>
             </tr>
             <tr>
                 <td class="kv-label">Nature</td>
@@ -143,7 +143,7 @@
         @if($localeCurrency && $localeRate && $localeSymbol)
             <div class="amount-sub">
                 ≈ {{ $localeSymbol }}{{ number_format((float) $payment->amount * (float) $localeRate, 2, ',', ' ') }} {{ $localeCurrency }}
-                <span style="color:#94a3b8;"> — taux indicatif visiteur</span>
+                <span style="color:#94a3b8;"> — taux indicatif </span>
             </div>
         @endif
     </div>

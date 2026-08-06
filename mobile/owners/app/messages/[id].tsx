@@ -22,6 +22,7 @@ import { Paragraph, Spinner, XStack, YStack } from 'tamagui';
 
 import { extractApiErrorMessage } from '@/api/client';
 import { ScreenHeader } from '@/components/ScreenHeader';
+import { Skeleton } from '@/components/Skeleton';
 import { useMe } from '@/hooks/useMe';
 import {
   useConversation,
@@ -36,6 +37,7 @@ import {
 import { useConversationRealtime } from '@/hooks/useConversationRealtime';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useMotionPresets } from '@/hooks/useMotionPresets';
+import { resolveMediaUrl } from '@/lib/media-url';
 import { showToast } from '@/services/toast';
 import { brand } from '@/theme/tokens';
 import { formatPresence } from '@/utils/presence';
@@ -217,12 +219,14 @@ export default function ConversationThreadScreen() {
         title={otherName}
         subtitle={presence.label ?? conversation?.ad?.title}
         right={
-          conversation?.other_participant?.avatar ? (
+          resolveMediaUrl(conversation?.other_participant?.avatar) ? (
             <YStack width={36} height={36} borderRadius={18} overflow="hidden" backgroundColor="$slate100">
               <Image
-                source={{ uri: conversation.other_participant.avatar }}
+                source={{ uri: resolveMediaUrl(conversation?.other_participant?.avatar)! }}
                 style={{ width: '100%', height: '100%' }}
                 contentFit="cover"
+                cachePolicy="memory-disk"
+                transition={150}
               />
             </YStack>
           ) : (
@@ -248,9 +252,7 @@ export default function ConversationThreadScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
       >
         {isLoading ? (
-          <YStack flex={1} alignItems="center" justifyContent="center">
-            <Spinner color={brand.primary} size="large" />
-          </YStack>
+          <ThreadSkeleton />
         ) : (
           <FlatList
             ref={listRef}
@@ -632,10 +634,18 @@ function MessageBubble({
 
 /** Avatar rond compact : photo si dispo, sinon initiale sur fond neutre. */
 function MessageAvatar({ uri, name }: { uri?: string | null; name: string }) {
-  if (uri) {
+  const resolved = resolveMediaUrl(uri);
+  if (resolved) {
     return (
       <YStack width={26} height={26} borderRadius={13} overflow="hidden" backgroundColor="$slate200">
-        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} contentFit="cover" />
+        <Image
+          source={{ uri: resolved }}
+          style={{ width: '100%', height: '100%' }}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          recyclingKey={resolved}
+          transition={150}
+        />
       </YStack>
     );
   }
@@ -678,4 +688,35 @@ function formatDay(iso: string): string {
   } catch {
     return '';
   }
+}
+
+/**
+ * Skeleton du fil : silhouettes de bulles alternées (reçu avec avatar /
+ * envoyé) — pas de spinner plein écran pendant le premier chargement.
+ */
+function ThreadSkeleton() {
+  const rows: Array<{ mine: boolean; width: number }> = [
+    { mine: false, width: 62 },
+    { mine: false, width: 44 },
+    { mine: true, width: 58 },
+    { mine: false, width: 70 },
+    { mine: true, width: 38 },
+    { mine: true, width: 52 },
+    { mine: false, width: 47 },
+  ];
+  return (
+    <YStack flex={1} paddingHorizontal={14} paddingTop={20} gap={10}>
+      {rows.map((row, i) => (
+        <XStack
+          key={i}
+          justifyContent={row.mine ? 'flex-end' : 'flex-start'}
+          alignItems="flex-end"
+          gap={6}
+        >
+          {!row.mine && <Skeleton width={24} height={24} radius={12} />}
+          <Skeleton width={`${row.width}%`} height={i % 3 === 0 ? 44 : 34} radius={16} />
+        </XStack>
+      ))}
+    </YStack>
+  );
 }

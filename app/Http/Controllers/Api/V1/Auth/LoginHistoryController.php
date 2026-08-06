@@ -14,9 +14,11 @@ final class LoginHistoryController
     {
         $user = $request->user();
 
+        // L'adresse IP n'est plus exposée dans le journal de connexions
+        // (minimisation des données personnelles).
         $history = LoginHistory::query()
             ->where('user_id', auth()->id())
-            ->select(['id', 'ip_address', 'device_type', 'browser', 'platform', 'country', 'city', 'guard', 'successful', 'created_at'])
+            ->select(['id', 'device_type', 'browser', 'platform', 'country', 'city', 'guard', 'successful', 'created_at'])
             ->latest()
             ->paginate(20);
 
@@ -24,7 +26,6 @@ final class LoginHistoryController
             'data' => $history,
             'current_login' => [
                 'last_login_at' => $user->last_login_at,
-                'last_login_ip' => $user->last_login_ip,
                 'last_login_country' => $user->last_login_country,
                 'last_login_city' => $user->last_login_city,
             ],

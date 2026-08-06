@@ -35,13 +35,15 @@ class LogAuthenticationEvents
             'user_agent' => request()->userAgent(),
         ]);
 
+        // NB : l'adresse IP n'est plus versée dans le journal d'activité
+        // (minimisation des données personnelles — le canal fichier
+        // `security` la conserve à des fins forensiques uniquement).
         activity('security')
             ->performedOn($user)
             ->causedBy($user)
             ->withProperties([
                 'action' => 'login',
                 'guard' => $event->guard,
-                'ip' => request()->ip(),
                 'user_agent' => request()->userAgent(),
             ])
             ->log('User logged in');
@@ -66,7 +68,6 @@ class LogAuthenticationEvents
             ->causedBy($user)
             ->withProperties([
                 'action' => 'logout',
-                'ip' => request()->ip(),
             ])
             ->log('User logged out');
     }
@@ -86,7 +87,6 @@ class LogAuthenticationEvents
                 ->performedOn($failedUser)
                 ->withProperties([
                     'action' => 'login_failed',
-                    'ip' => request()->ip(),
                     'user_agent' => request()->userAgent(),
                 ])
                 ->log('Failed login attempt');
@@ -122,7 +122,6 @@ class LogAuthenticationEvents
             ->causedBy($user)
             ->withProperties([
                 'action' => 'password_reset',
-                'ip' => request()->ip(),
             ])
             ->log('Password reset completed');
     }

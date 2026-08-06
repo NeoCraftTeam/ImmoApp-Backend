@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1\Payment;
 
 use App\Contracts\StripeSavedCardServiceInterface;
 use App\Exceptions\PaymentGatewayException;
+use App\Exceptions\StripeCustomerMissingException;
 use App\Http\Requests\Api\V1\StripePaymentMethodRequest;
 use App\Mail\CardAddedMail;
 use App\Models\User;
@@ -69,7 +70,7 @@ final class StripePaymentMethodController
 
             return response()->json([
                 'message' => 'Impossible de récupérer vos cartes. Veuillez réessayer.',
-            ], 502);
+            ], 503);
         }
 
         return response()->json([
@@ -183,7 +184,7 @@ final class StripePaymentMethodController
      *
      *     @OA\Response(response=200, description="Client secret retourné"),
      *     @OA\Response(response=401, description="Non authentifié"),
-     *     @OA\Response(response=502, description="Erreur Stripe")
+     *     @OA\Response(response=503, description="Erreur Stripe")
      * )
      */
     public function setupIntent(Request $request): JsonResponse
@@ -199,6 +200,27 @@ final class StripePaymentMethodController
 
         try {
             $intent = $this->stripe->createSetupIntent($customerId);
+        } catch (StripeCustomerMissingException) {
+            // stripe_id périmé (Customer supprimé ou créé avec d'anciennes
+            // clés) : auto-réparation — on oublie l'id local, on recrée un
+            // Customer neuf et on réessaie une seule fois.
+            Log::info('Stripe setup-intent: stripe_id périmé, recréation du Customer', [
+                'user_id' => $user->id,
+            ]);
+            $user->forceFill(['stripe_id' => null])->save();
+
+            try {
+                $intent = $this->stripe->createSetupIntent((string) $user->createAsStripeCustomer()->id);
+            } catch (PaymentGatewayException $e) {
+                Log::warning('Stripe createSetupIntent failed after customer re-creation', [
+                    'user_id' => $user->id,
+                    'message' => $e->getMessage(),
+                ]);
+
+                return response()->json([
+                    'message' => 'Impossible de préparer l\'ajout de carte. Veuillez réessayer.',
+                ], 503);
+            }
         } catch (PaymentGatewayException $e) {
             Log::warning('Stripe createSetupIntent failed', [
                 'user_id' => $user->id,
@@ -207,7 +229,7 @@ final class StripePaymentMethodController
 
             return response()->json([
                 'message' => 'Impossible de préparer l\'ajout de carte. Veuillez réessayer.',
-            ], 502);
+            ], 503);
         }
 
         return response()->json([

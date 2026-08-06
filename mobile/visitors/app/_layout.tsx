@@ -13,7 +13,9 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { OfflineBanner } from '@/components/OfflineBanner';
 import { SplashView } from '@/components/SplashView';
 import { ToastHost } from '@/components/ToastHost';
+import { useChatNotificationsRealtime } from '@/hooks/useChatNotificationsRealtime';
 import { useCreditsRealtime } from '@/hooks/useCreditsRealtime';
+import { useNotificationsRealtime } from '@/hooks/useNotificationsRealtime';
 import { useMe } from '@/hooks/useMe';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { CompareProvider } from '@/providers/CompareProvider';
@@ -142,6 +144,11 @@ function SplashGate() {
  */
 function PushNotificationsBridge() {
   usePushNotifications();
-  useCreditsRealtime(useMe().data?.id);
+  const meId = useMe().data?.id;
+  useCreditsRealtime(meId);
+  // Notifications chat temps réel (toast + inbox live) via le canal user.{id}.
+  useChatNotificationsRealtime(meId);
+  // Alertes de recherche temps réel (toast + centre de notifications live).
+  useNotificationsRealtime(meId);
   return null;
 }

@@ -85,7 +85,22 @@ return [
     |
     */
 
-    'timezone' => env('APP_TIMEZONE', 'Africa/Douala'),
+    'timezone' => env('APP_TIMEZONE', 'UTC'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Business (wall-clock) Timezone
+    |--------------------------------------------------------------------------
+    |
+    | Timezone used to INTERPRET stored local wall-clock values — visit slots
+    | (slot_date + slot_starts_at) are local Cameroon times, so reservation
+    | completion and ICS calendar feeds must parse them in this zone. This is
+    | deliberately independent from `timezone` (UTC, used for display/storage)
+    | because users browse from multiple regions of the world.
+    |
+    */
+
+    'business_timezone' => env('APP_BUSINESS_TIMEZONE', 'Africa/Douala'),
 
     /*
     |--------------------------------------------------------------------------

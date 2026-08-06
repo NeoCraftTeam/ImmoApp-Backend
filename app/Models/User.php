@@ -665,6 +665,17 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
         return ChatAvatarUrl::resolve($raw !== '' && $raw !== '0' ? $raw : null);
     }
 
+    /**
+     * Canal de diffusion des notifications temps réel (channel `broadcast`
+     * des notifications Laravel). Aligné sur l'autorisation existante
+     * `Broadcast::channel('user.{userId}')` — le défaut Laravel serait
+     * `App.Models.User.{id}`, que ni le web ni le mobile n'écoutent.
+     */
+    public function receivesBroadcastNotificationsOn(): string
+    {
+        return "user.{$this->id}";
+    }
+
     // =========================================================================
     // WebAuthn
     // =========================================================================

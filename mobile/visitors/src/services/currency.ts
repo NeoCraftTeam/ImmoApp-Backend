@@ -269,3 +269,22 @@ export function formatFromXAF(amountXAF: number, target: string): string {
     ? `${sym}${value}`
     : `${value} ${sym}`;
 }
+
+/**
+ * Format compact pour les pastilles carte (façon Airbnb) : jamais de
+ * décimales, et abréviation au-delà de 10 000 (« 18,5 k », « 1,2 M »)
+ * pour que la pastille reste courte à n'importe quel prix.
+ */
+export function formatCompactFromXAF(amountXAF: number, target: string): string {
+  const { amount, displayCurrency } = resolveDisplayedMoney(amountXAF, target);
+  const sym = symbolFor(displayCurrency);
+  const abbreviate = (v: number): string => {
+    if (v >= 1_000_000) return `${(v / 1_000_000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} M`;
+    if (v >= 10_000) return `${(v / 1_000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} k`;
+    return Math.round(v).toLocaleString('fr-FR');
+  };
+  const value = abbreviate(amount);
+  return ['EUR', 'USD', 'GBP', 'CAD', 'CHF'].includes(displayCurrency)
+    ? `${sym}${value}`
+    : `${value} ${sym}`;
+}

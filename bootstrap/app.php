@@ -200,7 +200,11 @@ return Application::configure(basePath: dirname(__DIR__))
 
             $status = $e->getCode();
             if ($status < 400 || $status >= 600) {
-                $status = 502;
+                // 503 (et non 502) : un 502 applicatif se confond avec un
+                // Bad Gateway nginx/Cloudflare (infrastructure) et égare le
+                // diagnostic — le navigateur affiche alors une erreur CORS
+                // trompeuse car la page d'erreur du proxy n'a pas d'en-têtes CORS.
+                $status = 503;
             }
 
             // 422 validation errors carry user-friendly French field-level
@@ -208,7 +212,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // du champ « devise » n'est pas acceptée par Kpay."). On
             // surface ces messages directement pour que le frontend puisse
             // afficher le détail au lieu d'un mur générique. Pour les
-            // autres statuts (5xx, 502, etc.) on conserve un message
+            // autres statuts (5xx, etc.) on conserve un message
             // générique pour ne pas leaker de détails techniques.
             $message = $status === 422 && $e->getMessage() !== ''
                 ? $e->getMessage()
