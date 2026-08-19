@@ -113,6 +113,51 @@ curl http://localhost:7700/indexes/ads/stats \
   -H "Authorization: Bearer $MEILISEARCH_KEY"
 ```
 
+### Incident: Emails not received (auth / notifications / invoices)
+
+**Symptômes :** OTP non reçu, mails de notification/facturation absents, `VerifyEmail` silencieux.
+
+```bash
+# 1. Diagnostic complet (prod / preprod)
+docker compose exec app php artisan mail:diagnose
+docker compose exec app php artisan mail:diagnose --send-to=ops-test@keyhome.app
+
+# 2. Transport attendu : Resend en prod, `log` en preprod
+#    Vérifier env (ne jamais logger la clé complète) :
+docker compose exec app php artisan tinker --execute="
+  echo json_encode([
+    'mailer' => config('mail.default'),
+    'from'   => config('mail.from.address'),
+    'resend_key_set' => filled(config('services.resend.key')),
+    'queue'  => config('queue.default'),
+  ], JSON_PRETTY_PRINT)
+"
+
+# 3. Domaine Resend vérifié (sinon 403 silencieux)
+#    → https://resend.com/domains — DKIM + SPF verts pour keyhome.app
+#    MAIL_FROM_ADDRESS et les 7 MAIL_*_ADDRESS (senders HasSender) doivent
+#    appartenir au domaine vérifié, sinon Resend rejette.
+
+# 4. Queue (les mailables sont ShouldQueue sur la queue `emails`)
+#    En prod : QUEUE_CONNECTION=redis + after_commit=true (config/queue.php)
+#    Vérifier que le worker tourne :
+docker compose ps worker
+docker compose logs --tail=50 worker
+
+# 5. Jobs échoués
+docker compose exec app php artisan queue:failed
+docker compose exec app php artisan queue:retry all
+# Si Resend 403/429 : corriger RESEND_KEY / domaine puis retry.
+# Voir storage/logs/laravel.log pour les exceptions ResendTransport.
+
+# 6. Fallback local
+#    Local / preprod peut utiliser MAIL_MAILER=log (mails dans
+#    storage/logs/laravel.log) ou SMTP Infomaniak. Valider :
+php artisan mail:diagnose --send-to=ton-email@exemple.com
+#    Test brut SMTP (hors queue) :
+php artisan tinker --execute="Mail::raw('test', fn(\$m) => \$m->to('x@y.z')->subject('test'));"
+```
+
 ### Incident: Database disk full
 
 ```bash
