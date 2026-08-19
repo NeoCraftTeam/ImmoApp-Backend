@@ -6,7 +6,7 @@ import { Paragraph, XStack, YStack } from 'tamagui';
 
 import { useDirections, type DirectionsProfile } from '@/hooks/useDirections';
 import { useUserLocation } from '@/hooks/useUserLocation';
-import { formatDistance, haversineKm, walkingMinutes } from '@/utils/geo';
+import { extractRouteCoords, formatDistance, haversineKm, walkingMinutes } from '@/utils/geo';
 import { brand } from '@/theme/tokens';
 
 interface Props {
@@ -69,16 +69,7 @@ export function LocationMap({
     enabled: Boolean(userLocation) && !isLocked,
   });
 
-  const routeCoords = useMemo(() => {
-    const coords = directions?.data?.geometry?.coordinates;
-    if (!coords || coords.length === 0) return null;
-    return coords
-      .map((c: number[]) => ({ latitude: c[1], longitude: c[0] }))
-      .filter(
-        (c): c is { latitude: number; longitude: number } =>
-          typeof c.latitude === 'number' && typeof c.longitude === 'number',
-      );
-  }, [directions]);
+  const routeCoords = useMemo(() => extractRouteCoords(directions), [directions]);
 
   const summary = directions?.data?.summary;
 

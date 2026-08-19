@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Clickbar\Magellan\Data\Geometries\MultiPolygon;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\QuarterFactory;
 use Eloquent;
@@ -54,10 +55,18 @@ class Quarter extends Model
 
     protected $fillable = [
         'name',
+        'display_name',
+        'normalized_name',
         'city_id',
         'latitude',
         'longitude',
         'location',
+        'boundary',
+        'osm_type',
+        'osm_id',
+        'place_type',
+        'source',
+        'osm_updated_at',
         'avg_price',
         'avg_price_per_sqm',
         'active_ads_count',
@@ -89,6 +98,9 @@ class Quarter extends Model
     {
         return [
             'location' => Point::class,
+            'boundary' => MultiPolygon::class,
+            'osm_id' => 'integer',
+            'osm_updated_at' => 'datetime',
             'avg_price' => 'decimal:2',
             'avg_price_per_sqm' => 'decimal:2',
             'pricing_updated_at' => 'datetime',

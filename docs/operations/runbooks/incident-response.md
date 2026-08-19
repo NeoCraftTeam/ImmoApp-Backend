@@ -106,7 +106,7 @@ docker compose exec app php artisan app:cleanup-stale-payments
 docker compose exec app php artisan scout:import "App\\Models\\Ad"
 
 # Sync index settings
-docker compose exec app php artisan app:sync-meilisearch-settings
+docker compose exec app php artisan meilisearch:sync-settings
 
 # Verify index has documents
 curl http://localhost:7700/indexes/ads/stats \

@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Permet aux bailleurs de créer une ville ou un quartier manquant
@@ -46,8 +47,7 @@ final class GeoFindOrCreateController extends Controller
             return response()->json(['message' => 'Impossible de créer ou trouver cette ville. Vérifiez les données saisies.'], 422);
         }
 
-        Cache::forget('cities:list:'.md5(':50'));
-        Cache::forget('cities:list:'.md5(':100'));
+        Cache::forever('geo:catalog_version', (string) Str::uuid());
 
         return response()->json([
             'data' => new CityResource($city),
@@ -73,7 +73,7 @@ final class GeoFindOrCreateController extends Controller
 
         $quarter = $this->findOrCreateQuarter->handle($data);
 
-        Cache::forget('quarters:list:'.md5($data['city_id'].'::50:1'));
+        Cache::forever('geo:catalog_version', (string) Str::uuid());
 
         return response()->json([
             'data' => new QuarterResource($quarter),

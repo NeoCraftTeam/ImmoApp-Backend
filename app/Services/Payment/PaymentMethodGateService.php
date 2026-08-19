@@ -60,7 +60,9 @@ final class PaymentMethodGateService
         return match ($method) {
             PaymentMethod::ORANGE_MONEY,
             PaymentMethod::MOBILE_MONEY,
-            PaymentMethod::CARD => true,
+            PaymentMethod::CARD,
+            PaymentMethod::ApplePay,
+            PaymentMethod::GooglePay => true,
         };
     }
 

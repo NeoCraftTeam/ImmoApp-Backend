@@ -21,6 +21,9 @@ KeyHome — multi-tenant real estate marketplace SaaS for francophone sub-Sahara
 
 **Brand color:** `#F6475F` (crimson/pink). UI language: French only (`fr_FR` hardcoded).
 
+**Modale d'achat de crédits (frontend)** : `PurchaseCreditsModal` ne doit jamais devenir scrollable. Son header (solde) et son footer restent visibles ; les trois `PackageCard` occupent l'espace restant. Seul le mobile utilise la variante de carte `compact` ; un laptop peu haut conserve les cartes complètes et ne compacte que le chrome de la modale. La variante compacte conserve la description et tous les avantages du pack. Le pack populaire conserve son ruban diagonal « Top » historique ; sa réduction est décalée vers la gauche afin de ne jamais passer sous le ruban.
+Sur les viewports ≤ 760 px de haut, `PackageCard.dense` réduit uniquement le rythme vertical pour garder prix et CTA visibles. Le hover ne zoome jamais la carte (translation verticale légère seulement), afin de ne pas rogner les cartes latérales dans la modale à `overflow: hidden`.
+
 **Brand tagline (devise):** « Votre patrimoine immobilier en poche » — single source of truth in `keyhome-frontend-next/src/lib/brand.ts` (`BRAND_TAGLINE`, `BRAND_TITLE_WITH_TAGLINE` for default titles and OG alt text).
 
 ## Remotes
@@ -129,7 +132,7 @@ vendor/bin/rector process --dry-run
 | Paramètre | Valeur |
 |-----------|--------|
 | **FORMAT** | 1080×1350 (ou 1080×1920 story) |
-| **BACKGROUND** | Option lumineuse : fond plein `#F6475F` (panel client) **ou** Style A midnight + glow |
+| **BACKGROUND** | Option lumineuse : fond plein `6475F` (panel client) **ou** Style A midnight + glow |
 | **HEADLINE** | « Votre patrimoine immobilier en poche » |
 | **CTA v4** | Ligne texte **« Accéder à la plateforme »** + **bouton** pilule blanche **`keyhome.app`** (texte rose `#F6475F`) — ne pas inverser |
 | **Features** | Annonces vérifiées · Visites 3D · Location & Vente · Bailleurs certifiés — **sans** « Paiement Mobile Money » sur les visuels |
@@ -166,6 +169,7 @@ vendor/bin/rector process --dry-run
 ### Services (`app/Services/`)
 - `UserProfileService` — public profile assembly, response-time computation, trust-score resolution, unlocked-ads retrieval. Extracted from `UserController` (SRP).
 - `LoginService`, `RegistrationService`, `TokenService`, `ClerkJwtService` — auth flows.
+- **Redirection post-auth frontend** : `keyhome-frontend-next/src/lib/auth/return-to.ts` est la source de vérité pour capturer puis restaurer la page protégée après login, inscription, OTP, OAuth, passkey ou One Tap. Les contextes `client` / `owner` ont des clés `sessionStorage` et des préfixes de routes séparés ; seules les destinations relatives et sûres sont acceptées. `/login` et `/register` doivent appeler `adoptReturnToFromQuery()` avant de retirer `?redirect=` de l’URL, puis `login()` / `finalizeAuth()` consomment la destination.
 - `Payment/PaymentService` — multi-gateway orchestrator. Accepts a primary gateway, optional cross-gateway fallback (mobile money only) and a `array<gateway-name, PaymentGatewayInterface>` registry built by `AppServiceProvider`. Routes each `createPayment()` call via `PaymentMethod::gateway()` lookup; webhook + verify dispatched to `$payment->gateway` for the right impl.
 - `Payment/KpayPaymentService` — Kpay (mobile money / Orange, Cameroun, pawaPay-backed). Hosted GATEWAY checkout redirect, webhook HMAC (`X-KPAY-Signature` on raw body), verify by stored Kpay `pay_*` id.
 - `Payment/FlutterwavePaymentService` — legacy (historical rows + webhook route only; no new MM routing).
@@ -232,7 +236,17 @@ vendor/bin/rector process --dry-run
 - `NaturalSearchRegexParser` — plain-language ad search (regex fallback when all LLM providers fail).
 - `RecommendationEngine` — personalised ad recommendations.
 - `NeighborhoodScorecardService` — location scoring. Overpass query uses `nwr` (node/way/relation) + `out center;` to capture building-mapped POIs (critical for sub-Saharan Africa where shops/schools are mapped as ways). Includes `public_transport` tags and expanded shop/amenity types. Coordinate parser handles both direct `lat/lon` (nodes) and `center.lat/center.lon` (ways/relations).
-- `IsochroneService`, `DirectionsService` — geo/routing.
+- **Référentiel OSM/PostGIS** — commande principale `php artisan geo:refresh-osm {regions?*}` : accepte un ou plusieurs pays (`cameroon france germany`), téléchargement Geofabrik réellement streamé par `curl` vers `.part` (jamais en mémoire PHP), import `osm2pgsql` séquentiel dans le schéma jetable `osm_import`, puis synchronisation idempotente et cumulative vers `city` / `quarter`. `--list` affiche les régions, `--force-download` renouvelle les PBF, `--cleanup` supprime chaque PBF après succès et `--force` autorise l'import en production. `germany-bremen` est le pilote allemand léger. Les trois sous-commandes restent disponibles pour le diagnostic. Voir `docs/architecture/osm-geography-import.md`.
+- **Bootstrap d’une base fraîche** — le `README.md` racine est la procédure officielle : `migrate:fresh --seed` → `geo:refresh-osm ... --cleanup` → `catalog:sync-attributes` → `survey:install-default` → `storage:link` → `meilisearch:sync-settings` → `scout:import`. Les annonces de démonstration restent une étape explicite après l’import géographique (`db:seed --class=MassiveAdSeeder`). Le README contient l’index vérifié des guides sous `docs/`; ne pas réintroduire l’ancienne commande inexistante `app:sync-meilisearch-settings` (utiliser `meilisearch:sync-settings`).
+- **`MassiveAdSeeder`** — crée exactement 10 annonces. Chaque annonce reçoit exactement le même ensemble déterministe de 10 fichiers, sélectionnés parmi `resources/seeder-images/{maison,terrain,chambre,studio,appartement,commercial}/`. Le seeder échoue avant de créer utilisateurs/annonces si moins de 10 images sont disponibles; l’ancien volume `SEED_FAST_MODE` (200/2 000 annonces) n’est plus utilisé.
+- **Création d’annonce bailleur / autosave** — la première auto-sauvegarde conserve son `draftId` dans la page `/owner/ads/new` sans navigation : Next.js 16 intercepte aussi `history.replaceState`, remonte le wizard et ferait perdre les photos/visites 360° encore uniquement en mémoire. Les sauvegardes et la publication mettent ensuite à jour ce brouillon existant; seule une sauvegarde manuelle ayant envoyé les médias redirige vers `/owner/ads/{id}`. `citiesService.list()` déduplique les représentations OSM équivalentes (node/relation) pour tous les autocompletes, et les options React utilisent l’UUID comme clé.
+- Les anciens `CameroonCitiesSeeder`, `CityQuarterCameroonSeeder`, `CitySeeder`, `database/data/cities.sql` et `geo:import-overpass` ont été supprimés. Ne pas les recréer : les données réelles viennent exclusivement du pipeline OSM; les coordonnées minimales conservées dans `AdFactory` servent uniquement aux tests.
+- **Catalogues de référence** — `catalog:sync-attributes` synchronise le catalogue résidentiel professionnel (`--dry-run`, `--fresh`) et `survey:install-default` installe idempotemment le sondage KeyHome avec questions/options. Le catalogue source est `PropertyAttributeCatalog`; justification dans `docs/research/property-attribute-catalog-2026.md`.
+- **Note privée du bien** — `owner_ad_private_notes` stocke sous chiffrement applicatif les coordonnées du propriétaire réel lorsqu’un annonceur agit comme intermédiaire. API dédiée `/api/v1/my/ads/{ad}/private-owner-note`, protégée owner/agent et vérification stricte `ad.user_id`; jamais sérialisée dans `AdResource`, donc invisible aux visiteurs et admins. UI : action « Note privée du bien » dans Mes annonces.
+- `IsochroneService`, `DirectionsService` — geo/routing. `DirectionsService` renvoie le tracé sous `data.geojson` (`FeatureCollection`) avec `summary`, `profile` et `profile_label`. Sur le web, `DirectionsPanel` remplace le tracé et le résumé de `AdLocationMap` quand l’utilisateur sélectionne voiture, marche, vélo ou fauteuil ; le libellé de la carte doit venir de `profile_label`, jamais être codé en dur. Sur `mobile/visitors`, `extractRouteCoords()` extrait la première géométrie `LineString` depuis `geojson.features` pour alimenter la `Polyline` React Native.
+- **Référentiel OpenStreetMap local** — pipeline sans API payante pour l'autocomplétion géographique. `geo:download-osm {region}` télécharge et vérifie le PBF Geofabrik dans `storage/app/private/osm`; `geo:import-osm {region} --force` utilise osm2pgsql Flex (`resources/osm/keyhome-places.lua`) vers le schéma jetable `osm_import`; `geo:sync-osm {region}` upsert de façon idempotente les lieux dans `city`/`quarter`. Les points sont en SRID 4326 et lus via Magellan (`Point::makeGeodetic(lat, lng)` côté PHP; `ST_MakePoint(lng, lat)` côté SQL). `city` et `quarter` conservent `osm_type`+`osm_id`, noms normalisés, type de lieu, source, géométrie et limites. Les quartiers sont rattachés à la localité la plus proche du même pays (75 km max). Les API `/cities?q=&country_code=` et `/quarters?city_id=&q=` utilisent trigrammes, accents normalisés et cache versionné. `DatabaseSeeder` n'injecte plus l'ancien catalogue GeoNames; importer OSM avant de lancer explicitement `MassiveAdSeeder`.
+  - `AdLocationMap` affiche toujours la distance utilisateur–annonce dans la carte : distance ORS pour un itinéraire calculé, distance à vol d'oiseau sinon, et distance approximative vers la zone floutée quand l'annonce est verrouillée (aucune fuite des coordonnées exactes).
+  - Le solde frontend partage la clé React Query `['credits-balance']`. `CreditsWidget` utilise `user.point_balance` pendant la synchronisation, refetch au montage/focus/clic, et ne doit jamais convertir un état inconnu ou une erreur initiale en faux solde `0` ; `PurchaseCreditsModal` reprend le même fallback. Son header réserve au moins 168 px (mobile) / 180 px (desktop) et remonte légèrement le groupe du solde afin que le montant ou son squelette ne soit jamais découpé par la grille des packs.
 - `KeyScoreService` — proprietary property score.
 - `TrustScoreService` — bidirectional user trust score (tenant + landlord, 7 signals each, 0–100).
 - `FeatureFlagService` — runtime feature toggles.
@@ -561,7 +575,7 @@ All prefixed `/api/v1/`: `auth.php`, `ads.php`, `payments.php`, `viewings.php`, 
 `HealthCheckCommand`, `MigrateAdImagesToSpatie`, `ProcessSubscriptionRenewals`, `PurgeExpiredData`,
 `RecalculateQuarterPricing`, `RecomputeTrustScores`, `ResetUserOnboardingCommand`, `SendEngagementEmails`, `SendMonthlyReport`,
 `SendPostViewingThanks`, `SendSearchAlertDigests`, `SendTestPush`, `SendViewingReminders`, `SyncMeilisearchSettings`,
-`TestMultiTenancyFlow`, `UploadAttributesCommand`.
+`TestMultiTenancyFlow`, `SyncPropertyAttributeCatalog`, `InstallDefaultSurvey`, `RefreshOsmPlaces`.
 
 ### Notifications & Mail
 - Notifications support: database, email, web push, WhatsApp (`app/Channels/WhatsAppChannel.php`).

@@ -43,8 +43,8 @@ final class PropertyAttributeImportService
                         [
                             'name' => $attributeData['name'],
                             'property_attribute_category_id' => $category->id,
-                            'icon' => $attributeData['icon'] ?? $categoryData['icon'],
-                            'admin_icon' => $attributeData['admin_icon'] ?? $categoryData['admin_icon'],
+                            'icon' => $attributeData['icon'],
+                            'admin_icon' => $categoryData['admin_icon'],
                             'sort_order' => (($categoryIndex + 1) * 1000) + $attributeIndex + 1,
                             'is_active' => true,
                         ],

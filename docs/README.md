@@ -2,7 +2,7 @@
 
 > **Platform:** Multi-tenant real-estate SaaS for francophone West/Central Africa (XAF/XOF)
 > **Stack:** Laravel 12 · Next.js 16 · Filament 4 · PostgreSQL/PostGIS · MeiliSearch · Flutterwave
-> **Last updated:** May 2026
+> **Last updated:** August 2026
 
 ---
 
@@ -17,6 +17,7 @@ docs/
 │   ├── backend-layers.md
 │   ├── auth-flows.md
 │   ├── payment-system.md
+│   ├── osm-geography-import.md           ← Import villes/quartiers OSM/PostGIS
 │   └── adr/001-flutterwave-only-gateway.md
 │
 ├── infrastructure/                        ← DevOps, CI/CD, déploiement VPS
@@ -101,9 +102,9 @@ docs/
 ### 👶 New Developer
 1. [Architecture Overview](./architecture/overview.md) — understand what you're working with
 2. [`README.md`](../README.md) — root README with install & run commands
-3. [Backend Layers](./architecture/backend-layers.md) — coding conventions & patterns
-4. [Auth Flows](./architecture/auth-flows.md) — how authentication works
-5. [Local Development](./guides/local-development.md) — get running in 15 minutes
+3. [Base fraîche / après une purge](../README.md#base-fraîche--après-une-purge) — migrations, OSM, attributs, sondage et indexation
+4. [Backend Layers](./architecture/backend-layers.md) — coding conventions & patterns
+5. [Auth Flows](./architecture/auth-flows.md) — how authentication works
 
 ### 🔧 Day-to-Day Development
 | Need | Go to |
@@ -112,6 +113,7 @@ docs/
 | Understand auth / roles | [Auth Flows](./architecture/auth-flows.md) |
 | Work on payments | [Payment System](./architecture/payment-system.md) |
 | Work on AI search | [AI Search Guide](./features/ai-search.md) |
+| Import cities and quarters | [OSM/PostGIS Geography](./architecture/osm-geography-import.md) |
 | Work on 360° tours | [Virtual Tours Guide](./features/TOUR_3D_IMPLEMENTATION.md) |
 | Feature flag usage | [`config/features.php`](../config/features.php) |
 

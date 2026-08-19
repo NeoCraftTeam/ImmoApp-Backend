@@ -27,6 +27,28 @@ tours virtuels 360°, intelligence artificielle, alertes de recherche, et plus.
 - Meilisearch
 - Composer
 - Node.js ≥ 18
+- `osm2pgsql` 2.x et `curl` pour importer les villes/quartiers OpenStreetMap
+
+## Documentation
+
+Le présent README est le point d’entrée pour installer le projet et reconstruire
+une base. L’index complet se trouve dans le
+[centre de documentation](docs/README.md).
+
+| Sujet | Documentation |
+|---|---|
+| Architecture générale | [Vue d’ensemble](docs/architecture/overview.md) · [Couches backend](docs/architecture/backend-layers.md) |
+| Authentification et isolation des sessions | [Flux d’authentification](docs/architecture/auth-flows.md) · [Correctif d’isolation](docs/architecture/SESSION_ISOLATION_FIX.md) |
+| Villes, quartiers et coordonnées OSM/PostGIS | [Import géographique OSM](docs/architecture/osm-geography-import.md) |
+| Paiements | [Architecture des paiements](docs/architecture/payment-system.md) · [Guide d’intégration](docs/integrations/payment-integration.md) |
+| Panel bailleur | [Spécification de l’acteur bailleur](docs/Actors/owner.md) |
+| Sondages | [Plan du module sondage](docs/features/5_Survey_Module_Backend_Plan.md) |
+| Attributs immobiliers | [Recherche et catalogue professionnel](docs/research/property-attribute-catalog-2026.md) |
+| Visites et réservations | [Spécification des visites](docs/features/VIEWING_SCHEDULING_SPEC.md) |
+| Tours virtuels 360° | [Guide d’implémentation](docs/features/KeyHome_360_Tour_Implementation_Guide.md) |
+| Déploiement et exploitation | [Documentation des opérations](docs/operations/README.md) · [Installation VPS](docs/infrastructure/DEPLOYEMENT_SETUP_GUIDE.md) |
+| Sécurité | [Vue d’ensemble](docs/security/overview.md) · [Checklist avant déploiement](docs/security/checklist.md) |
+| Fonctionnalités disponibles | [Inventaire KeyHome](docs/LiveDocs/keyhome_feature_inventory.md) |
 
 ## Installation locale
 
@@ -35,10 +57,110 @@ composer install
 npm ci
 cp .env.example .env
 php artisan key:generate
-php artisan migrate --seed
+php artisan migrate
 php artisan storage:link
+```
+
+Configurez PostgreSQL/PostGIS dans `.env`, puis suivez la procédure
+[Base fraîche / après une purge](#base-fraîche--après-une-purge). Le frontend
+Next.js possède ses propres dépendances dans `keyhome-frontend-next/`.
+
+## Base fraîche / après une purge
+
+> `migrate:fresh` supprime toutes les tables et toutes leurs données. Ne lancez
+> cette commande que sur une base que vous avez explicitement décidé de
+> reconstruire. En production, utilisez normalement `php artisan migrate
+> --force`, jamais `migrate:fresh`.
+
+### Procédure recommandée
+
+Après avoir créé une base PostgreSQL vide avec PostGIS, lancez les commandes
+suivantes depuis la racine du backend, sans Laravel Sail :
+
+```bash
+# 1. Recréer le schéma et installer les catalogues de base
+php artisan migrate:fresh --seed
+
+# 2. Importer les villes et quartiers des marchés actifs
+# --cleanup supprime chaque fichier PBF après une synchronisation réussie
+php artisan geo:refresh-osm cameroon germany-bremen --force-download --cleanup
+
+# 3. Vérifier/réconcilier les catalogues administrables (idempotent)
+php artisan catalog:sync-attributes
+php artisan survey:install-default
+
+# 4. Préparer le stockage public
+php artisan storage:link
+
+# 5. Configurer puis reconstruire l’index de recherche
+php artisan meilisearch:sync-settings
 php artisan scout:import "App\Models\Ad"
 ```
+
+`migrate:fresh --seed` installe déjà les types d’annonces, abonnements, packs de
+crédits, boosts, attributs et sondage. Les deux commandes de l’étape 3 sont
+volontairement relancées : elles sont idempotentes et garantissent que les
+catalogues professionnels correspondent à la version actuelle du code.
+
+L’import OSM doit être exécuté après les migrations. Il est cumulatif : importer
+un nouveau pays ne supprime pas les villes déjà synchronisées. Pour afficher les
+régions disponibles :
+
+```bash
+php artisan geo:refresh-osm --list
+```
+
+Exemples selon l’environnement :
+
+```bash
+# Cameroun uniquement
+php artisan geo:refresh-osm cameroon --force-download --cleanup
+
+# Test allemand léger (~20 Mo), recommandé en développement
+php artisan geo:refresh-osm germany-bremen --force-download --cleanup
+
+# Marchés complets — fichiers volumineux, prévoir disque et durée d’import
+php artisan geo:refresh-osm cameroon france germany --force-download --cleanup
+
+# Même opération en production (autorisation explicite requise)
+php artisan geo:refresh-osm cameroon france germany --force-download --cleanup --force
+```
+
+La documentation des fichiers téléchargés, du nettoyage, de PostGIS et de
+l’ordre latitude/longitude est disponible dans le
+[guide OSM/PostGIS](docs/architecture/osm-geography-import.md).
+
+### Données facultatives après reconstruction
+
+```bash
+# Annonces et utilisateurs de démonstration : nécessite d’abord villes/quartiers
+php artisan db:seed --class=MassiveAdSeeder
+
+# Comptes techniques de test (admin, agence, bailleur, client)
+php artisan app:create-test-users
+
+# Administrateur réel, assistant interactif
+php artisan app:create-admin
+```
+
+`MassiveAdSeeder` est volontairement séparé du premier seed lorsque la base ne
+contient pas encore de géographie. Ne l’utilisez pas sur une base de production
+contenant de vraies annonces.
+
+### Référence rapide
+
+| Besoin | Commande | Peut être relancée ? |
+|---|---|---|
+| Purger et reconstruire le schéma | `php artisan migrate:fresh --seed` | Oui, mais détruit toutes les données |
+| Lister les régions OSM | `php artisan geo:refresh-osm --list` | Oui, lecture seule |
+| Importer villes et quartiers | `php artisan geo:refresh-osm <régions> --cleanup` | Oui, synchronisation idempotente |
+| Forcer un nouveau téléchargement OSM | ajouter `--force-download` | Oui |
+| Synchroniser les attributs | `php artisan catalog:sync-attributes` | Oui |
+| Prévisualiser les attributs | `php artisan catalog:sync-attributes --dry-run` | Oui, lecture seule |
+| Remplacer tout le catalogue d’attributs | `php artisan catalog:sync-attributes --fresh` | Destructif pour le catalogue |
+| Installer/actualiser le sondage | `php artisan survey:install-default` | Oui |
+| Créer les annonces de démonstration | `php artisan db:seed --class=MassiveAdSeeder` | Réservé au développement |
+| Recréer l’index des annonces | `php artisan scout:import "App\Models\Ad"` | Oui |
 
 ## Développement
 
@@ -68,6 +190,49 @@ php artisan test --filter="it can login with valid credentials"
 
 Nécessite une base PostgreSQL `testing` (voir `phpunit.xml`).
 Driver Meilisearch : `null` en tests. Clés Flutterwave factices en tests.
+
+## Référentiel géographique OpenStreetMap
+
+Les villes et quartiers ne sont plus injectés par des seeders ou par l'ancien
+fichier `cities.sql`. Le catalogue réel provient des extraits Geofabrik importés
+dans PostgreSQL/PostGIS avec `osm2pgsql`.
+
+```bash
+# Afficher les pays/régions configurés
+php artisan geo:refresh-osm --list
+
+# Télécharger, importer et synchroniser un pays
+php artisan geo:refresh-osm cameroon
+
+# Traiter plusieurs pays successivement sans supprimer les précédents
+php artisan geo:refresh-osm cameroon france germany
+
+# Télécharger à nouveau les PBF avant l'import
+php artisan geo:refresh-osm france germany --force-download
+
+# Supprimer les PBF après chaque synchronisation réussie
+php artisan geo:refresh-osm france germany --force-download --cleanup
+```
+
+En production, ajouter `--force`. Les sous-commandes `geo:download-osm`,
+`geo:import-osm` et `geo:sync-osm` sont réservées au diagnostic et à la reprise
+d'une étape. Documentation détaillée :
+[`docs/architecture/osm-geography-import.md`](docs/architecture/osm-geography-import.md).
+
+### Catalogues administrables
+
+```bash
+# Attributs professionnels des studios, appartements et maisons
+php artisan catalog:sync-attributes --dry-run
+php artisan catalog:sync-attributes
+
+# Sondage KeyHome par défaut avec questions et options
+php artisan survey:install-default
+```
+
+Ces commandes sont idempotentes. `catalog:sync-attributes --fresh` remplace le
+catalogue d’attributs et doit uniquement être utilisé lors d’une reconstruction
+assumée de la base.
 
 ## Linting & Analyse statique
 
@@ -263,36 +428,37 @@ docker compose exec app php artisan app:create-admin
 ### Créer des utilisateurs de démo
 
 ```bash
-php artisan app:create-demo-users
+php artisan app:create-test-users
 # Docker
-docker compose exec app php artisan app:create-demo-users
+docker compose exec app php artisan app:create-test-users
 ```
 
 ### Import des attributs de biens
 
 ```bash
-php artisan make:upload-attributes           # Ajoute/met à jour le catalogue
-php artisan make:upload-attributes --fresh   # Réinitialise et réimporte
+php artisan catalog:sync-attributes           # Ajoute/met à jour le catalogue
+php artisan catalog:sync-attributes --fresh   # Réinitialise et réimporte
 # Docker
-docker compose exec app php artisan make:upload-attributes
+docker compose exec app php artisan catalog:sync-attributes
 ```
 
 ### Meilisearch
 
 ```bash
-php artisan app:sync-meilisearch-settings    # Synchroniser les paramètres d'index
+php artisan meilisearch:sync-settings        # Synchroniser les paramètres d'index
 php artisan scout:import "App\Models\Ad"     # Importer toutes les annonces
 ```
 
 ### Seeding
 
-> Avant le seed, déposez 10–20 images par catégorie dans
+> Avant le seed, déposez au moins 10 images au total dans
 > `resources/seeder-images/{maison,terrain,chambre,studio,appartement,commercial}/`.
-> Formats acceptés : jpg, jpeg, png, webp.
+> Formats acceptés : jpg, jpeg, png, webp. `MassiveAdSeeder` sélectionne les
+> 10 premiers fichiers dans un ordre déterministe et réutilise exactement ce
+> même ensemble pour chacune des 10 annonces.
 
 ```bash
 php artisan migrate:fresh --seed              # Purge et re-seed complet
-# SEED_FAST_MODE=true dans .env → 200 annonces (~10× plus rapide)
 php artisan media-library:regenerate --force  # Régénérer conversions WebP
 ```
 
@@ -517,13 +683,14 @@ Traefik assure le reverse proxy HTTPS (Let's Encrypt) devant le service `web`.
 
 ## Documentation opérationnelle
 
-Voir `.docs/` pour le guide complet :
-
-- `00-conventions-linux.md` — Structure Linux (FHS)
-- `01-migration-serveur.md` — Migration vers un nouveau VPS
-- `02-gitlab-cicd.md` — Pipeline CI/CD GitLab
-- `03-traefik-setup.md` — Reverse proxy & SSL
-- `04-docker-compose-complet.md` — Référence Docker complète
+- [Index complet de la documentation](docs/README.md)
+- [Runbooks et commandes d’exploitation](docs/operations/README.md)
+- [Déploiement](docs/operations/runbooks/deployment.md)
+- [Rollback](docs/operations/runbooks/rollback.md)
+- [Réponse aux incidents](docs/operations/runbooks/incident-response.md)
+- [Configuration préproduction](docs/infrastructure/PREPROD_SETUP.md)
+- [Déploiement Reverb/WebSocket](docs/infrastructure/REVERB_DEPLOY.md)
+- [Monitoring](docs/infrastructure/MONITORING_GUIDE.md)
 
 ## Licence
 

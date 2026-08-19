@@ -39,3 +39,18 @@ export function formatDistance(km: number): string {
 export function walkingMinutes(km: number): number {
   return Math.max(1, Math.round((km / 5) * 60));
 }
+
+export function extractRouteCoords(
+  directions?: import('../hooks/useDirections').DirectionsResponse | null
+): { latitude: number; longitude: number }[] | null {
+  const feature = directions?.data?.geojson?.features?.[0];
+  if (!feature || feature.geometry?.type !== 'LineString') return null;
+  const coords = (feature.geometry as { type: 'LineString'; coordinates: number[][] }).coordinates;
+  if (!coords || coords.length === 0) return null;
+  return coords
+    .map((c: number[]) => ({ latitude: c[1], longitude: c[0] }))
+    .filter(
+      (c): c is { latitude: number; longitude: number } =>
+        typeof c.latitude === 'number' && typeof c.longitude === 'number',
+    );
+}

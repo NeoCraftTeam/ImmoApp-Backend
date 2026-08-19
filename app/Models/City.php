@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Clickbar\Magellan\Data\Geometries\MultiPolygon;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\CityFactory;
 use Eloquent;
@@ -58,9 +59,19 @@ class City extends Model
     protected $fillable = [
         'name',
         'country',
+        'country_code',
+        'admin_area',
+        'display_name',
+        'normalized_name',
         'latitude',
         'longitude',
         'location',
+        'boundary',
+        'osm_type',
+        'osm_id',
+        'place_type',
+        'source',
+        'osm_updated_at',
     ];
 
     protected $hidden = [
@@ -68,15 +79,6 @@ class City extends Model
         'updated_at',
         'deleted_at',
     ];
-
-    /**
-     * Mutator to always set the name attribute
-     * with the first letter in uppercase and the rest in lowercase.
-     */
-    public function setNameAttribute($value): void
-    {
-        $this->attributes['name'] = ucfirst(strtolower((string) $value));
-    }
 
     /**
      * Get all of the quarters for the City
@@ -96,6 +98,9 @@ class City extends Model
     {
         return [
             'location' => Point::class,
+            'boundary' => MultiPolygon::class,
+            'osm_id' => 'integer',
+            'osm_updated_at' => 'datetime',
         ];
     }
 

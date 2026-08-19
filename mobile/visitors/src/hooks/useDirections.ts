@@ -8,14 +8,17 @@ export type DirectionsProfile = 'driving-car' | 'foot-walking' | 'cycling-regula
 export interface DirectionsSummary {
   distance_m: number;
   duration_s: number;
-  profile: DirectionsProfile;
-  cached?: boolean;
+  distance_label: string;
+  duration_label: string;
 }
 
 export interface DirectionsResponse {
   data: {
     summary: DirectionsSummary;
-    geometry?: GeoJSON.LineString | null;
+    geojson?: GeoJSON.FeatureCollection | null;
+    profile: string;
+    profile_label: string;
+    cached?: boolean;
   };
 }
 

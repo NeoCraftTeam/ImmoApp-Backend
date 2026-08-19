@@ -41,11 +41,15 @@ final readonly class IsochroneService
             return null;
         }
 
+        // `number_format` with an explicit decimal point is locale-independent,
+        // unlike `sprintf('%.3f')` which honours `LC_NUMERIC` and would emit a
+        // comma (e.g. `4,051`) under a fr_* runtime locale — silently shifting
+        // every cache key and defeating the cache on such hosts.
         $cacheKey = sprintf(
-            'isochrone_%s_%.3f_%.3f_%d',
+            'isochrone_%s_%s_%s_%d',
             $profile,
-            round($lat, 3),
-            round($lng, 3),
+            number_format(round($lat, 3), 3, '.', ''),
+            number_format(round($lng, 3), 3, '.', ''),
             $rangeMinutes,
         );
 

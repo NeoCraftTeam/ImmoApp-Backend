@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\Ad\AdSimilarController;
 use App\Http\Controllers\Api\V1\Ad\AdStatusController;
 use App\Http\Controllers\Api\V1\Ad\BulkAdController;
 use App\Http\Controllers\Api\V1\Ad\MyAdsController;
+use App\Http\Controllers\Api\V1\Ad\OwnerAdPrivateNoteController;
 use App\Http\Controllers\Api\V1\Geo\NeighborhoodScorecardController;
 use App\Http\Controllers\Api\V1\PrescreeningController;
 use App\Http\Controllers\Api\V1\QrCodeController;
@@ -138,6 +139,9 @@ Route::middleware(['auth:sanctum', 'owner.role', 'panel.role:owner', 'token.role
     Route::get('/{ad}/qr-code/image', [QrCodeController::class, 'adQrImage'])->middleware('throttle:60,1');
     Route::get('/{ad}/placarde', [QrCodeController::class, 'adPlacarde'])->middleware('throttle:20,1');
     Route::get('/{ad}/analytics', [AdAnalyticsController::class, 'show']);
+    Route::get('/{ad}/private-owner-note', [OwnerAdPrivateNoteController::class, 'show']);
+    Route::put('/{ad}/private-owner-note', [OwnerAdPrivateNoteController::class, 'update'])->middleware('throttle:30,1');
+    Route::delete('/{ad}/private-owner-note', [OwnerAdPrivateNoteController::class, 'destroy'])->middleware('throttle:30,1');
 
     // Item 11 — Prescreening questions (landlord manages)
     Route::patch('/{ad}/prescreening', [PrescreeningController::class, 'update'])
