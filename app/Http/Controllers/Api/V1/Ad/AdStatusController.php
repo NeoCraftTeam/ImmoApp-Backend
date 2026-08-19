@@ -10,6 +10,7 @@ use App\Http\Requests\Api\V1\PublishAdRequest;
 use App\Models\Ad;
 use App\Support\AdScoutSync;
 use App\Support\GeoLocation;
+use App\Support\SafeApiMessage;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -115,9 +116,11 @@ final class AdStatusController
                 ],
             ]);
         } catch (InvalidStatusTransitionException $e) {
+            $payload = SafeApiMessage::envelope($e->getMessage(), 'INVALID_STATUS_TRANSITION', 400);
+
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                ...$payload,
             ], 400);
         }
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions\Viewing;
 
+use App\Support\SafeApiMessage;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -16,12 +17,18 @@ class ClientHasActiveReservationForAdException extends \RuntimeException
 
     public function render(): JsonResponse
     {
-        return response()->json([
-            'error' => [
-                'code' => 'CLIENT_ACTIVE_RESERVATION_EXISTS',
-                'message' => $this->getMessage(),
-                'hint' => 'Annulez votre réservation en cours ou attendez la confirmation avant d\'en proposer une autre.',
-            ],
-        ], Response::HTTP_CONFLICT);
+        $payload = SafeApiMessage::envelope(
+            $this->getMessage(),
+            'CLIENT_ACTIVE_RESERVATION_EXISTS',
+            Response::HTTP_CONFLICT,
+            'Annulez votre réservation en cours ou attendez la confirmation avant d\'en proposer une autre.',
+        );
+        $payload['error'] = [
+            'code' => $payload['code'],
+            'message' => $payload['message'],
+            'hint' => $payload['hint'] ?? null,
+        ];
+
+        return response()->json($payload, Response::HTTP_CONFLICT);
     }
 }
