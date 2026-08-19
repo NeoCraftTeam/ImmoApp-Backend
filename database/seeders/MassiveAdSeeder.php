@@ -26,13 +26,9 @@ use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class MassiveAdSeeder extends Seeder
 {
-    private const TOTAL_ADS = 2000;
+    private const TOTAL_ADS = 10;
 
-    private const IMAGES_PER_AD_MIN = 7;
-
-    private const IMAGES_PER_AD_MAX = 10;
-
-    private const SEED_FAST_MODE_DEFAULT = true;
+    private const IMAGES_PER_AD = 10;
 
     /**
      * Maps normalized ad type to folder name in resources/seeder-images/
@@ -52,6 +48,9 @@ class MassiveAdSeeder extends Seeder
     ];
 
     private string $imageBaseDir;
+
+    /** @var string[] */
+    private array $sharedImageFiles = [];
 
     /** @var string[] */
     private array $quarterIds = [];
@@ -105,16 +104,21 @@ class MassiveAdSeeder extends Seeder
     public function run(): void
     {
         $this->imageBaseDir = resource_path('seeder-images');
-        $fastMode = config('seeding.massive_ad_fast_mode', self::SEED_FAST_MODE_DEFAULT);
-        $totalAds = $fastMode ? 200 : self::TOTAL_ADS;
-        $this->command->info('Seeding '.$totalAds.' realistic ads with images...'.($fastMode ? ' (fast mode)' : ''));
+        $this->command->info(sprintf(
+            'Seeding %d realistic ads with the same %d images...',
+            self::TOTAL_ADS,
+            self::IMAGES_PER_AD,
+        ));
 
         $this->ensureImageFoldersExist();
-        $hasImages = !empty($this->getImagesForType('maison'));
-        if (!$hasImages) {
-            $this->command->warn('No seeder images found. Seeding ads without images.');
-            $this->command->line('  To add images: place 10-20 jpg/png/webp per category in:');
-            $this->command->line('  '.$this->imageBaseDir.'/{maison,terrain,chambre,studio,appartement,commercial}/');
+        $this->sharedImageFiles = $this->getSharedSeedImages();
+        if (count($this->sharedImageFiles) < self::IMAGES_PER_AD) {
+            throw new \RuntimeException(sprintf(
+                'MassiveAdSeeder requires at least %d jpg/png/webp files in %s; only %d found.',
+                self::IMAGES_PER_AD,
+                $this->imageBaseDir,
+                count($this->sharedImageFiles),
+            ));
         }
 
         $this->createUsers();
@@ -134,7 +138,7 @@ class MassiveAdSeeder extends Seeder
             }
         });
 
-        $this->createAds($totalAds);
+        $this->createAds();
 
         app()->forgetInstance(FileManipulator::class);
 
@@ -178,6 +182,16 @@ class MassiveAdSeeder extends Seeder
         $this->quarterNames = $quarters->mapWithKeys(
             fn (Quarter $q) => [$q->id => $q->name.', '.$q->city->name]
         )->toArray();
+        foreach ($quarters as $quarter) {
+            $latitude = $quarter->location?->getY() ?? $quarter->latitude;
+            $longitude = $quarter->location?->getX() ?? $quarter->longitude;
+            if ($latitude !== null && $longitude !== null) {
+                $this->quarterCoords[$quarter->id] = [
+                    'lat' => (float) $latitude,
+                    'lng' => (float) $longitude,
+                ];
+            }
+        }
 
         $this->agentIds = User::where('role', UserRole::AGENT)->pluck('id')->toArray();
         $this->typeMap = AdType::pluck('id', 'name')->toArray();
@@ -218,12 +232,14 @@ class MassiveAdSeeder extends Seeder
         }
     }
 
-    private function createAds(int $totalAds = self::TOTAL_ADS): void
+    private function createAds(): void
     {
-        $fastMode = config('seeding.massive_ad_fast_mode', self::SEED_FAST_MODE_DEFAULT);
-        $imgMin = self::IMAGES_PER_AD_MIN;
-        $imgMax = self::IMAGES_PER_AD_MAX;
-        $this->command->info("Creating {$totalAds} ads with {$imgMin}-{$imgMax} images each...");
+        $totalAds = self::TOTAL_ADS;
+        $this->command->info(sprintf(
+            'Creating %d ads with the same %d images each...',
+            $totalAds,
+            self::IMAGES_PER_AD,
+        ));
 
         $typeNames = array_keys($this->typeMap);
         if (empty($typeNames)) {
@@ -232,7 +248,7 @@ class MassiveAdSeeder extends Seeder
             return;
         }
         if (empty($this->quarterIds)) {
-            $this->command->error('No quarters found. Run CameroonCitiesSeeder first.');
+            $this->command->error('No quarters found. Run php artisan geo:refresh-osm cameroon first.');
 
             return;
         }
@@ -247,15 +263,13 @@ class MassiveAdSeeder extends Seeder
 
         $perType = (int) ceil($totalAds / count($typeNames));
         $created = 0;
-        $imageErrors = 0;
 
-        Model::withoutEvents(function () use ($typeNames, $perType, $totalAds, $imgMin, $imgMax, &$created, &$imageErrors, $progress): void {
-            Ad::withoutSyncingToSearch(function () use ($typeNames, $perType, $totalAds, $imgMin, $imgMax, &$created, &$imageErrors, $progress): void {
-                DB::transaction(function () use ($typeNames, $perType, $totalAds, $imgMin, $imgMax, &$created, &$imageErrors, $progress): void {
+        Model::withoutEvents(function () use ($typeNames, $perType, $totalAds, &$created, $progress): void {
+            Ad::withoutSyncingToSearch(function () use ($typeNames, $perType, $totalAds, &$created, $progress): void {
+                DB::transaction(function () use ($typeNames, $perType, $totalAds, &$created, $progress): void {
                     foreach ($typeNames as $typeName) {
                         $count = min($perType, $totalAds - $created);
                         $normalizedType = $this->normalizeTypeName($typeName);
-                        $imageFiles = $this->getImagesForType($normalizedType);
 
                         for ($i = 0; $i < $count; $i++) {
                             $quarterId = $this->quarterIds[array_rand($this->quarterIds)];
@@ -311,18 +325,10 @@ class MassiveAdSeeder extends Seeder
                                 'updated_at' => now()->subDays($daysAgo),
                             ]);
 
-                            $imagesPerAd = mt_rand($imgMin, $imgMax);
-                            $shuffled = $imageFiles;
-                            shuffle($shuffled);
-                            $toAdd = array_slice($shuffled, 0, $imagesPerAd);
-                            foreach ($toAdd as $path) {
-                                try {
-                                    $ad->addMedia($path)
-                                        ->preservingOriginal()
-                                        ->toMediaCollection('images');
-                                } catch (\Exception $e) {
-                                    $imageErrors++;
-                                }
+                            foreach ($this->sharedImageFiles as $path) {
+                                $ad->addMedia($path)
+                                    ->preservingOriginal()
+                                    ->toMediaCollection('images');
                             }
 
                             $this->createReviewsForAd($ad, $daysAgo);
@@ -337,11 +343,7 @@ class MassiveAdSeeder extends Seeder
 
         $progress->finish();
         $this->command->newLine();
-        $msg = "  {$created} ads created";
-        if ($imageErrors > 0) {
-            $msg .= " ({$imageErrors} image errors)";
-        }
-        $this->command->info($msg);
+        $this->command->info("  {$created} ads created with 10 images each");
     }
 
     /**
@@ -364,27 +366,23 @@ class MassiveAdSeeder extends Seeder
     }
 
     /**
+     * Build one deterministic ten-image set reused by every seeded ad.
+     *
      * @return string[]
      */
-    private function getImagesForType(string $normalizedType): array
+    private function getSharedSeedImages(): array
     {
-        $folder = self::TYPE_TO_FOLDER[$normalizedType] ?? 'maison';
-        $dir = $this->imageBaseDir.'/'.$folder;
-        $files = $this->globImages($dir);
-        if (!empty($files)) {
-            return $files;
-        }
-        foreach (array_unique(array_values(self::TYPE_TO_FOLDER)) as $fallback) {
-            if ($fallback === $folder) {
-                continue;
-            }
-            $fallbackFiles = $this->globImages($this->imageBaseDir.'/'.$fallback);
-            if (!empty($fallbackFiles)) {
-                return $fallbackFiles;
-            }
+        $files = [];
+        foreach (array_unique(array_values(self::TYPE_TO_FOLDER)) as $folder) {
+            $files = array_merge(
+                $files,
+                $this->globImages($this->imageBaseDir.'/'.$folder),
+            );
         }
 
-        return [];
+        sort($files, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return array_slice($files, 0, self::IMAGES_PER_AD);
     }
 
     private function normalizeTypeName(string $name): string

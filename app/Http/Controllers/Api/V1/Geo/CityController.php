@@ -15,6 +15,7 @@ use App\Models\City;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 final class CityController
@@ -58,15 +59,17 @@ final class CityController
     public function index(ListCitiesAction $action)
     {
         $search = request('q');
+        $countryCode = request('country_code');
         $perPage = min((int) request('per_page', 50), 100);
 
-        $cacheKey = 'cities:list:'.md5(($search ?? '').':'.$perPage);
+        $catalogVersion = Cache::get('geo:catalog_version', '1');
+        $cacheKey = 'cities:list:'.$catalogVersion.':'.md5(($search ?? '').':'.($countryCode ?? '').':'.$perPage);
         $ttl = $search ? now()->addMinutes(5) : now()->addHour();
 
         $cities = Cache::remember(
             $cacheKey,
             $ttl,
-            fn () => $action->handle($perPage, $search)
+            fn () => $action->handle($perPage, $search, is_string($countryCode) ? $countryCode : null)
         );
 
         return CityResource::collection($cities);
@@ -277,7 +280,6 @@ final class CityController
 
     private function invalidateCityCache(): void
     {
-        Cache::forget('cities:list:'.md5(':50'));
-        Cache::forget('cities:list:'.md5(':100'));
+        Cache::forever('geo:catalog_version', (string) Str::uuid());
     }
 }

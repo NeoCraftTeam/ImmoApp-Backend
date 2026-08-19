@@ -21,8 +21,10 @@ final class QuarterResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'display_name' => $this->display_name ?? $this->name,
             'city_id' => $this->city_id,
             'city_name' => $this->city->name,
+            'place_type' => $this->place_type,
             'latitude' => $lat,
             'longitude' => $lng,
         ];

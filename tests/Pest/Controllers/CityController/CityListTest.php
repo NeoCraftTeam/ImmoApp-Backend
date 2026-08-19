@@ -41,3 +41,30 @@ it('exposes country and coordinates in city resource', function (): void {
         ->assertOk()
         ->assertJsonFragment(['country' => 'Cameroun']);
 });
+
+it('ranks a city before homonymous villages and filters by country', function (): void {
+    City::factory()->create([
+        'name' => 'Douala',
+        'normalized_name' => 'douala',
+        'country_code' => 'CM',
+        'place_type' => 'village',
+    ]);
+    $mainCity = City::factory()->create([
+        'name' => 'Douala',
+        'normalized_name' => 'douala',
+        'country_code' => 'CM',
+        'place_type' => 'city',
+    ]);
+    City::factory()->create([
+        'name' => 'Douala',
+        'normalized_name' => 'douala',
+        'country_code' => 'FR',
+        'place_type' => 'locality',
+    ]);
+
+    $this->actingAs($this->admin)
+        ->getJson('/api/v1/cities?q=douala&country_code=CM')
+        ->assertOk()
+        ->assertJsonCount(2, 'data')
+        ->assertJsonPath('data.0.id', $mainCity->id);
+});

@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\City;
+use App\Models\Quarter;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -12,8 +14,8 @@ class DatabaseSeeder extends Seeder
     /**
      * Seed the application's database.
      *
-     * Optional seeders (not called by default): UserSeeder, AgencySeeder,
-     * PaymentSeeder, CitySeeder. Call them explicitly if needed.
+     * Geographic data now comes from the OSM pipeline. Import and synchronize
+     * it before running MassiveAdSeeder explicitly.
      */
     public function run(): void
     {
@@ -22,10 +24,14 @@ class DatabaseSeeder extends Seeder
             SubscriptionPlanSeeder::class,
             PointSystemSeeder::class,
             BoostPackSeeder::class,
-            CameroonCitiesSeeder::class,
             PropertyAttributeSeeder::class,
-            MassiveAdSeeder::class,
             SurveySeeder::class,
         ]);
+
+        if (City::query()->exists() && Quarter::query()->exists()) {
+            $this->call(MassiveAdSeeder::class);
+        } else {
+            $this->command->warn('Données géographiques absentes : lancez php artisan geo:refresh-osm cameroon avant MassiveAdSeeder.');
+        }
     }
 }

@@ -28,7 +28,20 @@ final class UnlockAdRequest extends FormRequest
     {
         return [
             'ad_id' => ['required', 'uuid', 'exists:ad,id'],
-            'payment_method' => ['required', 'string', Rule::enum(PaymentMethod::class)],
+            // Apple Pay / Google Pay are outcomes resolved from Stripe's
+            // `payment_method_details.card.wallet`, never client-selected: the
+            // caller asks for `card` and Stripe reports the wallet afterwards.
+            // Accepting them here would let a client pin a method the
+            // initiation flow does not route (only `card` enters the Stripe
+            // flow — see PaymentService::initiate()).
+            'payment_method' => [
+                'required',
+                'string',
+                Rule::enum(PaymentMethod::class)->except([
+                    PaymentMethod::ApplePay,
+                    PaymentMethod::GooglePay,
+                ]),
+            ],
         ];
     }
 

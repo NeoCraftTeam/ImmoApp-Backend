@@ -1169,11 +1169,29 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
             $rawPayload['kh_payment_trace'] = $this->buildStripeKhPaymentTrace($intent, $charge);
         }
 
+        $paymentMethod = PaymentMethod::CARD->value;
+        if ($charge?->payment_method_details instanceof StripeObject) {
+            $details = $charge->payment_method_details;
+            $type = (string) ($details->__get('type') ?? $details->type ?? '');
+
+            if ($type === 'card') {
+                $card = $details->card ?? null;
+                $wallet = $card instanceof StripeObject ? ($card->wallet ?? null) : null;
+                $walletType = $wallet instanceof StripeObject ? (string) ($wallet->type ?? '') : '';
+
+                if ($walletType === 'apple_pay') {
+                    $paymentMethod = 'apple_pay';
+                } elseif ($walletType === 'google_pay') {
+                    $paymentMethod = 'google_pay';
+                }
+            }
+        }
+
         return [
             'status' => $normalisedStatus,
             'amount' => $xafAmount,
             'currency' => $expectedCurrency,
-            'payment_method' => PaymentMethod::CARD->value,
+            'payment_method' => $paymentMethod,
             'paid_at' => $stripeStatus === 'succeeded' ? now()->toIso8601String() : null,
             'raw' => $rawPayload,
         ];

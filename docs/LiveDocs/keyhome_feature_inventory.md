@@ -1238,7 +1238,8 @@ All under `app/Notifications/` (many implement `ShouldQueue`; channels: `mail`, 
 | `push:test` | Test Web Push |
 | `meilisearch:sync-settings` | Scout / Meilisearch index settings |
 | `test:tenancy` | Spark / agency vs landlord promotion simulation |
-| `make:upload-attributes` | Seed property attributes catalog |
+| `catalog:sync-attributes` | Synchronise le catalogue professionnel des attributs immobiliers (`--dry-run`, `--fresh`) |
+| `survey:install-default` | Installe le sondage KeyHome par défaut avec ses questions et options |
 
 ---
 

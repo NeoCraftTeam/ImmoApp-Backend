@@ -9,6 +9,8 @@ enum PaymentMethod: string
     case ORANGE_MONEY = 'orange_money';
     case MOBILE_MONEY = 'mobile_money';
     case CARD = 'card';
+    case ApplePay = 'apple_pay';
+    case GooglePay = 'google_pay';
 
     /**
      * Human-readable label (French) for display in emails and invoices.
@@ -19,6 +21,8 @@ enum PaymentMethod: string
             self::ORANGE_MONEY => 'Orange Money',
             self::MOBILE_MONEY => 'MTN Mobile Money',
             self::CARD => 'Carte bancaire',
+            self::ApplePay => 'Apple Pay',
+            self::GooglePay => 'Google Pay',
         };
     }
 
@@ -33,7 +37,9 @@ enum PaymentMethod: string
         return match ($this) {
             self::ORANGE_MONEY,
             self::MOBILE_MONEY => PaymentGateway::Kpay,
-            self::CARD => PaymentGateway::Stripe,
+            self::CARD,
+            self::ApplePay,
+            self::GooglePay => PaymentGateway::Stripe,
         };
     }
 }

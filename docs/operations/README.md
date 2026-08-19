@@ -73,7 +73,7 @@ docker compose exec app php artisan migrate:status
 docker compose exec app php artisan scout:import "App\\Models\\Ad"
 
 # Sync settings
-docker compose exec app php artisan app:sync-meilisearch-settings
+docker compose exec app php artisan meilisearch:sync-settings
 ```
 
 ---

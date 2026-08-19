@@ -337,6 +337,8 @@ final class PaymentPresentation
             return match ($payment->payment_method) {
                 PaymentMethod::ORANGE_MONEY, PaymentMethod::MOBILE_MONEY => 'Mobile',
                 PaymentMethod::CARD => 'Carte',
+                PaymentMethod::ApplePay => 'Apple Pay',
+                PaymentMethod::GooglePay => 'Google Pay',
             };
         }
 

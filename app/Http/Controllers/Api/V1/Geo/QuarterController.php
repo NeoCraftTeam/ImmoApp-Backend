@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\V1\Geo;
 use App\Http\Requests\QuarterRequest;
 use App\Http\Resources\QuarterResource;
 use App\Models\Quarter;
+use App\Support\GeoNameNormalizer;
 use Illuminate\Database\Connection;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -110,7 +111,8 @@ final class QuarterController
         $q = request('q');
         $perPage = min((int) request('per_page', 50), 100);
 
-        $cacheKey = 'quarters:list:'.md5(($cityId ?? '').':'.($q ?? '').':'.$perPage.':'.request('page', 1));
+        $catalogVersion = Cache::get('geo:catalog_version', '1');
+        $cacheKey = 'quarters:list:'.$catalogVersion.':'.md5(($cityId ?? '').':'.($q ?? '').':'.$perPage.':'.request('page', 1));
         $ttl = $q ? now()->addMinutes(5) : now()->addMinutes(30);
 
         $quarter = Cache::remember($cacheKey, $ttl, function () use ($cityId, $q, $perPage) {
@@ -121,10 +123,19 @@ final class QuarterController
             }
 
             if (is_string($q) && strlen($q) >= 2) {
+                $normalized = GeoNameNormalizer::normalize($q);
                 /** @var Connection $connection */
                 $connection = $query->getConnection();
                 $likeOp = $connection->getDriverName() === 'pgsql' ? 'ilike' : 'like';
-                $query->where('name', $likeOp, '%'.$q.'%');
+                $query->where(function ($builder) use ($q, $normalized, $likeOp): void {
+                    $builder
+                        ->where('name', $likeOp, '%'.$q.'%')
+                        ->orWhere('normalized_name', 'like', '%'.$normalized.'%');
+                });
+
+                if ($connection->getDriverName() === 'pgsql') {
+                    $query->orderByRaw('similarity(COALESCE(normalized_name, lower(name)), ?) DESC', [$normalized]);
+                }
             }
 
             return $query->orderBy('name')->paginate($perPage);

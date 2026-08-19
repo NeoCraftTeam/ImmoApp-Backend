@@ -63,13 +63,17 @@ final readonly class DirectionsService
             return null;
         }
 
+        // `number_format` with an explicit decimal point is locale-independent,
+        // unlike `sprintf('%.3f')` which honours `LC_NUMERIC` and would emit a
+        // comma (e.g. `4,051`) under a fr_* runtime locale — silently shifting
+        // every cache key and defeating the cache (see IsochroneService).
         $cacheKey = sprintf(
-            'directions_%s_%.3f_%.3f_%.3f_%.3f',
+            'directions_%s_%s_%s_%s_%s',
             $profile,
-            round($fromLat, 3),
-            round($fromLng, 3),
-            round($toLat, 3),
-            round($toLng, 3),
+            number_format(round($fromLat, 3), 3, '.', ''),
+            number_format(round($fromLng, 3), 3, '.', ''),
+            number_format(round($toLat, 3), 3, '.', ''),
+            number_format(round($toLng, 3), 3, '.', ''),
         );
 
         $cached = Cache::get($cacheKey);

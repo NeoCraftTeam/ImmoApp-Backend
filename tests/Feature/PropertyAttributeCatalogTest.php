@@ -15,7 +15,7 @@ it('imports grouped property attributes with command', function (): void {
     $attributeCount = collect(PropertyAttributeCatalog::categories())
         ->sum(fn (array $category): int => count($category['attributes']));
 
-    $this->artisan('make:upload-attributes')
+    $this->artisan('catalog:sync-attributes')
         ->assertSuccessful();
 
     expect(PropertyAttributeCategory::query()->count())->toBe($categoryCount);
@@ -23,7 +23,7 @@ it('imports grouped property attributes with command', function (): void {
 });
 
 it('returns grouped attributes api payload', function (): void {
-    $this->artisan('make:upload-attributes')
+    $this->artisan('catalog:sync-attributes')
         ->assertSuccessful();
 
     $response = $this->getJson('/api/v1/property-attributes');
@@ -47,7 +47,7 @@ it('returns grouped attributes api payload', function (): void {
 });
 
 it('validates attributes against active catalog values', function (): void {
-    $this->artisan('make:upload-attributes')
+    $this->artisan('catalog:sync-attributes')
         ->assertSuccessful();
 
     $owner = User::factory()->create(['role' => 'agent', 'type' => 'individual']);

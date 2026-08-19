@@ -82,3 +82,34 @@ it('shows apple pay with masked card detail', function (): void {
     expect($row['payment_method_label'])->toBe('Apple Pay');
     expect($row['payment_method_detail'])->toBe('•••• 1881');
 });
+
+it('shows google pay with masked card detail', function (): void {
+    $payment = Payment::factory()->success()->make([
+        'gateway' => 'stripe',
+        'payment_method' => PaymentMethod::CARD->value,
+        'gateway_response' => [
+            'kh_payment_trace' => [
+                'label_fr' => 'Google Pay',
+                'detail_fr' => 'Mastercard · •••• 4444',
+                'stripe_payment_method_type' => 'google_pay',
+            ],
+        ],
+    ]);
+
+    $row = PaymentPresentation::forPayment($payment);
+
+    expect($row['payment_method_label'])->toBe('Google Pay');
+    expect($row['payment_method_detail'])->toBe('•••• 4444');
+});
+
+it('falls back to google pay label when only the enum is set', function (): void {
+    $payment = Payment::factory()->success()->make([
+        'gateway' => 'stripe',
+        'payment_method' => PaymentMethod::GooglePay->value,
+        'gateway_response' => null,
+    ]);
+
+    $row = PaymentPresentation::forPayment($payment);
+
+    expect($row['payment_method_label'])->toBe('Google Pay');
+});
