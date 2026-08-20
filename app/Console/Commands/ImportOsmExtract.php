@@ -44,6 +44,18 @@ final class ImportOsmExtract extends Command
 
         /** @var array<string, mixed> $connection */
         $connection = config('database.connections.'.config('database.default'));
+        $host = $connection['host'] ?? $connection['write']['host'][0] ?? $connection['read']['host'][0] ?? null;
+        if (is_array($host)) {
+            $host = $host[0] ?? null;
+        }
+        // Fallback : DB_URL peut contenir l'hôte quand host n'est pas défini individuellement.
+        if (!is_string($host) || $host === '') {
+            $parsed = $connection['url'] ?? null;
+            if (is_string($parsed) && $parsed !== '') {
+                $host = parse_url($parsed, PHP_URL_HOST) ?: null;
+            }
+            $host ??= '127.0.0.1';
+        }
         $arguments = [
             (string) config('osm.binary'),
             '--create',
@@ -52,7 +64,7 @@ final class ImportOsmExtract extends Command
             '--output=flex',
             '--style='.(string) config('osm.style'),
             '--database='.(string) $connection['database'],
-            '--host='.(string) $connection['host'],
+            '--host='.(string) $host,
             '--port='.(string) $connection['port'],
             '--username='.(string) $connection['username'],
             '--number-processes=4',
