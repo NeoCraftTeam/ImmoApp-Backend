@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\Ad\AdFeedRankingService;
 use App\Services\Ai\RecommendationEngine;
 use App\Support\AdScoutSync;
+use App\Support\SafeApiMessage;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -526,9 +527,11 @@ final class AdController
             ]);
 
         } catch (InvalidStatusTransitionException $e) {
+            $payload = SafeApiMessage::envelope($e->getMessage(), 'INVALID_STATUS_TRANSITION', 422);
+
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                ...$payload,
             ], 422);
         } catch (Throwable $e) {
             $this->log->error('Error updating ad', [

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions\Viewing;
 
+use App\Support\SafeApiMessage;
 use Illuminate\Http\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -16,12 +17,18 @@ class SlotAlreadyReservedException extends \RuntimeException
 
     public function render(): JsonResponse
     {
-        return response()->json([
-            'error' => [
-                'code' => 'SLOT_ALREADY_RESERVED',
-                'message' => $this->getMessage(),
-                'hint' => 'Veuillez sélectionner un autre créneau disponible.',
-            ],
-        ], Response::HTTP_CONFLICT);
+        $payload = SafeApiMessage::envelope(
+            $this->getMessage(),
+            'SLOT_ALREADY_RESERVED',
+            Response::HTTP_CONFLICT,
+            'Veuillez sélectionner un autre créneau disponible.',
+        );
+        $payload['error'] = [
+            'code' => $payload['code'],
+            'message' => $payload['message'],
+            'hint' => $payload['hint'] ?? null,
+        ];
+
+        return response()->json($payload, Response::HTTP_CONFLICT);
     }
 }

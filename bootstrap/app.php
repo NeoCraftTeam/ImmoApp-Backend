@@ -22,6 +22,7 @@ use App\Http\Middleware\RoleScopedSession;
 use App\Http\Middleware\SanitizeInput;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\TouchLastSeen;
+use App\Support\SafeApiMessage;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -207,16 +208,15 @@ return Application::configure(basePath: dirname(__DIR__))
                 $status = 503;
             }
 
+            $rawMessage = $e->getMessage();
             // 422 validation errors carry user-friendly French field-level
             // messages translated by the gateway service (e.g. "La valeur
             // du champ « devise » n'est pas acceptée par Kpay."). On
-            // surface ces messages directement pour que le frontend puisse
-            // afficher le détail au lieu d'un mur générique. Pour les
-            // autres statuts (5xx, etc.) on conserve un message
-            // générique pour ne pas leaker de détails techniques.
-            $message = $status === 422 && $e->getMessage() !== ''
-                ? $e->getMessage()
+            // surface ces messages directly only if sanitized.
+            $candidate = $status === 422 && $rawMessage !== ''
+                ? $rawMessage
                 : 'Une erreur est survenue lors du traitement du paiement.';
+            $message = SafeApiMessage::sanitize($candidate, $status);
 
             return response()->json([
                 'message' => $message,

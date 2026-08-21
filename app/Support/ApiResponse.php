@@ -15,7 +15,8 @@ final class ApiResponse
      */
     public static function success(string $message, ?array $data = null, int $status = 200): JsonResponse
     {
-        $payload = ['success' => true, 'message' => $message];
+        $safeMessage = SafeApiMessage::sanitize($message, $status);
+        $payload = ['success' => true, 'message' => $safeMessage];
 
         if ($data !== null) {
             $payload['data'] = $data;
@@ -31,11 +32,8 @@ final class ApiResponse
      */
     public static function error(string $message, int $status = 400, ?array $errors = null): JsonResponse
     {
-        $payload = ['success' => false, 'message' => $message];
-
-        if ($errors !== null) {
-            $payload['errors'] = $errors;
-        }
+        $envelope = SafeApiMessage::envelope($message, null, $status, null, $errors);
+        $payload = ['success' => false, ...$envelope];
 
         return response()->json($payload, $status);
     }
@@ -47,10 +45,11 @@ final class ApiResponse
      */
     public static function validationError(string $message, array $errors): JsonResponse
     {
+        $envelope = SafeApiMessage::envelope($message, null, 422, null, $errors);
+
         return response()->json([
             'success' => false,
-            'message' => $message,
-            'errors' => $errors,
+            ...$envelope,
         ], 422);
     }
 }

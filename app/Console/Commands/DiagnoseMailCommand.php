@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Symfony\Component\Console\Command\Command as CommandAlias;
 
@@ -78,6 +79,20 @@ class DiagnoseMailCommand extends Command
             $this->warn("  ⚠  QUEUE_CONNECTION={$queue} — mail is dispatched to a queue.");
             $this->line('     A queue worker must be running: php artisan queue:work');
             $this->line('     Or set QUEUE_CONNECTION=sync to send emails inline.');
+            // Validate queue health for non-sync drivers
+            try {
+                $failedCount = (int) DB::table('failed_jobs')->count();
+                if ($failedCount > 0) {
+                    $this->warn("     ⚠  {$failedCount} job(s) currently in failed_jobs — run: php artisan queue:failed");
+                } else {
+                    $this->info('     ✓  No failed jobs.');
+                }
+            } catch (\Throwable $e) {
+                $this->line('     (could not check failed_jobs: '.$e->getMessage().')');
+            }
+            if ($mailer === 'resend' && empty($resendKey)) {
+                $this->error('     ✗  Resend selected but RESEND_KEY empty — queued jobs will fail.');
+            }
         } else {
             $this->info('  ✓  QUEUE_CONNECTION=sync — emails are sent inline (no worker needed).');
         }

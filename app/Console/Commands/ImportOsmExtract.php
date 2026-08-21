@@ -44,6 +44,7 @@ final class ImportOsmExtract extends Command
 
         /** @var array<string, mixed> $connection */
         $connection = config('database.connections.'.config('database.default'));
+        $host = self::resolveDatabaseHost($connection);
         $arguments = [
             (string) config('osm.binary'),
             '--create',
@@ -52,7 +53,7 @@ final class ImportOsmExtract extends Command
             '--output=flex',
             '--style='.(string) config('osm.style'),
             '--database='.(string) $connection['database'],
-            '--host='.(string) $connection['host'],
+            '--host='.$host,
             '--port='.(string) $connection['port'],
             '--username='.(string) $connection['username'],
             '--number-processes=4',
@@ -77,5 +78,37 @@ final class ImportOsmExtract extends Command
         $this->info('Import brut terminé. Lancez geo:sync-osm.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Résout l'hôte de la base pour osm2pgsql.
+     *
+     * Supporte le split read/write pgsql (aucune clé `host` à plat, seulement
+     * `write.host[]`/`read.host[]`), un host fourni sous forme de tableau, et
+     * le fallback `DB_URL`. Retombe sur 127.0.0.1 quand rien ne se résout.
+     *
+     * @param  array<string, mixed>  $connection
+     */
+    public static function resolveDatabaseHost(array $connection): string
+    {
+        $host = $connection['host'] ?? $connection['write']['host'][0] ?? $connection['read']['host'][0] ?? null;
+
+        if (is_array($host)) {
+            $host = $host[0] ?? null;
+        }
+
+        if (is_string($host) && $host !== '') {
+            return $host;
+        }
+
+        $url = $connection['url'] ?? null;
+        if (is_string($url) && $url !== '') {
+            $parsed = parse_url($url, PHP_URL_HOST);
+            if (is_string($parsed) && $parsed !== '') {
+                return $parsed;
+            }
+        }
+
+        return '127.0.0.1';
     }
 }
