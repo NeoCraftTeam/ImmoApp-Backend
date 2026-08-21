@@ -36,16 +36,23 @@ final class SafeApiMessage
         '/\bPostgres(?:ql)?\b/i',
     ];
 
+    /**
+     * Leaked authorization hints (role/panel enumeration). Accented — the `u`
+     * modifier is mandatory: without it preg_match walks the multibyte «é/è»
+     * byte-by-byte and these patterns never match, silently leaking the hint.
+     *
+     * @var string[]
+     */
     private const LEAKY_AUTH_PATTERNS = [
-        '/panneau administrateur/i',
-        '/panneau propri[ée]taire/i',
-        '/panneau bailleur/i',
-        '/acc[èe]s r[ée]serv[ée] aux clients/i',
-        '/acc[èe]s r[ée]serv[ée] aux propri[ée]taires/i',
-        '/r[ée]serv[ée] aux bailleurs/i',
-        '/compte admin/i',
-        '/utilisateur admin/i',
-        '/r[ôo]le utilisateur/i',
+        '/panneau administrateur/iu',
+        '/panneau propri[ée]taire/iu',
+        '/panneau bailleur/iu',
+        '/acc[èe]s r[ée]serv[ée] aux clients/iu',
+        '/acc[èe]s r[ée]serv[ée] aux propri[ée]taires/iu',
+        '/r[ée]serv[ée] aux bailleurs/iu',
+        '/compte admin/iu',
+        '/utilisateur admin/iu',
+        '/r[ôo]le utilisateur/iu',
     ];
 
     private const STATUS_FALLBACKS = [
