@@ -13,7 +13,7 @@ final class SafeApiMessage
      *
      * @var string[]
      */
-    private const UNSAFE_PATTERNS = [
+    private const array UNSAFE_PATTERNS = [
         '/\bapi\/v\d/i',
         '/\broute\b/i',
         '/\bcontroller\b/i',
@@ -43,7 +43,7 @@ final class SafeApiMessage
      *
      * @var string[]
      */
-    private const LEAKY_AUTH_PATTERNS = [
+    private const array LEAKY_AUTH_PATTERNS = [
         '/panneau administrateur/iu',
         '/panneau propri[ée]taire/iu',
         '/panneau bailleur/iu',
@@ -55,7 +55,7 @@ final class SafeApiMessage
         '/r[ôo]le utilisateur/iu',
     ];
 
-    private const STATUS_FALLBACKS = [
+    private const array STATUS_FALLBACKS = [
         400 => 'Requête invalide. Vérifiez les informations saisies et réessayez.',
         401 => 'Vous devez être connecté pour effectuer cette action.',
         403 => "Vous n'avez pas l'autorisation d'effectuer cette action.",
@@ -87,13 +87,7 @@ final class SafeApiMessage
             }
         }
 
-        foreach (self::LEAKY_AUTH_PATTERNS as $pattern) {
-            if (preg_match($pattern, $trimmed) === 1) {
-                return true;
-            }
-        }
-
-        return false;
+        return array_any(self::LEAKY_AUTH_PATTERNS, fn ($pattern) => preg_match($pattern, $trimmed) === 1);
     }
 
     public static function fallbackForStatus(int $status): string
