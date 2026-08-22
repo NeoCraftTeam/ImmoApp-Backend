@@ -43,7 +43,6 @@ RUN apk add --no-cache \
     icu-dev \
     postgresql-dev \
     postgresql-client \
-    osm2pgsql \
     freetype-dev \
     libjpeg-turbo-dev \
     libwebp-dev \
