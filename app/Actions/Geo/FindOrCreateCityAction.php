@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace App\Actions\Geo;
 
+use App\Actions\Geo\Concerns\InteractsWithNominatim;
 use App\Models\City;
 use Clickbar\Magellan\Data\Geometries\Point;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Cherche une ville par nom (insensible à la casse).
@@ -16,7 +15,7 @@ use Illuminate\Support\Facades\Log;
  */
 final class FindOrCreateCityAction
 {
-    private const string NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
+    use InteractsWithNominatim;
 
     /**
      * @param  array{name: string, country?: string|null}  $data
@@ -65,34 +64,21 @@ final class FindOrCreateCityAction
      */
     private function nominatimValidate(string $city, ?string $country): ?array
     {
-        try {
-            $q = $country ? "{$city}, {$country}" : $city;
-            $response = Http::timeout(8)
-                ->withHeaders(['User-Agent' => 'KeyHome/1.0 (contact@keyhome.app)'])
-                ->get(self::NOMINATIM_URL, [
-                    'q' => $q,
-                    'format' => 'json',
-                    'limit' => 1,
-                    'addressdetails' => 1,
-                ]);
+        $q = $country ? "{$city}, {$country}" : $city;
+        $results = $this->nominatimSearch($q, ['addressdetails' => 1]);
 
-            $results = $response->ok() ? $response->json() : [];
-
-            if (!empty($results)) {
-                $hit = $results[0];
-                $address = $hit['address'] ?? [];
-
-                return [
-                    'canonical' => (string) ($hit['name'] ?? $address['city'] ?? $address['town'] ?? $address['village'] ?? $city),
-                    'lat' => (float) $hit['lat'],
-                    'lng' => (float) $hit['lon'],
-                    'country' => $address['country'] ?? null,
-                ];
-            }
-        } catch (\Throwable $e) {
-            Log::warning("FindOrCreateCityAction nominatim: {$e->getMessage()}");
+        if ($results === []) {
+            return null;
         }
 
-        return null;
+        $hit = $results[0];
+        $address = $hit['address'] ?? [];
+
+        return [
+            'canonical' => (string) ($hit['name'] ?? $address['city'] ?? $address['town'] ?? $address['village'] ?? $city),
+            'lat' => (float) $hit['lat'],
+            'lng' => (float) $hit['lon'],
+            'country' => $address['country'] ?? null,
+        ];
     }
 }

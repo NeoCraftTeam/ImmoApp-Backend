@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Http;
 
 beforeEach(function (): void {
     $this->user = User::factory()->create();
+
+    // Disable the OSM ≤1 req/s spacing sleep so the throttle never blocks tests.
+    config(['services.nominatim.min_interval_ms' => 0]);
 });
 
 // ─── FindOrCreateCityAction ───────────────────────────────────────────────────
@@ -67,6 +70,40 @@ it('creates a non-african city (Geneva) with correct coords from nominatim', fun
         ->and($city->latitude)->toBeFloat()
         ->and((float) $city->latitude)->toBeGreaterThan(40.0)
         ->and($city->wasRecentlyCreated)->toBeTrue();
+});
+
+it('caches the nominatim response so a repeated geocode does not hit the network twice', function (): void {
+    Http::fake([
+        '*nominatim*' => Http::response([[
+            'name' => 'Kribi',
+            'lat' => '2.9370',
+            'lon' => '9.9100',
+            'address' => ['country' => 'Cameroun'],
+        ]], 200),
+    ]);
+
+    (new FindOrCreateCityAction)->handle(['name' => 'Kribi']);
+
+    // Remove the row so the DB short-circuit can't mask the cache: the second
+    // handle() must re-geocode "Kribi" and resolve it from the response cache.
+    City::query()->where('name', 'Kribi')->delete();
+
+    (new FindOrCreateCityAction)->handle(['name' => 'Kribi']);
+
+    Http::assertSentCount(1);
+});
+
+it('caches nominatim misses so an unknown place is not re-queried', function (): void {
+    Http::fake(['*nominatim*' => Http::response([], 200)]);
+
+    // The unknown name is never persisted (handle throws before create), so the
+    // second attempt can only avoid a network call via the negative cache.
+    expect(fn () => (new FindOrCreateCityAction)->handle(['name' => 'zzznotacity9999']))
+        ->toThrow(InvalidArgumentException::class);
+    expect(fn () => (new FindOrCreateCityAction)->handle(['name' => 'zzznotacity9999']))
+        ->toThrow(InvalidArgumentException::class);
+
+    Http::assertSentCount(1);
 });
 
 // ─── GeoFindOrCreateController ───────────────────────────────────────────────

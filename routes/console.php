@@ -30,6 +30,9 @@ Schedule::job(CompleteStaleReservationsJob::class)->hourly();
 Schedule::command('backup:clean')->daily()->at('01:00');
 Schedule::command('backup:run')->daily()->at('02:00');
 Schedule::command('model:prune')->daily()->at('04:00');
+// Cap Telescope's storage: even with recording disabled in prod, pruning keeps
+// `telescope_entries` from growing unbounded if the watcher is ever toggled on.
+Schedule::command('telescope:prune --hours=48')->daily()->at('04:15');
 
 // — Automated workflows (Item 25) —
 Schedule::command('app:auto-hide-stale-ads')->dailyAt('03:00');

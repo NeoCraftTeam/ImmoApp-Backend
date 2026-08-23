@@ -636,8 +636,11 @@ class Ad extends Model implements HasMedia
     /**
      * Check if the ad is unlocked for a specific user.
      *
-     * Result is memoized per request in a static array to avoid N+1 queries
-     * when AdResource calls this method multiple times for the same ad/user pair.
+     * Uses a per-request static batch loader keyed by user: the first call for a
+     * given user fires ONE query loading every ad they've unlocked, then every
+     * subsequent ad in the same request (e.g. a full AdResource page) resolves
+     * from the in-memory set. Mirrors {@see isFavoritedBy()} and eliminates the
+     * per-ad `exists()` N+1 AdResource previously triggered on list endpoints.
      */
     public function isUnlockedFor(?User $user): bool
     {
@@ -650,18 +653,17 @@ class Ad extends Model implements HasMedia
             return true;
         }
 
-        /** @var array<string, bool> $cache */
-        static $cache = [];
+        /** @var array<string, array<string, true>> $requestCache */
+        static $requestCache = [];
 
-        $key = $user->id.':'.$this->id;
-
-        if (!array_key_exists($key, $cache)) {
-            $cache[$key] = UnlockedAd::where('user_id', $user->id)
-                ->where('ad_id', $this->id)
-                ->exists();
+        if (!array_key_exists($user->id, $requestCache)) {
+            $requestCache[$user->id] = array_fill_keys(
+                UnlockedAd::where('user_id', $user->id)->pluck('ad_id')->all(),
+                true,
+            );
         }
 
-        return $cache[$key];
+        return isset($requestCache[$user->id][$this->id]);
     }
 
     /**
