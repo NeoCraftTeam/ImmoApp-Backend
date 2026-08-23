@@ -28,6 +28,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use OpenApi\Annotations as OA;
@@ -123,76 +124,93 @@ final class PaymentController
             $redirectUrl = (string) $validated['callback_url'];
         }
 
+        // Idempotency guard: a double-click / retry must not create duplicate
+        // PENDING payments for the same purchase.
+        $lock = Cache::lock(
+            'payment:initiate:'.$user->id.':'.$type.':'.($validated['plan_id'] ?? $validated['agency_id'] ?? 'na'),
+            15,
+        );
+
+        if (!$lock->get()) {
+            return response()->json([
+                'message' => 'Paiement en cours de traitement, veuillez patienter.',
+            ], 409);
+        }
+
         // Wrap promo code validation + payment creation in a single transaction
         // to prevent race conditions on single-use promo codes.
-        return DB::transaction(function () use ($validated, $user, $type, $amount, $stripeHosted, $redirectUrl): JsonResponse {
-            $appliedPromoCode = null;
-            $finalAmount = $amount;
+        try {
+            return DB::transaction(function () use ($validated, $user, $type, $amount, $stripeHosted, $redirectUrl): JsonResponse {
+                $appliedPromoCode = null;
+                $finalAmount = $amount;
 
-            if (!empty($validated['promo_code'])) {
-                $promoCode = PromoCode::where('code', strtoupper((string) $validated['promo_code']))
-                    ->lockForUpdate()
-                    ->first();
+                if (!empty($validated['promo_code'])) {
+                    $promoCode = PromoCode::where('code', strtoupper((string) $validated['promo_code']))
+                        ->lockForUpdate()
+                        ->first();
 
-                if ($promoCode && $promoCode->isValidForUser($user, $type)) {
-                    $finalAmount = max(0.0, $finalAmount - $promoCode->calculateDiscount($finalAmount));
-                    $appliedPromoCode = $promoCode;
+                    if ($promoCode && $promoCode->isValidForUser($user, $type)) {
+                        $finalAmount = max(0.0, $finalAmount - $promoCode->calculateDiscount($finalAmount));
+                        $appliedPromoCode = $promoCode;
+                    }
                 }
-            }
 
-            $description = match ($type) {
-                'subscription' => 'Abonnement agence',
-                'credit' => 'Achat de crédits',
-                default => 'Paiement KeyHome',
-            };
+                $description = match ($type) {
+                    'subscription' => 'Abonnement agence',
+                    'credit' => 'Achat de crédits',
+                    default => 'Paiement KeyHome',
+                };
 
-            $result = $this->paymentService->createPayment($user, [
-                'amount' => $finalAmount,
-                'type' => $type,
-                'payment_method' => $validated['payment_method'] ?? 'mobile_money',
-                'phone_number' => $validated['phone_number'] ?? null,
+                $result = $this->paymentService->createPayment($user, [
+                    'amount' => $finalAmount,
+                    'type' => $type,
+                    'payment_method' => $validated['payment_method'] ?? 'mobile_money',
+                    'phone_number' => $validated['phone_number'] ?? null,
 
-                'agency_id' => $validated['agency_id'] ?? null,
-                'plan_id' => $validated['plan_id'] ?? null,
-                'period' => $validated['period'] ?? null,
-                'description' => $description,
-                'redirect_url' => $redirectUrl,
-                'save_payment_method' => (bool) ($validated['save_payment_method'] ?? false),
-                'payment_method_id' => isset($validated['payment_method_id']) && is_string($validated['payment_method_id']) && $validated['payment_method_id'] !== ''
-                    ? $validated['payment_method_id']
-                    : null,
-                'stripe_hosted' => $stripeHosted,
-                'meta' => [
-                    'package_id' => ($type === 'credit') ? ($validated['plan_id'] ?? null) : null,
-                ],
-            ]);
-
-            if ($appliedPromoCode !== null) {
-                PromoCodeUsage::create([
-                    'promo_code_id' => $appliedPromoCode->id,
-                    'user_id' => $user->id,
-                    'payment_id' => $result['payment']->id,
+                    'agency_id' => $validated['agency_id'] ?? null,
+                    'plan_id' => $validated['plan_id'] ?? null,
+                    'period' => $validated['period'] ?? null,
+                    'description' => $description,
+                    'redirect_url' => $redirectUrl,
+                    'save_payment_method' => (bool) ($validated['save_payment_method'] ?? false),
+                    'payment_method_id' => isset($validated['payment_method_id']) && is_string($validated['payment_method_id']) && $validated['payment_method_id'] !== ''
+                        ? $validated['payment_method_id']
+                        : null,
+                    'stripe_hosted' => $stripeHosted,
+                    'meta' => [
+                        'package_id' => ($type === 'credit') ? ($validated['plan_id'] ?? null) : null,
+                    ],
                 ]);
-                $appliedPromoCode->increment('used_count');
-            }
 
-            return response()->json([
-                'reference' => $result['payment']->id,
-                'payment_link' => $result['link'],
-                'tx_ref' => $result['tx_ref'],
-                'gateway' => $result['gateway'],
-                // The orchestrator already mapped the gateway's reply onto
-                // the internal Payment status (PENDING / SUCCESS / FAILED /
-                // CANCELLED) when Stripe could short-circuit the flow
-                // (saved card off-session). Surface the same value here
-                // so the frontend can skip the verify poll on instant
-                // success / failure.
-                'status' => $result['status'],
-                // Stripe-only: tells the frontend which SDK flow to use for
-                // the `payment_link` secret ('checkout_session' or 'payment_intent').
-                'stripe_flow' => $result['stripe_flow'] ?? null,
-            ]);
-        });
+                if ($appliedPromoCode !== null) {
+                    PromoCodeUsage::create([
+                        'promo_code_id' => $appliedPromoCode->id,
+                        'user_id' => $user->id,
+                        'payment_id' => $result['payment']->id,
+                    ]);
+                    $appliedPromoCode->increment('used_count');
+                }
+
+                return response()->json([
+                    'reference' => $result['payment']->id,
+                    'payment_link' => $result['link'],
+                    'tx_ref' => $result['tx_ref'],
+                    'gateway' => $result['gateway'],
+                    // The orchestrator already mapped the gateway's reply onto
+                    // the internal Payment status (PENDING / SUCCESS / FAILED /
+                    // CANCELLED) when Stripe could short-circuit the flow
+                    // (saved card off-session). Surface the same value here
+                    // so the frontend can skip the verify poll on instant
+                    // success / failure.
+                    'status' => $result['status'],
+                    // Stripe-only: tells the frontend which SDK flow to use for
+                    // the `payment_link` secret ('checkout_session' or 'payment_intent').
+                    'stripe_flow' => $result['stripe_flow'] ?? null,
+                ]);
+            });
+        } finally {
+            $lock->release();
+        }
     }
 
     /**
