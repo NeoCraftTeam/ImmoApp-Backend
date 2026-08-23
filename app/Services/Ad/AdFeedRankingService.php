@@ -10,6 +10,7 @@ use App\Models\Ad;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Distributes a candidate pool of ads across a Facebook-style feed.
@@ -190,8 +191,13 @@ final class AdFeedRankingService
             return;
         }
 
-        RecordSponsoredImpressionsJob::dispatch($rows, Auth::id() !== null ? (string) Auth::id() : null)
-            ->onQueue('telemetry');
+        // A fresh batch id per render keys the job's idempotency guard, so a
+        // queue retry or at-least-once redelivery records this page exactly once.
+        RecordSponsoredImpressionsJob::dispatch(
+            $rows,
+            Auth::id() !== null ? (string) Auth::id() : null,
+            (string) Str::uuid(),
+        )->onQueue('telemetry');
     }
 
     /**
