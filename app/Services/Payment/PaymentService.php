@@ -32,6 +32,8 @@ use Illuminate\Support\Str;
  */
 final readonly class PaymentService
 {
+    private const int VERIFY_THROTTLE_SECONDS = 5;
+
     /** @var array<string, PaymentGatewayInterface> */
     private array $registry;
 
@@ -272,8 +274,13 @@ final readonly class PaymentService
      * Verify a payment model instance and sync its status.
      *
      * Uses a DB lock to prevent race conditions with concurrent webhook processing.
+     *
+     * When $useVerifyThrottle is true (client polling), the outbound gateway
+     * verify is coalesced to at most once per tx_ref per VERIFY_THROTTLE_SECONDS
+     * window; the reconciliation cron and admin tools leave it false so they
+     * always re-query the gateway.
      */
-    public function syncPaymentStatus(Payment $payment, ?string $gatewayReferenceOverride = null): Payment
+    public function syncPaymentStatus(Payment $payment, ?string $gatewayReferenceOverride = null, bool $useVerifyThrottle = false): Payment
     {
         // Re-query Kpay when locally FAILED/CANCELLED — sandbox may have
         // completed after an early verify (wrong ref or race). SUCCESS/REFUNDED
@@ -284,6 +291,17 @@ final readonly class PaymentService
 
         if (!$payment->transaction_id) {
             return $payment;
+        }
+
+        // Coalesce client polling: within a short window, skip the outbound
+        // gateway verify (2–5 s round-trip) and return the freshest DB state.
+        // Webhooks keep the row current in real time, so a success is never
+        // masked — this only throttles the redundant gateway calls triggered
+        // by multiple tabs/devices polling the same tx_ref. Opt-in, so the
+        // reconciliation cron and admin tools always hit the gateway.
+        if ($useVerifyThrottle
+            && !Cache::add('payment:verify-throttle:'.$payment->transaction_id, true, self::VERIFY_THROTTLE_SECONDS)) {
+            return $payment->refresh();
         }
 
         // Verify with the gateway that originally handled the payment, not

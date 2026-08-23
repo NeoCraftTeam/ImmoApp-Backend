@@ -312,6 +312,7 @@ final class CreditController
         $synced = $this->paymentService->syncPaymentStatus(
             $payment,
             $validated['reference'] ?? null,
+            useVerifyThrottle: true,
         );
 
         if ($synced->status === PaymentStatus::PENDING && !empty($validated['gateway_redirect_status'])) {

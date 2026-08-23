@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Contracts\FirebaseMessagingResolverInterface;
 use App\Enums\UserRole;
 use App\Models\FcmToken;
 use App\Models\Message;
@@ -15,7 +16,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Kreait\Firebase\Exception\Messaging\NotFound;
-use Kreait\Firebase\Factory;
 use Kreait\Firebase\Messaging\AndroidConfig;
 use Kreait\Firebase\Messaging\ApnsConfig;
 use Kreait\Firebase\Messaging\CloudMessage;
@@ -42,7 +42,7 @@ final class SendChatPushNotificationJob implements ShouldQueue
         $this->onQueue('notifications');
     }
 
-    public function handle(): void
+    public function handle(FirebaseMessagingResolverInterface $firebase): void
     {
         $message = Message::withTrashed()->find($this->messageId);
 
@@ -79,22 +79,12 @@ final class SendChatPushNotificationJob implements ShouldQueue
         $basePath = $isOwnerPanel ? '/owner/messages' : '/messages';
         $conversationUrl = $basePath.'/'.$message->conversation_id;
 
-        $credentialsPath = (string) config('chat.firebase.credentials');
-        if (!file_exists(storage_path('../'.ltrim($credentialsPath, '/')))) {
-            $credentialsPath = storage_path('app/firebase-credentials.json');
-        }
-
-        if (!file_exists($credentialsPath)) {
-            Log::warning('[FCM] Firebase credentials not found. Skipping push notification.', [
-                'path' => $credentialsPath,
-            ]);
-
-            return;
-        }
-
         try {
-            $factory = (new Factory)->withServiceAccount($credentialsPath);
-            $messaging = $factory->createMessaging();
+            $messaging = $firebase->make();
+
+            if ($messaging === null) {
+                return;
+            }
 
             $invalidTokenIds = [];
 

@@ -237,6 +237,7 @@ final class PaymentController
         $payment = $this->paymentService->syncPaymentStatus(
             $payment,
             $validated['reference'] ?? null,
+            useVerifyThrottle: true,
         );
 
         if ($payment->status === PaymentStatus::PENDING && !empty($validated['gateway_redirect_status'])) {
@@ -307,6 +308,7 @@ final class PaymentController
             $payment = $this->paymentService->syncPaymentStatus(
                 $payment,
                 PaymentTransactionLookup::isGatewayReference($txRef) ? $txRef : null,
+                useVerifyThrottle: true,
             );
 
             if ($payment->status === PaymentStatus::PENDING && is_string($redirectStatus) && $redirectStatus !== '') {

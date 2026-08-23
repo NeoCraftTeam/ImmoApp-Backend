@@ -237,6 +237,124 @@ it('should fire PaymentSucceeded event only once for duplicate webhooks', functi
     Event::assertDispatchedTimes(PaymentSucceeded::class, 1);
 });
 
+// ─── THROTTLE VÉRIFICATION ───────────────────────────────────────────────
+
+it('coalesces repeated client polls into a single gateway verify call', function (): void {
+    Http::fake([
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_THROTTLE_A',
+            'reference' => 'KPAY-THROTTLE-A',
+            'status' => 'PENDING',
+            'amount' => 10000,
+            'currency' => 'XAF',
+        ], 200),
+    ]);
+
+    $payment = Payment::factory()->pending()->create([
+        'gateway' => 'kpay',
+        'amount' => 10000,
+        'gateway_response' => ['kpay_id' => 'pay_THROTTLE_A'],
+    ]);
+
+    $service = app(PaymentService::class);
+
+    // Three near-simultaneous polls for the same transaction: only the first
+    // reaches the gateway, the rest are served from the throttle window.
+    $service->syncPaymentStatus($payment, useVerifyThrottle: true);
+    $service->syncPaymentStatus($payment, useVerifyThrottle: true);
+    $result = $service->syncPaymentStatus($payment, useVerifyThrottle: true);
+
+    expect($result->status)->toBe(PaymentStatus::PENDING);
+    Http::assertSentCount(1);
+});
+
+it('always hits the gateway when the verify throttle is not opted in', function (): void {
+    Http::fake([
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_THROTTLE_B',
+            'reference' => 'KPAY-THROTTLE-B',
+            'status' => 'PENDING',
+            'amount' => 10000,
+            'currency' => 'XAF',
+        ], 200),
+    ]);
+
+    $payment = Payment::factory()->pending()->create([
+        'gateway' => 'kpay',
+        'amount' => 10000,
+        'gateway_response' => ['kpay_id' => 'pay_THROTTLE_B'],
+    ]);
+
+    $service = app(PaymentService::class);
+
+    // Reconciliation cron / Filament path: every call must reach the gateway.
+    $service->syncPaymentStatus($payment);
+    $service->syncPaymentStatus($payment);
+
+    Http::assertSentCount(2);
+});
+
+it('verifies again once the throttle window has elapsed', function (): void {
+    Http::fake([
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_THROTTLE_C',
+            'reference' => 'KPAY-THROTTLE-C',
+            'status' => 'PENDING',
+            'amount' => 10000,
+            'currency' => 'XAF',
+        ], 200),
+    ]);
+
+    $payment = Payment::factory()->pending()->create([
+        'gateway' => 'kpay',
+        'amount' => 10000,
+        'gateway_response' => ['kpay_id' => 'pay_THROTTLE_C'],
+    ]);
+
+    $service = app(PaymentService::class);
+
+    $service->syncPaymentStatus($payment, useVerifyThrottle: true);
+    $this->travel(6)->seconds();
+    $service->syncPaymentStatus($payment, useVerifyThrottle: true);
+
+    Http::assertSentCount(2);
+});
+
+it('surfaces a webhook-driven success even while a poll is throttled', function (): void {
+    Http::fake([
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_THROTTLE_D',
+            'reference' => 'KPAY-THROTTLE-D',
+            'status' => 'PENDING',
+            'amount' => 10000,
+            'currency' => 'XAF',
+        ], 200),
+    ]);
+
+    $payment = Payment::factory()->pending()->create([
+        'gateway' => 'kpay',
+        'amount' => 10000,
+        'gateway_response' => ['kpay_id' => 'pay_THROTTLE_D'],
+    ]);
+
+    $service = app(PaymentService::class);
+
+    // First poll arms the throttle window (gateway still says PENDING).
+    $service->syncPaymentStatus($payment, useVerifyThrottle: true);
+
+    // The signed webhook lands out-of-band and promotes the row in the DB
+    // without touching our in-memory instance.
+    Payment::query()->whereKey($payment->id)->update([
+        'status' => PaymentStatus::SUCCESS->value,
+    ]);
+
+    // A throttled poll must still reflect the fresh DB state, never mask it.
+    $result = $service->syncPaymentStatus($payment, useVerifyThrottle: true);
+
+    expect($result->status)->toBe(PaymentStatus::SUCCESS);
+    Http::assertSentCount(1);
+});
+
 // ─── SÉCURITÉ MÉTIER ─────────────────────────────────────────────────────
 
 it('should prevent user from verifying another users payment', function (): void {
