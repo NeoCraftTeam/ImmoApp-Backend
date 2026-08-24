@@ -21,11 +21,20 @@
 |---|---|---|
 | Scout : `toSearchableArray`, `shouldBeSearchable`, `makeAllSearchableUsing`, `isFurnishedForSearch` (~85 l) | `app/Models/Concerns/AdSearchable.php` *(nouveau)* | déplacement, API stable |
 | Audience : `isFavoritedBy`, `loadFavoritedIds`, `isUnlockedFor`, `getAccessibleImages`, `recentViewCount` (~120 l) | `app/Models/Concerns/InteractsWithAudience.php` *(nouveau)* | déplacement, API stable |
-| Boost : `boost`, `unboost`, `isBoosted` | `AdBoostService` *(existe)* | logique → service |
-| Ranking : `computeRelevanceScore`, `computeRankingScore`, `recordImpression` | `AdFeedRankingService` *(existe)* | logique → service |
-| Tier : `sponsorshipTier`, `rankingMultiplier`, `syncSponsorshipTier`, memo `setAttribute` | enum `SponsorshipTier` + accessors fins | math → enum |
-| `getPublisherName` | `AdResource` *(existe)* | présentation → resource |
-| `isCurrentlyAvailable` / `setAvailability` | dédupliqué avec le scope `currentlyAvailable` | DRY |
+| Boost : `boost`, `unboost`, `isBoosted` | `app/Models/Concerns/HasBoostState.php` *(nouveau)* | déplacement, API stable |
+| Score de pertinence Meilisearch : `computeRelevanceScore` | `Concerns/AdSearchable` | reste avec le document de recherche |
+| Ranking feed : `computeRankingScore` (→ `rankingScore`), `recordImpression` (singulier) | `AdFeedRankingService` *(existe)* | logique → service (0 appelant prod) |
+| Tier : `sponsorshipTier`, `rankingMultiplier`, `syncSponsorshipTier`, memo `setAttribute` | `app/Models/Concerns/HasSponsorshipTier.php` *(nouveau)* — s'appuie sur l'enum `SponsorshipTier::fromFlags()/multiplier()` | déplacement, API stable |
+| `getPublisherName` | `AdResource::resolvePublisherName()` *(existe)* | présentation → resource |
+| `isCurrentlyAvailable` / `setAvailability` | **conservés sur `Ad`** | voir « Écarts vs plan initial » |
+
+### Écarts vs plan initial
+
+La carte d'appelants a fait pencher trois blocs vers un **concern** plutôt qu'un service, pour préserver l'API publique du modèle sans réécrire les nombreux appelants :
+
+- **Boost** (`isBoosted` ~20 appelants) et **Tier** (accessors mémoïsés + invalidation `setAttribute`) sont des **helpers d'état d'instance** à fan-out élevé : les déplacer dans un service aurait cassé chaque `$ad->isBoosted()` / `$ad->sponsorshipTier()`. Extraits en concerns (`HasBoostState`, `HasSponsorshipTier`) → corps hors du god model, signatures identiques.
+- **`computeRelevanceScore`** est le score de pertinence *Meilisearch* : sa place naturelle est le concern qui construit le document (`AdSearchable`), pas le service de ranking du feed. Seuls `computeRankingScore` (renommé `rankingScore`) et `recordImpression` (singulier, 0 appelant prod) ont rejoint `AdFeedRankingService`.
+- **`isCurrentlyAvailable` / `setAvailability` conservés** : un check de dates sur instance et un scope de requête (`currentlyAvailable`) ne partagent pas de logique factorisable sans inventer un helper commun → **YAGNI**, et dédupliquer aurait risqué un changement de comportement. Déviation assumée.
 
 ## Ce qui RESTE sur `Ad` (cœur du modèle)
 
@@ -49,12 +58,12 @@ Arbitrée par la **carte d'appelants** établie avant tout déplacement :
 
 0. **Cartographier les appelants** (subagents) + inspecter l'API des services/enum/Resource cibles.
 1. Tests de caractérisation manquants.
-2. Scout → `Concerns/AdSearchable`.
+2. Scout → `Concerns/AdSearchable` (dont `computeRelevanceScore`).
 3. Audience → `Concerns/InteractsWithAudience`.
-4. Boost → `AdBoostService`.
-5. Ranking → `AdFeedRankingService`.
-6. Tier → enum `SponsorshipTier` (+ accessors fins).
-7. `getPublisherName` → `AdResource` ; dédup disponibilité.
+4. Boost → `Concerns/HasBoostState`.
+5. Ranking feed (`rankingScore`, `recordImpression`) → `AdFeedRankingService` ; tests basculés.
+6. Tier → `Concerns/HasSponsorshipTier` (mémoïsation + invalidation `setAttribute`, math dans l'enum `SponsorshipTier`).
+7. `getPublisherName` → `AdResource::resolvePublisherName()` ; `isCurrentlyAvailable`/`setAvailability` conservés (cf. écarts).
 8. `pint --dirty` + gate 6/6 + commit(s)+push.
 
 ## Hors périmètre (vagues suivantes)

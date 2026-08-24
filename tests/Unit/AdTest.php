@@ -59,3 +59,23 @@ test('isUnlockedFor batches the unlocked lookup into a single query per user', f
     expect($results)->toBe([true, true, false])
         ->and($unlockedAdQueries)->toHaveCount(1);
 });
+
+test('toSearchableArray exposes the expected search document shape', function (): void {
+    $ad = Ad::factory()->create();
+    $ad->load(['quarter.city', 'ad_type']);
+
+    $doc = $ad->toSearchableArray();
+
+    expect($doc)->toHaveKeys([
+        'id',
+        'title',
+        'description',
+        'price',
+        'is_furnished',
+        'relevance_score',
+        'is_boosted',
+        'attributes',
+    ])
+        ->and($doc['relevance_score'])->toBeInt()
+        ->and($doc['is_furnished'])->toBeBool();
+});

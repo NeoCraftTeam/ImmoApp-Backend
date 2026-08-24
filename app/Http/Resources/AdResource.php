@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Resources;
 
+use App\Enums\UserType;
 use App\Models\Ad;
 use App\Models\Agency;
 use App\Models\Setting;
@@ -175,7 +176,7 @@ final class AdResource extends JsonResource
                 ];
             }),
             'agency' => new AgencyResource($this->whenLoaded('agency')),
-            'published_by' => $this->getPublisherName(),
+            'published_by' => $this->resolvePublisherName(),
             'quarter' => new QuarterResource($this->whenLoaded('quarter')),
             'type' => new AdTypeResource($this->whenLoaded('ad_type')),
             'images' => $accessibleImages->map(fn ($media) => [
@@ -209,6 +210,35 @@ final class AdResource extends JsonResource
         $score = $cached['score'] ?? null;
 
         return is_int($score) ? $score : null;
+    }
+
+    /**
+     * Resolve the display name of the ad's publisher: the agency name when
+     * the owner is an agency account, otherwise the owner's full name.
+     */
+    private function resolvePublisherName(): string
+    {
+        if (!$this->relationLoaded('user')) {
+            return '';
+        }
+
+        $user = $this->user;
+
+        // Si l'utilisateur est de type AGENCY, on essaie de retourner le nom de son agence
+        if ($user && $user->type === UserType::AGENCY) {
+            $agency = $this->agency;
+            if ($agency instanceof Agency) {
+                return $agency->name;
+            }
+
+            $userAgency = $user->agency;
+            if ($userAgency instanceof Agency) {
+                return $userAgency->name;
+            }
+        }
+
+        // Sinon ou par défaut, on retourne le nom personnel
+        return $user ? "{$user->firstname} {$user->lastname}" : 'Anonyme';
     }
 
     private function buildSeoTitle(): string
