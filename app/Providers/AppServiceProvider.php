@@ -26,6 +26,7 @@ use App\Services\Payment\KpayPaymentService;
 use App\Services\Payment\PaymentMethodGateService;
 use App\Services\Payment\PaymentService;
 use App\Services\Payment\StripePaymentService;
+use App\Services\Payment\StripeSavedCardService;
 use App\Services\Rental\ReservationService;
 use App\Services\Rental\ViewingScheduleService;
 use App\Services\Trust\TrustScoreService;
@@ -73,7 +74,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(AiSearchServiceInterface::class, AiSearchService::class);
         $this->app->bind(RecommendationEngineInterface::class, RecommendationEngine::class);
         $this->app->bind(TrustScoreServiceInterface::class, TrustScoreService::class);
-        $this->app->bind(StripeSavedCardServiceInterface::class, StripePaymentService::class);
+        $this->app->bind(StripeSavedCardServiceInterface::class, StripeSavedCardService::class);
 
         // WebAuthn: use cache (Redis) for challenge storage instead of session.
         // The default SessionChallengeRepository breaks with SESSION_DRIVER=cookie

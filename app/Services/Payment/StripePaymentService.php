@@ -5,21 +5,19 @@ declare(strict_types=1);
 namespace App\Services\Payment;
 
 use App\Contracts\PaymentGatewayInterface;
-use App\Contracts\StripeSavedCardServiceInterface;
 use App\Enums\PaymentGateway;
 use App\Enums\PaymentMethod;
 use App\Exceptions\InvalidWebhookSignatureException;
 use App\Exceptions\PaymentGatewayException;
 use App\Exceptions\StripeCustomerMissingException;
+use App\Support\StripeClientFactory;
+use App\Support\StripePaymentTrace;
 use App\Support\XafEurConverter;
 use Illuminate\Support\Facades\Log;
-use Laravel\Cashier\Cashier;
-use Stripe\ApiRequestor;
 use Stripe\Charge;
 use Stripe\Checkout\Session as CheckoutSession;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Exception\SignatureVerificationException;
-use Stripe\HttpClient\CurlClient as StripeCurlClient;
 use Stripe\PaymentIntent;
 use Stripe\Refund;
 use Stripe\StripeClient;
@@ -42,51 +40,13 @@ use Stripe\Webhook;
  * in `metadata.tx_ref` so the webhook can locate the local `Payment` row
  * regardless of retries.
  */
-final readonly class StripePaymentService implements PaymentGatewayInterface, StripeSavedCardServiceInterface
+final readonly class StripePaymentService implements PaymentGatewayInterface
 {
-    // Network timeout for all Stripe API calls made by this service.
-    // The Stripe PHP SDK default is 80 s (connect 30 s). nginx's
-    // fastcgi_read_timeout on the VPS is typically 60 s, so without an
-    // explicit override nginx terminates the connection first and returns
-    // its own raw 502 page — without CORS headers — causing the browser
-    // to reject the response entirely. Keeping these values below nginx's
-    // timeout ensures ApiConnectionException propagates back through PHP,
-    // Laravel catches it as PaymentGatewayException, and the client
-    // receives a proper JSON 502 response with Access-Control-Allow-Origin.
-    private const int STRIPE_TIMEOUT_S = 20;
-
-    private const int STRIPE_CONNECT_TIMEOUT_S = 5;
-
     private StripeClient $stripe;
 
     public function __construct()
     {
-        $secret = (string) config('services.stripe.secret');
-
-        if ($secret === '') {
-            // Boot-time guard: a misconfigured production deploy with an empty
-            // STRIPE_SECRET must fail immediately with a clear message rather
-            // than constructing a broken StripeClient that produces cryptic
-            // SDK errors on the first card attempt.
-            if (app()->isProduction()) {
-                throw new \RuntimeException('STRIPE_SECRET is not configured. Set the STRIPE_SECRET environment variable before deploying.');
-            }
-
-            Log::warning('Stripe secret key is not configured; card payments will fail until STRIPE_SECRET is set.');
-        }
-
-        // Use Cashier's helper so we share its app-info headers ("Laravel
-        // Cashier"). The Stripe SDK only accepts the keys defined in
-        // `BaseStripeClient::DEFAULT_OPTIONS` (api_key, client_id, stripe_account,
-        // stripe_version, stripe_context, api_base, connect_base, files_base) —
-        // passing `api_version` throws `InvalidArgumentException`. We rely on
-        // Cashier's pinned `stripe_version` (set via Cashier::STRIPE_VERSION).
-        $curlClient = StripeCurlClient::instance();
-        $curlClient->setTimeout(self::STRIPE_TIMEOUT_S);
-        $curlClient->setConnectTimeout(self::STRIPE_CONNECT_TIMEOUT_S);
-        ApiRequestor::setHttpClient($curlClient);
-
-        $this->stripe = Cashier::stripe(['api_key' => $secret]);
+        $this->stripe = StripeClientFactory::make();
     }
 
     public function getName(): string
@@ -352,173 +312,6 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
             'status' => 'pending',
             'gateway' => $this->getName(),
             'stripe_flow' => 'checkout_session',
-        ];
-    }
-
-    /**
-     * List the PaymentMethods saved on a Stripe Customer (type=card only).
-     *
-     * @return array<int, array{id: string, brand: string, last4: string, exp_month: int, exp_year: int, is_default: bool}>
-     */
-    public function listSavedCards(string $customerId): array
-    {
-        try {
-            $list = $this->stripe->paymentMethods->all([
-                'customer' => $customerId,
-                'type' => 'card',
-                'limit' => 20,
-            ]);
-
-            $customer = $this->stripe->customers->retrieve($customerId);
-            $defaultPaymentMethod = (string) ($customer->invoice_settings->default_payment_method ?? '');
-        } catch (ApiErrorException $e) {
-            // Client Stripe inexistant (ex. stripe_id créé avec des clés de
-            // test, ou Customer supprimé côté Stripe) : ce n'est PAS une
-            // erreur pour l'utilisateur — il n'a simplement aucune carte.
-            // On renvoie une liste vide au lieu d'un 5xx qui afficherait
-            // « Impossible de récupérer vos cartes » dans le profil.
-            if ($e->getStripeCode() === 'resource_missing') {
-                Log::info('Stripe listSavedCards: customer inconnu, liste vide renvoyée', [
-                    'customer_id' => $customerId,
-                ]);
-
-                return [];
-            }
-
-            Log::error('Stripe listSavedCards failed', [
-                'customer_id' => $customerId,
-                'message' => $e->getMessage(),
-            ]);
-
-            throw new PaymentGatewayException(
-                'Impossible de récupérer vos moyens de paiement. Réessayez plus tard.',
-                previous: $e,
-            );
-        }
-
-        $cards = [];
-        foreach ($list->data as $paymentMethod) {
-            $card = $paymentMethod->card ?? null;
-            if ($card === null) {
-                continue;
-            }
-            $cards[] = [
-                'id' => (string) $paymentMethod->id,
-                'brand' => (string) ($card->brand ?? 'unknown'),
-                'last4' => (string) ($card->last4 ?? '----'),
-                'exp_month' => (int) ($card->exp_month ?? 0),
-                'exp_year' => (int) ($card->exp_year ?? 0),
-                'is_default' => $defaultPaymentMethod !== '' && (string) $paymentMethod->id === $defaultPaymentMethod,
-            ];
-        }
-
-        return $cards;
-    }
-
-    /**
-     * Detach a saved PaymentMethod from its Customer.
-     *
-     * After detachment Stripe returns the PaymentMethod object but the card
-     * can no longer be charged off-session. Caller must ensure the
-     * `$paymentMethodId` actually belongs to `$customerId` (defence in
-     * depth — Stripe also enforces ownership server-side).
-     */
-    public function detachSavedCard(string $customerId, string $paymentMethodId): void
-    {
-        try {
-            $paymentMethod = $this->stripe->paymentMethods->retrieve($paymentMethodId);
-
-            if ((string) ($paymentMethod->customer ?? '') !== $customerId) {
-                throw new PaymentGatewayException('Cette carte n\'appartient pas à votre compte.');
-            }
-
-            $this->stripe->paymentMethods->detach($paymentMethodId);
-        } catch (ApiErrorException $e) {
-            Log::error('Stripe detachSavedCard failed', [
-                'customer_id' => $customerId,
-                'payment_method_id' => $paymentMethodId,
-                'message' => $e->getMessage(),
-            ]);
-
-            throw new PaymentGatewayException(
-                'Impossible de supprimer cette carte. Réessayez plus tard.',
-                previous: $e,
-            );
-        }
-    }
-
-    /**
-     * Mark a saved PaymentMethod as the Customer's default for future
-     * invoices (Cashier subscriptions) AND for off-session charges driven
-     * from KeyHome (we read `invoice_settings.default_payment_method` in
-     * `listSavedCards` to surface the `is_default` flag).
-     */
-    public function setDefaultSavedCard(string $customerId, string $paymentMethodId): void
-    {
-        try {
-            $paymentMethod = $this->stripe->paymentMethods->retrieve($paymentMethodId);
-
-            if ((string) ($paymentMethod->customer ?? '') !== $customerId) {
-                throw new PaymentGatewayException('Cette carte n\'appartient pas à votre compte.');
-            }
-
-            $this->stripe->customers->update($customerId, [
-                'invoice_settings' => [
-                    'default_payment_method' => $paymentMethodId,
-                ],
-            ]);
-        } catch (ApiErrorException $e) {
-            Log::error('Stripe setDefaultSavedCard failed', [
-                'customer_id' => $customerId,
-                'payment_method_id' => $paymentMethodId,
-                'message' => $e->getMessage(),
-            ]);
-
-            throw new PaymentGatewayException(
-                'Impossible de définir cette carte comme par défaut.',
-                previous: $e,
-            );
-        }
-    }
-
-    /**
-     * Create a SetupIntent so the frontend can save a new card WITHOUT a
-     * charge (profile flow). Returns the SetupIntent client secret.
-     *
-     * @return array{client_secret: string, id: string}
-     */
-    public function createSetupIntent(string $customerId): array
-    {
-        try {
-            $intent = $this->stripe->setupIntents->create([
-                'customer' => $customerId,
-                'payment_method_types' => ['card'],
-                'usage' => 'off_session',
-            ]);
-        } catch (ApiErrorException $e) {
-            // Customer inconnu (stripe_id périmé) : exception dédiée pour que
-            // l'appelant puisse s'auto-réparer (nouveau Customer + retry).
-            if ($e->getStripeCode() === 'resource_missing') {
-                throw new StripeCustomerMissingException(
-                    'Client Stripe introuvable : '.$customerId,
-                    previous: $e,
-                );
-            }
-
-            Log::error('Stripe createSetupIntent failed', [
-                'customer_id' => $customerId,
-                'message' => $e->getMessage(),
-            ]);
-
-            throw new PaymentGatewayException(
-                'Impossible d\'enregistrer une nouvelle carte. Réessayez plus tard.',
-                previous: $e,
-            );
-        }
-
-        return [
-            'client_secret' => (string) $intent->client_secret,
-            'id' => (string) $intent->id,
         ];
     }
 
@@ -906,214 +699,6 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
     }
 
     /**
-     * Stable French-facing labels driven by Stripe `payment_method_details`.
-     *
-     * @return array{label_fr: string, detail_fr: ?string}
-     */
-    private function stripeFrenchTraceFromCharge(?Charge $charge): array
-    {
-        $details = $charge?->payment_method_details;
-
-        if ($details === null) {
-            return [
-                'label_fr' => PaymentMethod::CARD->label(),
-                'detail_fr' => null,
-            ];
-        }
-
-        $pmType = (string) (($details->__get('type') ?? $details->type) ?: '');
-
-        return match ($pmType) {
-            'paypal', 'paypal_express_checkout', 'paypal_v2', 'paypal_billing_agreement', 'paypal_v3' => [
-                'label_fr' => 'PayPal',
-                'detail_fr' => null,
-            ],
-            'amazon_pay', 'amazonpay' => [
-                'label_fr' => 'Amazon Pay',
-                'detail_fr' => null,
-            ],
-            'cashapp', 'cashapp_pay' => [
-                'label_fr' => 'Cash App Pay',
-                'detail_fr' => null,
-            ],
-            'link' => [
-                'label_fr' => 'Stripe Link',
-                'detail_fr' => null,
-            ],
-            'ideal' => [
-                'label_fr' => 'iDEAL',
-                'detail_fr' => null,
-            ],
-            'bancontact' => [
-                'label_fr' => 'Bancontact',
-                'detail_fr' => null,
-            ],
-            'klarna', 'afterpay_clearpay', 'affirm', 'clearpay_instalments' => [
-                'label_fr' => str_contains($pmType, 'klarna') ? 'Klarna' : 'Fractionné (Buy now pay later)',
-                'detail_fr' => null,
-            ],
-            'sepa_debit' => [
-                'label_fr' => 'Prélèvement SEPA',
-                'detail_fr' => null,
-            ],
-            'apple_pay_card', 'facebook_pay_card' => [
-                'label_fr' => str_contains($pmType, 'apple') ? 'Apple Pay' : 'Carte',
-                'detail_fr' => null,
-            ],
-            'grabpay' => [
-                'label_fr' => 'GrabPay',
-                'detail_fr' => null,
-            ],
-            'alipay' => [
-                'label_fr' => 'Alipay',
-                'detail_fr' => null,
-            ],
-            'wechat_pay' => [
-                'label_fr' => 'WeChat Pay',
-                'detail_fr' => null,
-            ],
-            'paynow', 'fpx', 'fpx_kfp' => [
-                'label_fr' => 'Virement instantané (régional)',
-                'detail_fr' => null,
-            ],
-            'card' => $this->stripeCardLikeTrace($details, $pmType),
-            default => [
-                'label_fr' => self::stripeGenericInstrumentLabelFr($pmType),
-                'detail_fr' => null,
-            ],
-        };
-    }
-
-    /**
-     * @return array{label_fr: string, detail_fr: ?string}
-     */
-    private function stripeCardLikeTrace(?StripeObject $details, string $pmType): array
-    {
-        if ($details === null) {
-            return ['label_fr' => PaymentMethod::CARD->label(), 'detail_fr' => null];
-        }
-
-        $card = $details->card ?? null;
-        $wallet = $card instanceof StripeObject ? ($card->wallet ?? null) : null;
-        $walletType = $wallet instanceof StripeObject ? (string) ($wallet->type ?? '') : '';
-
-        $brandRaw = '';
-        if ($card instanceof StripeObject && isset($card->brand)) {
-            $brandRaw = (string) $card->brand;
-        }
-
-        $last4 = $card instanceof StripeObject && isset($card->last4)
-            ? preg_replace('/\D/', '', (string) $card->last4) : '';
-
-        $detailFromCard = $brandRaw !== '' && $last4 !== ''
-            ? sprintf('%s · •••• %s', self::stripeCardBrandFr($brandRaw), $last4)
-            : ($brandRaw !== '' ? self::stripeCardBrandFr($brandRaw) : null);
-
-        return match ($walletType) {
-            'apple_pay' => ['label_fr' => 'Apple Pay', 'detail_fr' => $detailFromCard],
-            'google_pay' => ['label_fr' => 'Google Pay', 'detail_fr' => $detailFromCard],
-            'link' => ['label_fr' => 'Stripe Link', 'detail_fr' => $detailFromCard],
-            'samsung_pay' => ['label_fr' => 'Samsung Pay', 'detail_fr' => $detailFromCard],
-            'cashapp_pay' => ['label_fr' => 'Cash App Pay', 'detail_fr' => null],
-            default => ['label_fr' => PaymentMethod::CARD->label(), 'detail_fr' => $detailFromCard],
-        };
-    }
-
-    private static function stripeGenericInstrumentLabelFr(string $stripeType): string
-    {
-        $stripeType = trim(strtolower(str_replace('_', '-', $stripeType)));
-
-        $map = [
-            'google-pay' => 'Google Pay',
-            'apple-pay' => 'Apple Pay',
-            'sepa-direct-debit' => 'Prélèvement SEPA',
-        ];
-
-        return $map[$stripeType] ?? 'Paiement en ligne '.$stripeType;
-    }
-
-    private static function stripeCardBrandFr(string $brand): string
-    {
-        $b = strtolower($brand);
-
-        return match ($b) {
-            'visa', 'electron' => 'Visa',
-            'mastercard' => 'Mastercard',
-            'amex', 'american_express' => 'American Express',
-            'diners' => 'Diners Club',
-            'discover', 'eftpos_au', 'china_union_pay', 'jcb', 'rupay', 'eftpos_au' => ucfirst(str_replace('_', ' ', $b)),
-            default => ucfirst($b ?: 'carte'),
-        };
-    }
-
-    /**
-     * @return array{label_fr: string, detail_fr: ?string, stripe_payment_method_type: string}
-     */
-    private function buildStripeKhPaymentTrace(PaymentIntent $intent, ?Charge $charge): array
-    {
-        $pmdType = '';
-
-        if (($charge?->payment_method_details) instanceof StripeObject) {
-            $pmdType = strtolower((string) (($charge->payment_method_details->__get('type')
-                ?? $charge->payment_method_details->type) ?: ''));
-        }
-
-        if ($pmdType === '') {
-            foreach ($intent->payment_method_types ?? [] as $t) {
-                if ($t === '') {
-                    continue;
-                }
-
-                $low = strtolower((string) $t);
-
-                if (str_contains($low, 'paypal')) {
-                    return [
-                        'label_fr' => 'PayPal',
-                        'detail_fr' => null,
-                        'stripe_payment_method_type' => 'paypal',
-                    ];
-                }
-
-                if ($low === 'link') {
-                    return [
-                        'label_fr' => 'Stripe Link',
-                        'detail_fr' => null,
-                        'stripe_payment_method_type' => 'link',
-                    ];
-                }
-
-                $pmdType = $low;
-
-                break;
-            }
-        }
-
-        if (str_contains($pmdType, 'paypal')) {
-            return [
-                'label_fr' => 'PayPal',
-                'detail_fr' => null,
-                'stripe_payment_method_type' => 'paypal',
-            ];
-        }
-
-        if ($pmdType === 'link') {
-            return [
-                'label_fr' => 'Stripe Link',
-                'detail_fr' => null,
-                'stripe_payment_method_type' => 'link',
-            ];
-        }
-
-        $fromCharge = $this->stripeFrenchTraceFromCharge($charge);
-
-        return [
-            'label_fr' => $fromCharge['label_fr'],
-            'detail_fr' => $fromCharge['detail_fr'],
-            'stripe_payment_method_type' => $pmdType !== '' ? $pmdType : 'card',
-        ];
-    }
-
-    /**
      * Translate a Stripe PaymentIntent into the gateway-agnostic shape that
      * `PaymentService` consumes.
      *
@@ -1166,7 +751,7 @@ final readonly class StripePaymentService implements PaymentGatewayInterface, St
         $rawPayload = $intent->toArray();
 
         if ($stripeStatus === 'succeeded') {
-            $rawPayload['kh_payment_trace'] = $this->buildStripeKhPaymentTrace($intent, $charge);
+            $rawPayload['kh_payment_trace'] = StripePaymentTrace::build($intent, $charge);
         }
 
         $paymentMethod = PaymentMethod::CARD->value;
