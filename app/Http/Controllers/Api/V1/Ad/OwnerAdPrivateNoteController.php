@@ -28,8 +28,8 @@ final class OwnerAdPrivateNoteController
         $validated = $request->validate([
             'is_property_owner' => ['required', 'boolean'],
             'owner_name' => ['nullable', 'required_if:is_property_owner,false', 'string', 'max:150'],
-            'owner_address' => ['nullable', 'string', 'max:500'],
-            'owner_phone' => ['nullable', 'string', 'max:40'],
+            'owner_address' => ['nullable', 'required_if:is_property_owner,false', 'string', 'max:500'],
+            'owner_phone' => ['nullable', 'required_if:is_property_owner,false', 'string', 'max:40'],
             'owner_email' => ['nullable', 'email:rfc', 'max:254'],
             'notes' => ['nullable', 'string', 'max:3000'],
         ]);

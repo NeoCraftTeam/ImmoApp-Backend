@@ -58,7 +58,7 @@ it('never exposes the private note through the public ad resource', function ():
         ->assertJsonMissingPath('data.private_owner_note');
 });
 
-it('requires the real owner name when the poster is an intermediary', function (): void {
+it('requires the real owner identity and contacts when the poster is an intermediary', function (): void {
     $owner = User::factory()->agents()->create();
     $ad = Ad::withoutSyncingToSearch(fn () => Ad::factory()->create(['user_id' => $owner->id]));
 
@@ -67,5 +67,36 @@ it('requires the real owner name when the poster is an intermediary', function (
             'is_property_owner' => false,
         ])
         ->assertUnprocessable()
-        ->assertJsonValidationErrors('owner_name');
+        ->assertJsonValidationErrors(['owner_name', 'owner_address', 'owner_phone'])
+        ->assertJsonMissingValidationErrors(['owner_email']);
+});
+
+it('accepts an intermediary note without the optional email', function (): void {
+    $owner = User::factory()->agents()->create();
+    $ad = Ad::withoutSyncingToSearch(fn () => Ad::factory()->create(['user_id' => $owner->id]));
+
+    $this->actingAs($owner, 'sanctum')
+        ->putJson("/api/v1/my/ads/{$ad->id}/private-owner-note", [
+            'is_property_owner' => false,
+            'owner_name' => 'Propriétaire réel',
+            'owner_address' => 'Adresse confidentielle',
+            'owner_phone' => '+237 699 000 000',
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.owner_email', null);
+});
+
+it('does not require owner contacts when the poster is the property owner', function (): void {
+    $owner = User::factory()->agents()->create();
+    $ad = Ad::withoutSyncingToSearch(fn () => Ad::factory()->create(['user_id' => $owner->id]));
+
+    $this->actingAs($owner, 'sanctum')
+        ->putJson("/api/v1/my/ads/{$ad->id}/private-owner-note", [
+            'is_property_owner' => true,
+            'notes' => 'Note interne.',
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.is_property_owner', true)
+        ->assertJsonPath('data.owner_name', null)
+        ->assertJsonPath('data.owner_phone', null);
 });
