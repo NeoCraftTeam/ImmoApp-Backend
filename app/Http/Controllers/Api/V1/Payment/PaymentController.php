@@ -19,6 +19,7 @@ use App\Models\Payment;
 use App\Models\PromoCode;
 use App\Models\PromoCodeUsage;
 use App\Models\User;
+use App\Services\Payment\PaymentPricingResolver;
 use App\Services\Payment\PaymentService;
 use App\Support\FrontendRedirectGuard;
 use App\Support\PaymentPresentation;
@@ -60,6 +61,7 @@ final class PaymentController
     public function __construct(
         protected HandlePostPaymentActions $postPaymentActions,
         protected PaymentService $paymentService,
+        protected PaymentPricingResolver $pricingResolver,
     ) {}
 
     /**
@@ -99,7 +101,7 @@ final class PaymentController
         $user = $request->user();
 
         $type = $validated['type'];
-        $amount = $this->paymentService->resolveAmountForType($type, $validated);
+        $amount = $this->pricingResolver->resolveAmountForType($type, $validated);
 
         if ($amount === null) {
             return response()->json([
