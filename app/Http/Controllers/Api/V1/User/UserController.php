@@ -10,7 +10,7 @@ use App\Http\Resources\UserResource;
 use App\Mail\EmailUpdatedMail;
 use App\Models\User;
 use App\Services\User\UserProfileService;
-use Clickbar\Magellan\Data\Geometries\Point;
+use App\Support\GeoLocation;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -367,9 +367,7 @@ final readonly class UserController
                 'email' => $data['email'],
                 'password' => $data['password'],
                 'phone_number' => $data['phone_number'],
-                'location' => isset($data['latitude'], $data['longitude'])
-                    ? Point::makeGeodetic((float) $data['latitude'], (float) $data['longitude'])
-                    : null,
+                'location' => GeoLocation::fromArray($data)?->toPoint(),
                 'type' => $data['type'] ?? null,
                 'city_id' => $data['city_id'],
             ]);
@@ -380,12 +378,7 @@ final readonly class UserController
             $user->save();
 
             // Gestion de l'avatar (le modèle gère le default)
-            if ($request->hasFile('avatar')) {
-                $user->clearMediaCollection('avatars');
-                $user->addMediaFromRequest('avatar')
-                    ->usingName($user->firstname.'_'.$user->lastname.'_avatar')
-                    ->toMediaCollection('avatars');
-            }
+            $user->syncAvatarFromRequest($request);
 
             // Création du token
             $token = $user->createToken('creation_token_'.now()->timestamp);
@@ -643,23 +636,13 @@ final readonly class UserController
 
             // Mettre à jour la localisation si fournie (lat/lng)
             if (array_key_exists('latitude', $data) || array_key_exists('longitude', $data)) {
-                if (($data['latitude'] ?? null) !== null && ($data['longitude'] ?? null) !== null) {
-                    $user->location = Point::makeGeodetic((float) $data['latitude'], (float) $data['longitude']);
-                } else {
-                    // Permettre de réinitialiser la localisation si null est envoyé
-                    $user->location = null;
-                }
+                $user->location = GeoLocation::fromArray($data)?->toPoint();
             }
 
             $user->save();
 
             // Gestion de l'avatar (le modèle gère le default)
-            if ($request->hasFile('avatar')) {
-                $user->clearMediaCollection('avatars');
-                $user->addMediaFromRequest('avatar')
-                    ->usingName($user->firstname.'_'.$user->lastname.'_avatar')
-                    ->toMediaCollection('avatars');
-            }
+            $user->syncAvatarFromRequest($request);
 
             DB::commit();
 

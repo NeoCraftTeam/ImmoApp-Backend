@@ -157,12 +157,7 @@ final readonly class RegistrationService
                 isset($data['session_id']) && is_string($data['session_id']) ? $data['session_id'] : null,
             );
 
-            if ($request->hasFile('avatar')) {
-                $user->clearMediaCollection('avatars');
-                $user->addMediaFromRequest('avatar')
-                    ->usingName($user->firstname.'_'.$user->lastname.'_avatar')
-                    ->toMediaCollection('avatars');
-            }
+            $user->syncAvatarFromRequest($request);
 
             $token = $this->tokenService->createForUser($user, 'registration');
 

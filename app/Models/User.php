@@ -35,6 +35,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Notifications\DatabaseNotificationCollection;
 use Illuminate\Notifications\Notifiable;
@@ -307,6 +308,24 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function assignDefaultAvatar(): void
     {
         app(AvatarGeneratorService::class)->generateAndAssign($this);
+    }
+
+    /**
+     * Replace the avatar media from an uploaded `avatar` file on the request.
+     *
+     * No-op when the request carries no avatar file, so the model's default
+     * avatar (assigned on creation) is preserved.
+     */
+    public function syncAvatarFromRequest(Request $request): void
+    {
+        if (!$request->hasFile('avatar')) {
+            return;
+        }
+
+        $this->clearMediaCollection('avatars');
+        $this->addMediaFromRequest('avatar')
+            ->usingName($this->firstname.'_'.$this->lastname.'_avatar')
+            ->toMediaCollection('avatars');
     }
 
     // =========================================================================
