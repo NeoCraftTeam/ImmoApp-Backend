@@ -72,6 +72,25 @@ describe('User model', function (): void {
 
         expect($user->isAnAgency())->toBeTrue();
     });
+
+    it('lets only agents access the owner panel', function (): void {
+        expect(User::factory()->agents()->create()->mayAccessOwnerPanel())->toBeTrue()
+            ->and(User::factory()->customers()->create()->mayAccessOwnerPanel())->toBeFalse()
+            ->and(User::factory()->admin()->create()->mayAccessOwnerPanel())->toBeFalse();
+    });
+
+    it('prefixes the sanctum session by role', function (): void {
+        expect(User::factory()->agents()->create()->sanctumSessionPrefix())->toBe('owner')
+            ->and(User::factory()->customers()->create()->sanctumSessionPrefix())->toBe('client');
+    });
+
+    it('detects a pending forced password change', function (): void {
+        $forced = User::factory()->create(['must_change_password_at' => now()]);
+        $normal = User::factory()->create(['must_change_password_at' => null]);
+
+        expect($forced->hasMustChangePassword())->toBeTrue()
+            ->and($normal->hasMustChangePassword())->toBeFalse();
+    });
 });
 
 describe('Payment model', function (): void {

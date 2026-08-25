@@ -5,14 +5,16 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\AdStatus;
-use App\Enums\PropertyAttribute;
 use App\Enums\SponsorshipTier;
 use App\Enums\TransactionType;
-use App\Enums\UserType;
 use App\Enums\VerificationStatus;
 use App\Exceptions\InvalidStatusTransitionException;
+use App\Models\Concerns\AdSearchable;
+use App\Models\Concerns\HasBoostState;
 use App\Models\Concerns\HasPropertyAttributes;
+use App\Models\Concerns\HasSponsorshipTier;
 use App\Models\Concerns\HasVisibility;
+use App\Models\Concerns\InteractsWithAudience;
 use Clickbar\Magellan\Data\Geometries\Point;
 use Database\Factories\AdFactory;
 use Eloquent;
@@ -22,6 +24,19 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
+use Laravel\Scout\Searchable;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Image\Enums\Fit;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Zap\Models\Concerns\HasSchedules;
+
 /**
  * @property-read Quarter|null $quarter
  * @property-read User|null $user
@@ -78,24 +93,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *
  * @mixin Eloquent
  */
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
-use Laravel\Scout\Searchable;
-use Spatie\Activitylog\LogOptions;
-use Spatie\Activitylog\Traits\LogsActivity;
-use Spatie\Image\Enums\Fit;
-use Spatie\MediaLibrary\HasMedia;
-use Spatie\MediaLibrary\InteractsWithMedia;
-use Spatie\MediaLibrary\MediaCollections\Models\Media;
-use Zap\Models\Concerns\HasSchedules;
-
 class Ad extends Model implements HasMedia
 {
+    use AdSearchable, HasBoostState, HasPropertyAttributes, HasSponsorshipTier, HasVisibility, InteractsWithAudience, InteractsWithMedia, Searchable;
     use HasFactory, HasSchedules, HasUuids, LogsActivity, SoftDeletes;
-    use HasPropertyAttributes, HasVisibility, InteractsWithMedia, Searchable;
 
     /**
      * Statuses that are visible on the public frontend.
@@ -261,7 +262,7 @@ class Ad extends Model implements HasMedia
         $this->save();
     }
 
-    /** Return the number of 360\u00b0 scenes in the tour config. */
+    /** Return the number of 360° scenes in the tour config. */
     public function getTourScenesCountAttribute(): int
     {
         if (!$this->tour_config) {
@@ -272,7 +273,7 @@ class Ad extends Model implements HasMedia
     }
 
     /**
-     * Scope \u2014 ads that have a published 3D tour.
+     * Scope — ads that have a published 3D tour.
      *
      * @param  Builder<static>  $query
      * @return Builder<static>
@@ -309,107 +310,18 @@ class Ad extends Model implements HasMedia
     }
 
     /**
-     * True when the listing is furnished (explicit attribute and/or type name typical of meublé listings).
+     * Scout hook — delegates to {@see AdSearchable::buildSearchableArray()}.
+     * Kept on the model so it wins over the Searchable trait default.
      */
-    public function isFurnishedForSearch(): bool
-    {
-        $attrs = $this->getAttribute('attributes');
-        if (is_array($attrs) && in_array(PropertyAttribute::Furnished->value, $attrs, true)) {
-            return true;
-        }
-
-        $typeName = $this->ad_type !== null ? $this->ad_type->name : '';
-
-        return (bool) preg_match('/meubl/i', (string) $typeName);
-    }
-
     public function toSearchableArray(): array
     {
-        return [
-            'id' => $this->id,
-            'title' => $this->title,
-            'description' => $this->description,
-            'adresse' => $this->adresse,
-            'price' => (float) $this->price,
-            'surface_area' => (float) $this->surface_area,
-            'bedrooms' => (int) $this->bedrooms,
-            'bathrooms' => (int) $this->bathrooms,
-            'has_parking' => (bool) $this->has_parking,
-            'has_3d_tour' => (bool) $this->has_3d_tour,
-            'is_verified' => (bool) $this->is_verified,
-            'is_furnished' => $this->isFurnishedForSearch(),
-            'status' => $this->status,
-            'is_visible' => (bool) $this->is_visible,
-
-            // Relations — vérifier qu'elles existent
-            'city' => $this->quarter?->city?->name,
-            'city_id' => $this->quarter?->city_id,
-            'country' => $this->quarter?->city?->country,
-            'quarter' => $this->quarter?->name,
-            'type' => $this->ad_type?->name,
-            'type_id' => $this->type_id,
-            'quarter_id' => $this->quarter_id,
-            'transaction_type' => $this->transaction_type?->value,
-            'price_period' => $this->price_period,
-
-            // Pour la recherche géographique (optionnel)
-            '_geo' => $this->location ? [
-                'lat' => $this->location->getY(),
-                'lng' => $this->location->getX(),
-            ] : null,
-
-            'created_at' => $this->created_at?->timestamp,
-
-            // Rating & popularity — use eager-loaded aggregates (see makeAllSearchableUsing).
-            // Fallback to 0 if the withAvg/withCount was not applied (e.g. single-model scout index).
-            'reviews_avg_rating' => (float) ($this->reviews_avg_rating ?? 0),
-            'views_count' => (int) ($this->views_count ?? 0),
-            'unlocked_count' => (int) ($this->unlocked_count ?? 0),
-            'contact_count' => (int) ($this->contact_count ?? 0),
-            'relevance_score' => $this->computeRelevanceScore(),
-
-            // Boost
-            'is_boosted' => (bool) $this->is_boosted,
-            'boost_score' => (int) $this->boost_score,
-            'boost_expires_at' => $this->boost_expires_at?->timestamp,
-
-            // Amenity slugs for filter-by-attribute support
-            'attributes' => $this->getAttribute('attributes') ?? [],
-        ];
+        return $this->buildSearchableArray();
     }
 
     public function shouldBeSearchable(): bool
     {
         // N'indexer que les annonces visibles, publiquement listées et non supprimées
         return $this->is_visible && in_array($this->status, self::PUBLIC_STATUSES, true) && !$this->trashed();
-    }
-
-    /**
-     * Get the name of the publisher (Agency name or User name).
-     */
-    public function getPublisherName(): string
-    {
-        if (!$this->relationLoaded('user')) {
-            return '';
-        }
-
-        $user = $this->user;
-
-        // Si l'utilisateur est de type AGENCY, on essaie de retourner le nom de son agence
-        if ($user && $user->type === UserType::AGENCY) {
-            $agency = $this->agency;
-            if ($agency instanceof Agency) {
-                return $agency->name;
-            }
-
-            $userAgency = $user->agency;
-            if ($userAgency instanceof Agency) {
-                return $userAgency->name;
-            }
-        }
-
-        // Sinon ou par défaut, on retourne le nom personnel
-        return $user ? "{$user->firstname} {$user->lastname}" : 'Anonyme';
     }
 
     /**
@@ -465,100 +377,6 @@ class Ad extends Model implements HasMedia
         return $this->hasMany(AdInteraction::class)->where('type', AdInteraction::TYPE_VIEW);
     }
 
-    /** Get the number of views in the last 30 days. */
-    public function recentViewCount(): int
-    {
-        return $this->interactions()
-            ->where('type', AdInteraction::TYPE_VIEW)
-            ->where('created_at', '>=', now()->subDays(30))
-            ->count();
-    }
-
-    /**
-     * Check if a user has favorited this ad.
-     *
-     * For single-ad lookups (detail page) pass no second argument — two queries
-     * will be fired. For list contexts, call `loadFavoritedIds()` once for the
-     * entire collection and pass the result here to avoid N+1.
-     *
-     * @param  array<string>|null  $preloadedFavoritedIds  Output of `Ad::loadFavoritedIds()`
-     */
-    public function isFavoritedBy(?User $user, ?array $preloadedFavoritedIds = null): bool
-    {
-        if (!$user) {
-            return false;
-        }
-
-        if ($preloadedFavoritedIds !== null) {
-            return in_array($this->id, $preloadedFavoritedIds, true);
-        }
-
-        // Per-request static batch loader: first call for a given user fires ONE
-        // GROUP BY query loading all their favorites, then every subsequent ad in
-        // the same request hits the in-memory cache. Eliminates the 2N query N+1.
-        /** @var array<string, array<string, array<string, int>>> $requestCache */
-        static $requestCache = [];
-
-        if (!array_key_exists($user->id, $requestCache)) {
-            $rows = AdInteraction::where('user_id', $user->id)
-                ->whereIn('type', [AdInteraction::TYPE_FAVORITE, AdInteraction::TYPE_UNFAVORITE])
-                ->selectRaw('ad_id, type, COUNT(*) as cnt')
-                ->groupBy('ad_id', 'type')
-                ->get();
-
-            $byAd = [];
-            foreach ($rows as $row) {
-                /** @var object{ad_id: string, type: string, cnt: int|string} $row */
-                $byAd[$row->ad_id][$row->type] = (int) $row->cnt;
-            }
-
-            $requestCache[$user->id] = $byAd;
-        }
-
-        $byAd = $requestCache[$user->id];
-
-        return ($byAd[$this->id][AdInteraction::TYPE_FAVORITE] ?? 0)
-            > ($byAd[$this->id][AdInteraction::TYPE_UNFAVORITE] ?? 0);
-    }
-
-    /**
-     * Bulk-load the ad IDs that a user has favorited — one query for the
-     * whole set, suitable for eliminating N+1 in paginated listing responses.
-     *
-     * Usage:
-     *   $favorited = Ad::loadFavoritedIds($user->id, $ads->pluck('id')->all());
-     *   // then in each resource: $ad->isFavoritedBy($user, $favorited)
-     *
-     * @param  array<string>  $adIds
-     * @return array<string>
-     */
-    public static function loadFavoritedIds(string $userId, array $adIds): array
-    {
-        if ($adIds === []) {
-            return [];
-        }
-
-        $rows = AdInteraction::whereIn('ad_id', $adIds)
-            ->where('user_id', $userId)
-            ->whereIn('type', [AdInteraction::TYPE_FAVORITE, AdInteraction::TYPE_UNFAVORITE])
-            ->selectRaw('ad_id, type, COUNT(*) as cnt')
-            ->groupBy('ad_id', 'type')
-            ->get();
-
-        /** @var array<string, array<string, int>> $byAd */
-        $byAd = [];
-        foreach ($rows as $row) {
-            /** @var object{ad_id: string, type: string, cnt: int|string} $row */
-            $byAd[$row->ad_id][$row->type] = (int) $row->cnt;
-        }
-
-        return array_values(array_filter(
-            array_keys($byAd),
-            static fn (string $adId): bool => ($byAd[$adId][AdInteraction::TYPE_FAVORITE] ?? 0)
-                > ($byAd[$adId][AdInteraction::TYPE_UNFAVORITE] ?? 0),
-        ));
-    }
-
     /** @return HasMany<Payment, $this> */
     public function payments(): HasMany
     {
@@ -585,18 +403,16 @@ class Ad extends Model implements HasMedia
         return $this->belongsTo(AdType::class, 'type_id');
     }
 
+    /**
+     * Scout hook — delegates to {@see AdSearchable::eagerLoadForSearch()}.
+     * Kept on the model so it wins over the Searchable trait default.
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     protected function makeAllSearchableUsing(Builder $query): Builder
     {
-        // PERF-W24: eager-load everything toSearchableArray() needs so bulk indexing
-        // (Ad::all()->searchable()) does not fire an extra query per model.
-        return $query
-            ->with(['quarter.city', 'ad_type'])
-            ->withAvg('reviews', 'rating')
-            ->withCount([
-                'interactions as views_count' => fn (Builder $q) => $q->where('type', 'view'),
-                'interactions as unlocked_count' => fn (Builder $q) => $q->where('type', 'unlock'),
-                'interactions as contact_count' => fn (Builder $q) => $q->whereIn('type', ['contact', 'whatsapp']),
-            ]);
+        return $this->eagerLoadForSearch($query);
     }
 
     public function registerMediaCollections(): void
@@ -631,125 +447,6 @@ class Ad extends Model implements HasMedia
             ->fit(Fit::Max, 1280, 854)
             ->format('webp')
             ->quality(82);
-    }
-
-    /**
-     * Check if the ad is unlocked for a specific user.
-     *
-     * Result is memoized per request in a static array to avoid N+1 queries
-     * when AdResource calls this method multiple times for the same ad/user pair.
-     */
-    public function isUnlockedFor(?User $user): bool
-    {
-        if (!$user) {
-            return false;
-        }
-
-        // Owner always has access
-        if ($this->user_id === $user->id) {
-            return true;
-        }
-
-        /** @var array<string, bool> $cache */
-        static $cache = [];
-
-        $key = $user->id.':'.$this->id;
-
-        if (!array_key_exists($key, $cache)) {
-            $cache[$key] = UnlockedAd::where('user_id', $user->id)
-                ->where('ad_id', $this->id)
-                ->exists();
-        }
-
-        return $cache[$key];
-    }
-
-    /**
-     * Get all images for the ad (images are always visible).
-     */
-    public function getAccessibleImages(?User $user): Collection
-    {
-        $media = $this->getMedia('images');
-
-        if ($this->isUnlockedFor($user)) {
-            return $media;
-        }
-
-        return $media->take(1);
-    }
-
-    /**
-     * Boost this ad with a given score and duration
-     */
-    public function boost(int $score, int $durationDays): void
-    {
-        $this->forceFill([
-            'is_boosted' => true,
-            'boost_score' => $score,
-            'boost_expires_at' => now()->addDays($durationDays),
-            'boosted_at' => now(),
-            'subscription_tier' => SponsorshipTier::fromFlags(
-                (bool) $this->is_subscription_sponsored,
-                true,
-            ),
-        ])->save();
-    }
-
-    /**
-     * Remove boost from this ad
-     */
-    public function unboost(): void
-    {
-        $this->forceFill([
-            'is_boosted' => false,
-            'boost_score' => 0,
-            'boost_expires_at' => null,
-            'subscription_tier' => SponsorshipTier::fromFlags(
-                (bool) $this->is_subscription_sponsored,
-                false,
-            ),
-        ])->save();
-    }
-
-    /**
-     * Relevance score for Meilisearch custom ranking (0–100).
-     *
-     * Formula:
-     *   CTR      = unlocked_count / max(views_count, 1)       → weight 40
-     *   Rating   = reviews_avg_rating / 5                     → weight 30
-     *   Boost    = ×1.5 multiplier if currently boosted       → weight 30
-     *   Behavior = (contact_count / max(views_count, 1)) × 10 → bonus up to 10
-     *
-     * Scores are clamped to [0, 100].
-     */
-    public function computeRelevanceScore(): int
-    {
-        $views = max((int) ($this->views_count ?? 0), 1);
-        $unlocks = (int) ($this->unlocked_count ?? 0);
-        $rating = (float) ($this->reviews_avg_rating ?? 0);
-        $contacts = (int) ($this->contact_count ?? 0);
-
-        $ctr = min($unlocks / $views, 1.0);
-        $ratingN = min($rating / 5.0, 1.0);
-        $behavior = min($contacts / $views, 1.0);
-
-        $base = $ctr * 40 + $ratingN * 30 + $behavior * 10;
-
-        if ($this->isBoosted()) {
-            $base *= 1.5;
-        }
-
-        return (int) min(round($base), 100);
-    }
-
-    /**
-     * Check if ad is currently boosted
-     */
-    public function isBoosted(): bool
-    {
-        return $this->is_boosted
-            && $this->boost_expires_at
-            && $this->boost_expires_at->isFuture();
     }
 
     /**
@@ -788,6 +485,24 @@ class Ad extends Model implements HasMedia
     protected function publiclyListed($query)
     {
         return $query->whereIn('status', array_map(fn (AdStatus $s) => $s->value, self::PUBLIC_STATUSES));
+    }
+
+    /**
+     * Scope — the canonical public listing query: visible + publicly listed
+     * ads, eager-loaded with exactly the relations and review aggregates
+     * AdResource renders. Shared by the paginated index and the cursor feed
+     * (including the organic-boost enrichment) so the base query lives in one
+     * place instead of being duplicated at each call site.
+     */
+    #[Scope]
+    protected function forPublicListing($query)
+    {
+        return $query
+            ->with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'user.media', 'user.latestTrustScore', 'agency')
+            ->withAvg('reviews', 'rating')
+            ->withCount('reviews')
+            ->visible()
+            ->publiclyListed();
     }
 
     /**
@@ -849,103 +564,6 @@ class Ad extends Model implements HasMedia
         }
 
         return true;
-    }
-
-    /**
-     * Lazy cache for sponsorshipTier(). The flags it depends on
-     * (is_subscription_sponsored, is_boosted, boost_expires_at) flip
-     * via mutators that all funnel through setAttribute(), which
-     * resets this field — so the cache invariant holds: a null cache
-     * means "needs recompute".
-     */
-    private ?SponsorshipTier $cachedSponsorshipTier = null;
-
-    /**
-     * Derive the current sponsorship tier from the underlying flags.
-     *
-     * Canonical truth — the persisted `subscription_tier` column is a
-     * denormalised copy kept in sync via boost()/unboost() and observers.
-     *
-     * Memoised because the feed render path calls this three times per
-     * ad (twice in AdResource, once in AdFeedRankingService::bucketize).
-     * The cache lives on the instance and is dropped whenever any input
-     * flag is reassigned via setAttribute().
-     */
-    public function sponsorshipTier(): SponsorshipTier
-    {
-        return $this->cachedSponsorshipTier ??= SponsorshipTier::fromFlags(
-            (bool) $this->is_subscription_sponsored,
-            $this->isBoosted(),
-        );
-    }
-
-    /**
-     * Reset the sponsorship-tier memo on any write to its inputs.
-     *
-     * Eloquent funnels every property write through `setAttribute`
-     * (including `forceFill`, mass assignment, and the `$ad->foo = bar`
-     * style). Intercepting it here is the cheapest place to keep the
-     * memo invariant intact without scattering invalidation calls
-     * across every mutator.
-     */
-    #[\Override]
-    public function setAttribute($key, $value)
-    {
-        if (in_array($key, ['is_subscription_sponsored', 'is_boosted', 'boost_expires_at', 'subscription_tier'], true)) {
-            $this->cachedSponsorshipTier = null;
-        }
-
-        return parent::setAttribute($key, $value);
-    }
-
-    /**
-     * Ranking multiplier for the sponsored-feed algorithm.
-     */
-    public function rankingMultiplier(): float
-    {
-        return $this->sponsorshipTier()->multiplier();
-    }
-
-    /**
-     * Recompute and persist `subscription_tier` from current flags.
-     */
-    public function syncSponsorshipTier(): void
-    {
-        $tier = $this->sponsorshipTier();
-
-        if ($this->subscription_tier === $tier) {
-            return;
-        }
-
-        $this->forceFill(['subscription_tier' => $tier])->saveQuietly();
-    }
-
-    /**
-     * Compute the final ranking score with time decay and rotation penalty.
-     */
-    public function computeRankingScore(): float
-    {
-        $baseScore = max(1, (int) ($this->boost_score ?? 0));
-
-        // Time decay: lose 1% per day since creation, floored at 10%.
-        $ageInDays = $this->created_at->diffInDays(now(), false);
-        $timeDecayFactor = max(0.1, 1 - ($ageInDays / 100));
-
-        // Rotation penalty: down-rank ads shown in the last 6h to fight fatigue.
-        $rotationPenalty = $this->last_shown_at && $this->last_shown_at->isAfter(now()->subHours(6))
-            ? 0.7
-            : 1.0;
-
-        return $baseScore * $this->rankingMultiplier() * $timeDecayFactor * $rotationPenalty;
-    }
-
-    /**
-     * Record an impression for this ad.
-     */
-    public function recordImpression(): void
-    {
-        $this->increment('impression_count');
-        $this->update(['last_shown_at' => now()]);
     }
 
     /**

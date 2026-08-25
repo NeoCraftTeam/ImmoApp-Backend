@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Auth;
 
-use App\Enums\UserRole;
 use App\Http\Requests\Api\V1\SocialAuthRequest;
-use App\Mail\OAuthLinkAttemptMail;
 use App\Models\User;
+use App\Services\Auth\SocialAuthService;
 use App\Services\Auth\TokenService;
 use App\Services\UtmAttributionService;
 use App\Support\FrontendRedirectGuard;
@@ -16,9 +15,7 @@ use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use OpenApi\Attributes as OA;
@@ -32,7 +29,10 @@ use OpenApi\Attributes as OA;
 #[OA\Tag(name: 'OAuth', description: 'Social authentication endpoints')]
 final readonly class SocialAuthController
 {
-    public function __construct(private TokenService $tokenService) {}
+    public function __construct(
+        private TokenService $tokenService,
+        private SocialAuthService $socialAuth,
+    ) {}
 
     /**
      * Supported OAuth providers.
@@ -104,7 +104,7 @@ final readonly class SocialAuthController
 
         try {
             // Get user info from OAuth provider
-            $socialUser = $this->getSocialUser($provider, $request->token, $request->id_token);
+            $socialUser = $this->socialAuth->getSocialUser($provider, $request->token, $request->id_token);
 
             if (!$socialUser || !$socialUser->getEmail()) {
                 return response()->json([
@@ -116,22 +116,22 @@ final readonly class SocialAuthController
             // NOTE: the requested role is restricted to customer|agent — admin can
             // never be granted via OAuth. The role only applies at CREATION; an
             // existing account keeps its role whatever the client requests.
-            $result = $this->findOrCreateUser(
+            $result = $this->socialAuth->findOrCreateUser(
                 $socialUser,
                 $provider,
                 $request,
                 $utmPayload,
-                $this->sanitizeRequestedRole($request->input('role')),
+                $this->socialAuth->sanitizeRequestedRole($request->input('role')),
             );
-            $user = $result['user'];
-            $isNewUser = $result['is_new'];
+            $user = $result->user;
+            $isNewUser = $result->isNew;
 
             // Cross-provider link requires explicit confirmation
-            if ($result['requires_link_confirmation'] ?? false) {
+            if ($result->requiresLinkConfirmation) {
                 return response()->json([
                     'message' => 'Un compte existe déjà avec cet email. Confirmez la liaison des comptes.',
                     'requires_link_confirmation' => true,
-                    'linking_token' => $result['linking_token'],
+                    'linking_token' => $result->linkingToken,
                 ], 200);
             }
 
@@ -250,7 +250,7 @@ final readonly class SocialAuthController
         $stateData = [
             'csrf' => Str::random(40),
             'redirect_uri' => $redirectUri,
-            'role' => $this->sanitizeRequestedRole($request->query('role')),
+            'role' => $this->socialAuth->sanitizeRequestedRole($request->query('role')),
         ];
         $state = base64_encode(json_encode($stateData) ?: '');
 
@@ -319,45 +319,6 @@ final readonly class SocialAuthController
     }
 
     /**
-     * Rattache le provider au compte identifié par le link_code (issu de
-     * linkRedirect). Redirige vers redirect_uri avec `?linked=1` en cas de
-     * succès, ou `?link_error=<code>` sinon. Consomme le link_code.
-     */
-    private function completeLinkFromCallback(
-        string $provider,
-        string $linkCode,
-        mixed $socialUser,
-        string $redirectUri,
-    ): mixed {
-        $userId = Cache::pull('oauth_link_'.$linkCode);
-        $sep = str_contains($redirectUri, '?') ? '&' : '?';
-
-        if (!$userId) {
-            return redirect($redirectUri.$sep.'link_error=expired&provider='.$provider);
-        }
-
-        $user = User::find($userId);
-        if (!$user || !$socialUser || !$socialUser->getId()) {
-            return redirect($redirectUri.$sep.'link_error=invalid&provider='.$provider);
-        }
-
-        $providerIdField = $provider.'_id';
-        $alreadyLinked = User::where($providerIdField, $socialUser->getId())
-            ->where('id', '!=', $user->id)
-            ->exists();
-        if ($alreadyLinked) {
-            return redirect($redirectUri.$sep.'link_error=already_used&provider='.$provider);
-        }
-
-        $user->forceFill([
-            $providerIdField => $socialUser->getId(),
-            'oauth_provider' => $user->oauth_provider ?? $provider,
-        ])->save();
-
-        return redirect($redirectUri.$sep.'linked=1&provider='.$provider);
-    }
-
-    /**
      * Handle OAuth callback (web flow).
      */
     #[OA\Get(
@@ -404,7 +365,7 @@ final readonly class SocialAuthController
                     }
                 }
                 if (is_array($stateData) && isset($stateData['role'])) {
-                    $requestedRole = $this->sanitizeRequestedRole($stateData['role']);
+                    $requestedRole = $this->socialAuth->sanitizeRequestedRole($stateData['role']);
                 }
                 if (is_array($stateData) && isset($stateData['link_code'])) {
                     $linkCode = (string) $stateData['link_code'];
@@ -418,11 +379,15 @@ final readonly class SocialAuthController
             // rattache le provider au compte identifié par le link_code, au
             // lieu d'ouvrir une session.
             if ($linkCode !== null) {
-                return $this->completeLinkFromCallback($provider, $linkCode, $socialUser, $redirectUri);
+                $outcome = $this->socialAuth->completeLinkFromCode($provider, $linkCode, $socialUser);
+                $sep = str_contains($redirectUri, '?') ? '&' : '?';
+                $query = $outcome === 'linked' ? 'linked=1' : 'link_error='.$outcome;
+
+                return redirect($redirectUri.$sep.$query.'&provider='.$provider);
             }
 
-            $result = $this->findOrCreateUser($socialUser, $provider, $request, [], $requestedRole);
-            $user = $result['user'];
+            $result = $this->socialAuth->findOrCreateUser($socialUser, $provider, $request, [], $requestedRole);
+            $user = $result->user;
 
             $user->forceFill([
                 'last_login_at' => now(),
@@ -436,7 +401,7 @@ final readonly class SocialAuthController
             $exchangeCode = Str::random(64);
             Cache::put('oauth_token_exchange_'.$exchangeCode, [
                 'token' => $token,
-                'is_new_user' => $result['is_new'],
+                'is_new_user' => $result->isNew,
             ], now()->addMinutes(2));
 
             return redirect($redirectUri.'?'.http_build_query([
@@ -524,7 +489,7 @@ final readonly class SocialAuthController
         ]);
 
         try {
-            $socialUser = $this->getSocialUser($provider, $request->token, $request->id_token);
+            $socialUser = $this->socialAuth->getSocialUser($provider, $request->token, $request->id_token);
 
             if (!$socialUser) {
                 return response()->json(['message' => 'Token OAuth invalide'], 401);
@@ -649,162 +614,5 @@ final readonly class SocialAuthController
             'user' => $user->fresh()->load('city'),
             'token' => $token,
         ]);
-    }
-
-    /**
-     * Get social user data from provider.
-     */
-    private function getSocialUser(string $provider, string $token, ?string $idToken = null): mixed
-    {
-        $driver = Socialite::driver($provider);
-
-        if ($provider === 'apple' && $idToken) {
-            /** @phpstan-ignore method.notFound */
-            return $driver->userFromToken($idToken);
-        }
-
-        /** @phpstan-ignore method.notFound */
-        return $driver->userFromToken($token);
-    }
-
-    /**
-     * Find existing user or create new one from OAuth data.
-     *
-     * @return array{user: User, is_new: bool}
-     */
-    /**
-     * @return array{
-     *     user: User,
-     *     is_new: bool,
-     *     requires_link_confirmation?: bool,
-     *     linking_token?: string
-     * }
-     */
-    /**
-     * @param  array<string, mixed>  $utmPayload
-     */
-    private function findOrCreateUser(
-        mixed $socialUser,
-        string $provider,
-        Request $request,
-        array $utmPayload,
-        string $requestedRole = 'customer',
-    ): array {
-        $providerIdField = $provider.'_id';
-
-        return DB::transaction(function () use ($socialUser, $provider, $providerIdField, $request, $utmPayload, $requestedRole) {
-            // Try to find by provider ID first
-            $user = User::where($providerIdField, $socialUser->getId())->first();
-
-            if ($user) {
-                // Update OAuth avatar if changed
-                if ($socialUser->getAvatar() && $user->oauth_avatar !== $socialUser->getAvatar()) {
-                    $user->update(['oauth_avatar' => $socialUser->getAvatar()]);
-                }
-
-                return ['user' => $user, 'is_new' => false];
-            }
-
-            // Try to find by email — requires EXPLICIT confirmation before linking
-            $existingUser = User::where('email', $socialUser->getEmail())->first();
-
-            if ($existingUser) {
-                $linkingToken = hash('sha256', Str::random(64));
-                $existingUser->update([
-                    'pending_oauth_provider' => $provider,
-                    'pending_oauth_id' => $socialUser->getId(),
-                    'pending_oauth_avatar' => $socialUser->getAvatar(),
-                    'pending_oauth_token' => $linkingToken,
-                    'pending_oauth_expires_at' => now()->addMinutes(5), // Reduced from 15min for security
-                ]);
-
-                // Notify the account owner that someone tried to link a provider to their account
-                Mail::to($existingUser->email, $existingUser->firstname ?? $existingUser->email)
-                    ->queue(new OAuthLinkAttemptMail(
-                        userFirstName: $existingUser->firstname ?? 'Utilisateur',
-                        provider: $provider,
-                        ipAddress: $request->ip() ?? 'inconnu',
-                        attemptedAt: now()->translatedFormat('d F Y à H:i'),
-                        secureAccountUrl: config('app.frontend_url').'/security/sessions',
-                        supportEmail: config('mail.from.address'),
-                    ));
-
-                return [
-                    'user' => $existingUser,
-                    'is_new' => false,
-                    'requires_link_confirmation' => true,
-                    'linking_token' => $linkingToken,
-                ];
-            }
-
-            // Create new user with the sanitized requested role (customer par
-            // défaut, agent quand le flux vient du panel/app owners — jamais
-            // admin). Un agent OAuth démarre en type `individual` ; le
-            // rattachement à une agence passe par l'onboarding post-création.
-            $names = $this->parseNames($socialUser);
-
-            $utm = app(UtmAttributionService::class);
-
-            $user = new User;
-            $user->fill([
-                'firstname' => $names['firstname'],
-                'lastname' => $names['lastname'],
-                'email' => $socialUser->getEmail(),
-                'password' => null,
-                $providerIdField => $socialUser->getId(),
-                'oauth_provider' => $provider,
-                'oauth_avatar' => $socialUser->getAvatar(),
-                'avatar' => $socialUser->getAvatar() ?? 'avatars/default.png',
-            ]);
-            $user->forceFill([
-                'email_verified_at' => now(),
-                'role' => $requestedRole === 'agent' ? UserRole::AGENT : UserRole::CUSTOMER,
-                'type' => 'individual',
-                'is_active' => true,
-                'registration_ip' => $request->ip(),
-                'last_login_ip' => $request->ip(),
-            ]);
-            $user->forceFill($utm->attributesForNewUser($request, $utmPayload));
-            $user->save();
-            $utm->linkSessionVisitsToUser(
-                $user,
-                isset($utmPayload['session_id']) && is_string($utmPayload['session_id']) ? $utmPayload['session_id'] : null,
-            );
-
-            return ['user' => $user, 'is_new' => true];
-        });
-    }
-
-    /**
-     * Whitelist the role a client may request at OAuth account creation.
-     *
-     * Only `customer` (default) and `agent` (owner panel / owners app) are
-     * accepted — `admin` or any other value silently falls back to customer.
-     */
-    private function sanitizeRequestedRole(mixed $role): string
-    {
-        return $role === 'agent' ? 'agent' : 'customer';
-    }
-
-    /**
-     * Parse first and last names from social user data.
-     *
-     * @return array{firstname: string, lastname: string}
-     */
-    private function parseNames(mixed $socialUser): array
-    {
-        $name = $socialUser->getName() ?? '';
-        $parts = explode(' ', $name, 2);
-
-        // Try to get from user array if available
-        $user = method_exists($socialUser, 'getRaw') ? $socialUser->getRaw() : [];
-
-        $firstname = $user['given_name'] ?? $user['first_name'] ?? $parts[0];
-        $lastname = $user['family_name'] ?? $user['last_name'] ?? ($parts[1] ?? '');
-
-        return [
-            'firstname' => $firstname ?: 'Utilisateur',
-            'lastname' => $lastname,
-        ];
     }
 }

@@ -68,9 +68,9 @@ test('public profile for individual agent returns ads and correct structure', fu
 });
 
 test('public profile for agency agent does not lazy-load agency on ads (regression)', function (): void {
-    // Regression: Ad::getPublisherName() accesses $this->agency without a
-    // relationLoaded guard. If 'agency' is not eager-loaded on the Ad query,
-    // it triggers a lazy load which is disabled globally → HTTP 500.
+    // Regression: AdResource::resolvePublisherName() accesses $this->agency
+    // without a relationLoaded guard. If 'agency' is not eager-loaded on the
+    // Ad query, it triggers a lazy load which is disabled globally → HTTP 500.
     $agent = User::factory()->agents()->state(['type' => 'agency'])->create();
 
     Ad::withoutSyncingToSearch(function () use ($agent): void {

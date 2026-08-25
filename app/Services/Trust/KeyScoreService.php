@@ -88,7 +88,7 @@ final class KeyScoreService
             return ['score' => 10, 'max' => 20, 'label' => 'Prix', 'value' => 'Non évalué'];
         }
 
-        $ratio = $ad->price / $median;
+        $ratio = (float) $ad->price / $median;
         $score = match (true) {
             $ratio <= 0.85 => 20,
             $ratio <= 1.0 => 16,

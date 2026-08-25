@@ -10,6 +10,7 @@ use App\Models\Ad;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 /**
  * Distributes a candidate pool of ads across a Facebook-style feed.
@@ -61,7 +62,7 @@ final class AdFeedRankingService
      * Re-order a candidate pool into a paginated, slot-filled page.
      *
      * The candidates collection should already be ordered by relevance
-     * (e.g. `computeRankingScore()`) so the highest-ranked ad inside each
+     * (e.g. `rankingScore()`) so the highest-ranked ad inside each
      * tier wins its slot first.
      *
      * @param  Collection<int, Ad>  $candidates
@@ -190,8 +191,44 @@ final class AdFeedRankingService
             return;
         }
 
-        RecordSponsoredImpressionsJob::dispatch($rows, Auth::id() !== null ? (string) Auth::id() : null)
-            ->onQueue('telemetry');
+        // A fresh batch id per render keys the job's idempotency guard, so a
+        // queue retry or at-least-once redelivery records this page exactly once.
+        RecordSponsoredImpressionsJob::dispatch(
+            $rows,
+            Auth::id() !== null ? (string) Auth::id() : null,
+            (string) Str::uuid(),
+        )->onQueue('telemetry');
+    }
+
+    /**
+     * Compute the final ranking score with time decay and rotation penalty.
+     */
+    public function rankingScore(Ad $ad): float
+    {
+        $baseScore = max(1, (int) ($ad->boost_score ?? 0));
+
+        // Time decay: lose 1% per day since creation, floored at 10%.
+        $ageInDays = $ad->created_at->diffInDays(now(), false);
+        $timeDecayFactor = max(0.1, 1 - ($ageInDays / 100));
+
+        // Rotation penalty: down-rank ads shown in the last 6h to fight fatigue.
+        $rotationPenalty = $ad->last_shown_at && $ad->last_shown_at->isAfter(now()->subHours(6))
+            ? 0.7
+            : 1.0;
+
+        return $baseScore * $ad->rankingMultiplier() * $timeDecayFactor * $rotationPenalty;
+    }
+
+    /**
+     * Record a single ad impression inline (bump counter + last-shown timestamp).
+     *
+     * This is the direct per-ad write; the batched, queued feed telemetry
+     * path lives in {@see recordImpressions()}.
+     */
+    public function recordImpression(Ad $ad): void
+    {
+        $ad->increment('impression_count');
+        $ad->update(['last_shown_at' => now()]);
     }
 
     /**

@@ -259,4 +259,22 @@ return [
         'host' => env('INDEXNOW_HOST', 'keyhome.app'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Nominatim (OpenStreetMap geocoding)
+    |--------------------------------------------------------------------------
+    | OSM usage policy: max 1 request/second, a valid User-Agent, and results
+    | MUST be cached. Every call goes through App\Actions\Geo\Concerns\
+    | InteractsWithNominatim, which enforces a global spacing lock plus a
+    | positive/negative response cache. `min_interval_ms` is set to 0 in tests
+    | so the throttle never sleeps under Http::fake().
+    */
+    'nominatim' => [
+        'url' => env('NOMINATIM_URL', 'https://nominatim.openstreetmap.org/search'),
+        'user_agent' => env('NOMINATIM_USER_AGENT', 'KeyHome/1.0 (contact@keyhome.app)'),
+        'min_interval_ms' => (int) env('NOMINATIM_MIN_INTERVAL_MS', 1000),
+        'ttl' => (int) env('NOMINATIM_CACHE_TTL', 2592000), // 30 days (positive hits)
+        'negative_ttl' => (int) env('NOMINATIM_NEGATIVE_CACHE_TTL', 21600), // 6 h (misses)
+    ],
+
 ];

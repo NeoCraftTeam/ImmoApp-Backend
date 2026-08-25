@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Contracts\AiSearchServiceInterface;
+use App\Contracts\FirebaseMessagingResolverInterface;
 use App\Contracts\PaymentGatewayInterface;
 use App\Contracts\RecommendationEngineInterface;
 use App\Contracts\ReservationServiceInterface;
@@ -20,10 +21,12 @@ use App\Models\PersonalAccessToken;
 use App\Models\User;
 use App\Services\Ai\AiSearchService;
 use App\Services\Ai\RecommendationEngine;
+use App\Services\Notification\FirebaseMessagingFactory;
 use App\Services\Payment\KpayPaymentService;
 use App\Services\Payment\PaymentMethodGateService;
 use App\Services\Payment\PaymentService;
 use App\Services\Payment\StripePaymentService;
+use App\Services\Payment\StripeSavedCardService;
 use App\Services\Rental\ReservationService;
 use App\Services\Rental\ViewingScheduleService;
 use App\Services\Trust\TrustScoreService;
@@ -71,7 +74,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(AiSearchServiceInterface::class, AiSearchService::class);
         $this->app->bind(RecommendationEngineInterface::class, RecommendationEngine::class);
         $this->app->bind(TrustScoreServiceInterface::class, TrustScoreService::class);
-        $this->app->bind(StripeSavedCardServiceInterface::class, StripePaymentService::class);
+        $this->app->bind(StripeSavedCardServiceInterface::class, StripeSavedCardService::class);
 
         // WebAuthn: use cache (Redis) for challenge storage instead of session.
         // The default SessionChallengeRepository breaks with SESSION_DRIVER=cookie
@@ -82,6 +85,11 @@ class AppServiceProvider extends ServiceProvider
         // the runtime overrides are cached per-method and we want a single
         // source of truth across the whole request lifecycle.
         $this->app->singleton(PaymentMethodGateService::class);
+
+        // Shared Firebase Cloud Messaging client. Singleton so long-lived queue
+        // workers reuse one instance (and its OAuth-token cache) across every
+        // FCM push job instead of rebuilding it per job.
+        $this->app->singleton(FirebaseMessagingResolverInterface::class, FirebaseMessagingFactory::class);
 
         $this->app->singleton(PaymentService::class, function ($app): PaymentService {
             $defaultName = (string) config('payment.default', 'kpay');

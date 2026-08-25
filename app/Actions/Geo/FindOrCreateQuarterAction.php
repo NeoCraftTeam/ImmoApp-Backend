@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace App\Actions\Geo;
 
+use App\Actions\Geo\Concerns\InteractsWithNominatim;
 use App\Models\Quarter;
 use Clickbar\Magellan\Data\Geometries\Point;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 
 /**
  * Cherche un quartier par nom + city_id (insensible à la casse).
@@ -15,7 +14,7 @@ use Illuminate\Support\Facades\Log;
  */
 final class FindOrCreateQuarterAction
 {
-    private const string NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
+    use InteractsWithNominatim;
 
     /**
      * @param  array{name: string, city_id: string, city_name?: string|null, country?: string|null}  $data
@@ -56,27 +55,13 @@ final class FindOrCreateQuarterAction
     /** @return array{lat:float,lng:float}|array{} */
     private function geocode(string $quarter, ?string $city, ?string $country): array
     {
-        try {
-            $parts = array_filter([$quarter, $city, $country]);
-            $q = implode(', ', $parts);
+        $parts = array_filter([$quarter, $city, $country]);
+        $results = $this->nominatimSearch(implode(', ', $parts));
 
-            $response = Http::timeout(8)
-                ->withHeaders(['User-Agent' => 'KeyHome/1.0 (contact@keyhome.app)'])
-                ->get(self::NOMINATIM_URL, [
-                    'q' => $q,
-                    'format' => 'json',
-                    'limit' => 1,
-                ]);
-
-            $results = $response->ok() ? $response->json() : [];
-
-            if (!empty($results)) {
-                return ['lat' => (float) $results[0]['lat'], 'lng' => (float) $results[0]['lon']];
-            }
-        } catch (\Throwable $e) {
-            Log::warning("FindOrCreateQuarterAction geocode: {$e->getMessage()}");
+        if ($results === []) {
+            return [];
         }
 
-        return [];
+        return ['lat' => (float) $results[0]['lat'], 'lng' => (float) $results[0]['lon']];
     }
 }

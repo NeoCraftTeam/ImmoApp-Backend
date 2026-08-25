@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Mail\AdminWelcomeEmail;
 use App\Mail\VerificationCodeMail;
+use App\Mail\VerifyEmailMail;
 use App\Mail\WelcomeEmail;
 use App\Models\Setting;
 use App\Models\User;
@@ -145,6 +146,15 @@ it('sendEmailVerificationNotification queues VerificationCodeMail with OTP', fun
 
     Mail::assertQueued(VerificationCodeMail::class, fn ($m) => $m->hasTo($user->email));
     expect(Cache::has('email_otp_'.$user->id))->toBeTrue();
+});
+
+it('sendAdminVerificationEmail queues VerifyEmailMail with a signed link', function (): void {
+    Mail::fake();
+    $admin = User::factory()->admin()->unverified()->create();
+
+    $admin->sendAdminVerificationEmail();
+
+    Mail::assertQueued(VerifyEmailMail::class, fn ($m) => $m->hasTo($admin->email));
 });
 
 // ── OTP Email Verification ─────────────────────────────────────────────────────────────

@@ -58,6 +58,35 @@ En production, ajouter `--force` pour autoriser la reconstruction de
 `geo:sync-osm` restent disponibles séparément pour le diagnostic et la reprise
 d'une étape interrompue.
 
+## Import en production (image Docker sans osm2pgsql)
+
+L'image runtime (`php:8.4-fpm-alpine`, partagée par `app`, `worker`,
+`scheduler`, `reverb`) **ne contient pas `osm2pgsql`** : Alpine ne le package
+pas (`apk add osm2pgsql` → `no such package`). Les services longs n'en ont pas
+besoin, et l'import est une opération **manuelle, rare et hors-deploy** (aucune
+entrée de planificateur).
+
+`osm2pgsql` parle à Postgres **par le réseau** (`--host/--port/--username` +
+`PGPASSWORD`, cf. `ImportOsmExtract`). L'import n'a donc pas à tourner dans le
+conteneur applicatif. Deux façons de le lancer :
+
+1. **Conteneur jetable Debian/Ubuntu** (recommandé) avec `osm2pgsql` via
+   `apt-get`, monté sur le même réseau que la base et sur le volume
+   `storage/app/private/osm/`, code applicatif présent, puis :
+
+   ```bash
+   OSM2PGSQL_BINARY=osm2pgsql php artisan geo:refresh-osm cameroon --force
+   ```
+
+2. **Repli en deux temps** sans osm2pgsql dans l'app : `geo:download-osm` (curl)
+   et `geo:sync-osm` (SQL pur) tournent dans le conteneur `app` normal ; seul
+   `geo:import-osm` exige `osm2pgsql`. On peut donc exécuter `osm2pgsql` à la
+   main (mêmes arguments que `ImportOsmExtract` : `--create --slim --drop
+   --output=flex --style=<keyhome-places.lua> --database=… --host=… --port=…
+   --username=…`) contre la base de prod pour peupler le schéma `osm_import`,
+   puis lancer `php artisan geo:sync-osm <region>` depuis le conteneur `app`
+   pour la synchronisation idempotente vers `city`/`quarter`.
+
 Le téléchargement est atomique (`.part` puis renommage) et validé avec le MD5
 publié par Geofabrik. L'import Flex ne conserve que les lieux et limites
 administratives. Les tables intermédiaires osm2pgsql sont supprimées après

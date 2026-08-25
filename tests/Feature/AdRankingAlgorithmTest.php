@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\AdStatus;
 use App\Enums\SponsorshipTier;
 use App\Models\Ad;
+use App\Services\Ad\AdFeedRankingService;
 use Illuminate\Support\Facades\DB;
 
 it('returns Premium tier when subscription stacks with active manual boost', function (): void {
@@ -94,8 +95,10 @@ it('computes ranking score with time decay', function (): void {
         'created_at' => now()->subDays(60),
     ]);
 
-    expect($recentAd->fresh()->computeRankingScore())
-        ->toBeGreaterThan($oldAd->fresh()->computeRankingScore());
+    $ranker = app(AdFeedRankingService::class);
+
+    expect($ranker->rankingScore($recentAd->fresh()))
+        ->toBeGreaterThan($ranker->rankingScore($oldAd->fresh()));
 });
 
 it('applies rotation penalty for recently shown ads', function (): void {
@@ -107,7 +110,7 @@ it('applies rotation penalty for recently shown ads', function (): void {
 
     // Score without penalty would be 100 * 1.8 * timeDecay ≈ 180.
     // With the 0.7 rotation penalty applied it must stay under 180.
-    expect($ad->computeRankingScore())->toBeLessThan(180);
+    expect(app(AdFeedRankingService::class)->rankingScore($ad))->toBeLessThan(180);
 });
 
 it('records impression and updates timestamp', function (): void {
@@ -116,7 +119,7 @@ it('records impression and updates timestamp', function (): void {
         'last_shown_at' => null,
     ]);
 
-    $ad->recordImpression();
+    app(AdFeedRankingService::class)->recordImpression($ad);
     $ad->refresh();
 
     expect($ad->impression_count)->toBe(6)
@@ -153,4 +156,19 @@ it('orders ads by sponsorship ranking', function (): void {
     expect($orderedAds->first()->id)->toBe($subscriptionAd->id)
         ->and($orderedAds->skip(1)->first()->id)->toBe($boostedAd->id)
         ->and($orderedAds->last()->id)->toBe($organicAd->id);
+});
+
+it('invalidates the memoised sponsorship tier when a boost flag flips on the instance', function (): void {
+    $ad = Ad::factory()->create([
+        'is_subscription_sponsored' => false,
+        'is_boosted' => false,
+        'boost_score' => 0,
+    ]);
+
+    expect($ad->sponsorshipTier())->toBe(SponsorshipTier::ORGANIC);
+
+    // Flip a tier input on the same instance — setAttribute() must drop the memo.
+    $ad->is_subscription_sponsored = true;
+
+    expect($ad->sponsorshipTier())->toBe(SponsorshipTier::SUBSCRIPTION);
 });

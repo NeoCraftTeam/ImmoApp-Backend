@@ -8,11 +8,11 @@ namespace App\Models;
 
 use App\Enums\UserRole;
 use App\Enums\UserType;
-use App\Mail\ForgotPasswordMail;
-use App\Mail\VerificationCodeMail;
-use App\Mail\VerifyEmailMail;
 use App\Models\Concerns\HasAdminPermissions;
-use App\Services\Auth\OtpService;
+use App\Models\Concerns\HasMultiFactorAuthentication;
+use App\Models\Concerns\HasRolesAndType;
+use App\Models\Concerns\InteractsWithFilamentPanels;
+use App\Services\Auth\UserAuthMailer;
 use App\Services\AvatarGeneratorService;
 use App\Support\ChatAvatarUrl;
 use Clickbar\Magellan\Data\Geometries\Point;
@@ -25,26 +25,22 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasAvatar;
 use Filament\Models\Contracts\HasName;
 use Filament\Models\Contracts\HasTenants;
-use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Http\Request;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Notifications\DatabaseNotificationCollection;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Laragear\WebAuthn\Contracts\WebAuthnAuthenticatable;
@@ -158,6 +154,7 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     /** @use HasFactory<UserFactory> */
     use HasAdminPermissions, HasApiTokens, HasFactory, HasPushSubscriptions, HasUuids, \Illuminate\Auth\MustVerifyEmail, LogsActivity, Notifiable, SoftDeletes;
 
+    use HasMultiFactorAuthentication, HasRolesAndType, InteractsWithFilamentPanels;
     use InteractsWithMedia;
     use WebAuthnAuthentication;
 
@@ -314,75 +311,21 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     /**
-     * Returns true if the user may publish ads (agent or admin).
+     * Replace the avatar media from an uploaded `avatar` file on the request.
+     *
+     * No-op when the request carries no avatar file, so the model's default
+     * avatar (assigned on creation) is preserved.
      */
-    public function canPublishAds(): bool
+    public function syncAvatarFromRequest(Request $request): void
     {
-        return in_array($this->role, [UserRole::AGENT, UserRole::ADMIN]);
-    }
+        if (!$request->hasFile('avatar')) {
+            return;
+        }
 
-    /**
-     * Returns true if the user holds the Agent role.
-     */
-    public function isAgent(): bool
-    {
-        return $this->role === UserRole::AGENT;
-    }
-
-    /**
-     * Integrated Next.js owner panel (/owner/*) — AGENT only; admins use Filament.
-     */
-    public function mayAccessOwnerPanel(): bool
-    {
-        return $this->isAgent();
-    }
-
-    /**
-     * Sanctum token name prefix for API session isolation (owner vs client).
-     */
-    public function sanctumSessionPrefix(): string
-    {
-        return $this->isAgent() ? 'owner' : 'client';
-    }
-
-    /**
-     * Returns true if the user holds the Admin role.
-     */
-    public function isAdmin(): bool
-    {
-        return $this->role === UserRole::ADMIN;
-    }
-
-    /**
-     * Returns true if the user holds the Customer role.
-     */
-    public function isCustomer(): bool
-    {
-        return $this->role === UserRole::CUSTOMER;
-    }
-
-    /**
-     * Returns true if the user's type is Individual.
-     */
-    public function isAnIndividual(): bool
-    {
-        return $this->type === UserType::INDIVIDUAL;
-    }
-
-    /**
-     * Returns true if the user's type is Agency.
-     */
-    public function isAnAgency(): bool
-    {
-        return $this->type === UserType::AGENCY;
-    }
-
-    /**
-     * Returns true when the user must change their password on next login.
-     */
-    public function hasMustChangePassword(): bool
-    {
-        return $this->must_change_password_at !== null;
+        $this->clearMediaCollection('avatars');
+        $this->addMediaFromRequest('avatar')
+            ->usingName($this->firstname.'_'.$this->lastname.'_avatar')
+            ->toMediaCollection('avatars');
     }
 
     // =========================================================================
@@ -573,86 +516,8 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     }
 
     // =========================================================================
-    // Filament contracts
+    // Chat & realtime helpers
     // =========================================================================
-
-    /**
-     * Determine whether this user may access the given Filament panel.
-     */
-    public function canAccessPanel(Panel $panel): bool
-    {
-        if ($this->isAdmin()) {
-            return true;
-        }
-
-        $panelId = $panel->getId();
-
-        if ($panelId === 'agency') {
-            return $this->role === UserRole::AGENT && $this->type === UserType::AGENCY;
-        }
-
-        if ($panelId === 'bailleur') {
-            return $this->role === UserRole::AGENT && $this->type === UserType::INDIVIDUAL;
-        }
-
-        return false;
-    }
-
-    /**
-     * Return the tenants (agencies) accessible to this user for the given panel.
-     *
-     * @return Collection<int, Agency>
-     */
-    public function getTenants(Panel $panel): Collection
-    {
-        if ($this->isAdmin()) {
-            return Agency::all();
-        }
-
-        return collect([$this->agency])->filter();
-    }
-
-    /**
-     * Determine whether this user can access a specific tenant.
-     */
-    public function canAccessTenant(Model $tenant): bool
-    {
-        if ($this->isAdmin()) {
-            return true;
-        }
-
-        return $this->agency_id === $tenant->getKey();
-    }
-
-    /**
-     * Return the user's display name for Filament UI.
-     */
-    public function getFilamentName(): string
-    {
-        return "{$this->firstname} {$this->lastname}";
-    }
-
-    /**
-     * Return a publicly accessible avatar URL for the Filament UI.
-     *
-     * Returns null (letting Filament render its placeholder) when no avatar
-     * is stored or the file no longer exists on disk.
-     */
-    public function getFilamentAvatarUrl(): ?string
-    {
-        if (str_starts_with($this->avatar ?? '', 'http')) {
-            return $this->avatar;
-        }
-
-        $disk = config('filesystems.app_media_disk');
-
-        if ($this->avatar && Storage::disk($disk)->exists($this->avatar)) {
-            return Storage::disk($disk)->url($this->avatar);
-        }
-
-        // Privacy: Return null to let Filament/Frontend handle the default placeholder.
-        return null;
-    }
 
     /**
      * Avatar URL for chat APIs and realtime payloads (Spatie avatars → avatar column → null).
@@ -686,71 +551,6 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     public function webAuthnData(): WebAuthnData
     {
         return WebAuthnData::make($this->email, trim("{$this->firstname} {$this->lastname}"));
-    }
-
-    // =========================================================================
-    // Multi-factor: TOTP App
-    // =========================================================================
-
-    /** {@inheritDoc} */
-    public function getAppAuthenticationSecret(): ?string
-    {
-        return $this->app_authentication_secret;
-    }
-
-    /** {@inheritDoc} */
-    public function saveAppAuthenticationSecret(?string $secret): void
-    {
-        $this->app_authentication_secret = $secret;
-        $this->save();
-    }
-
-    /**
-     * Return the account label shown inside the user's authenticator app.
-     *
-     * Using the email address ensures uniqueness across multiple accounts.
-     */
-    public function getAppAuthenticationHolderName(): string
-    {
-        return $this->email;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @return array<string>|null
-     */
-    public function getAppAuthenticationRecoveryCodes(): ?array
-    {
-        return $this->app_authentication_recovery_codes;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * @param  array<string>|null  $codes
-     */
-    public function saveAppAuthenticationRecoveryCodes(?array $codes): void
-    {
-        $this->app_authentication_recovery_codes = $codes;
-        $this->save();
-    }
-
-    // =========================================================================
-    // Multi-factor: Email OTP
-    // =========================================================================
-
-    /** {@inheritDoc} */
-    public function hasEmailAuthentication(): bool
-    {
-        return (bool) $this->has_email_authentication;
-    }
-
-    /** {@inheritDoc} */
-    public function toggleEmailAuthentication(bool $condition): void
-    {
-        $this->has_email_authentication = $condition;
-        $this->save();
     }
 
     // =========================================================================
@@ -810,37 +610,16 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     #[\Override]
     public function sendPasswordResetNotification(mixed $token): void
     {
-        $resetUrl = config('app.frontend_url').'/reset-password?token='.urlencode((string) $token).'&email='.urlencode($this->email);
-
-        $requestedFrom = request()->ip() ?? 'inconnu';
-        $requestedAt = now()->translatedFormat('d F Y à H:i');
-
-        Mail::to($this->email, $this->firstname)
-            ->queue(new ForgotPasswordMail($resetUrl, $requestedFrom, $requestedAt, $this->role->value));
+        app(UserAuthMailer::class)->sendPasswordReset($this, $token);
     }
 
     /**
      * Send a 6-digit OTP code for email verification instead of a magic link.
-     *
-     * OTP generation and cache management is delegated to {@see OtpService}.
-     * A per-user cooldown prevents flooding when the method is called repeatedly.
      */
     #[\Override]
     public function sendEmailVerificationNotification(): void
     {
-        $otpService = app(OtpService::class);
-
-        if ($otpService->isCoolingDown((string) $this->id)) {
-            return;
-        }
-
-        $otp = $otpService->generate((string) $this->id);
-
-        $requestedFrom = request()->ip() ?? 'inconnu';
-        $requestedAt = now()->translatedFormat('d F Y à H:i');
-
-        Mail::to($this->email, $this->firstname)
-            ->queue(new VerificationCodeMail($otp, $requestedFrom, $requestedAt, $this->role->value));
+        app(UserAuthMailer::class)->sendEmailVerification($this);
     }
 
     /**
@@ -848,22 +627,6 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
      */
     public function sendAdminVerificationEmail(): void
     {
-        $ttlMinutes = (int) config('auth.verification.expire', 60);
-
-        URL::forceRootUrl(config('app.url'));
-
-        $verificationUrl = URL::temporarySignedRoute(
-            'verification.verify',
-            now()->addMinutes($ttlMinutes),
-            ['id' => $this->getKey(), 'hash' => sha1((string) $this->getEmailForVerification())],
-        );
-
-        URL::forceRootUrl(config('app.url'));
-
-        $requestedFrom = request()->ip() ?? 'inconnu';
-        $requestedAt = now()->translatedFormat('d F Y à H:i');
-
-        Mail::to($this->email, $this->firstname)
-            ->queue(new VerifyEmailMail($verificationUrl, $ttlMinutes, $requestedFrom, $requestedAt));
+        app(UserAuthMailer::class)->sendAdminVerification($this);
     }
 }

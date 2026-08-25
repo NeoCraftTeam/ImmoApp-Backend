@@ -164,6 +164,16 @@ final class CreditController
             ? $validated['payment_method_id']
             : null;
 
+        // Idempotency guard: prevent a double-click / retry from creating
+        // duplicate PENDING credit payments for the same package.
+        $lock = Cache::lock("credits:purchase:{$user->id}:{$package->id}", 15);
+
+        if (!$lock->get()) {
+            return response()->json([
+                'message' => 'Paiement en cours de traitement, veuillez patienter.',
+            ], 409);
+        }
+
         try {
             $result = $this->paymentService->createPayment($user, [
                 'amount' => (float) $package->price,
@@ -195,6 +205,8 @@ final class CreditController
                 'code' => $status === 422 ? 'PAYMENT_VALIDATION_ERROR' : 'PAYMENT_GATEWAY_ERROR',
                 'error' => config('app.debug') ? $e->getMessage() : null,
             ], $status);
+        } finally {
+            $lock->release();
         }
 
         return response()->json([
@@ -312,6 +324,7 @@ final class CreditController
         $synced = $this->paymentService->syncPaymentStatus(
             $payment,
             $validated['reference'] ?? null,
+            useVerifyThrottle: true,
         );
 
         if ($synced->status === PaymentStatus::PENDING && !empty($validated['gateway_redirect_status'])) {

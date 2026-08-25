@@ -14,6 +14,7 @@ use App\Models\PointPackage;
 use App\Models\User;
 use App\Services\Payment\PaymentService;
 use App\Services\Payment\StripePaymentService;
+use App\Services\Payment\StripeSavedCardService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Event;
 use Stripe\Exception\InvalidRequestException;
@@ -482,7 +483,7 @@ function bindMissingCustomerStripeClient(): void
 it('returns an empty card list from the real service when Stripe reports a missing customer', function (): void {
     bindMissingCustomerStripeClient();
 
-    $service = new StripePaymentService;
+    $service = new StripeSavedCardService;
 
     expect($service->listSavedCards('cus_stale'))->toBe([]);
 });
@@ -490,7 +491,7 @@ it('returns an empty card list from the real service when Stripe reports a missi
 it('throws StripeCustomerMissingException from the real service on setup-intent for a missing customer', function (): void {
     bindMissingCustomerStripeClient();
 
-    $service = new StripePaymentService;
+    $service = new StripeSavedCardService;
 
     $service->createSetupIntent('cus_stale');
 })->throws(StripeCustomerMissingException::class);

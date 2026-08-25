@@ -18,7 +18,9 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\Payment\PaymentService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -30,6 +32,20 @@ final class SubscriptionService
 
     /** Extra days auto_renew subscriptions stay active past expiry before de-boosting. */
     private const int GRACE_PERIOD_DAYS = 3;
+
+    /**
+     * Active plans for the public catalogue, ordered by display priority and
+     * cached for a day. Extracted from SubscriptionController::plans().
+     *
+     * @return Collection<int, SubscriptionPlan>
+     */
+    public function activePlans(): Collection
+    {
+        return Cache::remember('subscription:plans:active', now()->addHours(24), fn () => SubscriptionPlan::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->get());
+    }
 
     /**
      * Create a new subscription for an agency.

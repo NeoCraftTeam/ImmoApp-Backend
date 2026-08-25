@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -43,11 +44,22 @@ final class RecordSponsoredImpressionsJob implements ShouldQueue
     public int $timeout = 30;
 
     /**
+     * TTL for the per-batch idempotency marker. Comfortably longer than any
+     * realistic redelivery window (visibility timeout + retry backoff), so a
+     * duplicate delivery of an already-recorded batch always sees the guard.
+     */
+    private const int RECORDED_GUARD_TTL_SECONDS = 86_400;
+
+    /**
      * @param  list<ImpressionRow>  $rows
+     * @param  string  $batchId  Stable per-dispatch id, identical across retries and
+     *                           redeliveries of the same serialised job. Keys the
+     *                           idempotency guard so a batch is recorded exactly once.
      */
     public function __construct(
         public readonly array $rows,
         public readonly ?string $userId,
+        public readonly string $batchId,
     ) {}
 
     public function handle(): void
@@ -56,24 +68,49 @@ final class RecordSponsoredImpressionsJob implements ShouldQueue
             return;
         }
 
-        $now = now();
-        $ids = array_values(array_unique(array_column($this->rows, 'ad_id')));
+        // Idempotency guard. The job runs under at-least-once delivery at
+        // `$tries = 2`, and its two writes are not naturally idempotent: a
+        // redelivery (or a retry after a partial-write failure) would
+        // re-increment `impression_count` and re-insert `sponsored_impressions`
+        // rows — the latter is the source of truth for advertiser billing, so
+        // duplicates over-bill. `Cache::add` is atomic: the first handler for a
+        // batch wins; any later delivery of the same batch short-circuits here.
+        $guardKey = 'sponsored-impressions:recorded:'.$this->batchId;
 
-        Ad::query()->whereIn('id', $ids)->update([
-            'last_shown_at' => $now,
-            'impression_count' => DB::raw('impression_count + 1'),
-        ]);
+        if (!Cache::add($guardKey, true, self::RECORDED_GUARD_TTL_SECONDS)) {
+            return;
+        }
 
-        $impressions = array_map(fn (array $row): array => [
-            'id' => (string) Str::uuid(),
-            'ad_id' => $row['ad_id'],
-            'user_id' => $this->userId,
-            'tier' => $row['tier'],
-            'slot' => $row['slot'],
-            'shown_at' => $now,
-        ], $this->rows);
+        try {
+            DB::transaction(function (): void {
+                $now = now();
+                $ids = array_values(array_unique(array_column($this->rows, 'ad_id')));
 
-        SponsoredImpression::query()->insert($impressions);
+                Ad::query()->whereIn('id', $ids)->update([
+                    'last_shown_at' => $now,
+                    'impression_count' => DB::raw('impression_count + 1'),
+                ]);
+
+                $impressions = array_map(fn (array $row): array => [
+                    'id' => (string) Str::uuid(),
+                    'ad_id' => $row['ad_id'],
+                    'user_id' => $this->userId,
+                    'tier' => $row['tier'],
+                    'slot' => $row['slot'],
+                    'shown_at' => $now,
+                ], $this->rows);
+
+                SponsoredImpression::query()->insert($impressions);
+            });
+        } catch (Throwable $e) {
+            // The transaction rolled back, so nothing was recorded — release
+            // the guard so the legitimate retry can re-run this batch. Without
+            // it, a transient failure would leave the guard set and silently
+            // drop the batch on the next attempt.
+            Cache::forget($guardKey);
+
+            throw $e;
+        }
     }
 
     /**

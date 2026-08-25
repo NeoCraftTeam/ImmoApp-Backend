@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Payment;
 
-use App\Enums\PaymentType;
+use App\Actions\InitiateSubscriptionPayment;
+use App\Http\Requests\Api\V1\ChangeSubscriptionPlanRequest;
 use App\Http\Requests\Api\V1\SubscribeRequest;
 use App\Http\Resources\SubscriptionPlanResource;
 use App\Http\Resources\SubscriptionResource;
@@ -13,13 +14,11 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPlan;
 use App\Models\User;
 use App\Services\Monetization\SubscriptionService;
-use App\Services\Payment\PaymentService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Validation\Rule;
 use OpenApi\Annotations as OA;
 
 /**
@@ -31,8 +30,8 @@ use OpenApi\Annotations as OA;
 final class SubscriptionController
 {
     public function __construct(
-        protected PaymentService $paymentService,
         protected SubscriptionService $subscriptionService,
+        protected InitiateSubscriptionPayment $initiateSubscriptionPayment,
     ) {}
 
     /**
@@ -81,12 +80,7 @@ final class SubscriptionController
      */
     public function plans(): AnonymousResourceCollection
     {
-        $plans = Cache::remember('subscription:plans:active', now()->addHours(24), fn () => SubscriptionPlan::query()
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->get());
-
-        return SubscriptionPlanResource::collection($plans);
+        return SubscriptionPlanResource::collection($this->subscriptionService->activePlans());
     }
 
     /**
@@ -254,7 +248,7 @@ final class SubscriptionController
         }
 
         $plan = SubscriptionPlan::findOrFail($request->validated('plan_id'));
-        $period = $request->validated('billing_period');
+        $period = (string) $request->validated('billing_period');
 
         if (!$plan->is_active) {
             return response()->json([
@@ -262,7 +256,7 @@ final class SubscriptionController
             ], 422);
         }
 
-        $amount = $period === 'yearly' ? (int) $plan->price_yearly : (int) $plan->price;
+        $amount = $plan->priceForPeriod($period);
 
         if ($amount <= 0) {
             return response()->json([
@@ -289,21 +283,14 @@ final class SubscriptionController
         }
 
         try {
-            $result = $this->paymentService->createPayment($user, [
-                'amount' => (float) $amount,
-                'type' => PaymentType::SUBSCRIPTION->value,
-                'payment_method' => 'orange_money',
-                'agency_id' => $agency->id,
-                'plan_id' => $plan->id,
-                'period' => $period,
-                'description' => "Abonnement {$plan->name} ({$period})",
-                'meta' => [
-                    'payment_type' => 'subscription',
-                    'agency_id' => $agency->id,
-                    'plan_id' => $plan->id,
-                    'period' => $period,
-                ],
-            ]);
+            $result = $this->initiateSubscriptionPayment->execute(
+                $user,
+                $agency,
+                $plan,
+                $period,
+                $amount,
+                "Abonnement {$plan->name} ({$period})",
+            );
 
             $lock->release();
 
@@ -625,8 +612,8 @@ final class SubscriptionController
             ], 422);
         }
 
-        $period = $subscription->billing_period ?? 'monthly';
-        $amount = $period === 'yearly' ? (int) $plan->price_yearly : (int) $plan->price;
+        $period = (string) ($subscription->billing_period ?? 'monthly');
+        $amount = $plan->priceForPeriod($period);
 
         if ($amount <= 0) {
             return response()->json([
@@ -640,23 +627,16 @@ final class SubscriptionController
         // gateway webhook confirms payment. We only create the payment row
         // and hand back the gateway link here.
         try {
-            $result = $this->paymentService->createPayment($user, [
-                'amount' => (float) $amount,
-                'type' => PaymentType::SUBSCRIPTION->value,
-                'payment_method' => 'orange_money',
-                'agency_id' => $agency->id,
-                'plan_id' => $plan->id,
-                'period' => $period,
-                'description' => "Renouvellement {$plan->name} ({$period})",
-                'meta' => [
-                    'payment_type' => 'subscription',
-                    'action' => 'renew',
-                    'agency_id' => $agency->id,
-                    'plan_id' => $plan->id,
-                    'subscription_id' => $subscription->id,
-                    'period' => $period,
-                ],
-            ]);
+            $result = $this->initiateSubscriptionPayment->execute(
+                $user,
+                $agency,
+                $plan,
+                $period,
+                $amount,
+                "Renouvellement {$plan->name} ({$period})",
+                'renew',
+                $subscription,
+            );
 
             return response()->json([
                 'payment_url' => $result['link'],
@@ -710,13 +690,8 @@ final class SubscriptionController
      *     @OA\Response(response=422, description="Plan invalide ou déjà souscrit")
      * )
      */
-    public function upgrade(Request $request): JsonResponse
+    public function upgrade(ChangeSubscriptionPlanRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'plan_id' => ['required', 'string', 'exists:subscription_plans,id'],
-            'billing_period' => ['required', 'string', Rule::in(['monthly', 'yearly'])],
-        ]);
-
         /** @var User $user */
         $user = $request->user();
         /** @var Agency|null $agency */
@@ -744,7 +719,7 @@ final class SubscriptionController
             ], 404);
         }
 
-        $newPlan = SubscriptionPlan::findOrFail($validated['plan_id']);
+        $newPlan = SubscriptionPlan::findOrFail($request->validated('plan_id'));
 
         if (!$newPlan->is_active) {
             return response()->json([
@@ -758,8 +733,8 @@ final class SubscriptionController
             ], 422);
         }
 
-        $period = $validated['billing_period'];
-        $amount = $period === 'yearly' ? (int) $newPlan->price_yearly : (int) $newPlan->price;
+        $period = (string) $request->validated('billing_period');
+        $amount = $newPlan->priceForPeriod($period);
 
         if ($amount <= 0) {
             return response()->json([
@@ -776,23 +751,16 @@ final class SubscriptionController
         // period. We only create the payment row here and hand back the
         // gateway checkout link.
         try {
-            $result = $this->paymentService->createPayment($user, [
-                'amount' => (float) $amount,
-                'type' => PaymentType::SUBSCRIPTION->value,
-                'payment_method' => 'orange_money',
-                'agency_id' => $agency->id,
-                'plan_id' => $newPlan->id,
-                'period' => $period,
-                'description' => "Mise à niveau vers {$newPlan->name} ({$period})",
-                'meta' => [
-                    'payment_type' => 'subscription',
-                    'action' => 'upgrade',
-                    'agency_id' => $agency->id,
-                    'plan_id' => $newPlan->id,
-                    'subscription_id' => $subscription->id,
-                    'period' => $period,
-                ],
-            ]);
+            $result = $this->initiateSubscriptionPayment->execute(
+                $user,
+                $agency,
+                $newPlan,
+                $period,
+                $amount,
+                "Mise à niveau vers {$newPlan->name} ({$period})",
+                'upgrade',
+                $subscription,
+            );
 
             return response()->json([
                 'payment_url' => $result['link'],
@@ -846,13 +814,8 @@ final class SubscriptionController
      *     @OA\Response(response=422, description="Plan invalide ou déjà souscrit")
      * )
      */
-    public function downgrade(Request $request): JsonResponse
+    public function downgrade(ChangeSubscriptionPlanRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'plan_id' => ['required', 'string', 'exists:subscription_plans,id'],
-            'billing_period' => ['required', 'string', Rule::in(['monthly', 'yearly'])],
-        ]);
-
         /** @var User $user */
         $user = $request->user();
         /** @var Agency|null $agency */
@@ -879,7 +842,7 @@ final class SubscriptionController
             ], 404);
         }
 
-        $newPlan = SubscriptionPlan::findOrFail($validated['plan_id']);
+        $newPlan = SubscriptionPlan::findOrFail($request->validated('plan_id'));
 
         if (!$newPlan->is_active) {
             return response()->json([
@@ -893,7 +856,7 @@ final class SubscriptionController
             ], 422);
         }
 
-        $subscription->downgradeTo($newPlan, $validated['billing_period']);
+        $subscription->downgradeTo($newPlan, $request->validated('billing_period'));
 
         return response()->json([
             'message' => 'L\'abonnement sera rétrogradé à la fin de la période actuelle.',

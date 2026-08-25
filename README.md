@@ -13,8 +13,8 @@ tours virtuels 360°, intelligence artificielle, alertes de recherche, et plus.
 | **Recherche** | Meilisearch v1.10 |
 | **Panels admin** | Filament 4 — 2 panels : Admin (`/admin`), Agency (`/agency`) |
 | **Frontend web** | Next.js 16 dans `keyhome-frontend-next/` |
-| **Paiement** | Flutterwave |
-| **Files d'attente** | Redis — queues : `critical`, `payments`, `emails`, `default`, `tours` |
+| **Paiement** | Kpay (mobile money, défaut) + Stripe (cartes) — multi-passerelle |
+| **Files d'attente** | Redis — queues : `critical`, `payments`, `notifications`, `emails`, `default`, `tours` |
 | **Stockage média** | Cloudflare R2 (prod) / local (dev) |
 | **Monitoring** | Sentry, Laravel Pulse, Telescope, Laravel Nightwatch |
 | **Proxy inverse** | Traefik (HTTPS Let's Encrypt) |
@@ -189,7 +189,7 @@ php artisan test --filter="it can login with valid credentials"
 ```
 
 Nécessite une base PostgreSQL `testing` (voir `phpunit.xml`).
-Driver Meilisearch : `null` en tests. Clés Flutterwave factices en tests.
+Driver Meilisearch : `null` en tests. Clés Kpay/Stripe factices en tests.
 
 ## Référentiel géographique OpenStreetMap
 
@@ -527,7 +527,7 @@ docker compose exec app php artisan backup:run
 ## Fonctionnalités principales
 
 1. **Annonces** — Machine à états (`pending → available → reserved/rent/sold`), boost, slug, expiration.
-2. **Déblocage payant** — Paiement Flutterwave pour les coordonnées de contact (montant côté serveur).
+2. **Déblocage payant** — Paiement Kpay/Stripe pour les coordonnées de contact (montant résolu côté serveur).
 3. **Abonnements agences** — Plans mensuel/annuel avec limites d'annonces et fonctionnalités premium.
 4. **Crédits (points)** — Portefeuille `PointPackage` / `PointTransaction`, achat & consommation.
 5. **Boost d'annonces** — Automatique via abonnement ou achat de crédits.
@@ -587,18 +587,20 @@ AES-GCM 256, clé non-extractible WebCrypto en IndexedDB. Mobile : AES-256
 
 | Couche | Répertoire | Règle |
 |---|---|---|
-| Controllers | `app/Http/Controllers/Api/V1/` | `final`, Form Requests, zéro logique métier |
-| Services | `app/Services/` | `final readonly`, logique métier, injection DI |
-| Actions | `app/Actions/` | Classes à usage unique |
-| DTOs | `app/DTOs/` | Value objects immuables |
+| Controllers | `app/Http/Controllers/Api/V1/` | `final`, Form Requests, injection DI ; délèguent les opérations métier aux Services et Actions |
+| Services | `app/Services/` | Logique métier, injection DI, groupés par domaine (`Ad/`, `Auth/`, `Chat/`, `Payment/`, `Geo/`, `Rental/`, `Monetization/`…) ; `final` (`readonly` dès que l'état le permet) |
+| Actions | `app/Actions/` | Classes à responsabilité unique (`execute()` / `handle()`) — ex. `CreateAd`, `UnlockAd`, `InitiateSubscriptionPayment`, `HandlePostPaymentActions` |
+| DTOs | `app/DTOs/` | Value objects immuables `final readonly` (`LoginResult`, `AdFeedResult`, `PromoCodeApplication`…) |
 | Models | `app/Models/` | Eloquent, UUID, soft delete, Spatie Media Library |
-| Support | `app/Support/` | Utilitaires (`ApiResponse`, `GeoLocation`, `PanelUrl`…) |
+| Support | `app/Support/` | Utilitaires sans état (`ApiResponse`, `GeoLocation`, `PanelUrl`, `Money`…) |
 
-## Paiement (Flutterwave)
+## Paiement (Kpay + Stripe)
 
-- Pattern Stratégie : `PaymentGatewayInterface` → `FlutterwavePaymentService`
-- `PaymentService` : orchestrateur injecté via DI dans `AppServiceProvider`
-- Montants résolus côté serveur depuis `PointPackage` / `SubscriptionPlan` — jamais côté client
+- Pattern Stratégie : `PaymentGatewayInterface` → `KpayPaymentService` (mobile money, passerelle par défaut) et `StripePaymentService` (cartes)
+- `PaymentService` : orchestrateur multi-passerelle injecté via DI dans `AppServiceProvider` — passerelle par défaut résolue depuis `config('payment.default')` (`kpay`), Stripe toujours enregistré pour les paiements par carte
+- Montants résolus côté serveur par `PaymentPricingResolver` depuis `PointPackage` / `SubscriptionPlan` — jamais côté client
+- Codes promo appliqués par `PromoCodeApplicator`
+- Webhooks : Stripe (signature vérifiée sur le corps brut) et Kpay, traités via `PaymentService::processWebhook()`
 - Verrous DB (`lockForUpdate`) contre la double-dépense
 - Events : `PaymentInitiated`, `PaymentSucceeded`, `PaymentFailed`
 - `RefundService` : traitement des remboursements
@@ -610,7 +612,7 @@ AES-GCM 256, clé non-extractible WebCrypto en IndexedDB. Mobile : AES-256
 | Service | Image | Rôle |
 |---|---|---|
 | `app` | `keyhome-backend` (Dockerfile) | PHP-FPM (Laravel) |
-| `worker` | `keyhome-backend` | Queue `critical,payments,emails,default` (tries=3, timeout=90s) |
+| `worker` | `keyhome-backend` | Queue `critical,payments,notifications,emails,default` (tries=3, timeout=90s) |
 | `worker-tours` | `keyhome-backend` | Queue `tours` (tries=2, timeout=900s, 512 MB) |
 | `nightwatch-agent` | `laravelphp/nightwatch-agent` | Laravel Nightwatch |
 | `web` | `nginx:alpine` | Nginx — port `WEB_PORT` (défaut 9090) |

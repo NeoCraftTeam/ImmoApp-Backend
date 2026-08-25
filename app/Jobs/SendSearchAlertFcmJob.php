@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs;
 
+use App\Contracts\FirebaseMessagingResolverInterface;
 use App\Models\Ad;
 use App\Models\FcmToken;
 use Illuminate\Bus\Queueable;
@@ -13,7 +14,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Kreait\Firebase\Exception\Messaging\NotFound;
-use Kreait\Firebase\Factory;
 use Kreait\Firebase\Messaging\AndroidConfig;
 use Kreait\Firebase\Messaging\ApnsConfig;
 use Kreait\Firebase\Messaging\CloudMessage;
@@ -39,7 +39,7 @@ final class SendSearchAlertFcmJob implements ShouldQueue
         $this->onQueue('notifications');
     }
 
-    public function handle(): void
+    public function handle(FirebaseMessagingResolverInterface $firebase): void
     {
         $ad = Ad::query()->find($this->adId);
 
@@ -58,22 +58,12 @@ final class SendSearchAlertFcmJob implements ShouldQueue
         $body = $ad->title.' — '.number_format((float) ($ad->price ?? 0), 0, ',', ' ').' FCFA';
         $adUrl = rtrim((string) config('app.frontend_url'), '/').'/ads/'.rawurlencode((string) $ad->slug);
 
-        $credentialsPath = (string) config('chat.firebase.credentials');
-        if (!file_exists(storage_path('../'.ltrim($credentialsPath, '/')))) {
-            $credentialsPath = storage_path('app/firebase-credentials.json');
-        }
-
-        if (!file_exists($credentialsPath)) {
-            Log::warning('[FCM] Firebase credentials not found. Skipping search-alert push.', [
-                'path' => $credentialsPath,
-            ]);
-
-            return;
-        }
-
         try {
-            $factory = (new Factory)->withServiceAccount($credentialsPath);
-            $messaging = $factory->createMessaging();
+            $messaging = $firebase->make();
+
+            if ($messaging === null) {
+                return;
+            }
 
             $invalidTokenIds = [];
 
