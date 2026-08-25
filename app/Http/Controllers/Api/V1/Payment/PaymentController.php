@@ -16,15 +16,15 @@ use App\Http\Requests\Api\V1\VerifyPaymentRequest;
 use App\Http\Resources\PaymentResource;
 use App\Jobs\ProcessPaymentWebhookJob;
 use App\Models\Payment;
-use App\Models\PromoCode;
-use App\Models\PromoCodeUsage;
 use App\Models\User;
 use App\Services\Payment\PaymentPricingResolver;
 use App\Services\Payment\PaymentService;
+use App\Services\Payment\PromoCodeApplicator;
 use App\Support\FrontendRedirectGuard;
+use App\Support\PaymentPdfRenderer;
 use App\Support\PaymentPresentation;
 use App\Support\PaymentTransactionLookup;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\VisitorLocalePdfHints;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -39,29 +39,11 @@ use OpenApi\Annotations as OA;
  */
 final class PaymentController
 {
-    /**
-     * ISO 4217 codes accepted by {@see resolveVisitorLocalePdfHints()} mapped to a display symbol for PDF receipts.
-     *
-     * @var array<string, string>
-     */
-    private const array VISITOR_LOCALE_SYMBOL_BY_CCY = [
-        'EUR' => '€',
-        'USD' => '$',
-        'CAD' => '$',
-        'AUD' => '$',
-        'MXN' => '$',
-        'BRL' => '$',
-        'GBP' => '£',
-        'CHF' => 'CHF',
-        'JPY' => '¥',
-        'CNY' => '¥',
-        'KRW' => '₩',
-    ];
-
     public function __construct(
         protected HandlePostPaymentActions $postPaymentActions,
         protected PaymentService $paymentService,
         protected PaymentPricingResolver $pricingResolver,
+        protected PromoCodeApplicator $promoApplicator,
     ) {}
 
     /**
@@ -143,19 +125,12 @@ final class PaymentController
         // to prevent race conditions on single-use promo codes.
         try {
             return DB::transaction(function () use ($validated, $user, $type, $amount, $stripeHosted, $redirectUrl): JsonResponse {
-                $appliedPromoCode = null;
-                $finalAmount = $amount;
-
-                if (!empty($validated['promo_code'])) {
-                    $promoCode = PromoCode::where('code', strtoupper((string) $validated['promo_code']))
-                        ->lockForUpdate()
-                        ->first();
-
-                    if ($promoCode && $promoCode->isValidForUser($user, $type)) {
-                        $finalAmount = max(0.0, $finalAmount - $promoCode->calculateDiscount($finalAmount));
-                        $appliedPromoCode = $promoCode;
-                    }
-                }
+                $promoApplication = $this->promoApplicator->apply(
+                    isset($validated['promo_code']) && is_string($validated['promo_code']) ? $validated['promo_code'] : null,
+                    $user,
+                    $type,
+                    $amount,
+                );
 
                 $description = match ($type) {
                     'subscription' => 'Abonnement agence',
@@ -164,7 +139,7 @@ final class PaymentController
                 };
 
                 $result = $this->paymentService->createPayment($user, [
-                    'amount' => $finalAmount,
+                    'amount' => $promoApplication->finalAmount,
                     'type' => $type,
                     'payment_method' => $validated['payment_method'] ?? 'mobile_money',
                     'phone_number' => $validated['phone_number'] ?? null,
@@ -184,13 +159,8 @@ final class PaymentController
                     ],
                 ]);
 
-                if ($appliedPromoCode !== null) {
-                    PromoCodeUsage::create([
-                        'promo_code_id' => $appliedPromoCode->id,
-                        'user_id' => $user->id,
-                        'payment_id' => $result['payment']->id,
-                    ]);
-                    $appliedPromoCode->increment('used_count');
+                if ($promoApplication->promoCode !== null) {
+                    $this->promoApplicator->recordUsage($promoApplication->promoCode, $user, $result['payment']->id);
                 }
 
                 return response()->json([
@@ -632,7 +602,7 @@ final class PaymentController
             'localeCurrency' => $localeCurrency,
             'localeRate' => $localeRate,
             'localeSymbol' => $localeSymbol,
-        ] = $this->resolveVisitorLocalePdfHints($request);
+        ] = VisitorLocalePdfHints::fromRequest($request);
 
         $query = Payment::where('user_id', $user->id)
             ->with('pointPackage', 'ad')
@@ -658,12 +628,7 @@ final class PaymentController
             default => 'Tout l\'historique',
         };
 
-        $logoPath = public_path('images/keyhomelogo_transparent.png');
-        $logoBase64 = file_exists($logoPath)
-            ? 'data:image/png;base64,'.base64_encode((string) file_get_contents($logoPath))
-            : null;
-
-        $pdf = Pdf::loadView('pdf.payment-history', [
+        $pdf = PaymentPdfRenderer::render('pdf.payment-history', [
             'user' => $user,
             'payments' => $payments,
             'totalAmount' => $totalAmount,
@@ -672,17 +637,10 @@ final class PaymentController
             'creditsEarned' => $creditsEarned,
             'periodLabel' => $periodLabel,
             'generatedAt' => now()->format('d/m/Y à H:i'),
-            'logoBase64' => $logoBase64,
             'localeCurrency' => $localeCurrency,
             'localeRate' => $localeRate,
             'localeSymbol' => $localeSymbol,
-        ])
-            ->setPaper('a4', 'portrait')
-            ->setOptions([
-                'isHtml5ParserEnabled' => true,
-                'isRemoteEnabled' => false,
-                'defaultFont' => 'DejaVu Sans',
-            ]);
+        ]);
 
         return $pdf->download('keyhome-paiements-'.now()->format('Y-m-d').'.pdf');
     }
@@ -712,7 +670,7 @@ final class PaymentController
             'localeCurrency' => $localeCurrency,
             'localeRate' => $localeRate,
             'localeSymbol' => $localeSymbol,
-        ] = $this->resolveVisitorLocalePdfHints($request);
+        ] = VisitorLocalePdfHints::fromRequest($request);
 
         $payment->loadMissing('pointPackage', 'ad');
 
@@ -725,62 +683,19 @@ final class PaymentController
             PaymentType::CREDIT => 'Crédits',
         };
 
-        $logoPath = public_path('images/keyhomelogo_transparent.png');
-        $logoBase64 = file_exists($logoPath)
-            ? 'data:image/png;base64,'.base64_encode((string) file_get_contents($logoPath))
-            : null;
-
-        $pdf = Pdf::loadView('pdf.payment-receipt', [
+        $pdf = PaymentPdfRenderer::render('pdf.payment-receipt', [
             'user' => $user,
             'payment' => $payment,
             'presentation' => $presentation,
             'typeLabel' => $typeLabel,
             'generatedAt' => now()->format('d/m/Y à H:i'),
-            'logoBase64' => $logoBase64,
             'localeCurrency' => $localeCurrency,
             'localeRate' => $localeRate,
             'localeSymbol' => $localeSymbol,
-        ])
-            ->setPaper('a4', 'portrait')
-            ->setOptions([
-                'isHtml5ParserEnabled' => true,
-                'isRemoteEnabled' => false,
-                'defaultFont' => 'DejaVu Sans',
-            ]);
+        ]);
 
         $safeRef = preg_replace('/[^A-Za-z0-9_-]+/', '-', (string) $payment->transaction_id) ?? 'recu';
 
         return $pdf->stream('keyhome-recu-'.$safeRef.'.pdf');
-    }
-
-    /**
-     * @return array{
-     *     localeCurrency: string|null,
-     *     localeRate: float|null,
-     *     localeSymbol: string|null
-     * }
-     */
-    private function resolveVisitorLocalePdfHints(Request $request): array
-    {
-        $allowedCurrencies = ['EUR', 'USD', 'GBP', 'CHF', 'CAD', 'JPY', 'MXN', 'BRL', 'CNY', 'AUD', 'KRW'];
-        $rawCurrency = strtoupper((string) $request->query('currency', ''));
-        $rawRate = (float) $request->query('rate', 0);
-        $useLocale = in_array($rawCurrency, $allowedCurrencies, true)
-            && is_finite($rawRate)
-            && $rawRate > 0;
-
-        if (!$useLocale) {
-            return [
-                'localeCurrency' => null,
-                'localeRate' => null,
-                'localeSymbol' => null,
-            ];
-        }
-
-        return [
-            'localeCurrency' => $rawCurrency,
-            'localeRate' => $rawRate,
-            'localeSymbol' => self::VISITOR_LOCALE_SYMBOL_BY_CCY[$rawCurrency],
-        ];
     }
 }
