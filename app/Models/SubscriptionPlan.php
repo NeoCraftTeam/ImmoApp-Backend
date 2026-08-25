@@ -121,6 +121,16 @@ class SubscriptionPlan extends Model
     }
 
     /**
+     * Amount charged for the given billing period, as an integer minor unit.
+     * Any period other than "yearly" resolves to the monthly price, matching
+     * the subscribe / renew / upgrade flows.
+     */
+    public function priceForPeriod(string $period): int
+    {
+        return $period === 'yearly' ? (int) $this->price_yearly : (int) $this->price;
+    }
+
+    /**
      * Get monthly savings if paying yearly
      */
     public function getYearlySavings(): float
