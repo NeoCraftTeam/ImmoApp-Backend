@@ -488,6 +488,24 @@ class Ad extends Model implements HasMedia
     }
 
     /**
+     * Scope — the canonical public listing query: visible + publicly listed
+     * ads, eager-loaded with exactly the relations and review aggregates
+     * AdResource renders. Shared by the paginated index and the cursor feed
+     * (including the organic-boost enrichment) so the base query lives in one
+     * place instead of being duplicated at each call site.
+     */
+    #[Scope]
+    protected function forPublicListing($query)
+    {
+        return $query
+            ->with('quarter.city', 'ad_type', 'media', 'user.agency', 'user.city', 'user.media', 'user.latestTrustScore', 'agency')
+            ->withAvg('reviews', 'rating')
+            ->withCount('reviews')
+            ->visible()
+            ->publiclyListed();
+    }
+
+    /**
      * Scope to get only currently available ads based on date range
      */
     #[Scope]

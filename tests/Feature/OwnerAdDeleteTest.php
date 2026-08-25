@@ -6,6 +6,8 @@ use App\Enums\AdStatus;
 use App\Models\Ad;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 
 uses(RefreshDatabase::class);
@@ -81,4 +83,29 @@ it('returns generic not found for unknown ad id', function (): void {
             'message' => 'Ressource introuvable.',
             'code' => 'NOT_FOUND',
         ]);
+});
+
+it('returns the deleted ad id and image count in the payload', function (): void {
+    Storage::fake('public');
+
+    $agent = User::factory()->create(['role' => 'agent', 'type' => 'individual']);
+    $ad = null;
+    Ad::withoutSyncingToSearch(function () use (&$ad, $agent): void {
+        $ad = Ad::factory()->create([
+            'user_id' => $agent->id,
+            'status' => AdStatus::DRAFT,
+        ]);
+        $ad->addMedia(UploadedFile::fake()->image('one.jpg'))->toMediaCollection('images');
+        $ad->addMedia(UploadedFile::fake()->image('two.jpg'))->toMediaCollection('images');
+    });
+
+    Sanctum::actingAs($agent, ['*']);
+    $response = $this->deleteJson("/api/v1/ads/{$ad->id}");
+
+    $response->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('message', 'Annonce supprimée.')
+        ->assertJsonPath('data.deleted_ad_id', $ad->id)
+        ->assertJsonPath('data.deleted_images_count', 2);
+    $this->assertSoftDeleted('ad', ['id' => $ad->id]);
 });
