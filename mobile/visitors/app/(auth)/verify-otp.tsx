@@ -10,6 +10,7 @@ import { ENDPOINTS } from '@/api/endpoints';
 import { ClerkOtpVerifyScreen } from '@/components/ClerkOtpVerifyScreen';
 import { KeyHomeLogo } from '@/components/KeyHomeLogo';
 import { useResendVerification, useVerifyEmailOtp } from '@/hooks/useAuthExtras';
+import { consumePendingRoute } from '@/auth/pending-route';
 import { useSession } from '@/auth/SessionProvider';
 import { brand } from '@/theme/tokens';
 
@@ -143,7 +144,7 @@ function EmailVerifyOtpScreen({ initialEmail }: { initialEmail: string }) {
       const result = await verify.mutateAsync({ email: email as string, otp });
       if (result?.token) {
         setToken(result.token);
-        router.replace('/(tabs)/home');
+        router.replace((consumePendingRoute() ?? '/(tabs)/home') as never);
         return;
       }
       // Email vérifié mais le backend n'a pas renvoyé de session : ne pas

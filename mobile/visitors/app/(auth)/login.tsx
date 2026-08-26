@@ -15,6 +15,7 @@ import { Button, H2, Input, Paragraph, Spinner, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractAuthErrorMessage, parseApiErrorPayload, RESOLVED_BASE_URL } from '@/api/client';
+import { consumePendingRoute } from '@/auth/pending-route';
 import { useSession } from '@/auth/SessionProvider';
 import { KeyHomeLogo } from '@/components/KeyHomeLogo';
 import { PasswordInput } from '@/components/PasswordInput';
@@ -146,7 +147,7 @@ export default function Login() {
     setSubmitting(true);
     try {
       await signIn(email.trim().toLowerCase(), password);
-      playSuccess(() => router.replace('/(tabs)/home'));
+      playSuccess(() => router.replace((consumePendingRoute() ?? '/(tabs)/home') as never));
     } catch (err) {
       const payload = parseApiErrorPayload(err);
       if (payload?.email_verification_required) {
@@ -324,7 +325,7 @@ export default function Login() {
             <SocialLoginButtons
               variant="icons"
               disabled={submitting || succeeded}
-              onSuccess={() => router.replace('/(tabs)/home')}
+              onSuccess={() => router.replace((consumePendingRoute() ?? '/(tabs)/home') as never)}
             />
 
             {__DEV__ ? (

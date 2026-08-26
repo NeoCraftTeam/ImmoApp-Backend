@@ -2,7 +2,7 @@ import { ArrowLeft, MessageCircle, RotateCw } from '@tamagui/lucide-icons';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Image } from 'expo-image';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, usePathname } from 'expo-router';
 import { FlatList, Pressable } from 'react-native';
 import { H2, Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/Skeleton';
 import { useConversations } from '@/hooks/useConversations';
 import { resolveMediaUrl } from '@/lib/media-url';
 import { formatPresence } from '@/lib/presence';
+import { rememberPendingRoute } from '@/auth/pending-route';
 import { useSession } from '@/auth/SessionProvider';
 import { brand } from '@/theme/tokens';
 import type { Conversation } from '@/types/conversation';
@@ -23,13 +24,22 @@ import type { Conversation } from '@/types/conversation';
  */
 export default function MessagesInbox() {
   const router = useRouter();
+  const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { isAuthenticated } = useSession();
   const { data, isLoading, isError, error, refetch, isRefetching } =
     useConversations();
 
   if (!isAuthenticated) {
-    return <SignInWall onSignIn={() => router.push('/(auth)/login')} insets={insets} />;
+    return (
+      <SignInWall
+        onSignIn={() => {
+          rememberPendingRoute(pathname);
+          router.push('/(auth)/login');
+        }}
+        insets={insets}
+      />
+    );
   }
 
   return (

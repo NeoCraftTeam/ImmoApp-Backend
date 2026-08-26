@@ -1,7 +1,7 @@
 import { ArrowLeft, CheckCircle2, Clock, Plus, XCircle } from '@tamagui/lucide-icons';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, usePathname } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Modal, Pressable, ScrollView, TextInput } from 'react-native';
 import { Button, Paragraph, XStack, YStack } from 'tamagui';
@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { extractApiErrorMessage } from '@/api/client';
 import { usePayments } from '@/hooks/usePayments';
 import { useRefunds, useRequestRefund } from '@/hooks/useRefunds';
+import { rememberPendingRoute } from '@/auth/pending-route';
 import { useSession } from '@/auth/SessionProvider';
 import { brand } from '@/theme/tokens';
 import type { Refund } from '@/types/refund';
@@ -20,13 +21,21 @@ import type { Refund } from '@/types/refund';
  */
 export default function RefundsScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { isAuthenticated } = useSession();
   const refunds = useRefunds();
   const [modalOpen, setModalOpen] = useState(false);
 
   if (!isAuthenticated) {
-    return <SignInWall onSignIn={() => router.push('/(auth)/login')} />;
+    return (
+      <SignInWall
+        onSignIn={() => {
+          rememberPendingRoute(pathname);
+          router.push('/(auth)/login');
+        }}
+      />
+    );
   }
 
   return (
