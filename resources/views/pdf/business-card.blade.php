@@ -117,7 +117,7 @@
             text-align: center;
         }
         .qr-wrap img {
-            width: 22mm; height: 22mm;
+            width: auto; height: 22mm;
             display: block;
             margin: 0 auto 0.8mm auto;
         }

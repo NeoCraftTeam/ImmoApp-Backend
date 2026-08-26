@@ -130,7 +130,7 @@
         .qr-row { width: 100%; border-collapse: collapse; }
         .qr-row td { vertical-align: middle; padding: 0; }
         .qr-cell { width: 52mm; text-align: center; }
-        .qr-img { width: 50mm; height: auto; display: block; margin: 0 auto; }
+        .qr-img { height: 50mm; width: auto; display: block; margin: 0 auto; }
         .qr-text { text-align: left; padding-left: 4mm !important; }
         .qr-cta {
             font-size: 13pt; font-weight: 800;
