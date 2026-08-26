@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Ad;
+use Clickbar\Magellan\Data\Geometries\Point;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 
@@ -38,30 +39,67 @@ test('single ad response structure is correct', function (): void {
         ]);
 });
 
-// Gap 9: cards on the feed render the KeyScore badge straight from the
-// AdResource response when the hourly cache is warm — no per-ad fetches.
-test('AdResource emits null keyscore on cold cache', function (): void {
-    $ad = Ad::factory()->create(['status' => 'available']);
+// KeyScore on the ad JSON is the real neighborhood livability score (0–100),
+// read cache-only from the grid entry warmed by a detail-page
+// `/neighborhood-scorecard` view. AdResource never computes it, so a cold
+// cache — or an ad with no GPS — yields null and cards simply omit the badge.
+test('AdResource emits null keyscore when the neighborhood cache is cold', function (): void {
+    $ad = Ad::factory()->create([
+        'status' => 'available',
+        'location' => Point::makeGeodetic(4.0511, 9.7679),
+    ]);
 
-    $response = $this->getJson('/api/v1/ads/'.$ad->id);
-
-    $response->assertOk()
+    $this->getJson('/api/v1/ads/'.$ad->id)
+        ->assertOk()
         ->assertJsonPath('data.keyscore', null);
 });
 
-test('AdResource emits cached keyscore when warm', function (): void {
+test('AdResource emits null keyscore when the ad has no GPS coordinates', function (): void {
     $ad = Ad::factory()->create(['status' => 'available']);
+    $ad->getConnection()->statement(
+        'UPDATE '.$ad->getConnection()->getTablePrefix().$ad->getTable().' SET location = NULL WHERE id = ?',
+        [$ad->id]
+    );
 
-    // Same key shape as KeyScoreController::show — hourly bucket.
-    $cacheKey = 'keyscore_'.$ad->id.'_'.now()->format('Ymd_H');
-    Cache::put($cacheKey, [
-        'score' => 82,
-        'breakdown' => [],
-        'label' => 'Très bon',
+    $this->getJson('/api/v1/ads/'.$ad->id)
+        ->assertOk()
+        ->assertJsonPath('data.location', null)
+        ->assertJsonPath('data.keyscore', null);
+});
+
+test('AdResource emits the cached neighborhood global_score as keyscore when warm', function (): void {
+    $ad = Ad::factory()->create([
+        'status' => 'available',
+        'location' => Point::makeGeodetic(4.0511, 9.7679),
+    ]);
+
+    // Grid-quantized key written by NeighborhoodScorecardService::compute().
+    Cache::put('neighborhood_scorecard_4.051_9.768', [
+        'global_score' => 82,
+        'status' => 'ok',
+        'computed_at' => now()->toIso8601String(),
+        'categories' => [],
     ], 3600);
 
-    $response = $this->getJson('/api/v1/ads/'.$ad->id);
-
-    $response->assertOk()
+    $this->getJson('/api/v1/ads/'.$ad->id)
+        ->assertOk()
         ->assertJsonPath('data.keyscore', 82);
+});
+
+test('AdResource suppresses keyscore when the cached scorecard is unavailable', function (): void {
+    $ad = Ad::factory()->create([
+        'status' => 'available',
+        'location' => Point::makeGeodetic(4.0511, 9.7679),
+    ]);
+
+    Cache::put('neighborhood_scorecard_4.051_9.768', [
+        'global_score' => 0,
+        'status' => 'unavailable',
+        'computed_at' => now()->toIso8601String(),
+        'categories' => [],
+    ], 3600);
+
+    $this->getJson('/api/v1/ads/'.$ad->id)
+        ->assertOk()
+        ->assertJsonPath('data.keyscore', null);
 });

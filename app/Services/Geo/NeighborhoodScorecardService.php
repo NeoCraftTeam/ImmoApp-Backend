@@ -62,9 +62,7 @@ final readonly class NeighborhoodScorecardService
      */
     public function compute(float $lat, float $lng, bool $force = false): array
     {
-        $latGrid = round($lat, 3);
-        $lngGrid = round($lng, 3);
-        $cacheKey = "neighborhood_scorecard_{$latGrid}_{$lngGrid}";
+        $cacheKey = self::cacheKey($lat, $lng);
         $apiKey = (string) config('services.ors.key', '');
 
         $cached = Cache::get($cacheKey);
@@ -97,6 +95,47 @@ final readonly class NeighborhoodScorecardService
         Cache::put($cacheKey, $payload, $ttl);
 
         return array_merge($payload, ['cached' => false]);
+    }
+
+    /**
+     * Cache-only read of the pre-computed neighborhood global score (0–100)
+     * for a coordinate. Returns null on a cache miss or when the location's
+     * OSM data was unavailable — this never computes, never calls Overpass/ORS
+     * and never touches the DB. It lets feed surfaces (AdResource → cards,
+     * comparator) reuse the KeyScore already warmed by a detail-page view
+     * without paying the per-ad OSM cost. Mirrors the grid cache key written
+     * by compute().
+     */
+    public static function cachedGlobalScore(float $lat, float $lng): ?int
+    {
+        $cached = Cache::get(self::cacheKey($lat, $lng));
+        if (!is_array($cached)) {
+            return null;
+        }
+
+        // A `status: unavailable` payload carries a global_score of 0 (empty
+        // categories); surfacing that as a real "0/100" KeyScore would be
+        // misleading, so treat it as absent.
+        if (($cached['status'] ?? null) === 'unavailable') {
+            return null;
+        }
+
+        $score = $cached['global_score'] ?? null;
+
+        return is_int($score) ? $score : null;
+    }
+
+    /**
+     * Grid-quantized cache key (≈111 m cells) shared by every ad at the same
+     * rounded coordinate, so one detail-page computation warms the score for
+     * neighbouring listings too.
+     */
+    private static function cacheKey(float $lat, float $lng): string
+    {
+        $latGrid = round($lat, 3);
+        $lngGrid = round($lng, 3);
+
+        return "neighborhood_scorecard_{$latGrid}_{$lngGrid}";
     }
 
     // ─── Core pipeline ────────────────────────────────────────────────────────

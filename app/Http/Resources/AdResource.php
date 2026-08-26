@@ -9,10 +9,10 @@ use App\Models\Ad;
 use App\Models\Agency;
 use App\Models\Setting;
 use App\Models\User;
+use App\Services\Geo\NeighborhoodScorecardService;
 use App\Support\TourAssetToken;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
 /** @mixin Ad */
@@ -99,12 +99,11 @@ final class AdResource extends JsonResource
             'is_subscription_sponsored' => (bool) ($this->is_subscription_sponsored ?? false),
             'sponsorship_tier' => $this->sponsorshipTier()->value,
 
-            // KeyScore — cached integer (0–100) read from the same hourly
-            // cache key written by `KeyScoreController::show`. Cards on the
-            // feed render the badge straight from this field when warm and
-            // fall back to the per-ad `/keyscore` fetch when null. We never
-            // compute here: a feed page must not pay 15× the cost of a
-            // detail-page request.
+            // KeyScore — the real neighborhood livability score (0–100),
+            // read cache-only from the grid entry warmed by a detail-page
+            // `/neighborhood-scorecard` view. Cards render the badge straight
+            // from this field when warm and simply omit it when null. We never
+            // compute here: a feed page must not pay the per-ad OSM cost.
             'keyscore' => $this->keyscoreFromCache(),
 
             // Premium info - only visible when unlocked
@@ -193,23 +192,22 @@ final class AdResource extends JsonResource
     }
 
     /**
-     * Cache-only read of the ad's KeyScore. Mirrors the key shape used
-     * by `KeyScoreController::show`:
-     * `keyscore_<adId>_<Ymd_H>`. Returning `null` on miss is the contract
-     * the frontend expects — `KeyScoreBadge` falls back to its per-ad
-     * fetch then. Never computes; never writes; never touches the DB.
+     * Cache-only read of the ad's KeyScore — the neighborhood livability
+     * score (0–100) computed by `NeighborhoodScorecardService`. Reads the
+     * grid cache warmed by a detail-page scorecard view and returns `null`
+     * on a miss (or when the ad has no GPS), which is the contract the
+     * frontend expects. Never computes; never writes; never touches the DB.
      */
     private function keyscoreFromCache(): ?int
     {
-        $cacheKey = 'keyscore_'.$this->id.'_'.now()->format('Ymd_H');
-        $cached = Cache::get($cacheKey);
-        if (!is_array($cached)) {
+        if (!$this->location) {
             return null;
         }
 
-        $score = $cached['score'] ?? null;
-
-        return is_int($score) ? $score : null;
+        return NeighborhoodScorecardService::cachedGlobalScore(
+            $this->location->getY(),
+            $this->location->getX(),
+        );
     }
 
     /**
