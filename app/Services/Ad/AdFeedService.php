@@ -156,8 +156,11 @@ final readonly class AdFeedService
             );
         }
 
-        /** @var int $total */
-        $total = Cache::remember(
+        // Cast to int: the Redis cache store returns cached numeric values as
+        // strings on a cache-hit (RedisStore keeps numerics unserialized), so
+        // without this the string reaches AdFeedResult's strict `int $total`
+        // and throws a TypeError on every request after the first.
+        $total = (int) Cache::remember(
             'ads:feed:total:'.($typeId ?? 'all'),
             600,
             function () use ($typeId): int {
