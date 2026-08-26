@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Api\V1\Lease;
 
 use App\Contracts\ReservationServiceInterface;
 use App\Contracts\ViewingScheduleServiceInterface;
+use App\Enums\SuccessCode;
 use App\Http\Requests\Viewing\StoreAvailabilityRequest;
 use App\Http\Requests\Viewing\UpdateAvailabilityRequest;
 use App\Http\Resources\AvailabilitySlotResource;
@@ -14,6 +15,7 @@ use App\Models\Ad;
 use App\Models\TentativeReservation;
 use App\Models\Zap\Schedule;
 use App\Policies\ViewingAvailabilityPolicy;
+use App\Support\ApiResponse;
 use App\Support\ViewingSlotsResponseCache;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -85,10 +87,7 @@ final readonly class ViewingAvailabilityController
 
             ViewingSlotsResponseCache::bumpGeneration($ad);
 
-            return response()->json([
-                'data' => $payload,
-                'message' => 'Planning de disponibilité créé avec succès.',
-            ], 201);
+            return ApiResponse::successCode(SuccessCode::AvailabilityScheduleCreated, $payload, 201);
         });
     }
 
@@ -125,10 +124,7 @@ final readonly class ViewingAvailabilityController
 
             ViewingSlotsResponseCache::bumpGeneration($ad);
 
-            return response()->json([
-                'data' => $payload,
-                'message' => 'Planning de disponibilité mis à jour.',
-            ]);
+            return ApiResponse::successCode(SuccessCode::AvailabilityScheduleUpdated, $payload);
         });
     }
 

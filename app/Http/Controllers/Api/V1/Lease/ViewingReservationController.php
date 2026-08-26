@@ -8,12 +8,14 @@ use App\Actions\Reservation\ConfirmReservationAction;
 use App\Contracts\ReservationServiceInterface;
 use App\Contracts\ViewingScheduleServiceInterface;
 use App\Enums\ReservationStatus;
+use App\Enums\SuccessCode;
 use App\Http\Requests\Viewing\CancelReservationRequest;
 use App\Http\Requests\Viewing\StoreTentativeReservationRequest;
 use App\Http\Resources\TentativeReservationResource;
 use App\Models\Ad;
 use App\Models\TentativeReservation;
 use App\Policies\TentativeReservationPolicy;
+use App\Support\ApiResponse;
 use App\Support\ViewingSlotsResponseCache;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -213,10 +215,10 @@ final readonly class ViewingReservationController
 
         $confirmed = $this->confirmReservation->execute($reservation);
 
-        return response()->json([
-            'data' => new TentativeReservationResource($confirmed->load('ad')),
-            'message' => 'Visite confirmée. Le locataire a été notifié.',
-        ]);
+        return ApiResponse::successCode(
+            SuccessCode::ViewingConfirmed,
+            new TentativeReservationResource($confirmed->load('ad'))->resolve($request),
+        );
     }
 
     /**

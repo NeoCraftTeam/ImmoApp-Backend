@@ -20,7 +20,7 @@ final class DuplicateAdController
     public function store(Ad $ad): JsonResponse
     {
         if ($ad->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         $duplicate = $ad->replicate([

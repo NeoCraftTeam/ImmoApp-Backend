@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Auth;
 
+use App\Enums\SuccessCode;
 use App\Exceptions\AccountInactiveException;
 use App\Exceptions\EmailNotVerifiedException;
 use App\Exceptions\RoleContextMismatchException;
@@ -11,6 +12,7 @@ use App\Http\Requests\LoginRequest;
 use App\Http\Resources\UserResource;
 use App\Services\Auth\LoginService;
 use App\Services\Auth\TokenService;
+use App\Support\ApiResponse;
 use App\Support\AuthError;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
@@ -133,9 +135,7 @@ final readonly class AuthController
                 $request->session()->regenerateToken();
             }
 
-            return response()->json([
-                'message' => 'Déconnexion réussie.',
-            ]);
+            return ApiResponse::successCode(SuccessCode::Logout);
 
         } catch (Throwable $e) {
             Log::error('Logout error', [

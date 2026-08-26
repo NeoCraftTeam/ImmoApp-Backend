@@ -18,7 +18,7 @@ final class DocumentController
     public function index(Ad $ad): JsonResponse
     {
         if ($ad->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         $type = request()->query('type');
@@ -35,7 +35,7 @@ final class DocumentController
     public function store(StoreDocumentRequest $request, Ad $ad): JsonResponse
     {
         if ($ad->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         $validated = $request->validated();
@@ -59,7 +59,7 @@ final class DocumentController
     public function download(Document $document): mixed
     {
         if ($document->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         return Storage::disk('private')->download($document->file_path, $document->name);
@@ -68,7 +68,7 @@ final class DocumentController
     public function destroy(Document $document): JsonResponse
     {
         if ($document->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         Storage::disk('private')->delete($document->file_path);

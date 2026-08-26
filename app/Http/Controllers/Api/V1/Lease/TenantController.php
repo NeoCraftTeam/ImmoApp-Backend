@@ -89,7 +89,7 @@ final class TenantController
     public function show(Tenant $tenant): JsonResponse
     {
         if ($tenant->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         $tenant->loadCount('leaseContracts')->load('leaseContracts.ad');
@@ -123,7 +123,7 @@ final class TenantController
     public function update(UpdateTenantRequest $request, Tenant $tenant): JsonResponse
     {
         if ($tenant->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         $validated = $request->validated();
@@ -150,7 +150,7 @@ final class TenantController
     public function destroy(Tenant $tenant): JsonResponse
     {
         if ($tenant->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         $tenant->delete();
