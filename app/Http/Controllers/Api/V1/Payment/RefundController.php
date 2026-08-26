@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Payment;
 
 use App\Http\Requests\RefundRequest;
+use App\Http\Resources\RefundResource;
 use App\Models\Payment;
 use App\Models\Refund;
 use App\Services\Payment\RefundService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Log;
 
 final readonly class RefundController
@@ -132,14 +134,14 @@ final readonly class RefundController
      *     @OA\Response(response=200, description="Paginated list of refunds")
      * )
      */
-    public function userRefunds(Request $request): JsonResponse
+    public function userRefunds(Request $request): AnonymousResourceCollection
     {
         $refunds = Refund::where('user_id', $request->user()->id)
-            ->with(['payment:id,type,amount,currency,created_at'])
+            ->with(['payment:id,type,amount,created_at'])
             ->latest()
             ->paginate(15);
 
-        return response()->json($refunds);
+        return RefundResource::collection($refunds);
     }
 
     /**

@@ -37,16 +37,19 @@ class Refund extends Model
         'side_effects_reversed' => 'boolean',
     ];
 
+    /** @return BelongsTo<Payment, $this> */
     public function payment(): BelongsTo
     {
         return $this->belongsTo(Payment::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function processedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'processed_by');
