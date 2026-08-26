@@ -1,10 +1,16 @@
 services:
   # Service temporaire pour synchroniser le code frais de l'image vers le volume
   # Cela règle le problème des 404 lors des mises à jour
+  # IMPORTANT : miroir strict (purge avant copie) et non copie additive.
+  # `cp` seul n'efface jamais les fichiers supprimés/renommés de l'image : ils
+  # survivaient dans le volume persistant et pouvaient être chargés à la place
+  # du code courant (ex. classe déplacée => fatal d'incompatibilité d'interface).
+  # `storage` (uploads/logs) vit dans un volume séparé monté par-dessus
+  # /var/www/storage à l'exécution : purger /shared-code ne touche pas aux données.
   code-sync:
     image: ${APP_IMAGE:-keyhome-backend}
     container_name: ${COMPOSE_PREFIX:-keyhome-prod}-code-sync
-    command: sh -c "rm -rf /shared-code/bootstrap/cache/* && cp -rp /var/www/. /shared-code/ && chmod -R 755 /shared-code && chown -R 1000:1000 /shared-code"
+    command: sh -c "find /shared-code -mindepth 1 -delete 2>/dev/null; cp -rp /var/www/. /shared-code/ && chmod -R 755 /shared-code && chown -R 1000:1000 /shared-code"
     volumes:
       - keyhome-app-code:/shared-code
     networks:

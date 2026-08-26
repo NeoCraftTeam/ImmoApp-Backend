@@ -13,10 +13,13 @@
 # ============================================================
 
 services:
+  # Miroir strict (purge avant copie) : voir docker-compose.yml pour le pourquoi.
+  # Une copie additive laissait survivre dans le volume les fichiers renommés/
+  # supprimés de l'image, chargés ensuite à la place du code courant.
   code-sync:
     image: ${APP_IMAGE:-keyhome-backend}
     container_name: ${COMPOSE_PREFIX:-keyhome-preprod}-code-sync
-    command: sh -c "rm -rf /shared-code/bootstrap/cache/* && cp -rp /var/www/. /shared-code/ && chmod -R 755 /shared-code && chown -R 1000:1000 /shared-code"
+    command: sh -c "find /shared-code -mindepth 1 -delete 2>/dev/null; cp -rp /var/www/. /shared-code/ && chmod -R 755 /shared-code && chown -R 1000:1000 /shared-code"
     volumes:
       - preprod-app-code:/shared-code
     networks:

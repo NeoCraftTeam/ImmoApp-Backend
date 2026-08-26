@@ -620,19 +620,34 @@ frontend_test:
         - 'keyhome-frontend-next/**/*'
 
 # --- ETAPE 3 : DEPLOIEMENT ---
+# Déploiement continu : chaque pipeline vert sur `main` part en prod
+# automatiquement (plus de clic manuel). Le garde-fou n'est plus un
+# humain mais la barrière `needs` ci-dessous — un seul job rouge et le
+# déploiement prod ne démarre pas. Sont exigés : build_image (⟸ composer
+# audit + phpstan + pint), la suite de tests complète, le scan Trivy
+# (CVE CRITICAL) et le SAST Semgrep. Le template fait déjà un rollback
+# auto si les migrations échouent ; `production_smoke_test` sonde ensuite
+# /api/health et déclenche `email_failure` en cas de régression.
+#
+# ⚠ Pas de rollback auto sur échec smoke : le déploiement applique des
+# migrations qui ne sont pas garanties rétro-compatibles ; ré-basculer
+# l'image sur une base déjà migrée pourrait aggraver la panne. Le smoke
+# alerte, l'intervention reste humaine (à durcir via migrations
+# expand/contract si on veut un rollback vraiment automatique).
 production_deploy:
   <<: *deploy_template
-  # Production deploys require an explicit click. Was fully automatic
-  # on every merge to `main` — a bad commit reached live within ~15
-  # min with no human in the loop. The `environment` block also gives
-  # GitLab a Deployments record, per-env secret scoping, and freeze
-  # windows.
   environment:
     name: production
     url: https://api.keyhome.app
     deployment_tier: production
-  when: manual
+  when: on_success
   allow_failure: false
+  needs:
+    - build_image
+    - test_suite
+    - trivy_scan
+    - job: sast
+      optional: true
   variables:
     DEPLOY_DIR: /opt/keyhome
     DEPLOY_BRANCH: main

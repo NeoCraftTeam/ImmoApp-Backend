@@ -248,6 +248,24 @@ describe('GET /api/v1/ads/feed — cursor pagination', function (): void {
         expect($response->json('total_approximate'))->toBeInt()->toBeGreaterThanOrEqual(4);
     });
 
+    it('renders when the cached total is a numeric string (Redis cache-hit)', function (): void {
+        Ad::withoutSyncingToSearch(fn () => Ad::factory(3)->create([
+            'status' => 'available',
+            'is_visible' => true,
+        ]));
+
+        // Redis's cache store returns cached numeric values as *strings* on a
+        // cache-hit (RedisStore stores numerics unserialized). The array store
+        // used in tests returns whatever was put, so seeding a string here
+        // reproduces the prod condition where AdFeedService receives `total`
+        // as a string and the strict-typed AdFeedResult DTO rejected it.
+        Cache::put('ads:feed:total:all', '167', 600);
+
+        $this->getJson('/api/v1/ads/feed?per_page=2')
+            ->assertOk()
+            ->assertJsonPath('total_approximate', 167);
+    });
+
     it('sorts by price ascending when sort=price_asc', function (): void {
         Ad::withoutSyncingToSearch(function (): void {
             Ad::factory()->create(['status' => 'available', 'is_visible' => true, 'price' => 300000]);
