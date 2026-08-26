@@ -40,7 +40,7 @@ final class AdRankEstimateController
     {
         // Only the ad owner (or admins) may see rank data
         if ($request->user()?->id !== $ad->user_id && !$request->user()?->isAdmin()) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         if (!in_array($ad->status, Ad::PUBLIC_STATUSES, true)) {

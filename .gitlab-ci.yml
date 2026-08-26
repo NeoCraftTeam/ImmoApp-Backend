@@ -1,11 +1,14 @@
 stages:
-  - prepare
-  - quality
-  - build_and_test # Build + Test en parallèle
-  - deploy
-  - smoke_test # Vérification post-déploiement
-  - notify
-  - cleanup
+  # Pipeline condensé en 4 étapes ; le parallélisme réel est porté par les
+  # `needs:` (DAG), pas par les stages :
+  #   1. prepare_and_quality — image CI → audit sécurité → analyses statiques
+  #   2. build_and_test      — build image + scan Trivy + suite de tests + front
+  #   3. deploy_and_test     — déploiement prod/preprod → smoke tests
+  #   4. notify_and_cleanup  — emails succès/échec + nettoyage du runner
+  - prepare_and_quality
+  - build_and_test
+  - deploy_and_test
+  - notify_and_cleanup
 
 workflow:
   rules:
@@ -31,7 +34,7 @@ default:
 # It does NOT include the application code, so `composer install` is only
 # re-run when composer.lock changes — not on every commit.
 prepare_ci_image:
-  stage: prepare
+  stage: prepare_and_quality
   variables:
     DOCKER_BUILDKIT: "1"
   script:
@@ -90,8 +93,16 @@ prepare_ci_image:
 
 # --- ETAPE 1 : QUALITY (tous en parallele) ---
 phpstan:
-  stage: quality
-  needs: [prepare_ci_image]
+  stage: prepare_and_quality
+  # Chaîne demandée : prepare_ci_image → composer_security → analyses.
+  # `composer_security` est `optional` car ses `rules` le skippent sur une
+  # branche feature sans changement de composer.lock ; un `needs` non-optionnel
+  # ferait alors échouer la création du pipeline. On garde `prepare_ci_image`
+  # pour toujours attendre l'image CI même quand l'audit est absent.
+  needs:
+    - prepare_ci_image
+    - job: composer_security
+      optional: true
   # On monte un cache `phpstan/` partagé entre exécutions sur le
   # runner. Le cache rend phpstan ~5× plus rapide quand seul un
   # sous-ensemble de fichiers PHP a changé : il ne ré-analyse que
@@ -111,8 +122,11 @@ phpstan:
         - phpstan.neon.dist
 
 style_check:
-  stage: quality
-  needs: [prepare_ci_image]
+  stage: prepare_and_quality
+  needs:
+    - prepare_ci_image
+    - job: composer_security
+      optional: true
   script:
     - docker run --rm $CI_IMAGE ./vendor/bin/pint --test
   rules:
@@ -121,7 +135,7 @@ style_check:
         - '**/*.php'
 
 composer_security:
-  stage: quality
+  stage: prepare_and_quality
   needs: [prepare_ci_image]
   # `--locked` audite uniquement les versions verrouillées dans
   # `composer.lock` sans tenter de résoudre la fenêtre de dispatch
@@ -147,8 +161,11 @@ composer_security:
 # fails the job if there are unapplied automatic upgrades / fixes that should be
 # committed before merge.
 rector:
-  stage: quality
-  needs: [prepare_ci_image]
+  stage: prepare_and_quality
+  needs:
+    - prepare_ci_image
+    - job: composer_security
+      optional: true
   allow_failure: true # advisory in CI: do not block the pipeline (yet) — see AGENTS.md
   script:
     - docker run --rm $CI_IMAGE ./vendor/bin/rector process --dry-run --no-progress-bar
@@ -159,8 +176,11 @@ rector:
         - rector.php
 
 sast:
-  stage: quality
-  needs: [prepare_ci_image]
+  stage: prepare_and_quality
+  needs:
+    - prepare_ci_image
+    - job: composer_security
+      optional: true
   # Was `allow_failure: true` — the scan ran but never blocked. The
   # `--error` flag instructs Semgrep to exit non-zero on findings.
   script:
@@ -379,7 +399,7 @@ test_suite:
 #   DEPLOY_POSTGRES_CONTAINER – when compose has no `db` service (preprod shares prod Postgres),
 #                               Docker name of the Postgres container (e.g. keyhome-prod-db).
 .deploy_template: &deploy_template
-  stage: deploy
+  stage: deploy_and_test
   needs: [build_image, test_suite]
   timeout: 15 minutes
   interruptible: false
@@ -645,7 +665,7 @@ preprod_deploy:
 
 # --- ETAPE 4 : SMOKE TEST ---
 production_smoke_test:
-  stage: smoke_test
+  stage: deploy_and_test
   needs: [production_deploy]
   script:
     - echo "Running smoke tests on production..."
@@ -685,7 +705,7 @@ production_smoke_test:
     - if: $CI_COMMIT_BRANCH == "main"
 
 preprod_smoke_test:
-  stage: smoke_test
+  stage: deploy_and_test
   needs: [preprod_deploy]
   script:
     - echo "Running smoke tests on preproduction..."
@@ -749,7 +769,7 @@ preprod_smoke_test:
 # pour les CTAs, vert/rouge pour le status banner).
 
 .email_notify_base: &email_notify_base
-  stage: notify
+  stage: notify_and_cleanup
   allow_failure: true
   variables:
     # Note : pas de `set -euo pipefail` dans les scripts notify — on
@@ -824,7 +844,7 @@ email_failure:
 
 # --- ETAPE 6 : NETTOYAGE INTELLIGENT ---
 cleanup:
-  stage: cleanup
+  stage: notify_and_cleanup
   script:
     - |
       echo "🧹 ══════════════════════════════════════════════"

@@ -65,7 +65,7 @@ final readonly class MessageService
         abort_if(
             $conv->status === ConversationStatus::Archived,
             422,
-            'Cannot send messages to an archived conversation.',
+            'Impossible d\'envoyer un message dans une conversation archivée.',
         );
 
         // Defence-in-depth: reject any attachment whose storage path doesn't
@@ -75,7 +75,7 @@ final readonly class MessageService
             foreach ($attachments as $attachment) {
                 $url = $attachment['url'] ?? null;
                 if (!is_string($url) || !$this->attachments->belongsToConversation($url, $conv->id)) {
-                    abort(422, 'Invalid attachment for this conversation.');
+                    abort(422, 'Pièce jointe invalide pour cette conversation.');
                 }
             }
         }
@@ -127,7 +127,7 @@ final readonly class MessageService
                     || $conv->landlord?->chat_e2ee_public_key_pem === null
                     || $conv->landlord->chat_e2ee_public_key_pem === '',
                     422,
-                    'Both chat participants must register an E2EE public key before sending sealed messages.',
+                    'Les deux participants doivent enregistrer une clé publique E2EE avant d\'envoyer des messages chiffrés.',
                 );
 
                 $needsKeys = $conv->e2ee_wrapped_key_tenant === null
@@ -144,14 +144,14 @@ final readonly class MessageService
                         || $wk['tenant'] === ''
                         || $wk['landlord'] === '',
                         422,
-                        'The first sealed message in this conversation must include e2ee_wrapped_keys for both participants.',
+                        'Le premier message chiffré de cette conversation doit inclure e2ee_wrapped_keys pour les deux participants.',
                     );
                     $conv->update([
                         'e2ee_wrapped_key_tenant' => $wk['tenant'],
                         'e2ee_wrapped_key_landlord' => $wk['landlord'],
                     ]);
                 } elseif (isset($e2ee['wrapped_keys']) && is_array($e2ee['wrapped_keys'])) {
-                    abort(422, 'This conversation already has E2EE session keys; omit e2ee_wrapped_keys.');
+                    abort(422, 'Cette conversation possède déjà des clés de session E2EE ; omettez e2ee_wrapped_keys.');
                 }
 
                 $attrs = [

@@ -46,7 +46,7 @@ final readonly class BoostController
      */
     public function status(Request $request, Ad $ad): JsonResponse
     {
-        abort_unless($ad->user_id === $request->user()?->id, 403, 'Forbidden');
+        abort_unless($ad->user_id === $request->user()?->id, 403, 'Action non autorisée.');
 
         $activeBoost = AdBoost::query()
             ->where('ad_id', $ad->id)
@@ -120,7 +120,7 @@ final readonly class BoostController
      */
     public function unboost(Request $request, Ad $ad): JsonResponse
     {
-        abort_unless($ad->user_id === $request->user()?->id, 403, 'Forbidden');
+        abort_unless($ad->user_id === $request->user()?->id, 403, 'Action non autorisée.');
 
         AdBoost::query()
             ->where('ad_id', $ad->id)
@@ -157,7 +157,7 @@ final readonly class BoostController
      */
     public function boostRoi(Request $request, Ad $ad): JsonResponse
     {
-        abort_unless($ad->user_id === $request->user()?->id, 403, 'Forbidden');
+        abort_unless($ad->user_id === $request->user()?->id, 403, 'Action non autorisée.');
 
         /** @var AdBoost|null $boost */
         $boost = AdBoost::query()

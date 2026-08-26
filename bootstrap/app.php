@@ -19,6 +19,7 @@ use App\Http\Middleware\PreventAuthEndpointEdgeCaching;
 use App\Http\Middleware\RequireApiMfa;
 use App\Http\Middleware\ResolveSanctumBearerUser;
 use App\Http\Middleware\RoleScopedSession;
+use App\Http\Middleware\SanitizeApiErrorResponse;
 use App\Http\Middleware\SanitizeInput;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\TouchLastSeen;
@@ -89,6 +90,7 @@ return Application::configure(basePath: dirname(__DIR__))
             CacheHeaders::class,
             PreventAuthEndpointEdgeCaching::class,
             TouchLastSeen::class,
+            SanitizeApiErrorResponse::class,
         ]);
         $middleware->prependToGroup('web', LocaleResolver::class);
         $middleware->throttleApi();

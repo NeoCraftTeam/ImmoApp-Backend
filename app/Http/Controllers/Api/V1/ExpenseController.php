@@ -33,7 +33,7 @@ final class ExpenseController
     public function index(Ad $ad): JsonResponse
     {
         if ($ad->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         $expenses = Expense::query()
@@ -90,7 +90,7 @@ final class ExpenseController
     public function store(StoreExpenseRequest $request, Ad $ad): JsonResponse
     {
         if ($ad->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         $validated = $request->validated();
@@ -120,7 +120,7 @@ final class ExpenseController
     public function destroy(Expense $expense): JsonResponse
     {
         if ($expense->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         $expense->delete();
@@ -157,7 +157,7 @@ final class ExpenseController
     public function profitLoss(Ad $ad): JsonResponse
     {
         if ($ad->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         $totalExpenses = Expense::query()

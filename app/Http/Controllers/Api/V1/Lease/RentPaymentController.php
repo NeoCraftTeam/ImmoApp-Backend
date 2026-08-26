@@ -39,7 +39,7 @@ final class RentPaymentController
     public function index(LeaseContract $leaseContract): JsonResponse
     {
         if ($leaseContract->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         $payments = RentPayment::query()
@@ -96,7 +96,7 @@ final class RentPaymentController
     public function store(StoreRentPaymentRequest $request, LeaseContract $leaseContract): JsonResponse
     {
         if ($leaseContract->user_id !== auth()->id()) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         $validated = $request->validated();
@@ -130,7 +130,7 @@ final class RentPaymentController
     public function update(UpdateRentPaymentRequest $request, RentPayment $rentPayment): JsonResponse
     {
         if (!$this->landlordOwns($rentPayment)) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         $validated = $request->validated();
@@ -161,7 +161,7 @@ final class RentPaymentController
     public function destroy(RentPayment $rentPayment): JsonResponse
     {
         if (!$this->landlordOwns($rentPayment)) {
-            return response()->json(['message' => 'Forbidden'], 403);
+            return response()->json(['message' => 'Action non autorisée.'], 403);
         }
 
         $rentPayment->delete();

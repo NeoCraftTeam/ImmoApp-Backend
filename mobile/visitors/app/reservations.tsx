@@ -1,13 +1,14 @@
 import { ArrowLeft, Calendar, CheckCircle2, Clock, MapPin, X } from '@tamagui/lucide-icons';
 import { format, isAfter } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useRouter, usePathname } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable } from 'react-native';
 import { Paragraph, XStack, YStack } from 'tamagui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { extractApiErrorMessage } from '@/api/client';
+import { rememberPendingRoute } from '@/auth/pending-route';
 import { useCancelReservation, useMyReservations } from '@/hooks/useReservations';
 import { useSession } from '@/auth/SessionProvider';
 import { brand } from '@/theme/tokens';
@@ -22,6 +23,7 @@ type Tab = 'upcoming' | 'past' | 'all';
  */
 export default function Reservations() {
   const router = useRouter();
+  const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { isAuthenticated } = useSession();
   const { data, isLoading, isError, error, refetch, isRefetching } = useMyReservations();
@@ -40,7 +42,14 @@ export default function Reservations() {
   }, [data, tab]);
 
   if (!isAuthenticated) {
-    return <SignInWall onSignIn={() => router.push('/(auth)/login')} />;
+    return (
+      <SignInWall
+        onSignIn={() => {
+          rememberPendingRoute(pathname);
+          router.push('/(auth)/login');
+        }}
+      />
+    );
   }
 
   const handleCancel = (r: Reservation) => {

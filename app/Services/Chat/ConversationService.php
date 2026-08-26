@@ -236,7 +236,7 @@ final readonly class ConversationService
         }
 
         if ($conv->status !== ConversationStatus::Archived) {
-            abort(422, 'Only archived conversations can be restored.');
+            abort(422, 'Seules les conversations archivées peuvent être restaurées.');
         }
 
         $conv->update(['status' => ConversationStatus::Active]);

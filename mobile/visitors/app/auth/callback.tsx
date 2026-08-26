@@ -6,6 +6,7 @@ import { Paragraph, Spinner, YStack } from 'tamagui';
 import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
 import { isOAuthFlowActive } from '@/auth/oauth-flow';
+import { consumePendingRoute } from '@/auth/pending-route';
 import { useSession } from '@/auth/SessionProvider';
 
 /**
@@ -85,7 +86,7 @@ export default function AuthCallbackScreen() {
           throw new Error('missing token');
         }
         setToken(accessToken);
-        router.replace('/(tabs)/home');
+        router.replace((consumePendingRoute() ?? '/(tabs)/home') as never);
       } catch {
         setFailed(true);
         Alert.alert(

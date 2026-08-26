@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
 import { extractApiErrorMessage } from '@/api/client';
+import { consumePendingRoute } from '@/auth/pending-route';
 import { useSession } from '@/auth/SessionProvider';
 import { KeyHomeLogo } from '@/components/KeyHomeLogo';
 import { PasswordInput } from '@/components/PasswordInput';
@@ -100,7 +101,7 @@ export default function Register() {
           params: { email: parsed.data.email },
         } as never);
       } else {
-        router.replace('/(tabs)/home');
+        router.replace((consumePendingRoute() ?? '/(tabs)/home') as never);
       }
     } catch (err) {
       Alert.alert(t('common.error'), extractApiErrorMessage(err));
@@ -267,7 +268,7 @@ export default function Register() {
             provider → aucun OTP). Même composant que le login. */}
         <SocialLoginButtons
           disabled={submitting}
-          onSuccess={() => router.replace('/(tabs)/home')}
+          onSuccess={() => router.replace((consumePendingRoute() ?? '/(tabs)/home') as never)}
         />
 
         <XStack justifyContent="center" gap="$2">
