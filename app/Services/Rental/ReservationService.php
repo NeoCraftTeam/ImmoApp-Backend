@@ -20,6 +20,8 @@ use App\Models\TentativeReservation;
 use App\Models\User;
 use App\Models\Zap\Schedule;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -209,14 +211,39 @@ final readonly class ReservationService implements ReservationServiceInterface
      */
     public function assertNoActiveReservationsForSchedule(Schedule $schedule): void
     {
-        $active = TentativeReservation::query()
-            ->where('appointment_schedule_id', $schedule->id)
-            ->active()
-            ->get();
+        $active = $this->activeReservationsCoveredBySchedule($schedule);
 
         if ($active->isNotEmpty()) {
             throw new ScheduleHasActiveReservationsException($active);
         }
+    }
+
+    /**
+     * Active reservations whose slot falls within an availability schedule's
+     * coverage window.
+     *
+     * Reservations only reference their own exclusive appointment schedule via
+     * `appointment_schedule_id`; they never point at the availability schedule
+     * the owner manages. Matching on that column therefore never finds anything,
+     * so we match on the ad and the schedule's active date range instead.
+     *
+     * @return Collection<int, TentativeReservation>
+     */
+    public function activeReservationsCoveredBySchedule(Schedule $schedule): Collection
+    {
+        if (!$schedule->is_active) {
+            return new Collection;
+        }
+
+        return TentativeReservation::query()
+            ->where('ad_id', $schedule->schedulable_id)
+            ->active()
+            ->whereDate('slot_date', '>=', $schedule->start_date->toDateString())
+            ->when(
+                $schedule->end_date !== null,
+                fn (Builder $query): Builder => $query->whereDate('slot_date', '<=', $schedule->end_date->toDateString()),
+            )
+            ->get();
     }
 
     /**

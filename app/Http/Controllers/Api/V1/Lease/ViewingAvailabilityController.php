@@ -149,10 +149,13 @@ final readonly class ViewingAvailabilityController
         $this->authorize($request, $ad);
 
         return DB::transaction(function () use ($request, $ad, $schedule): JsonResponse {
-            TentativeReservation::query()
-                ->where('appointment_schedule_id', $schedule->id)
-                ->active()
-                ->each(fn (TentativeReservation $r) => $this->reservationService->cancel($r, $request->user(), 'Planning supprimé par le propriétaire.'));
+            $this->reservationService
+                ->activeReservationsCoveredBySchedule($schedule)
+                ->each(fn (TentativeReservation $r) => $this->reservationService->cancel(
+                    $r,
+                    $request->user(),
+                    'Planning supprimé par le propriétaire.',
+                ));
 
             $schedule->delete();
 

@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Models\Zap\Schedule;
 use App\Services\Rental\ReservationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 
@@ -34,6 +35,30 @@ function svcAd(User $owner): Ad
     });
 
     return $ad;
+}
+
+/**
+ * Insert an availability schedule the owner manages — distinct from the
+ * per-reservation appointment schedule created by the factory.
+ *
+ * @param  array<string, mixed>  $extra
+ */
+function svcAvailabilitySchedule(Ad $ad, array $extra = []): Schedule
+{
+    $id = fake()->uuid();
+    DB::table('schedules')->insert(array_merge([
+        'id' => $id,
+        'schedulable_type' => Ad::class,
+        'schedulable_id' => $ad->id,
+        'name' => 'Disponibilités',
+        'start_date' => now()->toDateString(),
+        'is_active' => true,
+        'is_recurring' => false,
+        'created_at' => now(),
+        'updated_at' => now(),
+    ], $extra));
+
+    return Schedule::query()->findOrFail($id);
 }
 
 // ===========================================================================
@@ -227,5 +252,65 @@ it('does not throw when no active reservations exist for a schedule', function (
 
     // Must not throw.
     $service->assertNoActiveReservationsForSchedule($schedule);
+    expect(true)->toBeTrue();
+});
+
+// ===========================================================================
+// TC-SVC-09 — guard detects reservations covered by an AVAILABILITY schedule
+// (reservations never carry the availability schedule id — only their own
+//  appointment schedule id — so the guard must match on ad + coverage window)
+// ===========================================================================
+
+it('throws when an availability schedule covers an active reservation', function (): void {
+    $viewingScheduleService = Mockery::mock(ViewingScheduleServiceInterface::class);
+    $service = new ReservationService($viewingScheduleService);
+
+    $owner = User::factory()->create();
+    $client = User::factory()->create();
+    $ad = svcAd($owner);
+
+    $availability = svcAvailabilitySchedule($ad, [
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addMonth()->toDateString(),
+    ]);
+
+    // Active reservation whose slot falls inside the availability window. Its
+    // appointment_schedule_id points at its OWN appointment schedule, never at
+    // $availability.
+    TentativeReservation::factory()->pending()->create([
+        'ad_id' => $ad->id,
+        'client_id' => $client->id,
+        'slot_date' => now()->addDay()->toDateString(),
+    ]);
+
+    expect(fn () => $service->assertNoActiveReservationsForSchedule($availability))
+        ->toThrow(ScheduleHasActiveReservationsException::class);
+});
+
+// ===========================================================================
+// TC-SVC-10 — guard ignores reservations whose slot is outside the window
+// ===========================================================================
+
+it('does not throw when the reservation slot falls outside the schedule window', function (): void {
+    $viewingScheduleService = Mockery::mock(ViewingScheduleServiceInterface::class);
+    $service = new ReservationService($viewingScheduleService);
+
+    $owner = User::factory()->create();
+    $client = User::factory()->create();
+    $ad = svcAd($owner);
+
+    // Window starts next week; the reservation below is for tomorrow.
+    $availability = svcAvailabilitySchedule($ad, [
+        'start_date' => now()->addWeek()->toDateString(),
+        'end_date' => now()->addWeeks(2)->toDateString(),
+    ]);
+
+    TentativeReservation::factory()->pending()->create([
+        'ad_id' => $ad->id,
+        'client_id' => $client->id,
+        'slot_date' => now()->addDay()->toDateString(),
+    ]);
+
+    $service->assertNoActiveReservationsForSchedule($availability);
     expect(true)->toBeTrue();
 });
