@@ -77,6 +77,15 @@ final class LeaseContractController
             return response()->json(['message' => 'Non autorisé'], 403);
         }
 
+        // A terminated / archived lease is legally frozen: mirror the guard
+        // already enforced by renew() and terminate() so no mutation slips
+        // through the only edit path that used to lack it.
+        if ($leaseContract->status->isTerminal()) {
+            return response()->json([
+                'message' => 'Un bail résilié ou archivé ne peut plus être modifié.',
+            ], 409);
+        }
+
         $validated = $request->validated();
         $leaseContract->update($validated);
 
@@ -90,6 +99,18 @@ final class LeaseContractController
         } catch (\Throwable $e) {
             report($e);
         }
+
+        // Record the edit in the tamper-evident trail. Only the field names
+        // are stored (never the new values) to keep tenant PII out of the log
+        // while still answering "what was changed, by whom, when".
+        LeaseSignatureAuditLog::record(
+            leaseContractId: $leaseContract->id,
+            event: LeaseAuditEvent::Updated,
+            userId: auth()->id(),
+            ipAddress: $request->ip(),
+            userAgent: $request->userAgent(),
+            metadata: ['updated_fields' => array_keys($validated)],
+        );
 
         return new LeaseContractResource(
             $leaseContract->fresh(['ad', 'ad.media', 'ad.ad_type', 'ad.quarter.city'])
