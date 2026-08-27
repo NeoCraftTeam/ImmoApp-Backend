@@ -192,6 +192,7 @@ final readonly class ViewingAvailabilityController
 
         // Overlay reservation statuses.
         $activeReservations = TentativeReservation::query()
+            ->with('client:id,firstname,lastname')
             ->where('ad_id', $ad->id)
             ->active()
             ->whereDate('slot_date', '>=', $from)

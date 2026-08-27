@@ -346,6 +346,56 @@ it('returns the slot calendar for the owner with reservation overlays', function
 });
 
 // ===========================================================================
+// TC-AVA-14b — GET calendar: client overlay must not trigger an N+1 query
+// ===========================================================================
+
+it('eager-loads reservation clients so the calendar overlay avoids N+1 queries', function (): void {
+    $owner = User::factory()->create();
+    $ad = availAd($owner);
+    $day = now()->addDay()->toDateString();
+
+    $times = ['09:00', '10:00', '11:00', '13:00'];
+
+    foreach ($times as $time) {
+        TentativeReservation::factory()->pending()->create([
+            'ad_id' => $ad->id,
+            'client_id' => User::factory()->create()->id,
+            'slot_date' => $day,
+            'slot_starts_at' => "{$time}:00",
+            'slot_ends_at' => "{$time}:00",
+        ]);
+    }
+
+    $this->mock(ViewingScheduleServiceInterface::class)
+        ->shouldReceive('getBookableSlotsForRange')
+        ->once()
+        ->andReturn([
+            $day => array_map(
+                fn (string $time): array => ['start_time' => $time, 'end_time' => $time],
+                $times,
+            ),
+        ]);
+
+    Sanctum::actingAs($owner);
+
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+
+    $this->getJson("/api/v1/ads/{$ad->id}/availability/calendar?from={$day}&to={$day}")
+        ->assertOk();
+
+    // All four slots are overlaid with a reserved client. Without eager-loading
+    // the `client` relation, each reservation fires its own
+    // `select … from "users"` (classic N+1). The eager load collapses them
+    // into a single batched query.
+    $userQueries = collect(DB::getQueryLog())
+        ->filter(fn (array $query): bool => str_contains((string) $query['query'], 'from "users"'))
+        ->count();
+
+    expect($userQueries)->toBeLessThanOrEqual(1);
+});
+
+// ===========================================================================
 // TC-AVA-15 — GET calendar: non-owner → 403
 // ===========================================================================
 
