@@ -42,17 +42,27 @@ final readonly class KpayPaymentService implements PaymentGatewayInterface
      * Uses Kpay's hosted GATEWAY mode: the customer picks their own Mobile
      * Money operator and enters their number on Kpay's payment page. We
      * therefore never send `provider` / `phoneNumber` / `customerName` —
-     * only `amount`, `externalId` (our tx_ref, used for idempotency and
-     * matched back verbatim in the webhook + verify payloads), `returnUrl`
-     * and `cancelUrl`.
+     * only `amount`, `currency` (mandatory in GATEWAY mode so the amount shown
+     * on the hosted page is unambiguous), `externalId` (our tx_ref, used for
+     * idempotency and matched back verbatim in the webhook + verify payloads),
+     * `returnUrl` and `cancelUrl`.
      */
     public function initiate(array $payload): array
     {
         $meta = is_array($payload['meta'] ?? null) ? $payload['meta'] : [];
         $meta['tx_ref'] = $payload['tx_ref'];
 
+        // GATEWAY mode rejects the init request when `currency` is missing;
+        // fall back to the ledger currency if an upstream caller ever passes
+        // it blank so we never resurface the "champ currency obligatoire" 422.
+        $currency = strtoupper((string) $payload['currency']);
+        if ($currency === '') {
+            $currency = strtoupper((string) config('payment.default_currency', 'XAF'));
+        }
+
         $body = [
             'amount' => (int) round((float) $payload['amount']),
+            'currency' => $currency,
             'externalId' => (string) $payload['tx_ref'],
             'returnUrl' => (string) $payload['redirect_url'],
             'cancelUrl' => (string) $payload['redirect_url'],
