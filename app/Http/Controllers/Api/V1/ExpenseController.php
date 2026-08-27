@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Requests\Api\V1\StoreExpenseRequest;
 use App\Models\Ad;
 use App\Models\Expense;
+use App\Models\LeaseContract;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -164,8 +165,14 @@ final class ExpenseController
             ->where('ad_id', $ad->id)
             ->sum('amount');
 
+        // Cumulative accrued rent (monthly_rent × whole months in force per
+        // contract, drafts excluded) so the figure is an all-time total
+        // comparable to $totalExpenses. Summing raw monthly_rent across every
+        // contract — including terminated ones — overstated revenue and mixed a
+        // monthly amount with cumulative expenses, making net_income meaningless.
         $contractRevenue = $ad->leaseContracts()
-            ->sum('monthly_rent');
+            ->get()
+            ->sum(fn (LeaseContract $contract): float => $contract->accruedRentToDate());
 
         return response()->json([
             'data' => [

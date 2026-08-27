@@ -115,4 +115,45 @@ class LeaseContract extends Model
     {
         return $query->whereNull('archived_at');
     }
+
+    /**
+     * Rent that has accrued from {@see $lease_start} up to the effective end of
+     * the in-force period, so it can be compared against cumulative expenses in
+     * a profit/loss statement (both figures are then all-time totals).
+     *
+     * Revenue is recognised per whole month elapsed (rent is due monthly). The
+     * effective end depends on the lifecycle status:
+     * - Active: `$asOf` (still generating rent);
+     * - Expired: {@see $lease_end};
+     * - Terminated / Archived: {@see $terminated_at} (falling back to lease_end).
+     *
+     * Drafts carry no obligations yet, and a lease that has not started accrues
+     * nothing — both return `0.0`.
+     */
+    public function accruedRentToDate(?Carbon $asOf = null): float
+    {
+        if ($this->status === LeaseStatus::Draft || $this->lease_start === null) {
+            return 0.0;
+        }
+
+        $asOf ??= Carbon::now();
+
+        if ($asOf->lessThan($this->lease_start)) {
+            return 0.0;
+        }
+
+        $end = match ($this->status) {
+            LeaseStatus::Expired => $this->lease_end ?? $asOf,
+            LeaseStatus::Terminated, LeaseStatus::Archived => $this->terminated_at ?? $this->lease_end ?? $asOf,
+            default => $asOf,
+        };
+
+        if ($end->greaterThan($asOf)) {
+            $end = $asOf;
+        }
+
+        $monthsInForce = max(0, (int) $this->lease_start->diffInMonths($end));
+
+        return (float) $this->monthly_rent * $monthsInForce;
+    }
 }
