@@ -102,7 +102,7 @@ final readonly class ViewingReservationController
      * @OA\Post(
      *     path="/api/v1/ads/{ad}/reservations",
      *     summary="Réserver provisoirement un créneau de visite",
-     *     description="Crée une réservation provisoire pour un créneau de visite. Valide 24h.",
+     *     description="Crée une réservation provisoire pour un créneau de visite. Valide 72h.",
      *     tags={"🗓️ Réservations"},
      *     security={{"sanctum":{}}},
      *

@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\ReservationStatus;
 use App\Events\Reservation\ReservationStatusChanged;
 use App\Events\Reservation\SlotAvailabilityChanged;
+use App\Http\Resources\TentativeReservationResource;
 use App\Models\Ad;
 use App\Models\TentativeReservation;
 use App\Models\UnlockedAd;
@@ -118,6 +119,23 @@ it('returns 422 when slot_date is missing', function (): void {
         ])
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['slot_date']);
+});
+
+// TC-VR-05b — next_steps hold message reflects the configured reservation TTL
+// (guards against the hardcoded "24h" copy drifting from the real 72h TTL that
+//  ReservationService applies via config('viewings.reservation_ttl_hours', 72)).
+it('reflects the configured reservation TTL in the next_steps hold message', function (): void {
+    $reservation = TentativeReservation::factory()->pending()->create();
+
+    config()->set('viewings.reservation_ttl_hours', 72);
+    $next72 = new TentativeReservationResource($reservation)->toArray(request())['next_steps'];
+    expect($next72)->toContain('72h')->not->toContain('24h');
+
+    // Config-driven: the displayed hold duration follows the real TTL, so the
+    // copy can never silently drift from ReservationService's expires_at math.
+    config()->set('viewings.reservation_ttl_hours', 48);
+    $next48 = new TentativeReservationResource($reservation)->toArray(request())['next_steps'];
+    expect($next48)->toContain('48h');
 });
 
 // ===========================================================================

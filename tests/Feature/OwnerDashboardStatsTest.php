@@ -258,3 +258,58 @@ it('returns rent_collected_xaf_30d for the landlord — last 30 days only', func
 
     expect($data['rent_collected_xaf_30d'])->toBe(225000);
 });
+
+it('counts rented units in the occupancy denominator', function (): void {
+    Carbon::setTestNow(Carbon::parse('2026-06-01'));
+
+    $owner = User::factory()->agents()->create();
+    Sanctum::actingAs($owner);
+
+    $rented = null;
+    Ad::withoutSyncingToSearch(function () use (&$rented, $owner): void {
+        // 2 published (available) + 1 rented = 3 units in circulation.
+        Ad::factory()->count(2)->create(['user_id' => $owner->id, 'status' => 'available']);
+        $rented = Ad::factory()->create(['user_id' => $owner->id, 'status' => 'rent']);
+    });
+
+    LeaseContract::factory()->create([
+        'user_id' => $owner->id,
+        'ad_id' => $rented->id,
+        'lease_start' => '2026-01-01',
+        'lease_end' => '2026-12-31',
+    ]);
+
+    $data = $this->getJson('/api/v1/my/stats')->assertOk()->json('data');
+
+    // active_ads_count stays publiclyListed-only (2); occupancy divides by the
+    // full circulation (3) → 1/3 = 33.3 %. Before the fix the RENT unit was
+    // excluded from the denominator → 1/2 = 50 %.
+    expect($data['active_ads_count'])->toBe(2)
+        ->and($data['active_leases_count'])->toBe(1)
+        ->and($data['occupancy_rate'])->toEqual(33.3);
+});
+
+it('reports 100% occupancy when the only unit is rented', function (): void {
+    Carbon::setTestNow(Carbon::parse('2026-06-01'));
+
+    $owner = User::factory()->agents()->create();
+    Sanctum::actingAs($owner);
+
+    $ad = null;
+    Ad::withoutSyncingToSearch(function () use (&$ad, $owner): void {
+        $ad = Ad::factory()->create(['user_id' => $owner->id, 'status' => 'rent']);
+    });
+
+    LeaseContract::factory()->create([
+        'user_id' => $owner->id,
+        'ad_id' => $ad->id,
+        'lease_start' => '2026-01-01',
+        'lease_end' => '2026-12-31',
+    ]);
+
+    $data = $this->getJson('/api/v1/my/stats')->assertOk()->json('data');
+
+    // Before the fix: denominator collapsed to 0 (no publiclyListed ad) → 0 %.
+    expect($data['occupancy_rate'])->toEqual(100)
+        ->and($data['active_ads_count'])->toBe(0);
+});

@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 use App\Contracts\ReservationServiceInterface;
 use App\Contracts\ViewingScheduleServiceInterface;
+use App\Events\Reservation\ReservationStatusChanged;
 use App\Exceptions\Viewing\ScheduleHasActiveReservationsException;
 use App\Models\Ad;
 use App\Models\TentativeReservation;
 use App\Models\User;
 use App\Models\Zap\Schedule;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 
@@ -287,11 +290,15 @@ it('cancels all active reservations when a schedule is deleted', function (): vo
         'appointment_schedule_id' => $schedule->id,
     ]);
 
-    $this->mock(ReservationServiceInterface::class)
-        ->shouldReceive('cancel')
-        ->once()
-        ->withAnyArgs()
-        ->andReturn($reservation);
+    $this->mock(ReservationServiceInterface::class, function ($mock) use ($reservation): void {
+        $mock->shouldReceive('activeReservationsCoveredBySchedule')
+            ->once()
+            ->andReturn(new Collection([$reservation]));
+        $mock->shouldReceive('cancel')
+            ->once()
+            ->withAnyArgs()
+            ->andReturn($reservation);
+    });
 
     Sanctum::actingAs($owner);
 
@@ -336,6 +343,56 @@ it('returns the slot calendar for the owner with reservation overlays', function
     $this->getJson("/api/v1/ads/{$ad->id}/availability/calendar?from={$tomorrow}&to={$tomorrow}")
         ->assertOk()
         ->assertJsonStructure(['data']);
+});
+
+// ===========================================================================
+// TC-AVA-14b — GET calendar: client overlay must not trigger an N+1 query
+// ===========================================================================
+
+it('eager-loads reservation clients so the calendar overlay avoids N+1 queries', function (): void {
+    $owner = User::factory()->create();
+    $ad = availAd($owner);
+    $day = now()->addDay()->toDateString();
+
+    $times = ['09:00', '10:00', '11:00', '13:00'];
+
+    foreach ($times as $time) {
+        TentativeReservation::factory()->pending()->create([
+            'ad_id' => $ad->id,
+            'client_id' => User::factory()->create()->id,
+            'slot_date' => $day,
+            'slot_starts_at' => "{$time}:00",
+            'slot_ends_at' => "{$time}:00",
+        ]);
+    }
+
+    $this->mock(ViewingScheduleServiceInterface::class)
+        ->shouldReceive('getBookableSlotsForRange')
+        ->once()
+        ->andReturn([
+            $day => array_map(
+                fn (string $time): array => ['start_time' => $time, 'end_time' => $time],
+                $times,
+            ),
+        ]);
+
+    Sanctum::actingAs($owner);
+
+    DB::enableQueryLog();
+    DB::flushQueryLog();
+
+    $this->getJson("/api/v1/ads/{$ad->id}/availability/calendar?from={$day}&to={$day}")
+        ->assertOk();
+
+    // All four slots are overlaid with a reserved client. Without eager-loading
+    // the `client` relation, each reservation fires its own
+    // `select … from "users"` (classic N+1). The eager load collapses them
+    // into a single batched query.
+    $userQueries = collect(DB::getQueryLog())
+        ->filter(fn (array $query): bool => str_contains((string) $query['query'], 'from "users"'))
+        ->count();
+
+    expect($userQueries)->toBeLessThanOrEqual(1);
 });
 
 // ===========================================================================
@@ -391,4 +448,74 @@ it('denies reservation listing for a non-owner', function (): void {
 
     $this->getJson("/api/v1/ads/{$ad->id}/reservations")
         ->assertForbidden();
+});
+
+// ===========================================================================
+// TC-AVA-18 — PUT update: 409 when a reservation falls in the schedule window
+// (integration — no service mock; guards against the appointment/availability
+//  schedule id-space mismatch that made the guard a silent no-op)
+// ===========================================================================
+
+it('blocks a schedule update when a reservation falls within its coverage window', function (): void {
+    $owner = User::factory()->create();
+    $client = User::factory()->create();
+    $ad = availAd($owner);
+    $schedule = insertSchedule($ad, [
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addMonth()->toDateString(),
+    ]);
+
+    // Active reservation on the ad, inside the window. Its appointment_schedule_id
+    // points at its own appointment schedule, never at $schedule.
+    TentativeReservation::factory()->pending()->create([
+        'ad_id' => $ad->id,
+        'client_id' => $client->id,
+        'slot_date' => now()->addDay()->toDateString(),
+    ]);
+
+    Sanctum::actingAs($owner);
+
+    $this->putJson("/api/v1/ads/{$ad->id}/availability/{$schedule->id}", [
+        'name' => 'Updated',
+        'periods' => [['starts_at' => '10:00', 'ends_at' => '13:00']],
+    ])->assertConflict()
+        ->assertJsonPath('error.code', 'SCHEDULE_HAS_ACTIVE_RESERVATIONS');
+});
+
+// ===========================================================================
+// TC-AVA-19 — DELETE schedule: cascades cancellation of covered reservations
+// (integration — no service mock)
+// ===========================================================================
+
+it('cancels reservations covered by a deleted availability schedule', function (): void {
+    Event::fake();
+
+    $owner = User::factory()->create();
+    $client = User::factory()->create();
+    $ad = availAd($owner);
+    $schedule = insertSchedule($ad, [
+        'start_date' => now()->toDateString(),
+        'end_date' => now()->addMonth()->toDateString(),
+    ]);
+
+    $reservation = TentativeReservation::factory()->pending()->create([
+        'ad_id' => $ad->id,
+        'client_id' => $client->id,
+        'slot_date' => now()->addDay()->toDateString(),
+    ]);
+
+    Sanctum::actingAs($owner);
+
+    $this->deleteJson("/api/v1/ads/{$ad->id}/availability/{$schedule->id}")
+        ->assertNoContent();
+
+    $this->assertDatabaseMissing('schedules', ['id' => $schedule->id]);
+
+    // cancel() fires the status-change event, then releaseSlot() deletes the
+    // reservation's appointment schedule; the appointment_schedule_id FK cascade
+    // then removes the reservation row. Net effect: the cancellation event was
+    // dispatched and no active reservation for the ad survives.
+    Event::assertDispatched(ReservationStatusChanged::class);
+    expect(TentativeReservation::query()->where('ad_id', $ad->id)->active()->exists())
+        ->toBeFalse();
 });

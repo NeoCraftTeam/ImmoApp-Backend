@@ -8,6 +8,7 @@ use App\Models\Ad;
 use App\Models\TentativeReservation;
 use App\Models\User;
 use App\Models\Zap\Schedule;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 
 interface ReservationServiceInterface
@@ -43,6 +44,14 @@ interface ReservationServiceInterface
      * Guard against availability schedule modifications when active reservations exist.
      */
     public function assertNoActiveReservationsForSchedule(Schedule $schedule): void;
+
+    /**
+     * Active reservations whose slot falls within an availability schedule's
+     * coverage window (ad + active date range).
+     *
+     * @return Collection<int, TentativeReservation>
+     */
+    public function activeReservationsCoveredBySchedule(Schedule $schedule): Collection;
 
     /**
      * List paginated reservations for a property (landlord view).

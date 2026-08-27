@@ -19,6 +19,15 @@ use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
  */
 class AiDescriptionEnhancer
 {
+    /**
+     * Token budget for the free-text description paths (enhance /
+     * generateFromAttributes / streamEnhance). The system prompt allows up to
+     * ~320 French words ≈ 550-650 tokens plus punctuation and paragraph breaks,
+     * so 700 risked cutting the last sentence mid-word. 1100 leaves comfortable
+     * headroom for a complete 2-3 paragraph description.
+     */
+    private const int DESCRIPTION_MAX_TOKENS = 1100;
+
     /** @var array<string, array{api_key: string, model: string, base_url: string}> */
     private array $providers;
 
@@ -54,7 +63,19 @@ class AiDescriptionEnhancer
      */
     public function enhance(string $rawDescription): string
     {
-        return $this->callWithPrompt($rawDescription, AiDescriptionPrompts::systemPrompt());
+        $enhanced = $this->callWithPrompt(
+            $rawDescription,
+            AiDescriptionPrompts::systemPrompt(),
+            self::DESCRIPTION_MAX_TOKENS,
+        );
+
+        // Provider failure returns the input verbatim — never run cleanup on the
+        // owner's own text (it could strip emojis/formatting they typed on purpose).
+        if ($enhanced === $rawDescription) {
+            return $rawDescription;
+        }
+
+        return $this->stripDescriptionArtifacts($enhanced);
     }
 
     /**
@@ -89,7 +110,19 @@ class AiDescriptionEnhancer
             return '';
         }
 
-        return $this->callWithPrompt($context, AiDescriptionPrompts::generateFromAttributesPrompt());
+        $generated = $this->callWithPrompt(
+            $context,
+            AiDescriptionPrompts::generateFromAttributesPrompt(),
+            self::DESCRIPTION_MAX_TOKENS,
+        );
+
+        // On provider failure the raw attribute context is echoed back — leave it
+        // untouched rather than reformatting the technical key/value listing.
+        if ($generated === $context) {
+            return $context;
+        }
+
+        return $this->stripDescriptionArtifacts($generated);
     }
 
     /**
@@ -240,8 +273,35 @@ class AiDescriptionEnhancer
             return;
         }
 
-        $systemPrompt = AiDescriptionPrompts::systemPrompt();
+        $full = $this->collectStreamedText($rawDescription, AiDescriptionPrompts::systemPrompt());
 
+        // No streaming-capable provider succeeded → non-streaming path, which
+        // already applies the same output hygiene, emitted as a single chunk.
+        if ($full === null || $full === '') {
+            $onChunk($this->enhance($rawDescription));
+
+            return;
+        }
+
+        $clean = $full === $rawDescription
+            ? $rawDescription
+            : $this->stripDescriptionArtifacts($full);
+
+        // Re-emit sentence by sentence so the client keeps its progressive
+        // reveal. The split is loss-less: concatenating every chunk reproduces
+        // $clean verbatim, paragraph breaks included.
+        foreach ($this->splitIntoStreamSegments($clean) as $segment) {
+            $onChunk($segment);
+        }
+    }
+
+    /**
+     * Buffer the full streamed completion from the first available
+     * OpenAI-compatible provider. Returns the accumulated text, or null when no
+     * streaming provider is configured or every one fails transiently.
+     */
+    private function collectStreamedText(string $text, string $systemPrompt): ?string
+    {
         $order = array_values(array_unique(array_filter([
             $this->activeProvider,
             ...array_keys($this->providers),
@@ -254,29 +314,27 @@ class AiDescriptionEnhancer
             }
 
             if ($name === 'gemini') {
-                continue; // Gemini streaming differs — skip to fallback
+                continue; // Gemini streaming differs — handled by the non-streaming fallback
             }
 
-            $streamed = $this->streamOpenAiCompatible($rawDescription, $cfg, $systemPrompt, $name, $onChunk);
+            $streamed = $this->streamOpenAiCompatible($text, $cfg, $systemPrompt, $name, self::DESCRIPTION_MAX_TOKENS);
 
-            if ($streamed) {
-                return;
+            if ($streamed !== null) {
+                return $streamed;
             }
         }
 
-        // Fallback: non-streaming, emit full result in one chunk
-        $result = $this->callWithPrompt($rawDescription, $systemPrompt);
-        $onChunk($result);
+        return null;
     }
 
     /**
-     * Stream tokens from an OpenAI-compatible endpoint using `stream: true`.
-     * Returns true on success, false on transient failure (caller tries next provider).
+     * Consume a `stream: true` completion from an OpenAI-compatible endpoint and
+     * return the reassembled text. Returns null on transient failure so the
+     * caller can fail over to the next provider.
      *
      * @param  array{api_key: string, model: string, base_url: string}  $config
-     * @param  callable(string): void  $onChunk
      */
-    private function streamOpenAiCompatible(string $text, array $config, string $systemPrompt, string $providerName, callable $onChunk): bool
+    private function streamOpenAiCompatible(string $text, array $config, string $systemPrompt, string $providerName, int $maxTokens = 700): ?string
     {
         try {
             $response = Http::withToken($config['api_key'])
@@ -288,7 +346,7 @@ class AiDescriptionEnhancer
                         ['role' => 'system', 'content' => $systemPrompt],
                         ['role' => 'user',   'content' => $text],
                     ],
-                    'max_tokens' => 700,
+                    'max_tokens' => $maxTokens,
                     'temperature' => 0.7,
                     'stream' => true,
                 ]);
@@ -296,8 +354,10 @@ class AiDescriptionEnhancer
             if ($response->failed()) {
                 Log::warning('AI ('.$providerName.') stream failed', ['status' => $response->status()]);
 
-                return false;
+                return null;
             }
+
+            $buffer = '';
 
             foreach (explode("\n", $response->body()) as $line) {
                 $line = trim($line);
@@ -315,15 +375,15 @@ class AiDescriptionEnhancer
                 $delta = json_decode($data, true)['choices'][0]['delta']['content'] ?? null;
 
                 if ($delta !== null && $delta !== '') {
-                    $onChunk($delta);
+                    $buffer .= $delta;
                 }
             }
 
-            return true;
+            return $buffer !== '' ? $buffer : null;
         } catch (\Throwable $e) {
             Log::error('AI ('.$providerName.') stream exception: '.$e->getMessage());
 
-            return false;
+            return null;
         }
     }
 
@@ -336,7 +396,7 @@ class AiDescriptionEnhancer
      * Per-call provider state is local — never mutates `$this->activeProvider`
      * (race-safe under singleton concurrency).
      */
-    private function callWithPrompt(string $text, string $systemPrompt): string
+    private function callWithPrompt(string $text, string $systemPrompt, int $maxTokens = 700): string
     {
         if (empty(trim($text))) {
             return $text;
@@ -363,8 +423,8 @@ class AiDescriptionEnhancer
 
         foreach ($eligible as $name => $config) {
             $result = $name === 'gemini'
-                ? $this->callGemini($text, $config, $systemPrompt, $name)
-                : $this->callOpenAiCompatible($text, $config, $systemPrompt, $name);
+                ? $this->callGemini($text, $config, $systemPrompt, $name, $maxTokens)
+                : $this->callOpenAiCompatible($text, $config, $systemPrompt, $name, $maxTokens);
 
             // `null` signals a transient failure (429/5xx/network) — try the next provider.
             if ($result !== null) {
@@ -381,7 +441,7 @@ class AiDescriptionEnhancer
      * @param  array{api_key: string, model: string, base_url: string}  $config
      * @return string|null Returns null on transient failure so the caller can fail over.
      */
-    private function callOpenAiCompatible(string $text, array $config, string $systemPrompt, string $providerName): ?string
+    private function callOpenAiCompatible(string $text, array $config, string $systemPrompt, string $providerName, int $maxTokens = 700): ?string
     {
         try {
             $response = Http::withToken($config['api_key'])
@@ -392,11 +452,7 @@ class AiDescriptionEnhancer
                         ['role' => 'system', 'content' => $systemPrompt],
                         ['role' => 'user',   'content' => $text],
                     ],
-                    // Up to ~700 tokens ≈ 320 French words, enough for the
-                    // 2–3 paragraph description format and the 2-paragraph
-                    // rejection reason format. Newsletter HTML can use this
-                    // budget too.
-                    'max_tokens' => 700,
+                    'max_tokens' => $maxTokens,
                     'temperature' => 0.7,
                 ]);
 
@@ -418,6 +474,12 @@ class AiDescriptionEnhancer
 
             $content = trim((string) ($response->json('choices.0.message.content') ?? ''));
 
+            if ($response->json('choices.0.finish_reason') === 'length') {
+                Log::warning('AI ('.$providerName.') output truncated (finish_reason=length)', [
+                    'max_tokens' => $maxTokens,
+                ]);
+            }
+
             return $content !== '' ? $content : null;
         } catch (\Throwable $e) {
             Log::error('AI ('.$providerName.') enhancement exception: '.$e->getMessage());
@@ -432,7 +494,7 @@ class AiDescriptionEnhancer
      * @param  array{api_key: string, model: string, base_url: string}  $config
      * @return string|null Returns null on transient failure so the caller can fail over.
      */
-    private function callGemini(string $text, array $config, string $systemPrompt, string $providerName): ?string
+    private function callGemini(string $text, array $config, string $systemPrompt, string $providerName, int $maxTokens = 700): ?string
     {
         // `x-goog-api-key` header instead of `?key=` query param so the key isn't logged
         // by reverse proxies / CDN edges / access logs.
@@ -449,8 +511,7 @@ class AiDescriptionEnhancer
                         ['parts' => [['text' => $text]]],
                     ],
                     'generationConfig' => [
-                        // See OpenAI-compat call above for rationale.
-                        'maxOutputTokens' => 700,
+                        'maxOutputTokens' => $maxTokens,
                         'temperature' => 0.7,
                     ],
                 ]);
@@ -477,6 +538,87 @@ class AiDescriptionEnhancer
 
             return null;
         }
+    }
+
+    /**
+     * Remove provider artifacts from a free-text description: conversational or
+     * labelled meta-preamble, enclosing quotes, Markdown, and emojis. Paragraph
+     * structure is preserved. Applied ONLY to description paths — never to the
+     * newsletter (HTML), lease-summary (emojis) or lease-conditions (bullets).
+     */
+    private function stripDescriptionArtifacts(string $text): string
+    {
+        $text = trim($text);
+
+        if ($text === '') {
+            return $text;
+        }
+
+        // Conversational lead-in; [^\n.]{0,80} stops at a period so content is never crossed.
+        $text = (string) preg_replace('/^\s*(?:voici|voilà|bien sûr|avec plaisir|avec grand plaisir|certainement|bien entendu|d\'accord|pas de problème)[^\n.]{0,80}:\s+/iu', '', $text);
+        // Labelled lead-in: "Description améliorée :", "Version enrichie :", ...
+        $text = (string) preg_replace('/^\s*(?:description|version|texte)\s+(?:am[ée]lior[ée]e?|enrichie?|optimis[ée]e?|reformul[ée]e?|finale?|propos[ée]e?)\s*:\s+/iu', '', $text);
+
+        $text = $this->stripEnclosingQuotes(trim($text));
+
+        // Markdown: emphasis markers, then leading heading / blockquote / list markers.
+        $text = (string) preg_replace('/\*\*|__/u', '', $text);
+        $text = (string) preg_replace('/^[ \t]{0,3}#{1,6}[ \t]+/mu', '', $text);
+        $text = (string) preg_replace('/^[ \t]{0,3}>[ \t]?/mu', '', $text);
+        $text = (string) preg_replace('/^[ \t]{0,3}(?:[-*+]|\d+\.)[ \t]+/mu', '', $text);
+
+        // Emojis & pictographs (flags, symbols, dingbats, variation selectors, ZWJ).
+        $text = (string) preg_replace('/[\x{1F1E6}-\x{1F1FF}\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}\x{2B00}-\x{2BFF}\x{2300}-\x{23FF}\x{FE00}-\x{FE0F}\x{200D}\x{20E3}]/u', '', $text);
+
+        // Whitespace hygiene: collapse space runs, strip per-line indent/trailing, one blank line max.
+        $text = (string) preg_replace('/[^\S\n]{2,}/u', ' ', $text);
+        $text = (string) preg_replace('/^[^\S\n]+/mu', '', $text);
+        $text = (string) preg_replace('/[^\S\n]+$/mu', '', $text);
+        $text = (string) preg_replace('/\n{3,}/u', "\n\n", $text);
+
+        return trim($text);
+    }
+
+    /**
+     * Strip a single pair of quotes wrapping the whole string (straight, curly,
+     * or French guillemets). Inner quotes are left untouched.
+     */
+    private function stripEnclosingQuotes(string $text): string
+    {
+        $pairs = [['"', '"'], ["'", "'"], ['«', '»'], ['“', '”'], ['‘', '’']];
+
+        foreach ($pairs as [$open, $close]) {
+            if (mb_strlen($text) > mb_strlen($open.$close)
+                && str_starts_with($text, $open)
+                && str_ends_with($text, $close)
+            ) {
+                $inner = mb_substr($text, mb_strlen($open), mb_strlen($text) - mb_strlen($open) - mb_strlen($close));
+
+                return trim($inner);
+            }
+        }
+
+        return $text;
+    }
+
+    /**
+     * Split cleaned text into sentence-level segments for progressive streaming.
+     * Loss-less: PREG_SPLIT_DELIM_CAPTURE keeps the whitespace following each
+     * sentence as its own element, so concatenating every segment reproduces the
+     * input verbatim — paragraph breaks included.
+     *
+     * @return list<string>
+     */
+    private function splitIntoStreamSegments(string $text): array
+    {
+        $parts = preg_split(
+            '/(?<=[.!?…])(\s+)/u',
+            $text,
+            -1,
+            PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY,
+        );
+
+        return $parts === false ? [$text] : $parts;
     }
 
     /**

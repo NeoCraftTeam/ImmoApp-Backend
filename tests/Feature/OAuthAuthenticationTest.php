@@ -8,6 +8,8 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use Laravel\Socialite\Contracts\User as SocialiteUser;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\FacebookProvider;
+use Laravel\Socialite\Two\User as SocialiteTwoUser;
 
 uses(RefreshDatabase::class);
 
@@ -306,6 +308,70 @@ describe('Facebook OAuth Authentication', function (): void {
         $this->assertDatabaseHas('users', [
             'email' => 'ghuser@example.com',
             'github_id' => 'gh-123',
+        ]);
+    });
+
+    it('captures the GitHub username as firstname when the display name is blank', function (): void {
+        // GitHub users frequently leave their profile "name" empty; we must
+        // fall back to the public login (nickname) instead of storing the
+        // generic "Utilisateur" placeholder.
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
+        $socialiteUser->shouldReceive('getId')->andReturn('gh-noname-1');
+        $socialiteUser->shouldReceive('getEmail')->andReturn('octodev@example.com');
+        $socialiteUser->shouldReceive('getName')->andReturn(null);
+        $socialiteUser->shouldReceive('getNickname')->andReturn('octodev');
+        $socialiteUser->shouldReceive('getAvatar')->andReturn('https://github.com/octodev.png');
+        $socialiteUser->shouldReceive('getRaw')->andReturn([]);
+
+        Socialite::shouldReceive('driver')->with('github')->andReturnSelf();
+        Socialite::shouldReceive('userFromToken')->andReturn($socialiteUser);
+
+        $this->postJson('/api/v1/auth/oauth/github', ['token' => 'valid-gh-token'])
+            ->assertOk()
+            ->assertJson(['is_new_user' => true]);
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'octodev@example.com',
+            'github_id' => 'gh-noname-1',
+            'firstname' => 'octodev',
+            'oauth_avatar' => 'https://github.com/octodev.png',
+        ]);
+    });
+
+    it('requests first_name, last_name and picture fields from Facebook so the prénom and avatar are captured', function (): void {
+        // A real Two\User (not the Contracts\User mock) is required so getRaw()
+        // actually exists — the service reads first_name/last_name from it, the
+        // same shape a live Facebook Graph response produces.
+        $socialiteUser = (new SocialiteTwoUser)
+            ->setRaw(['first_name' => 'Marie Claire', 'last_name' => 'Dubois'])
+            ->map([
+                'id' => 'fb-fields-1',
+                'name' => 'Marie Claire Dubois',
+                'email' => 'marie@example.com',
+                'avatar' => 'https://facebook.com/marie.jpg',
+            ]);
+
+        // A real FacebookProvider instance is required so the service's
+        // `instanceof FacebookProvider` guard fires and requests the extra
+        // Graph fields; the default field set omits first_name/last_name.
+        $driver = Mockery::mock(FacebookProvider::class);
+        $driver->shouldReceive('fields')
+            ->once()
+            ->with(['first_name', 'last_name', 'name', 'email', 'picture.width(1920)'])
+            ->andReturnSelf();
+        $driver->shouldReceive('userFromToken')->andReturn($socialiteUser);
+
+        Socialite::shouldReceive('driver')->with('facebook')->andReturn($driver);
+
+        $this->postJson('/api/v1/auth/oauth/facebook', ['token' => 'valid-fb-token'])
+            ->assertOk();
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'marie@example.com',
+            'facebook_id' => 'fb-fields-1',
+            'firstname' => 'Marie Claire',
+            'lastname' => 'Dubois',
+            'oauth_avatar' => 'https://facebook.com/marie.jpg',
         ]);
     });
 });

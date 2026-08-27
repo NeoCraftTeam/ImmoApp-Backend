@@ -69,6 +69,36 @@ it('sends externalId as tx_ref to kpay init', function (): void {
     Http::assertSent(fn (Request $request) => $request->data()['externalId'] === 'KH-EXT-REF-001');
 });
 
+it('sends currency to kpay init because GATEWAY mode requires it', function (): void {
+    Http::fake([
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_cur',
+            'gatewayUrl' => 'https://admin.kpay.site/gateway/gw_cur',
+        ], 201),
+    ]);
+
+    $this->service->initiate(validKpayInitiatePayload(['currency' => 'cdf']));
+
+    // Regression: prod init failed with "le champ currency est obligatoire en
+    // mode GATEWAY". The service must forward the payload currency, uppercased.
+    Http::assertSent(fn (Request $request) => ($request->data()['currency'] ?? null) === 'CDF');
+});
+
+it('defaults currency to the configured ledger currency when the payload passes it blank', function (): void {
+    config()->set('payment.default_currency', 'XAF');
+
+    Http::fake([
+        'admin.kpay.site/*' => Http::response([
+            'id' => 'pay_def',
+            'gatewayUrl' => 'https://admin.kpay.site/gateway/gw_def',
+        ], 201),
+    ]);
+
+    $this->service->initiate(validKpayInitiatePayload(['currency' => '']));
+
+    Http::assertSent(fn (Request $request) => ($request->data()['currency'] ?? null) === 'XAF');
+});
+
 it('sends kpay auth headers', function (): void {
     Http::fake([
         'admin.kpay.site/*' => Http::response([

@@ -361,3 +361,60 @@ it('falls back to Payment.transaction_id when Stripe gateway_response lacks id',
         ])
         ->assertSuccessful();
 });
+
+/*
+|--------------------------------------------------------------------------
+| userRefunds — user-facing list must not leak internal columns
+|--------------------------------------------------------------------------
+|
+| GET /payments/refunds previously returned the raw Refund model, exposing
+| admin_note, gateway_response and processed_by to the end user. It now goes
+| through RefundResource, which curates the owner-facing fields only.
+*/
+it('does not expose internal refund columns in the user list', function (): void {
+    $user = User::factory()->create();
+    $admin = User::factory()->admin()->create();
+    $payment = Payment::factory()->success()->create(['user_id' => $user->id]);
+
+    $refund = Refund::factory()->completed()->create([
+        'user_id' => $user->id,
+        'payment_id' => $payment->id,
+        'admin_note' => 'INTERNE : geste commercial, ne pas divulguer',
+        'processed_by' => $admin->id,
+    ]);
+    $refund->forceFill([
+        'gateway_response' => ['id' => 're_secret_001', 'balance_transaction' => 'txn_secret'],
+    ])->save();
+
+    $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/payments/refunds');
+
+    $response->assertOk();
+
+    // Resource-collection envelope (matches the web PaginatedResponse contract).
+    $response->assertJsonStructure([
+        'data' => [['id', 'payment_id', 'amount', 'currency', 'reason', 'status', 'is_partial', 'created_at']],
+        'meta' => ['current_page', 'last_page', 'per_page', 'total'],
+        'links',
+    ]);
+
+    $response->assertJsonPath('data.0.id', $refund->id);
+
+    // Internal columns must never reach the refund's owner.
+    $response->assertJsonMissingPath('data.0.admin_note');
+    $response->assertJsonMissingPath('data.0.gateway_response');
+    $response->assertJsonMissingPath('data.0.processed_by');
+    $response->assertJsonMissing(['admin_note' => 'INTERNE : geste commercial, ne pas divulguer']);
+});
+
+it('scopes the user refunds list to the authenticated user', function (): void {
+    $user = User::factory()->create();
+    $other = User::factory()->create();
+
+    Refund::factory()->completed()->create(['user_id' => $user->id]);
+    Refund::factory()->completed()->count(2)->create(['user_id' => $other->id]);
+
+    $response = $this->actingAs($user, 'sanctum')->getJson('/api/v1/payments/refunds');
+
+    $response->assertOk();
+    $response->assertJsonCount(1, 'data');
+});

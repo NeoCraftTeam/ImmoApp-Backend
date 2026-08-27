@@ -321,7 +321,10 @@ final readonly class QrCodeService
                 $imagick->setBackgroundColor('white');
                 $imagick->readImageBlob($svg);
                 $imagick->setImageFormat('png32');
-                $imagick->resizeImage($size, $size, \Imagick::FILTER_LANCZOS, 1);
+                // Best-fit within the box while preserving the branded canvas's
+                // portrait aspect ratio. Forcing a square (resizeImage($size, $size))
+                // scales non-uniformly and squishes the embedded QR matrix.
+                $imagick->resizeImage($size, $size, \Imagick::FILTER_LANCZOS, 1, true);
                 $bytes = $imagick->getImageBlob();
                 $imagick->clear();
                 if ($bytes !== '') {
@@ -337,7 +340,9 @@ final readonly class QrCodeService
             $tmp = tempnam(sys_get_temp_dir(), 'kh-qr-').'.svg';
             file_put_contents($tmp, $svg);
             try {
-                $cmd = sprintf('%s -w %d -h %d -f png %s', escapeshellcmd($rsvg), $size, $size, escapeshellarg($tmp));
+                // Constrain height only so rsvg preserves the portrait aspect ratio
+                // (matches the Imagick best-fit path); forcing -w and -h squishes it.
+                $cmd = sprintf('%s -h %d -f png %s', escapeshellcmd($rsvg), $size, escapeshellarg($tmp));
                 $bytes = @shell_exec($cmd);
                 if (is_string($bytes) && $bytes !== '' && str_starts_with($bytes, "\x89PNG")) {
                     return $bytes;

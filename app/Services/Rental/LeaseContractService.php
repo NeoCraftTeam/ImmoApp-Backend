@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Rental;
 
+use App\Enums\LeaseStatus;
 use App\Models\Ad;
 use App\Models\LeaseContract;
+use App\Models\Tenant;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Carbon;
@@ -86,6 +88,7 @@ final class LeaseContractService
      * Generate a lease contract PDF, store it on disk, and persist a record.
      *
      * @param  array{
+     *     tenant_id?: string,
      *     unit_reference?: string,
      *     tenant_name: string,
      *     tenant_phone: string,
@@ -100,6 +103,8 @@ final class LeaseContractService
      */
     public function generate(Ad $ad, User $landlord, array $tenantData): LeaseContract
     {
+        $tenant = $this->resolveTenant($landlord, $tenantData);
+
         $leaseStart = Carbon::parse($tenantData['lease_start']);
         $leaseEnd = $leaseStart->copy()->addMonths($tenantData['lease_duration_months']);
         $contractNumber = 'KH-'.strtoupper(substr($ad->id, 0, 8)).'-'.now()->format('Ymd');
@@ -147,6 +152,7 @@ final class LeaseContractService
         return LeaseContract::create([
             'user_id' => $landlord->id,
             'ad_id' => $ad->id,
+            'tenant_id' => $tenant?->id,
             'unit_reference' => $unitReference,
             'contract_number' => $contractNumber,
             'tenant_name' => $tenantData['tenant_name'],
@@ -160,6 +166,53 @@ final class LeaseContractService
             'deposit_amount' => $depositAmount,
             'special_conditions' => $tenantData['special_conditions'] ?? null,
             'pdf_path' => $filename,
+            // Mirror the column default ('active') on the in-memory instance:
+            // create() does not hydrate DB defaults, so leaving this unset
+            // returns a null status that breaks resource serialization and
+            // keeps the fresh lease out of the active-lease KPIs.
+            'status' => LeaseStatus::Active->value,
         ]);
+    }
+
+    /**
+     * Resolve the tenant a generated lease should be linked to so the owner's
+     * "mes locataires" registry stays populated.
+     *
+     * An explicit {@see $tenantData['tenant_id']} (already validated as owned
+     * by the landlord in {@see GenerateLeaseContractRequest}) wins. Otherwise
+     * the tenant is registered from the contract's free-text fields, matched
+     * on phone within the landlord's own scope so re-generating a contract for
+     * the same person reuses the existing record instead of duplicating it.
+     *
+     * @param  array{
+     *     tenant_id?: string,
+     *     tenant_name?: string,
+     *     tenant_phone?: string,
+     *     tenant_email?: string,
+     *     tenant_id_number?: string,
+     * }  $tenantData
+     */
+    private function resolveTenant(User $landlord, array $tenantData): ?Tenant
+    {
+        $tenantId = $tenantData['tenant_id'] ?? null;
+        if ($tenantId !== null && $tenantId !== '') {
+            return Tenant::query()
+                ->where('user_id', $landlord->id)
+                ->find($tenantId);
+        }
+
+        $phone = trim((string) ($tenantData['tenant_phone'] ?? ''));
+        if ($phone === '') {
+            return null;
+        }
+
+        return Tenant::query()->firstOrCreate(
+            ['user_id' => $landlord->id, 'phone' => $phone],
+            [
+                'name' => $tenantData['tenant_name'] ?? '',
+                'email' => $tenantData['tenant_email'] ?? null,
+                'id_number' => $tenantData['tenant_id_number'] ?? null,
+            ],
+        );
     }
 }
