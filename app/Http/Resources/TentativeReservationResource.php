@@ -14,6 +14,8 @@ final class TentativeReservationResource extends JsonResource
     #[\Override]
     public function toArray(Request $request): array
     {
+        $holdHours = (int) config('viewings.reservation_ttl_hours', 72);
+
         return [
             'id' => $this->id,
             'status' => $this->status->value,
@@ -45,7 +47,7 @@ final class TentativeReservationResource extends JsonResource
 
             'next_steps' => $this->when(
                 $this->wasRecentlyCreated,
-                'Votre créneau est retenu pendant 24h. Le propriétaire vous contactera pour confirmer la visite. Assurez-vous d\'être joignable sur votre numéro enregistré.'
+                "Votre créneau est retenu pendant {$holdHours}h. Le propriétaire vous contactera pour confirmer la visite. Assurez-vous d'être joignable sur votre numéro enregistré."
             ),
         ];
     }
