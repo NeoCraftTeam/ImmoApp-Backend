@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Api\V1;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class GenerateLeaseContractRequest extends FormRequest
 {
@@ -14,11 +15,19 @@ class GenerateLeaseContractRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<int, string>>
+     * @return array<string, mixed>
      */
     public function rules(): array
     {
         return [
+            // Optional explicit link to a tenant already in the owner's
+            // registry; scoped to the authenticated landlord so a lease can
+            // never be attached to someone else's tenant record.
+            'tenant_id' => [
+                'nullable',
+                'uuid',
+                Rule::exists('tenants', 'id')->where('user_id', $this->user()?->id),
+            ],
             'tenant_name' => ['required', 'string', 'max:255'],
             'tenant_phone' => ['required', 'string', 'max:50'],
             'tenant_email' => ['nullable', 'email', 'max:255'],
