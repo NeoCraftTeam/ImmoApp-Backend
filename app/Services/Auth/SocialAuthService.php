@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\FacebookProvider;
 
 /**
  * Domain logic for OAuth social authentication: resolving the provider user,
@@ -36,6 +37,14 @@ final readonly class SocialAuthService
     public function getSocialUser(string $provider, string $token, ?string $idToken = null): mixed
     {
         $driver = Socialite::driver($provider);
+
+        // Facebook only returns the split first/last name (and a usable avatar)
+        // when we request those fields explicitly; the default field set omits
+        // `first_name`/`last_name`, so the prénom never gets captured. Keep
+        // `picture` so the avatar still comes through.
+        if ($provider === 'facebook' && $driver instanceof FacebookProvider) {
+            $driver->fields(['first_name', 'last_name', 'name', 'email', 'picture.width(1920)']);
+        }
 
         if ($provider === 'apple' && $idToken) {
             /** @phpstan-ignore method.notFound */
@@ -189,22 +198,39 @@ final readonly class SocialAuthService
     /**
      * Parse first and last names from social user data.
      *
+     * Prefers the provider's structured given/family names (Google, Apple, and
+     * Facebook once the first_name/last_name fields are requested), then falls
+     * back to splitting the display name, then to the public username — GitHub
+     * frequently leaves the display name blank, so `getNickname()` (the GitHub
+     * login) keeps us from storing the bare "Utilisateur" placeholder.
+     *
      * @return array{firstname: string, lastname: string}
      */
     private function parseNames(mixed $socialUser): array
     {
-        $name = $socialUser->getName() ?? '';
-        $parts = explode(' ', $name, 2);
+        $raw = method_exists($socialUser, 'getRaw') ? $socialUser->getRaw() : [];
 
-        // Try to get from user array if available
-        $user = method_exists($socialUser, 'getRaw') ? $socialUser->getRaw() : [];
+        $firstname = $raw['given_name'] ?? $raw['first_name'] ?? null;
+        $lastname = $raw['family_name'] ?? $raw['last_name'] ?? null;
 
-        $firstname = $user['given_name'] ?? $user['first_name'] ?? $parts[0];
-        $lastname = $user['family_name'] ?? $user['last_name'] ?? ($parts[1] ?? '');
+        if (!is_string($firstname) || trim($firstname) === '') {
+            $name = $socialUser->getName();
+
+            if (!is_string($name) || trim($name) === '') {
+                $name = method_exists($socialUser, 'getNickname') ? $socialUser->getNickname() : null;
+            }
+
+            $parts = explode(' ', is_string($name) ? trim($name) : '', 2);
+            $firstname = $parts[0];
+
+            if (!is_string($lastname) || trim($lastname) === '') {
+                $lastname = $parts[1] ?? '';
+            }
+        }
 
         return [
-            'firstname' => $firstname ?: 'Utilisateur',
-            'lastname' => $lastname,
+            'firstname' => trim($firstname) !== '' ? trim($firstname) : 'Utilisateur',
+            'lastname' => is_string($lastname) ? trim($lastname) : '',
         ];
     }
 }
