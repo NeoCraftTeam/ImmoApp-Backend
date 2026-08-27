@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Enums\AdStatus;
 use App\Enums\ReservationStatus;
 use App\Models\Ad;
 use App\Models\AdBoost;
@@ -31,7 +32,7 @@ final class OwnerDashboardController
      *
      *     - **active_ads_count** : annonces publiées (AVAILABLE + RESERVED)
      *     - **active_leases_count** : baux actifs (lease_end >= aujourd'hui)
-     *     - **occupancy_rate** : taux d'occupation (leases actifs / annonces publiées, %)
+     *     - **occupancy_rate** : taux d'occupation (baux actifs / parc en circulation [disponibles + réservés + loués], %)
      *     - **monthly_rent_total_xaf** : somme des loyers mensuels des baux actifs (XAF)
      *     - **pending_viewings_count** : visites en attente de confirmation
      *     - **confirmed_viewings_count** : visites confirmées à venir
@@ -82,8 +83,24 @@ final class OwnerDashboardController
                 ->active()
                 ->count();
 
-            $occupancyRate = $activeAdsCount > 0
-                ? min(100.0, round(($activeLeasesCount / $activeAdsCount) * 100, 1))
+            // Occupancy denominator must cover the whole rental circulation,
+            // not just publicly-listed ads. Once an owner flips a rented unit
+            // to RENT it leaves publiclyListed() (AVAILABLE + RESERVED) while
+            // its active lease stays in the numerator — the two universes
+            // become disjoint, so the ratio overshoots 100% (or collapses to
+            // 0% when every unit is rented). Counting AVAILABLE + RESERVED +
+            // RENT keeps the numerator a subset of the denominator.
+            $rentalCirculationCount = Ad::query()
+                ->where('user_id', $userId)
+                ->whereIn('status', [
+                    AdStatus::AVAILABLE->value,
+                    AdStatus::RESERVED->value,
+                    AdStatus::RENT->value,
+                ])
+                ->count();
+
+            $occupancyRate = $rentalCirculationCount > 0
+                ? min(100.0, round(($activeLeasesCount / $rentalCirculationCount) * 100, 1))
                 : 0.0;
 
             $monthlyRentTotal = (float) LeaseContract::query()
