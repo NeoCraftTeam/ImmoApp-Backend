@@ -35,11 +35,12 @@ final class AdAiController
      */
     public function __invoke(Request $request): JsonResponse
     {
-        $request->validate([
-            'description' => ['required', 'string', 'max:10000'],
-        ]);
+        $data = $request->validate($this->enhanceRules());
 
-        $enhanced = app(AiDescriptionEnhancer::class)->enhance($request->input('description'));
+        $enhanced = app(AiDescriptionEnhancer::class)->enhance(
+            $data['description'],
+            $this->contextFrom($data),
+        );
 
         return response()->json(['enhanced' => $enhanced]);
     }
@@ -144,20 +145,20 @@ final class AdAiController
      */
     public function stream(Request $request): StreamedResponse
     {
-        $request->validate([
-            'description' => ['required', 'string', 'max:10000'],
-        ]);
+        $data = $request->validate($this->enhanceRules());
 
-        $description = $request->input('description');
+        $description = $data['description'];
+        $context = $this->contextFrom($data);
 
-        return response()->stream(function () use ($description): void {
+        return response()->stream(function () use ($description, $context): void {
             app(AiDescriptionEnhancer::class)->streamEnhance(
                 $description,
                 function (string $chunk): void {
                     echo 'data: '.json_encode(['delta' => $chunk])."\n\n";
                     ob_flush();
                     flush();
-                }
+                },
+                $context,
             );
 
             echo "event: done\ndata: {}\n\n";
@@ -168,5 +169,55 @@ final class AdAiController
             'Cache-Control' => 'no-cache',
             'X-Accel-Buffering' => 'no',
         ]);
+    }
+
+    /**
+     * Validation rules shared by the JSON and SSE enhance endpoints: the raw
+     * description plus optional form facts the model can weave in without inventing.
+     * `attributes` stays lenient (array only) so the mobile client's `string[]`
+     * of feature labels is accepted as-is.
+     *
+     * @return array<string, array<int, string>>
+     */
+    private function enhanceRules(): array
+    {
+        return [
+            'description' => ['required', 'string', 'max:10000'],
+            'type' => ['nullable', 'string', 'max:100'],
+            'city' => ['nullable', 'string', 'max:100'],
+            'quarter' => ['nullable', 'string', 'max:100'],
+            'bedrooms' => ['nullable', 'integer', 'min:0', 'max:50'],
+            'surface' => ['nullable', 'numeric', 'min:0', 'max:100000'],
+            'price' => ['nullable', 'numeric', 'min:0'],
+            'transaction_type' => ['nullable', 'string', 'max:50'],
+            'attributes' => ['nullable', 'array'],
+        ];
+    }
+
+    /**
+     * Turn validated request data into the context array consumed by the enhancer:
+     * flat facts (dropping nulls) plus the feature labels under `features`.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function contextFrom(array $data): array
+    {
+        $context = array_filter([
+            'type' => $data['type'] ?? null,
+            'city' => $data['city'] ?? null,
+            'quarter' => $data['quarter'] ?? null,
+            'bedrooms' => $data['bedrooms'] ?? null,
+            'surface' => $data['surface'] ?? null,
+            'price' => $data['price'] ?? null,
+            'transaction_type' => $data['transaction_type'] ?? null,
+        ], static fn ($value): bool => $value !== null);
+
+        $attributes = $data['attributes'] ?? null;
+        if (is_array($attributes) && $attributes !== []) {
+            $context['features'] = $attributes;
+        }
+
+        return $context;
     }
 }
