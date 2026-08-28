@@ -288,7 +288,7 @@ class PendingAdResource extends Resource
                     }),
             ])
             ->emptyStateHeading('Aucune annonce en attente')
-            ->emptyStateDescription('Toutes les annonces ont été traitées. 🎉')
+            ->emptyStateDescription('Toutes les annonces ont été traitées.')
             ->emptyStateIcon('heroicon-o-check-circle')
             ->poll('15s');
     }

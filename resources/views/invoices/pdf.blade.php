@@ -345,7 +345,7 @@
                     <div class="party-label">Émetteur</div>
                     <div class="party-name">{{ config('app.name') }}</div>
                     <div class="party-detail">{{ config('app.url') }}</div>
-                    <div class="party-detail">support@keyhome.cm</div>
+                    <div class="party-detail">support@keyhome.app</div>
                 </td>
                 <td class="party-cell right">
                     <div class="party-label">Facturé à</div>
@@ -454,7 +454,7 @@
         <div class="info-box">
             <strong>Note :</strong> Cette facture fait office de reçu de paiement officiel.
             Conservez-la pour votre comptabilité. Pour toute question relative à ce paiement,
-            contactez notre équipe à <strong>support@keyhome.cm</strong> en mentionnant la référence
+            contactez notre équipe à <strong>support@keyhome.app</strong> en mentionnant la référence
             <strong>{{ $invoice->invoice_number }}</strong>.
         </div>
 
@@ -465,7 +465,7 @@
         <table class="footer-table">
             <tr>
                 <td class="footer-left">
-                    {{ config('app.name') }} · {{ config('app.url') }} · support@keyhome.cm
+                    {{ config('app.name') }} · {{ config('app.url') }} · support@keyhome.app
                 </td>
                 <td class="footer-right">
                     Page <span class="page-number"></span> · Facture {{ $invoice->invoice_number }} · Générée le {{ now()->format('d/m/Y à H:i') }}
