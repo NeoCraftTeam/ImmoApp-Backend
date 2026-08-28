@@ -234,4 +234,52 @@ describe('Clerk Exchange – authentication flows', function (): void {
                 'email' => $user->email,
             ]);
     });
+
+    it('refreshes the avatar and heals placeholder names on a returning Clerk login', function (): void {
+        $user = User::factory()->create([
+            'clerk_id' => 'clerk_abc123',
+            'email' => 'jean@example.com',
+            'firstname' => User::PLACEHOLDER_FIRSTNAME,
+            'lastname' => User::PLACEHOLDER_LASTNAME,
+            'avatar' => 'https://old.example.com/a.jpg',
+        ]);
+
+        $this->mock(ClerkJwtService::class)
+            ->shouldReceive('verifyAndFetchUser')
+            ->once()
+            ->andReturn(fakeClerkPayload());
+
+        $this->withToken('fake-clerk-jwt')
+            ->postJson('/api/v1/auth/clerk/exchange')
+            ->assertOk();
+
+        $fresh = $user->fresh();
+        expect($fresh->firstname)->toBe('Jean')
+            ->and($fresh->lastname)->toBe('Dupont')
+            ->and($fresh->avatar)->toBe('https://img.clerk.dev/avatar.jpg');
+    });
+
+    it('does not overwrite a user-edited name on a returning Clerk login', function (): void {
+        $user = User::factory()->create([
+            'clerk_id' => 'clerk_abc123',
+            'email' => 'jean@example.com',
+            'firstname' => 'Édith',
+            'lastname' => 'Piaf',
+            'avatar' => 'https://old.example.com/a.jpg',
+        ]);
+
+        $this->mock(ClerkJwtService::class)
+            ->shouldReceive('verifyAndFetchUser')
+            ->once()
+            ->andReturn(fakeClerkPayload());
+
+        $this->withToken('fake-clerk-jwt')
+            ->postJson('/api/v1/auth/clerk/exchange')
+            ->assertOk();
+
+        $fresh = $user->fresh();
+        expect($fresh->firstname)->toBe('Édith')
+            ->and($fresh->lastname)->toBe('Piaf')
+            ->and($fresh->avatar)->toBe('https://img.clerk.dev/avatar.jpg');
+    });
 });

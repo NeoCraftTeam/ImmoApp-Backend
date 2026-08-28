@@ -376,6 +376,114 @@ describe('Facebook OAuth Authentication', function (): void {
     });
 });
 
+describe('OAuth profile re-sync on returning login', function (): void {
+    it('refreshes the stored avatar and keeps a real name on a returning login', function (): void {
+        $user = User::factory()->create([
+            'email' => 'resync@example.com',
+            'google_id' => 'google-resync-1',
+            'oauth_provider' => 'google',
+            'avatar' => 'https://example.com/old-avatar.jpg',
+            'oauth_avatar' => 'https://example.com/old-avatar.jpg',
+            'firstname' => 'Marie',
+            'lastname' => 'Curie',
+        ]);
+
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
+        $socialiteUser->shouldReceive('getId')->andReturn('google-resync-1');
+        $socialiteUser->shouldReceive('getEmail')->andReturn('resync@example.com');
+        $socialiteUser->shouldReceive('getName')->andReturn('Marie Curie');
+        $socialiteUser->shouldReceive('getAvatar')->andReturn('https://example.com/new-avatar.jpg');
+        $socialiteUser->shouldReceive('getRaw')->andReturn(['given_name' => 'Marie', 'family_name' => 'Curie']);
+
+        Socialite::shouldReceive('driver')->with('google')->andReturnSelf();
+        Socialite::shouldReceive('userFromToken')->andReturn($socialiteUser);
+
+        $this->postJson('/api/v1/auth/oauth/google', ['token' => 'valid-google-token'])
+            ->assertOk()
+            ->assertJson(['is_new_user' => false]);
+
+        $fresh = $user->fresh();
+        expect($fresh->avatar)->toBe('https://example.com/new-avatar.jpg')
+            ->and($fresh->oauth_avatar)->toBe('https://example.com/new-avatar.jpg')
+            ->and($fresh->firstname)->toBe('Marie')
+            ->and($fresh->lastname)->toBe('Curie');
+    });
+    it('never overwrites a user-edited name with provider data on a returning login', function (): void {
+        $user = User::factory()->create([
+            'email' => 'keep@example.com',
+            'google_id' => 'google-keep-1',
+            'oauth_provider' => 'google',
+            'firstname' => 'Édith',
+            'lastname' => 'Piaf',
+        ]);
+
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
+        $socialiteUser->shouldReceive('getId')->andReturn('google-keep-1');
+        $socialiteUser->shouldReceive('getEmail')->andReturn('keep@example.com');
+        $socialiteUser->shouldReceive('getName')->andReturn('Someone Else');
+        $socialiteUser->shouldReceive('getAvatar')->andReturn(null);
+        $socialiteUser->shouldReceive('getRaw')->andReturn(['given_name' => 'Someone', 'family_name' => 'Else']);
+
+        Socialite::shouldReceive('driver')->with('google')->andReturnSelf();
+        Socialite::shouldReceive('userFromToken')->andReturn($socialiteUser);
+
+        $this->postJson('/api/v1/auth/oauth/google', ['token' => 'valid-google-token'])->assertOk();
+
+        $fresh = $user->fresh();
+        expect($fresh->firstname)->toBe('Édith')
+            ->and($fresh->lastname)->toBe('Piaf');
+    });
+
+    it('heals placeholder first and last names from the provider on a returning login', function (): void {
+        $user = User::factory()->create([
+            'email' => 'heal@example.com',
+            'google_id' => 'google-heal-1',
+            'oauth_provider' => 'google',
+            'firstname' => User::PLACEHOLDER_FIRSTNAME,
+            'lastname' => User::PLACEHOLDER_LASTNAME,
+        ]);
+
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
+        $socialiteUser->shouldReceive('getId')->andReturn('google-heal-1');
+        $socialiteUser->shouldReceive('getEmail')->andReturn('heal@example.com');
+        $socialiteUser->shouldReceive('getName')->andReturn('Ada Lovelace');
+        $socialiteUser->shouldReceive('getAvatar')->andReturn(null);
+        $socialiteUser->shouldReceive('getRaw')->andReturn(['given_name' => 'Ada', 'family_name' => 'Lovelace']);
+
+        Socialite::shouldReceive('driver')->with('google')->andReturnSelf();
+        Socialite::shouldReceive('userFromToken')->andReturn($socialiteUser);
+
+        $this->postJson('/api/v1/auth/oauth/google', ['token' => 'valid-google-token'])->assertOk();
+
+        $fresh = $user->fresh();
+        expect($fresh->firstname)->toBe('Ada')
+            ->and($fresh->lastname)->toBe('Lovelace');
+    });
+
+    it('leaves the last name empty (never the placeholder) when GitHub exposes only a handle', function (): void {
+        $socialiteUser = Mockery::mock(SocialiteUser::class);
+        $socialiteUser->shouldReceive('getId')->andReturn('gh-empty-1');
+        $socialiteUser->shouldReceive('getEmail')->andReturn('handle@example.com');
+        $socialiteUser->shouldReceive('getName')->andReturn(null);
+        $socialiteUser->shouldReceive('getNickname')->andReturn('octodev');
+        $socialiteUser->shouldReceive('getAvatar')->andReturn('https://github.com/octodev.png');
+        $socialiteUser->shouldReceive('getRaw')->andReturn([]);
+
+        Socialite::shouldReceive('driver')->with('github')->andReturnSelf();
+        Socialite::shouldReceive('userFromToken')->andReturn($socialiteUser);
+
+        $this->postJson('/api/v1/auth/oauth/github', ['token' => 'valid-gh-token'])
+            ->assertOk()
+            ->assertJson(['is_new_user' => true]);
+
+        $this->assertDatabaseHas('users', [
+            'github_id' => 'gh-empty-1',
+            'firstname' => 'octodev',
+            'lastname' => '',
+        ]);
+    });
+});
+
 describe('Apple OAuth Authentication', function (): void {
     it('authenticates user with Apple using id_token', function (): void {
         $socialiteUser = Mockery::mock(SocialiteUser::class);
