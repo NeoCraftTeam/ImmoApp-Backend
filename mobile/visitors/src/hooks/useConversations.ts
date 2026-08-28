@@ -1,13 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 
 import { apiClient } from '@/api/client';
 import { ENDPOINTS } from '@/api/endpoints';
+import { mergeDelta, mergeFreshPage, runDeltaSync } from '@/hooks/chat-delta';
 import type {
   Conversation,
   Message,
   MessageReaction,
   MessagesResponse,
 } from '@/types/conversation';
+
+/**
+ * On ne réévalue quasi jamais la première page : le cache (persisté chiffré)
+ * reste affiché à l'ouverture instantanée façon WhatsApp Web, et `syncDelta`
+ * tire uniquement ce qui est arrivé depuis. 23 h de fraîcheur ⇒ pas de refetch
+ * plein au remount tant que l'app vit.
+ */
+const CHAT_MESSAGES_STALE_MS = 23 * 60 * 60 * 1000;
 
 interface ConvListResponse {
   data: Conversation[];
@@ -100,20 +111,135 @@ export function useStartConversation() {
  * au lieu de marteler l'API pour rien.
  */
 export function useConversation(uuid: string | undefined, realtimeConnected = false) {
-  return useQuery<MessagesResponse, Error, Message[]>({
+  const qc = useQueryClient();
+  const isSyncingRef = useRef(false);
+  const bootstrappedRef = useRef<string | null>(null);
+  const prevConnectedRef = useRef(false);
+
+  const query = useQuery<MessagesResponse, Error, Message[]>({
     queryKey: ['conversation-messages', uuid],
     queryFn: async () => {
       if (!uuid) throw new Error('Missing conversation uuid');
+      const prev = qc.getQueryData<MessagesResponse>(['conversation-messages', uuid]);
       const { data } = await apiClient.get<MessagesResponse>(
         ENDPOINTS.conversations.messages(uuid),
       );
-      return data;
+      // Backend renvoie DESCENDANT (newest-first) ; on remet en ASCENDANT
+      // (oldest→newest) pour coller à l'append temps-réel / optimiste / delta et
+      // au scroll-to-end (cf. web useChatMessages).
+      const freshPageAscending = Array.isArray(data?.data)
+        ? [...data.data].reverse()
+        : [];
+      const prevList = Array.isArray(prev?.data) ? prev!.data : [];
+      return { data: mergeFreshPage(prevList, freshPageAscending) };
     },
     select: (payload) => (Array.isArray(payload?.data) ? payload.data : []),
     enabled: Boolean(uuid),
-    staleTime: 2 * 1000,
-    refetchInterval: realtimeConnected ? 30 * 1000 : 4 * 1000,
+    // Cache persisté → ouverture instantanée sans refetch plein ; la fraîcheur
+    // vient de syncDelta (bootstrap + AppState + reconnexion + delta-poll).
+    staleTime: CHAT_MESSAGES_STALE_MS,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
+  const refetch = query.refetch;
+
+  const syncDelta = useCallback(async () => {
+    if (!uuid || isSyncingRef.current) {
+      return;
+    }
+    isSyncingRef.current = true;
+    try {
+      await runDeltaSync({
+        getMessages: () => {
+          const c = qc.getQueryData<MessagesResponse>(['conversation-messages', uuid]);
+          return Array.isArray(c?.data) ? c!.data : [];
+        },
+        applyFresh: (fresh) => {
+          qc.setQueryData<MessagesResponse | undefined>(
+            ['conversation-messages', uuid],
+            (prev) => {
+              const list = Array.isArray(prev?.data) ? prev!.data : [];
+              return { data: mergeDelta(list, fresh) };
+            },
+          );
+        },
+        fetchAfter: async (afterIso) => {
+          const { data } = await apiClient.get<MessagesResponse>(
+            ENDPOINTS.conversations.messages(uuid),
+            { params: { after: afterIso } },
+          );
+          return {
+            data: Array.isArray(data?.data) ? data.data : [],
+            has_more: Boolean(data?.has_more),
+          };
+        },
+      });
+    } finally {
+      isSyncingRef.current = false;
+    }
+  }, [uuid, qc]);
+
+  // Bootstrap depuis le cache restauré (persisté chiffré) : `isFetchedAfterMount`
+  // est faux quand la liste vient du snapshot → c'est là qu'il faut rattraper ce
+  // qui est arrivé depuis (ouverture instantanée façon WhatsApp Web).
+  useEffect(() => {
+    if (!uuid) {
+      return;
+    }
+    const list = query.data;
+    if (!list || list.length === 0) {
+      return;
+    }
+    if (bootstrappedRef.current === uuid) {
+      return;
+    }
+    bootstrappedRef.current = uuid;
+    if (!query.isFetchedAfterMount) {
+      void syncDelta();
+    }
+  }, [uuid, query.data, query.isFetchedAfterMount, syncDelta]);
+
+  // Retour au premier plan → delta ciblé (jamais un refetch plein).
+  useEffect(() => {
+    if (!uuid) {
+      return;
+    }
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void syncDelta();
+      }
+    });
+    return () => sub.remove();
+  }, [uuid, syncDelta]);
+
+  // Reconnexion WS (false→true) → delta + un refetch plein invisible qui
+  // réconcilie read_at / suppressions manqués pendant la coupure (le merge
+  // préserve l'ordre et ne flashe pas : isLoading reste faux).
+  useEffect(() => {
+    if (!uuid) {
+      return;
+    }
+    const was = prevConnectedRef.current;
+    prevConnectedRef.current = realtimeConnected;
+    if (!was && realtimeConnected) {
+      void syncDelta();
+      void refetch();
+    }
+  }, [uuid, realtimeConnected, syncDelta, refetch]);
+
+  // Filet de sécurité léger : delta-poll (pas de refetch plein). 4 s sans WS,
+  // 30 s quand Reverb tient le fil.
+  useEffect(() => {
+    if (!uuid) {
+      return;
+    }
+    const period = realtimeConnected ? 30 * 1000 : 4 * 1000;
+    const id = setInterval(() => void syncDelta(), period);
+    return () => clearInterval(id);
+  }, [uuid, realtimeConnected, syncDelta]);
+
+  return query;
 }
 
 /**
