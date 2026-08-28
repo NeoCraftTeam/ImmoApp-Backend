@@ -176,6 +176,84 @@ it('dispatches mark-as-read job only for the first page of message history', fun
     Bus::assertDispatchedTimes(MarkConversationReadJob::class, 1);
 });
 
+// ─── GET /messages?after= (WhatsApp Web incremental sync) ─────────────────────
+
+it('returns only messages at or after the given UTC timestamp, oldest-first', function (): void {
+    ['tenant' => $tenant, 'conversation' => $conv] = makeConversationParticipants();
+    /** @var MessageService $messages */
+    $messages = app(MessageService::class);
+
+    $old = $messages->send($conv->fresh(), $tenant, 'old');
+    $mid = $messages->send($conv->fresh(), $tenant, 'mid');
+    $new = $messages->send($conv->fresh(), $tenant, 'new');
+
+    $base = now();
+    Message::query()->whereKey($old->id)->update(['created_at' => $base->copy()->subMinutes(20)]);
+    Message::query()->whereKey($mid->id)->update(['created_at' => $base->copy()->subMinutes(10)]);
+    Message::query()->whereKey($new->id)->update(['created_at' => $base]);
+
+    // after = 15 min ago → excludes $old, keeps $mid then $new (chronological).
+    $after = $base->copy()->subMinutes(15)->toIso8601String();
+
+    $resp = $this->actingAs($tenant)
+        ->getJson("/api/v1/conversations/{$conv->id}/messages?after=".urlencode($after))
+        ->assertOk()
+        ->assertJsonPath('next_cursor', null)
+        ->assertJsonPath('has_more', false);
+
+    expect(array_column($resp->json('data'), 'uuid'))->toBe([$mid->id, $new->id]);
+});
+
+it('caps the delta and flags has_more for a long-absence catch-up', function (): void {
+    config(['chat.pagination.messages_delta_max' => 2]);
+    ['tenant' => $tenant, 'conversation' => $conv] = makeConversationParticipants();
+    /** @var MessageService $messages */
+    $messages = app(MessageService::class);
+
+    foreach (range(1, 3) as $i) {
+        $messages->send($conv->fresh(), $tenant, "msg {$i}");
+    }
+
+    $after = now()->subHour()->toIso8601String();
+
+    $resp = $this->actingAs($tenant)
+        ->getJson("/api/v1/conversations/{$conv->id}/messages?after=".urlencode($after))
+        ->assertOk()
+        ->assertJsonPath('has_more', true);
+
+    expect($resp->json('data'))->toHaveCount(2);
+});
+
+it('rejects an invalid after timestamp with 422', function (): void {
+    ['tenant' => $tenant, 'conversation' => $conv] = makeConversationParticipants();
+
+    $this->actingAs($tenant)
+        ->getJson("/api/v1/conversations/{$conv->id}/messages?after=not-a-timestamp")
+        ->assertStatus(422);
+});
+
+it('returns 404 on the delta path for a non-participant', function (): void {
+    ['conversation' => $conv] = makeConversationParticipants();
+    $other = User::factory()->create();
+    $after = now()->subHour()->toIso8601String();
+
+    $this->actingAs($other)
+        ->getJson("/api/v1/conversations/{$conv->id}/messages?after=".urlencode($after))
+        ->assertNotFound();
+});
+
+it('marks the thread read on the delta sync path', function (): void {
+    Bus::fake();
+    ['tenant' => $tenant, 'conversation' => $conv] = makeConversationParticipants();
+    $after = now()->subHour()->toIso8601String();
+
+    $this->actingAs($tenant)
+        ->getJson("/api/v1/conversations/{$conv->id}/messages?after=".urlencode($after))
+        ->assertOk();
+
+    Bus::assertDispatchedTimes(MarkConversationReadJob::class, 1);
+});
+
 it('rejects reply_to_id when the message belongs to another conversation', function (): void {
     $tenant = User::factory()->create();
     $landlord1 = User::factory()->create();
