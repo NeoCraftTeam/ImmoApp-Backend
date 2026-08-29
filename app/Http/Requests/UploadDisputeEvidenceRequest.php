@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests;
 
 use App\Enums\DisputeEvidenceType;
+use App\Rules\VerifiedUpload;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -27,6 +28,7 @@ class UploadDisputeEvidenceRequest extends FormRequest
                 'file',
                 'max:10240', // 10 MB
                 'mimes:jpg,jpeg,png,webp,heic,pdf,doc,docx,xlsx',
+                new VerifiedUpload,
             ],
         ];
     }
