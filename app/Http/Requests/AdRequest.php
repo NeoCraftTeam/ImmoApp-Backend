@@ -95,7 +95,7 @@ final class AdRequest extends FormRequest
                 'attributes.*' => ['string', 'max:100'],
 
                 // Tri
-                'sort' => ['nullable', 'string', 'in:price,surface_area,created_at,boost_score,reviews_avg_rating,views_count,_geoPoint,newest,price_asc,price_desc'],
+                'sort' => ['nullable', 'string', 'in:price,surface_area,created_at,boost_score,reviews_avg_rating,views_count,_geoPoint,newest,price_asc,price_desc,nearby'],
                 'order' => ['nullable', 'string', 'in:asc,desc'],
 
                 // Pagination
