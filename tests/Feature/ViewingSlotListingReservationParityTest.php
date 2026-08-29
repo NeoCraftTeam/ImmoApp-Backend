@@ -98,5 +98,5 @@ it('lists a slot via GET and accepts the same window on POST with non-default sl
             'slot_ends_at' => $nextAvailable['ends_at'],
         ])
         ->assertConflict()
-        ->assertJsonPath('error.code', 'CLIENT_ACTIVE_RESERVATION_EXISTS');
+        ->assertJsonPath('code', 'CLIENT_ACTIVE_RESERVATION_EXISTS');
 });

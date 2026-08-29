@@ -23,11 +23,6 @@ class SlotAlreadyReservedException extends \RuntimeException
             Response::HTTP_CONFLICT,
             'Veuillez sélectionner un autre créneau disponible.',
         );
-        $payload['error'] = [
-            'code' => $payload['code'],
-            'message' => $payload['message'],
-            'hint' => $payload['hint'] ?? null,
-        ];
 
         return response()->json($payload, Response::HTTP_CONFLICT);
     }

@@ -227,7 +227,7 @@ it('blocks a schedule update when active reservations are attached', function ()
         'name' => 'Updated',
         'periods' => [['starts_at' => '10:00', 'ends_at' => '13:00']],
     ])->assertConflict()
-        ->assertJsonPath('error.code', 'SCHEDULE_HAS_ACTIVE_RESERVATIONS');
+        ->assertJsonPath('code', 'SCHEDULE_HAS_ACTIVE_RESERVATIONS');
 });
 
 // ===========================================================================
@@ -479,7 +479,7 @@ it('blocks a schedule update when a reservation falls within its coverage window
         'name' => 'Updated',
         'periods' => [['starts_at' => '10:00', 'ends_at' => '13:00']],
     ])->assertConflict()
-        ->assertJsonPath('error.code', 'SCHEDULE_HAS_ACTIVE_RESERVATIONS');
+        ->assertJsonPath('code', 'SCHEDULE_HAS_ACTIVE_RESERVATIONS');
 });
 
 // ===========================================================================

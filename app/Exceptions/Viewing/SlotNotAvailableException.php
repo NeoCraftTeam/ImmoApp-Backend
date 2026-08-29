@@ -23,12 +23,6 @@ class SlotNotAvailableException extends \RuntimeException
             Response::HTTP_GONE,
             'Ce créneau n\'existe pas ou la date est passée.',
         );
-        // Compat: keep legacy {error:{}} envelope until frontend migrates to top-level code/message.
-        $payload['error'] = [
-            'code' => $payload['code'],
-            'message' => $payload['message'],
-            'hint' => $payload['hint'] ?? null,
-        ];
 
         return response()->json($payload, Response::HTTP_GONE);
     }

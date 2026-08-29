@@ -37,12 +37,6 @@ class ScheduleHasActiveReservationsException extends \RuntimeException
             null,
             $extra,
         );
-        $payload['error'] = [
-            'code' => $payload['code'],
-            'message' => $payload['message'],
-            'hint' => $payload['hint'] ?? null,
-            'reservations' => $payload['reservations'],
-        ];
 
         return response()->json($payload, Response::HTTP_CONFLICT);
     }
