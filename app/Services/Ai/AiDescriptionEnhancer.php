@@ -60,18 +60,27 @@ class AiDescriptionEnhancer
      * Enhance a real-estate ad description using the configured AI provider.
      * Falls back to any other provider that has a key if the primary is not configured.
      * Returns the enhanced text, or the original if the call fails.
+     *
+     * Optional form context (type, city, quarter, bedrooms, surface, price,
+     * transaction_type, features[]) is appended to the user message so the model
+     * can turn a terse input into a rich paragraph WITHOUT inventing facts.
+     *
+     * @param  array<string, mixed>  $context
      */
-    public function enhance(string $rawDescription): string
+    public function enhance(string $rawDescription, array $context = []): string
     {
+        $userMessage = $this->buildEnhanceUserMessage($rawDescription, $context);
+
         $enhanced = $this->callWithPrompt(
-            $rawDescription,
+            $userMessage,
             AiDescriptionPrompts::systemPrompt(),
             self::DESCRIPTION_MAX_TOKENS,
         );
 
-        // Provider failure returns the input verbatim — never run cleanup on the
-        // owner's own text (it could strip emojis/formatting they typed on purpose).
-        if ($enhanced === $rawDescription) {
+        // Provider failure echoes the input verbatim — always return the owner's
+        // ORIGINAL text (never the augmented prompt), and never run cleanup on
+        // their own words (it could strip emojis/formatting they typed on purpose).
+        if ($enhanced === $userMessage || $enhanced === $rawDescription) {
             return $rawDescription;
         }
 
@@ -264,8 +273,9 @@ class AiDescriptionEnhancer
      * full result.
      *
      * @param  callable(string): void  $onChunk
+     * @param  array<string, mixed>  $context  Optional form context (see {@see enhance()}).
      */
-    public function streamEnhance(string $rawDescription, callable $onChunk): void
+    public function streamEnhance(string $rawDescription, callable $onChunk, array $context = []): void
     {
         if (empty(trim($rawDescription))) {
             $onChunk($rawDescription);
@@ -273,17 +283,19 @@ class AiDescriptionEnhancer
             return;
         }
 
-        $full = $this->collectStreamedText($rawDescription, AiDescriptionPrompts::systemPrompt());
+        $userMessage = $this->buildEnhanceUserMessage($rawDescription, $context);
+
+        $full = $this->collectStreamedText($userMessage, AiDescriptionPrompts::systemPrompt());
 
         // No streaming-capable provider succeeded → non-streaming path, which
         // already applies the same output hygiene, emitted as a single chunk.
         if ($full === null || $full === '') {
-            $onChunk($this->enhance($rawDescription));
+            $onChunk($this->enhance($rawDescription, $context));
 
             return;
         }
 
-        $clean = $full === $rawDescription
+        $clean = ($full === $userMessage || $full === $rawDescription)
             ? $rawDescription
             : $this->stripDescriptionArtifacts($full);
 
@@ -636,6 +648,50 @@ class AiDescriptionEnhancer
         $stripped = preg_replace('/^(sk-|gsk_|AIza)/i', '', $key);
 
         return $stripped !== '' && !preg_match('/^x+$/i', (string) $stripped);
+    }
+
+    /**
+     * Build the user message for the description-enhance path: the owner's raw
+     * text, optionally followed by a labelled block of the form facts already
+     * captured (type, city, surface, features…). The block gives the model real
+     * material to expand a terse input WITHOUT inventing — it is instructed (in
+     * the system prompt) to weave these facts into prose, never to echo the block.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private function buildEnhanceUserMessage(string $rawDescription, array $context): string
+    {
+        if ($context === []) {
+            return $rawDescription;
+        }
+
+        $lines = [];
+
+        $attributeLines = $this->buildAttributesContext($context);
+        if (trim($attributeLines) !== '') {
+            $lines[] = $attributeLines;
+        }
+
+        $features = $context['features'] ?? null;
+        if (is_array($features)) {
+            $clean = array_values(array_filter(
+                array_map(static fn ($feature): string => is_string($feature) ? trim($feature) : '', $features),
+                static fn (string $feature): bool => $feature !== '',
+            ));
+
+            if ($clean !== []) {
+                $lines[] = 'Équipements et atouts signalés : '.implode(', ', $clean);
+            }
+        }
+
+        if ($lines === []) {
+            return $rawDescription;
+        }
+
+        return $rawDescription
+            ."\n\n---\n"
+            ."Caractéristiques déjà saisies dans le formulaire (à intégrer si pertinent, sans rien inventer au-delà) :\n"
+            .implode("\n", $lines);
     }
 
     /**

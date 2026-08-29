@@ -23,11 +23,6 @@ class ClientHasActiveReservationForAdException extends \RuntimeException
             Response::HTTP_CONFLICT,
             'Annulez votre réservation en cours ou attendez la confirmation avant d\'en proposer une autre.',
         );
-        $payload['error'] = [
-            'code' => $payload['code'],
-            'message' => $payload['message'],
-            'hint' => $payload['hint'] ?? null,
-        ];
 
         return response()->json($payload, Response::HTTP_CONFLICT);
     }

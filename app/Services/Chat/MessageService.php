@@ -17,7 +17,9 @@ use App\Models\Message;
 use App\Models\User;
 use App\Support\ApiResponse;
 use App\Support\ChatE2eeSchema;
+use Carbon\CarbonInterface;
 use Illuminate\Contracts\Pagination\CursorPaginator;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -313,5 +315,45 @@ final readonly class MessageService
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->cursorPaginate($perPage, ['*'], 'cursor', $cursor);
+    }
+
+    /**
+     * Return messages created at or after the given UTC timestamp, oldest-first.
+     *
+     * WhatsApp Web-style incremental sync: the client keeps its already-cached
+     * history visible and only pulls messages newer than the latest one it
+     * holds. The boundary is inclusive (>=) and the client dedupes by UUID, so
+     * a message sharing the exact timestamp of the client's cursor is never
+     * lost to the second-level rounding of the ISO8601 timestamps we serialise.
+     *
+     * Capped at `$limit`; `has_more` signals a long-absence catch-up so the
+     * client can re-request the delta from the newest received timestamp.
+     *
+     * @return array{messages: Collection<int, Message>, has_more: bool}
+     */
+    public function getDelta(
+        Conversation $conv,
+        CarbonInterface $after,
+        int $limit = 200,
+    ): array {
+        $rows = $conv->messages()
+            ->with([
+                'sender:id,firstname,lastname,avatar',
+                'sender.media',
+                ChatE2eeSchema::messageReplyToEagerLoadSpec(),
+                'reactions:id,message_id,user_id,emoji',
+            ])
+            ->where('created_at', '>=', $after)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->limit($limit + 1)
+            ->get();
+
+        $hasMore = $rows->count() > $limit;
+
+        return [
+            'messages' => $hasMore ? $rows->take($limit) : $rows,
+            'has_more' => $hasMore,
+        ];
     }
 }

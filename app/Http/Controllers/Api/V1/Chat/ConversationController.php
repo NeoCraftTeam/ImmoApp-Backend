@@ -23,6 +23,7 @@ use App\Services\Chat\ConversationService;
 use App\Services\Chat\MessageService;
 use App\Support\ApiResponse;
 use App\Support\ChatE2eeSchema;
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -175,7 +176,8 @@ final readonly class ConversationController
      *     security={{"bearerAuth":{}}},
      *
      *     @OA\Parameter(name="uuid", in="path", required=true, @OA\Schema(type="string", format="uuid")),
-     *     @OA\Parameter(name="cursor", in="query", description="Curseur pour la pagination (retourné dans next_cursor)", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="cursor", in="query", description="Curseur pour la pagination historique (retourné dans next_cursor)", @OA\Schema(type="string")),
+     *     @OA\Parameter(name="after", in="query", description="Synchro incrémentale (modèle WhatsApp Web) : ne retourne que les messages créés à partir de ce timestamp ISO8601 UTC, ordre chronologique croissant. Prend le pas sur cursor.", @OA\Schema(type="string", format="date-time")),
      *
      *     @OA\Response(response=200, description="Messages avec curseur de pagination", @OA\JsonContent(
      *
@@ -192,6 +194,35 @@ final readonly class ConversationController
         /** @var User $user */
         $user = $request->user();
         $conv = $this->findConversationForUser($uuid, $user->id);
+
+        // WhatsApp Web-style incremental sync: `after` returns only messages
+        // newer than the client's latest cached one (oldest-first). It takes
+        // precedence over cursor pagination, which serves the cold-cache /
+        // new-device full history.
+        $after = $request->query('after');
+        if (filled($after)) {
+            try {
+                $afterTs = Carbon::parse((string) $after)->utc();
+            } catch (\Throwable) {
+                abort(422, 'Le paramètre « after » doit être un timestamp ISO8601 valide.');
+            }
+
+            $delta = $this->messages->getDelta(
+                $conv,
+                $afterTs,
+                (int) config('chat.pagination.messages_delta_max', 200),
+            );
+
+            // The user is actively viewing the thread (focus / reconnect sync)
+            // → mark it read, mirroring the first-page behaviour below.
+            MarkConversationReadJob::dispatch($conv->id, $user->id);
+
+            return response()->json([
+                'data' => MessageResource::collection($delta['messages']),
+                'next_cursor' => null,
+                'has_more' => $delta['has_more'],
+            ]);
+        }
 
         $paginator = $this->messages->getHistory(
             $conv,

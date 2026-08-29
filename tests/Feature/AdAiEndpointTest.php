@@ -55,6 +55,31 @@ it('enhance-description returns enhanced text', function (): void {
         ->assertJsonPath('enhanced', 'Description améliorée par l\'IA.');
 });
 
+it('enhance-description forwards form context and attributes to the enhancer', function (): void {
+    $owner = makeOwner();
+
+    $mock = Mockery::mock(AiDescriptionEnhancer::class);
+    $mock->shouldReceive('enhance')
+        ->once()
+        ->with('Terrain titré à Limbé.', Mockery::on(fn (array $context): bool => ($context['type'] ?? null) === 'Terrain'
+            && ($context['city'] ?? null) === 'Limbé'
+            && ($context['surface'] ?? null) === 100
+            && ($context['features'] ?? null) === ['Titre foncier', 'Bordure de route']))
+        ->andReturn('Description enrichie.');
+    app()->instance(AiDescriptionEnhancer::class, $mock);
+
+    $this->actingAs($owner, 'sanctum')
+        ->postJson('/api/v1/ads/ai/enhance-description', [
+            'description' => 'Terrain titré à Limbé.',
+            'type' => 'Terrain',
+            'city' => 'Limbé',
+            'surface' => 100,
+            'attributes' => ['Titre foncier', 'Bordure de route'],
+        ])
+        ->assertOk()
+        ->assertJsonPath('enhanced', 'Description enrichie.');
+});
+
 // ─── enhance-title ───────────────────────────────────────────────────────────
 
 it('returns 401 on enhance-title without auth', function (): void {

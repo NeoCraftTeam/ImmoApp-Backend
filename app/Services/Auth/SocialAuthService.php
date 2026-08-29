@@ -78,10 +78,20 @@ final readonly class SocialAuthService
             $user = User::where($providerIdField, $socialUser->getId())->first();
 
             if ($user) {
-                // Update OAuth avatar if changed
-                if ($socialUser->getAvatar() && $user->oauth_avatar !== $socialUser->getAvatar()) {
-                    $user->update(['oauth_avatar' => $socialUser->getAvatar()]);
+                // Refresh the profile captured from the provider on every login:
+                // the displayed `avatar` column is re-synced and the first/last
+                // name are healed only when still empty/placeholder (see
+                // User::syncOAuthProfile()). `oauth_avatar` keeps tracking the raw
+                // provider URL used by the pending-link handshake.
+                $rawAvatar = $socialUser->getAvatar();
+                $avatarUrl = is_string($rawAvatar) && trim($rawAvatar) !== '' ? $rawAvatar : null;
+
+                if ($avatarUrl !== null && $user->oauth_avatar !== $avatarUrl) {
+                    $user->oauth_avatar = $avatarUrl;
                 }
+
+                $names = $this->parseNames($socialUser);
+                $user->syncOAuthProfile($names['firstname'], $names['lastname'], $avatarUrl);
 
                 return new SocialAuthResult($user, false);
             }

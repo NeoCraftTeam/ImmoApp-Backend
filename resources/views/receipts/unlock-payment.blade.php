@@ -125,7 +125,7 @@
             <div class="party-name">Keyhome</div>
             <div class="party-line">
                 Plateforme immobilière<br>
-                support@keyhome.cm
+                support@keyhome.app
             </div>
         </div>
         <div class="party party-right">
@@ -209,7 +209,7 @@
 <div class="footer">
     <div class="footer-note">
         Conservez ce document comme preuve de paiement.<br>
-        En cas de litige, contactez <strong>support@keyhome.cm</strong> avec la réf. <strong>#{{ $payment->transaction_id }}</strong>.
+        En cas de litige, contactez <strong>support@keyhome.app</strong> avec la réf. <strong>#{{ $payment->transaction_id }}</strong>.
     </div>
     <div class="footer-right">
         <div class="footer-brand">Keyhome</div>

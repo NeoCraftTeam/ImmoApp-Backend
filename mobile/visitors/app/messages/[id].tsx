@@ -225,10 +225,21 @@ export default function ConversationScreen() {
   );
 
   if (isLoading) {
+    // Loader discret UNIQUEMENT au tout premier chargement sans cache (nouvel
+    // appareil / conversation jamais ouverte). Le cache persisté chiffré
+    // court-circuite cet état → ouverture instantanée façon WhatsApp Web, plus
+    // de fausses bulles-squelette qui donnaient l'impression d'un faux fil.
     return (
       <YStack flex={1} backgroundColor="$background">
         {header}
-        <ThreadSkeleton />
+        <YStack
+          flex={1}
+          alignItems="center"
+          justifyContent="center"
+          accessibilityLabel="Chargement des messages"
+        >
+          <ActivityIndicator size="small" color={brand.primary} />
+        </YStack>
       </YStack>
     );
   }
@@ -836,35 +847,3 @@ function formatDay(iso: string): string {
   }
 }
 
-/**
- * Skeleton du fil pendant le premier chargement : silhouettes de bulles
- * alternées (comme une vraie conversation) sous le header — jamais de
- * spinner plein écran qui donne l'impression d'une app cassée. Les
- * messages en cache (persistés) court-circuitent cet état.
- */
-function ThreadSkeleton() {
-  const rows: Array<{ mine: boolean; width: number }> = [
-    { mine: false, width: 62 },
-    { mine: false, width: 44 },
-    { mine: true, width: 58 },
-    { mine: false, width: 70 },
-    { mine: true, width: 38 },
-    { mine: true, width: 52 },
-    { mine: false, width: 47 },
-  ];
-  return (
-    <YStack flex={1} paddingHorizontal={14} paddingTop={20} gap={10}>
-      {rows.map((row, i) => (
-        <XStack
-          key={i}
-          justifyContent={row.mine ? 'flex-end' : 'flex-start'}
-          alignItems="flex-end"
-          gap={6}
-        >
-          {!row.mine && <Skeleton width={24} height={24} radius={12} />}
-          <Skeleton width={`${row.width}%`} height={i % 3 === 0 ? 44 : 34} radius={16} />
-        </XStack>
-      ))}
-    </YStack>
-  );
-}

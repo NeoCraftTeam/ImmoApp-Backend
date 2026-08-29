@@ -459,7 +459,7 @@
     <div class="confid-note">
         <strong>Note :</strong> Ce document est un relevé personnel de vos transactions KeyHome.
         Il ne constitue pas une facture fiscale. Pour toute question, contactez
-        <strong>support@keyhome.cm</strong> en mentionnant votre adresse email.
+        <strong>support@keyhome.app</strong> en mentionnant votre adresse email.
     </div>
 
     {{-- ── FOOTER ── --}}

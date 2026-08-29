@@ -15,6 +15,7 @@ use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\LivewireLongRunningRequest;
 use App\Http\Middleware\LocaleResolver;
 use App\Http\Middleware\OptionalAuth;
+use App\Http\Middleware\PreferBearerOverSession;
 use App\Http\Middleware\PreventAuthEndpointEdgeCaching;
 use App\Http\Middleware\RequireApiMfa;
 use App\Http\Middleware\ResolveSanctumBearerUser;
@@ -81,6 +82,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Use custom middleware that respects SESSION_SAME_SITE config
         $middleware->statefulApi();
         $middleware->replaceInGroup('api', Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class, EnsureFrontendRequestsAreStateful::class);
+        // Make a Bearer token authoritative over the stateful session cookie so a
+        // client-context request never resolves to the owner session (and vice-versa)
+        // when both are logged in the same browser. Runs before route `auth:sanctum`.
+        $middleware->prependToGroup('api', PreferBearerOverSession::class);
         // Append is_active check, email verification, and input sanitization to all API routes
         $middleware->appendToGroup('api', [
             LocaleResolver::class,

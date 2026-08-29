@@ -69,6 +69,10 @@ return [
     'pagination' => [
         'conversations' => 20,
         'messages' => 30,
+        // Max messages returned by the WhatsApp Web-style delta sync
+        // (GET /messages?after=<UTC>). Caps a long-absence catch-up so the
+        // client paginates the delta instead of pulling an unbounded batch.
+        'messages_delta_max' => 200,
     ],
 
     /*

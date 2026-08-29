@@ -90,6 +90,11 @@ final readonly class ClerkAuthController
                 $user->update(['clerk_id' => $clerkId]);
             }
 
+            // Refresh the profile captured from the OAuth provider on every
+            // login: avatar re-synced, first/last name healed only when still
+            // empty/placeholder (see User::syncOAuthProfile()).
+            $user->syncOAuthProfile($firstName, $lastName, $avatar);
+
             try {
                 $token = $this->rotateClerkToken($user, $request->input('login_context'));
             } catch (RoleContextMismatchException $e) {

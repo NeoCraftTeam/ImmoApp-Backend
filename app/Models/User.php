@@ -8,6 +8,7 @@ namespace App\Models;
 
 use App\Enums\UserRole;
 use App\Enums\UserType;
+use App\Http\Resources\UserResource;
 use App\Models\Concerns\HasAdminPermissions;
 use App\Models\Concerns\HasMultiFactorAuthentication;
 use App\Models\Concerns\HasRolesAndType;
@@ -221,6 +222,12 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
      */
     protected $hidden = ['password', 'app_authentication_secret', 'app_authentication_recovery_codes', 'remember_token', 'location', 'created_at', 'updated_at', 'google_id', 'facebook_id', 'apple_id', 'github_id'];
 
+    /** Placeholder first name stamped on accounts created without one. */
+    public const PLACEHOLDER_FIRSTNAME = 'Nouveau';
+
+    /** Placeholder last name stamped on non-OAuth accounts created without one. */
+    public const PLACEHOLDER_LASTNAME = 'Utilisateur';
+
     // =========================================================================
     // Boot
     // =========================================================================
@@ -238,11 +245,15 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
             }
 
             if (empty($user->firstname)) {
-                $user->firstname = 'Nouveau';
+                $user->firstname = self::PLACEHOLDER_FIRSTNAME;
             }
 
-            if (empty($user->lastname)) {
-                $user->lastname = 'Utilisateur';
+            // OAuth accounts keep an empty last name rather than the generic
+            // placeholder when the provider (typically GitHub) exposes only a
+            // single display name — a later login heals it if the provider ever
+            // returns a real surname (see syncOAuthProfile()).
+            if (empty($user->lastname) && !$user->isOAuthAccount()) {
+                $user->lastname = self::PLACEHOLDER_LASTNAME;
             }
 
             if (empty($user->avatar)) {
@@ -277,6 +288,74 @@ class User extends Authenticatable implements FilamentUser, HasAppAuthentication
     // =========================================================================
     // Public helpers / accessors
     // =========================================================================
+
+    /**
+     * Whether this account was provisioned or linked through an OAuth provider
+     * (Socialite direct or Clerk-brokered).
+     */
+    public function isOAuthAccount(): bool
+    {
+        return collect([
+            $this->oauth_provider,
+            $this->clerk_id,
+            $this->google_id,
+            $this->facebook_id,
+            $this->apple_id,
+            $this->github_id,
+        ])->filter()->isNotEmpty();
+    }
+
+    /**
+     * Re-synchronise the profile captured from an OAuth provider on a returning
+     * login (Socialite direct or Clerk-brokered).
+     *
+     * The provider avatar is always refreshed into the displayed `avatar`
+     * column — a user-uploaded avatar in the Spatie `avatars` collection still
+     * takes precedence in {@see UserResource}. First and
+     * last names are only healed when the stored value is empty or a generic
+     * placeholder, so a name edited in-app is never clobbered and an incoming
+     * placeholder never overwrites a real stored name. Persists on change.
+     */
+    public function syncOAuthProfile(?string $firstname, ?string $lastname, ?string $avatar): void
+    {
+        if (is_string($avatar) && trim($avatar) !== '') {
+            $this->avatar = $avatar;
+        }
+
+        $this->firstname = $this->healName($firstname, $this->firstname);
+        $this->lastname = $this->healName($lastname, $this->lastname);
+
+        if ($this->isDirty(['firstname', 'lastname', 'avatar', 'oauth_avatar'])) {
+            $this->save();
+        }
+    }
+
+    /**
+     * A "real" name is a non-empty value that is not one of the generic
+     * placeholders the model stamps on nameless accounts.
+     */
+    private function isRealName(?string $value): bool
+    {
+        if (!is_string($value)) {
+            return false;
+        }
+
+        $trimmed = trim($value);
+
+        return !in_array($trimmed, ['', self::PLACEHOLDER_FIRSTNAME, self::PLACEHOLDER_LASTNAME], true);
+    }
+
+    /**
+     * Return the incoming provider name when it should replace the stored one
+     * (incoming is a real name and the current value is still empty or a
+     * placeholder), otherwise keep the current value untouched.
+     */
+    private function healName(?string $incoming, string $current): string
+    {
+        return $this->isRealName($incoming) && !$this->isRealName($current)
+            ? trim((string) $incoming)
+            : $current;
+    }
 
     /**
      * Generate a URL-safe username that is unique across the users table.

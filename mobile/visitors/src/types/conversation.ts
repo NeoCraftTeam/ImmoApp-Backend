@@ -80,6 +80,10 @@ export interface Message {
 
 export interface MessagesResponse {
   data: Message[];
+  /** Curseur de pagination historique (non utilisé côté mobile — pas de load-more). */
+  next_cursor?: string | null;
+  /** `true` s'il reste des messages au-delà de ce lot (delta `?after`). */
+  has_more?: boolean;
   meta?: {
     next_cursor?: string | null;
   };

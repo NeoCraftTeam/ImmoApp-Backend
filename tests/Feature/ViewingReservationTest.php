@@ -263,7 +263,7 @@ it('prevents a landlord from reserving their own property', function (): void {
         'slot_starts_at' => '10:00',
         'slot_ends_at' => '10:30',
     ])->assertForbidden()
-        ->assertJsonPath('error.code', 'SELF_RESERVATION_NOT_ALLOWED');
+        ->assertJsonPath('code', 'SELF_RESERVATION_NOT_ALLOWED');
 });
 
 // ===========================================================================
@@ -288,9 +288,10 @@ it('returns 410 Gone when the slot is not offered by the availability schedule',
         'slot_starts_at' => '23:00',
         'slot_ends_at' => '23:30',
     ])->assertStatus(410)
-        ->assertJsonPath('error.code', 'SLOT_NOT_AVAILABLE')
-        ->assertJsonPath('error.message', 'Ce créneau n\'est pas disponible pour la date demandée.')
-        ->assertJsonPath('error.hint', 'Ce créneau n\'existe pas ou la date est passée.');
+        ->assertJsonPath('code', 'SLOT_NOT_AVAILABLE')
+        ->assertJsonPath('message', 'Ce créneau n\'est pas disponible pour la date demandée.')
+        ->assertJsonPath('hint', 'Ce créneau n\'existe pas ou la date est passée.')
+        ->assertJsonMissingPath('error');
 });
 
 // ===========================================================================
@@ -315,7 +316,7 @@ it('returns 409 Conflict when the slot is taken by a concurrent booking', functi
         'slot_starts_at' => '10:00',
         'slot_ends_at' => '10:30',
     ])->assertConflict()
-        ->assertJsonPath('error.code', 'SLOT_ALREADY_RESERVED');
+        ->assertJsonPath('code', 'SLOT_ALREADY_RESERVED');
 });
 
 // ===========================================================================
@@ -340,7 +341,7 @@ it('returns 409 Conflict when the client already has an active reservation for t
         'slot_starts_at' => '11:00',
         'slot_ends_at' => '11:30',
     ])->assertConflict()
-        ->assertJsonPath('error.code', 'CLIENT_ACTIVE_RESERVATION_EXISTS');
+        ->assertJsonPath('code', 'CLIENT_ACTIVE_RESERVATION_EXISTS');
 });
 
 // ===========================================================================

@@ -138,3 +138,54 @@ it('enhanceNewsletter() sends the newsletter system prompt', function (): void {
         'sauf si le texte original en contient déjà',
     );
 });
+
+/**
+ * Assert the USER message (messages[1]) sent to OpenAI contains each needle.
+ */
+function assertAiUserMessageContains(string ...$needles): void
+{
+    Http::assertSent(function (Request $request) use ($needles): bool {
+        if (!str_contains($request->url(), 'api.openai.com')) {
+            return false;
+        }
+
+        $user = $request->data()['messages'][1]['content'] ?? '';
+
+        return array_all($needles, fn ($needle) => str_contains($user, $needle));
+    });
+}
+
+it('enhance() weaves form context into the user message without echoing raw keys', function (): void {
+    app(AiDescriptionEnhancer::class)->enhance('Terrain titré à Limbé, 100 m², en bordure de route.', [
+        'type' => 'Terrain',
+        'city' => 'Limbé',
+        'surface' => 100,
+        'transaction_type' => 'vente',
+        'features' => ['Titre foncier', 'Bordure de route'],
+    ]);
+
+    assertAiUserMessageContains(
+        'Terrain titré à Limbé, 100 m², en bordure de route.',
+        'Caractéristiques déjà saisies dans le formulaire',
+        'Type de bien : Terrain',
+        'Ville : Limbé',
+        'Surface (m²) : 100',
+        'Équipements et atouts signalés : Titre foncier, Bordure de route',
+    );
+});
+
+it('enhance() sends the raw description alone when no context is provided', function (): void {
+    app(AiDescriptionEnhancer::class)->enhance('Studio meublé à louer à Douala.');
+
+    Http::assertSent(function (Request $request): bool {
+        if (!str_contains($request->url(), 'api.openai.com')) {
+            return false;
+        }
+
+        $user = $request->data()['messages'][1]['content'] ?? '';
+
+        return $user === 'Studio meublé à louer à Douala.'
+            && !str_contains($user, '---')
+            && !str_contains($user, 'Caractéristiques déjà saisies');
+    });
+});

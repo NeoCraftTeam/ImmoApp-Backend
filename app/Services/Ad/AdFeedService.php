@@ -10,6 +10,7 @@ use App\Models\Ad;
 use App\Models\AdType;
 use App\Models\User;
 use App\Services\Ai\RecommendationEngine;
+use App\Support\GeoLocation;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -34,6 +35,11 @@ final readonly class AdFeedService
         $type = filled($request->input('type')) ? (string) $request->input('type') : null;
         $sort = filled($request->input('sort')) ? (string) $request->input('sort') : 'newest';
 
+        // Proximity sort inputs; only honoured when the caller asked for the
+        // `nearby` sort AND supplied valid coordinates. Absent/invalid coords
+        // degrade gracefully to the default ranking below.
+        $geo = $sort === 'nearby' ? GeoLocation::fromRequest($request) : null;
+
         $requestExcludeIds = [];
         if ($rawExcludeIds = $request->input('exclude_ids')) {
             $requestExcludeIds = array_values(array_filter(array_map(strval(...), (array) $rawExcludeIds)));
@@ -55,7 +61,7 @@ final readonly class AdFeedService
         // thin. A wider candidate pool for the slot template would have to be
         // assembled out-of-band (e.g. fetched separately and woven into the
         // paginator), not by inflating cursorPaginate's page size.
-        $build = function () use ($perPage, $type, $sort, $requestExcludeIds) {
+        $build = function () use ($perPage, $type, $sort, $requestExcludeIds, $geo) {
             $query = Ad::query()->forPublicListing();
 
             if ($requestExcludeIds !== []) {
@@ -64,6 +70,35 @@ final readonly class AdFeedService
 
             if ($type !== null) {
                 $query->whereHas('ad_type', fn ($q) => $q->where('name', 'ilike', "%{$type}%"));
+            }
+
+            if ($sort === 'nearby' && $geo !== null) {
+                // Order by great-circle distance to the caller's position.
+                // Coordinates are validated floats (AdRequest between:-90,90 /
+                // -180,180), so inlining them as literals keeps the cursor's own
+                // seek bindings unambiguous. Ordering by the `distance` alias lets
+                // cursorPaginate resolve the expression for its WHERE seek clause
+                // (valid on PostGIS — the alias itself can't appear in WHERE).
+                // `%F` (not `%f`) is mandatory: `%f` is locale-aware and, under a
+                // French LC_NUMERIC, emits a comma decimal separator, turning
+                // ST_MakePoint(9.7, 4.05) into the 4-arg ST_MakePoint(9, 70000000,
+                // 4, 05000000) — a silent garbage point. Same guard as
+                // OsmPlaceSynchronizer.
+                $point = sprintf('ST_MakePoint(%.8F, %.8F)', $geo->longitude, $geo->latitude);
+                $distanceExpr = "ST_DistanceSphere(location, {$point})";
+
+                $query
+                    ->whereNotNull('location')
+                    ->selectRaw("{$distanceExpr} as distance");
+
+                if ($geo->radius !== null) {
+                    $query->whereRaw("{$distanceExpr} <= ?", [$geo->radius]);
+                }
+
+                return $query
+                    ->orderBy('distance')
+                    ->orderBy('id')
+                    ->cursorPaginate($perPage);
             }
 
             $ordered = match ($sort) {

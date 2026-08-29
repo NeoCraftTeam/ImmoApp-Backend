@@ -85,7 +85,8 @@ it('returns 403 when the ad owner tries to reserve their own property', function
     $this->actingAs($owner)
         ->postJson("/api/v1/ads/{$ad->id}/reservations", validSlotPayload())
         ->assertForbidden()
-        ->assertJsonPath('error.code', 'SELF_RESERVATION_NOT_ALLOWED');
+        ->assertJsonPath('code', 'SELF_RESERVATION_NOT_ALLOWED')
+        ->assertJsonMissingPath('error');
 });
 
 // TC-VR-04 — Unlocked client passes the auth gate (403 vs 410 distinction)
