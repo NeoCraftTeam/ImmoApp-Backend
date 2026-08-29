@@ -390,6 +390,7 @@ Route::prefix('v1')->group(function (): void {
 
     // --- E-SIGNATURE (public — no auth required) ---
     Route::get('/signatures/{token}', [SignatureController::class, 'show']);
+    Route::get('/signatures/{token}/preview', [SignatureController::class, 'preview'])->middleware('throttle:30,1');
     Route::post('/signatures/{token}/send-otp', [SignatureController::class, 'sendSignOtp'])->middleware('throttle:10,1');
     Route::post('/signatures/{token}/sign', [SignatureController::class, 'sign'])->middleware('throttle:10,1');
     Route::post('/signatures/{token}/decline', [SignatureController::class, 'decline'])->middleware('throttle:10,1');

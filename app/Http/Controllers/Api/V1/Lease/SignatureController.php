@@ -8,12 +8,14 @@ use App\Models\LeaseContract;
 use App\Models\LeaseSignatureRequest;
 use App\Notifications\LeaseSignatureOtpNotification;
 use App\Notifications\LeaseSignatureRequestNotification;
+use App\Services\Rental\LeaseContractService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 final class SignatureController
 {
@@ -113,6 +115,40 @@ final class SignatureController
             // Legacy keys (kept for backwards compatibility with mobile clients).
             'data' => $signatureRequest,
             'contract' => $contractPayload,
+        ]);
+    }
+
+    /**
+     * Public, token-scoped HTML preview of the contract being signed.
+     *
+     * Served as HTML (never the stored PDF blob) so it renders on iOS Safari /
+     * WebKit, where a `blob:` PDF inside an iframe shows blank. Read-only: it
+     * never flips the request status — that stays {@see show()}'s job — and it
+     * stays available whatever the status so a signer can re-read what they
+     * signed. Renders the same payload the printable PDF uses, so the on-screen
+     * document matches the file the anti-substitution hash binds to.
+     */
+    public function preview(string $token): SymfonyResponse
+    {
+        $signatureRequest = LeaseSignatureRequest::query()
+            ->where('token', $token)
+            ->with([
+                'leaseContract.ad.ad_type',
+                'leaseContract.ad.quarter.city',
+                'leaseContract.user',
+            ])
+            ->firstOrFail();
+
+        $data = app(LeaseContractService::class)->pdfViewData($signatureRequest->leaseContract);
+        if ($data === null) {
+            abort(404);
+        }
+
+        $html = view('pdf.lease-contract-preview', $data)->render();
+
+        return response($html, 200, [
+            'Content-Type' => 'text/html; charset=utf-8',
+            'Cache-Control' => 'private, max-age=60',
         ]);
     }
 
