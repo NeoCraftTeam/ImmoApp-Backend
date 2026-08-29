@@ -22,14 +22,52 @@ final class LeaseContractService
      */
     public function regeneratePdf(LeaseContract $contract): LeaseContract
     {
+        $data = $this->pdfViewData($contract);
+        if ($data === null) {
+            return $contract;
+        }
+
+        /** @var Ad $ad */
+        $ad = $contract->ad;
+
+        $pdf = Pdf::loadView('pdf.lease-contract', $data)->setPaper('a4');
+        $disk = config('filesystems.app_media_disk');
+        $filename = 'lease-contracts/'.str($ad->title)->slug()
+            .'-'.now()->format('Ymd-His').'.pdf';
+        Storage::disk($disk)->put($filename, $pdf->output());
+
+        $oldPath = $contract->pdf_path;
+        $contract->forceFill(['pdf_path' => $filename])->save();
+
+        if ($oldPath && $oldPath !== $filename && Storage::disk($disk)->exists($oldPath)) {
+            try {
+                Storage::disk($disk)->delete($oldPath);
+            } catch (\Throwable) {
+                // Best-effort cleanup — never block on storage GC errors.
+            }
+        }
+
+        return $contract;
+    }
+
+    /**
+     * Build the Blade payload shared by the printable PDF and the
+     * browser-friendly signature preview, so both render identical data
+     * (no divergence between what a signer reads on-screen and the file the
+     * anti-substitution hash binds to).
+     *
+     * @return array<string, mixed>|null Null when the contract has no linked ad.
+     */
+    public function pdfViewData(LeaseContract $contract): ?array
+    {
         $ad = $contract->ad?->load(['ad_type', 'quarter.city']);
         if (!$ad) {
-            return $contract;
+            return null;
         }
 
         $landlord = $contract->user;
 
-        $data = [
+        return [
             'landlord_name' => $landlord !== null
                 ? trim($landlord->firstname.' '.$landlord->lastname)
                 : '',
@@ -63,25 +101,6 @@ final class LeaseContractService
             'generated_at' => now()->format('d/m/Y à H:i'),
             'contract_number' => $contract->contract_number,
         ];
-
-        $pdf = Pdf::loadView('pdf.lease-contract', $data)->setPaper('a4');
-        $disk = config('filesystems.app_media_disk');
-        $filename = 'lease-contracts/'.str($ad->title)->slug()
-            .'-'.now()->format('Ymd-His').'.pdf';
-        Storage::disk($disk)->put($filename, $pdf->output());
-
-        $oldPath = $contract->pdf_path;
-        $contract->forceFill(['pdf_path' => $filename])->save();
-
-        if ($oldPath && $oldPath !== $filename && Storage::disk($disk)->exists($oldPath)) {
-            try {
-                Storage::disk($disk)->delete($oldPath);
-            } catch (\Throwable) {
-                // Best-effort cleanup — never block on storage GC errors.
-            }
-        }
-
-        return $contract;
     }
 
     /**

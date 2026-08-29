@@ -130,3 +130,42 @@ it('refuses to decline an expired signature request', function (): void {
     $this->postJson("/api/v1/signatures/{$signature->token}/decline", ['otp' => '000000'])
         ->assertStatus(410);
 });
+
+it('serves an HTML contract preview that renders on iOS', function (): void {
+    $signature = makeSignatureRequest();
+    $contract = $signature->leaseContract;
+
+    $response = $this->get("/api/v1/signatures/{$signature->token}/preview")
+        ->assertOk()
+        ->assertHeader('content-type', 'text/html; charset=utf-8');
+
+    $html = $response->getContent();
+    expect(is_string($html) && $html !== '')->toBeTrue();
+    expect($html)->toContain('class="lease-contract"')
+        ->and($html)->toContain('CONTRAT DE BAIL')
+        ->and($html)->toContain($contract->tenant_name)
+        ->and($html)->toContain((string) $contract->contract_number);
+});
+
+it('never leaks the stored PDF path in the contract preview', function (): void {
+    $signature = makeSignatureRequest('lease-contracts/secret-v1.pdf');
+
+    $html = $this->get("/api/v1/signatures/{$signature->token}/preview")
+        ->assertOk()
+        ->getContent();
+
+    expect($html)->not->toContain('lease-contracts/');
+});
+
+it('does not flip the request status when previewing (read-only)', function (): void {
+    $signature = makeSignatureRequest();
+
+    $this->get("/api/v1/signatures/{$signature->token}/preview")->assertOk();
+
+    expect(LeaseSignatureRequest::query()->where('token', $signature->token)->first()?->status)
+        ->toBe('pending');
+});
+
+it('returns 404 for an unknown token preview', function (): void {
+    $this->get('/api/v1/signatures/does-not-exist/preview')->assertNotFound();
+});
