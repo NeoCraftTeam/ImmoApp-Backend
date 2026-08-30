@@ -7,6 +7,7 @@ namespace App\Services\Geo;
 use App\Support\GeoNameNormalizer;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 final readonly class OsmPlaceSynchronizer
@@ -87,9 +88,19 @@ final readonly class OsmPlaceSynchronizer
         $sql = <<<SQL
             WITH resolved AS ({$placeSql})
             SELECT r.*,
-                   parent.id AS city_id,
-                   parent.distance_m
+                   contained.id AS contained_city_id,
+                   nearest.id AS nearest_city_id,
+                   nearest.distance_m
               FROM resolved AS r
+              LEFT JOIN LATERAL (
+                    SELECT c.id
+                      FROM city AS c
+                     WHERE c.country_code = r.country_code
+                       AND c.boundary IS NOT NULL
+                       AND ST_Covers(c.boundary, ST_SetSRID(ST_MakePoint(r.longitude, r.latitude), 4326))
+                     ORDER BY ST_Area(c.boundary) ASC
+                     LIMIT 1
+              ) AS contained ON true
               LEFT JOIN LATERAL (
                     SELECT c.id,
                            ST_DistanceSphere(c.location, ST_SetSRID(ST_MakePoint(r.longitude, r.latitude), 4326)) AS distance_m
@@ -98,16 +109,22 @@ final readonly class OsmPlaceSynchronizer
                        AND c.location IS NOT NULL
                      ORDER BY c.location <-> ST_SetSRID(ST_MakePoint(r.longitude, r.latitude), 4326)
                      LIMIT 1
-              ) AS parent ON true
+              ) AS nearest ON true
             SQL;
         $rows = DB::select($sql, [$fallbackCountryCode, ...$types]);
         $now = now();
         $payload = [];
         $unmatched = 0;
+        $unmatchedSamples = [];
 
         foreach ($rows as $row) {
-            if ($row->city_id === null || $row->distance_m === null || (float) $row->distance_m > $maxDistance) {
+            $cityId = $this->resolveParentCity($row, $maxDistance);
+
+            if ($cityId === null) {
                 $unmatched++;
+                if (count($unmatchedSamples) < 25) {
+                    $unmatchedSamples[] = $row->name;
+                }
 
                 continue;
             }
@@ -117,7 +134,7 @@ final readonly class OsmPlaceSynchronizer
                 'name' => $row->name,
                 'display_name' => $row->display_name ?: $row->name,
                 'normalized_name' => GeoNameNormalizer::normalize($row->name),
-                'city_id' => $row->city_id,
+                'city_id' => $cityId,
                 'latitude' => $row->latitude,
                 'longitude' => $row->longitude,
                 'location' => DB::raw(sprintf('ST_SetSRID(ST_MakePoint(%F, %F), 4326)', $row->longitude, $row->latitude)),
@@ -129,6 +146,13 @@ final readonly class OsmPlaceSynchronizer
                 'created_at' => $now,
                 'updated_at' => $now,
             ];
+        }
+
+        if ($unmatched > 0) {
+            Log::warning('geo.osm.quarters_unmatched', [
+                'count' => $unmatched,
+                'sample' => $unmatchedSamples,
+            ]);
         }
 
         foreach (array_chunk($payload, 1_000) as $chunk) {
@@ -149,6 +173,30 @@ final readonly class OsmPlaceSynchronizer
             SQL);
 
         return [count($payload), $unmatched];
+    }
+
+    /**
+     * Resolve a quarter's parent city. Prefers the city whose administrative
+     * boundary geographically contains the quarter (no distance limit), then
+     * falls back to the nearest city centroid within the configured cap.
+     * Returns null when neither rule matches so the caller counts and logs the
+     * orphan instead of silently discarding it.
+     */
+    private function resolveParentCity(object $row, int $maxDistance): ?string
+    {
+        if ($row->contained_city_id !== null) {
+            return (string) $row->contained_city_id;
+        }
+
+        if (
+            $row->nearest_city_id !== null
+            && $row->distance_m !== null
+            && (float) $row->distance_m <= $maxDistance
+        ) {
+            return (string) $row->nearest_city_id;
+        }
+
+        return null;
     }
 
     private function resolvedPlacesSql(int $typeCount): string
