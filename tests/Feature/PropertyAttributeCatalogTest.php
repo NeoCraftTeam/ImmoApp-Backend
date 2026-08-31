@@ -22,6 +22,31 @@ it('imports grouped property attributes with command', function (): void {
     expect(PropertyAttribute::query()->count())->toBe($attributeCount);
 });
 
+it('uses only professional MUI icon names in the catalog', function (): void {
+    // Noms qui n'existent pas dans @mui/icons-material : le front les rend en
+    // fallback générique (CheckCircleOutline) au lieu de l'icône attendue.
+    $invalidMuiIcons = ['Skillet', 'Kettle', 'Wardrobe'];
+
+    $icons = collect(PropertyAttributeCatalog::categories())
+        ->flatMap(fn (array $category): array => array_merge(
+            [$category['icon']],
+            array_column($category['attributes'], 'icon'),
+        ));
+
+    expect($icons)->not->toBeEmpty();
+
+    $icons->each(function (string $icon) use ($invalidMuiIcons): void {
+        expect($icon)->toMatch('/^[A-Z][A-Za-z0-9]+$/');
+        expect($invalidMuiIcons)->not->toContain($icon);
+    });
+
+    $plaques = collect(PropertyAttributeCatalog::categories())
+        ->flatMap(fn (array $category): array => $category['attributes'])
+        ->firstWhere('name', 'Plaques de cuisson');
+
+    expect($plaques['icon'])->toBe('Whatshot');
+});
+
 it('returns grouped attributes api payload', function (): void {
     $this->artisan('catalog:sync-attributes')
         ->assertSuccessful();
