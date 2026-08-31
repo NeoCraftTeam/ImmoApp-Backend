@@ -31,7 +31,7 @@ COPY --from=composer-builder /app/vendor/filament ./vendor/filament
 RUN npm run build && npm cache clean --force
 
 # ── Stage 3: PHP production image ────────────────────────────────────────────
-FROM php:8.4-fpm-alpine
+FROM php:8.5-fpm-alpine
 
 # Installation des dépendances système et extensions PHP nécessaires
 RUN apk add --no-cache \
