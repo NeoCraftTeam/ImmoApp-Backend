@@ -20,7 +20,7 @@ final class PropertyAttributeCatalog
                 ['Bureau / espace de travail', 'Desk'], ['Entrée indépendante', 'MeetingRoom'],
             ]),
             self::category('Cuisine et électroménager', 'Kitchen', 'heroicon-o-cake', [
-                ['Cuisine équipée', 'Kitchen'], ['Plaques de cuisson', 'Skillet'],
+                ['Cuisine équipée', 'Kitchen'], ['Plaques de cuisson', 'Whatshot'],
                 ['Four', 'Microwave'], ['Micro-ondes', 'Microwave'],
                 ['Réfrigérateur', 'Kitchen'], ['Congélateur', 'AcUnit'],
                 ['Hotte aspirante', 'Air'], ['Lave-vaisselle', 'LocalDining'],
