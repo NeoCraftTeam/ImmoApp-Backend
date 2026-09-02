@@ -6,6 +6,9 @@ namespace App\Http\Controllers\Api\V1\Ad;
 
 use App\Enums\AdStatus;
 use App\Exceptions\InvalidStatusTransitionException;
+use App\Http\Requests\Api\V1\Ad\AutosaveAdRequest;
+use App\Http\Requests\Api\V1\Ad\SetAdAvailabilityRequest;
+use App\Http\Requests\Api\V1\Ad\SetAdStatusRequest;
 use App\Http\Requests\Api\V1\PublishAdRequest;
 use App\Models\Ad;
 use App\Support\AdScoutSync;
@@ -14,7 +17,6 @@ use App\Support\SafeApiMessage;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 
 /**
  * Handles ad visibility, status transitions, and availability dates.
@@ -90,13 +92,11 @@ final class AdStatusController
      *     @OA\Response(response=404, description="Ad not found")
      * )
      */
-    public function setStatus(Ad $ad): JsonResponse
+    public function setStatus(SetAdStatusRequest $request, Ad $ad): JsonResponse
     {
         $this->authorize('update', $ad);
 
-        $validated = request()->validate([
-            'status' => ['required', Rule::enum(AdStatus::class)],
-        ]);
+        $validated = $request->validated();
 
         try {
             $oldStatus = $ad->status;
@@ -227,7 +227,7 @@ final class AdStatusController
      *     @OA\Response(response=422, description="Not a draft or validation error")
      * )
      */
-    public function autosave(Ad $ad): JsonResponse
+    public function autosave(AutosaveAdRequest $request, Ad $ad): JsonResponse
     {
         $this->authorize('update', $ad);
 
@@ -238,36 +238,7 @@ final class AdStatusController
             ], 422);
         }
 
-        $validated = request()->validate([
-            'title' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'description' => ['sometimes', 'nullable', 'string'],
-            'adresse' => ['sometimes', 'nullable', 'string', 'max:500'],
-            'price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'price_period' => ['sometimes', 'nullable', 'string', 'in:mois,jour'],
-            'surface_area' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'bedrooms' => ['sometimes', 'nullable', 'integer', 'min:0'],
-            'bathrooms' => ['sometimes', 'nullable', 'integer', 'min:0'],
-            'has_parking' => ['sometimes', 'nullable', 'boolean'],
-            'deposit_amount' => ['sometimes', 'nullable', 'string', 'max:50'],
-            'minimum_lease_duration' => ['sometimes', 'nullable', 'string', 'max:50'],
-            'charges_forfaitaires' => ['sometimes', 'nullable', 'boolean'],
-            'charges_montant_forfait' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'charges_eau' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'charges_electricite' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'charges_autres' => ['sometimes', 'nullable', 'string', 'max:1000'],
-            'quarter_id' => ['sometimes', 'nullable', 'uuid', 'exists:quarter,id'],
-            'type_id' => ['sometimes', 'nullable', 'uuid', 'exists:ad_type,id'],
-            'transaction_type' => ['sometimes', 'nullable', 'string', 'in:location,vente'],
-            'latitude' => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
-            'attributes' => ['sometimes', 'nullable', 'array', 'max:50'],
-            'attributes.*' => [
-                'string',
-                Rule::exists('property_attributes', 'slug')->where(
-                    fn ($query) => $query->where('is_active', true)
-                ),
-            ],
-        ]);
+        $validated = $request->validated();
 
         // Latitude/longitude are positioned as a single PostGIS point; let
         // GeoLocation drop them when both are missing so we don't overwrite
@@ -340,14 +311,11 @@ final class AdStatusController
      *     @OA\Response(response=422, description="Validation error")
      * )
      */
-    public function setAvailability(Ad $ad): JsonResponse
+    public function setAvailability(SetAdAvailabilityRequest $request, Ad $ad): JsonResponse
     {
         $this->authorize('update', $ad);
 
-        $validated = request()->validate([
-            'available_from' => ['nullable', 'date'],
-            'available_to' => ['nullable', 'date', 'after_or_equal:available_from'],
-        ]);
+        $validated = $request->validated();
 
         Ad::withoutSyncingToSearch(function () use ($ad, $validated): void {
             $ad->setAvailability(

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Ad;
 
 use App\Enums\AdStatus;
+use App\Http\Requests\Api\V1\Ad\SaveAdEditDraftRequest;
 use App\Models\Ad;
 use App\Support\AdScoutSync;
 use App\Support\ApiResponse;
@@ -12,7 +13,6 @@ use App\Support\GeoLocation;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 /**
  * Manages a pending-edit draft payload for existing (non-DRAFT) ads.
@@ -69,46 +69,17 @@ final class AdDraftEditController
     ];
 
     /**
-     * Validation rules used by both `save()` and `apply()`. `attributes.*`
-     * mirrors `AdStatusController::autosave` (exists + active) so an owner
-     * can't stash an invalid slug in `draft_payload` to surface only on
-     * apply. Defined as a method instead of a const so the Rule::exists()
-     * closure can run with the live container at call time.
+     * Validation rules used when re-validating the stored `draft_payload` in
+     * `apply()`. Delegates to {@see SaveAdEditDraftRequest::rules()} so the
+     * save and apply paths share one source of truth — the request validates
+     * the incoming body, this helper validates the persisted payload before
+     * promotion.
      *
      * @return array<string, array<int, mixed>>
      */
     private function validationRules(): array
     {
-        return [
-            'title' => ['sometimes', 'nullable', 'string', 'max:255'],
-            'description' => ['sometimes', 'nullable', 'string'],
-            'adresse' => ['sometimes', 'nullable', 'string', 'max:500'],
-            'price' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'price_period' => ['sometimes', 'nullable', 'string', 'in:mois,jour'],
-            'surface_area' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'bedrooms' => ['sometimes', 'nullable', 'integer', 'min:0'],
-            'bathrooms' => ['sometimes', 'nullable', 'integer', 'min:0'],
-            'has_parking' => ['sometimes', 'nullable', 'boolean'],
-            'deposit_amount' => ['sometimes', 'nullable', 'string', 'max:50'],
-            'minimum_lease_duration' => ['sometimes', 'nullable', 'string', 'max:50'],
-            'charges_forfaitaires' => ['sometimes', 'nullable', 'boolean'],
-            'charges_montant_forfait' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'charges_eau' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'charges_electricite' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'charges_autres' => ['sometimes', 'nullable', 'string', 'max:1000'],
-            'quarter_id' => ['sometimes', 'nullable', 'uuid', 'exists:quarter,id'],
-            'type_id' => ['sometimes', 'nullable', 'uuid', 'exists:ad_type,id'],
-            'transaction_type' => ['sometimes', 'nullable', 'string', 'in:location,vente'],
-            'latitude' => ['sometimes', 'nullable', 'numeric', 'between:-90,90'],
-            'longitude' => ['sometimes', 'nullable', 'numeric', 'between:-180,180'],
-            'attributes' => ['sometimes', 'nullable', 'array', 'max:50'],
-            'attributes.*' => [
-                'string',
-                Rule::exists('property_attributes', 'slug')->where(
-                    fn ($query) => $query->where('is_active', true)
-                ),
-            ],
-        ];
+        return (new SaveAdEditDraftRequest)->rules();
     }
 
     /**
@@ -138,12 +109,12 @@ final class AdDraftEditController
      *     @OA\Response(response=422, description="L'annonce est un brouillon — utilisez le flux standard")
      * )
      */
-    public function save(Request $request, Ad $ad): JsonResponse
+    public function save(SaveAdEditDraftRequest $request, Ad $ad): JsonResponse
     {
         $this->authorize('update', $ad);
         $this->requireNonDraftStatus($ad);
 
-        $validated = $request->validate($this->validationRules());
+        $validated = $request->validated();
 
         $existing = $ad->draft_payload ?? [];
         $merged = array_merge($existing, array_filter(

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Requests\Api\V1\StoreVisitTrackingRequest;
 use App\Models\SiteVisit;
 use App\Services\Ai\AcquisitionChannelClassifier;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -24,16 +24,9 @@ class VisitTrackingController
      *   (a single insert per (session_id, device_type, source, utm_*) combo
      *   per minute is enough for attribution analytics).
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreVisitTrackingRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'session_id' => 'required|string|max:64',
-            'utm_source' => 'nullable|string|max:100',
-            'utm_medium' => 'nullable|string|max:100',
-            'utm_campaign' => 'nullable|string|max:255',
-            'utm_content' => 'nullable|string|max:255',
-            'utm_term' => 'nullable|string|max:255',
-        ]);
+        $validated = $request->validated();
 
         $referrer = $request->header('Referer', '');
         $referrerDomain = $referrer ? parse_url($referrer, PHP_URL_HOST) : null;

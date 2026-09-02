@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Auth;
 
+use App\Http\Requests\Api\V1\Auth\ConfirmOAuthLinkRequest;
+use App\Http\Requests\Api\V1\Auth\ExchangeOAuthTokenRequest;
+use App\Http\Requests\Api\V1\Auth\LinkSocialAccountRequest;
 use App\Http\Requests\Api\V1\SocialAuthRequest;
 use App\Models\User;
 use App\Services\Auth\SocialAuthService;
@@ -427,11 +430,9 @@ final readonly class SocialAuthController
      * redirect and immediately calls this endpoint (within 2 minutes) to get the
      * real token without it ever appearing in browser history or server logs.
      */
-    public function exchangeToken(Request $request): JsonResponse
+    public function exchangeToken(ExchangeOAuthTokenRequest $request): JsonResponse
     {
-        $request->validate([
-            'exchange_code' => ['required', 'string', 'size:64'],
-        ]);
+        $request->validated();
 
         $cacheKey = 'oauth_token_exchange_'.$request->input('exchange_code');
         $data = Cache::pull($cacheKey); // pull = get + delete (single-use)
@@ -477,16 +478,13 @@ final readonly class SocialAuthController
             new OA\Response(response: 409, description: 'Provider already linked to another account'),
         ]
     )]
-    public function link(Request $request, string $provider): JsonResponse
+    public function link(LinkSocialAccountRequest $request, string $provider): JsonResponse
     {
         if (!in_array($provider, self::SUPPORTED_PROVIDERS, true)) {
             return response()->json(['message' => 'Provider non supporté'], 400);
         }
 
-        $request->validate([
-            'token' => 'required|string',
-            'id_token' => 'nullable|string',
-        ]);
+        $request->validated();
 
         try {
             $socialUser = $this->socialAuth->getSocialUser($provider, $request->token, $request->id_token);
@@ -577,11 +575,9 @@ final readonly class SocialAuthController
     /**
      * Confirm pending cross-provider account link using a short-lived token.
      */
-    public function confirmOAuthLink(Request $request): JsonResponse
+    public function confirmOAuthLink(ConfirmOAuthLinkRequest $request): JsonResponse
     {
-        $request->validate([
-            'linking_token' => ['required', 'string'],
-        ]);
+        $request->validated();
 
         $user = User::where('pending_oauth_token', $request->linking_token)
             ->where('pending_oauth_expires_at', '>', now())

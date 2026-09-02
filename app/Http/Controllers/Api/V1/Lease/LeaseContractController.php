@@ -9,6 +9,7 @@ use App\Enums\LeaseStatus;
 use App\Http\Requests\Api\V1\EnhanceLeaseConditionsRequest;
 use App\Http\Requests\Api\V1\GenerateLeaseContractRequest;
 use App\Http\Requests\Api\V1\RenewLeaseContractRequest;
+use App\Http\Requests\Api\V1\SummarizeLeaseContractRequest;
 use App\Http\Requests\Api\V1\TerminateLeaseContractRequest;
 use App\Http\Requests\Api\V1\UpdateLeaseContractRequest;
 use App\Http\Resources\LeaseContractResource;
@@ -132,15 +133,9 @@ final class LeaseContractController
     /**
      * Summarize a lease contract in plain language for the tenant.
      */
-    public function summarize(Request $request): JsonResponse
+    public function summarize(SummarizeLeaseContractRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'monthly_rent' => ['nullable', 'numeric', 'min:0'],
-            'deposit_amount' => ['nullable', 'numeric', 'min:0'],
-            'start_date' => ['nullable', 'string', 'max:30'],
-            'duration_months' => ['nullable', 'integer', 'min:1'],
-            'special_conditions' => ['nullable', 'string', 'max:5000'],
-        ]);
+        $data = $request->validated();
 
         $summary = app(AiDescriptionEnhancer::class)->summarizeLeaseContract(
             array_filter($data, fn ($v) => $v !== null)

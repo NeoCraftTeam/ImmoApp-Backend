@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Ad;
 
 use App\Enums\AdStatus;
+use App\Http\Requests\Api\V1\Ad\BulkDeleteAdsRequest;
+use App\Http\Requests\Api\V1\Ad\BulkUpdateAdStatusRequest;
 use App\Models\Ad;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\Rule;
 
 /**
  * Bulk operations on owned ads.
@@ -21,7 +21,7 @@ final class BulkAdController
     /**
      * Bulk update the status of multiple owned ads.
      *
-     * @param  Request  $request  { ids: string[], status: AdStatus }
+     * @param  BulkUpdateAdStatusRequest  $request  { ids: string[], status: AdStatus }
      *
      * @OA\Patch(
      *     path="/api/v1/ads/bulk/status",
@@ -49,13 +49,9 @@ final class BulkAdController
      *     @OA\Response(response=422, description="Données invalides")
      * )
      */
-    public function bulkUpdate(Request $request): JsonResponse
+    public function bulkUpdate(BulkUpdateAdStatusRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'ids' => ['required', 'array', 'min:1', 'max:50'],
-            'ids.*' => ['required', 'uuid'],
-            'status' => ['required', Rule::enum(AdStatus::class)],
-        ]);
+        $validated = $request->validated();
 
         $userId = auth()->id();
         $newStatus = AdStatus::from($validated['status']);
@@ -89,7 +85,7 @@ final class BulkAdController
         });
 
         return response()->json([
-            'message' => "{$updated} annonce(s) mise(s) à jour.",
+            'message' => "{$updated} annonce".($updated > 1 ? 's' : '').' mise'.($updated > 1 ? 's' : '').' à jour.',
             'updated' => $updated,
             'failed' => $failed,
         ]);
@@ -98,7 +94,7 @@ final class BulkAdController
     /**
      * Bulk soft-delete multiple owned ads.
      *
-     * @param  Request  $request  { ids: string[] }
+     * @param  BulkDeleteAdsRequest  $request  { ids: string[] }
      *
      * @OA\Delete(
      *     path="/api/v1/ads/bulk",
@@ -123,12 +119,9 @@ final class BulkAdController
      *     @OA\Response(response=422, description="Données invalides")
      * )
      */
-    public function bulkDelete(Request $request): JsonResponse
+    public function bulkDelete(BulkDeleteAdsRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'ids' => ['required', 'array', 'min:1', 'max:50'],
-            'ids.*' => ['required', 'uuid'],
-        ]);
+        $validated = $request->validated();
 
         $userId = auth()->id();
 
@@ -138,7 +131,7 @@ final class BulkAdController
             ->delete();
 
         return response()->json([
-            'message' => "{$deleted} annonce(s) supprimée(s).",
+            'message' => "{$deleted} annonce".($deleted > 1 ? 's' : '').' supprimée'.($deleted > 1 ? 's' : '').'.',
             'deleted' => $deleted,
         ]);
     }

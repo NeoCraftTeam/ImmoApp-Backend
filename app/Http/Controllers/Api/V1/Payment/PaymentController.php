@@ -9,6 +9,7 @@ use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
 use App\Exceptions\InvalidWebhookSignatureException;
 use App\Exceptions\PaymentGatewayException;
+use App\Http\Requests\Api\V1\CancelPaymentRequest;
 use App\Http\Requests\Api\V1\InitiatePaymentRequest;
 use App\Http\Requests\Api\V1\PaymentHistoryRequest;
 use App\Http\Requests\Api\V1\PaymentReceiptPdfRequest;
@@ -341,12 +342,8 @@ final class PaymentController
      *     @OA\Response(response=409, description="Paiement déjà traité")
      * )
      */
-    public function cancel(Request $request): JsonResponse
+    public function cancel(CancelPaymentRequest $request): JsonResponse
     {
-        $request->validate([
-            'tx_ref' => ['required', 'string'],
-        ]);
-
         /** @var User $user */
         $user = $request->user();
 

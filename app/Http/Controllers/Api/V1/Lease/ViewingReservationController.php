@@ -11,6 +11,7 @@ use App\Enums\ReservationStatus;
 use App\Enums\SuccessCode;
 use App\Http\Requests\Viewing\CancelReservationRequest;
 use App\Http\Requests\Viewing\StoreTentativeReservationRequest;
+use App\Http\Requests\Viewing\UpdateReservationNotesRequest;
 use App\Http\Resources\TentativeReservationResource;
 use App\Models\Ad;
 use App\Models\TentativeReservation;
@@ -224,17 +225,13 @@ final readonly class ViewingReservationController
     /**
      * Update landlord notes on a reservation.
      */
-    public function updateNotes(Request $request, TentativeReservation $reservation): JsonResponse
+    public function updateNotes(UpdateReservationNotesRequest $request, TentativeReservation $reservation): JsonResponse
     {
         abort_unless(
             $reservation->isOwnedByLandlord($request->user()),
             403,
             'Seul le propriétaire peut modifier les notes.'
         );
-
-        $request->validate([
-            'landlord_notes' => ['nullable', 'string', 'max:2000'],
-        ]);
 
         $reservation->update(['landlord_notes' => $request->input('landlord_notes')]);
 

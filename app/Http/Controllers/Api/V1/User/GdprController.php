@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\User;
 
+use App\Http\Requests\Api\V1\User\DeleteAccountRequest;
 use App\Mail\AccountDeletedMail;
 use App\Models\Ad;
 use App\Models\PointTransaction;
@@ -138,12 +139,8 @@ final class GdprController
      *     @OA\Response(response=422, description="Confirmation manquante")
      * )
      */
-    public function deleteAccount(Request $request): JsonResponse
+    public function deleteAccount(DeleteAccountRequest $request): JsonResponse
     {
-        $request->validate([
-            'confirmation' => ['required', 'string', 'in:DELETE MY ACCOUNT,SUPPRIMER MON COMPTE'],
-        ]);
-
         /** @var User $user */
         $user = $request->user();
 

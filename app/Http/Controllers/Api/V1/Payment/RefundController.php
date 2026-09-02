@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Payment;
 
 use App\Http\Requests\RefundRequest;
+use App\Http\Requests\RequestRefundRequest;
 use App\Http\Resources\RefundResource;
 use App\Models\Payment;
 use App\Models\Refund;
@@ -89,7 +90,7 @@ final readonly class RefundController
      *     @OA\Response(response=422, description="Already has a pending or completed refund")
      * )
      */
-    public function requestRefund(Request $request, Payment $payment): JsonResponse
+    public function requestRefund(RequestRefundRequest $request, Payment $payment): JsonResponse
     {
         if ($payment->user_id !== $request->user()->id) {
             abort(403, 'Accès refusé.');
@@ -105,9 +106,7 @@ final readonly class RefundController
             ], 422);
         }
 
-        $validated = $request->validate([
-            'reason' => 'required|string|min:10|max:1000',
-        ]);
+        $validated = $request->validated();
 
         $refund = Refund::create([
             'payment_id' => $payment->id,

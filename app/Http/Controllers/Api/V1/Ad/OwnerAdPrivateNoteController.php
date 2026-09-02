@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Ad;
 
+use App\Http\Requests\Api\V1\Ad\UpdateOwnerAdPrivateNoteRequest;
 use App\Models\Ad;
 use App\Models\OwnerAdPrivateNote;
 use Illuminate\Http\JsonResponse;
@@ -22,17 +23,10 @@ final class OwnerAdPrivateNoteController
         return response()->json(['data' => $note ? $this->payload($note) : null]);
     }
 
-    public function update(Request $request, Ad $ad): JsonResponse
+    public function update(UpdateOwnerAdPrivateNoteRequest $request, Ad $ad): JsonResponse
     {
         $this->assertOwner($request, $ad);
-        $validated = $request->validate([
-            'is_property_owner' => ['required', 'boolean'],
-            'owner_name' => ['nullable', 'required_if:is_property_owner,false', 'string', 'max:150'],
-            'owner_address' => ['nullable', 'required_if:is_property_owner,false', 'string', 'max:500'],
-            'owner_phone' => ['nullable', 'required_if:is_property_owner,false', 'string', 'max:40'],
-            'owner_email' => ['nullable', 'email:rfc', 'max:254'],
-            'notes' => ['nullable', 'string', 'max:3000'],
-        ]);
+        $validated = $request->validated();
 
         if ($validated['is_property_owner']) {
             $validated = [...$validated, ...array_fill_keys([

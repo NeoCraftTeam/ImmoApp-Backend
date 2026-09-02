@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Requests\Api\V1\DeleteFcmTokenRequest;
+use App\Http\Requests\Api\V1\StoreFcmTokenRequest;
 use App\Models\FcmToken;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
@@ -19,12 +20,9 @@ final class FcmTokenController
      * POST /api/v1/fcm/token
      * Upsert a FCM token for the authenticated user.
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreFcmTokenRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'token' => ['required', 'string'],
-            'platform' => ['required', 'string', 'in:web,android,ios'],
-        ]);
+        $validated = $request->validated();
 
         /** @var User $user */
         $user = $request->user();
@@ -45,11 +43,9 @@ final class FcmTokenController
      * DELETE /api/v1/fcm/token
      * Remove a FCM token (on logout or permission revocation).
      */
-    public function destroy(Request $request): Response
+    public function destroy(DeleteFcmTokenRequest $request): Response
     {
-        $validated = $request->validate([
-            'token' => ['required', 'string'],
-        ]);
+        $validated = $request->validated();
 
         FcmToken::where('token', $validated['token'])
             ->where('user_id', $request->user()?->id)

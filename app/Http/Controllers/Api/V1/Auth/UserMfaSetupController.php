@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Auth;
 
+use App\Http\Requests\Api\V1\Auth\ConfirmEmailMfaRequest;
+use App\Http\Requests\Api\V1\Auth\ConfirmTotpRequest;
+use App\Http\Requests\Api\V1\Auth\DisableTotpRequest;
+use App\Http\Requests\Api\V1\Auth\RegenerateRecoveryCodesRequest;
 use App\Mail\VerificationCodeMail;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -105,7 +109,7 @@ final class UserMfaSetupController
      * On success persists the secret and returns single-use recovery codes
      * (shown **once**).
      */
-    public function confirmTotp(Request $request): JsonResponse
+    public function confirmTotp(ConfirmTotpRequest $request): JsonResponse
     {
         $user = $request->user();
 
@@ -119,9 +123,7 @@ final class UserMfaSetupController
             return $this->rateLimited($rateKey);
         }
 
-        $validated = $request->validate([
-            'code' => ['required', 'string', 'min:6', 'max:8'],
-        ]);
+        $validated = $request->validated();
 
         $pendingSecret = Cache::get($this->pendingTotpKey($user->id));
 
@@ -172,7 +174,7 @@ final class UserMfaSetupController
      * Disable TOTP. Requires a current valid TOTP code (or a recovery code)
      * so that a stolen Sanctum token alone cannot disable MFA.
      */
-    public function disableTotp(Request $request): JsonResponse
+    public function disableTotp(DisableTotpRequest $request): JsonResponse
     {
         $user = $request->user();
 
@@ -195,9 +197,7 @@ final class UserMfaSetupController
             ], 422);
         }
 
-        $validated = $request->validate([
-            'code' => ['required', 'string', 'min:6', 'max:20'],
-        ]);
+        $validated = $request->validated();
 
         if (!$this->verifyTotpOrRecoveryCode($user, $secret, $validated['code'])) {
             RateLimiter::hit($rateKey, 300);
@@ -227,7 +227,7 @@ final class UserMfaSetupController
      * rotate (and thereby invalidate) the legitimate owner's codes. The fresh
      * codes are returned **once**; the previous set is discarded immediately.
      */
-    public function regenerateRecoveryCodes(Request $request): JsonResponse
+    public function regenerateRecoveryCodes(RegenerateRecoveryCodesRequest $request): JsonResponse
     {
         $user = $request->user();
 
@@ -250,9 +250,7 @@ final class UserMfaSetupController
             ], 422);
         }
 
-        $validated = $request->validate([
-            'code' => ['required', 'string', 'min:6', 'max:20'],
-        ]);
+        $validated = $request->validated();
 
         if (!$this->verifyTotpOrRecoveryCode($user, $secret, $validated['code'])) {
             RateLimiter::hit($rateKey, 300);
@@ -326,7 +324,7 @@ final class UserMfaSetupController
     /**
      * Step 2 — confirm email MFA setup with the code received by email.
      */
-    public function confirmEmail(Request $request): JsonResponse
+    public function confirmEmail(ConfirmEmailMfaRequest $request): JsonResponse
     {
         $user = $request->user();
 
@@ -340,9 +338,7 @@ final class UserMfaSetupController
             return $this->rateLimited($rateKey);
         }
 
-        $validated = $request->validate([
-            'code' => ['required', 'string', 'size:6'],
-        ]);
+        $validated = $request->validated();
 
         $cachedOtp = Cache::get($this->pendingEmailKey($user->id));
 
