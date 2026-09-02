@@ -34,6 +34,10 @@ final class SafeApiMessage
         '/\bLaravel\b/i',
         '/\bMeilisearch\b/i',
         '/\bPostgres(?:ql)?\b/i',
+        // Env var / config key names (ORS_API_KEY, STRIPE_SECRET…). Telling the
+        // caller which credential is missing maps out the deployment; the case
+        // is deliberately sensitive so French copy in caps stays safe.
+        '/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/',
     ];
 
     /**
