@@ -279,7 +279,7 @@ final readonly class TrustScoreService implements TrustScoreServiceInterface
             default => 0,
         };
 
-        return ['score' => $score, 'max' => 15, 'label' => 'Documents', 'value' => "{$count} document(s) fourni(s)", 'tip' => "Ajoutez votre pièce d'identité et justificatifs pour gagner en confiance."];
+        return ['score' => $score, 'max' => 15, 'label' => 'Documents', 'value' => "{$count} document".($count > 1 ? 's' : '').' fourni'.($count > 1 ? 's' : ''), 'tip' => "Ajoutez votre pièce d'identité et justificatifs pour gagner en confiance."];
     }
 
     private function scoreVerification(User $user): array

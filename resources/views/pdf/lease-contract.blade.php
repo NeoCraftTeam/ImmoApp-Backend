@@ -69,7 +69,7 @@
             <tr><td>Type</td><td>{{ $property_type }}</td></tr>
             <tr><td>Adresse</td><td>{{ $property_address }}</td></tr>
             <tr><td>Quartier / Ville</td><td>{{ $quarter }}, {{ $city }}</td></tr>
-            <tr><td>Chambres / SDB</td><td>{{ $bedrooms }} chambre(s), {{ $bathrooms }} salle(s) de bain</td></tr>
+            <tr><td>Chambres / SDB</td><td>{{ $bedrooms }} chambre{{ (int) $bedrooms > 1 ? 's' : '' }}, {{ $bathrooms }} salle{{ (int) $bathrooms > 1 ? 's' : '' }} de bain</td></tr>
             @if($surface_area)<tr><td>Surface</td><td>{{ $surface_area }} m²</td></tr>@endif
         </table>
     </div>

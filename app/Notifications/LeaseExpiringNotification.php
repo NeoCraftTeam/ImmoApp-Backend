@@ -42,7 +42,7 @@ class LeaseExpiringNotification extends Notification implements ShouldQueue
 
         $subject = $days <= 0
             ? 'Votre bail expire aujourd\'hui'
-            : "Votre bail expire dans {$days} jour(s)";
+            : "Votre bail expire dans {$days} jour".($days > 1 ? 's' : '');
 
         return (new MailMessage)
             ->subject("{$subject} - KeyHome")
@@ -61,7 +61,7 @@ class LeaseExpiringNotification extends Notification implements ShouldQueue
 
         $body = $days <= 0
             ? "Le bail pour \"{$adTitle}\" expire aujourd'hui."
-            : "Le bail pour \"{$adTitle}\" expire dans {$days} jour(s).";
+            : "Le bail pour \"{$adTitle}\" expire dans {$days} jour".($days > 1 ? 's' : '').'.';
 
         return (new WebPushMessage)
             ->title('Bail expirant bientôt - KeyHome')
