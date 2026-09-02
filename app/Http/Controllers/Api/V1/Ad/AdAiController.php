@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Ad;
 
+use App\Http\Requests\Api\V1\Ad\EnhanceAdDescriptionRequest;
+use App\Http\Requests\Api\V1\Ad\EnhanceAdTitleRequest;
+use App\Http\Requests\Api\V1\Ad\GenerateAdDescriptionRequest;
 use App\Services\Ai\AiDescriptionEnhancer;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class AdAiController
@@ -33,9 +36,9 @@ final class AdAiController
      *     @OA\Response(response=422, description="Validation échouée")
      * )
      */
-    public function __invoke(Request $request): JsonResponse
+    public function __invoke(EnhanceAdDescriptionRequest $request): JsonResponse
     {
-        $data = $request->validate($this->enhanceRules());
+        $data = $request->validated();
 
         $enhanced = app(AiDescriptionEnhancer::class)->enhance(
             $data['description'],
@@ -73,18 +76,9 @@ final class AdAiController
      *     @OA\Response(response=422, description="Validation échouée")
      * )
      */
-    public function generateFromAttributes(Request $request): JsonResponse
+    public function generateFromAttributes(GenerateAdDescriptionRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'type' => ['nullable', 'string', 'max:100'],
-            'city' => ['nullable', 'string', 'max:100'],
-            'quarter' => ['nullable', 'string', 'max:100'],
-            'bedrooms' => ['nullable', 'integer', 'min:0', 'max:50'],
-            'surface' => ['nullable', 'numeric', 'min:0', 'max:100000'],
-            'price' => ['nullable', 'numeric', 'min:0'],
-            'transaction_type' => ['nullable', 'string', 'max:50'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-        ]);
+        $data = $request->validated();
 
         $generated = app(AiDescriptionEnhancer::class)->generateFromAttributes(
             array_filter($data, fn ($v) => $v !== null)
@@ -118,14 +112,9 @@ final class AdAiController
      *     @OA\Response(response=422, description="Validation échouée")
      * )
      */
-    public function enhanceTitle(Request $request): JsonResponse
+    public function enhanceTitle(EnhanceAdTitleRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'title' => ['required', 'string', 'max:500'],
-            'type' => ['nullable', 'string', 'max:100'],
-            'city' => ['nullable', 'string', 'max:100'],
-            'transaction_type' => ['nullable', 'string', 'max:50'],
-        ]);
+        $data = $request->validated();
 
         $context = array_filter([
             'type' => $data['type'] ?? null,
@@ -143,55 +132,47 @@ final class AdAiController
      * Each SSE event carries a `delta` key with the next token chunk.
      * A final `event: done` signals end-of-stream.
      */
-    public function stream(Request $request): StreamedResponse
+    public function stream(EnhanceAdDescriptionRequest $request): StreamedResponse
     {
-        $data = $request->validate($this->enhanceRules());
+        $data = $request->validated();
 
         $description = $data['description'];
         $context = $this->contextFrom($data);
 
         return response()->stream(function () use ($description, $context): void {
-            app(AiDescriptionEnhancer::class)->streamEnhance(
-                $description,
-                function (string $chunk): void {
-                    echo 'data: '.json_encode(['delta' => $chunk])."\n\n";
+            $emit = static function (string $payload): void {
+                echo $payload;
+                // `output_buffering` may be Off (common in prod). Flushing a
+                // buffer that isn't there raises a PHP warning that Laravel
+                // escalates to an ErrorException — which, once headers are sent,
+                // leaks the generic 500 JSON into the open SSE stream.
+                if (ob_get_level() > 0) {
                     ob_flush();
-                    flush();
-                },
-                $context,
-            );
+                }
+                flush();
+            };
 
-            echo "event: done\ndata: {}\n\n";
-            ob_flush();
-            flush();
+            try {
+                app(AiDescriptionEnhancer::class)->streamEnhance(
+                    $description,
+                    static function (string $chunk) use ($emit): void {
+                        $emit('data: '.json_encode(['delta' => $chunk])."\n\n");
+                    },
+                    $context,
+                );
+            } catch (\Throwable $e) {
+                Log::error('AI stream-enhance failed mid-stream: '.$e->getMessage());
+                $emit('event: error'."\n".'data: '.json_encode([
+                    'message' => "L'amélioration IA est momentanément indisponible. Réessayez dans un instant.",
+                ])."\n\n");
+            }
+
+            $emit("event: done\ndata: {}\n\n");
         }, 200, [
             'Content-Type' => 'text/event-stream',
             'Cache-Control' => 'no-cache',
             'X-Accel-Buffering' => 'no',
         ]);
-    }
-
-    /**
-     * Validation rules shared by the JSON and SSE enhance endpoints: the raw
-     * description plus optional form facts the model can weave in without inventing.
-     * `attributes` stays lenient (array only) so the mobile client's `string[]`
-     * of feature labels is accepted as-is.
-     *
-     * @return array<string, array<int, string>>
-     */
-    private function enhanceRules(): array
-    {
-        return [
-            'description' => ['required', 'string', 'max:10000'],
-            'type' => ['nullable', 'string', 'max:100'],
-            'city' => ['nullable', 'string', 'max:100'],
-            'quarter' => ['nullable', 'string', 'max:100'],
-            'bedrooms' => ['nullable', 'integer', 'min:0', 'max:50'],
-            'surface' => ['nullable', 'numeric', 'min:0', 'max:100000'],
-            'price' => ['nullable', 'numeric', 'min:0'],
-            'transaction_type' => ['nullable', 'string', 'max:50'],
-            'attributes' => ['nullable', 'array'],
-        ];
     }
 
     /**

@@ -164,3 +164,63 @@ it('generate-from-attributes rejects invalid bedrooms value', function (): void 
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['bedrooms']);
 });
+
+// ─── stream-enhance (SSE) ─────────────────────────────────────────────────────
+
+it('returns 401 on stream-enhance without auth', function (): void {
+    $this->postJson('/api/v1/ads/ai/stream-enhance', ['description' => 'test'])
+        ->assertUnauthorized();
+});
+
+it('stream-enhance emits the enhanced deltas and a done event', function (): void {
+    $owner = makeOwner();
+
+    $mock = Mockery::mock(AiDescriptionEnhancer::class);
+    $mock->shouldReceive('streamEnhance')
+        ->once()
+        ->andReturnUsing(function (string $description, callable $onChunk): void {
+            $onChunk('Terrain titré à Bastos.');
+            $onChunk(' Idéal pour construire.');
+        });
+    app()->instance(AiDescriptionEnhancer::class, $mock);
+
+    $response = $this->actingAs($owner, 'sanctum')
+        ->postJson('/api/v1/ads/ai/stream-enhance', [
+            'description' => 'terrain bastos',
+        ]);
+
+    $response->assertOk();
+    expect($response->streamedContent())
+        ->toContain('data: '.json_encode(['delta' => 'Terrain titré à Bastos.']))
+        ->toContain('event: done');
+});
+
+it('stream-enhance degrades to a clean error event when the enhancer throws mid-stream', function (): void {
+    $owner = makeOwner();
+
+    $mock = Mockery::mock(AiDescriptionEnhancer::class);
+    $mock->shouldReceive('streamEnhance')
+        ->once()
+        ->andReturnUsing(function (string $description, callable $onChunk): void {
+            $onChunk('Terrain titré à Bastos.');
+
+            throw new RuntimeException('provider exploded mid-stream');
+        });
+    app()->instance(AiDescriptionEnhancer::class, $mock);
+
+    $response = $this->actingAs($owner, 'sanctum')
+        ->postJson('/api/v1/ads/ai/stream-enhance', [
+            'description' => 'terrain bastos',
+        ]);
+
+    // The 200 + headers are already flushed, so the status can't change — but the
+    // raw internal-error JSON must never leak into the open SSE body.
+    $response->assertOk();
+
+    $content = $response->streamedContent();
+    expect($content)
+        ->toContain('event: error')
+        ->toContain('event: done')
+        ->not->toContain('SERVER_ERROR')
+        ->not->toContain('Une erreur interne est survenue');
+});
