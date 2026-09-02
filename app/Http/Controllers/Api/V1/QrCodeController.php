@@ -72,36 +72,26 @@ final readonly class QrCodeController
     }
 
     /**
-     * Inline PDF for browser preview (same document as {@see adPlacarde}).
+     * Self-contained HTML preview of the A5 placard — rendered in an iframe
+     * inside the owner preview page. HTML renders reliably on every platform
+     * (including iOS Safari/WebKit, which refuses to display a blob: PDF in an
+     * iframe); the download endpoint {@see adPlacarde} serves the print-ready PDF.
      */
     public function adPlacardePreview(Request $request, Ad $ad): SymfonyResponse
     {
         $this->authorize('update', $ad);
 
-        $slug = $ad->slug ?: $ad->id;
-        $pdf = $this->buildAdPlacardePdf($ad);
+        $html = view('pdf.ad-placarde-preview', $this->buildAdPlacardePayload($ad))->render();
 
-        return response($pdf->output(), 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'inline; filename="placarde-'.$slug.'.pdf"',
+        return response($html, 200, [
+            'Content-Type' => 'text/html; charset=utf-8',
             'Cache-Control' => 'private, max-age=60',
         ]);
     }
 
     private function buildAdPlacardePdf(Ad $ad): \Barryvdh\DomPDF\PDF
     {
-        $ad->loadMissing(['quarter.city', 'ad_type', 'user', 'media']);
-
-        $adUrl = $this->urlBuilder->adListingUrl($ad, 'qr', true);
-
-        return Pdf::loadView('pdf.ad-placarde', [
-            'ad' => $ad,
-            'publicUrl' => $adUrl,
-            'qrDataUri' => $this->qrCodeService->plainPngDataUriForUrl($adUrl),
-            'coverImage' => $this->loadAdCoverAsBase64($ad),
-            'quarter' => $ad->quarter?->name,
-            'city' => $ad->quarter?->city?->name,
-        ])
+        return Pdf::loadView('pdf.ad-placarde', $this->buildAdPlacardePayload($ad))
             ->setPaper('a5', 'portrait')
             ->setOptions([
                 'isHtml5ParserEnabled' => true,
@@ -109,6 +99,27 @@ final readonly class QrCodeController
                 'defaultFont' => 'DejaVu Sans',
                 'dpi' => 150,
             ]);
+    }
+
+    /**
+     * Shared view data so the printable PDF and the HTML preview stay in sync.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildAdPlacardePayload(Ad $ad): array
+    {
+        $ad->loadMissing(['quarter.city', 'ad_type', 'user', 'media']);
+
+        $adUrl = $this->urlBuilder->adListingUrl($ad, 'qr', true);
+
+        return [
+            'ad' => $ad,
+            'publicUrl' => $adUrl,
+            'qrDataUri' => $this->qrCodeService->plainPngDataUriForUrl($adUrl),
+            'coverImage' => $this->loadAdCoverAsBase64($ad),
+            'quarter' => $ad->quarter?->name,
+            'city' => $ad->quarter?->city?->name,
+        ];
     }
 
     /**

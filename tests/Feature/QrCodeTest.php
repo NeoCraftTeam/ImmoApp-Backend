@@ -89,18 +89,38 @@ it('returns a png for ad qr image', function (): void {
         ->assertHeader('content-type', 'image/png');
 });
 
-it('streams an inline placarde pdf preview', function (): void {
+it('renders an html placarde preview that renders on ios', function (): void {
     $owner = User::factory()->agents()->create([
         'is_active' => true,
         'email_verified_at' => now(),
     ]);
     $ad = Ad::factory()->for($owner)->create();
 
-    $this->actingAs($owner, 'sanctum')
+    $response = $this->actingAs($owner, 'sanctum')
         ->get("/api/v1/my/ads/{$ad->id}/placarde/preview")
         ->assertOk()
-        ->assertHeader('content-type', 'application/pdf')
-        ->assertHeader('content-disposition', 'inline; filename="placarde-'.($ad->slug ?: $ad->id).'.pdf"');
+        ->assertHeader('content-type', 'text/html; charset=utf-8');
+
+    $html = $response->getContent();
+    expect(is_string($html) && $html !== '')->toBeTrue();
+    expect($html)->toContain('class="placarde"');
+    expect($html)->not->toContain('utm_');
+});
+
+it('forbids the placarde preview for an ad owned by someone else', function (): void {
+    $owner = User::factory()->agents()->create([
+        'is_active' => true,
+        'email_verified_at' => now(),
+    ]);
+    $intruder = User::factory()->agents()->create([
+        'is_active' => true,
+        'email_verified_at' => now(),
+    ]);
+    $ad = Ad::factory()->for($owner)->create();
+
+    $this->actingAs($intruder, 'sanctum')
+        ->get("/api/v1/my/ads/{$ad->id}/placarde/preview")
+        ->assertForbidden();
 });
 
 it('downloads a placarde pdf', function (): void {

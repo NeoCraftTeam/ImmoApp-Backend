@@ -2,26 +2,37 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Pancarte KeyHome — {{ $ad->title }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Aperçu — Pancarte {{ $ad->title }}</title>
     {{--
-        A5 placard — épuré, quasi-monochrome, single discreet accent.
+        Browser-friendly preview of the A5 placard.
 
-        DomPDF rules followed throughout:
-          • Sections are absolutely positioned relative to the .placarde root
-            so the QR block can NEVER be pushed off-page by content above.
-          • Heights are in mm; horizontal layout uses tables (no flex/grid).
-          • The cover photo uses `background-size: cover` (DomPDF ignores
-            `object-fit` on <img>, which distorted the image before).
-          • The QR is a pre-rasterised PNG embedded as a data URI.
-        Keep this in visual sync with pdf.ad-placarde-preview (browser view).
+        Re-uses the EXACT same DOM/styles as the printable @see pdf.ad-placarde
+        view so the on-screen preview is pixel-faithful with the downloaded PDF.
+        This HTML render is what fixes the iOS bug: iOS Safari/WebKit refuses to
+        display a blob: PDF in an iframe, but renders HTML everywhere. The only
+        differences vs the PDF blade are:
+          • a transparent surrounding viewport so the host page can centre it,
+          • a CSS scale that adapts to the iframe's available size (both axes),
+          • a fallback web font (DomPDF embeds DejaVu Sans).
     --}}
     <style>
-        @page { size: A5 portrait; margin: 0; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            background: transparent;
+            font-family: -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            color: #111827;
+            width: 100%; height: 100%; min-height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
 
-        body { font-family: 'DejaVu Sans', sans-serif; color: #111827; background: #FFFFFF; }
-
-        .placarde { width: 148mm; height: 210mm; position: relative; background: #FFFFFF; }
+        .placarde {
+            width: 148mm; height: 210mm; position: relative; background: #FFFFFF;
+            border: 0.5pt solid #E5E7EB; border-radius: 2mm;
+            box-shadow: 0 24px 60px -24px rgba(17, 24, 39, 0.22);
+            transform-origin: center center; transform: scale(1);
+        }
 
         .header { position: absolute; top: 13mm; left: 12mm; right: 12mm; height: 8mm; }
         .brand { font-size: 12pt; font-weight: 800; letter-spacing: 3px; color: #111827; }
@@ -60,7 +71,7 @@
         .qr-row td { vertical-align: middle; padding: 0; }
         .qr-cell { width: 32mm; }
         .qr-img { width: 30mm; height: 30mm; display: block; }
-        .qr-text { text-align: left; padding-left: 5mm !important; }
+        .qr-text { text-align: left; padding-left: 5mm; }
         .qr-cta { font-size: 12.5pt; font-weight: 700; color: #111827; line-height: 1.2; margin-bottom: 1.5mm; }
         .qr-cta .accent { color: #F6475F; }
         .qr-instruction { font-size: 8pt; color: #6B7280; line-height: 1.5; }
@@ -133,5 +144,28 @@
         <span class="site">keyhome.app</span>
     </div>
 </div>
+
+<script>
+    // Auto-fit the A5 sheet inside the iframe viewport (both axes) while
+    // keeping the physical mm dimensions intact, so the preview is a faithful
+    // 1:1 representation of the printable PDF — and renders on iOS, where a
+    // blob: PDF in an <iframe> stays blank.
+    (function () {
+        const sheet = document.querySelector('.placarde');
+        if (!sheet) return;
+        const pxPerMm = 96 / 25.4;
+        const sheetW = 148 * pxPerMm;
+        const sheetH = 210 * pxPerMm;
+        const margin = 16;
+        function fit() {
+            const availW = Math.max(50, window.innerWidth  - margin * 2);
+            const availH = Math.max(50, window.innerHeight - margin * 2);
+            const scale = Math.min(availW / sheetW, availH / sheetH, 2);
+            sheet.style.transform = 'scale(' + scale.toFixed(3) + ')';
+        }
+        fit();
+        window.addEventListener('resize', fit);
+    })();
+</script>
 </body>
 </html>
