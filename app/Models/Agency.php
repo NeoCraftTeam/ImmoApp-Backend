@@ -64,9 +64,13 @@ class Agency extends Model
         'updated_at',
     ];
 
-    protected $casts = [
-        'id' => 'string',
-    ];
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'id' => 'string',
+        ];
+    }
 
     public function owner(): BelongsTo
     {

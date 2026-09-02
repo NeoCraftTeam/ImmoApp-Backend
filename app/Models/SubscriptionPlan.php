@@ -61,18 +61,22 @@ class SubscriptionPlan extends Model
         'sort_order',
     ];
 
-    protected $casts = [
-        'tier' => SubscriptionTier::class,
-        'tier_multiplier' => 'float',
-        'price' => 'float',
-        'price_yearly' => 'float',
-        'features' => 'array',
-        'is_active' => 'boolean',
-        'has_trial' => 'boolean',
-        'has_priority_support' => 'boolean',
-        'has_analytics' => 'boolean',
-        'has_api_access' => 'boolean',
-    ];
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'tier' => SubscriptionTier::class,
+            'tier_multiplier' => 'float',
+            'price' => 'float',
+            'price_yearly' => 'float',
+            'features' => 'array',
+            'is_active' => 'boolean',
+            'has_trial' => 'boolean',
+            'has_priority_support' => 'boolean',
+            'has_analytics' => 'boolean',
+            'has_api_access' => 'boolean',
+        ];
+    }
 
     /**
      * Get subscriptions using this plan

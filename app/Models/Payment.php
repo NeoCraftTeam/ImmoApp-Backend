@@ -29,6 +29,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
  * @property PaymentMethod|null $payment_method
  * @property string $user_id
  * @property PaymentStatus $status
+ * @property array<string, mixed>|null $gateway_response
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
@@ -88,13 +89,17 @@ class Payment extends Model
         'deleted_at',
     ];
 
-    protected $casts = [
-        'type' => PaymentType::class,
-        'payment_method' => PaymentMethod::class,
-        'status' => PaymentStatus::class,
-        'amount' => 'integer',
-        'gateway_response' => 'array',
-    ];
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'type' => PaymentType::class,
+            'payment_method' => PaymentMethod::class,
+            'status' => PaymentStatus::class,
+            'amount' => 'integer',
+            'gateway_response' => 'array',
+        ];
+    }
 
     public function user(): BelongsTo
     {

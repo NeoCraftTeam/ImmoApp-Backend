@@ -54,13 +54,17 @@ class AdReport extends Model
         'user_agent',
     ];
 
-    protected $casts = [
-        'reason' => AdReportReason::class,
-        'scam_reason' => AdReportScamReason::class,
-        'payment_methods' => 'array',
-        'status' => AdReportStatus::class,
-        'resolved_at' => 'datetime',
-    ];
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'reason' => AdReportReason::class,
+            'scam_reason' => AdReportScamReason::class,
+            'payment_methods' => 'array',
+            'status' => AdReportStatus::class,
+            'resolved_at' => 'datetime',
+        ];
+    }
 
     /** @return BelongsTo<Ad, $this> */
     public function ad(): BelongsTo

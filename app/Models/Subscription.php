@@ -57,16 +57,20 @@ class Subscription extends Model
         'cancellation_reason',
     ];
 
-    protected $casts = [
-        'status' => SubscriptionStatus::class,
-        'starts_at' => 'datetime',
-        'trial_ends_at' => 'datetime',
-        'ends_at' => 'datetime',
-        'cancelled_at' => 'datetime',
-        'renewed_at' => 'datetime',
-        'amount_paid' => 'decimal:2',
-        'auto_renew' => 'boolean',
-    ];
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'status' => SubscriptionStatus::class,
+            'starts_at' => 'datetime',
+            'trial_ends_at' => 'datetime',
+            'ends_at' => 'datetime',
+            'cancelled_at' => 'datetime',
+            'renewed_at' => 'datetime',
+            'amount_paid' => 'decimal:2',
+            'auto_renew' => 'boolean',
+        ];
+    }
 
     /**
      * Get the agency that owns the subscription

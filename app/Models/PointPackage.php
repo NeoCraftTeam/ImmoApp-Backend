@@ -37,14 +37,18 @@ class PointPackage extends Model
         'sort_order',
     ];
 
-    protected $casts = [
-        'price' => 'integer',
-        'points_awarded' => 'integer',
-        'features' => 'array',
-        'is_active' => 'boolean',
-        'is_popular' => 'boolean',
-        'sort_order' => 'integer',
-    ];
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'price' => 'integer',
+            'points_awarded' => 'integer',
+            'features' => 'array',
+            'is_active' => 'boolean',
+            'is_popular' => 'boolean',
+            'sort_order' => 'integer',
+        ];
+    }
 
     /** @return HasMany<PointTransaction, $this> */
     public function pointTransactions(): HasMany

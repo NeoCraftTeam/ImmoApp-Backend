@@ -63,7 +63,21 @@ use Zap\Models\Concerns\HasSchedules;
  * @property bool $has_parking
  * @property Point|null $location
  * @property AdStatus $status
- * @property string|null $expires_at
+ * @property TransactionType|null $transaction_type
+ * @property SponsorshipTier|null $subscription_tier
+ * @property VerificationStatus|null $verification_status
+ * @property array<string, mixed>|null $tour_config
+ * @property array<string, mixed>|null $draft_payload
+ * @property array<string, mixed>|null $prescreening_questions
+ * @property Carbon|null $expires_at
+ * @property Carbon|null $available_from
+ * @property Carbon|null $available_to
+ * @property Carbon|null $boost_expires_at
+ * @property Carbon|null $boosted_at
+ * @property Carbon|null $last_shown_at
+ * @property Carbon|null $tour_published_at
+ * @property Carbon|null $verified_at
+ * @property Carbon|null $verification_requested_at
  * @property string $user_id
  * @property string $quarter_id
  * @property string $type_id
@@ -162,38 +176,42 @@ class Ad extends Model implements HasMedia
     /** @var list<string> */
     protected $appends = ['tour_scenes_count'];
 
-    protected $casts = [
-        'location' => Point::class, // Assuming 'point' is a custom cast for PostGIS
-        'status' => AdStatus::class,
-        'has_parking' => 'boolean',
-        'is_visible' => 'boolean',
-        'available_from' => 'date',
-        'available_to' => 'date',
-        'attributes' => 'array',
-        'expires_at' => 'datetime',
-        'price' => 'decimal:2',
-        'is_boosted' => 'boolean',
-        'boost_expires_at' => 'datetime',
-        'boosted_at' => 'datetime',
-        'is_subscription_sponsored' => 'boolean',
-        'subscription_tier' => SponsorshipTier::class,
-        'last_shown_at' => 'datetime',
-        'impression_count' => 'integer',
-        'charges_forfaitaires' => 'boolean',
-        'charges_montant_forfait' => 'integer',
-        'charges_eau' => 'integer',
-        'charges_electricite' => 'integer',
-        'transaction_type' => TransactionType::class,
-        'has_3d_tour' => 'boolean',
-        'tour_config' => 'array',
-        'tour_published_at' => 'datetime',
-        'draft_payload' => 'array',
-        'prescreening_questions' => 'array',
-        'is_verified' => 'boolean',
-        'verified_at' => 'datetime',
-        'verification_status' => VerificationStatus::class,
-        'verification_requested_at' => 'datetime',
-    ];
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'location' => Point::class, // Assuming 'point' is a custom cast for PostGIS
+            'status' => AdStatus::class,
+            'has_parking' => 'boolean',
+            'is_visible' => 'boolean',
+            'available_from' => 'date',
+            'available_to' => 'date',
+            'attributes' => 'array',
+            'expires_at' => 'datetime',
+            'price' => 'decimal:2',
+            'is_boosted' => 'boolean',
+            'boost_expires_at' => 'datetime',
+            'boosted_at' => 'datetime',
+            'is_subscription_sponsored' => 'boolean',
+            'subscription_tier' => SponsorshipTier::class,
+            'last_shown_at' => 'datetime',
+            'impression_count' => 'integer',
+            'charges_forfaitaires' => 'boolean',
+            'charges_montant_forfait' => 'integer',
+            'charges_eau' => 'integer',
+            'charges_electricite' => 'integer',
+            'transaction_type' => TransactionType::class,
+            'has_3d_tour' => 'boolean',
+            'tour_config' => 'array',
+            'tour_published_at' => 'datetime',
+            'draft_payload' => 'array',
+            'prescreening_questions' => 'array',
+            'is_verified' => 'boolean',
+            'verified_at' => 'datetime',
+            'verification_status' => VerificationStatus::class,
+            'verification_requested_at' => 'datetime',
+        ];
+    }
 
     #[\Override]
     protected static function boot(): void

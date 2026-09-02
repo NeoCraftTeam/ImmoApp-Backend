@@ -39,14 +39,18 @@ class AdBoost extends Model
         'status',
     ];
 
-    protected $casts = [
-        'credits_spent' => 'integer',
-        'boost_score' => 'integer',
-        'duration_days' => 'integer',
-        'started_at' => 'datetime',
-        'expires_at' => 'datetime',
-        'status' => AdBoostStatus::class,
-    ];
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'credits_spent' => 'integer',
+            'boost_score' => 'integer',
+            'duration_days' => 'integer',
+            'started_at' => 'datetime',
+            'expires_at' => 'datetime',
+            'status' => AdBoostStatus::class,
+        ];
+    }
 
     /** @return BelongsTo<Ad, $this> */
     public function ad(): BelongsTo

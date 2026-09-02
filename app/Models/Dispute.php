@@ -61,13 +61,17 @@ class Dispute extends Model
         'resolved_at',
     ];
 
-    protected $casts = [
-        'type' => DisputeType::class,
-        'status' => DisputeStatus::class,
-        'amount_claimed' => 'integer',
-        'sla_deadline' => 'datetime',
-        'resolved_at' => 'datetime',
-    ];
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'type' => DisputeType::class,
+            'status' => DisputeStatus::class,
+            'amount_claimed' => 'integer',
+            'sla_deadline' => 'datetime',
+            'resolved_at' => 'datetime',
+        ];
+    }
 
     /** @return BelongsTo<User, $this> */
     public function initiator(): BelongsTo

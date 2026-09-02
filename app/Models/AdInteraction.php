@@ -50,10 +50,14 @@ class AdInteraction extends Model
         'created_at',
     ];
 
-    protected $casts = [
-        'metadata' => 'array',
-        'created_at' => 'datetime',
-    ];
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'metadata' => 'array',
+            'created_at' => 'datetime',
+        ];
+    }
 
     // ── Interaction Types ─────────────────────────────────────────────
 

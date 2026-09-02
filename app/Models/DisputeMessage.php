@@ -32,9 +32,13 @@ class DisputeMessage extends Model
         'is_internal',
     ];
 
-    protected $casts = [
-        'is_internal' => 'boolean',
-    ];
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'is_internal' => 'boolean',
+        ];
+    }
 
     /** @return BelongsTo<Dispute, $this> */
     public function dispute(): BelongsTo

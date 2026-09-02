@@ -42,11 +42,15 @@ class SponsoredImpression extends Model
         'shown_at',
     ];
 
-    protected $casts = [
-        'tier' => SponsorshipTier::class,
-        'slot' => 'integer',
-        'shown_at' => 'datetime',
-    ];
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'tier' => SponsorshipTier::class,
+            'slot' => 'integer',
+            'shown_at' => 'datetime',
+        ];
+    }
 
     /**
      * Prune impressions older than 90 days — analytics dashboards only
