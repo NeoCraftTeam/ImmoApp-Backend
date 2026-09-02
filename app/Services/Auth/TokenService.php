@@ -26,7 +26,12 @@ use Laravel\Sanctum\NewAccessToken;
  *  - Compromise detection: if `rotateForUser()` finds no *active* token matching
  *    the revoke pattern, but finds revoked tokens from the same family, it means
  *    a previously rotated (and stolen) token was reused — OWASP RTR compromise.
- *    → All sessions for that user are immediately revoked and an alert is logged.
+ *    → That family's remaining sessions are revoked and an alert is logged.
+ *
+ * Caller contract: the revoke pattern MUST match the name of the token the
+ * rotation itself creates (`{prefix}_{suffix}_{timestamp}`). A pattern that
+ * cannot match its own output leaves the family with no active member, so the
+ * *next* rotation of that same healthy session is read as a replay.
  */
 final class TokenService
 {
@@ -86,15 +91,25 @@ final class TokenService
                     ->where('name', 'like', $revokePattern)
                     ->whereNotNull('revoked_at')
                     ->whereNotNull('family_id')
-                    ->exists();
+                    ->orderByDesc('revoked_at')
+                    ->first();
 
-                if ($revokedAncestor) {
+                if ($revokedAncestor !== null) {
                     Log::alert('auth.token_family.compromise_detected', [
                         'user_id' => $user->id,
                         'pattern' => $revokePattern,
+                        'family_id' => $revokedAncestor->family_id,
                     ]);
 
-                    $user->tokens()->whereNull('revoked_at')->update(['revoked_at' => now()]);
+                    // Only the suspected lineage is revoked. Nuking every active
+                    // token instead would sign the account out of the mobile app,
+                    // the OAuth session and the other panel over a suspicion that
+                    // concerns one session — and would also kill the token a
+                    // concurrent sibling request had just issued.
+                    $user->tokens()
+                        ->where('family_id', $revokedAncestor->family_id)
+                        ->whereNull('revoked_at')
+                        ->update(['revoked_at' => now()]);
 
                     return $this->createForUser($user, $suffix, $prefixOverride);
                 }

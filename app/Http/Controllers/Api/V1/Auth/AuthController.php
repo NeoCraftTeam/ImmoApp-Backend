@@ -254,8 +254,17 @@ final readonly class AuthController
             // propagates and the old token is soft-revoked (not hard-deleted).
             // This enables compromise detection in TokenService.
             // TransientToken (Clerk JWT) has no DB row — create a fresh token.
+            //
+            // The suffix stays `token` on purpose: compromise detection keys off
+            // "no active token matches the revoke pattern, yet a revoked ancestor
+            // does". Naming the rotated token `{prefix}_refreshed_…` put it
+            // outside `{prefix}_token_%`, so the *next* rotation of the very same
+            // session read as a stolen-token replay and revoked every session the
+            // user owned — logging the user out of the web app, the mobile app and
+            // the other panel at once. A rotation must leave behind an active token
+            // that its own pattern still matches.
             $newToken = $isDbToken
-                ? $this->tokenService->rotateForUser($user, 'refreshed', "{$prefix}_token_%", $prefix)
+                ? $this->tokenService->rotateForUser($user, 'token', "{$prefix}_token_%", $prefix)
                 : $this->tokenService->createForUser($user, 'refreshed', $prefix);
 
             return response()->json([
