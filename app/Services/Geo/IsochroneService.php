@@ -28,6 +28,18 @@ final readonly class IsochroneService
     public function __construct(private HttpFactory $http) {}
 
     /**
+     * Whether an ORS credential is present.
+     *
+     * Callers need this to tell "the platform never offered travel-time search"
+     * apart from "it is momentarily down", which are two different messages for
+     * the user — without having to know which config key holds the credential.
+     */
+    public function isConfigured(): bool
+    {
+        return trim((string) config('services.ors.key', '')) !== '';
+    }
+
+    /**
      * Return an isochrone GeoJSON FeatureCollection for the given point.
      *
      * @return array{geojson: array<string, mixed>, profile: string, range_minutes: int, center: array{lat: float, lng: float}, cached: bool}|null
@@ -86,7 +98,7 @@ final readonly class IsochroneService
                 ->timeout(10)
                 ->withHeaders([
                     'Authorization' => OpenRouteServiceAuth::authorizationHeader($apiKey),
-                    'Accept' => 'application/json',
+                    'Accept' => 'application/geo+json',
                     'Content-Type' => 'application/json',
                 ])
                 ->post(self::ORS_URL.'/'.$profile, [

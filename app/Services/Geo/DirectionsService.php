@@ -40,6 +40,18 @@ final readonly class DirectionsService
     public function __construct(private HttpFactory $http) {}
 
     /**
+     * Whether an ORS credential is present.
+     *
+     * Callers need this to tell "the platform never offered routing" apart from
+     * "routing is momentarily down", which are two different messages for the
+     * user — without having to know which config key holds the credential.
+     */
+    public function isConfigured(): bool
+    {
+        return trim((string) config('services.ors.key', '')) !== '';
+    }
+
+    /**
      * Return a route from A → B.
      *
      * @return array{
@@ -115,7 +127,7 @@ final readonly class DirectionsService
                 ->timeout(12)
                 ->withHeaders([
                     'Authorization' => OpenRouteServiceAuth::authorizationHeader($apiKey),
-                    'Accept' => 'application/json',
+                    'Accept' => 'application/geo+json',
                     'Content-Type' => 'application/json',
                 ])
                 ->post(self::ORS_URL.'/'.$profile.'/geojson', [
