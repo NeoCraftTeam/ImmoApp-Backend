@@ -4,18 +4,21 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Lease;
 
+use App\Enums\ScreeningDocumentType;
 use App\Enums\ScreeningStatus;
 use App\Http\Requests\Api\V1\CreateScreeningRequest;
 use App\Http\Requests\Api\V1\ReviewScreeningRequest;
 use App\Http\Requests\Api\V1\UploadScreeningDocumentRequest;
 use App\Http\Resources\TenantScreeningDocumentResource;
 use App\Http\Resources\TenantScreeningRequestResource;
+use App\Mail\TenantScreeningInvitationMail;
 use App\Models\LeaseContract;
 use App\Models\TenantScreeningDocument;
 use App\Models\TenantScreeningRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 
 final class TenantScreeningController
@@ -45,7 +48,7 @@ final class TenantScreeningController
         }
 
         $validated = $request->validated();
-        $expiresInDays = $validated['expires_in_days'] ?? 14;
+        $expiresInDays = (int) ($validated['expires_in_days'] ?? 14);
 
         $screening = TenantScreeningRequest::create([
             'lease_contract_id' => $leaseContract->id,
@@ -58,6 +61,17 @@ final class TenantScreeningController
             'landlord_notes' => $validated['landlord_notes'] ?? null,
             'expires_at' => now()->addDays($expiresInDays),
         ]);
+
+        Mail::to($screening->tenant_email)->send(new TenantScreeningInvitationMail(
+            tenantName: $screening->tenant_name,
+            actionUrl: $screening->publicUrl(),
+            expiresInDays: $expiresInDays,
+            requiredDocumentLabels: array_map(
+                static fn (string $type): string => ScreeningDocumentType::from($type)->getLabel(),
+                $screening->required_documents ?? [],
+            ),
+            landlordNotes: $screening->landlord_notes,
+        ));
 
         return response()->json([
             'data' => new TenantScreeningRequestResource($screening),

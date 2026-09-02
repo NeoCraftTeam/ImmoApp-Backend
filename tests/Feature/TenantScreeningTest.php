@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 use App\Enums\ScreeningDocumentType;
 use App\Enums\ScreeningStatus;
+use App\Mail\TenantScreeningInvitationMail;
 use App\Models\LeaseContract;
 use App\Models\TenantScreeningDocument;
 use App\Models\TenantScreeningRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 
@@ -68,6 +70,41 @@ it('creates a screening request with a token', function (): void {
 
     $persisted = TenantScreeningRequest::query()->where('id', $data['id'])->firstOrFail();
     expect(strlen((string) $persisted->token))->toBe(64);
+});
+
+it('emails the tenant an invitation with the shareable link when created', function (): void {
+    Mail::fake();
+
+    $owner = User::factory()->agents()->create();
+    Sanctum::actingAs($owner);
+
+    $lease = LeaseContract::factory()->create(['user_id' => $owner->id]);
+
+    $response = $this->postJson("/api/v1/my/lease-contracts/{$lease->id}/screening", [
+        'tenant_name' => 'Jean Dupont',
+        'tenant_email' => 'jean@example.com',
+        'required_documents' => ['id_card', 'salary_slip'],
+        'expires_in_days' => 7,
+    ])->assertCreated();
+
+    $token = TenantScreeningRequest::query()
+        ->where('id', $response->json('data.id'))
+        ->firstOrFail()
+        ->token;
+
+    // The landlord-facing payload carries the shareable link (the raw
+    // token stays hidden — see the security test below).
+    expect($response->json('data.screening_url'))->toContain("/screening/{$token}");
+
+    // The mailable is queued (implements ShouldQueue) to the tenant with the
+    // same link and the human-readable required-document labels.
+    Mail::assertQueued(
+        TenantScreeningInvitationMail::class,
+        fn (TenantScreeningInvitationMail $mail): bool => $mail->hasTo('jean@example.com')
+            && str_contains($mail->actionUrl, "/screening/{$token}")
+            && $mail->expiresInDays === 7
+            && in_array('Carte d\'identité', $mail->requiredDocumentLabels, true)
+    );
 });
 
 it('validates required_documents contains valid types', function (): void {

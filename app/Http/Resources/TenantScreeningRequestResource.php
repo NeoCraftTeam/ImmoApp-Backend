@@ -35,6 +35,11 @@ final class TenantScreeningRequestResource extends JsonResource
             'submitted_at' => $this->submitted_at?->toIso8601String(),
             'reviewed_at' => $this->reviewed_at?->toIso8601String(),
             'expires_at' => $this->expires_at->toIso8601String(),
+            // Shareable link the landlord can copy (and that we email to the
+            // tenant). Unlike `token` in isolation, exposing the full URL is
+            // safe: the public endpoints behind it are upload-only and never
+            // return the tenant's uploaded PII. See TenantScreeningRequest::publicUrl().
+            'screening_url' => $this->publicUrl(),
             'documents' => TenantScreeningDocumentResource::collection(
                 $this->whenLoaded('documents')
             ),

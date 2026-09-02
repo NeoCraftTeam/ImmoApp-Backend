@@ -61,6 +61,18 @@ class TenantScreeningRequest extends Model
         return $this->expires_at->isPast();
     }
 
+    /**
+     * Shareable, token-gated URL the tenant uses to upload their documents.
+     *
+     * The token is upload-only (the public endpoints never return the
+     * documents' signed URLs), so surfacing this link to the landlord — or
+     * emailing it to the tenant — does not leak the tenant's PII.
+     */
+    public function publicUrl(): string
+    {
+        return rtrim((string) config('app.frontend_url'), '/')."/screening/{$this->token}";
+    }
+
     /** @return BelongsTo<LeaseContract, $this> */
     public function leaseContract(): BelongsTo
     {
