@@ -107,31 +107,36 @@ final class CacheEmailAuthentication extends EmailAuthentication
 
     /**
      * Verify OTP from cache.  Clears all keys on success (one-time use).
+     *
+     * Since Filament 4.12 the challenged user is passed explicitly (MFA
+     * hardening: the code is checked against the account being challenged
+     * rather than whoever the guard happens to hold). The two fallbacks below
+     * stay for the call sites that still omit it.
      */
     #[\Override]
-    public function verifyCode(string $code): bool
+    public function verifyCode(#[\SensitiveParameter] string $code, ?HasEmailAuthentication $user = null): bool
     {
         // Primary path: guard is already set (e.g. "remember me" session).
-        $user = Filament::auth()->user();
+        $resolved = $user ?? Filament::auth()->user();
 
         // Fallback: during the MFA challenge Filament::auth()->user() is null
         // because the guard isn't established until MFA succeeds. Resolve the
         // user via the session→user_id cache mapping written in sendCode().
-        if (!($user instanceof HasEmailAuthentication)) {
+        if (!($resolved instanceof HasEmailAuthentication)) {
             $userId = Cache::get($this->sessionUserKey());
 
             if ($userId !== null) {
                 /** @phpstan-ignore method.notFound */
-                $user = Filament::auth()->getProvider()->retrieveById($userId);
+                $resolved = Filament::auth()->getProvider()->retrieveById($userId);
             }
         }
 
-        if (!($user instanceof HasEmailAuthentication)) {
+        if (!($resolved instanceof HasEmailAuthentication)) {
             return false;
         }
 
-        $codeHash = Cache::get($this->otpKey($user));
-        $expiresAt = Cache::get($this->expiryKey($user));
+        $codeHash = Cache::get($this->otpKey($resolved));
+        $expiresAt = Cache::get($this->expiryKey($resolved));
 
         if (
             blank($codeHash)
@@ -142,8 +147,8 @@ final class CacheEmailAuthentication extends EmailAuthentication
             return false;
         }
 
-        Cache::forget($this->otpKey($user));
-        Cache::forget($this->expiryKey($user));
+        Cache::forget($this->otpKey($resolved));
+        Cache::forget($this->expiryKey($resolved));
         Cache::forget($this->sessionUserKey());
 
         return true;
