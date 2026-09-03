@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Lease;
 
+use App\Http\Requests\Api\V1\DeclineSignatureRequest;
+use App\Http\Requests\Api\V1\SignContractRequest;
+use App\Http\Requests\Api\V1\StoreSignatureRequest;
 use App\Models\LeaseContract;
 use App\Models\LeaseSignatureRequest;
 use App\Notifications\LeaseSignatureOtpNotification;
@@ -33,16 +36,13 @@ final class SignatureController
         return response()->json(['data' => $signatures]);
     }
 
-    public function store(Request $request, LeaseContract $leaseContract): JsonResponse
+    public function store(StoreSignatureRequest $request, LeaseContract $leaseContract): JsonResponse
     {
         if ($leaseContract->user_id !== auth()->id()) {
             return response()->json(['message' => 'Non autorisé.'], 403);
         }
 
-        $validated = $request->validate([
-            'signer_email' => ['required', 'email', 'max:255'],
-            'signer_name' => ['required', 'string', 'max:255'],
-        ]);
+        $validated = $request->validated();
 
         // PDF anti-substitution binding: snapshot the SHA-256 of the contract
         // PDF at request time. `sign()` rejects the request if the current PDF
@@ -209,11 +209,9 @@ final class SignatureController
         return response()->json(['message' => 'Code envoyé par e-mail.']);
     }
 
-    public function sign(Request $request, string $token): JsonResponse
+    public function sign(SignContractRequest $request, string $token): JsonResponse
     {
-        $validated = $request->validate([
-            'otp' => ['required', 'string', 'max:32'],
-        ]);
+        $validated = $request->validated();
 
         $signatureRequest = LeaseSignatureRequest::query()
             ->where('token', $token)
@@ -280,12 +278,9 @@ final class SignatureController
         return response()->json(['message' => 'Contrat signé avec succès.']);
     }
 
-    public function decline(Request $request, string $token): JsonResponse
+    public function decline(DeclineSignatureRequest $request, string $token): JsonResponse
     {
-        $validated = $request->validate([
-            'otp' => ['required', 'string', 'max:32'],
-            'reason' => ['nullable', 'string', 'max:1000'],
-        ]);
+        $validated = $request->validated();
 
         $signatureRequest = LeaseSignatureRequest::query()
             ->where('token', $token)

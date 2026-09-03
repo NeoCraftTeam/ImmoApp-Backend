@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Payment;
 
 use App\Enums\AdBoostStatus;
+use App\Http\Requests\Api\V1\BoostAdRequest;
 use App\Models\Ad;
 use App\Models\AdBoost;
 use App\Models\AdInteraction;
@@ -71,16 +72,14 @@ final readonly class BoostController
      * SEC: Only the ad owner can boost. Credits deducted atomically.
      *      Score and duration come from the pack record (server-side) — no client input.
      */
-    public function boost(Request $request, Ad $ad): JsonResponse
+    public function boost(BoostAdRequest $request, Ad $ad): JsonResponse
     {
         /** @var User $user */
         $user = $request->user();
 
         abort_unless($ad->user_id === $user->id, 403, 'Seul le propriétaire peut booster cette annonce.');
 
-        $validated = $request->validate([
-            'boost_pack_id' => ['required', 'uuid', 'exists:boost_packs,id'],
-        ]);
+        $validated = $request->validated();
 
         /** @var BoostPack $pack */
         $pack = BoostPack::query()->where('id', $validated['boost_pack_id'])->where('is_active', true)->firstOrFail();

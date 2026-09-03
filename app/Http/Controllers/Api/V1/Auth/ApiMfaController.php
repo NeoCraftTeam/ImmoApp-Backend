@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Auth;
 
+use App\Http\Requests\Api\V1\Auth\VerifyMfaRequest;
 use App\Mail\VerificationCodeMail;
 use App\Models\PersonalAccessToken;
 use Illuminate\Http\JsonResponse;
@@ -81,7 +82,7 @@ final class ApiMfaController
      *  - method=totp + code: TOTP code from authenticator app
      *  - method=email: triggers email OTP and waits for code on second call
      */
-    public function verify(Request $request): JsonResponse
+    public function verify(VerifyMfaRequest $request): JsonResponse
     {
         $user = $request->user();
 
@@ -103,10 +104,7 @@ final class ApiMfaController
             ], 422);
         }
 
-        $request->validate([
-            'method' => ['required', 'string', 'in:totp,email'],
-            'code' => ['nullable', 'string'],
-        ]);
+        $request->validated();
 
         $method = $request->input('method');
         $token = $user->currentAccessToken();

@@ -2,189 +2,97 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Pancarte Keyhome — {{ $ad->title }}</title>
+    <title>Pancarte KeyHome — {{ $ad->title }}</title>
     {{--
-        A5 placarde — single-page, edge-to-edge design.
+        A5 placard — épuré, quasi-monochrome, single discreet accent.
 
         DomPDF rules followed throughout:
           • Sections are absolutely positioned relative to the .placarde root
             so the QR block can NEVER be pushed off-page by content above.
           • Heights are in mm; horizontal layout uses tables (no flex/grid).
+          • The cover photo uses `background-size: cover` (DomPDF ignores
+            `object-fit` on <img>, which distorted the image before).
           • The QR is a pre-rasterised PNG embedded as a data URI.
+        Keep this in visual sync with pdf.ad-placarde-preview (browser view).
     --}}
     <style>
         @page { size: A5 portrait; margin: 0; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        body {
-            font-family: 'DejaVu Sans', sans-serif;
-            color: #0F172A;
-            background: #FFFFFF;
+        body { font-family: 'DejaVu Sans', sans-serif; color: #111827; background: #FFFFFF; }
+
+        .placarde { width: 148mm; height: 210mm; position: relative; background: #FFFFFF; }
+
+        .header { position: absolute; top: 13mm; left: 12mm; right: 12mm; height: 8mm; }
+        .brand { font-size: 12pt; font-weight: 800; letter-spacing: 3px; color: #111827; }
+        .brand-rule { width: 16mm; height: 1.1mm; background: #F6475F; margin-top: 1.4mm; }
+        .transaction {
+            position: absolute; top: 1mm; right: 0;
+            font-size: 8.5pt; font-weight: 800; letter-spacing: 2.5px;
+            color: #F6475F; text-transform: uppercase;
         }
 
-        .placarde {
-            width: 148mm;
-            height: 210mm;
-            position: relative;
-            background: #FFFFFF;
-        }
-
-        /* === Top crimson band (8 mm) === */
-        .top-bar {
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 8mm;
-            background: #F6475F;
-            color: #FFFFFF;
-        }
-        .top-bar .brand {
-            position: absolute;
-            top: 1.8mm; left: 8mm;
-            font-size: 9pt; font-weight: 800; letter-spacing: 2.2px;
-        }
-        .top-bar .tagline {
-            position: absolute;
-            top: 2.2mm; right: 8mm;
-            font-size: 7.5pt; font-style: italic; opacity: 0.95;
-        }
-
-        /* === Bottom crimson band (6 mm) === */
-        .bottom-bar {
-            position: absolute;
-            bottom: 0; left: 0; right: 0;
-            height: 6mm;
-            background: #F6475F;
-            color: #FFFFFF;
-            text-align: center;
-            font-size: 7pt; font-weight: 600; letter-spacing: 1.5px;
-            padding-top: 1.7mm;
-            text-transform: uppercase;
-        }
-        .bottom-bar strong { font-weight: 800; letter-spacing: 2px; }
-
-        /* === Hero photo (enlarged) === */
         .photo {
-            position: absolute;
-            top: 14mm; left: 8mm; right: 8mm;
-            height: 72mm;
-            background: #F1F5F9;
-            border: 0.5pt solid #E2E8F0;
-            border-radius: 2mm;
-            overflow: hidden;
+            position: absolute; top: 25mm; left: 12mm; right: 12mm; height: 84mm;
+            background-color: #F3F4F6; background-position: center; background-size: cover;
+            background-repeat: no-repeat;
+            border: 0.5pt solid #E5E7EB; border-radius: 1.5mm; overflow: hidden;
         }
-        .photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .photo-placeholder {
-            text-align: center; color: #CBD5E1;
-            font-size: 9.5pt; font-weight: 600;
-            padding-top: 32mm;
-        }
+        .photo-placeholder { text-align: center; color: #9CA3AF; font-size: 9.5pt; padding-top: 38mm; }
 
-        .status-pill {
-            position: absolute;
-            top: 20mm; right: 12mm;
-            background: #F6475F; color: #FFFFFF;
-            padding: 1.5mm 4mm;
-            border-radius: 10mm;
-            font-size: 7.5pt; font-weight: 800;
-            letter-spacing: 1.5px; text-transform: uppercase;
-        }
-
-        /* === Title + price + meta + features (pushed below larger photo) === */
-        .info {
-            position: absolute;
-            top: 92mm;
-            left: 8mm; right: 8mm;
-            height: 48mm;
-        }
-        .title {
-            font-size: 14pt; font-weight: 800;
-            line-height: 1.2; color: #0F172A;
-            margin-bottom: 2.5mm;
-        }
-        .price {
-            font-size: 22pt; font-weight: 900;
-            color: #F6475F; line-height: 1; display: inline;
-        }
-        .price-suffix {
-            font-size: 9pt; color: #64748B; font-weight: 600;
-            display: inline; margin-left: 1.5mm;
-        }
+        .info { position: absolute; top: 113mm; left: 12mm; right: 12mm; }
+        .price { font-size: 23pt; font-weight: 800; color: #111827; line-height: 1; display: inline; }
+        .price-suffix { font-size: 9pt; color: #6B7280; font-weight: 600; display: inline; margin-left: 1.5mm; }
         .price-row { margin-bottom: 3mm; }
-        .meta {
-            font-size: 9pt; color: #475569;
-            line-height: 1.4;
-            padding-bottom: 3mm; margin-bottom: 3mm;
-            border-bottom: 0.5pt dashed #CBD5E1;
+        .title { font-size: 13pt; font-weight: 700; line-height: 1.25; color: #111827; margin-bottom: 2mm; }
+        .address {
+            font-size: 9.5pt; color: #6B7280; line-height: 1.4;
+            padding-bottom: 3.5mm; margin-bottom: 3.5mm; border-bottom: 0.5pt solid #E5E7EB;
         }
         .features { width: 100%; border-collapse: collapse; }
-        .features td {
-            text-align: center; padding: 1mm 0;
-            border-right: 0.5pt solid #E2E8F0;
-            width: 33.33%; vertical-align: middle;
-        }
+        .features td { text-align: center; padding: 0; border-right: 0.5pt solid #E5E7EB; width: 33.33%; vertical-align: middle; }
         .features td:last-child { border-right: none; }
-        .feature-value {
-            font-size: 13pt; font-weight: 800;
-            color: #0F172A; line-height: 1.05;
-        }
-        .feature-label {
-            font-size: 6.5pt; color: #94A3B8;
-            text-transform: uppercase; letter-spacing: 1px;
-            margin-top: 0.8mm;
-        }
+        .feature-value { font-size: 13pt; font-weight: 800; color: #111827; line-height: 1.05; }
+        .feature-label { font-size: 6.5pt; color: #9CA3AF; text-transform: uppercase; letter-spacing: 1px; margin-top: 0.8mm; }
 
-        /* === QR block — anchored above the bottom bar === */
-        .qr-block {
-            position: absolute;
-            bottom: 6mm;
-            left: 8mm; right: 8mm;
-            height: 50mm;
-            border-top: 0.5pt solid #E2E8F0;
-            padding-top: 3mm;
-        }
+        .qr-block { position: absolute; bottom: 11mm; left: 12mm; right: 12mm; height: 34mm; border-top: 0.5pt solid #E5E7EB; padding-top: 4mm; }
         .qr-row { width: 100%; border-collapse: collapse; }
         .qr-row td { vertical-align: middle; padding: 0; }
-        .qr-cell { width: 44mm; text-align: center; }
-        .qr-img { width: 42mm; height: 42mm; display: block; margin: 0 auto; }
-        .qr-text { text-align: left; padding-left: 4mm !important; }
-        .qr-cta {
-            font-size: 13pt; font-weight: 800;
-            color: #0F172A; line-height: 1.15;
-            margin-bottom: 1.5mm;
-        }
+        .qr-cell { width: 32mm; }
+        .qr-img { width: 30mm; height: 30mm; display: block; }
+        .qr-text { text-align: left; padding-left: 5mm !important; }
+        .qr-cta { font-size: 12.5pt; font-weight: 700; color: #111827; line-height: 1.2; margin-bottom: 1.5mm; }
         .qr-cta .accent { color: #F6475F; }
-        .qr-instruction {
-            font-size: 8pt; color: #64748B; line-height: 1.55;
-        }
-        .qr-instruction strong { color: #F6475F; font-weight: 800; }
+        .qr-instruction { font-size: 8pt; color: #6B7280; line-height: 1.5; }
+
+        .footer { position: absolute; bottom: 5mm; left: 12mm; right: 12mm; font-size: 6.5pt; color: #9CA3AF; letter-spacing: 0.5px; }
+        .footer .ref { display: inline; }
+        .footer .site { float: right; font-weight: 700; color: #6B7280; }
     </style>
 </head>
 <body>
 <div class="placarde">
 
-    <div class="top-bar">
-        <span class="brand">KEYHOME</span>
-        <span class="tagline">Votre patrimoine immobilier en poche</span>
+    <div class="header">
+        <span class="transaction">{{ $ad->transaction_type === 'vente' ? 'À vendre' : 'À louer' }}</span>
+        <div class="brand">KEYHOME</div>
+        <div class="brand-rule"></div>
     </div>
 
-    <div class="photo">
-        @if(!empty($coverImage))
-            <img src="{{ $coverImage }}" alt="">
-        @else
-            <div class="photo-placeholder">Pas de photo disponible</div>
-        @endif
-    </div>
-
-    <div class="status-pill">{{ $ad->transaction_type === 'vente' ? 'À VENDRE' : 'À LOUER' }}</div>
+    @if(!empty($coverImage))
+        <div class="photo" style="background-image: url('{{ $coverImage }}');"></div>
+    @else
+        <div class="photo"><div class="photo-placeholder">Pas de photo disponible</div></div>
+    @endif
 
     <div class="info">
-        <div class="title">{{ \Illuminate\Support\Str::limit($ad->title, 60) }}</div>
-
         <div class="price-row">
             <span class="price">{{ number_format((float) $ad->price, 0, ',', ' ') }} FCFA</span>@if($ad->transaction_type !== 'vente')<span class="price-suffix">/ mois</span>@endif
         </div>
 
-        <div class="meta">
+        <div class="title">{{ \Illuminate\Support\Str::limit($ad->title, 60) }}</div>
+
+        <div class="address">
             {{ $ad->adresse }}@if(!empty($quarter)), {{ $quarter }}@endif@if(!empty($city)), {{ $city }}@endif
         </div>
 
@@ -214,17 +122,15 @@
                 </td>
                 <td class="qr-text">
                     <div class="qr-cta">Scannez pour <span class="accent">visiter</span></div>
-                    <div class="qr-instruction">
-                        Contact direct du bailleur<br>
-                        sur <strong>keyhome.app</strong>
-                    </div>
+                    <div class="qr-instruction">Toutes les infos et le contact du bailleur sur keyhome.app</div>
                 </td>
             </tr>
         </table>
     </div>
 
-    <div class="bottom-bar">
-        Annonce vérifiée &nbsp;·&nbsp; Réf. <strong>{{ strtoupper(substr($ad->id, 0, 8)) }}</strong> &nbsp;·&nbsp; <strong>KEYHOME.APP</strong>
+    <div class="footer">
+        <span class="ref">Réf. {{ strtoupper(substr($ad->id, 0, 8)) }}</span>
+        <span class="site">keyhome.app</span>
     </div>
 </div>
 </body>

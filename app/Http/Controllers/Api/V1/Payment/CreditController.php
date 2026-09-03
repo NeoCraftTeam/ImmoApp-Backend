@@ -10,6 +10,7 @@ use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
 use App\Exceptions\PaymentGatewayException;
 use App\Http\Requests\Api\V1\PurchaseCreditPackageRequest;
+use App\Http\Requests\Api\V1\VerifyCreditPurchaseRequest;
 use App\Http\Resources\PointPackageResource;
 use App\Models\Ad;
 use App\Models\Payment;
@@ -255,27 +256,9 @@ final class CreditController
      *     @OA\Response(response=422, description="Paiement échoué")
      * )
      */
-    public function verifyPurchase(Request $request): JsonResponse
+    public function verifyPurchase(VerifyCreditPurchaseRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'tx_ref' => [
-                'nullable',
-                'string',
-                'max:255',
-                'regex:/^KH-[A-Z0-9]{6,32}$/i',
-            ],
-            'reference' => [
-                'nullable',
-                'string',
-                'max:255',
-                'regex:'.PaymentTransactionLookup::gatewayReferenceValidationPattern(),
-            ],
-            'gateway_redirect_status' => [
-                'nullable',
-                'string',
-                'max:50',
-            ],
-        ]);
+        $validated = $request->validated();
 
         $user = $request->user();
 

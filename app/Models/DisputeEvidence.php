@@ -44,10 +44,14 @@ class DisputeEvidence extends Model
         'size_bytes',
     ];
 
-    protected $casts = [
-        'type' => DisputeEvidenceType::class,
-        'size_bytes' => 'integer',
-    ];
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'type' => DisputeEvidenceType::class,
+            'size_bytes' => 'integer',
+        ];
+    }
 
     /** @return BelongsTo<Dispute, $this> */
     public function dispute(): BelongsTo

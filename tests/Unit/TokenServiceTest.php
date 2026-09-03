@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Models\User;
 use App\Services\Auth\TokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 
 uses(RefreshDatabase::class);
 
@@ -95,4 +96,58 @@ it('skips revocation when revokePattern is null', function (): void {
     // Old token kept + new token = 2
     expect($user->tokens()->count())->toBe(2);
     expect($newToken->accessToken->name)->toStartWith('client_fresh_');
+});
+
+// ---------------------------------------------------------------------------
+// rotateForUser — family continuity across a rotation chain (AUTH-5)
+//
+// A session is rotated more than once in its lifetime: login rotates, then
+// every `/auth/refresh` rotates again. Compromise detection keys off "no
+// active token matches the pattern, yet a revoked ancestor does" — so each
+// rotation MUST leave behind an active token that the same pattern still
+// matches. Otherwise the second rotation of a perfectly legitimate session
+// is read as a stolen-token replay.
+// ---------------------------------------------------------------------------
+
+it('keeps one family across a chain of rotations', function (): void {
+    $user = User::factory()->customers()->create();
+    $service = app(TokenService::class);
+
+    $login = $service->rotateForUser($user, 'token', 'client_token_%');
+    $firstRefresh = $service->rotateForUser($user, 'token', 'client_token_%');
+    $secondRefresh = $service->rotateForUser($user, 'token', 'client_token_%');
+
+    expect($firstRefresh->accessToken->family_id)->toBe($login->accessToken->family_id);
+    expect($secondRefresh->accessToken->family_id)->toBe($login->accessToken->family_id);
+});
+
+it('does not report a compromise when a legitimate session rotates twice', function (): void {
+    $user = User::factory()->customers()->create();
+    $service = app(TokenService::class);
+
+    Log::spy();
+
+    $service->rotateForUser($user, 'token', 'client_token_%');
+    $service->rotateForUser($user, 'token', 'client_token_%');
+    $service->rotateForUser($user, 'token', 'client_token_%');
+
+    Log::shouldNotHaveReceived('alert');
+});
+
+// BUG CATCH: the compromise branch revoked every active token of the user, so a
+// suspicion raised on one session signed the account out of every other surface
+// too — mobile app, OAuth session, the other panel. The suspected lineage is
+// the only thing that may be revoked.
+it('confines a suspected compromise to the affected family', function (): void {
+    $user = User::factory()->customers()->create();
+    $service = app(TokenService::class);
+
+    $mobileSession = $service->createForUser($user, 'clerk');
+
+    // Rotating on a pattern the new token no longer matches leaves the family
+    // without an active member, which is what raises the suspicion.
+    $service->rotateForUser($user, 'token', 'client_token_%');
+    $service->rotateForUser($user, 'refreshed', 'client_token_%');
+
+    expect($mobileSession->accessToken->fresh()->revoked_at)->toBeNull();
 });

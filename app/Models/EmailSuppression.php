@@ -30,7 +30,11 @@ final class EmailSuppression extends Model
         'metadata',
     ];
 
-    protected $casts = [
-        'metadata' => 'array',
-    ];
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'metadata' => 'array',
+        ];
+    }
 }

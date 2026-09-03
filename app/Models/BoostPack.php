@@ -41,14 +41,18 @@ class BoostPack extends Model
         'sort_order',
     ];
 
-    protected $casts = [
-        'duration_days' => 'integer',
-        'boost_score' => 'integer',
-        'price_credits' => 'integer',
-        'is_active' => 'boolean',
-        'is_popular' => 'boolean',
-        'sort_order' => 'integer',
-    ];
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'duration_days' => 'integer',
+            'boost_score' => 'integer',
+            'price_credits' => 'integer',
+            'is_active' => 'boolean',
+            'is_popular' => 'boolean',
+            'sort_order' => 'integer',
+        ];
+    }
 
     /** @return HasMany<AdBoost, $this> */
     public function adBoosts(): HasMany

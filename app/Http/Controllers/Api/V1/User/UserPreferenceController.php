@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\User;
 
 use App\Enums\UserRole;
+use App\Http\Requests\Api\V1\User\UpdateLocaleRequest;
+use App\Http\Requests\Api\V1\User\UpdatePreferencesRequest;
 use App\Mail\OwnerProfileCompletedMail;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -49,12 +51,9 @@ final class UserPreferenceController
     /**
      * Update user preferences (e.g. survey_postponed_ids).
      */
-    public function updatePreferences(Request $request): JsonResponse
+    public function updatePreferences(UpdatePreferencesRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'survey_postponed_ids' => 'sometimes|array',
-            'survey_postponed_ids.*' => 'string',
-        ]);
+        $validated = $request->validated();
 
         /** @var User $user */
         $user = $request->user();
@@ -73,11 +72,9 @@ final class UserPreferenceController
     /**
      * Change user's preferred language/locale.
      */
-    public function updateLocale(Request $request): JsonResponse
+    public function updateLocale(UpdateLocaleRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'locale' => ['required', 'string', 'in:fr,en'],
-        ]);
+        $validated = $request->validated();
 
         /** @var User $user */
         $user = $request->user();

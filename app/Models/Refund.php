@@ -13,6 +13,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
+/**
+ * @property RefundStatus $status
+ * @property array<string, mixed>|null $gateway_response
+ */
 class Refund extends Model
 {
     /** @use HasFactory<RefundFactory> */
@@ -29,13 +33,17 @@ class Refund extends Model
         'admin_note',
     ];
 
-    protected $casts = [
-        'status' => RefundStatus::class,
-        'amount' => 'decimal:2',
-        'gateway_response' => 'array',
-        'is_partial' => 'boolean',
-        'side_effects_reversed' => 'boolean',
-    ];
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'status' => RefundStatus::class,
+            'amount' => 'decimal:2',
+            'gateway_response' => 'array',
+            'is_partial' => 'boolean',
+            'side_effects_reversed' => 'boolean',
+        ];
+    }
 
     /** @return BelongsTo<Payment, $this> */
     public function payment(): BelongsTo

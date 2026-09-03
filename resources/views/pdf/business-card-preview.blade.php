@@ -5,11 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Aperçu — Carte de visite</title>
     {{--
-        Browser-friendly preview of the business card.
-
-        Re-uses the EXACT same DOM structure and styles as the printable
-        @see pdf.business-card view so the on-screen preview is pixel-perfect
-        with the downloaded PDF. The only differences are:
+        Browser-friendly preview of the business card. Re-uses the EXACT same
+        DOM/styles as the printable @see pdf.business-card view so the on-screen
+        preview is pixel-faithful with the downloaded PDF. Differences:
           • a transparent surrounding viewport so the host page can centre it,
           • a CSS scale that adapts to the iframe's available size (both axes),
           • a fallback web font (DomPDF embeds DejaVu Sans).
@@ -19,135 +17,71 @@
         html, body {
             background: transparent;
             font-family: -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            color: #0F172A;
-            width: 100%;
-            height: 100%;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            color: #111827;
+            width: 100%; height: 100%; min-height: 100vh;
+            display: flex; align-items: center; justify-content: center;
             overflow: hidden;
         }
 
         .card {
-            width: 90mm;
-            height: 55mm;
-            position: relative;
-            background: #FFFFFF;
-            border-radius: 3mm;
-            border: 0.5pt solid #E2E8F0;
-            box-shadow: 0 16px 40px -16px rgba(15, 23, 42, 0.18);
-            transform-origin: center center;
-            transform: scale(1);
+            width: 90mm; height: 55mm; position: relative; background: #FFFFFF;
+            border-radius: 3mm; border: 0.5pt solid #E5E7EB;
+            box-shadow: 0 16px 40px -16px rgba(17, 24, 39, 0.18);
+            transform-origin: center center; transform: scale(1);
         }
 
-        .accent-bar {
-            position: absolute;
-            top: 0; left: 0; bottom: 0;
-            width: 3mm;
-            background: #F6475F;
-            border-radius: 3mm 0 0 3mm;
-        }
+        .header { position: absolute; top: 5mm; left: 6mm; right: 5mm; height: 17mm; }
 
-        .header {
-            position: absolute;
-            top: 4mm; left: 6mm; right: 4mm;
-            height: 18mm;
-        }
         .avatar {
-            position: absolute;
-            top: 0; left: 0;
-            width: 16mm; height: 16mm;
+            position: absolute; top: 0; left: 0; width: 15mm; height: 15mm;
             border-radius: 50%;
-            background: #F1F5F9;
-            border: 0.5pt solid #E2E8F0;
-            overflow: hidden;
-            text-align: center;
+            background-color: #F3F4F6; background-position: center; background-size: cover;
+            background-repeat: no-repeat;
+            border: 0.5pt solid #E5E7EB; overflow: hidden; text-align: center;
         }
-        .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
-        .avatar .initials {
-            display: block;
-            font-size: 14pt; font-weight: 800;
-            color: #F6475F;
-            padding-top: 4mm;
-            letter-spacing: 0.5px;
-        }
-        .name-block {
-            position: absolute;
-            top: 1mm; left: 19mm; right: 14mm;
-        }
-        .name {
-            font-size: 11pt; font-weight: 800;
-            line-height: 1.1; color: #0F172A;
-            margin-bottom: 0.4mm;
-        }
-        .role {
-            font-size: 7pt; color: #64748B;
-            font-weight: 500; margin-bottom: 0.4mm;
-        }
-        .brand-line { font-size: 7pt; color: #94A3B8; }
+        .avatar .initials { display: block; font-size: 13pt; font-weight: 800; color: #0D9488; padding-top: 4mm; letter-spacing: 0.5px; }
+
+        .name-block { position: absolute; top: 0.5mm; left: 19mm; right: 12mm; }
+        .name { font-size: 11pt; font-weight: 800; line-height: 1.1; color: #111827; margin-bottom: 0.6mm; }
+        .role { font-size: 7pt; color: #6B7280; font-weight: 600; line-height: 1.2; }
+        .brand-rule { width: 10mm; height: 0.8mm; background: #0D9488; margin: 1mm 0; }
+        .brand-line { font-size: 6.5pt; color: #9CA3AF; line-height: 1.2; letter-spacing: 0.5px; }
+        .brand-line strong { color: #6B7280; font-weight: 700; }
 
         .kh-badge {
-            position: absolute;
-            top: 0; right: 0;
-            width: 12mm; height: 12mm;
-            border-radius: 50%;
-            background: #FFE9EC;
-            text-align: center;
-            border: 0.5pt solid rgba(246,71,95,0.25);
+            position: absolute; top: 0; right: 0; width: 11mm; height: 11mm;
+            border-radius: 50%; border: 0.5pt solid #E5E7EB; text-align: center;
         }
-        .kh-badge img { width: 8mm; height: 8mm; margin-top: 1.7mm; }
+        .kh-badge img { width: 7mm; height: 7mm; margin-top: 1.8mm; }
 
-        .contact {
-            position: absolute;
-            bottom: 4mm; left: 6mm;
-            width: 50mm;
-        }
+        .contact { position: absolute; bottom: 4mm; left: 6mm; width: 52mm; }
         .contact .row {
-            font-size: 7.5pt; color: #334155;
-            line-height: 1.45;
-            display: block; margin-bottom: 0.6mm;
-            white-space: nowrap; overflow: hidden;
+            font-size: 7.5pt; color: #374151; line-height: 1.5;
+            display: block; margin-bottom: 0.6mm; white-space: nowrap; overflow: hidden;
         }
-        .contact .row .ico {
-            display: inline-block; width: 4mm;
-            color: #F6475F; font-weight: 800;
-        }
-        .contact .row strong { color: #0F172A; font-weight: 700; }
+        .contact .row .ico { display: inline-block; width: 4mm; color: #0D9488; font-weight: 800; }
+        .contact .row strong { color: #111827; font-weight: 700; }
 
-        .qr-wrap {
-            position: absolute;
-            bottom: 3mm; right: 4mm;
-            width: 24mm; text-align: center;
-        }
-        .qr-wrap img {
-            width: auto; height: 22mm;
-            display: block;
-            margin: 0 auto 0.8mm auto;
-        }
-        .qr-wrap .qr-cta {
-            font-size: 5.5pt; color: #64748B; line-height: 1.2;
-        }
-        .qr-wrap .qr-cta strong { color: #F6475F; font-weight: 800; }
+        .qr-wrap { position: absolute; bottom: 3.5mm; right: 5mm; width: 22mm; text-align: center; }
+        .qr-wrap img { width: auto; height: 20mm; display: block; margin: 0 auto 0.8mm auto; }
+        .qr-wrap .qr-cta { font-size: 5.5pt; color: #6B7280; line-height: 1.2; letter-spacing: 0.2px; }
+        .qr-wrap .qr-cta strong { color: #0D9488; font-weight: 800; }
     </style>
 </head>
 <body>
 <div class="card">
-    <div class="accent-bar"></div>
-
     <div class="header">
-        <div class="avatar">
-            @if($avatarDataUri)
-                <img src="{{ $avatarDataUri }}" alt="">
-            @else
-                <span class="initials">{{ strtoupper(substr($user->firstname, 0, 1)) }}{{ strtoupper(substr($user->lastname, 0, 1)) }}</span>
-            @endif
-        </div>
+        @if($avatarDataUri)
+            <div class="avatar" style="background-image: url('{{ $avatarDataUri }}');"></div>
+        @else
+            <div class="avatar"><span class="initials">{{ strtoupper(substr($user->firstname, 0, 1)) }}{{ strtoupper(substr($user->lastname, 0, 1)) }}</span></div>
+        @endif
 
         <div class="name-block">
             <div class="name">{{ \Illuminate\Support\Str::limit($user->firstname.' '.$user->lastname, 28) }}</div>
             <div class="role">{{ $roleLabel }}</div>
-            <div class="brand-line">KeyHome &nbsp;·&nbsp; {{ $adsCount > 0 ? $adsCount.' annonce'.($adsCount > 1 ? 's' : '').' active'.($adsCount > 1 ? 's' : '') : 'keyhome.app' }}</div>
+            <div class="brand-rule"></div>
+            <div class="brand-line">KEYHOME &nbsp;·&nbsp; {{ $adsCount > 0 ? $adsCount.' annonce'.($adsCount > 1 ? 's' : '').' active'.($adsCount > 1 ? 's' : '') : 'keyhome.app' }}</div>
         </div>
 
         <div class="kh-badge">
@@ -174,9 +108,9 @@
 </div>
 
 <script>
-    // Auto-fit the card inside the iframe viewport (both axes) while
-    // keeping the physical mm dimensions intact, so the preview is a
-    // faithful 1:1 representation of the printable PDF.
+    // Auto-fit the card inside the iframe viewport (both axes) while keeping
+    // the physical mm dimensions intact, so the preview is a faithful 1:1
+    // representation of the printable PDF.
     (function () {
         const card = document.querySelector('.card');
         if (!card) return;

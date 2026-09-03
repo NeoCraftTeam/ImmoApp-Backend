@@ -1,7 +1,4 @@
 {
-  "enabledPlugins": {
-    "warp@claude-code-warp": true
-  },
   "hooks": {
     "PreToolUse": [
       {
@@ -14,5 +11,9 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "warp@claude-code-warp": true,
+    "superpowers@claude-plugins-official": true
   }
 }

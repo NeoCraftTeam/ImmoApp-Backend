@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Requests\Api\V1\StoreCookieConsentRequest;
 use App\Models\CookieConsent;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -19,13 +19,9 @@ use Illuminate\Support\Facades\Auth;
  */
 final class CookieConsentController
 {
-    public function __invoke(Request $request): JsonResponse
+    public function __invoke(StoreCookieConsentRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'analytics' => ['required', 'boolean'],
-            'marketing' => ['required', 'boolean'],
-            'policy_version' => ['sometimes', 'string', 'max:20'],
-        ]);
+        $data = $request->validated();
 
         /** @var User|null $user */
         $user = Auth::guard('sanctum')->user();

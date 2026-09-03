@@ -55,7 +55,7 @@ final readonly class RetentionPushService
 
                     $netFavorites = $this->getNetFavoriteCount($user->id);
                     $body = $netFavorites > 0
-                        ? "Vous avez {$netFavorites} annonce(s) sauvegardée(s) qui vous attendent. "
+                        ? "Vous avez {$netFavorites} annonce".($netFavorites > 1 ? 's' : '').' sauvegardée'.($netFavorites > 1 ? 's' : '').' qui vous attendent. '
                         : 'Reprenez votre recherche immobilière là où vous vous êtes arrêté(e). ';
 
                     $result = $this->webPush->sendToUser($user, [

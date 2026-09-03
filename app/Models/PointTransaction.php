@@ -36,10 +36,14 @@ class PointTransaction extends Model
         'ad_id',
     ];
 
-    protected $casts = [
-        'type' => PointTransactionType::class,
-        'points' => 'integer',
-    ];
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'type' => PointTransactionType::class,
+            'points' => 'integer',
+        ];
+    }
 
     /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo

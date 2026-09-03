@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Requests\Api\V1\SubscribePushRequest;
+use App\Http\Requests\Api\V1\UnsubscribePushRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -45,14 +47,8 @@ class PwaController
      *     @OA\Response(response=422, description="Données invalides")
      * )
      */
-    public function subscribe(Request $request): JsonResponse
+    public function subscribe(SubscribePushRequest $request): JsonResponse
     {
-        $request->validate([
-            'endpoint' => ['required', 'url', 'max:500'],
-            'keys.p256dh' => ['required', 'string'],
-            'keys.auth' => ['required', 'string'],
-        ]);
-
         $user = $request->user();
 
         if (!$user) {
@@ -99,12 +95,8 @@ class PwaController
      *     @OA\Response(response=422, description="Données invalides")
      * )
      */
-    public function unsubscribe(Request $request): JsonResponse
+    public function unsubscribe(UnsubscribePushRequest $request): JsonResponse
     {
-        $request->validate([
-            'endpoint' => ['required', 'url'],
-        ]);
-
         $user = $request->user();
 
         if (!$user) {

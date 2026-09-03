@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Requests\Api\V1\PreviewSearchAlertCountRequest;
 use App\Http\Requests\Api\V1\StoreSearchAlertRequest;
 use App\Http\Requests\Api\V1\UpdateSearchAlertRequest;
 use App\Models\Ad;
@@ -203,19 +204,9 @@ final class SearchAlertController
      *     ))
      * )
      */
-    public function previewCount(Request $request): JsonResponse
+    public function previewCount(PreviewSearchAlertCountRequest $request): JsonResponse
     {
-        $validated = $request->validate([
-            'city_id' => ['nullable', 'uuid'],
-            'city_name' => ['nullable', 'string', 'max:100'],
-            'type_id' => ['nullable', 'uuid'],
-            'quarter_id' => ['nullable', 'uuid'],
-            'price_min' => ['nullable', 'integer', 'min:0'],
-            'price_max' => ['nullable', 'integer', 'min:0'],
-            'bedrooms_min' => ['nullable', 'integer', 'min:0'],
-            'surface_min' => ['nullable', 'integer', 'min:0'],
-            'has_parking' => ['nullable', 'boolean'],
-        ]);
+        $validated = $request->validated();
 
         $query = Ad::query()->visible()->whereIn('status', Ad::PUBLIC_STATUSES);
 

@@ -79,7 +79,9 @@ echo ""
 
 # ─── 2. PHPStan ────────────────────────────────────────────
 echo -e "${YELLOW}▸ [2/6] PHPStan${NC}"
-./vendor/bin/phpstan analyse 2>&1
+# Limite explicite (identique à la CI) pour ne pas dépendre du memory_limit
+# du php.ini local : un worker qui absorbe beaucoup de fichiers monte à ~830 Mo.
+./vendor/bin/phpstan analyse --memory-limit=1536M 2>&1
 if [[ $? -eq 0 ]]; then
     echo -e "${GREEN}  ✅ PHPStan — aucune erreur${NC}"; PASS=$((PASS + 1))
 else

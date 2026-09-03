@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\Geo;
 
 use App\Enums\TransactionType;
+use App\Http\Requests\Api\V1\Geo\EstimateRentRequest;
 use App\Models\Ad;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
@@ -53,14 +53,9 @@ final class RentEstimatorController
      *     @OA\Response(response=422, description="Validation échouée")
      * )
      */
-    public function estimate(Request $request): JsonResponse
+    public function estimate(EstimateRentRequest $request): JsonResponse
     {
-        $data = $request->validate([
-            'city_id' => ['required', 'uuid'],
-            'type_id' => ['required', 'uuid'],
-            'surface' => ['required', 'integer', 'min:10', 'max:10000'],
-            'bedrooms' => ['nullable', 'integer', 'min:0', 'max:20'],
-        ]);
+        $data = $request->validated();
 
         $cacheKey = 'rent_estimate_'.self::CACHE_VERSION.'_'.md5(serialize($data));
 

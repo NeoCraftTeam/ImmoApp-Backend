@@ -115,7 +115,7 @@
 
     <div style="text-align: center; margin-top: 20px;">
         <span class="countdown-badge {{ $badgeClass }}">
-            {{ $days <= 1 ? 'Dernier jour' : $days . ' jour(s) restant(s)' }}
+            {{ $days <= 1 ? 'Dernier jour' : $days . ' jours restants' }}
         </span>
     </div>
 

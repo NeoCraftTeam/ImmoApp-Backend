@@ -39,7 +39,7 @@ class AdExpiring extends Notification implements ShouldQueue
     {
         $message = $this->daysUntilExpiry === 0
             ? 'Votre annonce expire aujourd\'hui !'
-            : 'Votre annonce expire dans '.$this->daysUntilExpiry.' jour(s).';
+            : 'Votre annonce expire dans '.$this->daysUntilExpiry.' jour'.($this->daysUntilExpiry > 1 ? 's' : '').'.';
 
         return (new MailMessage)
             ->subject('Votre annonce expire bientôt - KeyHome')
@@ -54,7 +54,7 @@ class AdExpiring extends Notification implements ShouldQueue
     {
         $message = $this->daysUntilExpiry === 0
             ? 'Votre annonce "'.$this->ad->title.'" expire aujourd\'hui'
-            : 'Votre annonce "'.$this->ad->title.'" expire dans '.$this->daysUntilExpiry.' jour(s)';
+            : 'Votre annonce "'.$this->ad->title.'" expire dans '.$this->daysUntilExpiry.' jour'.($this->daysUntilExpiry > 1 ? 's' : '');
 
         return (new WebPushMessage)
             ->title('Annonce expirante - KeyHome')
@@ -75,7 +75,7 @@ class AdExpiring extends Notification implements ShouldQueue
             'title' => 'Annonce expirante',
             'message' => $this->daysUntilExpiry === 0
                 ? 'Votre annonce "'.$this->ad->title.'" expire aujourd\'hui'
-                : 'Votre annonce "'.$this->ad->title.'" expire dans '.$this->daysUntilExpiry.' jour(s)',
+                : 'Votre annonce "'.$this->ad->title.'" expire dans '.$this->daysUntilExpiry.' jour'.($this->daysUntilExpiry > 1 ? 's' : ''),
             'ad_id' => $this->ad->id,
             'ad_title' => $this->ad->title,
             'days_until_expiry' => $this->daysUntilExpiry,

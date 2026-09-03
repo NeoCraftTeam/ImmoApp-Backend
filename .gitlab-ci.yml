@@ -107,13 +107,20 @@ phpstan:
   # runner. Le cache rend phpstan ~5× plus rapide quand seul un
   # sous-ensemble de fichiers PHP a changé : il ne ré-analyse que
   # les fichiers dont le hash a bougé.
+  #
+  # `--memory-limit` s'applique à CHAQUE worker parallèle, et le nombre de
+  # workers dépend de la charge du runner (`parallel.loadLimit`) : les cinq
+  # jobs de qualité tournent en même temps, donc phpstan retombe parfois sur
+  # très peu de workers qui absorbent alors tous les fichiers. Mesuré en
+  # mono-processus sur la totalité de `app/` avec un cache froid : 830 Mo.
+  # 1536 Mo garde de la marge ; c'est un plafond, pas une réservation.
   script:
     - mkdir -p /tmp/phpstan-cache-$CI_PROJECT_ID
     - docker run --rm
         -e APP_KEY="base64:$(openssl rand -base64 32)"
         -v "/tmp/phpstan-cache-$CI_PROJECT_ID:/tmp/phpstan"
         -e PHPSTAN_TMPDIR=/tmp/phpstan
-        $CI_IMAGE ./vendor/bin/phpstan analyse --memory-limit=512M --no-progress
+        $CI_IMAGE ./vendor/bin/phpstan analyse --memory-limit=1536M --no-progress
   rules:
     - if: $CI_COMMIT_BRANCH
       changes:

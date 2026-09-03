@@ -6,13 +6,13 @@ namespace App\Http\Controllers\Api\V1\Auth;
 
 use App\DTOs\RegistrationResult;
 use App\Exceptions\RegistrationEmailTakenException;
+use App\Http\Requests\Api\V1\Auth\CheckEmailAvailabilityRequest;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\Auth\RegistrationService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Spatie\MediaLibrary\MediaCollections\Exceptions\FileDoesNotExist;
 use Spatie\MediaLibrary\MediaCollections\Exceptions\FileIsTooBig;
@@ -120,9 +120,9 @@ final readonly class RegistrationController
      *     @OA\Response(response=429, description="Trop de tentatives")
      * )
      */
-    public function checkEmail(Request $request): JsonResponse
+    public function checkEmail(CheckEmailAvailabilityRequest $request): JsonResponse
     {
-        $request->validate(['email' => ['required', 'email', 'max:255']]);
+        $request->validated();
 
         $available = !User::query()
             ->where('email', $request->string('email')->lower())

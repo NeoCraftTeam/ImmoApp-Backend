@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Requests\Api\V1\UpdatePrescreeningRequest;
 use App\Models\Ad;
 use App\Support\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -25,7 +26,7 @@ final readonly class PrescreeningController
      * Accepts:
      *   questions: string[]  (max 10 questions, each max 500 chars)
      */
-    public function update(Request $request, Ad $ad): JsonResponse
+    public function update(UpdatePrescreeningRequest $request, Ad $ad): JsonResponse
     {
         abort_unless(
             $ad->user_id === $request->user()->id,
@@ -33,10 +34,7 @@ final readonly class PrescreeningController
             'Cette annonce ne vous appartient pas.'
         );
 
-        $validated = $request->validate([
-            'questions' => ['required', 'array', 'max:10'],
-            'questions.*' => ['required', 'string', 'max:500'],
-        ]);
+        $validated = $request->validated();
 
         $ad->prescreening_questions = $validated['questions'];
         $ad->save();

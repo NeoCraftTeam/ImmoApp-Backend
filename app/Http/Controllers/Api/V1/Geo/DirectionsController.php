@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Geo;
 
+use App\Http\Requests\Api\V1\Geo\DirectionsRequest;
 use App\Services\Geo\DirectionsService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 
 #[OA\Get(
@@ -29,15 +30,9 @@ use OpenApi\Attributes as OA;
 )]
 final class DirectionsController
 {
-    public function __invoke(Request $request, DirectionsService $service): JsonResponse
+    public function __invoke(DirectionsRequest $request, DirectionsService $service): JsonResponse
     {
-        $validated = $request->validate([
-            'from_lat' => ['required', 'numeric', 'between:-90,90'],
-            'from_lng' => ['required', 'numeric', 'between:-180,180'],
-            'to_lat' => ['required', 'numeric', 'between:-90,90'],
-            'to_lng' => ['required', 'numeric', 'between:-180,180'],
-            'profile' => ['sometimes', 'string', 'in:'.implode(',', DirectionsService::PROFILES)],
-        ]);
+        $validated = $request->validated();
 
         $result = $service->get(
             fromLat: (float) $validated['from_lat'],
@@ -48,8 +43,20 @@ final class DirectionsController
         );
 
         if ($result === null) {
+            // Naming the missing credential in the response would tell any caller
+            // which provider and which env var the API runs on. The gap is an
+            // operator concern: it goes to the log, not to the user.
+            if (!$service->isConfigured()) {
+                Log::warning('geo.ors.not_configured', ['endpoint' => 'directions']);
+
+                return response()->json(
+                    ['message' => "Le calcul d'itinéraire n'est pas disponible sur cette plateforme."],
+                    503,
+                );
+            }
+
             return response()->json(
-                ['message' => 'Calcul d\'itinéraire non disponible. Vérifiez que ORS_API_KEY est configuré.'],
+                ['message' => "Calcul d'itinéraire temporairement indisponible. Veuillez réessayer dans quelques instants."],
                 503,
             );
         }

@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\Geo;
 
+use App\Http\Requests\Api\V1\Geo\IsochroneRequest;
 use App\Services\Geo\IsochroneService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 
 #[OA\Get(
@@ -28,14 +29,9 @@ use OpenApi\Attributes as OA;
 )]
 final class IsochroneController
 {
-    public function __invoke(Request $request, IsochroneService $service): JsonResponse
+    public function __invoke(IsochroneRequest $request, IsochroneService $service): JsonResponse
     {
-        $validated = $request->validate([
-            'lat' => ['required', 'numeric', 'between:-90,90'],
-            'lng' => ['required', 'numeric', 'between:-180,180'],
-            'profile' => ['sometimes', 'string', 'in:'.implode(',', IsochroneService::PROFILES)],
-            'range' => ['sometimes', 'integer', 'min:5', 'max:60'],
-        ]);
+        $validated = $request->validated();
 
         $result = $service->get(
             lat: (float) $validated['lat'],
@@ -45,8 +41,20 @@ final class IsochroneController
         );
 
         if ($result === null) {
+            // Naming the missing credential in the response would tell any caller
+            // which provider and which env var the API runs on. The gap is an
+            // operator concern: it goes to the log, not to the user.
+            if (!$service->isConfigured()) {
+                Log::warning('geo.ors.not_configured', ['endpoint' => 'isochrones']);
+
+                return response()->json(
+                    ['message' => "Le calcul de zones de trajet n'est pas disponible sur cette plateforme."],
+                    503,
+                );
+            }
+
             return response()->json(
-                ['message' => 'Service de calcul de zones non disponible. Vérifiez que ORS_API_KEY est configuré.'],
+                ['message' => 'Service de calcul de zones temporairement indisponible. Veuillez réessayer dans quelques instants.'],
                 503,
             );
         }

@@ -26,6 +26,8 @@ describe('isSensitive', function (): void {
         'postgres keyword' => 'Postgres connection timed out',
         'leaky auth owner' => 'Accès réservé aux propriétaires',
         'leaky auth admin panel' => 'Panneau administrateur réservé aux admins',
+        'env var name' => 'Configuration manquante : ORS_API_KEY',
+        'env var name in sentence' => 'Ajoutez STRIPE_WEBHOOK_SECRET puis relancez',
     ]);
 
     it('treats user-facing French messages as safe', function (string $message): void {
@@ -36,6 +38,8 @@ describe('isSensitive', function (): void {
         'status updated' => 'Statut mis à jour: Disponible',
         'rate limited' => 'Trop de tentatives. Patientez quelques instants.',
         'success' => 'Visite confirmée avec succès.',
+        'french caps without underscore' => 'ATTENTION : votre dossier est incomplet.',
+        'acronym in caps' => 'Votre document PDF a bien été reçu.',
     ]);
 });
 

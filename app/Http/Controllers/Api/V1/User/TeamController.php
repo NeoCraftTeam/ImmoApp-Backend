@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api\V1\User;
 
+use App\Http\Requests\Api\V1\User\InviteTeamMemberRequest;
 use App\Models\Agency;
 use App\Models\TeamInvitation;
 use App\Models\User;
@@ -40,7 +41,7 @@ final class TeamController
         ]);
     }
 
-    public function invite(Request $request): JsonResponse
+    public function invite(InviteTeamMemberRequest $request): JsonResponse
     {
         $user = auth()->user();
 
@@ -58,10 +59,7 @@ final class TeamController
             return response()->json(['message' => 'Seul le propriétaire de l\'agence peut inviter de nouveaux membres.'], 403);
         }
 
-        $validated = $request->validate([
-            'email' => ['required', 'email', 'max:255'],
-            'role' => ['required', 'in:manager,viewer'],
-        ]);
+        $validated = $request->validated();
 
         $alreadyMember = User::query()
             ->where('agency_id', $user->agency_id)

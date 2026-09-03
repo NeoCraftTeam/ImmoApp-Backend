@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\User;
 
 use App\Enums\UserRole;
+use App\Http\Requests\Api\V1\User\UpdateTrustScoreConsentRequest;
 use App\Http\Resources\TrustScoreResource;
 use App\Models\User;
 use App\Services\Trust\TrustScoreService;
@@ -60,10 +61,8 @@ final readonly class TrustScoreController
         ]);
     }
 
-    public function consent(Request $request): JsonResponse
+    public function consent(UpdateTrustScoreConsentRequest $request): JsonResponse
     {
-        $request->validate(['consent' => 'required|boolean']);
-
         /** @var User $user */
         $user = $request->user();
         $user->update(['trust_score_consent' => $request->boolean('consent')]);

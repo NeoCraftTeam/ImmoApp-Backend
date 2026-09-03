@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\V1\User;
 
 use App\Exceptions\RoleContextMismatchException;
+use App\Http\Requests\Api\V1\User\UpdatePasskeyRequest;
 use App\Http\Resources\UserResource;
 use App\Mail\PasskeyNotificationMail;
 use App\Models\User;
@@ -205,10 +206,8 @@ final readonly class WebAuthnApiController
     /**
      * Update a passkey's alias.
      */
-    public function update(Request $request, string $credentialId): JsonResponse
+    public function update(UpdatePasskeyRequest $request, string $credentialId): JsonResponse
     {
-        $request->validate(['alias' => 'required|string|max:255']);
-
         /** @var User $user */
         $user = $request->user();
 

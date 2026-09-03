@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\EmailPreference\ApiUpdateEmailPreferenceRequest;
+use App\Http\Requests\EmailPreference\UpdateEmailPreferenceRequest;
 use App\Models\EmailPreference;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -89,18 +91,11 @@ class EmailPreferenceController
     /**
      * Update email preferences from the management page.
      */
-    public function update(Request $request, string $token): RedirectResponse
+    public function update(UpdateEmailPreferenceRequest $request, string $token): RedirectResponse
     {
         $preference = EmailPreference::where('unsubscribe_token', $token)->firstOrFail();
 
-        $validated = $request->validate([
-            'ad_updates' => 'boolean',
-            'search_alerts' => 'boolean',
-            'subscription_updates' => 'boolean',
-            'survey_notifications' => 'boolean',
-            'admin_notifications' => 'boolean',
-            'welcome_emails' => 'boolean',
-        ]);
+        $validated = $request->validated();
 
         $preference->update($validated);
 
@@ -123,19 +118,12 @@ class EmailPreferenceController
     /**
      * API endpoint: Update current user's email preferences.
      */
-    public function apiUpdate(Request $request): JsonResponse
+    public function apiUpdate(ApiUpdateEmailPreferenceRequest $request): JsonResponse
     {
         $user = $request->user();
         $preference = EmailPreference::getOrCreateForUser($user);
 
-        $validated = $request->validate([
-            'ad_updates' => 'sometimes|boolean',
-            'search_alerts' => 'sometimes|boolean',
-            'subscription_updates' => 'sometimes|boolean',
-            'survey_notifications' => 'sometimes|boolean',
-            'admin_notifications' => 'sometimes|boolean',
-            'welcome_emails' => 'sometimes|boolean',
-        ]);
+        $validated = $request->validated();
 
         $preference->update($validated);
 

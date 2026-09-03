@@ -37,11 +37,15 @@ final class NlpSearchLog extends Model
         'created_at',
     ];
 
-    protected $casts = [
-        'parsed' => 'array',
-        'latency_ms' => 'integer',
-        'created_at' => 'datetime',
-    ];
+    #[\Override]
+    protected function casts(): array
+    {
+        return [
+            'parsed' => 'array',
+            'latency_ms' => 'integer',
+            'created_at' => 'datetime',
+        ];
+    }
 
     public function user(): BelongsTo
     {
