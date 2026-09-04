@@ -27,8 +27,31 @@ Schedule::command('app:expire-overdue-leases')->dailyAt('03:45');
 Schedule::job(ExpireStaleReservationsJob::class)->everyThirtyMinutes();
 Schedule::job(CompleteStaleReservationsJob::class)->hourly();
 
-Schedule::command('backup:clean')->daily()->at('01:00');
-Schedule::command('backup:run')->daily()->at('02:00');
+// — Sauvegardes (spatie/laravel-backup → disque `backups`, Cloudflare R2) —
+// Ordre imposé : `backup:run` d'abord, `backup:clean` ensuite (la purge doit
+// compter le backup du jour), `backup:monitor` en dernier pour alerter si
+// l'ensemble a échoué. L'ancienne planification lançait `clean` à 01:00 AVANT
+// `run` à 02:00, et `monitor` n'était jamais planifié : une chaîne cassée
+// pouvait donc rester silencieuse indéfiniment.
+//
+// `appendOutputTo` est indispensable : sans lui le scheduler redirige vers
+// /dev/null et, avec LOG_CHANNEL=nightwatch, plus rien n'atterrit dans
+// storage/logs — c'est ce qui a masqué des mois de backups inexistants.
+Schedule::command('backup:run --only-db')
+    ->dailyAt('02:00')
+    ->appendOutputTo(storage_path('logs/backup.log'));
+// Hebdomadaire : `backup.backup.source.files.include` ne couvre que
+// `storage/app` (uploads du disque local), donc l'archive reste légère.
+Schedule::command('backup:run --only-files')
+    ->weeklyOn(0, '02:20')
+    ->appendOutputTo(storage_path('logs/backup.log'));
+Schedule::command('backup:clean')
+    ->dailyAt('03:00')
+    ->appendOutputTo(storage_path('logs/backup.log'));
+Schedule::command('backup:monitor')
+    ->dailyAt('04:00')
+    ->appendOutputTo(storage_path('logs/backup.log'));
+
 Schedule::command('model:prune')->daily()->at('04:00');
 // Cap Telescope's storage: even with recording disabled in prod, pruning keeps
 // `telescope_entries` from growing unbounded if the watcher is ever toggled on.

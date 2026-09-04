@@ -167,7 +167,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256m
+          # 256 Mo suffisaient aux tâches courantes mais tuaient `backup:run` :
+          # le conteneur a été observé OOMKilled sur la création du zip. La
+          # limite cgroup prime sur le memory_limit de PHP, donc le process
+          # mourait sans exception exploitable.
+          memory: 768m
           cpus: "0.50"
 
   worker-tours:
@@ -466,9 +470,15 @@ services:
         reservations:
           memory: 512m
 
-  # ── Postgres backups : gérés par spatie/laravel-backup (conteneur app) ────────
-  # Le scheduler Laravel exécute `backup:run` chaque nuit à 02h00 UTC.
-  # Les dumps sont uploadés sur Cloudflare R2 (disk 'backups' dans filesystems.php).
+  # ── Postgres backups : gérés par spatie/laravel-backup (conteneur scheduler) ──
+  # Planification dans routes/console.php (heures UTC) :
+  #   02:00 quotidien   `backup:run --only-db`      → dump Postgres zippé
+  #   02:20 dimanche    `backup:run --only-files`   → uploads de storage/app
+  #   03:00 quotidien   `backup:clean`              → purge > BACKUP_KEEP_DAYS (30)
+  #   04:00 quotidien   `backup:monitor`            → alerte si le dernier > 1 jour
+  # Sortie tracée dans storage/logs/backup.log (le scheduler écrit sinon dans
+  # /dev/null, et LOG_CHANNEL=nightwatch n'alimente pas storage/logs).
+  # Les archives sont uploadées sur Cloudflare R2 (disk 'backups').
   # Un email avec un lien signé R2 valide 48h est envoyé automatiquement.
   # Variables requises dans .env :
   #   BACKUP_DISKS=backups
@@ -477,7 +487,14 @@ services:
   #   BACKUP_R2_BUCKET=keyhome-db-backups
   #   BACKUP_R2_ENDPOINT=https://{R2_ACCOUNT_ID}.r2.cloudflarestorage.com
   #   BACKUP_NOTIFICATION_MAIL=admin@keyhome.app
-  # Pas de conteneurs dédiés — `backup:run` tourne dans le conteneur `app`.
+  #   BACKUP_ARCHIVE_PASSWORD=...   ← chiffre l'archive en AES-256 côté client.
+  #                                   À conserver dans le gestionnaire de secrets :
+  #                                   sans lui l'archive est illisible.
+  # Filet côté bucket (à poser une seule fois, purge server-side asynchrone) :
+  #   npx wrangler r2 bucket lifecycle add keyhome-db-backups --expire-days 45
+  #   → volontairement plus long que BACKUP_KEEP_DAYS pour ne jamais entrer en
+  #     concurrence avec `backup:clean`, qui lui préserve toujours le plus récent.
+  # Pas de conteneurs dédiés — les commandes tournent dans `scheduler`.
 
   # Cache (Redis) — enable AOF for persistence when used for cache/queue/session
   redis:

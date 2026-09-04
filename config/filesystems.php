@@ -106,7 +106,9 @@ return [
             'use_path_style_endpoint' => false,
             // ⚠️ R2 ne supporte pas les ACLs — obligatoire
             'retain_visibility' => false,
-            'throw' => false,
+            // `true` volontairement : une écriture de backup qui échoue doit
+            // remonter en exception, pas retourner `false` en silence.
+            'throw' => true,
         ],
 
         // ─── CLOUDFLARE R2 ────────────────────────────────────────────

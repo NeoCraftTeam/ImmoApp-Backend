@@ -11,14 +11,39 @@ use Spatie\Backup\Tasks\Cleanup\Strategies\DefaultStrategy;
 use Spatie\Backup\Tasks\Monitor\HealthChecks\MaximumAgeInDays;
 use Spatie\Backup\Tasks\Monitor\HealthChecks\MaximumStorageInMegabytes;
 
+/*
+ * `storage/app/public` n'est inclus dans l'archive que si les médias y vivent
+ * réellement. En production ils sont sur Cloudflare R2 (`MEDIA_DISK=r2`,
+ * `FILESYSTEM_DISK=r2`), donc déjà répliqués hors du VPS : les rezipper chaque
+ * semaine n'apporterait rien. En local le même dossier pèse plusieurs Go, ce
+ * qui rendait `backup:run --only-files` inutilisable.
+ *
+ * Les deux variables sont testées : `MEDIA_DISK` pilote spatie/medialibrary
+ * (photos d'annonces) et `APP_MEDIA_DISK` les avatars, logos et contrats. Si
+ * l'une des deux redevient locale, les médias repassent automatiquement dans
+ * l'archive — pas de perte silencieuse en cas de changement de configuration.
+ */
+$mediaDisksAreLocal = (bool) array_intersect(
+    [
+        env('MEDIA_DISK', env('FILESYSTEM_DISK', 'public')),
+        env('APP_MEDIA_DISK', env('FILESYSTEM_DISK', 'public')),
+    ],
+    ['public', 'local'],
+);
+
 return [
 
     /*
-     * Send backup zip by email when backup completes.
-     * Attachment skipped if file exceeds send_backup_max_size_mb (most providers limit ~25MB).
+     * Envoi d'un email récapitulatif après chaque sauvegarde réussie sur le
+     * disque `backups`, avec un lien R2 signé valide 48h (jamais de pièce
+     * jointe : les archives dépassent la limite des fournisseurs SMTP).
+     *
+     * Défaut à `true` car c'est le comportement effectif depuis l'origine ;
+     * le drapeau était documenté mais ignoré par le listener.
+     *
+     * @see \App\Listeners\SendBackupByEmailListener
      */
-    'send_backup_by_mail' => env('BACKUP_SEND_BY_MAIL', false),
-    'send_backup_max_size_mb' => (int) env('BACKUP_MAIL_MAX_SIZE_MB', 20),
+    'send_backup_by_mail' => (bool) env('BACKUP_SEND_BY_MAIL', true),
 
     'backup' => [
         /*
@@ -30,10 +55,19 @@ return [
         'source' => [
             'files' => [
                 /*
-                 * The list of directories and files that will be included in the backup.
+                 * On ne sauvegarde que l'état non reproductible : les uploads du
+                 * disque local (`storage/app`). Le code applicatif vit dans l'image
+                 * Docker, reconstructible depuis git, et les médias de production
+                 * sont déjà sur R2 (`FILESYSTEM_DISK=r2`) — inclure `base_path()`
+                 * produisait une archive de plusieurs centaines de Mo sans rien
+                 * protéger de plus.
+                 *
+                 * Conséquence voulue : `.env` reste HORS de l'archive. Les secrets
+                 * de production ne partent donc jamais en clair sur R2 ; ils sont
+                 * gérés côté déploiement (voir docker-compose.yml).
                  */
                 'include' => [
-                    base_path(),
+                    storage_path('app'),
                 ],
 
                 /*
@@ -41,13 +75,23 @@ return [
                  *
                  * Directories used by the backup process will automatically be excluded.
                  */
-                'exclude' => [
-                    base_path('vendor'),
-                    base_path('node_modules'),
-                    storage_path('framework'),
+                'exclude' => array_values(array_filter([
                     storage_path('app/tmp'),
                     storage_path('app/backup-temp'),
-                ],
+                    // Jeu d'images de seed (~233 Mo en local) : reproductible,
+                    // absent de la production, inutile dans une archive.
+                    storage_path('app/seeder-images'),
+                    // Extrait OpenStreetMap (~213 Mo) : re-téléchargeable depuis
+                    // Geofabrik, il doublait à lui seul la taille de l'archive.
+                    storage_path('app/private/osm'),
+                    // Dumps manuels : sauvegarder une sauvegarde n'apporte rien.
+                    storage_path('app/private/backups'),
+                    // Même logique que `.env` : les identifiants de service ne
+                    // partent pas sur le bucket, ils vivent dans le gestionnaire
+                    // de secrets.
+                    storage_path('app/firebase-credentials.json'),
+                    $mediaDisksAreLocal ? null : storage_path('app/public'),
+                ])),
 
                 /*
                  * Determines if symlinks should be followed.
@@ -60,11 +104,13 @@ return [
                 'ignore_unreadable_directories' => false,
 
                 /*
-                 * This path is used to make directories in resulting zip-file relative
-                 * Set to `null` to include complete absolute path
-                 * Example: base_path()
+                 * Les entrées du zip sont relatives à la racine du projet
+                 * (`storage/app/…` au lieu de `/var/www/storage/app/…`), ce qui
+                 * rend la restauration possible par un simple `unzip` dans le
+                 * dossier du projet, sans reconstruire l'arborescence absolue
+                 * de la machine d'origine.
                  */
-                'relative_path' => null,
+                'relative_path' => base_path(),
             ],
 
             /*
@@ -204,8 +250,12 @@ return [
         /*
          * After creating the zip, verify it can be opened and contains files.
          * Recommended for critical backups but adds a small overhead.
+         *
+         * Activé : sur une archive base-seule de ~1,5 Mo le surcoût est
+         * négligeable, et un zip tronqué ou vide échoue immédiatement au lieu
+         * d'être découvert le jour de la restauration.
          */
-        'verify_backup' => false,
+        'verify_backup' => (bool) env('BACKUP_VERIFY', true),
 
         /*
          * The number of attempts, in case the backup command encounters an exception
@@ -227,13 +277,25 @@ return [
      * the `Spatie\Backup\Notifications\Notifications` classes.
      */
     'notifications' => [
+        /*
+         * Seuls les ÉCHECS déclenchent un email Spatie. Les trois notifications
+         * « tout va bien » sont volontairement muettes : avec run + clean +
+         * monitor quotidiens elles produisaient quatre emails par jour, et un
+         * canal saturé de succès est un canal où l'échec passe inaperçu.
+         *
+         * Le signal de bonne santé quotidien reste assuré par
+         * `SendBackupByEmailListener`, plus utile puisqu'il prouve à la fois que
+         * l'archive existe et qu'elle est téléchargeable (lien R2 signé 48h).
+         *
+         * @see \App\Listeners\SendBackupByEmailListener
+         */
         'notifications' => [
             BackupHasFailedNotification::class => ['mail'],
             UnhealthyBackupWasFoundNotification::class => ['mail'],
             CleanupHasFailedNotification::class => ['mail'],
-            BackupWasSuccessfulNotification::class => ['mail'],
-            HealthyBackupWasFoundNotification::class => ['mail'],
-            CleanupWasSuccessfulNotification::class => ['mail'],
+            BackupWasSuccessfulNotification::class => [],
+            HealthyBackupWasFoundNotification::class => [],
+            CleanupWasSuccessfulNotification::class => [],
         ],
 
         /*
@@ -328,42 +390,30 @@ return [
 
         'default_strategy' => [
             /*
-             * The number of days for which backups must be kept.
+             * Rétention PLATE : on garde tous les backups des 30 derniers jours,
+             * puis plus rien. Les quatre paliers du « grandfather-father-son » de
+             * Spatie (daily/weekly/monthly/yearly) sont donc neutralisés à 0 —
+             * `DefaultStrategy::calculateDateRanges()` les enchaîne à partir de
+             * `keep_all_backups_for_days`, si bien que la fenêtre annuelle se
+             * termine elle aussi à J-30 et que `removeBackupsOlderThan()` purge
+             * tout ce qui la dépasse.
+             *
+             * Garde-fou intégré à Spatie : le backup le PLUS RÉCENT n'est jamais
+             * supprimé, même s'il dépasse la fenêtre. Si la planification
+             * s'arrête, il reste toujours une copie exploitable.
              */
-            'keep_all_backups_for_days' => 7,
-
-            /*
-             * After the "keep_all_backups_for_days" period is over, the most recent backup
-             * of that day will be kept. Older backups within the same day will be removed.
-             * If you create backups only once a day, no backups will be removed yet.
-             */
-            'keep_daily_backups_for_days' => 16,
-
-            /*
-             * After the "keep_daily_backups_for_days" period is over, the most recent backup
-             * of that week will be kept. Older backups within the same week will be removed.
-             * If you create backups only once a week, no backups will be removed yet.
-             */
-            'keep_weekly_backups_for_weeks' => 8,
-
-            /*
-             * After the "keep_weekly_backups_for_weeks" period is over, the most recent backup
-             * of that month will be kept. Older backups within the same month will be removed.
-             */
-            'keep_monthly_backups_for_months' => 4,
-
-            /*
-             * After the "keep_monthly_backups_for_months" period is over, the most recent backup
-             * of that year will be kept. Older backups within the same year will be removed.
-             */
-            'keep_yearly_backups_for_years' => 2,
+            'keep_all_backups_for_days' => (int) env('BACKUP_KEEP_DAYS', 30),
+            'keep_daily_backups_for_days' => 0,
+            'keep_weekly_backups_for_weeks' => 0,
+            'keep_monthly_backups_for_months' => 0,
+            'keep_yearly_backups_for_years' => 0,
 
             /*
              * After cleaning up the backups remove the oldest backup until
              * this amount of megabytes has been reached.
              * Set null for unlimited size.
              */
-            'delete_oldest_backups_when_using_more_megabytes_than' => 5000,
+            'delete_oldest_backups_when_using_more_megabytes_than' => (int) env('BACKUP_MAX_STORAGE_MB', 5000),
         ],
 
         /*

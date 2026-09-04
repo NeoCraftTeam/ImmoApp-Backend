@@ -22,6 +22,10 @@ class SendBackupByEmailListener
             return;
         }
 
+        if (!config('backup.send_backup_by_mail')) {
+            return;
+        }
+
         $to = config('backup.notifications.mail.to');
         if (empty($to)) {
             Log::warning('Backup email skipped: BACKUP_NOTIFICATION_MAIL not configured.');
@@ -61,7 +65,7 @@ class SendBackupByEmailListener
             $message->to($to)
                 ->subject($subject)
                 ->html(implode('', [
-                    '<p><strong>Sauvegarde base de données réussie.</strong></p>',
+                    '<p><strong>Sauvegarde réussie.</strong></p>',
                     '<ul>',
                     '<li><strong>Fichier :</strong> '.basename($path).'</li>',
                     '<li><strong>Taille :</strong> '.$sizeInMb.' MB</li>',
