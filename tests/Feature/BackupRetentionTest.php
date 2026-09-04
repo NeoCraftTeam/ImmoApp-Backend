@@ -7,6 +7,7 @@ use Carbon\Carbon;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Env;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Backup\Config\Config;
 use Spatie\Backup\Events\BackupWasSuccessful;
@@ -109,7 +110,7 @@ it('planifie run puis clean puis monitor, avec la sortie tracée', function (): 
     );
 
     $expected = [
-        'backup:run --only-db' => '0 2 * * *',
+        'backup:run --only-db' => '0 2,8,14,20 * * *',
         'backup:run --only-files' => '20 2 * * 0',
         'backup:clean' => '0 3 * * *',
         'backup:monitor' => '0 4 * * *',
@@ -220,4 +221,53 @@ it('notifie les échecs par email et laisse les succès muets', function (): voi
         ->and($notifications[BackupWasSuccessfulNotification::class])->toBe([])
         ->and($notifications[HealthyBackupWasFoundNotification::class])->toBe([])
         ->and($notifications[CleanupWasSuccessfulNotification::class])->toBe([]);
+});
+
+it("n'envoie qu'un seul email par jour malgré quatre sauvegardes", function (): void {
+    config([
+        'backup.send_backup_by_mail' => true,
+        'backup.notifications.mail.to' => 'admin@example.com',
+    ]);
+
+    $disk = Storage::disk('backups');
+    $disk->put('keyhome-test/2026-09-04-02-00-01.zip', 'fake-zip-content');
+
+    // Le disque falsifié est local : `temporaryUrl()` y lève une exception.
+    $signed = Mockery::mock($disk)->makePartial();
+    $signed->shouldReceive('temporaryUrl')->andReturn('https://example.test/signed');
+    Storage::set('backups', $signed);
+
+    Mail::shouldReceive('send')->once();
+
+    $event = new BackupWasSuccessful(diskName: 'backups', backupName: 'keyhome-test');
+
+    foreach ([2, 8, 14, 20] as $hour) {
+        Carbon::setTestNow(Carbon::parse('2026-09-04')->setTime($hour, 0));
+
+        (new SendBackupByEmailListener)->handle($event);
+    }
+});
+
+it("réarme l'email le lendemain", function (): void {
+    config([
+        'backup.send_backup_by_mail' => true,
+        'backup.notifications.mail.to' => 'admin@example.com',
+    ]);
+
+    $disk = Storage::disk('backups');
+    $disk->put('keyhome-test/2026-09-04-02-00-01.zip', 'fake-zip-content');
+
+    $signed = Mockery::mock($disk)->makePartial();
+    $signed->shouldReceive('temporaryUrl')->andReturn('https://example.test/signed');
+    Storage::set('backups', $signed);
+
+    Mail::shouldReceive('send')->twice();
+
+    $event = new BackupWasSuccessful(diskName: 'backups', backupName: 'keyhome-test');
+
+    Carbon::setTestNow(Carbon::parse('2026-09-04 20:00:00'));
+    (new SendBackupByEmailListener)->handle($event);
+
+    Carbon::setTestNow(Carbon::parse('2026-09-05 02:00:00'));
+    (new SendBackupByEmailListener)->handle($event);
 });

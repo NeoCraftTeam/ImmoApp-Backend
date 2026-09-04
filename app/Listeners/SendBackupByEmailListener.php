@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Listeners;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -14,7 +15,7 @@ class SendBackupByEmailListener
     /**
      * Fired after Spatie Backup stores the zip on a disk.
      * When the disk is 'backups' (Cloudflare R2), generates a 48-hour signed URL
-     * and emails it to BACKUP_NOTIFICATION_MAIL.
+     * and emails it to BACKUP_NOTIFICATION_MAIL — at most once per calendar day.
      */
     public function handle(BackupWasSuccessful $event): void
     {
@@ -60,6 +61,20 @@ class SendBackupByEmailListener
 
         $appName = config('app.name');
         $subject = "[{$appName}] Sauvegarde réussie — ".now()->format('d/m/Y H:i');
+
+        /*
+         * Un seul email par jour civil. Les dumps tournent toutes les 6 h : sans
+         * ce verrou l'email de bonne santé partirait quatre fois par jour, et un
+         * canal saturé de succès est un canal où l'échec passe inaperçu.
+         *
+         * Le créneau n'est réservé qu'ici, une fois le lien signé obtenu : si R2
+         * est indisponible à 02:00, l'exécution de 08:00 pourra encore prévenir.
+         * `Cache::add()` est atomique, donc deux exécutions concurrentes ne
+         * peuvent pas doubler l'envoi.
+         */
+        if (!Cache::add('backup-mail-sent:'.now()->toDateString(), true, now()->endOfDay())) {
+            return;
+        }
 
         Mail::send([], [], function ($message) use ($to, $subject, $signedUrl, $sizeInMb, $expiresAt, $path): void {
             $message->to($to)
