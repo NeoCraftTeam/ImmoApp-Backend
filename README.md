@@ -404,11 +404,52 @@ TRUSTED_PROXIES=172.18.0.0/16             # ⚠️  adapter au réseau Docker
 ### Backups
 
 ```env
-BACKUP_DISKS=local,backups
+BACKUP_DISKS=backups                 # `local,backups` pour doubler sur le VPS
 BACKUP_NOTIFICATION_MAIL=admin@example.com
-BACKUP_SEND_BY_MAIL=true
-BACKUP_MAIL_MAX_SIZE_MB=20
+BACKUP_SEND_BY_MAIL=true             # email + lien R2 signé 48h après chaque succès
+BACKUP_KEEP_DAYS=30                  # rétention plate ; au-delà `backup:clean` purge
+BACKUP_MAX_STORAGE_MB=5000           # plafond de stockage du bucket
+BACKUP_ARCHIVE_PASSWORD=             # ⚠️  chiffrement AES-256 de l'archive
+BACKUP_VERIFY=true                   # ouvre le zip après création
 ```
+
+Planification (`routes/console.php`, heures UTC) : `backup:run --only-db` à 02:00
+chaque jour, `backup:run --only-files` le dimanche à 02:20, `backup:clean` à 03:00,
+`backup:monitor` à 04:00. Les sorties sont tracées dans `storage/logs/backup.log`.
+
+L'archive de fichiers ne contient que `storage/app` : le code vient de l'image
+Docker et les médias de production vivent sur R2. `.env` est donc volontairement
+exclu — aucun secret ne part sur le bucket. Sont également exclus
+`firebase-credentials.json`, `seeder-images`, `private/osm` (extrait Geofabrik
+re-téléchargeable) et `private/backups`.
+
+Seuls les échecs déclenchent un email Spatie ; le signal quotidien de bonne
+santé est l'email de `SendBackupByEmailListener`, qui prouve à la fois que
+l'archive existe et qu'elle est téléchargeable.
+
+#### Restaurer une archive
+
+Les chemins du zip sont relatifs à la racine du projet (`storage/app/…`), donc
+une archive de fichiers se restaure en la dépliant dans `/var/www`.
+
+`BACKUP_ARCHIVE_PASSWORD` produit un chiffrement **AES-256 (WinZip)** que
+l'`unzip` d'Info-ZIP — celui de macOS — ne sait pas déchiffrer
+(`need PK compat. v5.1`). Utiliser `7z`, ou PHP, disponible dans le conteneur :
+
+```bash
+7z x 2026-09-04-02-00-01.zip -p"$BACKUP_ARCHIVE_PASSWORD" -o/var/www
+
+php -r '$z=new ZipArchive; $z->open($argv[1], ZipArchive::RDONLY);
+$z->setPassword(getenv("BACKUP_ARCHIVE_PASSWORD")); var_dump($z->extractTo($argv[2]));' \
+  2026-09-04-02-00-01.zip /var/www
+
+# puis, pour une archive de base :
+psql "$DATABASE_URL" -f /var/www/db-dumps/postgresql-keyhome.sql
+```
+
+Sans mot de passe valide l'extraction échoue : une archive chiffrée dont la
+passphrase est perdue est définitivement illisible. Conserver
+`BACKUP_ARCHIVE_PASSWORD` hors du VPS.
 
 ## Commandes Artisan utiles
 

@@ -67,6 +67,7 @@ scripts/.venv-smoke/
 
 # Claude Code local state (per-user, never tracked)
 .claude/
+CLAUDE.local.md
 .gstack/
 .codex/
 .agents/skills/tiktok-skills/

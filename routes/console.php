@@ -27,8 +27,36 @@ Schedule::command('app:expire-overdue-leases')->dailyAt('03:45');
 Schedule::job(ExpireStaleReservationsJob::class)->everyThirtyMinutes();
 Schedule::job(CompleteStaleReservationsJob::class)->hourly();
 
-Schedule::command('backup:clean')->daily()->at('01:00');
-Schedule::command('backup:run')->daily()->at('02:00');
+// — Sauvegardes (spatie/laravel-backup → disque `backups`, Cloudflare R2) —
+// Ordre imposé : `backup:run` d'abord, `backup:clean` ensuite (la purge doit
+// compter le backup du jour), `backup:monitor` en dernier pour alerter si
+// l'ensemble a échoué. L'ancienne planification lançait `clean` à 01:00 AVANT
+// `run` à 02:00, et `monitor` n'était jamais planifié : une chaîne cassée
+// pouvait donc rester silencieuse indéfiniment.
+//
+// `appendOutputTo` est indispensable : sans lui le scheduler redirige vers
+// /dev/null et, avec LOG_CHANNEL=nightwatch, plus rien n'atterrit dans
+// storage/logs — c'est ce qui a masqué des mois de backups inexistants.
+// Toutes les 6 h et non une fois par jour : un dump quotidien laisse perdre
+// jusqu'à 24 h de paiements, de messages et de réservations de visites. À
+// ~1,35 Mo par archive, 4 dumps quotidiens coûtent ~160 Mo sur la fenêtre de
+// 30 jours, très loin du plafond BACKUP_MAX_STORAGE_MB (5 Go).
+// 02:00 reste un créneau pour rester en amont de `backup:clean` (03:00).
+Schedule::command('backup:run --only-db')
+    ->cron('0 2,8,14,20 * * *')
+    ->appendOutputTo(storage_path('logs/backup.log'));
+// Hebdomadaire : `backup.backup.source.files.include` ne couvre que
+// `storage/app` (uploads du disque local), donc l'archive reste légère.
+Schedule::command('backup:run --only-files')
+    ->weeklyOn(0, '02:20')
+    ->appendOutputTo(storage_path('logs/backup.log'));
+Schedule::command('backup:clean')
+    ->dailyAt('03:00')
+    ->appendOutputTo(storage_path('logs/backup.log'));
+Schedule::command('backup:monitor')
+    ->dailyAt('04:00')
+    ->appendOutputTo(storage_path('logs/backup.log'));
+
 Schedule::command('model:prune')->daily()->at('04:00');
 // Cap Telescope's storage: even with recording disabled in prod, pruning keeps
 // `telescope_entries` from growing unbounded if the watcher is ever toggled on.
