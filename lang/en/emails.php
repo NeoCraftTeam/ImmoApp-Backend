@@ -16,6 +16,12 @@ return [
         'manage_preferences' => 'Manage my preferences',
     ],
 
+    // Shared partials (ad-card, ad-list, stat, divider)
+    'components' => [
+        'see_listing' => 'View listing',
+        'price_on_request' => 'Price on request',
+    ],
+
     // Welcome
     'welcome' => [
         'subject' => 'Welcome to :app',
@@ -243,11 +249,38 @@ return [
     ],
 
     'abandoned_search' => [
-        'subject' => 'Your searches are waiting — :app',
-        'heading' => 'Don\'t miss your next home',
-        'intro' => 'Hello :name, you recently searched for properties on <strong>:app</strong> but didn\'t finish your search.',
+        'subject' => 'Did you find the place you were looking for?',
+        'preheader' => 'Your search is right where you left it.',
+        'hero_eyebrow' => 'Your search',
+        'hero_heading' => 'So — did you find it?',
+        'hero_sub' => 'Two days ago you were looking for a home. We kept your place in the queue.',
+        'heading' => 'Hello :name, did you find your place?',
+        'intro' => 'You were browsing properties on <strong>:app</strong> a couple of days ago and haven\'t been back since. If you signed, congratulations — ignore this email. If not, your search is waiting, untouched.',
+        'seen_title' => 'The properties you looked at',
+        'seen_note' => 'Still available as we write this.',
+        'stat_label' => 'new listings published since your last visit',
+        'stat_label_one' => 'new listing published since your last visit',
         'matching' => ':count listings match your criteria.',
         'cta' => 'Resume my search',
-        'alert_tip' => 'Create an alert to be notified as soon as a matching property is listed.',
+        'alert_tip' => 'Create an alert to be notified as soon as a matching property is listed — even while you are logged out.',
+        'found_it' => 'Already found a place? Pause your alerts from your preferences and we will stop writing about it.',
+    ],
+
+    'owner_activity' => [
+        'subject' => 'Your listings were viewed :views times while you were away',
+        'subject_one' => 'Your listing was viewed while you were away',
+        'preheader' => 'Tenants are looking at your properties right now — here is what is waiting.',
+        'hero_eyebrow' => 'While you were away',
+        'hero_heading' => 'Your listings are getting attention',
+        'hero_sub' => 'Tenants have been viewing your properties since you last signed in.',
+        'heading' => 'Hello :name, something is happening on your listings',
+        'intro' => 'Since your last visit to <strong>:app</strong>, tenants have viewed your properties. Landlords who reply within 24 hours close far more often.',
+        'stat_label' => 'views on your listings since your last sign-in',
+        'stat_label_one' => 'view on your listings since your last sign-in',
+        'favorites' => ':count people saved one of your properties to their favourites.',
+        'messages_waiting' => 'You have :count tenant message(s) waiting for a reply.',
+        'top_title' => 'Your most viewed listings',
+        'cta' => 'Open my landlord space',
+        'tip' => 'One tip: publish your viewing slots. Listings with open slots receive noticeably more concrete requests.',
     ],
 ];

@@ -28,6 +28,7 @@ use App\Mail\NewAdReportMail;
 use App\Mail\NewAdSubmissionMail;
 use App\Mail\NewDeviceSignInMail;
 use App\Mail\NewLocationSignInMail;
+use App\Mail\OwnerActivityMail;
 use App\Mail\PasskeyChangedMail;
 use App\Mail\PasswordChangedMail;
 use App\Mail\PostViewingFeedbackMail;
@@ -54,6 +55,7 @@ use App\Models\SearchAlert;
 use App\Models\Subscription;
 use App\Models\Survey;
 use App\Models\User;
+use App\Support\MailTheme;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -427,6 +429,70 @@ it('renders AbandonedSearchMail without errors', function (): void {
     $rendered = $mail->render();
 
     expect($rendered)->toBeString();
+});
+
+it('prints the listings the customer looked at in AbandonedSearchMail', function (): void {
+    $user = User::factory()->create();
+    $ad = Ad::factory()->create(['title' => 'Duplex Bonamoussadi', 'status' => 'available']);
+
+    $rendered = new AbandonedSearchMail($user, 15, 'https://keyhome.cm/search', [$ad])->render();
+
+    expect($rendered)->toContain('Duplex Bonamoussadi')
+        ->and($rendered)->toContain('/ads/'.$ad->slug);
+});
+
+it('flattens a listing into strings the queued mail can print on its own', function (): void {
+    // The job renders long after the command ran, so the card carries plain
+    // strings rather than an Ad that may have moved on since.
+    $user = User::factory()->create();
+    $ad = Ad::factory()->create(['price' => 250000, 'status' => 'available']);
+
+    $mail = new AbandonedSearchMail($user, 1, 'https://keyhome.cm/search', [$ad]);
+    $card = $mail->adCards[0];
+
+    expect($card['price'])->toBe('250 000 FCFA')
+        ->and($card['location'])->toContain((string) $ad->quarter->name)
+        ->and($card['url'])->toContain('/ads/'.$ad->slug);
+});
+
+it('offers to talk about the price when a listing names none', function (): void {
+    // An empty price line reads like a broken template, so the copy says something.
+    $user = User::factory()->create();
+    $ad = Ad::factory()->create(['price' => null, 'status' => 'available']);
+
+    $mail = new AbandonedSearchMail($user, 1, 'https://keyhome.cm/search', [$ad]);
+
+    expect($mail->adCards[0]['price'])->toBe(__('emails.components.price_on_request'));
+});
+
+it('dresses AbandonedSearchMail in the client palette', function (): void {
+    $user = User::factory()->create();
+
+    $rendered = new AbandonedSearchMail($user, 3, 'https://keyhome.cm/search')->render();
+
+    expect($rendered)->toContain(MailTheme::client()['accent'])
+        ->and($rendered)->not->toContain(MailTheme::owner()['accent']);
+});
+
+it('renders OwnerActivityMail without errors', function (): void {
+    $owner = User::factory()->agents()->create();
+    $ad = Ad::factory()->for($owner)->create(['title' => 'Villa Bonapriso']);
+
+    $rendered = new OwnerActivityMail($owner, 42, 5, 2, [$ad])->render();
+
+    expect($rendered)->toContain('42')
+        ->and($rendered)->toContain('Villa Bonapriso');
+});
+
+it('dresses OwnerActivityMail in the landlord palette and never the client one', function (): void {
+    // The audience split is the whole reason MailTheme exists: a landlord must
+    // never open a coral mail, nor a client a teal one.
+    $owner = User::factory()->agents()->create();
+
+    $rendered = new OwnerActivityMail($owner, 42)->render();
+
+    expect($rendered)->toContain(MailTheme::owner()['accent'])
+        ->and($rendered)->not->toContain(MailTheme::client()['accent']);
 });
 
 it('renders AppointmentReminderMail without errors', function (): void {

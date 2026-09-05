@@ -16,6 +16,12 @@ return [
         'manage_preferences' => 'Gérer mes préférences',
     ],
 
+    // Shared partials (ad-card, ad-list, stat, divider)
+    'components' => [
+        'see_listing' => 'Voir l\'annonce',
+        'price_on_request' => 'Prix sur demande',
+    ],
+
     // Welcome (client)
     'welcome' => [
         'subject' => 'Votre compte :app est activé — explorez dès maintenant',
@@ -254,13 +260,41 @@ return [
         'browse_cta' => 'Voir les annonces',
     ],
 
-    // Abandoned Search
+    // Abandoned Search — client warm-lead win-back, 48h after an interaction
     'abandoned_search' => [
-        'subject' => 'Vos critères de recherche sont toujours actifs — :app',
-        'heading' => 'Votre recherche vous attend',
-        'intro' => 'Bonjour :name, vous avez consulté des biens sur <strong>:app</strong> sans finaliser votre recherche. <strong>:count annonces</strong> correspondent encore à vos critères.',
+        'subject' => 'Avez-vous trouvé le bien que vous cherchiez ?',
+        'preheader' => 'Votre recherche est restée exactement où vous l\'avez laissée.',
+        'hero_eyebrow' => 'Votre recherche',
+        'hero_heading' => 'Alors, vous avez trouvé ?',
+        'hero_sub' => 'Il y a deux jours vous cherchiez un bien. Nous avons gardé vos repères.',
+        'heading' => 'Bonjour :name, avez-vous trouvé votre bien ?',
+        'intro' => 'Vous avez consulté des biens sur <strong>:app</strong> il y a quelques jours sans revenir depuis. Si vous avez signé, félicitations — vous pouvez ignorer cet email. Sinon, votre recherche vous attend, intacte.',
+        'seen_title' => 'Les biens que vous avez regardés',
+        'seen_note' => 'Encore disponibles à l\'heure où nous vous écrivons.',
+        'stat_label' => 'nouvelles annonces publiées depuis votre passage',
+        'stat_label_one' => 'nouvelle annonce publiée depuis votre passage',
         'matching' => ':count annonces disponibles pour vos critères actuels.',
         'cta' => 'Reprendre ma recherche',
         'alert_tip' => 'Activez une alerte pour être notifié dès qu\'un nouveau bien correspondant est publié — même lorsque vous n\'êtes pas connecté.',
+        'found_it' => 'Vous avez déjà trouvé ? Mettez vos alertes en pause depuis vos préférences : nous cesserons de vous écrire à ce sujet.',
+    ],
+
+    // Owner Activity — landlord counterpart, 48h after activity on their listings
+    'owner_activity' => [
+        'subject' => 'Vos annonces ont été consultées :views fois pendant votre absence',
+        'subject_one' => 'Votre annonce a été consultée pendant votre absence',
+        'preheader' => 'Des locataires regardent vos biens en ce moment — voici ce qui vous attend.',
+        'hero_eyebrow' => 'Pendant votre absence',
+        'hero_heading' => 'Ça bouge sur vos annonces',
+        'hero_sub' => 'Des locataires ont regardé vos biens depuis votre dernière connexion.',
+        'heading' => 'Bonjour :name, il se passe quelque chose sur vos annonces',
+        'intro' => 'Depuis votre dernière visite sur <strong>:app</strong>, des locataires ont consulté vos biens. Les bailleurs qui répondent dans les 24 heures concluent nettement plus souvent.',
+        'stat_label' => 'vues sur vos annonces depuis votre dernière connexion',
+        'stat_label_one' => 'vue sur vos annonces depuis votre dernière connexion',
+        'favorites' => ':count personne(s) ont ajouté un de vos biens à leurs favoris.',
+        'messages_waiting' => 'Vous avez :count message(s) de locataires en attente de réponse.',
+        'top_title' => 'Vos annonces les plus regardées',
+        'cta' => 'Ouvrir mon espace bailleur',
+        'tip' => 'Un conseil : ajoutez vos créneaux de visite disponibles. Les annonces avec des créneaux ouverts reçoivent davantage de demandes concrètes.',
     ],
 ];
