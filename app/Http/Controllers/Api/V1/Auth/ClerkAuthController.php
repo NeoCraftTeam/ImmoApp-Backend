@@ -12,6 +12,8 @@ use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\Auth\ClerkJwtService;
 use App\Services\Auth\LoginService;
+use App\Services\Auth\MfaChallengeService;
+use App\Services\Auth\MfaService;
 use App\Services\Auth\TokenService;
 use App\Services\User\UserWelcomeService;
 use App\Services\UtmAttributionService;
@@ -31,6 +33,8 @@ final readonly class ClerkAuthController
     public function __construct(
         private TokenService $tokenService,
         private LoginService $loginService,
+        private MfaService $mfa,
+        private MfaChallengeService $challenges,
     ) {}
 
     /**
@@ -95,6 +99,10 @@ final readonly class ClerkAuthController
             // empty/placeholder (see User::syncOAuthProfile()).
             $user->syncOAuthProfile($firstName, $lastName, $avatar);
 
+            if (($challenge = $this->mfaChallengeResponse($user, $request, $request->input('login_context'))) !== null) {
+                return $challenge;
+            }
+
             try {
                 $token = $this->rotateClerkToken($user, $request->input('login_context'));
             } catch (RoleContextMismatchException $e) {
@@ -158,6 +166,12 @@ final readonly class ClerkAuthController
         Cache::forget('clerk_otp_'.$clerkId);
         Cache::forget('clerk_verified_'.$clerkId);
         Cache::forget('clerk_otp_sent_'.$clerkId);
+
+        // A freshly created account has no second factor yet; the gate stays so
+        // that a future change to this branch cannot silently skip MFA.
+        if (($challenge = $this->mfaChallengeResponse($user, $request, $request->input('login_context'))) !== null) {
+            return $challenge;
+        }
 
         try {
             $token = $this->rotateClerkToken($user, $request->input('login_context'));
@@ -263,6 +277,10 @@ final readonly class ClerkAuthController
 
             Cache::forget('clerk_verified_'.$clerkId);
             Cache::forget('clerk_pending_'.$clerkId);
+
+            if (($challenge = $this->mfaChallengeResponse($user, $request, $request->input('login_context'))) !== null) {
+                return $challenge;
+            }
 
             try {
                 $token = $this->rotateClerkToken($user, $request->input('login_context'));
@@ -417,6 +435,10 @@ final readonly class ClerkAuthController
         Cache::forget('clerk_verified_'.$clerkId);
         Cache::forget('clerk_pending_'.$clerkId);
 
+        if (($challenge = $this->mfaChallengeResponse($user, $request, $request->input('login_context'))) !== null) {
+            return $challenge;
+        }
+
         try {
             $token = $this->rotateClerkToken($user, $request->input('login_context'));
         } catch (RoleContextMismatchException $e) {
@@ -450,6 +472,29 @@ final readonly class ClerkAuthController
         $prefix = $user->sanctumSessionPrefix();
 
         return $this->tokenService->rotateForUser($user, 'clerk', "{$prefix}_clerk_%", $prefix);
+    }
+
+    /**
+     * 403 + `mfa_token` when the account has a second factor, null otherwise.
+     *
+     * Guards every Clerk token-issuing branch: production web auth is
+     * Clerk-first, so Google/Facebook/GitHub on the web arrive here rather than
+     * through SocialAuthController. Returned rather than thrown — a challenge
+     * must not be mistaken for a Clerk verification failure.
+     */
+    private function mfaChallengeResponse(User $user, Request $request, mixed $loginContext): ?JsonResponse
+    {
+        if (!$this->mfa->isEnabled($user)) {
+            return null;
+        }
+
+        return $this->challenges->response($this->challenges->issue(
+            user: $user,
+            source: MfaChallengeService::SOURCE_CLERK,
+            loginContext: is_string($loginContext) ? $loginContext : null,
+            stateful: $request->hasSession(),
+            ip: $request->ip(),
+        ));
     }
 
     /**

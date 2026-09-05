@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\V1\Auth\ApiMfaController;
 use App\Http\Controllers\Api\V1\Auth\AuthController;
 use App\Http\Controllers\Api\V1\Auth\ClerkAuthController;
+use App\Http\Controllers\Api\V1\Auth\MfaChallengeController;
 use App\Http\Controllers\Api\V1\Auth\PasswordController;
 use App\Http\Controllers\Api\V1\Auth\RegistrationController;
 use App\Http\Controllers\Api\V1\Auth\SocialAuthController;
@@ -95,6 +96,13 @@ Route::prefix('auth')->group(function (): void {
         Route::get('exchange-token', 'exchangeToken')
             ->middleware('throttle:20,1');
     });
+
+    // Second step of a two-factor login. PUBLIC on purpose: the caller has no
+    // Sanctum token yet — the single-use `mfa_token` handed out by the 403
+    // `MFA_CHALLENGE_REQUIRED` response is the credential. Guessing codes also
+    // spends the login throttle budget of the attempt that minted the token.
+    Route::post('mfa/challenge', MfaChallengeController::class)
+        ->middleware('throttle:10,1');
 
     // MFA for admin API access (verification only).
     // Setup endpoints (TOTP / Email enrol) sit under /mfa/setup and are

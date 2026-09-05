@@ -10,12 +10,12 @@ use App\Http\Requests\Api\V1\Auth\DisableTotpRequest;
 use App\Http\Requests\Api\V1\Auth\RegenerateRecoveryCodesRequest;
 use App\Mail\VerificationCodeMail;
 use App\Models\User;
+use App\Services\Auth\MfaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
-use PragmaRX\Google2FAQRCode\Google2FA;
 
 /**
  * MFA setup / enrolment for any authenticated user.
@@ -25,7 +25,7 @@ use PragmaRX\Google2FAQRCode\Google2FA;
  * TOTP or email-based step-up MFA from the PWA.
  *
  * Endpoints (all under `/api/v1/auth/mfa/setup/*`, `auth:sanctum`):
- *  - POST /totp/start    → returns ephemeral secret + otpauth URL
+ *  - POST /totp/start    → returns ephemeral secret + otpauth URL + QR image
  *  - POST /totp/confirm  → user supplies first valid code; secret + recovery codes persisted
  *  - POST /totp/disable  → wipes TOTP + recovery codes (requires current code)
  *  - POST /email/enable  → enables email MFA (sends test code first)
@@ -33,19 +33,20 @@ use PragmaRX\Google2FAQRCode\Google2FA;
  *  - POST /email/disable → flag flipped off (requires current code)
  *
  * Security notes:
- *  - The pending TOTP secret is cached server-side under a per-token key
+ *  - The pending TOTP secret is cached server-side under a per-user key
  *    (10 min TTL) so a leaked secret never reaches persistent storage
  *    before the user proves possession by entering a valid TOTP.
- *  - Recovery codes are returned **once** (plaintext) at confirm-time. They
- *    are stored via `User::saveAppAuthenticationRecoveryCodes()`, which
- *    inherits the `encrypted:array` cast from the User model.
+ *  - Recovery codes are returned **once** (plaintext) at confirm-time and
+ *    persisted bcrypt-hashed by {@see MfaService::saveRecoveryCodes()} — the
+ *    same shape the Filament panel writes, so a user can enrol here and
+ *    verify there (and vice-versa) with the very same codes.
  *  - Per-user rate limiter on every endpoint (10/min) to thwart brute-force.
  */
-final class UserMfaSetupController
+final readonly class UserMfaSetupController
 {
     private const int PENDING_TOTP_TTL_MIN = 10;
 
-    private const int RECOVERY_CODES_COUNT = 8;
+    public function __construct(private MfaService $mfa) {}
 
     /**
      * Step 1 — generate a TOTP secret + QR otpauth URL.
@@ -53,17 +54,18 @@ final class UserMfaSetupController
      * Returns:
      *  - secret (base32)        : show as text/copy-fallback
      *  - otpauth_url            : `otpauth://totp/...` for QR rendering
+     *  - qr_code                : ready-to-display `image/svg+xml` data URI
      *  - holder (account label) : email used inside the authenticator app
      *  - company                : app name shown in the authenticator
      *
      * The secret is **not** persisted yet. It lives in the cache under the
-     * current token's ID for 10 minutes.
+     * current user's ID for 10 minutes.
      */
     public function startTotp(Request $request): JsonResponse
     {
         $user = $request->user();
 
-        if ($user === null) {
+        if (!$user instanceof User) {
             return response()->json(['message' => 'Non authentifié.'], 401);
         }
 
@@ -75,15 +77,14 @@ final class UserMfaSetupController
 
         RateLimiter::hit($rateKey, 60);
 
-        if ($user->getAppAuthenticationSecret() !== null) {
+        if ($this->mfa->hasTotp($user)) {
             return response()->json([
                 'message' => 'TOTP déjà activé. Désactivez-le avant de générer un nouveau secret.',
                 'code' => 'MFA_TOTP_ALREADY_ENABLED',
             ], 422);
         }
 
-        $google2fa = app(Google2FA::class);
-        $secret = $google2fa->generateSecretKey(32);
+        $secret = $this->mfa->generateSecret();
 
         Cache::put(
             $this->pendingTotpKey($user->id),
@@ -91,12 +92,16 @@ final class UserMfaSetupController
             now()->addMinutes(self::PENDING_TOTP_TTL_MIN),
         );
 
-        $company = (string) config('app.name', 'KeyHome');
+        $company = $this->mfa->brandName();
         $holder = $user->getAppAuthenticationHolderName();
+        $otpauthUrl = $this->mfa->otpauthUrl($secret, $holder, $company);
 
         return response()->json([
             'secret' => $secret,
-            'otpauth_url' => $google2fa->getQRCodeUrl($company, $holder, $secret),
+            'otpauth_url' => $otpauthUrl,
+            // Rendered server-side so no client has to ship a QR library; null
+            // if rendering failed, in which case the URL/secret still work.
+            'qr_code' => $this->mfa->qrCodeDataUri($otpauthUrl),
             'holder' => $holder,
             'company' => $company,
             'expires_in_minutes' => self::PENDING_TOTP_TTL_MIN,
@@ -113,7 +118,7 @@ final class UserMfaSetupController
     {
         $user = $request->user();
 
-        if ($user === null) {
+        if (!$user instanceof User) {
             return response()->json(['message' => 'Non authentifié.'], 401);
         }
 
@@ -136,13 +141,13 @@ final class UserMfaSetupController
             ], 422);
         }
 
-        $google2fa = app(Google2FA::class);
-
-        try {
-            $valid = $google2fa->verifyKey($pendingSecret, $validated['code'], 1);
-        } catch (\Throwable) {
-            $valid = false;
-        }
+        // `preventReuse: false` on purpose: burning this timestep would make the
+        // code still on screen fail at the very next login, seconds later.
+        $valid = $this->mfa->verifyTotpAgainstSecret(
+            $pendingSecret,
+            (string) $validated['code'],
+            preventReuse: false,
+        );
 
         if (!$valid) {
             RateLimiter::hit($rateKey, 300);
@@ -153,10 +158,10 @@ final class UserMfaSetupController
             ], 422);
         }
 
-        $recoveryCodes = $this->generateRecoveryCodes();
+        $recoveryCodes = $this->mfa->generateRecoveryCodes();
 
         $user->saveAppAuthenticationSecret($pendingSecret);
-        $user->saveAppAuthenticationRecoveryCodes($recoveryCodes);
+        $this->mfa->saveRecoveryCodes($user, $recoveryCodes);
 
         Cache::forget($this->pendingTotpKey($user->id));
         RateLimiter::clear($rateKey);
@@ -164,8 +169,9 @@ final class UserMfaSetupController
         return response()->json([
             'message' => 'TOTP activé avec succès. Conservez vos codes de récupération en lieu sûr.',
             'mfa_method' => 'totp',
-            // Plaintext recovery codes are returned **once** — they will not
-            // appear again. Frontends should prompt the user to download/print.
+            // Plaintext recovery codes are returned **once** — only their bcrypt
+            // hashes are stored. Frontends should prompt the user to
+            // download/print them before leaving the screen.
             'recovery_codes' => $recoveryCodes,
         ]);
     }
@@ -178,7 +184,7 @@ final class UserMfaSetupController
     {
         $user = $request->user();
 
-        if ($user === null) {
+        if (!$user instanceof User) {
             return response()->json(['message' => 'Non authentifié.'], 401);
         }
 
@@ -188,9 +194,7 @@ final class UserMfaSetupController
             return $this->rateLimited($rateKey);
         }
 
-        $secret = $user->getAppAuthenticationSecret();
-
-        if ($secret === null) {
+        if (!$this->mfa->hasTotp($user)) {
             return response()->json([
                 'message' => 'TOTP n\'est pas activé sur ce compte.',
                 'code' => 'MFA_TOTP_NOT_ENABLED',
@@ -199,7 +203,7 @@ final class UserMfaSetupController
 
         $validated = $request->validated();
 
-        if (!$this->verifyTotpOrRecoveryCode($user, $secret, $validated['code'])) {
+        if ($this->mfa->verifyTotpOrRecoveryCode($user, (string) $validated['code']) === null) {
             RateLimiter::hit($rateKey, 300);
 
             return response()->json([
@@ -209,7 +213,7 @@ final class UserMfaSetupController
         }
 
         $user->saveAppAuthenticationSecret(null);
-        $user->saveAppAuthenticationRecoveryCodes(null);
+        $this->mfa->saveRecoveryCodes($user, null);
         RateLimiter::clear($rateKey);
 
         return response()->json([
@@ -231,7 +235,7 @@ final class UserMfaSetupController
     {
         $user = $request->user();
 
-        if ($user === null) {
+        if (!$user instanceof User) {
             return response()->json(['message' => 'Non authentifié.'], 401);
         }
 
@@ -241,9 +245,7 @@ final class UserMfaSetupController
             return $this->rateLimited($rateKey);
         }
 
-        $secret = $user->getAppAuthenticationSecret();
-
-        if ($secret === null) {
+        if (!$this->mfa->hasTotp($user)) {
             return response()->json([
                 'message' => 'TOTP n\'est pas activé sur ce compte.',
                 'code' => 'MFA_TOTP_NOT_ENABLED',
@@ -252,7 +254,7 @@ final class UserMfaSetupController
 
         $validated = $request->validated();
 
-        if (!$this->verifyTotpOrRecoveryCode($user, $secret, $validated['code'])) {
+        if ($this->mfa->verifyTotpOrRecoveryCode($user, (string) $validated['code']) === null) {
             RateLimiter::hit($rateKey, 300);
 
             return response()->json([
@@ -261,8 +263,8 @@ final class UserMfaSetupController
             ], 422);
         }
 
-        $recoveryCodes = $this->generateRecoveryCodes();
-        $user->saveAppAuthenticationRecoveryCodes($recoveryCodes);
+        $recoveryCodes = $this->mfa->generateRecoveryCodes();
+        $this->mfa->saveRecoveryCodes($user, $recoveryCodes);
         RateLimiter::clear($rateKey);
 
         return response()->json([
@@ -281,7 +283,7 @@ final class UserMfaSetupController
     {
         $user = $request->user();
 
-        if ($user === null) {
+        if (!$user instanceof User) {
             return response()->json(['message' => 'Non authentifié.'], 401);
         }
 
@@ -328,7 +330,7 @@ final class UserMfaSetupController
     {
         $user = $request->user();
 
-        if ($user === null) {
+        if (!$user instanceof User) {
             return response()->json(['message' => 'Non authentifié.'], 401);
         }
 
@@ -371,7 +373,7 @@ final class UserMfaSetupController
     {
         $user = $request->user();
 
-        if ($user === null) {
+        if (!$user instanceof User) {
             return response()->json(['message' => 'Non authentifié.'], 401);
         }
 
@@ -429,55 +431,6 @@ final class UserMfaSetupController
             'mfa_method' => 'email',
             'disabled' => true,
         ]);
-    }
-
-    /**
-     * Try TOTP first, then fall back to single-use recovery codes.
-     * Consumed recovery codes are removed from the stored list.
-     */
-    private function verifyTotpOrRecoveryCode(User $user, string $secret, string $code): bool
-    {
-        $google2fa = app(Google2FA::class);
-
-        try {
-            if ($google2fa->verifyKey($secret, $code, 1)) {
-                return true;
-            }
-        } catch (\Throwable) {
-            // fall through to recovery codes
-        }
-
-        $codes = $user->getAppAuthenticationRecoveryCodes() ?? [];
-
-        foreach ($codes as $idx => $recoveryCode) {
-            if (hash_equals((string) $recoveryCode, $code)) {
-                unset($codes[$idx]);
-                $user->saveAppAuthenticationRecoveryCodes(array_values($codes));
-
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function generateRecoveryCodes(): array
-    {
-        $codes = [];
-
-        for ($i = 0; $i < self::RECOVERY_CODES_COUNT; $i++) {
-            // 4-4 group like Google's recovery codes — easy to copy/paste.
-            $codes[] = strtoupper(
-                substr(bin2hex(random_bytes(2)), 0, 4)
-                .'-'
-                .substr(bin2hex(random_bytes(2)), 0, 4)
-            );
-        }
-
-        return $codes;
     }
 
     private function pendingTotpKey(string $userId): string

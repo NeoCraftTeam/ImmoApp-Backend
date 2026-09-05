@@ -147,4 +147,35 @@ return [
 
     'mfa_api_session_lifetime' => env('MFA_API_SESSION_LIFETIME', 480),
 
+    /*
+    |--------------------------------------------------------------------------
+    | TOTP Acceptance Window
+    |--------------------------------------------------------------------------
+    |
+    | Accepted clock drift, expressed in 30-second timesteps either side of the
+    | current one. 8 = ±4 minutes, the value the Filament panel uses, so a code
+    | accepted in the admin panel is accepted by the API and vice-versa. Replay
+    | is prevented independently (the last accepted timestep is cached), so a
+    | wide window does not mean a code can be reused.
+    |
+    */
+
+    'mfa_totp_window' => env('MFA_TOTP_WINDOW', 8),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Login MFA Challenge
+    |--------------------------------------------------------------------------
+    |
+    | When a user with 2FA enabled passes the first factor, login stops and
+    | returns a short-lived, single-use challenge token instead of an access
+    | token. `ttl` is in minutes; after `max_attempts` wrong codes the challenge
+    | is destroyed and the user must start the login over.
+    |
+    */
+
+    'mfa_challenge_ttl' => env('MFA_CHALLENGE_TTL', 10),
+
+    'mfa_challenge_max_attempts' => env('MFA_CHALLENGE_MAX_ATTEMPTS', 5),
+
 ];

@@ -9,6 +9,8 @@ use App\Http\Requests\Api\V1\Auth\ExchangeOAuthTokenRequest;
 use App\Http\Requests\Api\V1\Auth\LinkSocialAccountRequest;
 use App\Http\Requests\Api\V1\SocialAuthRequest;
 use App\Models\User;
+use App\Services\Auth\MfaChallengeService;
+use App\Services\Auth\MfaService;
 use App\Services\Auth\SocialAuthService;
 use App\Services\Auth\TokenService;
 use App\Services\UtmAttributionService;
@@ -35,6 +37,8 @@ final readonly class SocialAuthController
     public function __construct(
         private TokenService $tokenService,
         private SocialAuthService $socialAuth,
+        private MfaService $mfa,
+        private MfaChallengeService $challenges,
     ) {}
 
     /**
@@ -136,6 +140,21 @@ final readonly class SocialAuthController
                     'requires_link_confirmation' => true,
                     'linking_token' => $result->linkingToken,
                 ], 200);
+            }
+
+            // Second factor owed: the OAuth identity is proven, but no token and
+            // no `last_login_*` stamp until POST /auth/mfa/challenge succeeds.
+            // Returned, never thrown — the catch (Exception) below would turn a
+            // thrown challenge into a generic 401.
+            if ($this->mfa->isEnabled($user)) {
+                return $this->challenges->response($this->challenges->issue(
+                    user: $user,
+                    source: MfaChallengeService::SOURCE_OAUTH,
+                    provider: $provider,
+                    isNewUser: $isNewUser,
+                    stateful: $request->hasSession(),
+                    ip: $request->ip(),
+                ));
             }
 
             // Update last login info
@@ -392,6 +411,29 @@ final readonly class SocialAuthController
             $result = $this->socialAuth->findOrCreateUser($socialUser, $provider, $request, [], $requestedRole);
             $user = $result->user;
 
+            // Second factor owed: park a challenge behind the exchange code
+            // instead of a token. The SPA redeems it at /oauth/exchange-token,
+            // which answers 403 + `mfa_token` rather than 200 + `token`, so the
+            // raw challenge never travels in the redirect URL either.
+            if ($this->mfa->isEnabled($user)) {
+                $challenge = $this->challenges->issue(
+                    user: $user,
+                    source: MfaChallengeService::SOURCE_OAUTH,
+                    provider: $provider,
+                    isNewUser: $result->isNew,
+                    ip: $request->ip(),
+                );
+
+                $exchangeCode = Str::random(64);
+                Cache::put('oauth_token_exchange_'.$exchangeCode, [
+                    'mfa_challenge' => $challenge->token,
+                ], now()->addMinutes(2));
+
+                return redirect($redirectUri.'?'.http_build_query([
+                    'exchange_code' => $exchangeCode,
+                ]));
+            }
+
             $user->forceFill([
                 'last_login_at' => now(),
                 'last_login_ip' => $request->ip(),
@@ -442,6 +484,20 @@ final readonly class SocialAuthController
                 'message' => 'Code d\'échange invalide ou expiré.',
                 'code' => 'EXCHANGE_CODE_INVALID',
             ], 422);
+        }
+
+        // The callback parked a pending second factor rather than a token.
+        if (isset($data['mfa_challenge'])) {
+            $challenge = $this->challenges->retrieve((string) $data['mfa_challenge']);
+
+            if ($challenge === null) {
+                return response()->json([
+                    'message' => 'Session de vérification expirée. Reconnectez-vous.',
+                    'code' => MfaChallengeService::CODE_INVALID,
+                ], 422);
+            }
+
+            return $this->challenges->response($challenge);
         }
 
         return response()->json([
@@ -602,6 +658,17 @@ final readonly class SocialAuthController
             'pending_oauth_token' => null,
             'pending_oauth_expires_at' => null,
         ]);
+
+        // The provider is now linked either way; only the session waits. Returned
+        // rather than thrown for the same reason as authenticate().
+        if ($this->mfa->isEnabled($user)) {
+            return $this->challenges->response($this->challenges->issue(
+                user: $user,
+                source: MfaChallengeService::SOURCE_OAUTH_LINK,
+                stateful: $request->hasSession(),
+                ip: $request->ip(),
+            ));
+        }
 
         $token = $this->tokenService->createForUser($user, 'oauth_link')->plainTextToken;
 

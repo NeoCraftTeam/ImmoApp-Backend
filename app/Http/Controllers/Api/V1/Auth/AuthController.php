@@ -7,10 +7,12 @@ namespace App\Http\Controllers\Api\V1\Auth;
 use App\Enums\SuccessCode;
 use App\Exceptions\AccountInactiveException;
 use App\Exceptions\EmailNotVerifiedException;
+use App\Exceptions\MfaChallengeRequiredException;
 use App\Exceptions\RoleContextMismatchException;
 use App\Http\Requests\LoginRequest;
 use App\Http\Resources\UserResource;
 use App\Services\Auth\LoginService;
+use App\Services\Auth\MfaChallengeService;
 use App\Services\Auth\TokenService;
 use App\Support\ApiResponse;
 use App\Support\AuthError;
@@ -36,6 +38,7 @@ final readonly class AuthController
     public function __construct(
         private TokenService $tokenService,
         private LoginService $loginService,
+        private MfaChallengeService $challenges,
     ) {}
 
     /**
@@ -47,7 +50,7 @@ final readonly class AuthController
      *
      *     @OA\Response(response=200, description="Connexion réussie"),
      *     @OA\Response(response=401, description="Identifiants invalides"),
-     *     @OA\Response(response=403, description="Compte désactivé"),
+     *     @OA\Response(response=403, description="Compte désactivé, email non vérifié, ou second facteur requis (`mfa_required`, `mfa_token`)"),
      *     @OA\Response(response=429, description="Trop de tentatives")
      * )
      */
@@ -71,6 +74,11 @@ final readonly class AuthController
 
         } catch (AuthenticationException) {
             return AuthError::loginFailure();
+
+        } catch (MfaChallengeRequiredException $e) {
+            // First factor OK, second factor owed: no token, no session, no
+            // login journal until POST /auth/mfa/challenge succeeds.
+            return $this->challenges->response($e->challenge);
 
         } catch (EmailNotVerifiedException $e) {
             return response()->json([

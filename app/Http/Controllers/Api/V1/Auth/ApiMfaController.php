@@ -7,12 +7,13 @@ namespace App\Http\Controllers\Api\V1\Auth;
 use App\Http\Requests\Api\V1\Auth\VerifyMfaRequest;
 use App\Mail\VerificationCodeMail;
 use App\Models\PersonalAccessToken;
+use App\Models\User;
+use App\Services\Auth\MfaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
-use PragmaRX\Google2FAQRCode\Google2FA;
 
 /**
  * API Multi-Factor Authentication controller.
@@ -23,23 +24,30 @@ use PragmaRX\Google2FAQRCode\Google2FA;
  * `step.up.mfa` middleware on sensitive routes (password change, account
  * deletion, etc.) or by calling `/auth/mfa/verify` proactively.
  *
+ * This is *step-up* verification of an already-authenticated token — not the
+ * login second factor. A login that owes a second factor never reaches here:
+ * it gets a 403 `MFA_CHALLENGE_REQUIRED` and completes at
+ * {@see MfaChallengeController} with no token at all.
+ *
  * Flow:
  *  1. User logs in via POST /auth/login → receives Sanctum token
  *  2. User accesses protected route → 403 MFA_REQUIRED (if applicable)
  *  3. User calls GET /auth/mfa/status to discover configured methods
- *  4. User calls POST /auth/mfa/verify with TOTP code or email OTP
+ *  4. User calls POST /auth/mfa/verify with TOTP code, recovery code or email OTP
  *  5. Token is marked MFA-verified in cache for MFA_API_SESSION_LIFETIME minutes
  *  6. User retries protected route → granted
  */
-final class ApiMfaController
+final readonly class ApiMfaController
 {
+    public function __construct(private MfaService $mfa) {}
+
     /**
      * How long (minutes) the MFA verification is valid for a given token.
      * Defaults to 8 hours. Override via MFA_API_SESSION_LIFETIME env var.
      */
     private function sessionLifetime(): int
     {
-        return (int) config('auth.mfa_api_session_lifetime', 480);
+        return $this->mfa->apiSessionLifetime();
     }
 
     /**
@@ -49,7 +57,7 @@ final class ApiMfaController
     {
         $user = $request->user();
 
-        if ($user === null) {
+        if (!$user instanceof User) {
             return response()->json(['message' => 'Non authentifié.'], 401);
         }
 
@@ -58,9 +66,7 @@ final class ApiMfaController
             ? 'api_mfa_verified_'.$token->getKey()
             : null;
 
-        $hasTotpConfigured = $user->getAppAuthenticationSecret() !== null;
-        $hasEmailConfigured = $user->hasEmailAuthentication();
-        $hasMfaConfigured = $hasTotpConfigured || $hasEmailConfigured;
+        $hasMfaConfigured = $this->mfa->isEnabled($user);
 
         return response()->json([
             // Admins are forced to verify on admin routes (RequireApiMfa).
@@ -68,10 +74,8 @@ final class ApiMfaController
             'mfa_required' => $user->isAdmin() && $hasMfaConfigured,
             'mfa_configured' => $hasMfaConfigured,
             'mfa_verified' => $cacheKey !== null && Cache::has($cacheKey),
-            'methods' => array_filter([
-                $hasTotpConfigured ? 'totp' : null,
-                $hasEmailConfigured ? 'email' : null,
-            ]),
+            'methods' => $this->mfa->enabledMethods($user),
+            'recovery_codes_remaining' => $this->mfa->remainingRecoveryCodeCount($user),
         ]);
     }
 
@@ -79,14 +83,15 @@ final class ApiMfaController
      * Verify MFA code and mark the current token as MFA-verified.
      *
      * Accepts:
-     *  - method=totp + code: TOTP code from authenticator app
+     *  - method=totp + code: TOTP code from authenticator app (a single-use
+     *    recovery code is also accepted, for a lost/reset authenticator)
      *  - method=email: triggers email OTP and waits for code on second call
      */
     public function verify(VerifyMfaRequest $request): JsonResponse
     {
         $user = $request->user();
 
-        if ($user === null) {
+        if (!$user instanceof User) {
             return response()->json(['message' => 'Non authentifié.'], 401);
         }
 
@@ -94,10 +99,7 @@ final class ApiMfaController
         // Admins are forced into this flow by RequireApiMfa; non-admins opt in by
         // setting up TOTP/email via /auth/mfa/setup or by hitting a `step.up.mfa`
         // gated route.
-        $hasMfaConfigured = $user->getAppAuthenticationSecret() !== null
-            || $user->hasEmailAuthentication();
-
-        if (!$hasMfaConfigured) {
+        if (!$this->mfa->isEnabled($user)) {
             return response()->json([
                 'message' => 'Aucune méthode MFA configurée pour ce compte.',
                 'code' => 'MFA_NOT_CONFIGURED',
@@ -132,31 +134,28 @@ final class ApiMfaController
     }
 
     /**
-     * Verify TOTP code from authenticator app.
+     * Verify a TOTP code from the authenticator app, or a single-use recovery
+     * code for a user who lost it.
+     *
+     * Delegates to {@see MfaService} so the accepted window (±4 min) and the
+     * replay ledger are the same here, on the login challenge and in the
+     * Filament panel — a code accepted anywhere is spent everywhere.
      */
-    private function verifyTotp(Request $request, mixed $user, PersonalAccessToken $token, string $rateLimitKey): JsonResponse
+    private function verifyTotp(Request $request, User $user, PersonalAccessToken $token, string $rateLimitKey): JsonResponse
     {
-        $secret = $user->getAppAuthenticationSecret();
-
-        if ($secret === null) {
+        if (!$this->mfa->hasTotp($user)) {
             return response()->json(['message' => 'Authentification TOTP non configurée.'], 422);
         }
 
-        $code = (string) $request->input('code', '');
+        $code = trim((string) $request->input('code', ''));
 
         if ($code === '') {
             return response()->json(['message' => 'Le code TOTP est obligatoire.'], 422);
         }
 
-        $google2fa = app(Google2FA::class);
+        $usedMethod = $this->mfa->verifyTotpOrRecoveryCode($user, $code);
 
-        try {
-            $valid = $google2fa->verifyKey($secret, $code, 1);
-        } catch (\Throwable) {
-            $valid = false;
-        }
-
-        if (!$valid) {
+        if ($usedMethod === null) {
             RateLimiter::hit($rateLimitKey, 300);
 
             return response()->json(['message' => 'Code TOTP invalide ou expiré.'], 422);
@@ -168,6 +167,8 @@ final class ApiMfaController
         return response()->json([
             'message' => 'MFA vérifié avec succès.',
             'mfa_verified' => true,
+            'mfa_method' => $usedMethod,
+            'recovery_codes_remaining' => $this->mfa->remainingRecoveryCodeCount($user),
             'expires_in_minutes' => $this->sessionLifetime(),
         ]);
     }
@@ -178,13 +179,13 @@ final class ApiMfaController
      * First call (no code provided): sends OTP email and returns 202.
      * Second call (with code):       verifies the OTP and marks token as verified.
      */
-    private function verifyEmailOtp(Request $request, mixed $user, PersonalAccessToken $token, string $rateLimitKey): JsonResponse
+    private function verifyEmailOtp(Request $request, User $user, PersonalAccessToken $token, string $rateLimitKey): JsonResponse
     {
-        if (!$user->hasEmailAuthentication()) {
+        if (!$this->mfa->hasEmail($user)) {
             return response()->json(['message' => 'Authentification par email non configurée.'], 422);
         }
 
-        $code = (string) $request->input('code', '');
+        $code = trim((string) $request->input('code', ''));
         $otpCacheKey = 'api_mfa_email_otp_'.$token->getKey();
         $cooldownKey = 'api_mfa_email_cooldown_'.$token->getKey();
 
@@ -211,15 +212,16 @@ final class ApiMfaController
                 ));
 
             return response()->json([
-                'message' => 'Code envoyé à '.$this->maskEmail($user->email).'. Saisissez-le dans ce formulaire.',
+                'message' => 'Code envoyé à '.$this->mfa->maskEmail((string) $user->email).'. Saisissez-le dans ce formulaire.',
                 'code_sent' => true,
+                'masked_email' => $this->mfa->maskEmail((string) $user->email),
             ], 202);
         }
 
         // Code provided → verify
         $cachedOtp = Cache::get($otpCacheKey);
 
-        if ($cachedOtp === null || !hash_equals($cachedOtp, $code)) {
+        if (!is_string($cachedOtp) || !hash_equals($cachedOtp, $code)) {
             RateLimiter::hit($rateLimitKey, 300);
 
             return response()->json(['message' => 'Code invalide ou expiré.'], 422);
@@ -233,24 +235,13 @@ final class ApiMfaController
         return response()->json([
             'message' => 'MFA vérifié avec succès.',
             'mfa_verified' => true,
+            'mfa_method' => MfaService::METHOD_EMAIL,
             'expires_in_minutes' => $this->sessionLifetime(),
         ]);
     }
 
     private function markVerified(PersonalAccessToken $token): void
     {
-        Cache::put(
-            'api_mfa_verified_'.$token->getKey(),
-            true,
-            now()->addMinutes($this->sessionLifetime()),
-        );
-    }
-
-    private function maskEmail(string $email): string
-    {
-        [$local, $domain] = explode('@', $email, 2);
-        $masked = mb_substr($local, 0, 1).str_repeat('*', max(3, mb_strlen($local) - 1));
-
-        return $masked.'@'.$domain;
+        $this->mfa->markTokenVerified((string) $token->getKey());
     }
 }

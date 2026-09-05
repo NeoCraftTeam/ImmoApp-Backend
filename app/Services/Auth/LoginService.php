@@ -7,6 +7,7 @@ namespace App\Services\Auth;
 use App\DTOs\LoginResult;
 use App\Exceptions\AccountInactiveException;
 use App\Exceptions\EmailNotVerifiedException;
+use App\Exceptions\MfaChallengeRequiredException;
 use App\Exceptions\RoleContextMismatchException;
 use App\Http\Requests\LoginRequest;
 use App\Mail\NewDeviceSignInMail;
@@ -19,6 +20,7 @@ use App\Support\AuthError;
 use App\Support\FrontendRedirectGuard;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -30,6 +32,8 @@ final readonly class LoginService
     public function __construct(
         private TokenService $tokenService,
         private TurnstileService $turnstile,
+        private MfaService $mfa,
+        private MfaChallengeService $challenges,
     ) {}
 
     /**
@@ -40,6 +44,9 @@ final readonly class LoginService
      * @throws AccountInactiveException
      * @throws EmailNotVerifiedException
      * @throws RoleContextMismatchException
+     * @throws MfaChallengeRequiredException When 2FA is enabled: no token is
+     *                                       issued and no login side effect runs
+     *                                       until the second factor is cleared.
      */
     public function authenticate(LoginRequest $request): LoginResult
     {
@@ -123,10 +130,46 @@ final readonly class LoginService
             );
         }
 
-        $loginContext = $request->input('login_context', 'client');
+        $loginContextInput = $request->input('login_context', 'client');
+        $loginContext = is_string($loginContextInput) ? $loginContextInput : 'client';
         $this->enforceRoleContext($user, $loginContext);
 
+        // Second factor due: stop here. The rate-limit key is deliberately NOT
+        // cleared — the challenge keeps spending it, so minting a new challenge
+        // cannot be used to reset the 5-attempts-per-5-minutes budget.
+        if ($this->mfa->isEnabled($user)) {
+            Log::info('Login awaiting second factor', [
+                'user_id' => $user->id,
+                'methods' => $this->mfa->enabledMethods($user),
+                'ip' => $request->ip(),
+            ]);
+
+            throw new MfaChallengeRequiredException($this->challenges->issue(
+                user: $user,
+                source: MfaChallengeService::SOURCE_PASSWORD,
+                loginContext: $loginContext,
+                stateful: $request->hasSession(),
+                throttleKey: $key,
+            ));
+        }
+
         RateLimiter::clear($key);
+
+        return $this->completeLogin($user, $request, $loginContext);
+    }
+
+    /**
+     * Everything a successful password login does *after* every factor passed:
+     * rotate the API token, warn about a new device/location, journal the login.
+     *
+     * Extracted so the MFA challenge endpoint produces exactly the same state as
+     * a login that never needed a second factor — one code path, no drift.
+     *
+     * @throws RoleContextMismatchException
+     */
+    public function completeLogin(User $user, Request $request, string $loginContext = 'client'): LoginResult
+    {
+        $this->enforceRoleContext($user, $loginContext);
 
         $token = $this->rotateApiTokenForLoginContext($user, $loginContext);
 
@@ -135,7 +178,7 @@ final readonly class LoginService
 
         Log::info('Successful login', [
             'user_id' => $user->id,
-            'email' => $email,
+            'email' => $user->email,
             'is_spa' => $request->hasSession(),
             'ip' => $request->ip(),
             'user_agent' => $request->userAgent(),
@@ -216,7 +259,7 @@ final readonly class LoginService
         }
     }
 
-    private function recordLogin(User $user, LoginRequest $request): void
+    private function recordLogin(User $user, Request $request): void
     {
         $user->forceFill([
             'last_login_at' => now(),
@@ -244,7 +287,7 @@ final readonly class LoginService
         ]);
     }
 
-    private function detectNewLocation(User $user, LoginRequest $request): void
+    private function detectNewLocation(User $user, Request $request): void
     {
         $currentIp = $request->ip();
         $cfCountry = $request->header('CF-IPCountry', '');

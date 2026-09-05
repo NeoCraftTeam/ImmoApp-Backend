@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use App\Services\Auth\MfaService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Mail;
@@ -57,7 +58,11 @@ it('issues a TOTP secret + otpauth url to a customer', function (): void {
     $response = $this->postJson('/api/v1/auth/mfa/setup/totp/start');
 
     $response->assertOk()
-        ->assertJsonStructure(['secret', 'otpauth_url', 'holder', 'company', 'expires_in_minutes']);
+        ->assertJsonStructure(['secret', 'otpauth_url', 'qr_code', 'holder', 'company', 'expires_in_minutes']);
+
+    // The QR is rendered server-side so no client has to ship a QR library.
+    expect($response->json('qr_code'))->toStartWith('data:image/svg+xml;base64,')
+        ->and($response->json('otpauth_url'))->toStartWith('otpauth://totp/');
 
     // Secret stays pending — never persisted yet.
     expect($customer->fresh()->getAppAuthenticationSecret())->toBeNull();
@@ -102,6 +107,13 @@ it('confirms TOTP setup, persists secret, returns recovery codes', function (): 
     expect($response->json('recovery_codes'))->toHaveCount(8);
     expect($customer->fresh()->getAppAuthenticationSecret())->toBe($secret);
     expect($customer->fresh()->getAppAuthenticationRecoveryCodes())->toHaveCount(8);
+
+    // Codes are stored bcrypt-hashed — a DB dump does not hand them over — yet
+    // the plaintext just shown to the user still verifies against them.
+    $stored = $customer->fresh()->getAppAuthenticationRecoveryCodes();
+    $plaintext = $response->json('recovery_codes');
+    expect($stored)->not->toContain($plaintext[0]);
+    expect(app(MfaService::class)->verifyRecoveryCode($customer->fresh(), $plaintext[0]))->toBeTrue();
 
     // Pending cache must be cleared once confirmed.
     expect(Cache::has('mfa_pending_totp:'.$customer->id))->toBeFalse();
@@ -311,17 +323,32 @@ it('disables email MFA via a two-step confirm flow', function (): void {
 
 it('lets a customer verify TOTP via /auth/mfa/verify after login', function (): void {
     $google2fa = app(Google2FA::class);
+    $mfa = app(MfaService::class);
     $customer = User::factory()->customers()->create(['password' => bcrypt('Password123@')]);
     $secret = $google2fa->generateSecretKey(32);
     $customer->saveAppAuthenticationSecret($secret);
 
-    // Real Sanctum token (not actingAs) so currentAccessToken() returns a PAT.
+    $codes = $mfa->generateRecoveryCodes();
+    $mfa->saveRecoveryCodes($customer, $codes);
+
+    // Enrolling in TOTP turns login into a two-step flow: the password only
+    // buys a challenge ticket now.
     $login = $this->postJson('/api/v1/auth/login', [
         'email' => $customer->email,
         'password' => 'Password123@',
     ]);
-    $token = $login->json('access_token');
 
+    $login->assertStatus(403)->assertJsonPath('code', 'MFA_CHALLENGE_REQUIRED');
+
+    // Cleared with a recovery code on purpose: a TOTP spent here would be
+    // rejected by the shared replay ledger on the step-up call below.
+    $token = $this->postJson('/api/v1/auth/mfa/challenge', [
+        'mfa_token' => $login->json('mfa_token'),
+        'method' => 'recovery',
+        'code' => $codes[0],
+    ])->assertOk()->json('access_token');
+
+    // Real Sanctum token (not actingAs) so currentAccessToken() returns a PAT.
     $response = $this->withHeader('Authorization', "Bearer {$token}")
         ->postJson('/api/v1/auth/mfa/verify', [
             'method' => 'totp',
@@ -329,7 +356,46 @@ it('lets a customer verify TOTP via /auth/mfa/verify after login', function (): 
         ]);
 
     $response->assertOk()
-        ->assertJsonPath('mfa_verified', true);
+        ->assertJsonPath('mfa_verified', true)
+        ->assertJsonPath('mfa_method', 'totp')
+        ->assertJsonPath('recovery_codes_remaining', 7);
+});
+
+it('accepts a recovery code on /auth/mfa/verify for a lost authenticator', function (): void {
+    $mfa = app(MfaService::class);
+    $customer = User::factory()->customers()->create();
+    $customer->saveAppAuthenticationSecret(app(Google2FA::class)->generateSecretKey(32));
+    $codes = $mfa->generateRecoveryCodes();
+    $mfa->saveRecoveryCodes($customer, $codes);
+
+    $token = $customer->createToken('client_token_test', ['*'], now()->addDay())->plainTextToken;
+
+    $verify = fn (string $code) => $this->withHeader('Authorization', "Bearer {$token}")
+        ->postJson('/api/v1/auth/mfa/verify', ['method' => 'totp', 'code' => $code]);
+
+    $verify($codes[0])
+        ->assertOk()
+        ->assertJsonPath('mfa_method', 'recovery')
+        ->assertJsonPath('recovery_codes_remaining', 7);
+
+    // Single-use: the very same code is worthless now.
+    $verify($codes[0])->assertStatus(422);
+});
+
+it('refuses to replay a TOTP code already accepted by /auth/mfa/verify', function (): void {
+    $google2fa = app(Google2FA::class);
+    $customer = User::factory()->customers()->create();
+    $secret = $google2fa->generateSecretKey(32);
+    $customer->saveAppAuthenticationSecret($secret);
+
+    $token = $customer->createToken('client_token_test', ['*'], now()->addDay())->plainTextToken;
+    $code = (string) $google2fa->getCurrentOtp($secret);
+
+    $verify = fn () => $this->withHeader('Authorization', "Bearer {$token}")
+        ->postJson('/api/v1/auth/mfa/verify', ['method' => 'totp', 'code' => $code]);
+
+    $verify()->assertOk()->assertJsonPath('mfa_verified', true);
+    $verify()->assertStatus(422);
 });
 
 it('rejects /auth/mfa/verify when the user has no MFA configured', function (): void {
