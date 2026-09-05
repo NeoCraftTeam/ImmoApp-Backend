@@ -413,9 +413,12 @@ BACKUP_ARCHIVE_PASSWORD=             # ⚠️  chiffrement AES-256 de l'archive
 BACKUP_VERIFY=true                   # ouvre le zip après création
 ```
 
-Planification (`routes/console.php`, heures UTC) : `backup:run --only-db` à 02:00
-chaque jour, `backup:run --only-files` le dimanche à 02:20, `backup:clean` à 03:00,
-`backup:monitor` à 04:00. Les sorties sont tracées dans `storage/logs/backup.log`.
+Planification (`routes/console.php`, heures UTC) : `backup:run --only-db` toutes
+les six heures (02:00, 08:00, 14:00, 20:00), `backup:run --only-files` le dimanche
+à 02:20, `backup:clean` à 03:00, `backup:monitor` à 04:00. Les sorties sont
+tracées dans `storage/logs/backup.log`. Ces expressions cron sont verrouillées
+par `tests/Feature/BackupRetentionTest.php` : les modifier sans mettre le test à
+jour fait échouer la suite.
 
 L'archive de fichiers ne contient que `storage/app` : le code vient de l'image
 Docker et les médias de production vivent sur R2. `.env` est donc volontairement
@@ -423,9 +426,13 @@ exclu — aucun secret ne part sur le bucket. Sont également exclus
 `firebase-credentials.json`, `seeder-images`, `private/osm` (extrait Geofabrik
 re-téléchargeable) et `private/backups`.
 
-Seuls les échecs déclenchent un email Spatie ; le signal quotidien de bonne
-santé est l'email de `SendBackupByEmailListener`, qui prouve à la fois que
-l'archive existe et qu'elle est téléchargeable.
+Seuls les échecs déclenchent un email Spatie. Le signal de bonne santé est
+l'email de `SendBackupByEmailListener`, qui prouve à la fois que l'archive existe
+et qu'elle est téléchargeable. Les quatre dumps quotidiens ne produisent qu'**un
+seul** message par jour civil : le verrou (`Cache::add`, atomique) n'est posé
+qu'après l'obtention du lien signé, donc si R2 est indisponible à 02:00,
+l'exécution de 08:00 peut encore prévenir. Un canal saturé de succès est un canal
+où l'échec passe inaperçu.
 
 #### Restaurer une archive
 
@@ -446,6 +453,22 @@ $z->setPassword(getenv("BACKUP_ARCHIVE_PASSWORD")); var_dump($z->extractTo($argv
 # puis, pour une archive de base :
 psql "$DATABASE_URL" -f /var/www/db-dumps/postgresql-keyhome.sql
 ```
+
+Trois pièges, vérifiés lors du test de restauration du 2026-09-05 (base montée
+dans un conteneur `postgis/postgis` jetable, sur le réseau Docker de la prod) :
+
+1. **Utiliser le client `psql` du conteneur applicatif** (18.6), pas celui du
+   serveur PostgreSQL cible (15). Le dump est produit par `pg_dump` 18.6 et
+   contient `\restrict` et `SET transaction_timeout`, que `psql` 15 rejette.
+2. **Créer le rôle propriétaire avant le chargement** sur une base neuve
+   (`CREATE ROLE cedrick;`), sinon chaque `ALTER … OWNER TO` échoue.
+3. **Ne jamais faire passer la sortie de `psql` dans un `head`** (ni `grep -m`) :
+   la fermeture du tube envoie un SIGPIPE qui interrompt le chargement au bout de
+   quelques dizaines de lignes et laisse une base vide sans message d'erreur.
+   Rediriger vers un fichier, puis le lire.
+
+Contrôle de conformité après restauration : nombre de tables, de migrations, de
+contraintes et d'index, puis quelques comptages métier (`users`, `ad`, `media`).
 
 Sans mot de passe valide l'extraction échoue : une archive chiffrée dont la
 passphrase est perdue est définitivement illisible. Conserver
